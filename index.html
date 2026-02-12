@@ -171,11 +171,24 @@
         };
 
         let supabase = null;
-        try {
-          const { createClient } = window.supabase;
-          supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
-        } catch (error) {
-          console.error('Failed to initialize Supabase:', error);
+        
+        // Lazy initialize Supabase
+        function getSupabase() {
+          if (supabase) return supabase;
+          
+          if (window.supabase && window.supabase.createClient) {
+            try {
+              supabase = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+              console.log('Supabase initialized');
+              return supabase;
+            } catch (error) {
+              console.error('Failed to initialize Supabase:', error);
+              return null;
+            }
+          }
+          
+          console.warn('Supabase library not loaded yet');
+          return null;
         }
 
         class DataService {
@@ -190,11 +203,11 @@
               this.useSupabase = false;
               return;
             }
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await getSupabase().auth.getUser();
             if (user) {
               this.user = user;
               this.useSupabase = true;
-              const { data: profile } = await supabase.from('profiles').select('is_owner').eq('id', user.id).single();
+              const { data: profile } = await getSupabase().from('profiles').select('is_owner').eq('id', user.id).single();
               this.isOwner = profile?.is_owner || false;
             } else {
               this.useSupabase = false;
@@ -206,7 +219,7 @@
               const saved = localStorage.getItem('evData');
               return saved ? (JSON.parse(saved).vehicles || []) : [];
             }
-            const { data } = await supabase.from('vehicles').select(`*, runs(*)`).order('created_at', { ascending: false });
+            const { data } = await getSupabase().from('vehicles').select(`*, runs(*)`).order('created_at', { ascending: false });
             return data || [];
           }
 
@@ -219,7 +232,7 @@
               localStorage.setItem('evData', JSON.stringify(data));
               return newVehicle;
             }
-            const { data, error } = await supabase.from('vehicles').insert({
+            const { data, error } = await getSupabase().from('vehicles').insert({
               user_id: this.user.id, name: vehicle.name, make: vehicle.make, model: vehicle.model, year: vehicle.year,
               battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
               range: vehicle.range ? parseFloat(vehicle.range) : null,
@@ -238,7 +251,7 @@
               localStorage.setItem('evData', JSON.stringify(data));
               return;
             }
-            const { error } = await supabase.from('vehicles').update({
+            const { error } = await getSupabase().from('vehicles').update({
               name: updates.name, make: updates.make, model: updates.model, year: updates.year,
               battery: updates.battery ? parseFloat(updates.battery) : null,
               range: updates.range ? parseFloat(updates.range) : null,
@@ -256,7 +269,7 @@
               localStorage.setItem('evData', JSON.stringify(data));
               return;
             }
-            const { error } = await supabase.from('vehicles').delete().eq('id', vehicleId);
+            const { error } = await getSupabase().from('vehicles').delete().eq('id', vehicleId);
             if (error) throw error;
           }
 
@@ -272,7 +285,7 @@
               localStorage.setItem('evData', JSON.stringify(data));
               return newRun;
             }
-            const { data: newRun, error } = await supabase.from('runs').insert({
+            const { data: newRun, error } = await getSupabase().from('runs').insert({
               vehicle_id: vehicleId, name: run.name, date: run.date,
               software_version: run.softwareVersion, conditions: run.conditions,
               color: run.color || '#3b82f6', is_default: run.isDefault || false
@@ -286,7 +299,7 @@
                   soc: point.soc, charge_rate: point.chargeRate,
                   time_value: point.time, range_value: point.range, temperature: point.temperature
                 }));
-                await supabase.from('data_points').insert(batch);
+                await getSupabase().from('data_points').insert(batch);
               }
             }
             return { ...newRun, data: run.data };
@@ -302,7 +315,7 @@
               localStorage.setItem('evData', JSON.stringify(data));
               return;
             }
-            const { error } = await supabase.from('runs').update({
+            const { error } = await getSupabase().from('runs').update({
               name: updates.name, date: updates.date,
               software_version: updates.softwareVersion, conditions: updates.conditions, color: updates.color
             }).eq('id', runId);
@@ -319,7 +332,7 @@
               localStorage.setItem('evData', JSON.stringify(data));
               return;
             }
-            const { error } = await supabase.from('runs').update({ is_default: true }).eq('id', runId);
+            const { error } = await getSupabase().from('runs').update({ is_default: true }).eq('id', runId);
             if (error) throw error;
           }
 
@@ -333,7 +346,7 @@
               localStorage.setItem('evData', JSON.stringify(data));
               return;
             }
-            const { error } = await supabase.from('runs').update({ color }).eq('id', runId);
+            const { error } = await getSupabase().from('runs').update({ color }).eq('id', runId);
             if (error) throw error;
           }
 
@@ -347,7 +360,7 @@
               localStorage.setItem('evData', JSON.stringify(data));
               return;
             }
-            const { error } = await supabase.from('runs').delete().eq('id', runId);
+            const { error } = await getSupabase().from('runs').delete().eq('id', runId);
             if (error) throw error;
           }
 
@@ -371,23 +384,10 @@
             localStorage.setItem('selectedVehicles', JSON.stringify(vehicleIds));
           }
 
-          async signUp(email, password, fullName) {
-            const { data, error } = await supabase.auth.signUp({
-              email, password, options: { data: { full_name: fullName } }
-            });
-            if (error) throw error;
-            return data;
-          }
-
-          async signIn(email, password) {
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) throw error;
-            await this.initialize();
-            return data;
-          }
-
           async signOut() {
-            const { error } = await supabase.auth.signOut();
+            const supabase = getSupabase();
+            if (!supabase) return;
+            const { error } = await getSupabase().auth.signOut();
             if (error) throw error;
             this.user = null;
             this.isOwner = false;
@@ -397,31 +397,32 @@
 
         const dataService = new DataService();
 
-        // Auth Modal Component
+        // Auth Modal Component - OAuth Version
         function AuthModal({ onClose, onAuthSuccess }) {
-            const [mode, setMode] = useState('signin');
-            const [email, setEmail] = useState('');
-            const [password, setPassword] = useState('');
-            const [fullName, setFullName] = useState('');
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState('');
 
-            const handleSubmit = async (e) => {
-                e.preventDefault();
+            const handleOAuthSignIn = async (provider) => {
                 setLoading(true);
                 setError('');
                 try {
-                    if (mode === 'signup') {
-                        await dataService.signUp(email, password, fullName);
-                        alert('Sign up successful! Please check your email to confirm your account.');
-                        setMode('signin');
-                    } else {
-                        await dataService.signIn(email, password);
-                        onAuthSuccess();
+                    const supabase = getSupabase();
+                    if (!supabase) {
+                        throw new Error('Authentication service not available');
                     }
+                    
+                    const { data, error } = await getSupabase().auth.signInWithOAuth({
+                        provider: provider,
+                        options: {
+                            redirectTo: window.location.origin
+                        }
+                    });
+                    
+                    if (error) throw error;
+                    
+                    // OAuth redirect happens automatically, no need to call onAuthSuccess here
                 } catch (err) {
                     setError(err.message);
-                } finally {
                     setLoading(false);
                 }
             };
@@ -430,40 +431,46 @@
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
                     <div className="bg-white rounded-lg p-8 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold">{mode === 'signin' ? 'Sign In' : 'Sign Up'}</h2>
+                            <h2 className="text-2xl font-bold">Sign In</h2>
                             <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">×</button>
                         </div>
+                        
                         {error && (
-                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
+                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                                {error}
+                            </div>
                         )}
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            {mode === 'signup' && (
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Full Name</label>
-                                    <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)}
-                                        className="w-full border p-2 rounded" required />
-                                </div>
-                            )}
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Email</label>
-                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full border p-2 rounded" required />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Password</label>
-                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full border p-2 rounded" minLength={6} required />
-                            </div>
-                            <button type="submit" disabled={loading} className="w-full btn btn-primary">
-                                {loading ? 'Loading...' : (mode === 'signin' ? 'Sign In' : 'Sign Up')}
+
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => handleOAuthSignIn('github')}
+                                disabled={loading}
+                                className="w-full flex items-center justify-center gap-3 bg-gray-800 hover:bg-gray-900 text-white font-medium py-3 px-4 rounded-lg transition"
+                            >
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                                </svg>
+                                {loading ? 'Signing in...' : 'Continue with GitHub'}
                             </button>
-                        </form>
-                        <div className="mt-4 text-center">
-                            <button onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-                                className="text-blue-600 hover:underline">
-                                {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+
+                            <button
+                                onClick={() => handleOAuthSignIn('google')}
+                                disabled={loading}
+                                className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-800 font-medium py-3 px-4 rounded-lg border-2 border-gray-300 transition"
+                            >
+                                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                </svg>
+                                {loading ? 'Signing in...' : 'Continue with Google'}
                             </button>
                         </div>
+
+                        <p className="text-xs text-gray-500 text-center mt-6">
+                            By signing in, you agree to our terms of service and privacy policy
+                        </p>
                     </div>
                 </div>
             );
