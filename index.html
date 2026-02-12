@@ -9,7 +9,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* ========================================
@@ -203,7 +203,13 @@
         
         // Try to initialize immediately when script runs
         setTimeout(() => {
-          getSupabase();
+          const client = getSupabase();
+          if (client) {
+            console.log('✅ Supabase ready for use');
+          } else {
+            console.error('❌ Supabase failed to initialize. Check if library loaded correctly.');
+            console.log('window.supabase =', window.supabase);
+          }
         }, 100);
 
         class DataService {
