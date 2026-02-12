@@ -1,0 +1,1837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Data Visualization</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ========================================
+           CUSTOMIZATION GUIDE
+           ========================================
+           
+           All colors, button styles, and UI elements are defined here.
+           To customize the look and feel of the app, edit the variables and classes below.
+           
+           QUICK CUSTOMIZATION:
+           1. Color Scheme: Edit CSS variables in :root section
+           2. Button Styles: Edit .btn-* classes
+           3. Cards & Layout: Edit .card class
+           
+           ======================================== */
+        
+        /* Color Scheme Variables */
+        :root {
+            /* Primary color (main actions: Add, Save, View) */
+            --color-primary: rgb(59, 130, 246);
+            --color-primary-hover: rgb(37, 99, 235);
+            --color-primary-light: rgb(219, 234, 254);
+            --color-primary-text: rgb(30, 64, 175);
+            
+            /* Success/Edit color (Edit buttons) */
+            --color-success: rgb(34, 197, 94);
+            --color-success-hover: rgb(22, 163, 74);
+            
+            /* Danger color (Delete buttons) */
+            --color-danger: rgb(239, 68, 68);
+            --color-danger-hover: rgb(220, 38, 38);
+            
+            /* Secondary color (Cancel, Back buttons) */
+            --color-secondary: rgb(107, 114, 128);
+            --color-secondary-hover: rgb(75, 85, 99);
+            
+            /* Edit button specific (defaults to success color) */
+            --color-edit: rgb(34, 197, 94);
+            --color-edit-hover: rgb(22, 163, 74);
+            
+            /* Background and layout colors */
+            --color-background: rgb(249, 250, 251);
+            --color-card: rgb(255, 255, 255);
+            --color-border: rgb(229, 231, 235);
+        }
+        
+        /* Base Button Styles - All buttons inherit these */
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+            border: none;
+            display: inline-block;
+            text-align: center;
+        }
+        
+        /* Primary Button - Used for: Add Vehicle, Save, View Runs, Import Run */
+        .btn-primary {
+            background-color: var(--color-primary);
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: var(--color-primary-hover);
+        }
+        
+        /* Edit Button - Used for: All Edit actions */
+        .btn-edit {
+            background-color: var(--color-edit);
+            color: white;
+        }
+        .btn-edit:hover {
+            background-color: var(--color-edit-hover);
+        }
+        
+        /* Danger Button - Used for: All Delete actions */
+        .btn-danger {
+            background-color: var(--color-danger);
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: var(--color-danger-hover);
+        }
+        
+        /* Secondary Button - Used for: Cancel, Back, Import Data */
+        .btn-secondary {
+            background-color: var(--color-secondary);
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: var(--color-secondary-hover);
+        }
+        
+        /* Tab/Navigation Button - Used for: Top navigation tabs */
+        .btn-tab {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            cursor: pointer;
+            color: rgb(75, 85, 99);
+            background-color: transparent;
+        }
+        .btn-tab:hover {
+            background-color: rgb(243, 244, 246);
+        }
+        .btn-tab.active {
+            background-color: var(--color-primary-light);
+            color: var(--color-primary-text);
+        }
+        .btn-tab:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Background and Card Styles */
+        body {
+            background-color: var(--color-background);
+        }
+        
+        .card {
+            background-color: var(--color-card);
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+        }
+        
+        .card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Utility to parse CSV
+        const parseCSV = (file) => {
+            return new Promise((resolve, reject) => {
+                Papa.parse(file, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true,
+                    complete: (results) => resolve(results),
+                    error: (error) => reject(error)
+                });
+            });
+        };
+
+        // ============================================================================
+        // SUPABASE CONFIGURATION & DATA SERVICE
+        // ============================================================================
+
+        const SUPABASE_CONFIG = {
+          url: 'https://hgjseiqsdijvieemhfqd.supabase.co',
+          anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhnanNlaXFzZGlqdmllZW1oZnFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NzE3NDQsImV4cCI6MjA4NjQ0Nzc0NH0.SRJ7krjxWOWg9obOVuGec7OsKUUwWEP-RHnfWPid6dY'
+        };
+
+        const supabase = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+
+        class DataService {
+          constructor() {
+            this.user = null;
+            this.isOwner = false;
+            this.useSupabase = false;
+          }
+
+          async initialize() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              this.user = user;
+              this.useSupabase = true;
+              const { data: profile } = await supabase.from('profiles').select('is_owner').eq('id', user.id).single();
+              this.isOwner = profile?.is_owner || false;
+            } else {
+              this.useSupabase = false;
+            }
+          }
+
+          async getVehicles() {
+            if (!this.useSupabase) {
+              const saved = localStorage.getItem('evData');
+              return saved ? (JSON.parse(saved).vehicles || []) : [];
+            }
+            const { data } = await supabase.from('vehicles').select(`*, runs(*)`).order('created_at', { ascending: false });
+            return data || [];
+          }
+
+          async addVehicle(vehicle) {
+            if (!this.useSupabase) {
+              const saved = localStorage.getItem('evData');
+              const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
+              const newVehicle = { ...vehicle, id: Date.now(), runs: [] };
+              data.vehicles.push(newVehicle);
+              localStorage.setItem('evData', JSON.stringify(data));
+              return newVehicle;
+            }
+            const { data, error } = await supabase.from('vehicles').insert({
+              user_id: this.user.id, name: vehicle.name, make: vehicle.make, model: vehicle.model, year: vehicle.year,
+              battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
+              range: vehicle.range ? parseFloat(vehicle.range) : null,
+              power: vehicle.power ? parseFloat(vehicle.power) : null,
+              visibility: this.isOwner ? 'public' : 'private'
+            }).select().single();
+            if (error) throw error;
+            return { ...data, runs: [] };
+          }
+
+          async updateVehicle(vehicleId, updates) {
+            if (!this.useSupabase) {
+              const saved = localStorage.getItem('evData');
+              const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
+              data.vehicles = data.vehicles.map(v => v.id === vehicleId ? { ...v, ...updates } : v);
+              localStorage.setItem('evData', JSON.stringify(data));
+              return;
+            }
+            const { error } = await supabase.from('vehicles').update({
+              name: updates.name, make: updates.make, model: updates.model, year: updates.year,
+              battery: updates.battery ? parseFloat(updates.battery) : null,
+              range: updates.range ? parseFloat(updates.range) : null,
+              power: updates.power ? parseFloat(updates.power) : null
+            }).eq('id', vehicleId);
+            if (error) throw error;
+          }
+
+          async deleteVehicle(vehicleId) {
+            if (!this.useSupabase) {
+              const saved = localStorage.getItem('evData');
+              const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
+              data.vehicles = data.vehicles.filter(v => v.id !== vehicleId);
+              data.selectedVehicles = data.selectedVehicles.filter(id => id !== vehicleId);
+              localStorage.setItem('evData', JSON.stringify(data));
+              return;
+            }
+            const { error } = await supabase.from('vehicles').delete().eq('id', vehicleId);
+            if (error) throw error;
+          }
+
+          async addRun(vehicleId, run) {
+            if (!this.useSupabase) {
+              const saved = localStorage.getItem('evData');
+              const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
+              const vehicle = data.vehicles.find(v => v.id === vehicleId);
+              const runCount = vehicle?.runs?.length || 0;
+              const colorPalette = ['#3b82f6', '#ef4444', '#22c55e', '#a855f7', '#fb923c', '#0ea5e9', '#ec4899', '#84cc16'];
+              const newRun = { ...run, id: Date.now(), color: colorPalette[runCount % colorPalette.length] };
+              data.vehicles = data.vehicles.map(v => v.id === vehicleId ? { ...v, runs: [...(v.runs || []), newRun] } : v);
+              localStorage.setItem('evData', JSON.stringify(data));
+              return newRun;
+            }
+            const { data: newRun, error } = await supabase.from('runs').insert({
+              vehicle_id: vehicleId, name: run.name, date: run.date,
+              software_version: run.softwareVersion, conditions: run.conditions,
+              color: run.color || '#3b82f6', is_default: run.isDefault || false
+            }).select().single();
+            if (error) throw error;
+            if (run.data?.length > 0) {
+              const batchSize = 1000;
+              for (let i = 0; i < run.data.length; i += batchSize) {
+                const batch = run.data.slice(i, i + batchSize).map(point => ({
+                  run_id: newRun.id, frame: point.frame, timestamp: point.timestamp,
+                  soc: point.soc, charge_rate: point.chargeRate,
+                  time_value: point.time, range_value: point.range, temperature: point.temperature
+                }));
+                await supabase.from('data_points').insert(batch);
+              }
+            }
+            return { ...newRun, data: run.data };
+          }
+
+          async updateRun(vehicleId, runId, updates) {
+            if (!this.useSupabase) {
+              const saved = localStorage.getItem('evData');
+              const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
+              data.vehicles = data.vehicles.map(v => 
+                v.id === vehicleId ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, ...updates } : r) } : v
+              );
+              localStorage.setItem('evData', JSON.stringify(data));
+              return;
+            }
+            const { error } = await supabase.from('runs').update({
+              name: updates.name, date: updates.date,
+              software_version: updates.softwareVersion, conditions: updates.conditions, color: updates.color
+            }).eq('id', runId);
+            if (error) throw error;
+          }
+
+          async setDefaultRun(vehicleId, runId) {
+            if (!this.useSupabase) {
+              const saved = localStorage.getItem('evData');
+              const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
+              data.vehicles = data.vehicles.map(v => 
+                v.id === vehicleId ? { ...v, runs: v.runs.map(r => ({ ...r, isDefault: r.id === runId }))} : v
+              );
+              localStorage.setItem('evData', JSON.stringify(data));
+              return;
+            }
+            const { error } = await supabase.from('runs').update({ is_default: true }).eq('id', runId);
+            if (error) throw error;
+          }
+
+          async updateRunColor(vehicleId, runId, color) {
+            if (!this.useSupabase) {
+              const saved = localStorage.getItem('evData');
+              const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
+              data.vehicles = data.vehicles.map(v => 
+                v.id === vehicleId ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, color } : r) } : v
+              );
+              localStorage.setItem('evData', JSON.stringify(data));
+              return;
+            }
+            const { error } = await supabase.from('runs').update({ color }).eq('id', runId);
+            if (error) throw error;
+          }
+
+          async deleteRun(vehicleId, runId) {
+            if (!this.useSupabase) {
+              const saved = localStorage.getItem('evData');
+              const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
+              data.vehicles = data.vehicles.map(v => 
+                v.id === vehicleId ? { ...v, runs: v.runs.filter(r => r.id !== runId) } : v
+              );
+              localStorage.setItem('evData', JSON.stringify(data));
+              return;
+            }
+            const { error } = await supabase.from('runs').delete().eq('id', runId);
+            if (error) throw error;
+          }
+
+          async getSelectedVehicles() {
+            if (!this.useSupabase) {
+              const saved = localStorage.getItem('evData');
+              return saved ? (JSON.parse(saved).selectedVehicles || []) : [];
+            }
+            const saved = localStorage.getItem('selectedVehicles');
+            return saved ? JSON.parse(saved) : [];
+          }
+
+          async setSelectedVehicles(vehicleIds) {
+            if (!this.useSupabase) {
+              const saved = localStorage.getItem('evData');
+              const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
+              data.selectedVehicles = vehicleIds;
+              localStorage.setItem('evData', JSON.stringify(data));
+              return;
+            }
+            localStorage.setItem('selectedVehicles', JSON.stringify(vehicleIds));
+          }
+
+          async signUp(email, password, fullName) {
+            const { data, error } = await supabase.auth.signUp({
+              email, password, options: { data: { full_name: fullName } }
+            });
+            if (error) throw error;
+            return data;
+          }
+
+          async signIn(email, password) {
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+            await this.initialize();
+            return data;
+          }
+
+          async signOut() {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+            this.user = null;
+            this.isOwner = false;
+            this.useSupabase = false;
+          }
+        }
+
+        const dataService = new DataService();
+
+        // Auth Modal Component
+        function AuthModal({ onClose, onAuthSuccess }) {
+            const [mode, setMode] = useState('signin');
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [fullName, setFullName] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setError('');
+                try {
+                    if (mode === 'signup') {
+                        await dataService.signUp(email, password, fullName);
+                        alert('Sign up successful! Please check your email to confirm your account.');
+                        setMode('signin');
+                    } else {
+                        await dataService.signIn(email, password);
+                        onAuthSuccess();
+                    }
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+                    <div className="bg-white rounded-lg p-8 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold">{mode === 'signin' ? 'Sign In' : 'Sign Up'}</h2>
+                            <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                        </div>
+                        {error && (
+                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
+                        )}
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {mode === 'signup' && (
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Full Name</label>
+                                    <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)}
+                                        className="w-full border p-2 rounded" required />
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Email</label>
+                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full border p-2 rounded" required />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Password</label>
+                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full border p-2 rounded" minLength={6} required />
+                            </div>
+                            <button type="submit" disabled={loading} className="w-full btn btn-primary">
+                                {loading ? 'Loading...' : (mode === 'signin' ? 'Sign In' : 'Sign Up')}
+                            </button>
+                        </form>
+                        <div className="mt-4 text-center">
+                            <button onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+                                className="text-blue-600 hover:underline">
+                                {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main App Component
+        function App() {
+            const [vehicles, setVehicles] = useState([]);
+            const [selectedVehicles, setSelectedVehicles] = useState([]);
+            const [activeVehicle, setActiveVehicle] = useState(null);
+            const [view, setView] = useState('vehicles');
+            const [chartConfig, setChartConfig] = useState({
+                xAxis: 'soc',
+                yAxis: 'chargeRate',
+                selectedRuns: []
+            });
+            
+            // Auth state
+            const [user, setUser] = useState(null);
+            const [isOwner, setIsOwner] = useState(false);
+            const [loading, setLoading] = useState(true);
+            const [showAuthModal, setShowAuthModal] = useState(false);
+
+            // Initialize on mount
+            useEffect(() => {
+                initializeApp();
+            }, []);
+
+            async function initializeApp() {
+                setLoading(true);
+                await dataService.initialize();
+                setUser(dataService.user);
+                setIsOwner(dataService.isOwner);
+                
+                const vehiclesData = await dataService.getVehicles();
+                const selectedIds = await dataService.getSelectedVehicles();
+                
+                setVehicles(vehiclesData);
+                setSelectedVehicles(selectedIds);
+                setLoading(false);
+            }
+
+            const toggleVehicleSelection = async (vehicleId) => {
+                const newSelection = selectedVehicles.includes(vehicleId)
+                    ? selectedVehicles.filter(id => id !== vehicleId)
+                    : [...selectedVehicles, vehicleId];
+                
+                setSelectedVehicles(newSelection);
+                await dataService.setSelectedVehicles(newSelection);
+            };
+
+            const removeVehicleSelection = async (vehicleId) => {
+                const newSelection = selectedVehicles.filter(id => id !== vehicleId);
+                setSelectedVehicles(newSelection);
+                await dataService.setSelectedVehicles(newSelection);
+            };
+
+            const addVehicle = async (vehicle) => {
+                try {
+                    const newVehicle = await dataService.addVehicle(vehicle);
+                    setVehicles([...vehicles, newVehicle]);
+                } catch (error) {
+                    alert('Error adding vehicle: ' + error.message);
+                }
+            };
+
+            const addRun = async (vehicleId, run) => {
+                try {
+                    const newRun = await dataService.addRun(vehicleId, run);
+                    const updatedVehicles = vehicles.map(v => 
+                        v.id === vehicleId 
+                            ? { ...v, runs: [...(v.runs || []), newRun] }
+                            : v
+                    );
+                    setVehicles(updatedVehicles);
+                    const updated = updatedVehicles.find(v => v.id === vehicleId);
+                    if (updated) setActiveVehicle(updated);
+                } catch (error) {
+                    alert('Error adding run: ' + error.message);
+                }
+            };
+
+            const updateRun = async (vehicleId, runId, updates) => {
+                try {
+                    await dataService.updateRun(vehicleId, runId, updates);
+                    const updatedVehicles = vehicles.map(v => 
+                        v.id === vehicleId 
+                            ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, ...updates } : r) }
+                            : v
+                    );
+                    setVehicles(updatedVehicles);
+                    const updated = updatedVehicles.find(v => v.id === vehicleId);
+                    if (updated) setActiveVehicle(updated);
+                } catch (error) {
+                    alert('Error updating run: ' + error.message);
+                }
+            };
+
+            const setDefaultRun = async (vehicleId, runId) => {
+                try {
+                    await dataService.setDefaultRun(vehicleId, runId);
+                    const updatedVehicles = vehicles.map(v => 
+                        v.id === vehicleId 
+                            ? { 
+                                ...v, 
+                                runs: v.runs.map(r => ({
+                                    ...r,
+                                    isDefault: r.id === runId
+                                }))
+                            }
+                            : v
+                    );
+                    setVehicles(updatedVehicles);
+                    const updated = updatedVehicles.find(v => v.id === vehicleId);
+                    if (updated) setActiveVehicle(updated);
+                } catch (error) {
+                    alert('Error setting default run: ' + error.message);
+                }
+            };
+
+            const updateRunColor = async (vehicleId, runId, color) => {
+                try {
+                    await dataService.updateRunColor(vehicleId, runId, color);
+                    const updatedVehicles = vehicles.map(v => 
+                        v.id === vehicleId 
+                            ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, color } : r) }
+                            : v
+                    );
+                    setVehicles(updatedVehicles);
+                } catch (error) {
+                    console.error('Error updating color:', error);
+                }
+            };
+
+            const updateVehicle = async (vehicleId, updates) => {
+                try {
+                    await dataService.updateVehicle(vehicleId, updates);
+                    const updatedVehicles = vehicles.map(v => 
+                        v.id === vehicleId ? { ...v, ...updates } : v
+                    );
+                    setVehicles(updatedVehicles);
+                    if (activeVehicle?.id === vehicleId) {
+                        setActiveVehicle(updatedVehicles.find(v => v.id === vehicleId));
+                    }
+                } catch (error) {
+                    alert('Error updating vehicle: ' + error.message);
+                }
+            };
+
+            const deleteVehicle = async (vehicleId) => {
+                try {
+                    await dataService.deleteVehicle(vehicleId);
+                    setVehicles(vehicles.filter(v => v.id !== vehicleId));
+                    setSelectedVehicles(prev => prev.filter(id => id !== vehicleId));
+                    if (activeVehicle?.id === vehicleId) {
+                        setActiveVehicle(null);
+                        setView('vehicles');
+                    }
+                } catch (error) {
+                    alert('Error deleting vehicle: ' + error.message);
+                }
+            };
+
+            const deleteRun = async (vehicleId, runId) => {
+                try {
+                    await dataService.deleteRun(vehicleId, runId);
+                    const updatedVehicles = vehicles.map(v => 
+                        v.id === vehicleId 
+                            ? { ...v, runs: v.runs.filter(r => r.id !== runId) }
+                            : v
+                    );
+                    setVehicles(updatedVehicles);
+                    const updated = updatedVehicles.find(v => v.id === vehicleId);
+                    if (updated) setActiveVehicle(updated);
+                } catch (error) {
+                    alert('Error deleting run: ' + error.message);
+                }
+            };
+
+            const exportData = () => {
+                const dataStr = JSON.stringify({ vehicles }, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'ev-data-export.json';
+                a.click();
+            };
+
+            const importData = (file) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        setVehicles(data.vehicles || []);
+                        alert('Data imported successfully!');
+                    } catch (error) {
+                        alert('Error importing data: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            // Loading state
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                        <div className="text-center">
+                            <div className="text-6xl mb-4">⚡</div>
+                            <div className="text-2xl font-semibold text-gray-700">Loading EV Data...</div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <>
+                    {showAuthModal && (
+                        <AuthModal 
+                            onClose={() => setShowAuthModal(false)} 
+                            onAuthSuccess={() => {
+                                setShowAuthModal(false);
+                                initializeApp();
+                            }}
+                        />
+                    )}
+                    <div className="min-h-screen">
+                    <header className="bg-blue-600 text-white p-6 shadow-lg" style={{backgroundColor: 'var(--color-primary)'}}>
+                        <div className="max-w-7xl mx-auto">
+                            <h1 className="text-3xl font-bold">EV Data Visualization</h1>
+                            <p className="text-blue-100 mt-1" style={{color: 'rgba(255, 255, 255, 0.8)'}}>Compare and analyze electric vehicle performance data</p>
+                        </div>
+                    </header>
+
+                    <nav className="bg-white shadow-sm border-b">
+                        <div className="max-w-7xl mx-auto px-6 py-3">
+                            <div className="flex gap-4 items-center mb-3">
+                                <button 
+                                    onClick={() => setView('vehicles')}
+                                    className={`btn-tab ${view === 'vehicles' ? 'active' : ''}`}
+                                >
+                                    Vehicles
+                                </button>
+                                <button 
+                                    onClick={() => activeVehicle && setView('runs')}
+                                    disabled={!activeVehicle}
+                                    className={`btn-tab ${view === 'runs' ? 'active' : ''}`}
+                                >
+                                    Test Runs {activeVehicle ? `(${activeVehicle.name})` : ''}
+                                </button>
+                                <button 
+                                    onClick={() => selectedVehicles.length > 0 && setView('chart')}
+                                    disabled={selectedVehicles.length === 0}
+                                    className={`btn-tab ${view === 'chart' ? 'active' : ''}`}
+                                >
+                                    Charts
+                                </button>
+                                <button 
+                                    onClick={() => setView('specs')}
+                                    className={`btn-tab ${view === 'specs' ? 'active' : ''}`}
+                                >
+                                    Compare Specs
+                                </button>
+                                <div className="ml-auto flex gap-2 items-center">
+                                    {user ? (
+                                        <>
+                                            <span className="text-sm text-gray-600">
+                                                {user.email}
+                                                {isOwner && <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-bold">OWNER</span>}
+                                            </span>
+                                            <button 
+                                                onClick={async () => {
+                                                    await dataService.signOut();
+                                                    window.location.reload();
+                                                }}
+                                                className="btn btn-secondary text-sm"
+                                            >
+                                                Sign Out
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button 
+                                            onClick={() => setShowAuthModal(true)}
+                                            className="btn btn-primary text-sm"
+                                        >
+                                            Sign In
+                                        </button>
+                                    )}
+                                    <button 
+                                        onClick={exportData}
+                                        className="btn btn-edit"
+                                    >
+                                        Export Data
+                                    </button>
+                                    <label className="btn btn-secondary cursor-pointer">
+                                        Import Data
+                                        <input 
+                                            type="file" 
+                                            accept=".json"
+                                            className="hidden"
+                                            onChange={(e) => e.target.files[0] && importData(e.target.files[0])}
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div className="flex gap-2 items-center flex-wrap pt-2 border-t">
+                                <span className="text-sm text-gray-600 font-medium">Selected:</span>
+                                {selectedVehicles.length === 0 ? (
+                                    <div className="px-3 py-1 bg-gray-100 text-gray-500 rounded-full text-sm">
+                                        None
+                                    </div>
+                                ) : (
+                                    selectedVehicles.map(vehicleId => {
+                                        const vehicle = vehicles.find(v => v.id === vehicleId);
+                                        if (!vehicle) return null;
+                                        return (
+                                            <div 
+                                                key={vehicleId}
+                                                className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                                                style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}
+                                            >
+                                                <span>{vehicle.name}</span>
+                                                <button 
+                                                    onClick={() => removeVehicleSelection(vehicleId)}
+                                                    className="ml-1 hover:bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center"
+                                                    style={{fontSize: '12px'}}
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    </nav>
+
+                    <main className="max-w-7xl mx-auto p-6">
+                        {view === 'vehicles' && (
+                            <VehiclesView 
+                                vehicles={vehicles} 
+                                selectedVehicles={selectedVehicles}
+                                onToggleSelection={toggleVehicleSelection}
+                                onAdd={addVehicle}
+                                onUpdate={updateVehicle}
+                                onDelete={deleteVehicle}
+                                onViewRuns={(v) => { setActiveVehicle(v); setView('runs'); }}
+                            />
+                        )}
+                        {view === 'runs' && activeVehicle && (
+                            <RunsView 
+                                vehicle={activeVehicle}
+                                onAddRun={(run) => addRun(activeVehicle.id, run)}
+                                onUpdateRun={(runId, updates) => updateRun(activeVehicle.id, runId, updates)}
+                                onSetDefaultRun={(runId) => setDefaultRun(activeVehicle.id, runId)}
+                                onDeleteRun={(runId) => deleteRun(activeVehicle.id, runId)}
+                                onViewChart={() => setView('chart')}
+                            />
+                        )}
+                        {view === 'chart' && selectedVehicles.length > 0 && (
+                            <ChartView 
+                                vehicles={vehicles}
+                                selectedVehicleIds={selectedVehicles}
+                                chartConfig={chartConfig}
+                                setChartConfig={setChartConfig}
+                                onUpdateRunColor={updateRunColor}
+                            />
+                        )}
+                        {view === 'specs' && (
+                            <SpecsView 
+                                vehicles={vehicles}
+                                selectedVehicleIds={selectedVehicles}
+                            />
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        // Vehicles View
+        function VehiclesView({ vehicles, selectedVehicles, onToggleSelection, onAdd, onUpdate, onDelete, onViewRuns }) {
+            const [showForm, setShowForm] = useState(false);
+            const [editingId, setEditingId] = useState(null);
+            const [formData, setFormData] = useState({
+                name: '', make: '', model: '', year: '',
+                battery: '', range: '', power: ''
+            });
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (editingId) {
+                    onUpdate(editingId, formData);
+                    setEditingId(null);
+                } else {
+                    onAdd(formData);
+                }
+                setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '', power: '' });
+                setShowForm(false);
+            };
+
+            const handleEdit = (vehicle, e) => {
+                e.stopPropagation(); // Prevent card selection
+                setFormData({
+                    name: vehicle.name,
+                    make: vehicle.make || '',
+                    model: vehicle.model || '',
+                    year: vehicle.year || '',
+                    battery: vehicle.battery || '',
+                    range: vehicle.range || '',
+                    power: vehicle.power || ''
+                });
+                setEditingId(vehicle.id);
+                setShowForm(true);
+            };
+
+            const handleCancel = () => {
+                setShowForm(false);
+                setEditingId(null);
+                setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '', power: '' });
+            };
+
+            const handleCardClick = (vehicle) => {
+                onToggleSelection(vehicle.id);
+            };
+
+            return (
+                <div>
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold">Vehicles</h2>
+                        <button 
+                            onClick={() => setShowForm(!showForm)}
+                            className="btn btn-primary"
+                        >
+                            {showForm ? 'Cancel' : '+ Add Vehicle'}
+                        </button>
+                    </div>
+
+                    {showForm && (
+                        <form onSubmit={handleSubmit} className="card mb-6">
+                            <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <input 
+                                    placeholder="Display Name (e.g., Model 3 LR 2024)"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                    className="border p-2 rounded col-span-2"
+                                    required
+                                />
+                                <input 
+                                    placeholder="Make"
+                                    value={formData.make}
+                                    onChange={(e) => setFormData({...formData, make: e.target.value})}
+                                    className="border p-2 rounded"
+                                />
+                                <input 
+                                    placeholder="Model"
+                                    value={formData.model}
+                                    onChange={(e) => setFormData({...formData, model: e.target.value})}
+                                    className="border p-2 rounded"
+                                />
+                                <input 
+                                    placeholder="Year"
+                                    value={formData.year}
+                                    onChange={(e) => setFormData({...formData, year: e.target.value})}
+                                    className="border p-2 rounded"
+                                />
+                                <input 
+                                    placeholder="Battery (kWh)"
+                                    value={formData.battery}
+                                    onChange={(e) => setFormData({...formData, battery: e.target.value})}
+                                    className="border p-2 rounded"
+                                />
+                                <input 
+                                    placeholder="EPA Range (mi)"
+                                    value={formData.range}
+                                    onChange={(e) => setFormData({...formData, range: e.target.value})}
+                                    className="border p-2 rounded"
+                                />
+                                <input 
+                                    placeholder="Peak Power (kW)"
+                                    value={formData.power}
+                                    onChange={(e) => setFormData({...formData, power: e.target.value})}
+                                    className="border p-2 rounded"
+                                />
+                            </div>
+                            <div className="mt-4 flex gap-2">
+                                <button type="submit" className="btn btn-primary">
+                                    {editingId ? 'Save Changes' : 'Add Vehicle'}
+                                </button>
+                                {editingId && (
+                                    <button type="button" onClick={handleCancel} className="btn btn-secondary">
+                                        Cancel
+                                    </button>
+                                )}
+                            </div>
+                        </form>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {vehicles.map(vehicle => {
+                            const isSelected = selectedVehicles.includes(vehicle.id);
+                            return (
+                                <div 
+                                    key={vehicle.id} 
+                                    onClick={() => handleCardClick(vehicle)}
+                                    className="card hover:shadow-lg transition cursor-pointer relative"
+                                    style={{
+                                        borderWidth: '2px',
+                                        borderStyle: 'solid',
+                                        borderColor: isSelected ? 'var(--color-primary)' : 'transparent'
+                                    }}
+                                >
+                                    {isSelected && (
+                                        <div 
+                                            className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white font-bold"
+                                            style={{backgroundColor: 'var(--color-primary)'}}
+                                        >
+                                            ✓
+                                        </div>
+                                    )}
+                                    <h3 className="text-xl font-bold mb-2">{vehicle.name}</h3>
+                                    <p className="text-gray-600 mb-4">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                                    <div className="text-sm text-gray-700 space-y-1 mb-4">
+                                        {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
+                                        {vehicle.range && <p>Range: {vehicle.range} mi</p>}
+                                        {vehicle.power && <p>Power: {vehicle.power} kW</p>}
+                                        <p className="font-semibold mt-2">Test Runs: {vehicle.runs?.length || 0}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); onViewRuns(vehicle); }}
+                                            className="btn btn-primary flex-1"
+                                        >
+                                            View Runs
+                                        </button>
+                                        <button 
+                                            onClick={(e) => handleEdit(vehicle, e)}
+                                            className="btn btn-edit"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); onDelete(vehicle.id); }}
+                                            className="btn btn-danger"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {vehicles.length === 0 && !showForm && (
+                        <div className="text-center py-12 text-gray-500">
+                            <p className="text-lg">No vehicles yet. Click "Add Vehicle" to get started!</p>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Runs View
+        function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onViewChart }) {
+            const [showUpload, setShowUpload] = useState(false);
+            const [uploadStep, setUploadStep] = useState('file'); // file, mapping
+            const [csvData, setCsvData] = useState(null);
+            const [fieldMapping, setFieldMapping] = useState({});
+            const [runMetadata, setRunMetadata] = useState({
+                name: '',
+                date: new Date().toISOString().split('T')[0],
+                softwareVersion: '',
+                conditions: ''
+            });
+            const [editingRunId, setEditingRunId] = useState(null);
+            const [editFormData, setEditFormData] = useState({});
+
+            const handleFileUpload = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                try {
+                    const result = await parseCSV(file);
+                    setCsvData(result);
+                    
+                    // Auto-detect common field names
+                    const headers = result.meta.fields;
+                    const autoMapping = {};
+                    
+                    headers.forEach(header => {
+                        const lower = header.toLowerCase();
+                        if (lower.includes('soc') || lower.includes('state of charge')) autoMapping.soc = header;
+                        if (lower.includes('charge') && lower.includes('rate')) autoMapping.chargeRate = header;
+                        if (lower.includes('time')) autoMapping.time = header;
+                        if (lower.includes('range')) autoMapping.range = header;
+                        if (lower.includes('temp')) autoMapping.temperature = header;
+                        if (lower.includes('frame')) autoMapping.frame = header;
+                    });
+                    
+                    setFieldMapping(autoMapping);
+                    setUploadStep('mapping');
+                } catch (error) {
+                    alert('Error parsing CSV: ' + error.message);
+                }
+            };
+
+            const handleImport = () => {
+                if (!csvData) return;
+
+                // Transform data based on mapping
+                const transformedData = csvData.data.map(row => {
+                    const newRow = {};
+                    Object.keys(fieldMapping).forEach(key => {
+                        if (fieldMapping[key]) {
+                            newRow[key] = row[fieldMapping[key]];
+                        }
+                    });
+                    return newRow;
+                });
+
+                const run = {
+                    ...runMetadata,
+                    data: transformedData,
+                    fieldMapping,
+                    uploadDate: new Date().toISOString()
+                };
+
+                onAddRun(run);
+                setShowUpload(false);
+                setUploadStep('file');
+                setCsvData(null);
+                setFieldMapping({});
+                setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '' });
+            };
+
+            const handleEditRun = (run) => {
+                setEditingRunId(run.id);
+                setEditFormData({
+                    name: run.name,
+                    date: run.date,
+                    softwareVersion: run.softwareVersion || '',
+                    conditions: run.conditions || ''
+                });
+            };
+
+            const handleSaveEdit = (runId) => {
+                onUpdateRun(runId, editFormData);
+                setEditingRunId(null);
+                setEditFormData({});
+            };
+
+            const handleCancelEdit = () => {
+                setEditingRunId(null);
+                setEditFormData({});
+            };
+
+            const availableFields = csvData?.meta.fields || [];
+
+            return (
+                <div>
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 className="text-2xl font-bold">{vehicle.name} - Test Runs</h2>
+                            <p className="text-gray-600">Manage charging test data for this vehicle</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => setShowUpload(!showUpload)}
+                                className="btn btn-primary"
+                            >
+                                {showUpload ? 'Cancel' : '+ Upload CSV'}
+                            </button>
+                            {vehicle.runs?.length > 0 && (
+                                <button 
+                                    onClick={onViewChart}
+                                    className="btn btn-edit"
+                                >
+                                    View Charts
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {showUpload && (
+                        <div className="card mb-6">
+                            {uploadStep === 'file' && (
+                                <div>
+                                    <h3 className="text-lg font-bold mb-4">Upload Test Run Data</h3>
+                                    <div className="space-y-4">
+                                        <input 
+                                            placeholder="Run Name (e.g., Highway Test - Winter 2024)"
+                                            value={runMetadata.name}
+                                            onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
+                                            className="border p-2 rounded w-full"
+                                            required
+                                        />
+                                        <input 
+                                            type="date"
+                                            value={runMetadata.date}
+                                            onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
+                                            className="border p-2 rounded w-full"
+                                        />
+                                        <input 
+                                            placeholder="Software Version (e.g., 2024.1.5)"
+                                            value={runMetadata.softwareVersion}
+                                            onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
+                                            className="border p-2 rounded w-full"
+                                        />
+                                        <input 
+                                            placeholder="Conditions (e.g., 20°F, highway speeds)"
+                                            value={runMetadata.conditions}
+                                            onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
+                                            className="border p-2 rounded w-full"
+                                        />
+                                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                                            <label className="cursor-pointer">
+                                                <span className="text-blue-600 font-medium">Click to upload CSV file</span>
+                                                <input 
+                                                    type="file" 
+                                                    accept=".csv"
+                                                    className="hidden"
+                                                    onChange={handleFileUpload}
+                                                />
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {uploadStep === 'mapping' && (
+                                <div>
+                                    <h3 className="text-lg font-bold mb-4">Map CSV Fields</h3>
+                                    <p className="text-gray-600 mb-4">Match your CSV columns to standard fields. We've auto-detected some for you.</p>
+                                    
+                                    <div className="mb-6 p-4 bg-gray-50 rounded">
+                                        <h4 className="font-semibold mb-3">Run Metadata</h4>
+                                        <div className="space-y-3">
+                                            <input 
+                                                placeholder="Run Name (e.g., Highway Test - Winter 2024)"
+                                                value={runMetadata.name}
+                                                onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
+                                                className="border p-2 rounded w-full"
+                                                required
+                                            />
+                                            <input 
+                                                type="date"
+                                                value={runMetadata.date}
+                                                onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
+                                                className="border p-2 rounded w-full"
+                                            />
+                                            <input 
+                                                placeholder="Software Version (e.g., 2024.1.5)"
+                                                value={runMetadata.softwareVersion}
+                                                onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
+                                                className="border p-2 rounded w-full"
+                                            />
+                                            <input 
+                                                placeholder="Conditions (e.g., 20°F, highway speeds)"
+                                                value={runMetadata.conditions}
+                                                onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
+                                                className="border p-2 rounded w-full"
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    <h4 className="font-semibold mb-3">Field Mapping</h4>
+                                    <div className="space-y-3">
+                                        {['soc', 'chargeRate', 'time', 'range', 'temperature', 'frame'].map(field => (
+                                            <div key={field} className="flex items-center gap-4">
+                                                <label className="w-40 font-medium capitalize">{field.replace(/([A-Z])/g, ' $1')}:</label>
+                                                <select 
+                                                    value={fieldMapping[field] || ''}
+                                                    onChange={(e) => setFieldMapping({...fieldMapping, [field]: e.target.value})}
+                                                    className="border p-2 rounded flex-1"
+                                                >
+                                                    <option value="">-- Not mapped --</option>
+                                                    {availableFields.map(f => (
+                                                        <option key={f} value={f}>{f}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-6 flex gap-2">
+                                        <button 
+                                            onClick={() => setUploadStep('file')}
+                                            className="btn btn-secondary"
+                                        >
+                                            Back
+                                        </button>
+                                        <button 
+                                            onClick={handleImport}
+                                            className="btn btn-primary"
+                                        >
+                                            Import Run
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="space-y-4">
+                        {vehicle.runs?.map(run => (
+                            <div key={run.id} className="card">
+                                {editingRunId === run.id ? (
+                                    // Edit mode
+                                    <div>
+                                        <h3 className="text-lg font-bold mb-4">Edit Run</h3>
+                                        <div className="space-y-3">
+                                            <input 
+                                                placeholder="Run Name"
+                                                value={editFormData.name}
+                                                onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
+                                                className="border p-2 rounded w-full"
+                                            />
+                                            <input 
+                                                type="date"
+                                                value={editFormData.date}
+                                                onChange={(e) => setEditFormData({...editFormData, date: e.target.value})}
+                                                className="border p-2 rounded w-full"
+                                            />
+                                            <input 
+                                                placeholder="Software Version"
+                                                value={editFormData.softwareVersion}
+                                                onChange={(e) => setEditFormData({...editFormData, softwareVersion: e.target.value})}
+                                                className="border p-2 rounded w-full"
+                                            />
+                                            <input 
+                                                placeholder="Conditions"
+                                                value={editFormData.conditions}
+                                                onChange={(e) => setEditFormData({...editFormData, conditions: e.target.value})}
+                                                className="border p-2 rounded w-full"
+                                            />
+                                        </div>
+                                        <div className="flex gap-2 mt-4">
+                                            <button 
+                                                onClick={() => handleSaveEdit(run.id)}
+                                                className="btn btn-primary"
+                                            >
+                                                Save Changes
+                                            </button>
+                                            <button 
+                                                onClick={handleCancelEdit}
+                                                className="btn btn-secondary"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    // View mode
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-lg font-bold">{run.name}</h3>
+                                                {run.isDefault && (
+                                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-semibold" style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}>
+                                                        Default
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-sm text-gray-600 mt-2 space-y-1">
+                                                <p>Date: {run.date}</p>
+                                                {run.softwareVersion && <p>Software: {run.softwareVersion}</p>}
+                                                {run.conditions && <p>Conditions: {run.conditions}</p>}
+                                                <p>Data Points: {run.data?.length || 0}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-3">
+                                                <span className="text-sm text-gray-600">Plot Color:</span>
+                                                <div 
+                                                    className="w-6 h-6 rounded border border-gray-300"
+                                                    style={{backgroundColor: run.color || '#3b82f6'}}
+                                                ></div>
+                                                <input
+                                                    type="color"
+                                                    value={run.color || '#3b82f6'}
+                                                    onChange={(e) => {
+                                                        onUpdateRun(run.id, { color: e.target.value });
+                                                    }}
+                                                    className="w-10 h-7 border-0 rounded cursor-pointer"
+                                                    title="Change color"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={run.color || '#3b82f6'}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        onUpdateRun(run.id, { color: value });
+                                                    }}
+                                                    onBlur={(e) => {
+                                                        const value = e.target.value;
+                                                        if (!/^#[0-9A-Fa-f]{6}$/.test(value)) {
+                                                            onUpdateRun(run.id, { color: run.color || '#3b82f6' });
+                                                        }
+                                                    }}
+                                                    className="w-24 px-2 py-1 border rounded text-sm font-mono"
+                                                    placeholder="#3b82f6"
+                                                    maxLength={7}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {!run.isDefault && (
+                                                <button 
+                                                    onClick={() => onSetDefaultRun(run.id)}
+                                                    className="btn btn-secondary text-sm"
+                                                >
+                                                    Set as Default
+                                                </button>
+                                            )}
+                                            <button 
+                                                onClick={() => handleEditRun(run)}
+                                                className="btn btn-edit"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button 
+                                                onClick={() => onDeleteRun(run.id)}
+                                                className="btn btn-danger"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {vehicle.runs?.length === 0 && !showUpload && (
+                        <div className="text-center py-12 text-gray-500">
+                            <p className="text-lg">No test runs yet. Upload a CSV to get started!</p>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Chart View
+        function ChartView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor }) {
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+            const [expandedVehicles, setExpandedVehicles] = useState({});
+
+            // Get all selected vehicles
+            const selectedVehicles = vehicles.filter(v => selectedVehicleIds.includes(v.id));
+
+            const handleColorChange = (vehicleId, runId, color) => {
+                onUpdateRunColor(vehicleId, runId, color);
+            };
+
+            // Auto-select default or newest run from each vehicle on mount or when selected vehicles change
+            useEffect(() => {
+                const autoSelectedRuns = [];
+                selectedVehicles.forEach(vehicle => {
+                    if (vehicle.runs && vehicle.runs.length > 0) {
+                        // First try to find a default run
+                        const defaultRun = vehicle.runs.find(r => r.isDefault);
+                        
+                        if (defaultRun) {
+                            autoSelectedRuns.push(defaultRun.id);
+                        } else {
+                            // Otherwise, sort runs by date (newest first) and select the first one
+                            const sortedRuns = [...vehicle.runs].sort((a, b) => 
+                                new Date(b.date) - new Date(a.date)
+                            );
+                            autoSelectedRuns.push(sortedRuns[0].id);
+                        }
+                    }
+                });
+                
+                // Only update if different from current selection
+                if (JSON.stringify(autoSelectedRuns.sort()) !== JSON.stringify(chartConfig.selectedRuns.sort())) {
+                    setChartConfig(prev => ({
+                        ...prev,
+                        selectedRuns: autoSelectedRuns
+                    }));
+                }
+            }, [selectedVehicleIds]);
+
+            const toggleVehicleExpanded = (vehicleId) => {
+                setExpandedVehicles(prev => ({
+                    ...prev,
+                    [vehicleId]: !prev[vehicleId]
+                }));
+            };
+
+            const axisOptions = [
+                { value: 'soc', label: 'State of Charge (%)' },
+                { value: 'chargeRate', label: 'Charge Rate (kW)' },
+                { value: 'time', label: 'Time' },
+                { value: 'range', label: 'Range (mi)' },
+                { value: 'temperature', label: 'Temperature' },
+                { value: 'frame', label: 'Frame' }
+            ];
+
+            const chartPresets = [
+                { name: 'Charge Rate vs SoC', x: 'soc', y: 'chargeRate' },
+                { name: 'Range vs Time', x: 'time', y: 'range' },
+                { name: 'Charge Rate vs Time', x: 'time', y: 'chargeRate' }
+            ];
+
+            useEffect(() => {
+                if (!chartRef.current) return;
+
+                const ctx = chartRef.current.getContext('2d');
+
+                if (chartInstance.current) {
+                    chartInstance.current.destroy();
+                }
+
+                // Collect all runs from all selected vehicles
+                const allSelectedRuns = [];
+                selectedVehicles.forEach(vehicle => {
+                    if (vehicle.runs) {
+                        vehicle.runs.forEach(run => {
+                            if (chartConfig.selectedRuns.includes(run.id)) {
+                                allSelectedRuns.push({
+                                    ...run,
+                                    vehicleName: vehicle.name
+                                });
+                            }
+                        });
+                    }
+                });
+
+                const datasets = allSelectedRuns.map((run, idx) => {
+                    const data = run.data
+                        .filter(d => d[chartConfig.xAxis] != null && d[chartConfig.yAxis] != null)
+                        .map(d => ({
+                            x: d[chartConfig.xAxis],
+                            y: d[chartConfig.yAxis]
+                        }));
+
+                    // Use the run's color property, or fall back to a default color
+                    const color = run.color || '#3b82f6';
+
+                    return {
+                        label: `${run.vehicleName} - ${run.name}`,
+                        data: data,
+                        backgroundColor: color,
+                        borderColor: color,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    };
+                });
+
+                chartInstance.current = new Chart(ctx, {
+                    type: 'scatter',
+                    data: { datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: (${context.parsed.x}, ${context.parsed.y})`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: axisOptions.find(a => a.value === chartConfig.xAxis)?.label || chartConfig.xAxis
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: axisOptions.find(a => a.value === chartConfig.yAxis)?.label || chartConfig.yAxis
+                                }
+                            }
+                        }
+                    }
+                });
+
+                return () => {
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                    }
+                };
+            }, [chartConfig, selectedVehicles]);
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-6">Charts - {selectedVehicles.length} Vehicle{selectedVehicles.length !== 1 ? 's' : ''} Selected</h2>
+
+                    <div className="card mb-6">
+                        <h3 className="text-lg font-bold mb-4">Chart Configuration</h3>
+                        
+                        <div className="grid grid-cols-3 gap-4 mb-6">
+                            {chartPresets.map(preset => (
+                                <button
+                                    key={preset.name}
+                                    onClick={() => setChartConfig({
+                                        ...chartConfig,
+                                        xAxis: preset.x,
+                                        yAxis: preset.y
+                                    })}
+                                    className="btn"
+                                    style={{
+                                        backgroundColor: 'var(--color-primary-light)',
+                                        color: 'var(--color-primary-text)'
+                                    }}
+                                >
+                                    {preset.name}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label className="block font-medium mb-2">X-Axis:</label>
+                                <select 
+                                    value={chartConfig.xAxis}
+                                    onChange={(e) => setChartConfig({...chartConfig, xAxis: e.target.value})}
+                                    className="border p-2 rounded w-full"
+                                >
+                                    {axisOptions.map(opt => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block font-medium mb-2">Y-Axis:</label>
+                                <select 
+                                    value={chartConfig.yAxis}
+                                    onChange={(e) => setChartConfig({...chartConfig, yAxis: e.target.value})}
+                                    className="border p-2 rounded w-full"
+                                >
+                                    {axisOptions.map(opt => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block font-medium mb-2">Select Runs to Display:</label>
+                            <div className="space-y-4">
+                                {selectedVehicles.map(vehicle => {
+                                    const isExpanded = expandedVehicles[vehicle.id];
+                                    const activeRuns = vehicle.runs?.filter(r => chartConfig.selectedRuns.includes(r.id)) || [];
+                                    const inactiveRuns = vehicle.runs?.filter(r => !chartConfig.selectedRuns.includes(r.id)) || [];
+                                    const hasInactiveRuns = inactiveRuns.length > 0;
+                                    
+                                    return (
+                                        <div key={vehicle.id} className="border-l-4 pl-4" style={{borderColor: 'var(--color-primary)'}}>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <h4 className="font-semibold text-gray-700">{vehicle.name}</h4>
+                                                {hasInactiveRuns && (
+                                                    <button
+                                                        onClick={() => toggleVehicleExpanded(vehicle.id)}
+                                                        className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                                                    >
+                                                        <span style={{
+                                                            display: 'inline-block',
+                                                            transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                                            transition: 'transform 0.2s'
+                                                        }}>▼</span>
+                                                        <span>{isExpanded ? 'Hide' : 'Show'} all ({vehicle.runs?.length || 0})</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="space-y-2">
+                                                {/* Active runs - always shown */}
+                                                {activeRuns.map(run => (
+                                                    <label key={run.id} className="flex items-center gap-2">
+                                                        <input 
+                                                            type="checkbox"
+                                                            checked={true}
+                                                            onChange={(e) => {
+                                                                setChartConfig({
+                                                                    ...chartConfig,
+                                                                    selectedRuns: chartConfig.selectedRuns.filter(id => id !== run.id)
+                                                                });
+                                                            }}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        <input
+                                                            type="color"
+                                                            value={run.color || '#3b82f6'}
+                                                            onChange={(e) => {
+                                                                e.stopPropagation();
+                                                                handleColorChange(vehicle.id, run.id, e.target.value);
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="w-8 h-6 border-0 rounded cursor-pointer"
+                                                            title="Change color"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={run.color || '#3b82f6'}
+                                                            onChange={(e) => {
+                                                                e.stopPropagation();
+                                                                const value = e.target.value;
+                                                                // Always update to allow typing
+                                                                handleColorChange(vehicle.id, run.id, value);
+                                                            }}
+                                                            onBlur={(e) => {
+                                                                // Validate and reset on blur if invalid
+                                                                const value = e.target.value;
+                                                                if (!/^#[0-9A-Fa-f]{6}$/.test(value)) {
+                                                                    handleColorChange(vehicle.id, run.id, run.color || '#3b82f6');
+                                                                }
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="w-20 px-2 py-0.5 border rounded text-xs font-mono"
+                                                            placeholder="#3b82f6"
+                                                            maxLength={7}
+                                                        />
+                                                        <span className="flex-1">
+                                                            {run.name} 
+                                                            <span className="text-sm text-gray-500"> ({run.date})</span>
+                                                            {run.isDefault && <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded" style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}>Default</span>}
+                                                        </span>
+                                                    </label>
+                                                ))}
+                                                
+                                                {/* Inactive runs - shown when expanded */}
+                                                {isExpanded && inactiveRuns.map(run => (
+                                                    <label key={run.id} className="flex items-center gap-2 opacity-60 hover:opacity-100">
+                                                        <input 
+                                                            type="checkbox"
+                                                            checked={false}
+                                                            onChange={(e) => {
+                                                                setChartConfig({
+                                                                    ...chartConfig,
+                                                                    selectedRuns: [...chartConfig.selectedRuns, run.id]
+                                                                });
+                                                            }}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        <input
+                                                            type="color"
+                                                            value={run.color || '#3b82f6'}
+                                                            onChange={(e) => {
+                                                                e.stopPropagation();
+                                                                handleColorChange(vehicle.id, run.id, e.target.value);
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="w-8 h-6 border-0 rounded cursor-pointer"
+                                                            title="Change color"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={run.color || '#3b82f6'}
+                                                            onChange={(e) => {
+                                                                e.stopPropagation();
+                                                                const value = e.target.value;
+                                                                handleColorChange(vehicle.id, run.id, value);
+                                                            }}
+                                                            onBlur={(e) => {
+                                                                const value = e.target.value;
+                                                                if (!/^#[0-9A-Fa-f]{6}$/.test(value)) {
+                                                                    handleColorChange(vehicle.id, run.id, run.color || '#3b82f6');
+                                                                }
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="w-20 px-2 py-0.5 border rounded text-xs font-mono"
+                                                            placeholder="#3b82f6"
+                                                            maxLength={7}
+                                                        />
+                                                        <span className="flex-1">
+                                                            {run.name} 
+                                                            <span className="text-sm text-gray-500"> ({run.date})</span>
+                                                            {run.isDefault && <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded" style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}>Default</span>}
+                                                        </span>
+                                                    </label>
+                                                ))}
+                                                
+                                                {(!vehicle.runs || vehicle.runs.length === 0) && (
+                                                    <p className="text-sm text-gray-500 italic">No runs available</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="card">
+                        <div style={{ height: '500px' }}>
+                            <canvas ref={chartRef}></canvas>
+                        </div>
+                    </div>
+
+                    {chartConfig.selectedRuns.length === 0 && (
+                        <div className="text-center py-12 text-gray-500">
+                            <p className="text-lg">Select runs to display on the chart</p>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Specs View
+        function SpecsView({ vehicles, selectedVehicleIds }) {
+            // Filter to only show selected vehicles, or all if none selected
+            const displayVehicles = selectedVehicleIds.length > 0 
+                ? vehicles.filter(v => selectedVehicleIds.includes(v.id))
+                : vehicles;
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-6">
+                        Vehicle Specifications Comparison
+                        {selectedVehicleIds.length > 0 && ` (${selectedVehicleIds.length} Selected)`}
+                    </h2>
+
+                    {displayVehicles.length === 0 ? (
+                        <div className="text-center py-12 text-gray-500">
+                            <p className="text-lg">
+                                {vehicles.length === 0 
+                                    ? 'No vehicles to compare. Add vehicles first!' 
+                                    : 'No vehicles selected. Select vehicles from the Vehicles page to compare them here.'}
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-lg shadow overflow-x-auto" style={{backgroundColor: 'var(--color-card)'}}>
+                            <table className="w-full">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left font-semibold">Specification</th>
+                                        {displayVehicles.map(v => (
+                                            <th key={v.id} className="px-6 py-3 text-left font-semibold">{v.name}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    <tr>
+                                        <td className="px-6 py-4 font-medium">Make</td>
+                                        {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.make || '-'}</td>)}
+                                    </tr>
+                                    <tr>
+                                        <td className="px-6 py-4 font-medium">Model</td>
+                                        {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.model || '-'}</td>)}
+                                    </tr>
+                                    <tr>
+                                        <td className="px-6 py-4 font-medium">Year</td>
+                                        {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.year || '-'}</td>)}
+                                    </tr>
+                                    <tr>
+                                        <td className="px-6 py-4 font-medium">Battery (kWh)</td>
+                                        {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.battery || '-'}</td>)}
+                                    </tr>
+                                    <tr>
+                                        <td className="px-6 py-4 font-medium">EPA Range (mi)</td>
+                                        {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.range || '-'}</td>)}
+                                    </tr>
+                                    <tr>
+                                        <td className="px-6 py-4 font-medium">Peak Power (kW)</td>
+                                        {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.power || '-'}</td>)}
+                                    </tr>
+                                    <tr>
+                                        <td className="px-6 py-4 font-medium">Test Runs</td>
+                                        {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.runs?.length || 0}</td>)}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+            </>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
