@@ -171,25 +171,40 @@
         };
 
         let supabase = null;
+        let supabaseInitAttempted = false;
         
-        // Lazy initialize Supabase
+        // Initialize Supabase client
         function getSupabase() {
           if (supabase) return supabase;
           
-          if (window.supabase && window.supabase.createClient) {
-            try {
-              supabase = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
-              console.log('Supabase initialized');
-              return supabase;
-            } catch (error) {
-              console.error('Failed to initialize Supabase:', error);
+          // Only try to initialize once to avoid repeated console errors
+          if (supabaseInitAttempted) return null;
+          supabaseInitAttempted = true;
+          
+          try {
+            if (!window.supabase) {
+              console.error('Supabase library not loaded. Check if script tag is present.');
               return null;
             }
+            
+            if (!window.supabase.createClient) {
+              console.error('Supabase.createClient not found. Library may have loaded incorrectly.');
+              return null;
+            }
+            
+            supabase = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+            console.log('✅ Supabase initialized successfully');
+            return supabase;
+          } catch (error) {
+            console.error('Failed to initialize Supabase:', error);
+            return null;
           }
-          
-          console.warn('Supabase library not loaded yet');
-          return null;
         }
+        
+        // Try to initialize immediately when script runs
+        setTimeout(() => {
+          getSupabase();
+        }, 100);
 
         class DataService {
           constructor() {
@@ -408,10 +423,10 @@
                 try {
                     const supabase = getSupabase();
                     if (!supabase) {
-                        throw new Error('Authentication service not available');
+                        throw new Error('Authentication system is still loading. Please refresh the page and try again.');
                     }
                     
-                    const { data, error } = await getSupabase().auth.signInWithOAuth({
+                    const { data, error } = await supabase.auth.signInWithOAuth({
                         provider: provider,
                         options: {
                             redirectTo: window.location.origin
@@ -422,7 +437,8 @@
                     
                     // OAuth redirect happens automatically, no need to call onAuthSuccess here
                 } catch (err) {
-                    setError(err.message);
+                    console.error('OAuth error:', err);
+                    setError(err.message || 'Failed to sign in. Please try again.');
                     setLoading(false);
                 }
             };
@@ -438,6 +454,13 @@
                         {error && (
                             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
                                 {error}
+                            </div>
+                        )}
+                        
+                        {/* Debug info - remove after OAuth is working */}
+                        {!getSupabase() && (
+                            <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded mb-4 text-sm">
+                                <strong>Debug:</strong> Supabase library loading issue. Check browser console for details.
                             </div>
                         )}
 
