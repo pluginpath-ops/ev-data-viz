@@ -159,16 +159,50 @@ export function AppProvider({ children }) {
             try {
                 const data = JSON.parse(e.target.result);
                 const vehiclesToImport = data.vehicles || [];
+
                 if (dataService.useSupabase && dataService.user) {
-                    // Insert each vehicle and its runs into Supabase
+                    // Build conflict report by name (case-insensitive)
+                    const conflictLines = [];
+                    const skipVehicleNames = new Set();
+
                     for (const vehicle of vehiclesToImport) {
+                        const existing = vehicles.find(v =>
+                            v.name?.toLowerCase() === vehicle.name?.toLowerCase()
+                        );
+                        if (existing) {
+                            const dupRuns = (vehicle.runs || []).filter(run =>
+                                existing.runs?.some(r =>
+                                    r.name?.toLowerCase() === run.name?.toLowerCase()
+                                )
+                            );
+                            if (dupRuns.length > 0) {
+                                conflictLines.push(`• Vehicle "${vehicle.name}" — duplicate runs: ${dupRuns.map(r => `"${r.name}"`).join(', ')}`);
+                            } else {
+                                conflictLines.push(`• Vehicle "${vehicle.name}"`);
+                            }
+                            skipVehicleNames.add(vehicle.name?.toLowerCase());
+                        }
+                    }
+
+                    if (conflictLines.length > 0) {
+                        const msg = `Found ${conflictLines.length} conflict(s):\n\n${conflictLines.join('\n')}\n\nOK — skip conflicts and import the rest\nCancel — abort the entire import`;
+                        if (!window.confirm(msg)) return;
+                    }
+
+                    // Import non-conflicting vehicles
+                    let imported = 0;
+                    for (const vehicle of vehiclesToImport) {
+                        if (skipVehicleNames.has(vehicle.name?.toLowerCase())) continue;
                         const newVehicle = await dataService.addVehicle(vehicle);
                         for (const run of vehicle.runs || []) {
                             await dataService.addRun(newVehicle.id, run);
                         }
+                        imported++;
                     }
+
                     await initializeApp();
-                    alert(`Imported ${vehiclesToImport.length} vehicle(s) into Supabase successfully!`);
+                    const skipped = skipVehicleNames.size;
+                    alert(`Imported ${imported} vehicle(s) into Supabase.${skipped > 0 ? ` Skipped ${skipped} duplicate(s).` : ''}`);
                 } else {
                     setVehicles(vehiclesToImport);
                     alert('Data imported successfully!');
