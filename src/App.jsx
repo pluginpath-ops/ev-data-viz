@@ -23,6 +23,7 @@ export default function App() {
         setDefaultRun,
         updateRunColor,
         deleteRun,
+        toggleVehicleVisibility,
         exportData,
         importData,
         signOut,
@@ -184,6 +185,8 @@ export default function App() {
                             onUpdate={updateVehicle}
                             onDelete={deleteVehicle}
                             onViewRuns={(v) => { setActiveVehicle(v); setView('runs'); }}
+                            isOwner={isOwner}
+                            onToggleVisibility={toggleVehicleVisibility}
                         />
                     )}
                     {view === 'runs' && currentActiveVehicle && (

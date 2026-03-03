@@ -13,14 +13,14 @@ class DataService {
       this.useSupabase = false;
       return;
     }
+    // Always use Supabase for reads when credentials are configured,
+    // so unauthenticated visitors can see public vehicles.
+    this.useSupabase = true;
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       this.user = user;
-      this.useSupabase = true;
       const { data: profile } = await getSupabase().from('profiles').select('is_owner').eq('id', user.id).single();
       this.isOwner = profile?.is_owner || false;
-    } else {
-      this.useSupabase = false;
     }
   }
 
@@ -34,7 +34,7 @@ class DataService {
   }
 
   async addVehicle(vehicle) {
-    if (!this.useSupabase) {
+    if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
       const newVehicle = { ...vehicle, id: Date.now(), runs: [] };
@@ -54,7 +54,7 @@ class DataService {
   }
 
   async updateVehicle(vehicleId, updates) {
-    if (!this.useSupabase) {
+    if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
       data.vehicles = data.vehicles.map(v => v.id === vehicleId ? { ...v, ...updates } : v);
@@ -71,7 +71,7 @@ class DataService {
   }
 
   async deleteVehicle(vehicleId) {
-    if (!this.useSupabase) {
+    if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
       data.vehicles = data.vehicles.filter(v => v.id !== vehicleId);
@@ -84,7 +84,7 @@ class DataService {
   }
 
   async addRun(vehicleId, run) {
-    if (!this.useSupabase) {
+    if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
       const vehicle = data.vehicles.find(v => v.id === vehicleId);
@@ -116,7 +116,7 @@ class DataService {
   }
 
   async updateRun(vehicleId, runId, updates) {
-    if (!this.useSupabase) {
+    if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
       data.vehicles = data.vehicles.map(v =>
@@ -133,7 +133,7 @@ class DataService {
   }
 
   async setDefaultRun(vehicleId, runId) {
-    if (!this.useSupabase) {
+    if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
       data.vehicles = data.vehicles.map(v =>
@@ -147,7 +147,7 @@ class DataService {
   }
 
   async updateRunColor(vehicleId, runId, color) {
-    if (!this.useSupabase) {
+    if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
       data.vehicles = data.vehicles.map(v =>
@@ -161,7 +161,7 @@ class DataService {
   }
 
   async deleteRun(vehicleId, runId) {
-    if (!this.useSupabase) {
+    if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
       data.vehicles = data.vehicles.map(v =>
@@ -192,6 +192,11 @@ class DataService {
       return;
     }
     localStorage.setItem('selectedVehicles', JSON.stringify(vehicleIds));
+  }
+
+  async toggleVehicleVisibility(vehicleId, newVisibility) {
+    const { error } = await getSupabase().from('vehicles').update({ visibility: newVisibility }).eq('id', vehicleId);
+    if (error) throw error;
   }
 
   async signOut() {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function VehiclesView({ vehicles, selectedVehicles, onToggleSelection, onAdd, onUpdate, onDelete, onViewRuns }) {
+export default function VehiclesView({ vehicles, selectedVehicles, onToggleSelection, onAdd, onUpdate, onDelete, onViewRuns, isOwner, onToggleVisibility }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
@@ -140,7 +140,33 @@ export default function VehiclesView({ vehicles, selectedVehicles, onToggleSelec
                                     &#10003;
                                 </div>
                             )}
-                            <h3 className="text-xl font-bold mb-2">{vehicle.name}</h3>
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-xl font-bold">{vehicle.name}</h3>
+                                {isOwner ? (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onToggleVisibility(vehicle.id, vehicle.visibility === 'public' ? 'private' : 'public');
+                                        }}
+                                        title={`Click to make ${vehicle.visibility === 'public' ? 'private' : 'public'}`}
+                                        className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition ${
+                                            vehicle.visibility === 'public'
+                                                ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200'
+                                                : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        {vehicle.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+                                    </button>
+                                ) : (
+                                    <span className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border ${
+                                        vehicle.visibility === 'public'
+                                            ? 'bg-green-100 text-green-700 border-green-300'
+                                            : 'bg-gray-100 text-gray-500 border-gray-300'
+                                    }`}>
+                                        {vehicle.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+                                    </span>
+                                )}
+                            </div>
                             <p className="text-gray-600 mb-4">{vehicle.make} {vehicle.model} {vehicle.year}</p>
                             <div className="text-sm text-gray-700 space-y-1 mb-4">
                                 {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
