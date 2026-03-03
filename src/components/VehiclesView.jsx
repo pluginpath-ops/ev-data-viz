@@ -298,7 +298,7 @@ export default function VehiclesView({
                             <div className="relative z-10">
                                 {isSelected && (
                                     <div
-                                        className="absolute top-0 right-0 w-6 h-6 rounded-full flex items-center justify-center text-white font-bold"
+                                        className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-white font-bold"
                                         style={{ backgroundColor: 'var(--color-primary)' }}
                                     >
                                         &#10003;
