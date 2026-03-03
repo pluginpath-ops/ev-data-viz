@@ -155,11 +155,18 @@ export function AppProvider({ children }) {
 
     const importData = (file) => {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const data = JSON.parse(e.target.result);
-                setVehicles(data.vehicles || []);
-                alert('Data imported successfully!');
+                if (dataService.useSupabase && dataService.user) {
+                    // When logged in, ignore the file and re-sync from Supabase
+                    // to avoid overwriting the live DB view with stale local data.
+                    await initializeApp();
+                    alert('You are logged in — data is managed by Supabase. Local import ignored; view refreshed from database.');
+                } else {
+                    setVehicles(data.vehicles || []);
+                    alert('Data imported successfully!');
+                }
             } catch (error) {
                 alert('Error importing data: ' + error.message);
             }
@@ -170,9 +177,12 @@ export function AppProvider({ children }) {
     const toggleVehicleVisibility = async (vehicleId, newVisibility) => {
         try {
             await dataService.toggleVehicleVisibility(vehicleId, newVisibility);
+            // Only update UI after confirmed DB write
             setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, visibility: newVisibility } : v));
         } catch (error) {
             alert('Error updating visibility: ' + error.message);
+            // Re-sync from DB so the UI doesn't show stale state
+            await initializeApp();
         }
     };
 

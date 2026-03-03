@@ -195,8 +195,15 @@ class DataService {
   }
 
   async toggleVehicleVisibility(vehicleId, newVisibility) {
-    const { error } = await getSupabase().from('vehicles').update({ visibility: newVisibility }).eq('id', vehicleId);
+    const { data, error } = await getSupabase()
+      .from('vehicles')
+      .update({ visibility: newVisibility })
+      .eq('id', vehicleId)
+      .select('id');
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('Update blocked — vehicle may have no owner assigned. Run the SQL fix in Supabase.');
+    }
   }
 
   async signOut() {
