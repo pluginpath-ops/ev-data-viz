@@ -29,8 +29,51 @@ class DataService {
       const saved = localStorage.getItem('evData');
       return saved ? (JSON.parse(saved).vehicles || []) : [];
     }
-    const { data } = await getSupabase().from('vehicles').select(`*, runs(*)`).order('created_at', { ascending: false });
+    const { data } = await getSupabase()
+      .from('vehicles')
+      .select(`*, runs(*), vehicle_tags(tags(id, name))`)
+      .order('created_at', { ascending: false });
+    return (data || []).map(v => ({
+      ...v,
+      tags: (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
+    }));
+  }
+
+  async getTags() {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase().from('tags').select('*').order('name');
+    if (error) throw error;
     return data || [];
+  }
+
+  async createTag(name) {
+    const { data, error } = await getSupabase().from('tags').insert({ name }).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async syncVehicleTags(vehicleId, tagIds) {
+    await getSupabase().from('vehicle_tags').delete().eq('vehicle_id', vehicleId);
+    if (tagIds.length > 0) {
+      const { error } = await getSupabase()
+        .from('vehicle_tags')
+        .insert(tagIds.map(tagId => ({ vehicle_id: vehicleId, tag_id: tagId })));
+      if (error) throw error;
+    }
+  }
+
+  async uploadVehicleImage(vehicleId, file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const path = `${vehicleId}.${ext}`;
+    const { error: uploadError } = await getSupabase().storage
+      .from('vehicle-images')
+      .upload(path, file, { upsert: true });
+    if (uploadError) throw uploadError;
+    const { data } = getSupabase().storage.from('vehicle-images').getPublicUrl(path);
+    const { error: updateError } = await getSupabase()
+      .from('vehicles').update({ image_url: data.publicUrl }).eq('id', vehicleId);
+    if (updateError) throw updateError;
+    return data.publicUrl;
   }
 
   async addVehicle(vehicle) {
