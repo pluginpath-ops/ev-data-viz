@@ -6,6 +6,7 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
     const [vehicles, setVehicles] = useState([]);
     const [selectedVehicles, setSelectedVehicles] = useState([]);
+    const [tags, setTags] = useState([]);
     const [user, setUser] = useState(null);
     const [isOwner, setIsOwner] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -22,9 +23,11 @@ export function AppProvider({ children }) {
 
         const vehiclesData = await dataService.getVehicles();
         const selectedIds = await dataService.getSelectedVehicles();
+        const tagsData = dataService.useSupabase ? await dataService.getTags() : [];
 
         setVehicles(vehiclesData);
         setSelectedVehicles(selectedIds);
+        setTags(tagsData);
         setLoading(false);
     }
 
@@ -233,6 +236,39 @@ export function AppProvider({ children }) {
         reader.readAsText(file);
     };
 
+    const createTag = async (name) => {
+        try {
+            const tag = await dataService.createTag(name);
+            setTags(prev => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)));
+            return tag;
+        } catch (error) {
+            const message = error.message?.includes('row-level security')
+                ? 'Only vehicle owners can create tags.'
+                : 'Error creating tag: ' + error.message;
+            alert(message);
+        }
+    };
+
+    const syncVehicleTags = async (vehicleId, tagIds) => {
+        try {
+            await dataService.syncVehicleTags(vehicleId, tagIds);
+            const vehicleTags = tags.filter(t => tagIds.includes(t.id));
+            setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, tags: vehicleTags } : v));
+        } catch (error) {
+            alert('Error updating tags: ' + error.message);
+        }
+    };
+
+    const uploadVehicleImage = async (vehicleId, file) => {
+        try {
+            const imageUrl = await dataService.uploadVehicleImage(vehicleId, file);
+            setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, image_url: imageUrl } : v));
+            return imageUrl;
+        } catch (error) {
+            alert('Error uploading image: ' + error.message);
+        }
+    };
+
     const toggleVehicleVisibility = async (vehicleId, newVisibility) => {
         try {
             await dataService.toggleVehicleVisibility(vehicleId, newVisibility);
@@ -266,6 +302,10 @@ export function AppProvider({ children }) {
         setDefaultRun,
         updateRunColor,
         deleteRun,
+        tags,
+        createTag,
+        syncVehicleTags,
+        uploadVehicleImage,
         toggleVehicleVisibility,
         exportData,
         importData,

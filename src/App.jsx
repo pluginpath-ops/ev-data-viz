@@ -23,6 +23,10 @@ export default function App() {
         setDefaultRun,
         updateRunColor,
         deleteRun,
+        tags,
+        createTag,
+        syncVehicleTags,
+        uploadVehicleImage,
         toggleVehicleVisibility,
         exportData,
         importData,
@@ -187,6 +191,10 @@ export default function App() {
                             onViewRuns={(v) => { setActiveVehicle(v); setView('runs'); }}
                             isOwner={isOwner}
                             onToggleVisibility={toggleVehicleVisibility}
+                            tags={tags}
+                            onCreateTag={createTag}
+                            onSyncVehicleTags={syncVehicleTags}
+                            onUploadVehicleImage={uploadVehicleImage}
                         />
                     )}
                     {view === 'runs' && currentActiveVehicle && (
