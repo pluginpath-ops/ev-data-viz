@@ -167,6 +167,15 @@ export function AppProvider({ children }) {
         reader.readAsText(file);
     };
 
+    const toggleVehicleVisibility = async (vehicleId, newVisibility) => {
+        try {
+            await dataService.toggleVehicleVisibility(vehicleId, newVisibility);
+            setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, visibility: newVisibility } : v));
+        } catch (error) {
+            alert('Error updating visibility: ' + error.message);
+        }
+    };
+
     const signOut = async () => {
         await dataService.signOut();
         window.location.reload();
@@ -188,6 +197,7 @@ export function AppProvider({ children }) {
         setDefaultRun,
         updateRunColor,
         deleteRun,
+        toggleVehicleVisibility,
         exportData,
         importData,
         signOut,
