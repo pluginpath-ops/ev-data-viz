@@ -1,5 +1,23 @@
 import { useState } from 'react';
 
+// Icons for view toggle
+const CardViewIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <rect x="1" y="1" width="6" height="6" rx="1"/>
+        <rect x="9" y="1" width="6" height="6" rx="1"/>
+        <rect x="1" y="9" width="6" height="6" rx="1"/>
+        <rect x="9" y="9" width="6" height="6" rx="1"/>
+    </svg>
+);
+
+const ListViewIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <rect x="1" y="2" width="14" height="2.5" rx="1"/>
+        <rect x="1" y="6.75" width="14" height="2.5" rx="1"/>
+        <rect x="1" y="11.5" width="14" height="2.5" rx="1"/>
+    </svg>
+);
+
 export default function VehiclesView({
     vehicles, selectedVehicles, onToggleSelection, onAdd, onUpdate, onDelete, onViewRuns,
     isOwner, onToggleVisibility, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage
@@ -14,6 +32,7 @@ export default function VehiclesView({
     const [newTagName, setNewTagName] = useState('');
     const [activeTagFilters, setActiveTagFilters] = useState([]);
     const [imageUploading, setImageUploading] = useState(false);
+    const [viewMode, setViewMode] = useState('card'); // 'card' | 'list'
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -103,13 +122,227 @@ export default function VehiclesView({
     const availableTagsForForm = tags.filter(t => !formTags.some(ft => ft.id === t.id));
     const editingVehicle = editingId ? vehicles.find(v => v.id === editingId) : null;
 
+    // ── Shared sub-components ────────────────────────────────────────────────
+
+    const VisibilityPill = ({ vehicle }) => {
+        const base = 'flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition';
+        const pubCls = 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200';
+        const privCls = 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200';
+        const isPublic = vehicle.visibility === 'public';
+        if (isOwner) {
+            return (
+                <button
+                    onClick={(e) => { e.stopPropagation(); onToggleVisibility(vehicle.id, isPublic ? 'private' : 'public'); }}
+                    title={`Click to make ${isPublic ? 'private' : 'public'}`}
+                    className={`${base} ${isPublic ? pubCls : privCls}`}
+                >
+                    {isPublic ? '🌐 Public' : '🔒 Private'}
+                </button>
+            );
+        }
+        return (
+            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-100 text-gray-500 border-gray-300'}`}>
+                {isPublic ? '🌐 Public' : '🔒 Private'}
+            </span>
+        );
+    };
+
+    const ActionButtons = ({ vehicle, layout }) => {
+        const isVertical = layout === 'list';
+        return (
+            <div className={isVertical ? 'flex flex-col gap-1' : 'flex gap-2'}>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onViewRuns(vehicle); }}
+                    className={`px-3 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition${isVertical ? '' : ' flex-1'}`}
+                >
+                    View Runs
+                </button>
+                {isOwner && (
+                    <button
+                        onClick={(e) => handleEdit(vehicle, e)}
+                        className="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
+                    >
+                        Edit
+                    </button>
+                )}
+                {isOwner && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onDelete(vehicle.id); }}
+                        className="px-3 py-1 rounded-md text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition"
+                    >
+                        Delete
+                    </button>
+                )}
+            </div>
+        );
+    };
+
+    const TagPills = ({ vehicle }) => {
+        if (!vehicle.tags?.length) return null;
+        return (
+            <div className="flex flex-wrap gap-1">
+                {vehicle.tags.map(tag => (
+                    <span
+                        key={tag.id}
+                        className="px-2 py-0.5 rounded-full text-xs font-medium"
+                        style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
+                    >
+                        {tag.name}
+                    </span>
+                ))}
+            </div>
+        );
+    };
+
+    // ── Inline edit form (shared between card and list views) ────────────────
+
+    const EditForm = () => (
+        <form onSubmit={handleSubmit} className="card">
+            <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
+            <div className="grid grid-cols-2 gap-4">
+                <input
+                    placeholder="Display Name (e.g., Model 3 LR 2024)"
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    className="border p-2 rounded col-span-2"
+                    required
+                />
+                <input placeholder="Make" value={formData.make} onChange={(e) => setFormData({...formData, make: e.target.value})} className="border p-2 rounded" />
+                <input placeholder="Model" value={formData.model} onChange={(e) => setFormData({...formData, model: e.target.value})} className="border p-2 rounded" />
+                <input placeholder="Year" value={formData.year} onChange={(e) => setFormData({...formData, year: e.target.value})} className="border p-2 rounded" />
+                <input placeholder="Battery (kWh)" value={formData.battery} onChange={(e) => setFormData({...formData, battery: e.target.value})} className="border p-2 rounded" />
+                <input placeholder="EPA Range (mi)" value={formData.range} onChange={(e) => setFormData({...formData, range: e.target.value})} className="border p-2 rounded" />
+                <input placeholder="Peak Power (kW)" value={formData.power} onChange={(e) => setFormData({...formData, power: e.target.value})} className="border p-2 rounded" />
+            </div>
+
+            {/* Tags — edit mode only */}
+            {editingId && (
+                <div className="mt-5 border-t pt-4">
+                    <label className="block font-medium mb-2">Tags</label>
+                    {formTags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                            {formTags.map(tag => (
+                                <div
+                                    key={tag.id}
+                                    className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium"
+                                    style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
+                                >
+                                    <span>{tag.name}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveFormTag(tag.id)}
+                                        className="ml-1 rounded-full w-4 h-4 flex items-center justify-center hover:opacity-70"
+                                        style={{ fontSize: '12px' }}
+                                    >
+                                        &times;
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {availableTagsForForm.length > 0 && (
+                        <div className="mb-2">
+                            <select
+                                onChange={(e) => {
+                                    const tag = tags.find(t => t.id === parseInt(e.target.value));
+                                    if (tag) handleAddFormTag(tag);
+                                    e.target.value = '';
+                                }}
+                                className="border p-2 rounded text-sm w-full"
+                                defaultValue=""
+                            >
+                                <option value="" disabled>Add existing tag…</option>
+                                {availableTagsForForm.map(tag => (
+                                    <option key={tag.id} value={tag.id}>{tag.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder="New tag name"
+                            value={newTagName}
+                            onChange={(e) => setNewTagName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateTag(); } }}
+                            className="border p-2 rounded text-sm flex-1"
+                        />
+                        <button type="button" onClick={handleCreateTag} className="btn btn-secondary text-sm">
+                            Create tag
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Image upload — edit mode only */}
+            {editingId && (
+                <div className="mt-4 border-t pt-4">
+                    <label className="block font-medium mb-2">Card Background Image</label>
+                    {editingVehicle?.image_url && (
+                        <img
+                            src={editingVehicle.image_url}
+                            alt="Current"
+                            className="h-24 w-full object-cover rounded mb-2 border"
+                        />
+                    )}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <span className="btn btn-secondary text-sm">
+                            {imageUploading ? 'Uploading…' : editingVehicle?.image_url ? 'Replace image' : 'Upload image'}
+                        </span>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleImageUpload}
+                            disabled={imageUploading}
+                        />
+                    </label>
+                </div>
+            )}
+
+            <div className="mt-4 flex gap-2">
+                <button type="submit" className="btn btn-primary">
+                    {editingId ? 'Save Changes' : 'Add Vehicle'}
+                </button>
+                <button type="button" onClick={handleCancel} className="btn btn-secondary">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    );
+
+    // ────────────────────────────────────────────────────────────────────────
+
     return (
         <div>
+            {/* Header */}
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">Vehicles</h2>
-                <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">
-                    {showForm && !editingId ? 'Cancel' : '+ Add Vehicle'}
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* View mode toggle */}
+                    <div className="flex border rounded-lg overflow-hidden text-gray-500">
+                        <button
+                            onClick={() => setViewMode('card')}
+                            title="Card view"
+                            className={`px-2 py-1.5 transition ${viewMode === 'card' ? 'bg-gray-200 text-gray-800' : 'hover:bg-gray-100'}`}
+                        >
+                            <CardViewIcon />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('list')}
+                            title="List view"
+                            className={`px-2 py-1.5 transition ${viewMode === 'list' ? 'bg-gray-200 text-gray-800' : 'hover:bg-gray-100'}`}
+                        >
+                            <ListViewIcon />
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => { setEditingId(null); setShowForm(!showForm); }}
+                        className="btn btn-primary"
+                    >
+                        {showForm && !editingId ? 'Cancel' : '+ Add Vehicle'}
+                    </button>
+                </div>
             </div>
 
             {/* Tag filter bar */}
@@ -141,234 +374,155 @@ export default function VehiclesView({
                 </div>
             )}
 
-            {showForm && (
-                <form onSubmit={handleSubmit} className="card mb-6">
-                    <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                        <input
-                            placeholder="Display Name (e.g., Model 3 LR 2024)"
-                            value={formData.name}
-                            onChange={(e) => setFormData({...formData, name: e.target.value})}
-                            className="border p-2 rounded col-span-2"
-                            required
-                        />
-                        <input placeholder="Make" value={formData.make} onChange={(e) => setFormData({...formData, make: e.target.value})} className="border p-2 rounded" />
-                        <input placeholder="Model" value={formData.model} onChange={(e) => setFormData({...formData, model: e.target.value})} className="border p-2 rounded" />
-                        <input placeholder="Year" value={formData.year} onChange={(e) => setFormData({...formData, year: e.target.value})} className="border p-2 rounded" />
-                        <input placeholder="Battery (kWh)" value={formData.battery} onChange={(e) => setFormData({...formData, battery: e.target.value})} className="border p-2 rounded" />
-                        <input placeholder="EPA Range (mi)" value={formData.range} onChange={(e) => setFormData({...formData, range: e.target.value})} className="border p-2 rounded" />
-                        <input placeholder="Peak Power (kW)" value={formData.power} onChange={(e) => setFormData({...formData, power: e.target.value})} className="border p-2 rounded" />
-                    </div>
-
-                    {/* Tags — edit mode only */}
-                    {editingId && (
-                        <div className="mt-5 border-t pt-4">
-                            <label className="block font-medium mb-2">Tags</label>
-
-                            {/* Current tags as pills */}
-                            {formTags.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mb-3">
-                                    {formTags.map(tag => (
-                                        <div
-                                            key={tag.id}
-                                            className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium"
-                                            style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
-                                        >
-                                            <span>{tag.name}</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRemoveFormTag(tag.id)}
-                                                className="ml-1 rounded-full w-4 h-4 flex items-center justify-center hover:opacity-70"
-                                                style={{ fontSize: '12px' }}
-                                            >
-                                                &times;
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Add existing tag */}
-                            {availableTagsForForm.length > 0 && (
-                                <div className="mb-2">
-                                    <select
-                                        onChange={(e) => {
-                                            const tag = tags.find(t => t.id === parseInt(e.target.value));
-                                            if (tag) handleAddFormTag(tag);
-                                            e.target.value = '';
-                                        }}
-                                        className="border p-2 rounded text-sm w-full"
-                                        defaultValue=""
-                                    >
-                                        <option value="" disabled>Add existing tag…</option>
-                                        {availableTagsForForm.map(tag => (
-                                            <option key={tag.id} value={tag.id}>{tag.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            {/* Create new tag */}
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    placeholder="New tag name"
-                                    value={newTagName}
-                                    onChange={(e) => setNewTagName(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateTag(); } }}
-                                    className="border p-2 rounded text-sm flex-1"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleCreateTag}
-                                    className="btn btn-secondary text-sm"
-                                >
-                                    Create tag
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Image upload — edit mode only */}
-                    {editingId && (
-                        <div className="mt-4 border-t pt-4">
-                            <label className="block font-medium mb-2">Card Background Image</label>
-                            {editingVehicle?.image_url && (
-                                <img
-                                    src={editingVehicle.image_url}
-                                    alt="Current"
-                                    className="h-24 w-full object-cover rounded mb-2 border"
-                                />
-                            )}
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <span className="btn btn-secondary text-sm">
-                                    {imageUploading ? 'Uploading…' : editingVehicle?.image_url ? 'Replace image' : 'Upload image'}
-                                </span>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={handleImageUpload}
-                                    disabled={imageUploading}
-                                />
-                            </label>
-                        </div>
-                    )}
-
-                    <div className="mt-4 flex gap-2">
-                        <button type="submit" className="btn btn-primary">
-                            {editingId ? 'Save Changes' : 'Add Vehicle'}
-                        </button>
-                        <button type="button" onClick={handleCancel} className="btn btn-secondary">
-                            Cancel
-                        </button>
-                    </div>
-                </form>
+            {/* Add form — above grid, only when not editing */}
+            {showForm && !editingId && (
+                <div className="mb-6">
+                    <EditForm />
+                </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredVehicles.map(vehicle => {
-                    const isSelected = selectedVehicles.includes(vehicle.id);
-                    return (
-                        <div
-                            key={vehicle.id}
-                            onClick={() => handleCardClick(vehicle)}
-                            className="card hover:shadow-lg transition cursor-pointer relative overflow-hidden"
-                            style={{
-                                borderWidth: '2px',
-                                borderStyle: 'solid',
-                                borderColor: isSelected ? 'var(--color-primary)' : 'transparent'
-                            }}
-                        >
-                            {/* Background image + overlay */}
-                            {vehicle.image_url && (
-                                <>
-                                    <div
-                                        className="absolute inset-0"
-                                        style={{
-                                            backgroundImage: `url(${vehicle.image_url})`,
-                                            backgroundSize: 'cover',
-                                            backgroundPosition: 'center',
-                                        }}
-                                    />
-                                    <div className="absolute inset-0 bg-white/80" />
-                                </>
-                            )}
-
-                            <div className="relative z-10">
-                                {isSelected && (
-                                    <div
-                                        className="absolute -top-5 -right-5 w-6 h-6 rounded-full flex items-center justify-center text-white font-bold"
-                                        style={{ backgroundColor: 'var(--color-primary)' }}
-                                    >
-                                        &#10003;
-                                    </div>
-                                )}
-
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="text-xl font-bold">{vehicle.name}</h3>
-                                    {isOwner ? (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onToggleVisibility(vehicle.id, vehicle.visibility === 'public' ? 'private' : 'public'); }}
-                                            title={`Click to make ${vehicle.visibility === 'public' ? 'private' : 'public'}`}
-                                            className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition ${
-                                                vehicle.visibility === 'public'
-                                                    ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200'
-                                                    : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200'
-                                            }`}
-                                        >
-                                            {vehicle.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
-                                        </button>
-                                    ) : (
-                                        <span className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border ${
-                                            vehicle.visibility === 'public'
-                                                ? 'bg-green-100 text-green-700 border-green-300'
-                                                : 'bg-gray-100 text-gray-500 border-gray-300'
-                                        }`}>
-                                            {vehicle.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
-                                        </span>
+            {/* ── CARD VIEW ── */}
+            {viewMode === 'card' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredVehicles.map(vehicle => {
+                        const isSelected = selectedVehicles.includes(vehicle.id);
+                        return (
+                            <div key={vehicle.id} className="contents">
+                                <div
+                                    onClick={() => handleCardClick(vehicle)}
+                                    className="card hover:shadow-lg transition cursor-pointer relative overflow-hidden"
+                                    style={{
+                                        borderWidth: '2px',
+                                        borderStyle: 'solid',
+                                        borderColor: isSelected ? 'var(--color-primary)' : 'transparent'
+                                    }}
+                                >
+                                    {/* Background image + overlay */}
+                                    {vehicle.image_url && (
+                                        <>
+                                            <div
+                                                className="absolute inset-0"
+                                                style={{
+                                                    backgroundImage: `url(${vehicle.image_url})`,
+                                                    backgroundSize: 'cover',
+                                                    backgroundPosition: 'center',
+                                                }}
+                                            />
+                                            <div className="absolute inset-0 bg-white/80" />
+                                        </>
                                     )}
-                                </div>
 
-                                <p className="text-gray-600 mb-3">{vehicle.make} {vehicle.model} {vehicle.year}</p>
-                                <div className="text-sm text-gray-700 space-y-1 mb-3">
-                                    {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
-                                    {vehicle.range && <p>Range: {vehicle.range} mi</p>}
-                                    {vehicle.power && <p>Power: {vehicle.power} kW</p>}
-                                    <p className="font-semibold mt-2">Test Runs: {vehicle.runs?.length || 0}</p>
-                                </div>
-
-                                {/* Tag pills */}
-                                {vehicle.tags?.length > 0 && (
-                                    <div className="flex flex-wrap gap-1 mb-3">
-                                        {vehicle.tags.map(tag => (
-                                            <span
-                                                key={tag.id}
-                                                className="px-2 py-0.5 rounded-full text-xs font-medium"
-                                                style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
+                                    <div className="relative z-10">
+                                        {isSelected && (
+                                            <div
+                                                className="absolute -top-5 -right-5 w-6 h-6 rounded-full flex items-center justify-center text-white font-bold"
+                                                style={{ backgroundColor: 'var(--color-primary)' }}
                                             >
-                                                {tag.name}
-                                            </span>
-                                        ))}
+                                                &#10003;
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h3 className="text-xl font-bold">{vehicle.name}</h3>
+                                            <VisibilityPill vehicle={vehicle} />
+                                        </div>
+
+                                        <p className="text-gray-600 mb-3">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                                        <div className="text-sm text-gray-700 space-y-1 mb-3">
+                                            {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
+                                            {vehicle.range && <p>Range: {vehicle.range} mi</p>}
+                                            {vehicle.power && <p>Power: {vehicle.power} kW</p>}
+                                            <p className="font-semibold mt-2">Test Runs: {vehicle.runs?.length || 0}</p>
+                                        </div>
+
+                                        {vehicle.tags?.length > 0 && (
+                                            <div className="mb-3">
+                                                <TagPills vehicle={vehicle} />
+                                            </div>
+                                        )}
+
+                                        <ActionButtons vehicle={vehicle} layout="card" />
+                                    </div>
+                                </div>
+
+                                {/* Inline edit form — spans full grid width below the edited card's row */}
+                                {editingId === vehicle.id && showForm && (
+                                    <div className="col-span-full">
+                                        <EditForm />
                                     </div>
                                 )}
-
-                                <div className="flex gap-2">
-                                    <button onClick={(e) => { e.stopPropagation(); onViewRuns(vehicle); }} className="btn btn-primary flex-1">
-                                        View Runs
-                                    </button>
-                                    <button onClick={(e) => handleEdit(vehicle, e)} className="btn btn-edit">
-                                        Edit
-                                    </button>
-                                    <button onClick={(e) => { e.stopPropagation(); onDelete(vehicle.id); }} className="btn btn-danger">
-                                        Delete
-                                    </button>
-                                </div>
                             </div>
-                        </div>
-                    );
-                })}
-            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* ── LIST VIEW ── */}
+            {viewMode === 'list' && (
+                <div className="flex flex-col gap-2">
+                    {filteredVehicles.map(vehicle => {
+                        const isSelected = selectedVehicles.includes(vehicle.id);
+                        return (
+                            <div key={vehicle.id}>
+                                <div
+                                    onClick={() => handleCardClick(vehicle)}
+                                    className="card hover:shadow-lg transition cursor-pointer flex items-center gap-4 py-3 px-4 relative overflow-hidden"
+                                    style={{
+                                        borderWidth: '2px',
+                                        borderStyle: 'solid',
+                                        borderColor: isSelected ? 'var(--color-primary)' : 'transparent'
+                                    }}
+                                >
+                                    {isSelected && (
+                                        <div
+                                            className="absolute -top-5 -right-5 w-6 h-6 rounded-full flex items-center justify-center text-white font-bold z-10"
+                                            style={{ backgroundColor: 'var(--color-primary)' }}
+                                        >
+                                            &#10003;
+                                        </div>
+                                    )}
+
+                                    {/* Thumbnail */}
+                                    <div className="flex-shrink-0 w-20 h-20 rounded overflow-hidden bg-gray-100 flex items-center justify-center text-2xl">
+                                        {vehicle.image_url
+                                            ? <img src={vehicle.image_url} alt={vehicle.name} className="w-full h-full object-cover" />
+                                            : <span>🚗</span>
+                                        }
+                                    </div>
+
+                                    {/* Name + make + tags */}
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-bold text-lg leading-tight truncate">{vehicle.name}</h3>
+                                        <p className="text-gray-500 text-sm mb-1">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                                        <TagPills vehicle={vehicle} />
+                                    </div>
+
+                                    {/* Specs */}
+                                    <div className="text-sm text-gray-600 space-y-0.5 w-36 flex-shrink-0 hidden sm:block">
+                                        {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
+                                        {vehicle.range && <p>Range: {vehicle.range} mi</p>}
+                                        {vehicle.power && <p>Power: {vehicle.power} kW</p>}
+                                        <p className="font-medium">Runs: {vehicle.runs?.length || 0}</p>
+                                    </div>
+
+                                    {/* Visibility + action buttons */}
+                                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                        <VisibilityPill vehicle={vehicle} />
+                                        <ActionButtons vehicle={vehicle} layout="list" />
+                                    </div>
+                                </div>
+
+                                {/* Inline edit form below this list row */}
+                                {editingId === vehicle.id && showForm && (
+                                    <div className="mt-2">
+                                        <EditForm />
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             {filteredVehicles.length === 0 && !showForm && (
                 <div className="text-center py-12 text-gray-500">
