@@ -194,6 +194,24 @@ class DataService {
     localStorage.setItem('selectedVehicles', JSON.stringify(vehicleIds));
   }
 
+  async getRunData(runId) {
+    const { data, error } = await getSupabase()
+      .from('data_points')
+      .select('*')
+      .eq('run_id', runId)
+      .order('frame', { ascending: true });
+    if (error) throw error;
+    return (data || []).map(p => ({
+      frame: p.frame,
+      timestamp: p.timestamp,
+      soc: p.soc,
+      chargeRate: p.charge_rate,
+      time: p.time_value,
+      range: p.range_value,
+      temperature: p.temperature,
+    }));
+  }
+
   async toggleVehicleVisibility(vehicleId, newVisibility) {
     const { data, error } = await getSupabase()
       .from('vehicles')

@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
+import { dataService } from '../services/DataService';
 
 export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor }) {
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
     const [expandedVehicles, setExpandedVehicles] = useState({});
+    const [runDataCache, setRunDataCache] = useState({});
+    const [loadingData, setLoadingData] = useState(false);
 
     const selectedVehicles = vehicles.filter(v => selectedVehicleIds.includes(v.id));
 
@@ -37,6 +40,35 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
             }));
         }
     }, [selectedVehicleIds]);
+
+    // Lazy-load data_points for newly selected runs
+    useEffect(() => {
+        const fetchMissingData = async () => {
+            const missingIds = chartConfig.selectedRuns.filter(id => !(id in runDataCache));
+            if (missingIds.length === 0) return;
+            setLoadingData(true);
+            const updates = {};
+            for (const runId of missingIds) {
+                try {
+                    if (dataService.useSupabase) {
+                        updates[runId] = await dataService.getRunData(runId);
+                    } else {
+                        // localStorage: find run.data inline
+                        for (const v of vehicles) {
+                            const run = v.runs?.find(r => r.id === runId);
+                            if (run) { updates[runId] = run.data || []; break; }
+                        }
+                    }
+                } catch (err) {
+                    console.error(`Failed to load data for run ${runId}:`, err);
+                    updates[runId] = [];
+                }
+            }
+            setRunDataCache(prev => ({ ...prev, ...updates }));
+            setLoadingData(false);
+        };
+        fetchMissingData();
+    }, [chartConfig.selectedRuns]);
 
     const toggleVehicleExpanded = (vehicleId) => {
         setExpandedVehicles(prev => ({
@@ -84,7 +116,8 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
         });
 
         const datasets = allSelectedRuns.map((run) => {
-            const data = run.data
+            const rawData = runDataCache[run.id] ?? run.data ?? [];
+            const data = rawData
                 .filter(d => d[chartConfig.xAxis] != null && d[chartConfig.yAxis] != null)
                 .map(d => ({
                     x: d[chartConfig.xAxis],
@@ -143,7 +176,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                 chartInstance.current.destroy();
             }
         };
-    }, [chartConfig, selectedVehicles]);
+    }, [chartConfig, selectedVehicles, runDataCache]);
 
     return (
         <div>
@@ -343,6 +376,9 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
             </div>
 
             <div className="card">
+                {loadingData && (
+                    <div className="text-center py-4 text-gray-500 text-sm">Loading run data...</div>
+                )}
                 <div style={{ height: '500px' }}>
                     <canvas ref={chartRef}></canvas>
                 </div>
