@@ -155,11 +155,77 @@ export function AppProvider({ children }) {
 
     const importData = (file) => {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const data = JSON.parse(e.target.result);
-                setVehicles(data.vehicles || []);
-                alert('Data imported successfully!');
+                const vehiclesToImport = data.vehicles || [];
+
+                if (dataService.useSupabase && dataService.user) {
+                    // Build import plan:
+                    // - Vehicle name match → merge into existing (no duplicate vehicle created)
+                    // - Run name+date match → suspected duplicate, ask user
+                    const plans = [];
+                    const suspectedDupLines = [];
+
+                    for (const vehicle of vehiclesToImport) {
+                        const existing = vehicles.find(v =>
+                            v.name?.toLowerCase() === vehicle.name?.toLowerCase()
+                        );
+                        const runsToAdd = [];
+                        const suspectedDups = [];
+
+                        for (const run of vehicle.runs || []) {
+                            const isDup = (existing?.runs || []).some(r =>
+                                r.name?.toLowerCase() === run.name?.toLowerCase() &&
+                                r.date === run.date
+                            );
+                            if (isDup) {
+                                suspectedDups.push(run);
+                                suspectedDupLines.push(`• "${vehicle.name}" → Run "${run.name}" (${run.date || 'no date'})`);
+                            } else {
+                                runsToAdd.push(run);
+                            }
+                        }
+
+                        plans.push({ vehicle, existingId: existing?.id || null, isNew: !existing, runsToAdd, suspectedDups });
+                    }
+
+                    // Ask about suspected duplicates (name + date match)
+                    let addDups = false;
+                    if (suspectedDupLines.length > 0) {
+                        const msg = `Found ${suspectedDupLines.length} suspected duplicate run(s) (same name & date):\n\n${suspectedDupLines.join('\n')}\n\nAdd suspected duplicates anyway?`;
+                        addDups = window.confirm(msg); // OK = add anyway, Cancel = skip
+                    }
+
+                    // Execute import
+                    let vehiclesImported = 0;
+                    let runsImported = 0;
+
+                    for (const plan of plans) {
+                        let vehicleId = plan.existingId;
+                        if (plan.isNew) {
+                            const newVehicle = await dataService.addVehicle(plan.vehicle);
+                            vehicleId = newVehicle.id;
+                            vehiclesImported++;
+                        }
+                        const allRuns = addDups
+                            ? [...plan.runsToAdd, ...plan.suspectedDups]
+                            : plan.runsToAdd;
+                        for (const run of allRuns) {
+                            await dataService.addRun(vehicleId, run);
+                            runsImported++;
+                        }
+                    }
+
+                    await initializeApp();
+                    const dupNote = suspectedDupLines.length > 0
+                        ? ` ${suspectedDupLines.length} suspected duplicate(s) ${addDups ? 'added' : 'skipped'}.`
+                        : '';
+                    alert(`Import complete: ${vehiclesImported} new vehicle(s), ${runsImported} run(s) added.${dupNote}`);
+                } else {
+                    setVehicles(vehiclesToImport);
+                    alert('Data imported successfully!');
+                }
             } catch (error) {
                 alert('Error importing data: ' + error.message);
             }
@@ -170,9 +236,12 @@ export function AppProvider({ children }) {
     const toggleVehicleVisibility = async (vehicleId, newVisibility) => {
         try {
             await dataService.toggleVehicleVisibility(vehicleId, newVisibility);
+            // Only update UI after confirmed DB write
             setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, visibility: newVisibility } : v));
         } catch (error) {
             alert('Error updating visibility: ' + error.message);
+            // Re-sync from DB so the UI doesn't show stale state
+            await initializeApp();
         }
     };
 
