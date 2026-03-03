@@ -390,7 +390,7 @@ export default function VehiclesView({
                             <div key={vehicle.id} className="contents">
                                 <div
                                     onClick={() => handleCardClick(vehicle)}
-                                    className="card hover:shadow-lg transition cursor-pointer relative overflow-hidden"
+                                    className="card hover:shadow-lg transition cursor-pointer relative overflow-hidden flex flex-col"
                                     style={{
                                         borderWidth: '2px',
                                         borderStyle: 'solid',
@@ -412,7 +412,7 @@ export default function VehiclesView({
                                         </>
                                     )}
 
-                                    <div className="relative z-10">
+                                    <div className="relative z-10 flex flex-col flex-1">
                                         {isSelected && (
                                             <div
                                                 className="absolute -top-5 -right-5 w-6 h-6 rounded-full flex items-center justify-center text-white font-bold"
@@ -422,26 +422,30 @@ export default function VehiclesView({
                                             </div>
                                         )}
 
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h3 className="text-xl font-bold">{vehicle.name}</h3>
-                                            <VisibilityPill vehicle={vehicle} />
-                                        </div>
-
-                                        <p className="text-gray-600 mb-3">{vehicle.make} {vehicle.model} {vehicle.year}</p>
-                                        <div className="text-sm text-gray-700 space-y-1 mb-3">
-                                            {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
-                                            {vehicle.range && <p>Range: {vehicle.range} mi</p>}
-                                            {vehicle.power && <p>Power: {vehicle.power} kW</p>}
-                                            <p className="font-semibold mt-2">Test Runs: {vehicle.runs?.length || 0}</p>
-                                        </div>
-
-                                        {vehicle.tags?.length > 0 && (
-                                            <div className="mb-3">
-                                                <TagPills vehicle={vehicle} />
+                                        {/* Top content */}
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h3 className="text-xl font-bold">{vehicle.name}</h3>
+                                                <VisibilityPill vehicle={vehicle} />
                                             </div>
-                                        )}
+                                            <p className="text-gray-600 mb-2">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                                            <div className="text-sm text-gray-700 space-y-1">
+                                                {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
+                                                {vehicle.range && <p>Range: {vehicle.range} mi</p>}
+                                                {vehicle.power && <p>Power: {vehicle.power} kW</p>}
+                                            </div>
+                                        </div>
 
-                                        <ActionButtons vehicle={vehicle} layout="card" />
+                                        {/* Bottom anchor — Test Runs, tags, buttons always at card base */}
+                                        <div className="mt-auto pt-3">
+                                            <p className="text-sm font-semibold mb-2">Test Runs: {vehicle.runs?.length || 0}</p>
+                                            {vehicle.tags?.length > 0 && (
+                                                <div className="mb-2">
+                                                    <TagPills vehicle={vehicle} />
+                                                </div>
+                                            )}
+                                            <ActionButtons vehicle={vehicle} layout="card" />
+                                        </div>
                                     </div>
                                 </div>
 
