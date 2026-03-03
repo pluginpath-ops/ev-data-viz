@@ -158,13 +158,19 @@ export function AppProvider({ children }) {
         reader.onload = async (e) => {
             try {
                 const data = JSON.parse(e.target.result);
+                const vehiclesToImport = data.vehicles || [];
                 if (dataService.useSupabase && dataService.user) {
-                    // When logged in, ignore the file and re-sync from Supabase
-                    // to avoid overwriting the live DB view with stale local data.
+                    // Insert each vehicle and its runs into Supabase
+                    for (const vehicle of vehiclesToImport) {
+                        const newVehicle = await dataService.addVehicle(vehicle);
+                        for (const run of vehicle.runs || []) {
+                            await dataService.addRun(newVehicle.id, run);
+                        }
+                    }
                     await initializeApp();
-                    alert('You are logged in — data is managed by Supabase. Local import ignored; view refreshed from database.');
+                    alert(`Imported ${vehiclesToImport.length} vehicle(s) into Supabase successfully!`);
                 } else {
-                    setVehicles(data.vehicles || []);
+                    setVehicles(vehiclesToImport);
                     alert('Data imported successfully!');
                 }
             } catch (error) {
