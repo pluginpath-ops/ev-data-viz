@@ -383,7 +383,7 @@ export default function VehiclesView({
 
             {/* ── CARD VIEW ── */}
             {viewMode === 'card' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {filteredVehicles.map(vehicle => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
                         return (
@@ -483,7 +483,7 @@ export default function VehiclesView({
                                     )}
 
                                     {/* Thumbnail */}
-                                    <div className="flex-shrink-0 w-20 h-20 rounded overflow-hidden bg-gray-100 flex items-center justify-center text-2xl">
+                                    <div className="list-thumbnail">
                                         {vehicle.image_url
                                             ? <img src={vehicle.image_url} alt={vehicle.name} className="w-full h-full object-cover" />
                                             : <span>🚗</span>
