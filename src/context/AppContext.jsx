@@ -242,7 +242,10 @@ export function AppProvider({ children }) {
             setTags(prev => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)));
             return tag;
         } catch (error) {
-            alert('Error creating tag: ' + error.message);
+            const message = error.message?.includes('row-level security')
+                ? 'Only vehicle owners can create tags.'
+                : 'Error creating tag: ' + error.message;
+            alert(message);
         }
     };
 
