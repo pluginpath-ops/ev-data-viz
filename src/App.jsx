@@ -14,8 +14,11 @@ export default function App() {
         user,
         isOwner,
         loading,
+        headerImageUrl,
+        uploadHeaderImage,
         toggleVehicleSelection,
         removeVehicleSelection,
+        clearAllSelections,
         addVehicle,
         updateVehicle,
         deleteVehicle,
@@ -83,10 +86,42 @@ export default function App() {
                 />
             )}
             <div className="min-h-screen">
-                <header className="bg-blue-600 text-white p-6 shadow-lg" style={{backgroundColor: 'var(--color-primary)'}}>
-                    <div className="max-w-7xl mx-auto">
-                        <h1 className="text-3xl font-bold">EV Data Visualization</h1>
-                        <p className="text-blue-100 mt-1" style={{color: 'rgba(255, 255, 255, 0.8)'}}>Compare and analyze electric vehicle performance data</p>
+                {/* ── Header ── */}
+                <header className="relative text-white shadow-lg overflow-hidden">
+                    {/* Background image (set by owner via site settings) */}
+                    {headerImageUrl && (
+                        <div
+                            className="absolute inset-0"
+                            style={{ backgroundImage: `url(${headerImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                        />
+                    )}
+                    {/* Solid colour overlay — slightly more opaque when no image */}
+                    <div
+                        className="absolute inset-0"
+                        style={{ backgroundColor: headerImageUrl ? 'rgba(29,78,216,0.72)' : 'var(--color-primary)' }}
+                    />
+                    <div className="relative max-w-7xl mx-auto px-6 py-6">
+                        {/* Clickable title → home */}
+                        <button
+                            onClick={() => setView('vehicles')}
+                            className="text-left group"
+                        >
+                            <h1 className="text-3xl font-bold group-hover:underline decoration-white/60">EV Data Visualization</h1>
+                        </button>
+                        <p className="mt-1" style={{color: 'rgba(255,255,255,0.8)'}}>Compare and analyze electric vehicle performance data</p>
+
+                        {/* Owner-only: change header image */}
+                        {isOwner && (
+                            <label className="absolute top-3 right-6 cursor-pointer flex items-center gap-1 text-xs text-white/60 hover:text-white/90 transition">
+                                📷 Change header image
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => { e.target.files[0] && uploadHeaderImage(e.target.files[0]); e.target.value = ''; }}
+                                />
+                            </label>
+                        )}
                     </div>
                 </header>
 
@@ -126,38 +161,28 @@ export default function App() {
                                             {user.email}
                                             {isOwner && <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-bold">OWNER</span>}
                                         </span>
-                                        <button
-                                            onClick={signOut}
-                                            className="btn btn-secondary text-sm"
-                                        >
+                                        <button onClick={signOut} className="btn btn-secondary">
                                             Sign Out
                                         </button>
                                     </>
                                 ) : (
-                                    <button
-                                        onClick={() => setShowAuthModal(true)}
-                                        className="btn btn-primary text-sm"
-                                    >
+                                    <button onClick={() => setShowAuthModal(true)} className="btn btn-primary">
                                         Sign In
                                     </button>
                                 )}
-                                <button
-                                    onClick={exportData}
-                                    className="btn btn-edit"
-                                >
+                                <button onClick={exportData} className="btn btn-secondary">
                                     Export Data
                                 </button>
-                                {/* Import dropdown */}
+                                {/* Import ▾ dropdown — blue (primary action) */}
                                 <div className="relative">
                                     <button
-                                        className="btn btn-secondary"
+                                        className="btn btn-primary"
                                         onClick={() => setShowImportMenu(m => !m)}
                                     >
                                         Import ▾
                                     </button>
                                     {showImportMenu && (
                                         <>
-                                            {/* Click-away backdrop */}
                                             <div className="fixed inset-0 z-10" onClick={() => setShowImportMenu(false)} />
                                             <div className="absolute right-0 mt-1 w-44 bg-white border rounded-lg shadow-lg z-20 overflow-hidden">
                                                 <label
@@ -186,6 +211,7 @@ export default function App() {
                             </div>
                         </div>
 
+                        {/* Selected vehicles row */}
                         <div className="flex gap-2 items-center flex-wrap pt-2 border-t">
                             <span className="text-sm text-gray-600 font-medium">Selected:</span>
                             {selectedVehicles.length === 0 ? (
@@ -193,26 +219,34 @@ export default function App() {
                                     None
                                 </div>
                             ) : (
-                                selectedVehicles.map(vehicleId => {
-                                    const vehicle = vehicles.find(v => v.id === vehicleId);
-                                    if (!vehicle) return null;
-                                    return (
-                                        <div
-                                            key={vehicleId}
-                                            className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
-                                            style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}
-                                        >
-                                            <span>{vehicle.name}</span>
-                                            <button
-                                                onClick={() => removeVehicleSelection(vehicleId)}
-                                                className="ml-1 hover:bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center"
-                                                style={{fontSize: '12px'}}
+                                <>
+                                    {selectedVehicles.map(vehicleId => {
+                                        const vehicle = vehicles.find(v => v.id === vehicleId);
+                                        if (!vehicle) return null;
+                                        return (
+                                            <div
+                                                key={vehicleId}
+                                                className="flex items-center gap-1 px-3 py-1 rounded-full text-sm"
+                                                style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}
                                             >
-                                                &times;
-                                            </button>
-                                        </div>
-                                    );
-                                })
+                                                <span>{vehicle.name}</span>
+                                                <button
+                                                    onClick={() => removeVehicleSelection(vehicleId)}
+                                                    className="ml-1 hover:opacity-70 rounded-full w-4 h-4 flex items-center justify-center"
+                                                    style={{fontSize: '12px'}}
+                                                >
+                                                    &times;
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                    <button
+                                        onClick={clearAllSelections}
+                                        className="text-xs text-gray-400 hover:text-gray-600 underline ml-1"
+                                    >
+                                        Clear all
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>

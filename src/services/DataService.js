@@ -269,6 +269,33 @@ class DataService {
     }
   }
 
+  // ── Site settings ────────────────────────────────────────────────────────
+
+  async getSiteSettings() {
+    if (!this.useSupabase) return {};
+    const { data } = await getSupabase().from('site_settings').select('*');
+    const settings = {};
+    for (const row of data || []) settings[row.key] = row.value;
+    return settings;
+  }
+
+  async uploadHeaderImage(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const path = `header_image.${ext}`;
+    const { error: uploadError } = await getSupabase().storage
+      .from('site-assets')
+      .upload(path, file, { upsert: true });
+    if (uploadError) throw uploadError;
+    // Bust the CDN cache by appending a timestamp query param
+    const { data } = getSupabase().storage.from('site-assets').getPublicUrl(path);
+    const url = `${data.publicUrl}?t=${Date.now()}`;
+    const { error: settingError } = await getSupabase()
+      .from('site_settings')
+      .upsert({ key: 'header_image_url', value: url });
+    if (settingError) throw settingError;
+    return url;
+  }
+
   /**
    * Import pre-parsed Tableau CSV sessions into Supabase.
    * @param {Array} sessions - output of parseTableauCSV()
