@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useDeleteQueue } from '../hooks/useDeleteQueue';
+import DeleteQueueBar from './DeleteQueueBar';
 
 // Icons for view toggle
 const CardViewIcon = () => (
@@ -164,6 +166,11 @@ export default function VehiclesView({
     const [imageUploading, setImageUploading] = useState(false);
     const [viewMode, setViewMode] = useState('card'); // 'card' | 'list'
 
+    const {
+        pendingDeletes, committedDeletes, undoState, secondsLeft,
+        queueDelete, restoreItem, clearQueue, commitDeletes, undoDelete,
+    } = useDeleteQueue(onDelete);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (editingId) {
@@ -243,11 +250,12 @@ export default function VehiclesView({
         );
     };
 
-    const filteredVehicles = activeTagFilters.length === 0
+    const filteredVehicles = (activeTagFilters.length === 0
         ? vehicles
         : vehicles.filter(v =>
             activeTagFilters.every(tagId => v.tags?.some(t => t.id === tagId))
-        );
+        )
+    ).filter(v => !committedDeletes.has(v.id));
 
     const availableTagsForForm = tags.filter(t => !formTags.some(ft => ft.id === t.id));
     const editingVehicle = editingId ? vehicles.find(v => v.id === editingId) : null;
@@ -295,14 +303,24 @@ export default function VehiclesView({
                         Edit
                     </button>
                 )}
-                {isOwner && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onDelete(vehicle.id); }}
-                        className="px-3 py-1 rounded-md text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition"
-                    >
-                        Delete
-                    </button>
-                )}
+                {isOwner && (() => {
+                    const isPending = pendingDeletes.has(vehicle.id);
+                    return (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                isPending ? restoreItem(vehicle.id) : queueDelete(vehicle.id);
+                            }}
+                            className={`px-3 py-1 rounded-md text-xs font-medium transition${isVertical ? '' : ''} ${
+                                isPending
+                                    ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                                    : 'bg-red-50 text-red-600 hover:bg-red-100'
+                            }`}
+                        >
+                            {isPending ? '↩ Restore' : 'Delete'}
+                        </button>
+                    );
+                })()}
             </div>
         );
     };
@@ -338,8 +356,10 @@ export default function VehiclesView({
 
     // ────────────────────────────────────────────────────────────────────────
 
+    const barVisible = pendingDeletes.size > 0 || !!undoState;
+
     return (
-        <div>
+        <div className={barVisible ? 'pb-20' : ''}>
             {/* Header */}
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">Vehicles</h2>
@@ -411,15 +431,16 @@ export default function VehiclesView({
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {filteredVehicles.map(vehicle => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
+                        const isPending  = pendingDeletes.has(vehicle.id);
                         return (
                             <div key={vehicle.id} className="contents">
                                 <div
                                     onClick={() => handleCardClick(vehicle)}
-                                    className="card hover:shadow-lg transition cursor-pointer relative overflow-hidden flex flex-col"
+                                    className={`card hover:shadow-lg transition cursor-pointer relative overflow-hidden flex flex-col${isPending ? ' opacity-60' : ''}`}
                                     style={{
                                         borderWidth: '2px',
                                         borderStyle: 'solid',
-                                        borderColor: isSelected ? 'var(--color-primary)' : 'transparent'
+                                        borderColor: isPending ? 'rgb(252,165,165)' : isSelected ? 'var(--color-primary)' : 'transparent'
                                     }}
                                 >
                                     {/* Background image + overlay */}
@@ -491,15 +512,16 @@ export default function VehiclesView({
                 <div className="flex flex-col gap-2">
                     {filteredVehicles.map(vehicle => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
+                        const isPending  = pendingDeletes.has(vehicle.id);
                         return (
                             <div key={vehicle.id}>
                                 <div
                                     onClick={() => handleCardClick(vehicle)}
-                                    className="card hover:shadow-lg transition cursor-pointer flex items-center gap-4 py-3 px-4 relative overflow-hidden"
+                                    className={`card hover:shadow-lg transition cursor-pointer flex items-center gap-4 py-3 px-4 relative overflow-hidden${isPending ? ' opacity-60' : ''}`}
                                     style={{
                                         borderWidth: '2px',
                                         borderStyle: 'solid',
-                                        borderColor: isSelected ? 'var(--color-primary)' : 'transparent'
+                                        borderColor: isPending ? 'rgb(252,165,165)' : isSelected ? 'var(--color-primary)' : 'transparent'
                                     }}
                                 >
                                     {isSelected && (
@@ -561,6 +583,16 @@ export default function VehiclesView({
                     }
                 </div>
             )}
+
+            <DeleteQueueBar
+                pendingCount={pendingDeletes.size}
+                onClearQueue={clearQueue}
+                onCommit={commitDeletes}
+                undoState={undoState}
+                secondsLeft={secondsLeft}
+                onUndo={undoDelete}
+                noun="vehicle"
+            />
         </div>
     );
 }

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { parseCSV } from '../utils/parseCSV';
+import { useDeleteQueue } from '../hooks/useDeleteQueue';
+import DeleteQueueBar from './DeleteQueueBar';
 
 export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onViewChart }) {
     const [showUpload, setShowUpload] = useState(false);
@@ -14,6 +16,11 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
     });
     const [editingRunId, setEditingRunId] = useState(null);
     const [editFormData, setEditFormData] = useState({});
+
+    const {
+        pendingDeletes, committedDeletes, undoState, secondsLeft,
+        queueDelete, restoreItem, clearQueue, commitDeletes, undoDelete,
+    } = useDeleteQueue(onDeleteRun);
 
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
@@ -93,9 +100,11 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
     };
 
     const availableFields = csvData?.meta.fields || [];
+    const displayRuns     = (vehicle.runs || []).filter(r => !committedDeletes.has(r.id));
+    const barVisible      = pendingDeletes.size > 0 || !!undoState;
 
     return (
-        <div>
+        <div className={barVisible ? 'pb-20' : ''}>
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="text-2xl font-bold">{vehicle.name} - Test Runs</h2>
@@ -239,8 +248,13 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
             )}
 
             <div className="space-y-4">
-                {vehicle.runs?.map(run => (
-                    <div key={run.id} className="card">
+                {displayRuns.map(run => {
+                  const isPending = pendingDeletes.has(run.id);
+                  return (
+                    <div
+                        key={run.id}
+                        className={`card${isPending ? ' opacity-60 border-2 border-red-200' : ''}`}
+                    >
                         {editingRunId === run.id ? (
                             <div>
                                 <h3 className="text-lg font-bold mb-4">Edit Run</h3>
@@ -352,16 +366,17 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
                                         Edit
                                     </button>
                                     <button
-                                        onClick={() => onDeleteRun(run.id)}
-                                        className="btn btn-danger"
+                                        onClick={() => isPending ? restoreItem(run.id) : queueDelete(run.id)}
+                                        className={`btn text-sm ${isPending ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-0 rounded-md px-3 py-1 font-medium' : 'btn-danger'}`}
                                     >
-                                        Delete
+                                        {isPending ? '↩ Restore' : 'Delete'}
                                     </button>
                                 </div>
                             </div>
                         )}
                     </div>
-                ))}
+                  );
+                })}
             </div>
 
             {vehicle.runs?.length === 0 && !showUpload && (
@@ -369,6 +384,16 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
                     <p className="text-lg">No test runs yet. Upload a CSV to get started!</p>
                 </div>
             )}
+
+            <DeleteQueueBar
+                pendingCount={pendingDeletes.size}
+                onClearQueue={clearQueue}
+                onCommit={commitDeletes}
+                undoState={undoState}
+                secondsLeft={secondsLeft}
+                onUndo={undoDelete}
+                noun="run"
+            />
         </div>
     );
 }
