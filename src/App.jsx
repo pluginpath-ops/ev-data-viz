@@ -46,7 +46,9 @@ export default function App() {
     const [chartConfig, setChartConfig] = useState({
         xAxis: 'soc',
         yAxis: 'chargeRate',
-        selectedRuns: []
+        selectedRuns: [],
+        raceMode: false,
+        raceThreshold: 10,  // % SoC at which all runs are normalised to t = 0
     });
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [showImportMenu, setShowImportMenu] = useState(false);
