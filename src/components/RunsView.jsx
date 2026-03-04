@@ -536,7 +536,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         onClick={() => handleToggleDataTable(run.id)}
                                         className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
                                     >
-                                        <span>{showDataTable ? '▴ Hide data' : '▾ Show data'}</span>
+                                        <span className="font-semibold">{showDataTable ? '▴ Hide data' : '▾ Show data'}</span>
                                         {editData !== null && !editDataLoading && (
                                             <span className="text-xs text-gray-400">({editData.length} rows)</span>
                                         )}
@@ -574,7 +574,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                                                     value={row[field] ?? ''}
                                                                                     onChange={e => handleEditDataCell(i, field, e.target.value)}
                                                                                     placeholder="—"
-                                                                                    className={`w-full text-xs p-0.5 rounded outline-none ${
+                                                                                    className={`w-full text-xs p-0.5 rounded outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                                                                                         isOwner
                                                                                             ? 'bg-transparent hover:bg-white focus:bg-white focus:ring-1 focus:ring-blue-300'
                                                                                             : 'bg-transparent text-gray-600 cursor-default'
