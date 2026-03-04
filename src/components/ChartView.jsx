@@ -112,6 +112,21 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
     };
 
     /**
+     * Returns the time offset (minutes) subtracted from a participating run,
+     * or null if the run is excluded / data not yet loaded.
+     * An offset of 0 means the data started right at the threshold — nothing trimmed.
+     */
+    const getRaceOffset = (runId) => {
+        if (!raceActive) return null;
+        const data = runDataCache[runId];
+        if (!data) return null;
+        const anchor = data.findIndex(p => p.soc != null && p.soc >= raceThreshold);
+        if (anchor === -1) return null;
+        const t = data[anchor].time;
+        return t ?? null;
+    };
+
+    /**
      * Apply the race-mode time offset transform to a run's raw data.
      * Returns null if the run must be excluded (can't participate).
      */
@@ -336,6 +351,8 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
 
                             const RunLabel = ({ run }) => {
                                 const exclusionReason = getRaceExclusionReason(run.id);
+                                const offset = getRaceOffset(run.id);
+                                const noTrim = offset !== null && offset === 0;
                                 return (
                                     <span className="flex-1 flex items-center gap-2 flex-wrap">
                                         <span>
@@ -352,6 +369,17 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                                             <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded-full" title={`Hidden in race mode: ${exclusionReason}`}>
                                                 ⚠ {exclusionReason}
                                             </span>
+                                        )}
+                                        {!exclusionReason && offset !== null && (
+                                            noTrim ? (
+                                                <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full" title="Data starts at or above the threshold — no time was trimmed">
+                                                    no offset
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded-full" title={`${offset} min of pre-threshold data trimmed`}>
+                                                    −{offset} min
+                                                </span>
+                                            )
                                         )}
                                     </span>
                                 );
