@@ -3,7 +3,7 @@ import { parseCSV } from '../utils/parseCSV';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 
-export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onViewChart }) {
+export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onViewChart }) {
     const [showUpload, setShowUpload] = useState(false);
     const [uploadStep, setUploadStep] = useState('file');
     const [csvData, setCsvData] = useState(null);
@@ -17,10 +17,32 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
     const [editingRunId, setEditingRunId] = useState(null);
     const [editFormData, setEditFormData] = useState({});
 
+    // ── Merge-mode state ─────────────────────────────────────────────────────
+    // uploadMode: 'create' (new run) | 'merge' (append data to existing run)
+    const [uploadMode, setUploadMode] = useState('create');
+    const [mergeTargetRun, setMergeTargetRun] = useState(null);
+    // joinKey: 'soc' | 'time' — auto-selected or chosen by user
+    const [joinKey, setJoinKey] = useState('soc');
+
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
         queueDelete, restoreItem, clearQueue, commitDeletes, undoDelete,
     } = useDeleteQueue(onDeleteRun);
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    const resetUploadState = () => {
+        setShowUpload(false);
+        setUploadStep('file');
+        setCsvData(null);
+        setFieldMapping({});
+        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '' });
+        setUploadMode('create');
+        setMergeTargetRun(null);
+        setJoinKey('soc');
+    };
+
+    // ── File upload ───────────────────────────────────────────────────────────
 
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
@@ -50,6 +72,8 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
         }
     };
 
+    // ── Create-mode import ────────────────────────────────────────────────────
+
     const handleImport = () => {
         if (!csvData) return;
 
@@ -71,12 +95,29 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
         };
 
         onAddRun(run);
-        setShowUpload(false);
-        setUploadStep('file');
-        setCsvData(null);
-        setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '' });
+        resetUploadState();
     };
+
+    // ── Merge-mode import ─────────────────────────────────────────────────────
+
+    const handleMerge = async () => {
+        if (!csvData || !mergeTargetRun) return;
+
+        const transformedData = csvData.data.map(row => {
+            const newRow = {};
+            Object.keys(fieldMapping).forEach(key => {
+                if (fieldMapping[key]) {
+                    newRow[key] = row[fieldMapping[key]];
+                }
+            });
+            return newRow;
+        });
+
+        await onMergeRunData(mergeTargetRun.id, transformedData, joinKey);
+        resetUploadState();
+    };
+
+    // ── Edit handlers ─────────────────────────────────────────────────────────
 
     const handleEditRun = (run) => {
         setEditingRunId(run.id);
@@ -99,9 +140,31 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
         setEditFormData({});
     };
 
+    // ── Update data (merge mode entry) ────────────────────────────────────────
+
+    const handleUpdateData = (run) => {
+        setMergeTargetRun(run);
+        setUploadMode('merge');
+        setShowUpload(true);
+        setUploadStep('file');
+        setCsvData(null);
+        setFieldMapping({});
+        setJoinKey('soc');
+    };
+
+    // ── Join key logic ────────────────────────────────────────────────────────
+    // Show a radio selector only when the new CSV has both soc AND time mapped.
+    const canJoinBySoc  = !!fieldMapping.soc;
+    const canJoinByTime = !!fieldMapping.time;
+    const showJoinSelector = uploadMode === 'merge' && canJoinBySoc && canJoinByTime;
+
+    // ── Derived state ─────────────────────────────────────────────────────────
+
     const availableFields = csvData?.meta.fields || [];
     const displayRuns     = (vehicle.runs || []).filter(r => !committedDeletes.has(r.id));
     const barVisible      = pendingDeletes.size > 0 || !!undoState;
+
+    // ── Render ────────────────────────────────────────────────────────────────
 
     return (
         <div className={barVisible ? 'pb-20' : ''}>
@@ -111,12 +174,25 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
                     <p className="text-gray-600">Manage charging test data for this vehicle</p>
                 </div>
                 <div className="flex gap-2">
-                    <button
-                        onClick={() => setShowUpload(!showUpload)}
-                        className="btn btn-primary"
-                    >
-                        {showUpload ? 'Cancel' : '+ Upload CSV'}
-                    </button>
+                    {isOwner && (
+                        <button
+                            onClick={() => {
+                                if (showUpload && uploadMode === 'create') {
+                                    resetUploadState();
+                                } else {
+                                    setUploadMode('create');
+                                    setMergeTargetRun(null);
+                                    setShowUpload(true);
+                                    setUploadStep('file');
+                                    setCsvData(null);
+                                    setFieldMapping({});
+                                }
+                            }}
+                            className="btn btn-primary"
+                        >
+                            {showUpload && uploadMode === 'create' ? 'Cancel' : '+ Upload CSV'}
+                        </button>
+                    )}
                     {vehicle.runs?.length > 0 && (
                         <button
                             onClick={onViewChart}
@@ -130,35 +206,55 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
 
             {showUpload && (
                 <div className="card mb-6">
+                    {/* ── Merge-mode banner ── */}
+                    {uploadMode === 'merge' && mergeTargetRun && (
+                        <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                            <div>
+                                <span className="text-sm font-semibold text-blue-800">Adding data to: </span>
+                                <span className="text-sm text-blue-700">{mergeTargetRun.name}</span>
+                            </div>
+                            <button onClick={resetUploadState} className="text-blue-500 hover:text-blue-700 text-sm">
+                                Cancel
+                            </button>
+                        </div>
+                    )}
+
                     {uploadStep === 'file' && (
                         <div>
-                            <h3 className="text-lg font-bold mb-4">Upload Test Run Data</h3>
+                            <h3 className="text-lg font-bold mb-4">
+                                {uploadMode === 'merge' ? 'Upload Additional Data' : 'Upload Test Run Data'}
+                            </h3>
                             <div className="space-y-4">
-                                <input
-                                    placeholder="Run Name (e.g., Highway Test - Winter 2024)"
-                                    value={runMetadata.name}
-                                    onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
-                                    className="border p-2 rounded w-full"
-                                    required
-                                />
-                                <input
-                                    type="date"
-                                    value={runMetadata.date}
-                                    onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
-                                    className="border p-2 rounded w-full"
-                                />
-                                <input
-                                    placeholder="Software Version (e.g., 2024.1.5)"
-                                    value={runMetadata.softwareVersion}
-                                    onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
-                                    className="border p-2 rounded w-full"
-                                />
-                                <input
-                                    placeholder="Conditions (e.g., 20°F, highway speeds)"
-                                    value={runMetadata.conditions}
-                                    onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
-                                    className="border p-2 rounded w-full"
-                                />
+                                {/* Only show metadata inputs in create mode */}
+                                {uploadMode === 'create' && (
+                                    <>
+                                        <input
+                                            placeholder="Run Name (e.g., Highway Test - Winter 2024)"
+                                            value={runMetadata.name}
+                                            onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
+                                            className="border p-2 rounded w-full"
+                                            required
+                                        />
+                                        <input
+                                            type="date"
+                                            value={runMetadata.date}
+                                            onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
+                                            className="border p-2 rounded w-full"
+                                        />
+                                        <input
+                                            placeholder="Software Version (e.g., 2024.1.5)"
+                                            value={runMetadata.softwareVersion}
+                                            onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
+                                            className="border p-2 rounded w-full"
+                                        />
+                                        <input
+                                            placeholder="Conditions (e.g., 20°F, highway speeds)"
+                                            value={runMetadata.conditions}
+                                            onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
+                                            className="border p-2 rounded w-full"
+                                        />
+                                    </>
+                                )}
                                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                                     <label className="cursor-pointer">
                                         <span className="text-blue-600 font-medium">Click to upload CSV file</span>
@@ -179,36 +275,39 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
                             <h3 className="text-lg font-bold mb-4">Map CSV Fields</h3>
                             <p className="text-gray-600 mb-4">Match your CSV columns to standard fields. We've auto-detected some for you.</p>
 
-                            <div className="mb-6 p-4 bg-gray-50 rounded">
-                                <h4 className="font-semibold mb-3">Run Metadata</h4>
-                                <div className="space-y-3">
-                                    <input
-                                        placeholder="Run Name (e.g., Highway Test - Winter 2024)"
-                                        value={runMetadata.name}
-                                        onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
-                                        className="border p-2 rounded w-full"
-                                        required
-                                    />
-                                    <input
-                                        type="date"
-                                        value={runMetadata.date}
-                                        onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
-                                        className="border p-2 rounded w-full"
-                                    />
-                                    <input
-                                        placeholder="Software Version (e.g., 2024.1.5)"
-                                        value={runMetadata.softwareVersion}
-                                        onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
-                                        className="border p-2 rounded w-full"
-                                    />
-                                    <input
-                                        placeholder="Conditions (e.g., 20°F, highway speeds)"
-                                        value={runMetadata.conditions}
-                                        onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
-                                        className="border p-2 rounded w-full"
-                                    />
+                            {/* In create mode, allow editing metadata here too */}
+                            {uploadMode === 'create' && (
+                                <div className="mb-6 p-4 bg-gray-50 rounded">
+                                    <h4 className="font-semibold mb-3">Run Metadata</h4>
+                                    <div className="space-y-3">
+                                        <input
+                                            placeholder="Run Name (e.g., Highway Test - Winter 2024)"
+                                            value={runMetadata.name}
+                                            onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
+                                            className="border p-2 rounded w-full"
+                                            required
+                                        />
+                                        <input
+                                            type="date"
+                                            value={runMetadata.date}
+                                            onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
+                                            className="border p-2 rounded w-full"
+                                        />
+                                        <input
+                                            placeholder="Software Version (e.g., 2024.1.5)"
+                                            value={runMetadata.softwareVersion}
+                                            onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
+                                            className="border p-2 rounded w-full"
+                                        />
+                                        <input
+                                            placeholder="Conditions (e.g., 20°F, highway speeds)"
+                                            value={runMetadata.conditions}
+                                            onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
+                                            className="border p-2 rounded w-full"
+                                        />
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <h4 className="font-semibold mb-3">Field Mapping</h4>
                             <div className="space-y-3">
@@ -228,6 +327,40 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
                                     </div>
                                 ))}
                             </div>
+
+                            {/* Join key selector — only in merge mode when both soc and time are mapped */}
+                            {showJoinSelector && (
+                                <div className="mt-5 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <p className="text-sm font-semibold text-yellow-800 mb-2">
+                                        Both SoC and Time are mapped — which field should be used to match rows?
+                                    </p>
+                                    <div className="flex gap-6">
+                                        <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                            <input
+                                                type="radio"
+                                                name="joinKey"
+                                                value="soc"
+                                                checked={joinKey === 'soc'}
+                                                onChange={() => setJoinKey('soc')}
+                                            />
+                                            <span className="font-medium">SoC</span>
+                                            <span className="text-gray-500">(recommended for charging curves)</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                            <input
+                                                type="radio"
+                                                name="joinKey"
+                                                value="time"
+                                                checked={joinKey === 'time'}
+                                                onChange={() => setJoinKey('time')}
+                                            />
+                                            <span className="font-medium">Time</span>
+                                            <span className="text-gray-500">(use if SoC varies between sessions)</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="mt-6 flex gap-2">
                                 <button
                                     onClick={() => setUploadStep('file')}
@@ -235,12 +368,21 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
                                 >
                                     Back
                                 </button>
-                                <button
-                                    onClick={handleImport}
-                                    className="btn btn-primary"
-                                >
-                                    Import Run
-                                </button>
+                                {uploadMode === 'create' ? (
+                                    <button
+                                        onClick={handleImport}
+                                        className="btn btn-primary"
+                                    >
+                                        Import Run
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleMerge}
+                                        className="btn btn-primary"
+                                    >
+                                        Merge into Run
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
@@ -350,13 +492,21 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
                                         />
                                     </div>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 flex-wrap justify-end">
                                     {!run.isDefault && (
                                         <button
                                             onClick={() => onSetDefaultRun(run.id)}
                                             className="btn btn-secondary text-sm"
                                         >
                                             Set as Default
+                                        </button>
+                                    )}
+                                    {isOwner && (
+                                        <button
+                                            onClick={() => handleUpdateData(run)}
+                                            className="btn btn-secondary text-sm"
+                                        >
+                                            Update data…
                                         </button>
                                     )}
                                     <button

@@ -154,6 +154,17 @@ export function AppProvider({ children }) {
         }
     };
 
+    const mergeRunData = async (vehicleId, runId, newDataPoints, joinKey) => {
+        try {
+            const result = await dataService.mergeRunData(runId, newDataPoints, joinKey);
+            // Re-initialise so the run's data-point count refreshes in the UI
+            await initializeApp();
+            return result;
+        } catch (error) {
+            alert('Error updating run data: ' + error.message);
+        }
+    };
+
     const exportData = () => {
         const dataStr = JSON.stringify({ vehicles }, null, 2);
         const blob = new Blob([dataStr], { type: 'application/json' });
@@ -338,6 +349,7 @@ export function AppProvider({ children }) {
         syncVehicleTags,
         uploadVehicleImage,
         toggleVehicleVisibility,
+        mergeRunData,
         exportData,
         importData,
         importTableauSessions,

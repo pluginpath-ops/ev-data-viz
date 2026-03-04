@@ -32,6 +32,7 @@ export default function App() {
         syncVehicleTags,
         uploadVehicleImage,
         toggleVehicleVisibility,
+        mergeRunData,
         exportData,
         importData,
         importTableauSessions,
@@ -286,10 +287,12 @@ export default function App() {
                     {view === 'runs' && currentActiveVehicle && (
                         <RunsView
                             vehicle={currentActiveVehicle}
+                            isOwner={isOwner}
                             onAddRun={(run) => addRun(currentActiveVehicle.id, run)}
                             onUpdateRun={(runId, updates) => updateRun(currentActiveVehicle.id, runId, updates)}
                             onSetDefaultRun={(runId) => setDefaultRun(currentActiveVehicle.id, runId)}
                             onDeleteRun={(runId) => deleteRun(currentActiveVehicle.id, runId)}
+                            onMergeRunData={(runId, pts, joinKey) => mergeRunData(currentActiveVehicle.id, runId, pts, joinKey)}
                             onViewChart={() => setView('chart')}
                         />
                     )}
