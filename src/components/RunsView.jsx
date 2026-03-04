@@ -111,7 +111,7 @@ export default function RunsView({ vehicle, onAddRun, onUpdateRun, onSetDefaultR
                     {vehicle.runs?.length > 0 && (
                         <button
                             onClick={onViewChart}
-                            className="btn btn-edit"
+                            className="btn btn-primary"
                         >
                             View Charts
                         </button>

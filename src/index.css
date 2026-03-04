@@ -42,7 +42,29 @@
     text-align: center;
 }
 
-/* Primary Button - Used for: Add Vehicle, Save, View Runs, Import Run */
+/*
+ * BUTTON SEMANTIC GUIDE
+ * ─────────────────────────────────────────────────────────────────
+ * btn-primary  (blue)  — Additive / available actions.
+ *                        Rule: "I can create, add, or move forward here."
+ *                        Examples: Add Vehicle, Save Changes, Upload Image,
+ *                                  Create tag, Import, View Charts, Sign In
+ *
+ * btn-edit     (green) — Modify-in-place actions.
+ *                        Rule: "I'm editing something that already exists."
+ *                        Examples: Edit (run)
+ *
+ * btn-danger   (red)   — Destructive / irreversible actions.
+ *                        Rule: "This permanently removes data."
+ *                        Examples: Delete (vehicle, run)
+ *
+ * btn-secondary (grey) — Neutral / non-data-changing actions.
+ *                        Rule: "This cancels, goes back, or exports without mutating state."
+ *                        Examples: Cancel, Back, Sign Out, Export Data, Set as Default
+ * ─────────────────────────────────────────────────────────────────
+ */
+
+/* Primary / Additive Action Button */
 .btn-primary {
     background-color: var(--color-primary);
     color: white;
@@ -51,7 +73,7 @@
     background-color: var(--color-primary-hover);
 }
 
-/* Edit Button - Used for: All Edit actions */
+/* Edit / Modify Button */
 .btn-edit {
     background-color: var(--color-edit);
     color: white;
@@ -60,7 +82,7 @@
     background-color: var(--color-edit-hover);
 }
 
-/* Danger Button - Used for: All Delete actions */
+/* Danger / Destructive Button */
 .btn-danger {
     background-color: var(--color-danger);
     color: white;
@@ -69,7 +91,7 @@
     background-color: var(--color-danger-hover);
 }
 
-/* Secondary Button - Used for: Cancel, Back, Import Data */
+/* Secondary / Neutral Button */
 .btn-secondary {
     background-color: var(--color-secondary);
     color: white;

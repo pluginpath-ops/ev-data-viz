@@ -102,7 +102,7 @@ function EditForm({
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onCreateTag(); } }}
                             className="border p-2 rounded text-sm flex-1"
                         />
-                        <button type="button" onClick={onCreateTag} className="btn btn-secondary text-sm">
+                        <button type="button" onClick={onCreateTag} className="btn btn-primary text-sm">
                             Create tag
                         </button>
                     </div>
@@ -121,7 +121,7 @@ function EditForm({
                         />
                     )}
                     <label className="flex items-center gap-2 cursor-pointer">
-                        <span className="btn btn-secondary text-sm">
+                        <span className="btn btn-primary text-sm">
                             {imageUploading ? 'Uploading…' : editingVehicle?.image_url ? 'Replace image' : 'Upload image'}
                         </span>
                         <input
@@ -135,12 +135,13 @@ function EditForm({
                 </div>
             )}
 
-            <div className="mt-4 flex gap-2">
-                <button type="submit" className="btn btn-primary">
-                    {editingId ? 'Save Changes' : 'Add Vehicle'}
-                </button>
-                <button type="button" onClick={onCancel} className="btn btn-secondary">
+            {/* Footer: Cancel left, Save right, both text-sm to match image button */}
+            <div className="mt-4 flex gap-2 justify-end">
+                <button type="button" onClick={onCancel} className="btn btn-secondary text-sm">
                     Cancel
+                </button>
+                <button type="submit" className="btn btn-primary text-sm">
+                    {editingId ? 'Save Changes' : 'Add Vehicle'}
                 </button>
             </div>
         </form>

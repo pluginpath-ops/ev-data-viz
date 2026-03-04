@@ -269,6 +269,35 @@ class DataService {
     }
   }
 
+  // ── Site settings ────────────────────────────────────────────────────────
+
+  async getSiteSettings() {
+    if (!this.useSupabase) return {};
+    const { data } = await getSupabase().from('site_settings').select('*');
+    const settings = {};
+    for (const row of data || []) settings[row.key] = row.value;
+    return settings;
+  }
+
+  async uploadHeaderImage(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const path = `header_image.${ext}`;
+    const { error: uploadError } = await getSupabase().storage
+      .from('site-assets')
+      .upload(path, file, { upsert: true });
+    if (uploadError) throw new Error(`[Storage] ${uploadError.message}`);
+    // Bust the CDN cache by appending a timestamp query param
+    const { data } = getSupabase().storage.from('site-assets').getPublicUrl(path);
+    const url = `${data.publicUrl}?t=${Date.now()}`;
+    // Use an RPC (SECURITY DEFINER function) to write the setting.
+    // Direct upsert on site_settings triggers a double RLS check
+    // (INSERT + ON CONFLICT DO UPDATE) that fails even for owners.
+    const { error: settingError } = await getSupabase()
+      .rpc('update_site_setting', { setting_key: 'header_image_url', setting_value: url });
+    if (settingError) throw new Error(`[DB] ${settingError.message}`);
+    return url;
+  }
+
   /**
    * Import pre-parsed Tableau CSV sessions into Supabase.
    * @param {Array} sessions - output of parseTableauCSV()

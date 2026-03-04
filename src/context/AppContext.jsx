@@ -10,6 +10,7 @@ export function AppProvider({ children }) {
     const [user, setUser] = useState(null);
     const [isOwner, setIsOwner] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [headerImageUrl, setHeaderImageUrl] = useState('');
 
     useEffect(() => {
         initializeApp();
@@ -24,10 +25,12 @@ export function AppProvider({ children }) {
         const vehiclesData = await dataService.getVehicles();
         const selectedIds = await dataService.getSelectedVehicles();
         const tagsData = dataService.useSupabase ? await dataService.getTags() : [];
+        const siteSettings = await dataService.getSiteSettings();
 
         setVehicles(vehiclesData);
         setSelectedVehicles(selectedIds);
         setTags(tagsData);
+        setHeaderImageUrl(siteSettings.header_image_url || '');
         setLoading(false);
     }
 
@@ -44,6 +47,11 @@ export function AppProvider({ children }) {
         const newSelection = selectedVehicles.filter(id => id !== vehicleId);
         setSelectedVehicles(newSelection);
         await dataService.setSelectedVehicles(newSelection);
+    };
+
+    const clearAllSelections = async () => {
+        setSelectedVehicles([]);
+        await dataService.setSelectedVehicles([]);
     };
 
     const addVehicle = async (vehicle) => {
@@ -281,6 +289,16 @@ export function AppProvider({ children }) {
         }
     };
 
+    const uploadHeaderImage = async (file) => {
+        try {
+            const url = await dataService.uploadHeaderImage(file);
+            setHeaderImageUrl(url);
+            return url;
+        } catch (error) {
+            alert('Error uploading header image: ' + error.message);
+        }
+    };
+
     const importTableauSessions = async (sessions, vehicleMap) => {
         try {
             const result = await dataService.importTableauSessions(sessions, vehicleMap);
@@ -302,8 +320,11 @@ export function AppProvider({ children }) {
         user,
         isOwner,
         loading,
+        headerImageUrl,
+        uploadHeaderImage,
         toggleVehicleSelection,
         removeVehicleSelection,
+        clearAllSelections,
         addVehicle,
         updateVehicle,
         deleteVehicle,
