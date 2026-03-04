@@ -291,7 +291,7 @@ class DataService {
     const url = `${data.publicUrl}?t=${Date.now()}`;
     const { error: settingError } = await getSupabase()
       .from('site_settings')
-      .upsert({ key: 'header_image_url', value: url });
+      .upsert({ key: 'header_image_url', value: url }, { onConflict: 'key' });
     if (settingError) throw settingError;
     return url;
   }
