@@ -289,9 +289,11 @@ class DataService {
     // Bust the CDN cache by appending a timestamp query param
     const { data } = getSupabase().storage.from('site-assets').getPublicUrl(path);
     const url = `${data.publicUrl}?t=${Date.now()}`;
+    // Use an RPC (SECURITY DEFINER function) to write the setting.
+    // Direct upsert on site_settings triggers a double RLS check
+    // (INSERT + ON CONFLICT DO UPDATE) that fails even for owners.
     const { error: settingError } = await getSupabase()
-      .from('site_settings')
-      .upsert({ key: 'header_image_url', value: url }, { onConflict: 'key' });
+      .rpc('update_site_setting', { setting_key: 'header_image_url', setting_value: url });
     if (settingError) throw settingError;
     return url;
   }
