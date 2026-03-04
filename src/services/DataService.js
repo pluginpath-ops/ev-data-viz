@@ -285,7 +285,7 @@ class DataService {
     const { error: uploadError } = await getSupabase().storage
       .from('site-assets')
       .upload(path, file, { upsert: true });
-    if (uploadError) throw uploadError;
+    if (uploadError) throw new Error(`[Storage] ${uploadError.message}`);
     // Bust the CDN cache by appending a timestamp query param
     const { data } = getSupabase().storage.from('site-assets').getPublicUrl(path);
     const url = `${data.publicUrl}?t=${Date.now()}`;
@@ -294,7 +294,7 @@ class DataService {
     // (INSERT + ON CONFLICT DO UPDATE) that fails even for owners.
     const { error: settingError } = await getSupabase()
       .rpc('update_site_setting', { setting_key: 'header_image_url', setting_value: url });
-    if (settingError) throw settingError;
+    if (settingError) throw new Error(`[DB] ${settingError.message}`);
     return url;
   }
 
