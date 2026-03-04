@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAppContext } from './context/AppContext';
 import AuthModal from './components/AuthModal';
+import ImportTableauModal from './components/ImportTableauModal';
 import VehiclesView from './components/VehiclesView';
 import RunsView from './components/RunsView';
 import ChartView from './components/ChartView';
@@ -30,6 +31,7 @@ export default function App() {
         toggleVehicleVisibility,
         exportData,
         importData,
+        importTableauSessions,
         signOut,
         initializeApp,
     } = useAppContext();
@@ -42,6 +44,9 @@ export default function App() {
         selectedRuns: []
     });
     const [showAuthModal, setShowAuthModal] = useState(false);
+    const [showImportMenu, setShowImportMenu] = useState(false);
+    const [showTableauModal, setShowTableauModal] = useState(false);
+    const jsonImportRef = useRef();
 
     // Keep activeVehicle in sync with vehicles state
     const currentActiveVehicle = activeVehicle
@@ -68,6 +73,13 @@ export default function App() {
                         setShowAuthModal(false);
                         initializeApp();
                     }}
+                />
+            )}
+            {showTableauModal && (
+                <ImportTableauModal
+                    vehicles={vehicles}
+                    onImport={importTableauSessions}
+                    onClose={() => setShowTableauModal(false)}
                 />
             )}
             <div className="min-h-screen">
@@ -135,15 +147,42 @@ export default function App() {
                                 >
                                     Export Data
                                 </button>
-                                <label className="btn btn-secondary cursor-pointer">
-                                    Import Data
-                                    <input
-                                        type="file"
-                                        accept=".json"
-                                        className="hidden"
-                                        onChange={(e) => e.target.files[0] && importData(e.target.files[0])}
-                                    />
-                                </label>
+                                {/* Import dropdown */}
+                                <div className="relative">
+                                    <button
+                                        className="btn btn-secondary"
+                                        onClick={() => setShowImportMenu(m => !m)}
+                                    >
+                                        Import ▾
+                                    </button>
+                                    {showImportMenu && (
+                                        <>
+                                            {/* Click-away backdrop */}
+                                            <div className="fixed inset-0 z-10" onClick={() => setShowImportMenu(false)} />
+                                            <div className="absolute right-0 mt-1 w-44 bg-white border rounded-lg shadow-lg z-20 overflow-hidden">
+                                                <label
+                                                    className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer"
+                                                    onClick={() => setShowImportMenu(false)}
+                                                >
+                                                    📄 App JSON
+                                                    <input
+                                                        ref={jsonImportRef}
+                                                        type="file"
+                                                        accept=".json"
+                                                        className="hidden"
+                                                        onChange={(e) => { e.target.files[0] && importData(e.target.files[0]); e.target.value = ''; }}
+                                                    />
+                                                </label>
+                                                <button
+                                                    className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 w-full text-left"
+                                                    onClick={() => { setShowImportMenu(false); setShowTableauModal(true); }}
+                                                >
+                                                    📊 Tableau CSV
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         </div>
 

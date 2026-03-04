@@ -281,6 +281,16 @@ export function AppProvider({ children }) {
         }
     };
 
+    const importTableauSessions = async (sessions, vehicleMap) => {
+        try {
+            const result = await dataService.importTableauSessions(sessions, vehicleMap);
+            await initializeApp();
+            return result;
+        } catch (error) {
+            throw error;
+        }
+    };
+
     const signOut = async () => {
         await dataService.signOut();
         window.location.reload();
@@ -309,6 +319,7 @@ export function AppProvider({ children }) {
         toggleVehicleVisibility,
         exportData,
         importData,
+        importTableauSessions,
         signOut,
         initializeApp,
     };

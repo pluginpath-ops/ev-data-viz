@@ -18,6 +18,135 @@ const ListViewIcon = () => (
     </svg>
 );
 
+// ── EditForm lifted outside VehiclesView so its identity is stable across re-renders.
+// Defining it inside the parent causes React to unmount+remount it on every keystroke
+// (new function reference = new component type), which kills input focus.
+function EditForm({
+    formData, onFormChange,
+    editingId,
+    formTags, onAddTag, onRemoveTag,
+    newTagName, onNewTagNameChange, onCreateTag,
+    tags, availableTagsForForm,
+    editingVehicle,
+    imageUploading, onImageUpload,
+    onSubmit, onCancel,
+}) {
+    return (
+        <form onSubmit={onSubmit} className="card">
+            <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
+            <div className="grid grid-cols-2 gap-4">
+                <input
+                    placeholder="Display Name (e.g., Model 3 LR 2024)"
+                    value={formData.name}
+                    onChange={(e) => onFormChange({ ...formData, name: e.target.value })}
+                    className="border p-2 rounded col-span-2"
+                    required
+                />
+                <input placeholder="Make"           value={formData.make}    onChange={(e) => onFormChange({ ...formData, make: e.target.value })}    className="border p-2 rounded" />
+                <input placeholder="Model"          value={formData.model}   onChange={(e) => onFormChange({ ...formData, model: e.target.value })}   className="border p-2 rounded" />
+                <input placeholder="Year"           value={formData.year}    onChange={(e) => onFormChange({ ...formData, year: e.target.value })}    className="border p-2 rounded" />
+                <input placeholder="Battery (kWh)"  value={formData.battery} onChange={(e) => onFormChange({ ...formData, battery: e.target.value })} className="border p-2 rounded" />
+                <input placeholder="EPA Range (mi)" value={formData.range}   onChange={(e) => onFormChange({ ...formData, range: e.target.value })}   className="border p-2 rounded" />
+                <input placeholder="Peak Power (kW)" value={formData.power}  onChange={(e) => onFormChange({ ...formData, power: e.target.value })}   className="border p-2 rounded" />
+            </div>
+
+            {/* Tags — edit mode only */}
+            {editingId && (
+                <div className="mt-5 border-t pt-4">
+                    <label className="block font-medium mb-2">Tags</label>
+                    {formTags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                            {formTags.map(tag => (
+                                <div
+                                    key={tag.id}
+                                    className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium"
+                                    style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
+                                >
+                                    <span>{tag.name}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => onRemoveTag(tag.id)}
+                                        className="ml-1 rounded-full w-4 h-4 flex items-center justify-center hover:opacity-70"
+                                        style={{ fontSize: '12px' }}
+                                    >
+                                        &times;
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {availableTagsForForm.length > 0 && (
+                        <div className="mb-2">
+                            <select
+                                onChange={(e) => {
+                                    const tag = tags.find(t => t.id === parseInt(e.target.value));
+                                    if (tag) onAddTag(tag);
+                                    e.target.value = '';
+                                }}
+                                className="border p-2 rounded text-sm w-full"
+                                defaultValue=""
+                            >
+                                <option value="" disabled>Add existing tag…</option>
+                                {availableTagsForForm.map(tag => (
+                                    <option key={tag.id} value={tag.id}>{tag.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder="New tag name"
+                            value={newTagName}
+                            onChange={(e) => onNewTagNameChange(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onCreateTag(); } }}
+                            className="border p-2 rounded text-sm flex-1"
+                        />
+                        <button type="button" onClick={onCreateTag} className="btn btn-secondary text-sm">
+                            Create tag
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Image upload — edit mode only */}
+            {editingId && (
+                <div className="mt-4 border-t pt-4">
+                    <label className="block font-medium mb-2">Card Background Image</label>
+                    {editingVehicle?.image_url && (
+                        <img
+                            src={editingVehicle.image_url}
+                            alt="Current"
+                            className="h-24 w-full object-cover rounded mb-2 border"
+                        />
+                    )}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <span className="btn btn-secondary text-sm">
+                            {imageUploading ? 'Uploading…' : editingVehicle?.image_url ? 'Replace image' : 'Upload image'}
+                        </span>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={onImageUpload}
+                            disabled={imageUploading}
+                        />
+                    </label>
+                </div>
+            )}
+
+            <div className="mt-4 flex gap-2">
+                <button type="submit" className="btn btn-primary">
+                    {editingId ? 'Save Changes' : 'Add Vehicle'}
+                </button>
+                <button type="button" onClick={onCancel} className="btn btn-secondary">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    );
+}
+
 export default function VehiclesView({
     vehicles, selectedVehicles, onToggleSelection, onAdd, onUpdate, onDelete, onViewRuns,
     isOwner, onToggleVisibility, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage
@@ -194,122 +323,17 @@ export default function VehiclesView({
         );
     };
 
-    // ── Inline edit form (shared between card and list views) ────────────────
-
-    const EditForm = () => (
-        <form onSubmit={handleSubmit} className="card">
-            <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
-            <div className="grid grid-cols-2 gap-4">
-                <input
-                    placeholder="Display Name (e.g., Model 3 LR 2024)"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    className="border p-2 rounded col-span-2"
-                    required
-                />
-                <input placeholder="Make" value={formData.make} onChange={(e) => setFormData({...formData, make: e.target.value})} className="border p-2 rounded" />
-                <input placeholder="Model" value={formData.model} onChange={(e) => setFormData({...formData, model: e.target.value})} className="border p-2 rounded" />
-                <input placeholder="Year" value={formData.year} onChange={(e) => setFormData({...formData, year: e.target.value})} className="border p-2 rounded" />
-                <input placeholder="Battery (kWh)" value={formData.battery} onChange={(e) => setFormData({...formData, battery: e.target.value})} className="border p-2 rounded" />
-                <input placeholder="EPA Range (mi)" value={formData.range} onChange={(e) => setFormData({...formData, range: e.target.value})} className="border p-2 rounded" />
-                <input placeholder="Peak Power (kW)" value={formData.power} onChange={(e) => setFormData({...formData, power: e.target.value})} className="border p-2 rounded" />
-            </div>
-
-            {/* Tags — edit mode only */}
-            {editingId && (
-                <div className="mt-5 border-t pt-4">
-                    <label className="block font-medium mb-2">Tags</label>
-                    {formTags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-3">
-                            {formTags.map(tag => (
-                                <div
-                                    key={tag.id}
-                                    className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium"
-                                    style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
-                                >
-                                    <span>{tag.name}</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemoveFormTag(tag.id)}
-                                        className="ml-1 rounded-full w-4 h-4 flex items-center justify-center hover:opacity-70"
-                                        style={{ fontSize: '12px' }}
-                                    >
-                                        &times;
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                    {availableTagsForForm.length > 0 && (
-                        <div className="mb-2">
-                            <select
-                                onChange={(e) => {
-                                    const tag = tags.find(t => t.id === parseInt(e.target.value));
-                                    if (tag) handleAddFormTag(tag);
-                                    e.target.value = '';
-                                }}
-                                className="border p-2 rounded text-sm w-full"
-                                defaultValue=""
-                            >
-                                <option value="" disabled>Add existing tag…</option>
-                                {availableTagsForForm.map(tag => (
-                                    <option key={tag.id} value={tag.id}>{tag.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            placeholder="New tag name"
-                            value={newTagName}
-                            onChange={(e) => setNewTagName(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateTag(); } }}
-                            className="border p-2 rounded text-sm flex-1"
-                        />
-                        <button type="button" onClick={handleCreateTag} className="btn btn-secondary text-sm">
-                            Create tag
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Image upload — edit mode only */}
-            {editingId && (
-                <div className="mt-4 border-t pt-4">
-                    <label className="block font-medium mb-2">Card Background Image</label>
-                    {editingVehicle?.image_url && (
-                        <img
-                            src={editingVehicle.image_url}
-                            alt="Current"
-                            className="h-24 w-full object-cover rounded mb-2 border"
-                        />
-                    )}
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <span className="btn btn-secondary text-sm">
-                            {imageUploading ? 'Uploading…' : editingVehicle?.image_url ? 'Replace image' : 'Upload image'}
-                        </span>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleImageUpload}
-                            disabled={imageUploading}
-                        />
-                    </label>
-                </div>
-            )}
-
-            <div className="mt-4 flex gap-2">
-                <button type="submit" className="btn btn-primary">
-                    {editingId ? 'Save Changes' : 'Add Vehicle'}
-                </button>
-                <button type="button" onClick={handleCancel} className="btn btn-secondary">
-                    Cancel
-                </button>
-            </div>
-        </form>
-    );
+    // Shared props bundle for the module-level EditForm component
+    const editFormProps = {
+        formData, onFormChange: setFormData,
+        editingId,
+        formTags, onAddTag: handleAddFormTag, onRemoveTag: handleRemoveFormTag,
+        newTagName, onNewTagNameChange: setNewTagName, onCreateTag: handleCreateTag,
+        tags, availableTagsForForm,
+        editingVehicle,
+        imageUploading, onImageUpload: handleImageUpload,
+        onSubmit: handleSubmit, onCancel: handleCancel,
+    };
 
     // ────────────────────────────────────────────────────────────────────────
 
@@ -377,7 +401,7 @@ export default function VehiclesView({
             {/* Add form — above grid, only when not editing */}
             {showForm && !editingId && (
                 <div className="mb-6">
-                    <EditForm />
+                    <EditForm {...editFormProps} />
                 </div>
             )}
 
@@ -452,7 +476,7 @@ export default function VehiclesView({
                                 {/* Inline edit form — spans full grid width below the edited card's row */}
                                 {editingId === vehicle.id && showForm && (
                                     <div className="col-span-full">
-                                        <EditForm />
+                                        <EditForm {...editFormProps} />
                                     </div>
                                 )}
                             </div>
@@ -519,7 +543,7 @@ export default function VehiclesView({
                                 {/* Inline edit form below this list row */}
                                 {editingId === vehicle.id && showForm && (
                                     <div className="mt-2">
-                                        <EditForm />
+                                        <EditForm {...editFormProps} />
                                     </div>
                                 )}
                             </div>

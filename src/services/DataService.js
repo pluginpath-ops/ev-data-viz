@@ -141,7 +141,8 @@ class DataService {
     const { data: newRun, error } = await getSupabase().from('runs').insert({
       vehicle_id: vehicleId, name: run.name, date: run.date,
       software_version: run.softwareVersion, conditions: run.conditions,
-      color: run.color || '#3b82f6', is_default: run.isDefault || false
+      color: run.color || '#3b82f6', is_default: run.isDefault || false,
+      synthetic: run.synthetic || false
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
@@ -152,7 +153,8 @@ class DataService {
           soc: point.soc, charge_rate: point.chargeRate,
           time_value: point.time, range_value: point.range, temperature: point.temperature
         }));
-        await getSupabase().from('data_points').insert(batch);
+        const { error: batchError } = await getSupabase().from('data_points').insert(batch);
+        if (batchError) throw batchError;
       }
     }
     return { ...newRun, data: run.data };
@@ -265,6 +267,96 @@ class DataService {
     if (!data || data.length === 0) {
       throw new Error('Update blocked — vehicle may have no owner assigned. Run the SQL fix in Supabase.');
     }
+  }
+
+  /**
+   * Import pre-parsed Tableau CSV sessions into Supabase.
+   * @param {Array} sessions - output of parseTableauCSV()
+   * @param {Object} vehicleMap - { rawVehicle: vehicleId|null }
+   *   null → create a new vehicle from session.year + session.vehicleName
+   */
+  async importTableauSessions(sessions, vehicleMap) {
+    if (!this.useSupabase || !this.user) throw new Error('Must be logged in to import.');
+    console.log('[DataService] importTableauSessions — starting, sessions:', sessions.length);
+    const colorPalette = ['#3b82f6', '#ef4444', '#22c55e', '#a855f7', '#fb923c', '#0ea5e9', '#ec4899', '#84cc16'];
+    const results = { vehiclesCreated: 0, runsImported: 0, runsSkipped: 0, pointsImported: 0 };
+    // Cache of existing run names per vehicle (lowercased) to skip duplicates on retry
+    const existingRunNames = {}; // vehicleId → Set<string>
+    const getExistingRunNames = async (vid) => {
+      if (!existingRunNames[vid]) {
+        const { data } = await getSupabase().from('runs').select('name').eq('vehicle_id', vid);
+        existingRunNames[vid] = new Set((data || []).map(r => (r.name || '').toLowerCase()));
+      }
+      return existingRunNames[vid];
+    };
+
+    // Build a name→id lookup of all existing vehicles so "create new" is idempotent:
+    // if a vehicle with the same name already exists we reuse it instead of duplicating.
+    const { data: existingVehicles } = await getSupabase()
+      .from('vehicles')
+      .select('id, name, year');
+    const existingByName = {};
+    for (const v of existingVehicles || []) {
+      if (v.name) existingByName[v.name.toLowerCase()] = v.id;
+    }
+
+    // Cache vehicles created during this batch so multiple sessions for the same
+    // raw vehicle string all get the same id.
+    const createdIds = {};
+
+    for (const session of sessions) {
+      let vehicleId = vehicleMap[session.rawVehicle];
+
+      if (!vehicleId) {
+        // Reuse a vehicle created earlier in this batch
+        if (createdIds[session.rawVehicle]) {
+          vehicleId = createdIds[session.rawVehicle];
+        } else {
+          // Reuse an existing vehicle with the same name (makes retries safe)
+          const nameKey = session.vehicleName.toLowerCase();
+          if (existingByName[nameKey]) {
+            vehicleId = existingByName[nameKey];
+          } else {
+            const v = await this.addVehicle({ name: session.vehicleName, year: session.year });
+            vehicleId = v.id;
+            existingByName[nameKey] = vehicleId; // prevent duplicates later in batch
+            results.vehiclesCreated++;
+          }
+          createdIds[session.rawVehicle] = vehicleId;
+        }
+      }
+
+      const runData = session.dataPoints.map((p, i) => ({
+        frame: i,
+        soc: p.soc,
+        chargeRate: p.charge_rate,
+        timestamp: null,
+        time: null,
+        range: null,
+        temperature: null,
+      }));
+
+      // Skip if a run with this exact name already exists for the vehicle
+      const runNamesForVehicle = await getExistingRunNames(vehicleId);
+      if (runNamesForVehicle.has(session.runName.toLowerCase())) {
+        results.runsSkipped++;
+        continue;
+      }
+
+      const colorIndex = results.runsImported % colorPalette.length;
+      await this.addRun(vehicleId, {
+        name: session.runName,
+        date: session.date,
+        synthetic: session.synthetic,
+        color: colorPalette[colorIndex],
+        data: runData,
+      });
+      // Add to cache so a second session with the same name in this batch is also skipped
+      runNamesForVehicle.add(session.runName.toLowerCase());
+      results.runsImported++;
+      results.pointsImported += session.dataPoints.length;
+    }
+    return results;
   }
 
   async signOut() {
