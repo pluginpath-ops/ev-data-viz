@@ -88,18 +88,22 @@ export default function App() {
             <div className="min-h-screen">
                 {/* ── Header ── */}
                 <header className="relative text-white shadow-lg overflow-hidden">
-                    {/* Background image (set by owner via site settings) */}
+                    {/* Full-width base colour — always fills edge to edge */}
+                    <div className="absolute inset-0" style={{ backgroundColor: 'var(--color-primary)' }} />
+                    {/* Image + overlay are both capped to page width (max-w-7xl) so on very
+                        wide monitors the image stays aligned with the content column and more
+                        of it is visible rather than being stretched thin across the viewport */}
                     {headerImageUrl && (
-                        <div
-                            className="absolute inset-0"
-                            style={{ backgroundImage: `url(${headerImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-                        />
+                        <div className="absolute inset-0 flex justify-center">
+                            <div className="relative w-full max-w-7xl h-full flex-shrink-0">
+                                <div
+                                    className="absolute inset-0"
+                                    style={{ backgroundImage: `url(${headerImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                                />
+                                <div className="absolute inset-0" style={{ backgroundColor: 'rgba(29,78,216,0.72)' }} />
+                            </div>
+                        </div>
                     )}
-                    {/* Solid colour overlay — slightly more opaque when no image */}
-                    <div
-                        className="absolute inset-0"
-                        style={{ backgroundColor: headerImageUrl ? 'rgba(29,78,216,0.72)' : 'var(--color-primary)' }}
-                    />
                     <div className="relative max-w-7xl mx-auto px-6 py-6">
                         {/* Clickable title → home */}
                         <button
