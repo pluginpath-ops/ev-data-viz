@@ -130,7 +130,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
@@ -190,6 +190,24 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                         {newVehicleCount} new vehicle{newVehicleCount !== 1 ? 's' : ''} will be created
                                     </span>
                                 )}
+                            </div>
+
+                            {/* Skip All / Include All */}
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setSkipSet(new Set(uniqueVehicles.map(v => v.raw)))}
+                                    className="px-3 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
+                                >
+                                    Skip all
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSkipSet(new Set())}
+                                    className="px-3 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
+                                >
+                                    Include all
+                                </button>
                             </div>
 
                             {/* Global prefix */}

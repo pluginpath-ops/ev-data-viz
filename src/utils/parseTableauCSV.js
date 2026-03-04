@@ -79,9 +79,8 @@ export async function parseTableauCSV(file) {
         const synthetic     = optimizedText.length > 0;
 
         const date    = rawDate || TODAY;
-        const runName = rawDate
-            ? `${vehicleName} ${rawDate}`
-            : `${vehicleName} (Synthetic)`;
+        // Date is stored as a separate field — don't include it in the run name
+        const runName = synthetic ? `${vehicleName} (Synthetic)` : vehicleName;
 
         // Build data points — skip blank/non-numeric cells
         const dataPoints = [];
