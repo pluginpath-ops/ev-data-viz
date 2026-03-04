@@ -1,5 +1,30 @@
 import { getSupabase } from './supabase';
 
+/**
+ * Round a numeric field to a given number of decimal places.
+ * Returns null if the value is null/undefined/NaN.
+ */
+function roundField(value, decimals) {
+  if (value == null) return null;
+  const n = Number(value);
+  if (isNaN(n)) return null;
+  return Math.round(n * 10 ** decimals) / 10 ** decimals;
+}
+
+/** Normalise a raw data-point object into a clean DB row shape. */
+function normalisePoint(point, runId, frame) {
+  return {
+    run_id:      runId,
+    frame,
+    timestamp:   point.timestamp ?? null,
+    soc:         roundField(point.soc,         1),  // 0–100 %,   1 dp  e.g. 42.5
+    charge_rate: roundField(point.chargeRate,  2),  // kW,        2 dp  e.g. 150.00
+    time_value:  roundField(point.time,        1),  // min/s,     1 dp
+    range_value: roundField(point.range,       1),  // mi/km,     1 dp
+    temperature: roundField(point.temperature, 1),  // °C/°F,     1 dp
+  };
+}
+
 class DataService {
   constructor() {
     this.user = null;
@@ -31,11 +56,16 @@ class DataService {
     }
     const { data } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*), vehicle_tags(tags(id, name))`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name))`)
       .order('created_at', { ascending: false });
     return (data || []).map(v => ({
       ...v,
       tags: (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
+      runs: (v.runs || []).map(r => ({
+        ...r,
+        // data_points(count) returns [{ count: N }]; normalise to a plain number
+        dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
+      })),
     }));
   }
 
@@ -146,15 +176,26 @@ class DataService {
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
+      // Determine which fields have at least one non-null value
+      const populatedFields = [];
+      if (run.data.some(p => p.soc         != null)) populatedFields.push('soc');
+      if (run.data.some(p => p.chargeRate  != null)) populatedFields.push('chargeRate');
+      if (run.data.some(p => p.time        != null)) populatedFields.push('time');
+      if (run.data.some(p => p.range       != null)) populatedFields.push('range');
+      if (run.data.some(p => p.temperature != null)) populatedFields.push('temperature');
+
       const batchSize = 1000;
       for (let i = 0; i < run.data.length; i += batchSize) {
-        const batch = run.data.slice(i, i + batchSize).map(point => ({
-          run_id: newRun.id, frame: point.frame, timestamp: point.timestamp,
-          soc: point.soc, charge_rate: point.chargeRate,
-          time_value: point.time, range_value: point.range, temperature: point.temperature
-        }));
+        const batch = run.data.slice(i, i + batchSize).map((point, j) =>
+          normalisePoint(point, newRun.id, point.frame ?? (i + j))
+        );
         const { error: batchError } = await getSupabase().from('data_points').insert(batch);
         if (batchError) throw batchError;
+      }
+
+      if (populatedFields.length > 0) {
+        await getSupabase().from('runs').update({ populated_fields: populatedFields }).eq('id', newRun.id);
+        newRun.populated_fields = populatedFields;
       }
     }
     return { ...newRun, data: run.data };
@@ -386,6 +427,97 @@ class DataService {
       results.pointsImported += session.dataPoints.length;
     }
     return results;
+  }
+
+  /**
+   * Merge new data points into an existing run via a server-side RPC.
+   *
+   * The PostgreSQL function merge_run_data_points does a set-based UPDATE
+   * (patching only non-null fields with COALESCE) for rows whose join-key
+   * matches, then INSERTs any unmatched rows.  One round-trip, no extra RLS
+   * policy needed (SECURITY DEFINER handles auth internally).
+   *
+   * @param {string} runId
+   * @param {Array}  newDataPoints — [{ soc, chargeRate, time, range, temperature }]
+   * @param {'soc'|'time'} joinKey — shared column used to align rows
+   */
+  async mergeRunData(runId, newDataPoints, joinKey = 'soc') {
+    if (!this.useSupabase || !this.user) {
+      throw new Error('Must be logged in to update run data.');
+    }
+
+    // Round values to consistent precision before sending to the RPC
+    const rows = newDataPoints.map(p => ({
+      soc:         roundField(p.soc,         1),
+      charge_rate: roundField(p.chargeRate,  2),
+      time_value:  roundField(p.time,        1),
+      range_value: roundField(p.range,       1),
+      temperature: roundField(p.temperature, 1),
+    }));
+
+    const { data, error } = await getSupabase()
+      .rpc('merge_run_data_points', {
+        p_run_id:   runId,
+        p_join_key: joinKey,
+        p_rows:     rows,
+      });
+    if (error) throw error;
+
+    // After a successful merge, union any newly-populated fields into populated_fields
+    const newFields = [];
+    if (rows.some(r => r.soc         != null)) newFields.push('soc');
+    if (rows.some(r => r.charge_rate != null)) newFields.push('chargeRate');
+    if (rows.some(r => r.time_value  != null)) newFields.push('time');
+    if (rows.some(r => r.range_value != null)) newFields.push('range');
+    if (rows.some(r => r.temperature != null)) newFields.push('temperature');
+
+    const result = data; // { updated: N, inserted: M }
+    if (newFields.length > 0) {
+      const { data: runRow } = await getSupabase()
+        .from('runs').select('populated_fields').eq('id', runId).single();
+      const current = runRow?.populated_fields || [];
+      const merged = [...new Set([...current, ...newFields])];
+      await getSupabase().from('runs').update({ populated_fields: merged }).eq('id', runId);
+      result.populatedFields = merged;
+    }
+
+    return result; // { updated: N, inserted: M, populatedFields?: [...] }
+  }
+
+  /**
+   * Replace all data points for a run with a new set of rows.
+   * Uses a SECURITY DEFINER RPC (delete + re-insert) so RLS is not an obstacle.
+   * Updates populated_fields on the runs table after the write.
+   *
+   * @param {string|number} runId
+   * @param {Array} points — [{ soc, chargeRate, time, range, temperature }]
+   */
+  async replaceRunData(runId, points) {
+    if (!this.useSupabase || !this.user) {
+      throw new Error('Must be logged in to update run data.');
+    }
+    const rows = points.map((p, i) => ({
+      frame:       p.frame ?? i,
+      soc:         roundField(p.soc,         1),
+      charge_rate: roundField(p.chargeRate,  2),
+      time_value:  roundField(p.time,        1),
+      range_value: roundField(p.range,       1),
+      temperature: roundField(p.temperature, 1),
+    }));
+    const { error } = await getSupabase()
+      .rpc('replace_run_data_points', { p_run_id: runId, p_rows: rows });
+    if (error) throw error;
+
+    // Recompute populated_fields from the new data
+    const populatedFields = [];
+    if (points.some(p => p.soc         != null)) populatedFields.push('soc');
+    if (points.some(p => p.chargeRate  != null)) populatedFields.push('chargeRate');
+    if (points.some(p => p.time        != null)) populatedFields.push('time');
+    if (points.some(p => p.range       != null)) populatedFields.push('range');
+    if (points.some(p => p.temperature != null)) populatedFields.push('temperature');
+    await getSupabase().from('runs').update({ populated_fields: populatedFields }).eq('id', runId);
+
+    return { rowCount: points.length, populatedFields };
   }
 
   async signOut() {

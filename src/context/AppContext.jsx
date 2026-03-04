@@ -154,6 +154,44 @@ export function AppProvider({ children }) {
         }
     };
 
+    const replaceRunData = async (vehicleId, runId, points) => {
+        try {
+            const result = await dataService.replaceRunData(runId, points);
+            // Sync updated field tags and point count back into state
+            setVehicles(prev => prev.map(v =>
+                v.id === vehicleId
+                    ? { ...v, runs: v.runs.map(r => r.id === runId
+                        ? { ...r, populated_fields: result.populatedFields, dataPointCount: result.rowCount }
+                        : r) }
+                    : v
+            ));
+            return result;
+        } catch (error) {
+            alert('Error saving data: ' + error.message);
+            throw error;
+        }
+    };
+
+    const mergeRunData = async (vehicleId, runId, newDataPoints, joinKey) => {
+        try {
+            const result = await dataService.mergeRunData(runId, newDataPoints, joinKey);
+            // No need to call initializeApp() — run cards don't display data-point
+            // values loaded from DB, and ChartView fetches fresh via getRunData().
+            // If the service returned updated populated_fields, sync them into state.
+            if (result?.populatedFields) {
+                setVehicles(prev => prev.map(v =>
+                    v.id === vehicleId
+                        ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, populated_fields: result.populatedFields } : r) }
+                        : v
+                ));
+            }
+            return result;
+        } catch (error) {
+            alert('Error updating run data: ' + error.message);
+            throw error; // re-throw so the caller knows it failed
+        }
+    };
+
     const exportData = () => {
         const dataStr = JSON.stringify({ vehicles }, null, 2);
         const blob = new Blob([dataStr], { type: 'application/json' });
@@ -338,6 +376,8 @@ export function AppProvider({ children }) {
         syncVehicleTags,
         uploadVehicleImage,
         toggleVehicleVisibility,
+        replaceRunData,
+        mergeRunData,
         exportData,
         importData,
         importTableauSessions,
