@@ -18,9 +18,11 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const [editFormData, setEditFormData] = useState({});
 
     // ── Merge-mode state ─────────────────────────────────────────────────────
-    // uploadMode: 'create' (new run) | 'merge' (append data to existing run)
+    // uploadMode: 'create' (new run) | 'merge' (patch fields into existing rows)
     const [uploadMode, setUploadMode] = useState('create');
     const [mergeTargetRun, setMergeTargetRun] = useState(null);
+    // joinKey: which column links incoming rows to existing ones
+    const [joinKey, setJoinKey] = useState('soc');
     const [merging, setMerging] = useState(false);
 
     const {
@@ -38,6 +40,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
+        setJoinKey('soc');
         setMerging(false);
     };
 
@@ -112,12 +115,17 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             return newRow;
         });
 
+        // Determine the effective join key: auto-select when only one is mapped
+        const effectiveJoinKey = canJoinBySoc && !canJoinByTime ? 'soc'
+                               : !canJoinBySoc && canJoinByTime ? 'time'
+                               : joinKey; // user-chosen when both are available
+
         setMerging(true);
         try {
-            const result = await onMergeRunData(mergeTargetRun.id, transformedData);
+            const result = await onMergeRunData(mergeTargetRun.id, transformedData, effectiveJoinKey);
             resetUploadState();
             if (result) {
-                alert(`Data appended successfully: ${result.inserted} new rows added.`);
+                alert(`Merge complete: ${result.updated} rows updated, ${result.inserted} new rows inserted.`);
             }
         } catch {
             setMerging(false); // leave the panel open so the user can retry
@@ -157,6 +165,14 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setCsvData(null);
         setFieldMapping({});
     };
+
+    // ── Join key logic (merge mode only) ─────────────────────────────────────
+    const canJoinBySoc  = uploadMode === 'merge' && !!fieldMapping.soc;
+    const canJoinByTime = uploadMode === 'merge' && !!fieldMapping.time;
+    // Show radio selector only when the user has a real choice
+    const showJoinSelector  = canJoinBySoc && canJoinByTime;
+    // Disable confirm when there's no key to join on at all
+    const missingJoinKey    = uploadMode === 'merge' && !canJoinBySoc && !canJoinByTime;
 
     // ── Derived state ─────────────────────────────────────────────────────────
 
@@ -326,6 +342,39 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                 ))}
                             </div>
 
+                            {/* Join key selector — merge mode only */}
+                            {uploadMode === 'merge' && (
+                                <div className={`mt-5 p-4 rounded-lg border ${missingJoinKey ? 'bg-red-50 border-red-200' : showJoinSelector ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
+                                    {missingJoinKey ? (
+                                        <p className="text-sm font-semibold text-red-700">
+                                            ⚠ Map at least one of <strong>SoC</strong> or <strong>Time</strong> — it's needed to link incoming rows to existing ones.
+                                        </p>
+                                    ) : showJoinSelector ? (
+                                        <>
+                                            <p className="text-sm font-semibold text-yellow-800 mb-2">
+                                                Both SoC and Time are mapped — which should be used to link rows?
+                                            </p>
+                                            <div className="flex gap-6">
+                                                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                                    <input type="radio" name="joinKey" value="soc" checked={joinKey === 'soc'} onChange={() => setJoinKey('soc')} />
+                                                    <span className="font-medium">SoC</span>
+                                                    <span className="text-gray-500">(charging curves, SoC-based data)</span>
+                                                </label>
+                                                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                                    <input type="radio" name="joinKey" value="time" checked={joinKey === 'time'} onChange={() => setJoinKey('time')} />
+                                                    <span className="font-medium">Time</span>
+                                                    <span className="text-gray-500">(time-series, e.g. Time+Power → Time+SoC)</span>
+                                                </label>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <p className="text-sm text-green-800">
+                                            ✓ Rows will be linked by <strong>{canJoinBySoc ? 'SoC' : 'Time'}</strong>.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="mt-6 flex gap-2">
                                 <button
                                     onClick={() => setUploadStep('file')}
@@ -343,7 +392,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                 ) : (
                                     <button
                                         onClick={handleMerge}
-                                        disabled={merging}
+                                        disabled={merging || missingJoinKey}
                                         className="btn btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
                                         {merging ? 'Merging…' : 'Merge into Run'}

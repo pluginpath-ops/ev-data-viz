@@ -154,9 +154,9 @@ export function AppProvider({ children }) {
         }
     };
 
-    const mergeRunData = async (vehicleId, runId, newDataPoints) => {
+    const mergeRunData = async (vehicleId, runId, newDataPoints, joinKey) => {
         try {
-            const result = await dataService.mergeRunData(runId, newDataPoints);
+            const result = await dataService.mergeRunData(runId, newDataPoints, joinKey);
             // No need to call initializeApp() — run cards don't display data-point
             // values loaded from DB, and ChartView fetches fresh via getRunData().
             return result;

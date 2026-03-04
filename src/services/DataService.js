@@ -417,43 +417,39 @@ class DataService {
   }
 
   /**
-   * Append new data points to an existing run.
+   * Merge new data points into an existing run via a server-side RPC.
    *
-   * Each CSV upload contributes independent rows — no row-matching needed.
-   * For XY plots, each axis is drawn from whatever field is populated on a
-   * given row, so SoC+kW rows and SoC+Time rows live happily alongside each
-   * other; the chart simply skips rows where the chosen axis field is null.
+   * The PostgreSQL function merge_run_data_points does a set-based UPDATE
+   * (patching only non-null fields with COALESCE) for rows whose join-key
+   * matches, then INSERTs any unmatched rows.  One round-trip, no extra RLS
+   * policy needed (SECURITY DEFINER handles auth internally).
    *
-   * @param {string|number} runId
-   * @param {Array} newDataPoints — array of { soc, chargeRate, time, range, temperature }
+   * @param {string} runId
+   * @param {Array}  newDataPoints — [{ soc, chargeRate, time, range, temperature }]
+   * @param {'soc'|'time'} joinKey — shared column used to align rows
    */
-  async mergeRunData(runId, newDataPoints) {
+  async mergeRunData(runId, newDataPoints, joinKey = 'soc') {
     if (!this.useSupabase || !this.user) {
       throw new Error('Must be logged in to update run data.');
     }
 
-    // Get current row count so we can assign sequential frame numbers
-    const { count, error: countError } = await getSupabase()
-      .from('data_points')
-      .select('*', { count: 'exact', head: true })
-      .eq('run_id', runId);
-    if (countError) throw countError;
+    // Round values to consistent precision before sending to the RPC
+    const rows = newDataPoints.map(p => ({
+      soc:         roundField(p.soc,         1),
+      charge_rate: roundField(p.chargeRate,  2),
+      time_value:  roundField(p.time,        1),
+      range_value: roundField(p.range,       1),
+      temperature: roundField(p.temperature, 1),
+    }));
 
-    const startFrame = count || 0;
-
-    const toInsert = newDataPoints.map((point, i) =>
-      normalisePoint(point, runId, startFrame + i)
-    );
-
-    const batchSize = 1000;
-    for (let i = 0; i < toInsert.length; i += batchSize) {
-      const { error } = await getSupabase()
-        .from('data_points')
-        .insert(toInsert.slice(i, i + batchSize));
-      if (error) throw error;
-    }
-
-    return { inserted: toInsert.length };
+    const { data, error } = await getSupabase()
+      .rpc('merge_run_data_points', {
+        p_run_id:   runId,
+        p_join_key: joinKey,
+        p_rows:     rows,
+      });
+    if (error) throw error;
+    return data; // { updated: N, inserted: M }
   }
 
   async signOut() {
