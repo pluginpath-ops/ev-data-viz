@@ -150,3 +150,9 @@ body {
 .card:hover {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
+
+/* Draining countdown bar used in the soft-delete undo toast */
+@keyframes drain {
+    from { width: 100%; }
+    to   { width: 0%; }
+}
