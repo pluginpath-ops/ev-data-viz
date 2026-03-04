@@ -127,34 +127,43 @@ export default function App() {
 
                 <nav className="bg-white shadow-sm border-b">
                     <div className="max-w-7xl mx-auto px-6 py-3">
-                        <div className="flex gap-4 items-center mb-3">
-                            <button
-                                onClick={() => setView('vehicles')}
-                                className={`btn-tab ${view === 'vehicles' ? 'active' : ''}`}
-                            >
-                                Vehicles
-                            </button>
-                            <button
-                                onClick={() => currentActiveVehicle && setView('runs')}
-                                disabled={!currentActiveVehicle}
-                                className={`btn-tab ${view === 'runs' ? 'active' : ''}`}
-                            >
-                                Test Runs {currentActiveVehicle ? `(${currentActiveVehicle.name})` : ''}
-                            </button>
-                            <button
-                                onClick={() => selectedVehicles.length > 0 && setView('chart')}
-                                disabled={selectedVehicles.length === 0}
-                                className={`btn-tab ${view === 'chart' ? 'active' : ''}`}
-                            >
-                                Charts
-                            </button>
-                            <button
-                                onClick={() => setView('specs')}
-                                className={`btn-tab ${view === 'specs' ? 'active' : ''}`}
-                            >
-                                Compare Specs
-                            </button>
-                            <div className="ml-auto flex gap-2 items-center">
+                        {/*
+                          * flex-col-reverse on mobile: DOM order is tabs first, actions second,
+                          * but col-reverse flips that so actions render on TOP and tabs below.
+                          * sm:flex-row restores the normal side-by-side layout on wider screens.
+                          */}
+                        <div className="flex flex-col-reverse gap-y-2 sm:flex-row sm:items-center mb-3">
+                            {/* Tab group */}
+                            <div className="flex gap-1 items-center flex-wrap">
+                                <button
+                                    onClick={() => setView('vehicles')}
+                                    className={`btn-tab ${view === 'vehicles' ? 'active' : ''}`}
+                                >
+                                    Vehicles
+                                </button>
+                                <button
+                                    onClick={() => currentActiveVehicle && setView('runs')}
+                                    disabled={!currentActiveVehicle}
+                                    className={`btn-tab ${view === 'runs' ? 'active' : ''}`}
+                                >
+                                    Test Runs {currentActiveVehicle ? `(${currentActiveVehicle.name})` : ''}
+                                </button>
+                                <button
+                                    onClick={() => selectedVehicles.length > 0 && setView('chart')}
+                                    disabled={selectedVehicles.length === 0}
+                                    className={`btn-tab ${view === 'chart' ? 'active' : ''}`}
+                                >
+                                    Charts
+                                </button>
+                                <button
+                                    onClick={() => setView('specs')}
+                                    className={`btn-tab ${view === 'specs' ? 'active' : ''}`}
+                                >
+                                    Compare Specs
+                                </button>
+                            </div>
+                            {/* Action group — right-aligned on desktop, full-width right-justified on mobile */}
+                            <div className="flex gap-2 items-center justify-end sm:ml-auto">
                                 {user ? (
                                     <>
                                         <span className="text-sm text-gray-600">
