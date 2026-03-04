@@ -141,7 +141,8 @@ class DataService {
     const { data: newRun, error } = await getSupabase().from('runs').insert({
       vehicle_id: vehicleId, name: run.name, date: run.date,
       software_version: run.softwareVersion, conditions: run.conditions,
-      color: run.color || '#3b82f6', is_default: run.isDefault || false
+      color: run.color || '#3b82f6', is_default: run.isDefault || false,
+      synthetic: run.synthetic || false
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
@@ -265,6 +266,58 @@ class DataService {
     if (!data || data.length === 0) {
       throw new Error('Update blocked — vehicle may have no owner assigned. Run the SQL fix in Supabase.');
     }
+  }
+
+  /**
+   * Import pre-parsed Tableau CSV sessions into Supabase.
+   * @param {Array} sessions - output of parseTableauCSV()
+   * @param {Object} vehicleMap - { rawVehicle: vehicleId|null }
+   *   null → create a new vehicle from session.year + session.vehicleName
+   */
+  async importTableauSessions(sessions, vehicleMap) {
+    if (!this.useSupabase || !this.user) throw new Error('Must be logged in to import.');
+    const colorPalette = ['#3b82f6', '#ef4444', '#22c55e', '#a855f7', '#fb923c', '#0ea5e9', '#ec4899', '#84cc16'];
+    const results = { vehiclesCreated: 0, runsImported: 0, pointsImported: 0 };
+    // Cache newly created vehicles so duplicate rawVehicle rows reuse the same id
+    const createdIds = {};
+
+    for (const session of sessions) {
+      let vehicleId = vehicleMap[session.rawVehicle];
+
+      if (!vehicleId) {
+        // Reuse if we already created this vehicle earlier in this import batch
+        if (createdIds[session.rawVehicle]) {
+          vehicleId = createdIds[session.rawVehicle];
+        } else {
+          const v = await this.addVehicle({ name: session.vehicleName, year: session.year });
+          vehicleId = v.id;
+          createdIds[session.rawVehicle] = vehicleId;
+          results.vehiclesCreated++;
+        }
+      }
+
+      const runData = session.dataPoints.map((p, i) => ({
+        frame: i,
+        soc: p.soc,
+        chargeRate: p.charge_rate,
+        timestamp: null,
+        time: null,
+        range: null,
+        temperature: null,
+      }));
+
+      const colorIndex = results.runsImported % colorPalette.length;
+      await this.addRun(vehicleId, {
+        name: session.runName,
+        date: session.date,
+        synthetic: session.synthetic,
+        color: colorPalette[colorIndex],
+        data: runData,
+      });
+      results.runsImported++;
+      results.pointsImported += session.dataPoints.length;
+    }
+    return results;
   }
 
   async signOut() {
