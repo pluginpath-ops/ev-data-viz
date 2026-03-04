@@ -484,6 +484,42 @@ class DataService {
     return result; // { updated: N, inserted: M, populatedFields?: [...] }
   }
 
+  /**
+   * Replace all data points for a run with a new set of rows.
+   * Uses a SECURITY DEFINER RPC (delete + re-insert) so RLS is not an obstacle.
+   * Updates populated_fields on the runs table after the write.
+   *
+   * @param {string|number} runId
+   * @param {Array} points — [{ soc, chargeRate, time, range, temperature }]
+   */
+  async replaceRunData(runId, points) {
+    if (!this.useSupabase || !this.user) {
+      throw new Error('Must be logged in to update run data.');
+    }
+    const rows = points.map((p, i) => ({
+      frame:       p.frame ?? i,
+      soc:         roundField(p.soc,         1),
+      charge_rate: roundField(p.chargeRate,  2),
+      time_value:  roundField(p.time,        1),
+      range_value: roundField(p.range,       1),
+      temperature: roundField(p.temperature, 1),
+    }));
+    const { error } = await getSupabase()
+      .rpc('replace_run_data_points', { p_run_id: runId, p_rows: rows });
+    if (error) throw error;
+
+    // Recompute populated_fields from the new data
+    const populatedFields = [];
+    if (points.some(p => p.soc         != null)) populatedFields.push('soc');
+    if (points.some(p => p.chargeRate  != null)) populatedFields.push('chargeRate');
+    if (points.some(p => p.time        != null)) populatedFields.push('time');
+    if (points.some(p => p.range       != null)) populatedFields.push('range');
+    if (points.some(p => p.temperature != null)) populatedFields.push('temperature');
+    await getSupabase().from('runs').update({ populated_fields: populatedFields }).eq('id', runId);
+
+    return { rowCount: points.length, populatedFields };
+  }
+
   async signOut() {
     const supabase = getSupabase();
     if (!supabase) return;

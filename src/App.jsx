@@ -32,6 +32,7 @@ export default function App() {
         syncVehicleTags,
         uploadVehicleImage,
         toggleVehicleVisibility,
+        replaceRunData,
         mergeRunData,
         exportData,
         importData,
@@ -293,6 +294,7 @@ export default function App() {
                             onSetDefaultRun={(runId) => setDefaultRun(currentActiveVehicle.id, runId)}
                             onDeleteRun={(runId) => deleteRun(currentActiveVehicle.id, runId)}
                             onMergeRunData={(runId, pts, joinKey) => mergeRunData(currentActiveVehicle.id, runId, pts, joinKey)}
+                            onReplaceRunData={(runId, pts) => replaceRunData(currentActiveVehicle.id, runId, pts)}
                             onViewChart={() => setView('chart')}
                         />
                     )}

@@ -154,6 +154,24 @@ export function AppProvider({ children }) {
         }
     };
 
+    const replaceRunData = async (vehicleId, runId, points) => {
+        try {
+            const result = await dataService.replaceRunData(runId, points);
+            // Sync updated field tags and point count back into state
+            setVehicles(prev => prev.map(v =>
+                v.id === vehicleId
+                    ? { ...v, runs: v.runs.map(r => r.id === runId
+                        ? { ...r, populated_fields: result.populatedFields, dataPointCount: result.rowCount }
+                        : r) }
+                    : v
+            ));
+            return result;
+        } catch (error) {
+            alert('Error saving data: ' + error.message);
+            throw error;
+        }
+    };
+
     const mergeRunData = async (vehicleId, runId, newDataPoints, joinKey) => {
         try {
             const result = await dataService.mergeRunData(runId, newDataPoints, joinKey);
@@ -358,6 +376,7 @@ export function AppProvider({ children }) {
         syncVehicleTags,
         uploadVehicleImage,
         toggleVehicleVisibility,
+        replaceRunData,
         mergeRunData,
         exportData,
         importData,

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { parseCSV } from '../utils/parseCSV';
+import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 
-export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onViewChart }) {
+export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onViewChart }) {
     const [showUpload, setShowUpload] = useState(false);
     const [uploadStep, setUploadStep] = useState('file');
     const [csvData, setCsvData] = useState(null);
@@ -24,6 +25,13 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     // joinKey: which column links incoming rows to existing ones
     const [joinKey, setJoinKey] = useState('soc');
     const [merging, setMerging] = useState(false);
+
+    // ── Inline data-table state (edit mode) ──────────────────────────────────
+    const [editData, setEditData]               = useState(null);   // null=not fetched, []=loaded
+    const [editDataLoading, setEditDataLoading] = useState(false);
+    const [editDataDirty, setEditDataDirty]     = useState(false);  // cells modified
+    const [showDataTable, setShowDataTable]     = useState(false);  // expand/collapse
+    const [savingData, setSavingData]           = useState(false);
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -144,15 +152,31 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         });
     };
 
-    const handleSaveEdit = (runId) => {
-        onUpdateRun(runId, editFormData);
-        setEditingRunId(null);
-        setEditFormData({});
+    const handleSaveEdit = async (runId) => {
+        setSavingData(true);
+        try {
+            // Always save metadata
+            onUpdateRun(runId, editFormData);
+            // Save table data only if the owner made changes
+            if (editDataDirty && isOwner && editData !== null) {
+                await onReplaceRunData(runId, editData.map((row, i) => ({ ...row, frame: i })));
+            }
+        } finally {
+            setSavingData(false);
+            setEditingRunId(null);
+            setEditFormData({});
+            setEditData(null);
+            setEditDataDirty(false);
+            setShowDataTable(false);
+        }
     };
 
     const handleCancelEdit = () => {
         setEditingRunId(null);
         setEditFormData({});
+        setEditData(null);
+        setEditDataDirty(false);
+        setShowDataTable(false);
     };
 
     // ── Update data (merge mode entry) ────────────────────────────────────────
@@ -164,6 +188,45 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
+    };
+
+    // ── Data table helpers (edit mode) ───────────────────────────────────────
+
+    const handleToggleDataTable = async (runId) => {
+        if (!showDataTable && editData === null) {
+            // First expand: lazy-load the data points
+            setShowDataTable(true);
+            setEditDataLoading(true);
+            try {
+                const data = await dataService.getRunData(runId);
+                setEditData(data);
+            } catch (err) {
+                console.error('Error loading run data:', err);
+                setEditData([]);
+            } finally {
+                setEditDataLoading(false);
+            }
+        } else {
+            setShowDataTable(s => !s);
+        }
+    };
+
+    const handleEditDataCell = (rowIdx, field, value) => {
+        const parsed = value === '' ? null : parseFloat(value);
+        setEditData(prev => prev.map((row, i) =>
+            i === rowIdx ? { ...row, [field]: isNaN(parsed) ? null : parsed } : row
+        ));
+        setEditDataDirty(true);
+    };
+
+    const handleAddDataRow = () => {
+        setEditData(prev => [...prev, { soc: null, chargeRate: null, time: null, range: null, temperature: null }]);
+        setEditDataDirty(true);
+    };
+
+    const handleDeleteDataRow = (rowIdx) => {
+        setEditData(prev => prev.filter((_, i) => i !== rowIdx));
+        setEditDataDirty(true);
     };
 
     // ── Join key logic (merge mode only) ─────────────────────────────────────
@@ -453,16 +516,98 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                 <div className="flex gap-2 mt-4">
                                     <button
                                         onClick={() => handleSaveEdit(run.id)}
-                                        className="btn btn-primary"
+                                        disabled={savingData}
+                                        className="btn btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
-                                        Save Changes
+                                        {savingData ? 'Saving…' : 'Save Changes'}
                                     </button>
                                     <button
                                         onClick={handleCancelEdit}
-                                        className="btn btn-secondary"
+                                        disabled={savingData}
+                                        className="btn btn-secondary disabled:opacity-60"
                                     >
                                         Cancel
                                     </button>
+                                </div>
+
+                                {/* ── Data table toggle ── */}
+                                <div className="mt-4 border-t pt-3">
+                                    <button
+                                        onClick={() => handleToggleDataTable(run.id)}
+                                        className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
+                                    >
+                                        <span>{showDataTable ? '▴ Hide data' : '▾ Show data'}</span>
+                                        {editData !== null && !editDataLoading && (
+                                            <span className="text-xs text-gray-400">({editData.length} rows)</span>
+                                        )}
+                                        {editDataDirty && (
+                                            <span className="ml-1 text-xs text-orange-500 font-medium">● unsaved changes</span>
+                                        )}
+                                    </button>
+
+                                    {showDataTable && (
+                                        <div className="mt-3">
+                                            {editDataLoading ? (
+                                                <p className="text-sm text-gray-500 py-4 text-center">Loading…</p>
+                                            ) : (
+                                                <>
+                                                    <div className="overflow-auto rounded border" style={{ maxHeight: 360 }}>
+                                                        <table className="w-full text-xs border-collapse">
+                                                            <thead className="bg-gray-50 sticky top-0 z-10 border-b">
+                                                                <tr>
+                                                                    <th className="px-2 py-1.5 text-left text-gray-500 font-medium w-8">#</th>
+                                                                    {[['soc','SoC (%)'],['chargeRate','kW'],['time','Time'],['range','Range'],['temperature','Temp']].map(([,label]) => (
+                                                                        <th key={label} className="px-2 py-1.5 text-left text-gray-500 font-medium">{label}</th>
+                                                                    ))}
+                                                                    {isOwner && <th className="w-6"></th>}
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {(editData || []).map((row, i) => (
+                                                                    <tr key={i} className={`border-t ${i % 2 !== 0 ? 'bg-gray-50/50' : ''}`}>
+                                                                        <td className="px-2 py-0.5 text-gray-400 select-none">{i + 1}</td>
+                                                                        {['soc','chargeRate','time','range','temperature'].map(field => (
+                                                                            <td key={field} className="px-1 py-0.5">
+                                                                                <input
+                                                                                    type="number"
+                                                                                    disabled={!isOwner}
+                                                                                    value={row[field] ?? ''}
+                                                                                    onChange={e => handleEditDataCell(i, field, e.target.value)}
+                                                                                    placeholder="—"
+                                                                                    className={`w-full text-xs p-0.5 rounded outline-none ${
+                                                                                        isOwner
+                                                                                            ? 'bg-transparent hover:bg-white focus:bg-white focus:ring-1 focus:ring-blue-300'
+                                                                                            : 'bg-transparent text-gray-600 cursor-default'
+                                                                                    }`}
+                                                                                />
+                                                                            </td>
+                                                                        ))}
+                                                                        {isOwner && (
+                                                                            <td className="px-1 text-center">
+                                                                                <button
+                                                                                    onClick={() => handleDeleteDataRow(i)}
+                                                                                    className="text-gray-300 hover:text-red-500 leading-none"
+                                                                                    title="Remove row"
+                                                                                >×</button>
+                                                                            </td>
+                                                                        )}
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                    {isOwner && (
+                                                        <button
+                                                            onClick={handleAddDataRow}
+                                                            className="mt-2 text-xs text-blue-600 hover:text-blue-800"
+                                                        >
+                                                            + Add row
+                                                        </button>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ) : (
