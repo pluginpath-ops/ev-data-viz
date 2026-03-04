@@ -372,12 +372,12 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                                         )}
                                         {!exclusionReason && offset !== null && (
                                             noTrim ? (
-                                                <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full" title="Data starts at or above the threshold — no time was trimmed">
+                                                <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded-full" title="Data starts at or above the threshold — no time was trimmed">
                                                     no offset
                                                 </span>
                                             ) : (
                                                 <span className="text-xs bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded-full" title={`${offset} min of pre-threshold data trimmed`}>
-                                                    −{offset} min
+                                                    −{offset} min offset
                                                 </span>
                                             )
                                         )}
