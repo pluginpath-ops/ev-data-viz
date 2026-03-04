@@ -174,25 +174,23 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                     <p className="text-gray-600">Manage charging test data for this vehicle</p>
                 </div>
                 <div className="flex gap-2">
-                    {isOwner && (
-                        <button
-                            onClick={() => {
-                                if (showUpload && uploadMode === 'create') {
-                                    resetUploadState();
-                                } else {
-                                    setUploadMode('create');
-                                    setMergeTargetRun(null);
-                                    setShowUpload(true);
-                                    setUploadStep('file');
-                                    setCsvData(null);
-                                    setFieldMapping({});
-                                }
-                            }}
-                            className="btn btn-primary"
-                        >
-                            {showUpload && uploadMode === 'create' ? 'Cancel' : '+ Upload CSV'}
-                        </button>
-                    )}
+                    <button
+                        onClick={() => {
+                            if (showUpload && uploadMode === 'create') {
+                                resetUploadState();
+                            } else {
+                                setUploadMode('create');
+                                setMergeTargetRun(null);
+                                setShowUpload(true);
+                                setUploadStep('file');
+                                setCsvData(null);
+                                setFieldMapping({});
+                            }
+                        }}
+                        className="btn btn-primary"
+                    >
+                        {showUpload && uploadMode === 'create' ? 'Cancel' : '+ Upload CSV'}
+                    </button>
                     {vehicle.runs?.length > 0 && (
                         <button
                             onClick={onViewChart}
