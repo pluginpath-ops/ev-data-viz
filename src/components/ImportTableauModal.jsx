@@ -111,7 +111,16 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
             setResult(res);
             setStep('done');
         } catch (err) {
-            setParseError('Import failed: ' + err.message);
+            // A "NetworkError" / "Failed to fetch" with a 502 usually means the
+            // Supabase project is paused (free tier) or experiencing an outage.
+            const isNetworkError = err.message?.toLowerCase().includes('networkerror')
+                || err.message?.toLowerCase().includes('failed to fetch')
+                || err.message?.toLowerCase().includes('load failed');
+            const detail = isNetworkError
+                ? 'Network error — your Supabase project may be paused. Visit app.supabase.com, restore the project, then try again.'
+                : err.message;
+            console.error('[ImportTableau] Import error:', err);
+            setParseError('Import failed: ' + detail);
             setStep('mapping');
         } finally {
             setImporting(false);
@@ -357,6 +366,11 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                 <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700">
                                     {result.runsImported} run{result.runsImported !== 1 ? 's' : ''} imported
                                 </span>
+                                {result.runsSkipped > 0 && (
+                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-50 text-yellow-700">
+                                        {result.runsSkipped} duplicate{result.runsSkipped !== 1 ? 's' : ''} skipped
+                                    </span>
+                                )}
                                 <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
                                     {result.pointsImported.toLocaleString()} data points
                                 </span>
