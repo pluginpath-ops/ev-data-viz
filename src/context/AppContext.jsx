@@ -159,6 +159,14 @@ export function AppProvider({ children }) {
             const result = await dataService.mergeRunData(runId, newDataPoints, joinKey);
             // No need to call initializeApp() — run cards don't display data-point
             // values loaded from DB, and ChartView fetches fresh via getRunData().
+            // If the service returned updated populated_fields, sync them into state.
+            if (result?.populatedFields) {
+                setVehicles(prev => prev.map(v =>
+                    v.id === vehicleId
+                        ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, populated_fields: result.populatedFields } : r) }
+                        : v
+                ));
+            }
             return result;
         } catch (error) {
             alert('Error updating run data: ' + error.message);

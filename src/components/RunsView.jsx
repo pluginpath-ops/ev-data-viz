@@ -174,6 +174,15 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     // Disable confirm when there's no key to join on at all
     const missingJoinKey    = uploadMode === 'merge' && !canJoinBySoc && !canJoinByTime;
 
+    // ── Field tag metadata (ordered for display) ─────────────────────────────
+    const FIELD_META = [
+        { key: 'soc',         label: 'SoC',   title: 'State of Charge (%)' },
+        { key: 'chargeRate',  label: 'kW',    title: 'Charge Rate (kW)' },
+        { key: 'time',        label: 'Time',  title: 'Time' },
+        { key: 'range',       label: 'Range', title: 'Range' },
+        { key: 'temperature', label: 'Temp',  title: 'Temperature' },
+    ];
+
     // ── Derived state ─────────────────────────────────────────────────────────
 
     const availableFields = csvData?.meta.fields || [];
@@ -473,6 +482,24 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         {run.conditions && <p>Conditions: {run.conditions}</p>}
                                         <p>Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</p>
                                     </div>
+                                    {/* Field tags — which data columns are populated */}
+                                    {(() => {
+                                        const fields = run.populated_fields || [];
+                                        if (fields.length === 0) return null;
+                                        return (
+                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                {FIELD_META.filter(f => fields.includes(f.key)).map(f => (
+                                                    <span
+                                                        key={f.key}
+                                                        title={f.title}
+                                                        className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-medium"
+                                                    >
+                                                        {f.label}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
                                     <div className="flex items-center gap-2 mt-3">
                                         <span className="text-sm text-gray-600">Plot Color:</span>
                                         <div

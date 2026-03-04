@@ -176,6 +176,14 @@ class DataService {
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
+      // Determine which fields have at least one non-null value
+      const populatedFields = [];
+      if (run.data.some(p => p.soc         != null)) populatedFields.push('soc');
+      if (run.data.some(p => p.chargeRate  != null)) populatedFields.push('chargeRate');
+      if (run.data.some(p => p.time        != null)) populatedFields.push('time');
+      if (run.data.some(p => p.range       != null)) populatedFields.push('range');
+      if (run.data.some(p => p.temperature != null)) populatedFields.push('temperature');
+
       const batchSize = 1000;
       for (let i = 0; i < run.data.length; i += batchSize) {
         const batch = run.data.slice(i, i + batchSize).map((point, j) =>
@@ -183,6 +191,11 @@ class DataService {
         );
         const { error: batchError } = await getSupabase().from('data_points').insert(batch);
         if (batchError) throw batchError;
+      }
+
+      if (populatedFields.length > 0) {
+        await getSupabase().from('runs').update({ populated_fields: populatedFields }).eq('id', newRun.id);
+        newRun.populated_fields = populatedFields;
       }
     }
     return { ...newRun, data: run.data };
@@ -449,7 +462,26 @@ class DataService {
         p_rows:     rows,
       });
     if (error) throw error;
-    return data; // { updated: N, inserted: M }
+
+    // After a successful merge, union any newly-populated fields into populated_fields
+    const newFields = [];
+    if (rows.some(r => r.soc         != null)) newFields.push('soc');
+    if (rows.some(r => r.charge_rate != null)) newFields.push('chargeRate');
+    if (rows.some(r => r.time_value  != null)) newFields.push('time');
+    if (rows.some(r => r.range_value != null)) newFields.push('range');
+    if (rows.some(r => r.temperature != null)) newFields.push('temperature');
+
+    const result = data; // { updated: N, inserted: M }
+    if (newFields.length > 0) {
+      const { data: runRow } = await getSupabase()
+        .from('runs').select('populated_fields').eq('id', runId).single();
+      const current = runRow?.populated_fields || [];
+      const merged = [...new Set([...current, ...newFields])];
+      await getSupabase().from('runs').update({ populated_fields: merged }).eq('id', runId);
+      result.populatedFields = merged;
+    }
+
+    return result; // { updated: N, inserted: M, populatedFields?: [...] }
   }
 
   async signOut() {
