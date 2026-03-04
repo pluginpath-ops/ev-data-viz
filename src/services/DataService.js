@@ -31,11 +31,16 @@ class DataService {
     }
     const { data } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*), vehicle_tags(tags(id, name))`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name))`)
       .order('created_at', { ascending: false });
     return (data || []).map(v => ({
       ...v,
       tags: (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
+      runs: (v.runs || []).map(r => ({
+        ...r,
+        // data_points(count) returns [{ count: N }]; normalise to a plain number
+        dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
+      })),
     }));
   }
 
@@ -389,84 +394,50 @@ class DataService {
   }
 
   /**
-   * Merge new data points into an existing run.
+   * Append new data points to an existing run.
    *
-   * For each incoming point, we look up an existing data_point row by joinKey
-   * ('soc' or 'time') and patch only the fields that are present in the new
-   * point. Incoming rows that have no match are inserted as new data_points.
+   * Each CSV upload contributes independent rows — no row-matching needed.
+   * For XY plots, each axis is drawn from whatever field is populated on a
+   * given row, so SoC+kW rows and SoC+Time rows live happily alongside each
+   * other; the chart simply skips rows where the chosen axis field is null.
    *
    * @param {string|number} runId
-   * @param {Array}  newDataPoints  — array of { soc, chargeRate, time, range, temperature }
-   * @param {'soc'|'time'} joinKey  — which field to use as the join key
+   * @param {Array} newDataPoints — array of { soc, chargeRate, time, range, temperature }
    */
-  async mergeRunData(runId, newDataPoints, joinKey = 'soc') {
+  async mergeRunData(runId, newDataPoints) {
     if (!this.useSupabase || !this.user) {
       throw new Error('Must be logged in to update run data.');
     }
 
-    // Fetch all existing data points for the run
-    const { data: existingPoints, error: fetchError } = await getSupabase()
+    // Get current row count so we can assign sequential frame numbers
+    const { count, error: countError } = await getSupabase()
       .from('data_points')
-      .select('*')
+      .select('*', { count: 'exact', head: true })
       .eq('run_id', runId);
-    if (fetchError) throw fetchError;
+    if (countError) throw countError;
 
-    // Build a lookup map: joinKey value → existing row
-    const lookup = new Map();
-    for (const dp of existingPoints || []) {
-      const key = joinKey === 'soc' ? dp.soc : dp.time_value;
-      if (key !== null && key !== undefined) lookup.set(Number(key), dp);
-    }
+    const startFrame = count || 0;
 
-    const toUpdate = [];  // [{ id, fields }]
-    const toInsert = [];  // [data_point row objects]
+    const toInsert = newDataPoints.map((point, i) => ({
+      run_id:      runId,
+      frame:       startFrame + i,
+      soc:         point.soc         != null ? Number(point.soc)         : null,
+      charge_rate: point.chargeRate  != null ? Number(point.chargeRate)  : null,
+      time_value:  point.time        != null ? Number(point.time)        : null,
+      range_value: point.range       != null ? Number(point.range)       : null,
+      temperature: point.temperature != null ? Number(point.temperature) : null,
+      timestamp:   point.timestamp   ?? null,
+    }));
 
-    for (const point of newDataPoints) {
-      const rawKey = joinKey === 'soc' ? point.soc : point.time;
-      const keyVal  = rawKey !== null && rawKey !== undefined ? Number(rawKey) : null;
-      const match   = keyVal !== null ? lookup.get(keyVal) : null;
-
-      if (match) {
-        // Patch only the fields that arrived in the new CSV
-        const fields = {};
-        if (point.chargeRate != null) fields.charge_rate  = Number(point.chargeRate);
-        if (point.time        != null) fields.time_value   = Number(point.time);
-        if (point.range       != null) fields.range_value  = Number(point.range);
-        if (point.temperature != null) fields.temperature  = Number(point.temperature);
-        // If joining by time we can also update soc (and vice-versa)
-        if (joinKey === 'time' && point.soc != null) fields.soc = Number(point.soc);
-        if (joinKey === 'soc'  && point.time != null) fields.time_value = Number(point.time);
-        if (Object.keys(fields).length > 0) toUpdate.push({ id: match.id, fields });
-      } else {
-        toInsert.push({
-          run_id:      runId,
-          frame:       (existingPoints?.length || 0) + toInsert.length,
-          soc:         point.soc         != null ? Number(point.soc)         : null,
-          charge_rate: point.chargeRate  != null ? Number(point.chargeRate)  : null,
-          time_value:  point.time        != null ? Number(point.time)        : null,
-          range_value: point.range       != null ? Number(point.range)       : null,
-          temperature: point.temperature != null ? Number(point.temperature) : null,
-          timestamp:   point.timestamp   ?? null,
-        });
-      }
-    }
-
-    // Apply updates row-by-row (Supabase doesn't support batch update by id list)
-    for (const { id, fields } of toUpdate) {
-      const { error } = await getSupabase().from('data_points').update(fields).eq('id', id);
+    const batchSize = 1000;
+    for (let i = 0; i < toInsert.length; i += batchSize) {
+      const { error } = await getSupabase()
+        .from('data_points')
+        .insert(toInsert.slice(i, i + batchSize));
       if (error) throw error;
     }
 
-    // Batch-insert new rows
-    if (toInsert.length > 0) {
-      const batchSize = 1000;
-      for (let i = 0; i < toInsert.length; i += batchSize) {
-        const { error } = await getSupabase().from('data_points').insert(toInsert.slice(i, i + batchSize));
-        if (error) throw error;
-      }
-    }
-
-    return { updated: toUpdate.length, inserted: toInsert.length };
+    return { inserted: toInsert.length };
   }
 
   async signOut() {

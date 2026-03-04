@@ -21,8 +21,6 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     // uploadMode: 'create' (new run) | 'merge' (append data to existing run)
     const [uploadMode, setUploadMode] = useState('create');
     const [mergeTargetRun, setMergeTargetRun] = useState(null);
-    // joinKey: 'soc' | 'time' — auto-selected or chosen by user
-    const [joinKey, setJoinKey] = useState('soc');
     const [merging, setMerging] = useState(false);
 
     const {
@@ -40,7 +38,6 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
-        setJoinKey('soc');
         setMerging(false);
     };
 
@@ -117,10 +114,10 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
         setMerging(true);
         try {
-            const result = await onMergeRunData(mergeTargetRun.id, transformedData, joinKey);
+            const result = await onMergeRunData(mergeTargetRun.id, transformedData);
             resetUploadState();
             if (result) {
-                alert(`Data merged successfully: ${result.updated} rows updated, ${result.inserted} new rows inserted.`);
+                alert(`Data appended successfully: ${result.inserted} new rows added.`);
             }
         } catch {
             setMerging(false); // leave the panel open so the user can retry
@@ -159,14 +156,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setJoinKey('soc');
     };
-
-    // ── Join key logic ────────────────────────────────────────────────────────
-    // Show a radio selector only when the new CSV has both soc AND time mapped.
-    const canJoinBySoc  = !!fieldMapping.soc;
-    const canJoinByTime = !!fieldMapping.time;
-    const showJoinSelector = uploadMode === 'merge' && canJoinBySoc && canJoinByTime;
 
     // ── Derived state ─────────────────────────────────────────────────────────
 
@@ -336,39 +326,6 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                 ))}
                             </div>
 
-                            {/* Join key selector — only in merge mode when both soc and time are mapped */}
-                            {showJoinSelector && (
-                                <div className="mt-5 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                    <p className="text-sm font-semibold text-yellow-800 mb-2">
-                                        Both SoC and Time are mapped — which field should be used to match rows?
-                                    </p>
-                                    <div className="flex gap-6">
-                                        <label className="flex items-center gap-2 cursor-pointer text-sm">
-                                            <input
-                                                type="radio"
-                                                name="joinKey"
-                                                value="soc"
-                                                checked={joinKey === 'soc'}
-                                                onChange={() => setJoinKey('soc')}
-                                            />
-                                            <span className="font-medium">SoC</span>
-                                            <span className="text-gray-500">(recommended for charging curves)</span>
-                                        </label>
-                                        <label className="flex items-center gap-2 cursor-pointer text-sm">
-                                            <input
-                                                type="radio"
-                                                name="joinKey"
-                                                value="time"
-                                                checked={joinKey === 'time'}
-                                                onChange={() => setJoinKey('time')}
-                                            />
-                                            <span className="font-medium">Time</span>
-                                            <span className="text-gray-500">(use if SoC varies between sessions)</span>
-                                        </label>
-                                    </div>
-                                </div>
-                            )}
-
                             <div className="mt-6 flex gap-2">
                                 <button
                                     onClick={() => setUploadStep('file')}
@@ -465,7 +422,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         <p>Date: {run.date}</p>
                                         {run.softwareVersion && <p>Software: {run.softwareVersion}</p>}
                                         {run.conditions && <p>Conditions: {run.conditions}</p>}
-                                        <p>Data Points: {run.data?.length || 0}</p>
+                                        <p>Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</p>
                                     </div>
                                     <div className="flex items-center gap-2 mt-3">
                                         <span className="text-sm text-gray-600">Plot Color:</span>

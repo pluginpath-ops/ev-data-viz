@@ -292,7 +292,7 @@ export default function App() {
                             onUpdateRun={(runId, updates) => updateRun(currentActiveVehicle.id, runId, updates)}
                             onSetDefaultRun={(runId) => setDefaultRun(currentActiveVehicle.id, runId)}
                             onDeleteRun={(runId) => deleteRun(currentActiveVehicle.id, runId)}
-                            onMergeRunData={(runId, pts, joinKey) => mergeRunData(currentActiveVehicle.id, runId, pts, joinKey)}
+                            onMergeRunData={(runId, pts) => mergeRunData(currentActiveVehicle.id, runId, pts)}
                             onViewChart={() => setView('chart')}
                         />
                     )}
