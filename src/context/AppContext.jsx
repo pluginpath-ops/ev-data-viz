@@ -157,11 +157,12 @@ export function AppProvider({ children }) {
     const mergeRunData = async (vehicleId, runId, newDataPoints, joinKey) => {
         try {
             const result = await dataService.mergeRunData(runId, newDataPoints, joinKey);
-            // Re-initialise so the run's data-point count refreshes in the UI
-            await initializeApp();
+            // No need to call initializeApp() — run cards don't display data-point
+            // values loaded from DB, and ChartView fetches fresh via getRunData().
             return result;
         } catch (error) {
             alert('Error updating run data: ' + error.message);
+            throw error; // re-throw so the caller knows it failed
         }
     };
 

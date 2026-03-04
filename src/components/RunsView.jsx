@@ -23,6 +23,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const [mergeTargetRun, setMergeTargetRun] = useState(null);
     // joinKey: 'soc' | 'time' — auto-selected or chosen by user
     const [joinKey, setJoinKey] = useState('soc');
+    const [merging, setMerging] = useState(false);
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -40,6 +41,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setUploadMode('create');
         setMergeTargetRun(null);
         setJoinKey('soc');
+        setMerging(false);
     };
 
     // ── File upload ───────────────────────────────────────────────────────────
@@ -113,8 +115,16 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             return newRow;
         });
 
-        await onMergeRunData(mergeTargetRun.id, transformedData, joinKey);
-        resetUploadState();
+        setMerging(true);
+        try {
+            const result = await onMergeRunData(mergeTargetRun.id, transformedData, joinKey);
+            resetUploadState();
+            if (result) {
+                alert(`Data merged successfully: ${result.updated} rows updated, ${result.inserted} new rows inserted.`);
+            }
+        } catch {
+            setMerging(false); // leave the panel open so the user can retry
+        }
     };
 
     // ── Edit handlers ─────────────────────────────────────────────────────────
@@ -376,9 +386,10 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                 ) : (
                                     <button
                                         onClick={handleMerge}
-                                        className="btn btn-primary"
+                                        disabled={merging}
+                                        className="btn btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
-                                        Merge into Run
+                                        {merging ? 'Merging…' : 'Merge into Run'}
                                     </button>
                                 )}
                             </div>
