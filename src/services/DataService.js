@@ -1,5 +1,30 @@
 import { getSupabase } from './supabase';
 
+/**
+ * Round a numeric field to a given number of decimal places.
+ * Returns null if the value is null/undefined/NaN.
+ */
+function roundField(value, decimals) {
+  if (value == null) return null;
+  const n = Number(value);
+  if (isNaN(n)) return null;
+  return Math.round(n * 10 ** decimals) / 10 ** decimals;
+}
+
+/** Normalise a raw data-point object into a clean DB row shape. */
+function normalisePoint(point, runId, frame) {
+  return {
+    run_id:      runId,
+    frame,
+    timestamp:   point.timestamp ?? null,
+    soc:         roundField(point.soc,         1),  // 0–100 %,   1 dp  e.g. 42.5
+    charge_rate: roundField(point.chargeRate,  2),  // kW,        2 dp  e.g. 150.00
+    time_value:  roundField(point.time,        1),  // min/s,     1 dp
+    range_value: roundField(point.range,       1),  // mi/km,     1 dp
+    temperature: roundField(point.temperature, 1),  // °C/°F,     1 dp
+  };
+}
+
 class DataService {
   constructor() {
     this.user = null;
@@ -153,11 +178,9 @@ class DataService {
     if (run.data?.length > 0) {
       const batchSize = 1000;
       for (let i = 0; i < run.data.length; i += batchSize) {
-        const batch = run.data.slice(i, i + batchSize).map(point => ({
-          run_id: newRun.id, frame: point.frame, timestamp: point.timestamp,
-          soc: point.soc, charge_rate: point.chargeRate,
-          time_value: point.time, range_value: point.range, temperature: point.temperature
-        }));
+        const batch = run.data.slice(i, i + batchSize).map((point, j) =>
+          normalisePoint(point, newRun.id, point.frame ?? (i + j))
+        );
         const { error: batchError } = await getSupabase().from('data_points').insert(batch);
         if (batchError) throw batchError;
       }
@@ -418,16 +441,9 @@ class DataService {
 
     const startFrame = count || 0;
 
-    const toInsert = newDataPoints.map((point, i) => ({
-      run_id:      runId,
-      frame:       startFrame + i,
-      soc:         point.soc         != null ? Number(point.soc)         : null,
-      charge_rate: point.chargeRate  != null ? Number(point.chargeRate)  : null,
-      time_value:  point.time        != null ? Number(point.time)        : null,
-      range_value: point.range       != null ? Number(point.range)       : null,
-      temperature: point.temperature != null ? Number(point.temperature) : null,
-      timestamp:   point.timestamp   ?? null,
-    }));
+    const toInsert = newDataPoints.map((point, i) =>
+      normalisePoint(point, runId, startFrame + i)
+    );
 
     const batchSize = 1000;
     for (let i = 0; i < toInsert.length; i += batchSize) {
