@@ -49,6 +49,11 @@ export default function App() {
         selectedRuns: [],
         raceMode: false,
         raceThreshold: 10,  // % SoC at which all runs are normalised to t = 0
+        xMin: null,
+        xMax: null,
+        yMin: null,
+        yMax: null,
+        showLine: false,
     });
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [showImportMenu, setShowImportMenu] = useState(false);

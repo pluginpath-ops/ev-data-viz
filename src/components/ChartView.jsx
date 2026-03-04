@@ -188,6 +188,8 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                 borderColor: color,
                 pointRadius: 3,
                 pointHoverRadius: 5,
+                showLine: chartConfig.showLine || false,
+                tension: 0.1,
             }];
         });
 
@@ -214,8 +216,16 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                     }
                 },
                 scales: {
-                    x: { title: { display: true, text: xLabel } },
-                    y: { title: { display: true, text: yLabel } }
+                    x: {
+                        title: { display: true, text: xLabel },
+                        ...(chartConfig.xMin != null ? { min: chartConfig.xMin } : {}),
+                        ...(chartConfig.xMax != null ? { max: chartConfig.xMax } : {}),
+                    },
+                    y: {
+                        title: { display: true, text: yLabel },
+                        ...(chartConfig.yMin != null ? { min: chartConfig.yMin } : {}),
+                        ...(chartConfig.yMax != null ? { max: chartConfig.yMax } : {}),
+                    }
                 }
             }
         });
@@ -276,6 +286,54 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                             ))}
                         </select>
                     </div>
+                </div>
+
+                {/* ── Axis scale controls + line toggle ── */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                    {[
+                        { axisKey: 'x', minKey: 'xMin', maxKey: 'xMax', label: 'X-Axis Scale' },
+                        { axisKey: 'y', minKey: 'yMin', maxKey: 'yMax', label: 'Y-Axis Scale' },
+                    ].map(({ minKey, maxKey, label }) => (
+                        <div key={label}>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">{label}</label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    placeholder="Min"
+                                    value={chartConfig[minKey] ?? ''}
+                                    onChange={e => setChartConfig({ ...chartConfig, [minKey]: e.target.value === '' ? null : Number(e.target.value) })}
+                                    className="w-20 px-2 py-1 border rounded text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                />
+                                <span className="text-gray-400 text-sm">–</span>
+                                <input
+                                    type="number"
+                                    placeholder="Max"
+                                    value={chartConfig[maxKey] ?? ''}
+                                    onChange={e => setChartConfig({ ...chartConfig, [maxKey]: e.target.value === '' ? null : Number(e.target.value) })}
+                                    className="w-20 px-2 py-1 border rounded text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                />
+                                {(chartConfig[minKey] != null || chartConfig[maxKey] != null) && (
+                                    <button
+                                        onClick={() => setChartConfig({ ...chartConfig, [minKey]: null, [maxKey]: null })}
+                                        className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                                    >
+                                        Reset
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div className="mb-4">
+                    <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+                        <input
+                            type="checkbox"
+                            checked={chartConfig.showLine || false}
+                            onChange={e => setChartConfig({ ...chartConfig, showLine: e.target.checked })}
+                            className="w-4 h-4"
+                        />
+                        <span className="text-sm font-medium">Connect points with lines</span>
+                    </label>
                 </div>
 
                 {/* ── Race mode panel — only visible when X = Time ── */}
