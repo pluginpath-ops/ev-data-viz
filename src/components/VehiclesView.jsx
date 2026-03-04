@@ -102,7 +102,7 @@ function EditForm({
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onCreateTag(); } }}
                             className="border p-2 rounded text-sm flex-1"
                         />
-                        <button type="button" onClick={onCreateTag} className="btn btn-secondary text-sm">
+                        <button type="button" onClick={onCreateTag} className="btn btn-primary text-sm">
                             Create tag
                         </button>
                     </div>
