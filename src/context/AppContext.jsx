@@ -54,6 +54,12 @@ export function AppProvider({ children }) {
         await dataService.setSelectedVehicles([]);
     };
 
+    // Replace the entire selection at once (used by URL restore)
+    const setVehicleSelection = async (vehicleIds) => {
+        setSelectedVehicles(vehicleIds);
+        await dataService.setSelectedVehicles(vehicleIds);
+    };
+
     const addVehicle = async (vehicle) => {
         try {
             const newVehicle = await dataService.addVehicle(vehicle);
@@ -363,6 +369,7 @@ export function AppProvider({ children }) {
         toggleVehicleSelection,
         removeVehicleSelection,
         clearAllSelections,
+        setVehicleSelection,
         addVehicle,
         updateVehicle,
         deleteVehicle,

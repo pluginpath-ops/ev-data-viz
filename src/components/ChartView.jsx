@@ -9,6 +9,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
     const [runDataCache, setRunDataCache] = useState({});
     const [loadingData, setLoadingData] = useState(false);
     const [runsExpanded, setRunsExpanded] = useState(true);
+    const [copied, setCopied] = useState(false);
 
     const selectedVehicles = vehicles.filter(v => selectedVehicleIds.includes(v.id));
 
@@ -16,31 +17,34 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
         onUpdateRunColor(vehicleId, runId, color);
     };
 
-    // Auto-select default or newest run from each vehicle on mount or when selected vehicles change
+    // Auto-select runs when the vehicle selection changes.
+    // Reads chartConfig.selectedRuns directly (no ref) so it always sees the
+    // current value — this is what prevents URL-restored runs from being wiped.
+    // Safe against loops: if kept+added equals current, no state update fires.
     useEffect(() => {
-        const autoSelectedRuns = [];
-        selectedVehicles.forEach(vehicle => {
-            if (vehicle.runs && vehicle.runs.length > 0) {
-                const defaultRun = vehicle.runs.find(r => r.isDefault);
+        const currentRuns = chartConfig.selectedRuns;
+        const validRunIds = new Set(selectedVehicles.flatMap(v => (v.runs || []).map(r => String(r.id))));
 
-                if (defaultRun) {
-                    autoSelectedRuns.push(defaultRun.id);
-                } else {
-                    const sortedRuns = [...vehicle.runs].sort((a, b) =>
-                        new Date(b.date) - new Date(a.date)
-                    );
-                    autoSelectedRuns.push(sortedRuns[0].id);
-                }
+        // Drop stale run IDs that no longer belong to any selected vehicle
+        const kept = currentRuns.filter(id => validRunIds.has(String(id)));
+
+        // For vehicles with no run currently selected, auto-pick default or newest
+        const added = [];
+        selectedVehicles.forEach(vehicle => {
+            if (!vehicle.runs?.length) return;
+            const hasRun = kept.some(id => vehicle.runs.some(r => String(r.id) === String(id)));
+            if (!hasRun) {
+                const defaultRun = vehicle.runs.find(r => r.isDefault);
+                const pick = defaultRun || [...vehicle.runs].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+                if (pick) added.push(pick.id);
             }
         });
 
-        if (JSON.stringify(autoSelectedRuns.sort()) !== JSON.stringify(chartConfig.selectedRuns.sort())) {
-            setChartConfig(prev => ({
-                ...prev,
-                selectedRuns: autoSelectedRuns
-            }));
+        const newRuns = [...kept, ...added];
+        if (newRuns.join(',') !== currentRuns.join(',')) {
+            setChartConfig(prev => ({ ...prev, selectedRuns: newRuns }));
         }
-    }, [selectedVehicleIds]);
+    }, [selectedVehicleIds, chartConfig.selectedRuns]);
 
     // Lazy-load data_points for newly selected runs
     useEffect(() => {
@@ -282,7 +286,25 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
 
             {/* ── Top card: presets, axis selectors, run selector ── */}
             <div className="card mb-6">
-                <h3 className="text-lg font-bold mb-4">Chart Configuration</h3>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold">Chart Configuration</h3>
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(window.location.href).then(() => {
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 2000);
+                            });
+                        }}
+                        className={`text-sm flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors ${
+                            copied
+                                ? 'bg-green-50 border-green-200 text-green-700'
+                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        }`}
+                        title="Copy link to this chart view"
+                    >
+                        {copied ? '✓ Copied!' : '🔗 Copy Link'}
+                    </button>
+                </div>
 
                 {/* Presets */}
                 <div className="grid grid-cols-3 gap-4 mb-6">
