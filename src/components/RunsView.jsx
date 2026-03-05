@@ -26,6 +26,10 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const [joinKey, setJoinKey] = useState('soc');
     const [merging, setMerging] = useState(false);
 
+    // ── Estimation opts (import / merge step) ────────────────────────────────
+    // Tracks which derived-column offers the user has accepted
+    const [estimations, setEstimations] = useState({ range: false });
+
     // ── Inline data-table state (edit mode) ──────────────────────────────────
     const [editData, setEditData]               = useState(null);   // null=not fetched, []=loaded
     const [editDataLoading, setEditDataLoading] = useState(false);
@@ -48,6 +52,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
+        setEstimations({ range: false });
         setJoinKey('soc');
         setMerging(false);
     };
@@ -87,7 +92,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const handleImport = () => {
         if (!csvData) return;
 
-        const transformedData = csvData.data.map(row => {
+        let transformedData = csvData.data.map(row => {
             const newRow = {};
             Object.keys(fieldMapping).forEach(key => {
                 if (fieldMapping[key]) {
@@ -96,6 +101,16 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             });
             return newRow;
         });
+
+        // Apply opted-in estimations
+        if (estimations.range && offerRangeEstimate) {
+            const ratedRange = vehicle.range;
+            transformedData = transformedData.map(row => ({
+                ...row,
+                range: row.range != null ? row.range
+                    : roundField((parseFloat(row.soc) / 100) * ratedRange, 1),
+            }));
+        }
 
         const run = {
             ...runMetadata,
@@ -113,7 +128,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const handleMerge = async () => {
         if (!csvData || !mergeTargetRun) return;
 
-        const transformedData = csvData.data.map(row => {
+        let transformedData = csvData.data.map(row => {
             const newRow = {};
             Object.keys(fieldMapping).forEach(key => {
                 if (fieldMapping[key]) {
@@ -122,6 +137,16 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             });
             return newRow;
         });
+
+        // Apply opted-in estimations
+        if (estimations.range && offerRangeEstimate) {
+            const ratedRange = vehicle.range;
+            transformedData = transformedData.map(row => ({
+                ...row,
+                range: row.range != null ? row.range
+                    : roundField((parseFloat(row.soc) / 100) * ratedRange, 1),
+            }));
+        }
 
         // Determine the effective join key: auto-select when only one is mapped
         const effectiveJoinKey = canJoinBySoc && !canJoinByTime ? 'soc'
@@ -229,6 +254,18 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setEditDataDirty(true);
     };
 
+    // Fill null range values from SoC × rated range for the currently-loaded edit table
+    const handleEstimateRangeInEdit = () => {
+        if (!editData || !vehicle?.range) return;
+        const ratedRange = vehicle.range;
+        setEditData(prev => prev.map(row => ({
+            ...row,
+            range: row.range != null ? row.range
+                : (row.soc != null ? Math.round((row.soc / 100) * ratedRange * 10) / 10 : null),
+        })));
+        setEditDataDirty(true);
+    };
+
     // ── Join key logic (merge mode only) ─────────────────────────────────────
     const canJoinBySoc  = uploadMode === 'merge' && !!fieldMapping.soc;
     const canJoinByTime = uploadMode === 'merge' && !!fieldMapping.time;
@@ -236,6 +273,13 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const showJoinSelector  = canJoinBySoc && canJoinByTime;
     // Disable confirm when there's no key to join on at all
     const missingJoinKey    = uploadMode === 'merge' && !canJoinBySoc && !canJoinByTime;
+
+    // ── Derived-column offer logic ────────────────────────────────────────────
+    // Range can be estimated when: SoC is mapped, Range is NOT mapped, and vehicle has a rated range
+    const offerRangeEstimate = !!fieldMapping.soc && !fieldMapping.range && !!vehicle?.range;
+
+    // ── Tiny rounding helper (mirrors DataService.roundField, used for estimations) ──
+    const roundField = (v, dp) => (v == null || isNaN(Number(v))) ? null : Math.round(Number(v) * 10 ** dp) / 10 ** dp;
 
     // ── Field tag metadata (ordered for display) ─────────────────────────────
     const FIELD_META = [
@@ -414,6 +458,32 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                 ))}
                             </div>
 
+                            {/* ── Derived-column offers ── */}
+                            {offerRangeEstimate && (
+                                <div className={`mt-5 p-4 rounded-lg border flex items-start justify-between gap-4 ${estimations.range ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+                                    <div>
+                                        <p className={`text-sm font-semibold ${estimations.range ? 'text-green-800' : 'text-blue-800'}`}>
+                                            {estimations.range ? '✓ Range will be estimated' : 'ℹ No Range column mapped'}
+                                        </p>
+                                        <p className={`text-xs mt-0.5 ${estimations.range ? 'text-green-700' : 'text-blue-700'}`}>
+                                            {estimations.range
+                                                ? `range = SoC% × ${vehicle.range} mi for each row`
+                                                : `Estimate from vehicle rated range (${vehicle.range} mi × SoC%)?`}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setEstimations(prev => ({ ...prev, range: !prev.range }))}
+                                        className={`shrink-0 text-xs px-3 py-1 rounded border transition-colors ${
+                                            estimations.range
+                                                ? 'bg-white text-green-700 border-green-300 hover:bg-green-100'
+                                                : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                                        }`}
+                                    >
+                                        {estimations.range ? 'Undo' : 'Yes, estimate'}
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Join key selector — merge mode only */}
                             {uploadMode === 'merge' && (
                                 <div className={`mt-5 p-4 rounded-lg border ${missingJoinKey ? 'bg-red-50 border-red-200' : showJoinSelector ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
@@ -547,6 +617,23 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
                                     {showDataTable && (
                                         <div className="mt-3">
+                                            {/* Range estimation offer — shown when range is absent but SoC exists */}
+                                            {isOwner && !editDataLoading && editData !== null && vehicle?.range &&
+                                             editData.some(r => r.soc != null) &&
+                                             editData.every(r => r.range == null) && (
+                                                <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200 flex items-center justify-between gap-4">
+                                                    <p className="text-xs text-blue-800">
+                                                        <span className="font-semibold">ℹ No range data.</span>{' '}
+                                                        Estimate from vehicle rated range ({vehicle.range} mi × SoC%)?
+                                                    </p>
+                                                    <button
+                                                        onClick={handleEstimateRangeInEdit}
+                                                        className="shrink-0 text-xs px-3 py-1 rounded border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
+                                                    >
+                                                        Estimate
+                                                    </button>
+                                                </div>
+                                            )}
                                             {editDataLoading ? (
                                                 <p className="text-sm text-gray-500 py-4 text-center">Loading…</p>
                                             ) : (
