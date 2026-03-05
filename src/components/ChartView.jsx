@@ -17,16 +17,12 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
         onUpdateRunColor(vehicleId, runId, color);
     };
 
-    // Always keep a ref to the latest selectedRuns so the auto-selection effect
-    // below can read it without a stale closure (selectedVehicleIds is the only dep).
-    const selectedRunsRef = useRef(chartConfig.selectedRuns);
-    useEffect(() => { selectedRunsRef.current = chartConfig.selectedRuns; }, [chartConfig.selectedRuns]);
-
     // Auto-select runs when the vehicle selection changes.
-    // Preserves any existing valid selection (e.g., URL-restored runs);
-    // only auto-picks a run for vehicles that don't already have one selected.
+    // Reads chartConfig.selectedRuns directly (no ref) so it always sees the
+    // current value — this is what prevents URL-restored runs from being wiped.
+    // Safe against loops: if kept+added equals current, no state update fires.
     useEffect(() => {
-        const currentRuns = selectedRunsRef.current;
+        const currentRuns = chartConfig.selectedRuns;
         const validRunIds = new Set(selectedVehicles.flatMap(v => (v.runs || []).map(r => String(r.id))));
 
         // Drop stale run IDs that no longer belong to any selected vehicle
@@ -48,7 +44,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
         if (newRuns.join(',') !== currentRuns.join(',')) {
             setChartConfig(prev => ({ ...prev, selectedRuns: newRuns }));
         }
-    }, [selectedVehicleIds]);
+    }, [selectedVehicleIds, chartConfig.selectedRuns]);
 
     // Lazy-load data_points for newly selected runs
     useEffect(() => {
