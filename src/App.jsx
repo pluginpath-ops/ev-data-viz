@@ -87,7 +87,17 @@ export default function App() {
         if (loading || urlApplied.current || !pendingUrlState.current) return;
         urlApplied.current = true;
         const s = pendingUrlState.current;
-        if (s.vehicleIds.length > 0) setVehicleSelection(s.vehicleIds);
+
+        // Derive vehicle IDs from run IDs (v param is optional / omitted from new URLs)
+        let vehicleIds = s.vehicleIds;
+        if (vehicleIds.length === 0 && s.runIds.length > 0) {
+            const runIdSet = new Set(s.runIds.map(String));
+            vehicleIds = vehicles
+                .filter(v => (v.runs || []).some(r => runIdSet.has(String(r.id))))
+                .map(v => v.id);
+        }
+        if (vehicleIds.length > 0) setVehicleSelection(vehicleIds);
+
         setChartConfig(prev => ({
             ...prev,
             ...(s.xAxis         && { xAxis: s.xAxis }),
@@ -109,7 +119,6 @@ export default function App() {
         if (view !== 'chart') return;
         const p = new URLSearchParams();
         p.set('tab', 'chart');
-        if (selectedVehicles.length > 0)          p.set('v',    selectedVehicles.join(','));
         if (chartConfig.selectedRuns.length > 0)  p.set('r',    chartConfig.selectedRuns.join(','));
         p.set('x', chartConfig.xAxis);
         p.set('y', chartConfig.yAxis);
