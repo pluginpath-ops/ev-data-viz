@@ -294,6 +294,19 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                     </div>
                 </div>
 
+                {/* ── Line toggle ── */}
+                <div className="mb-4">
+                    <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+                        <input
+                            type="checkbox"
+                            checked={chartConfig.showLine || false}
+                            onChange={e => setChartConfig({ ...chartConfig, showLine: e.target.checked })}
+                            className="w-4 h-4"
+                        />
+                        <span className="text-sm font-medium">Connect points with lines</span>
+                    </label>
+                </div>
+
                 {/* ── Collapsible run selector ── */}
                 <div>
                     <button
@@ -448,10 +461,10 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
             {/* ── Controls below chart: scale inputs + line toggle + race mode ── */}
             <div className="card mb-6">
 
-                {/* 3-column: Y scale | line toggle | X scale */}
-                <div className="grid grid-cols-3 gap-6 items-center">
+                {/* 2-column: Y scale | X scale — both stacked symmetrically */}
+                <div className="grid grid-cols-2 gap-8">
 
-                    {/* Left — Y-Axis Scale (stacked: Max on top, Min below) */}
+                    {/* Left — Y-Axis Scale */}
                     <div>
                         <div className="flex items-baseline justify-between mb-2">
                             <p className="text-sm font-medium text-gray-500">Y-Axis Scale</p>
@@ -488,20 +501,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                         </div>
                     </div>
 
-                    {/* Center — line toggle */}
-                    <div className="flex justify-center">
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                            <input
-                                type="checkbox"
-                                checked={chartConfig.showLine || false}
-                                onChange={e => setChartConfig({ ...chartConfig, showLine: e.target.checked })}
-                                className="w-4 h-4"
-                            />
-                            <span className="text-sm font-medium">Connect points with lines</span>
-                        </label>
-                    </div>
-
-                    {/* Right — X-Axis Scale (Min | Max side by side) */}
+                    {/* Right — X-Axis Scale */}
                     <div>
                         <div className="flex items-baseline justify-between mb-2">
                             <p className="text-sm font-medium text-gray-500">X-Axis Scale</p>
@@ -514,22 +514,27 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                                 </button>
                             )}
                         </div>
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="number"
-                                placeholder="Min"
-                                value={chartConfig.xMin ?? ''}
-                                onChange={e => setChartConfig({ ...chartConfig, xMin: e.target.value === '' ? null : Number(e.target.value) })}
-                                className={`w-24 ${numInputCls}`}
-                            />
-                            <span className="text-gray-400 text-sm">–</span>
-                            <input
-                                type="number"
-                                placeholder="Max"
-                                value={chartConfig.xMax ?? ''}
-                                onChange={e => setChartConfig({ ...chartConfig, xMax: e.target.value === '' ? null : Number(e.target.value) })}
-                                className={`w-24 ${numInputCls}`}
-                            />
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400 w-7 text-right">Max</span>
+                                <input
+                                    type="number"
+                                    placeholder="Auto"
+                                    value={chartConfig.xMax ?? ''}
+                                    onChange={e => setChartConfig({ ...chartConfig, xMax: e.target.value === '' ? null : Number(e.target.value) })}
+                                    className={`w-24 ${numInputCls}`}
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400 w-7 text-right">Min</span>
+                                <input
+                                    type="number"
+                                    placeholder="Auto"
+                                    value={chartConfig.xMin ?? ''}
+                                    onChange={e => setChartConfig({ ...chartConfig, xMin: e.target.value === '' ? null : Number(e.target.value) })}
+                                    className={`w-24 ${numInputCls}`}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
