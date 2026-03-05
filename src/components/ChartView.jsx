@@ -453,7 +453,17 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
 
                     {/* Left — Y-Axis Scale (stacked: Max on top, Min below) */}
                     <div>
-                        <p className="text-sm font-medium text-gray-500 mb-2">Y-Axis Scale</p>
+                        <div className="flex items-baseline justify-between mb-2">
+                            <p className="text-sm font-medium text-gray-500">Y-Axis Scale</p>
+                            {(chartConfig.yMin != null || chartConfig.yMax != null) && (
+                                <button
+                                    onClick={() => setChartConfig({ ...chartConfig, yMin: null, yMax: null })}
+                                    className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                                >
+                                    Reset
+                                </button>
+                            )}
+                        </div>
                         <div className="flex flex-col gap-1.5">
                             <div className="flex items-center gap-2">
                                 <span className="text-xs text-gray-400 w-7 text-right">Max</span>
@@ -475,14 +485,6 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                                     className={`w-24 ${numInputCls}`}
                                 />
                             </div>
-                            {(chartConfig.yMin != null || chartConfig.yMax != null) && (
-                                <button
-                                    onClick={() => setChartConfig({ ...chartConfig, yMin: null, yMax: null })}
-                                    className="text-xs text-gray-400 hover:text-gray-700 transition-colors ml-9"
-                                >
-                                    Reset
-                                </button>
-                            )}
                         </div>
                     </div>
 
@@ -501,25 +503,8 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
 
                     {/* Right — X-Axis Scale (Min | Max side by side) */}
                     <div>
-                        <p className="text-sm font-medium text-gray-500 mb-2">X-Axis Scale</p>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="number"
-                                    placeholder="Min"
-                                    value={chartConfig.xMin ?? ''}
-                                    onChange={e => setChartConfig({ ...chartConfig, xMin: e.target.value === '' ? null : Number(e.target.value) })}
-                                    className={`w-24 ${numInputCls}`}
-                                />
-                                <span className="text-gray-400 text-sm">–</span>
-                                <input
-                                    type="number"
-                                    placeholder="Max"
-                                    value={chartConfig.xMax ?? ''}
-                                    onChange={e => setChartConfig({ ...chartConfig, xMax: e.target.value === '' ? null : Number(e.target.value) })}
-                                    className={`w-24 ${numInputCls}`}
-                                />
-                            </div>
+                        <div className="flex items-baseline justify-between mb-2">
+                            <p className="text-sm font-medium text-gray-500">X-Axis Scale</p>
                             {(chartConfig.xMin != null || chartConfig.xMax != null) && (
                                 <button
                                     onClick={() => setChartConfig({ ...chartConfig, xMin: null, xMax: null })}
@@ -528,6 +513,23 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                                     Reset
                                 </button>
                             )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                placeholder="Min"
+                                value={chartConfig.xMin ?? ''}
+                                onChange={e => setChartConfig({ ...chartConfig, xMin: e.target.value === '' ? null : Number(e.target.value) })}
+                                className={`w-24 ${numInputCls}`}
+                            />
+                            <span className="text-gray-400 text-sm">–</span>
+                            <input
+                                type="number"
+                                placeholder="Max"
+                                value={chartConfig.xMax ?? ''}
+                                onChange={e => setChartConfig({ ...chartConfig, xMax: e.target.value === '' ? null : Number(e.target.value) })}
+                                className={`w-24 ${numInputCls}`}
+                            />
                         </div>
                     </div>
                 </div>
