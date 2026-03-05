@@ -10,6 +10,8 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
     const [loadingData, setLoadingData] = useState(false);
     const [runsExpanded, setRunsExpanded] = useState(true);
     const [copied, setCopied] = useState(false);
+    const [chartImage, setChartImage] = useState(null);
+    const [imageCopied, setImageCopied] = useState(false);
 
     const selectedVehicles = vehicles.filter(v => selectedVehicleIds.includes(v.id));
 
@@ -176,6 +178,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
 
     useEffect(() => {
         if (!chartRef.current) return;
+        setChartImage(null); // clear stale preview whenever chart redraws
 
         const ctx = chartRef.current.getContext('2d');
 
@@ -274,6 +277,22 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
             }
         };
     }, [chartConfig, selectedVehicles, runDataCache]);
+
+    // ── PNG export ───────────────────────────────────────────────────────────
+    const handleExportImage = async () => {
+        if (!chartInstance.current) return;
+        const dataUrl = chartInstance.current.toBase64Image('image/png', 1.0);
+        setChartImage(dataUrl);
+        // Try writing directly to clipboard (Chrome/Edge; Safari requires user gesture)
+        try {
+            const blob = await (await fetch(dataUrl)).blob();
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            setImageCopied(true);
+            setTimeout(() => setImageCopied(false), 2500);
+        } catch {
+            // Clipboard image write not supported — image is shown inline for manual copy
+        }
+    };
 
     // ── Shared input class ────────────────────────────────────────────────────
     const numInputCls = 'px-2 py-1 border rounded text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
@@ -510,6 +529,41 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                 <div style={{ height: '500px' }}>
                     <canvas ref={chartRef}></canvas>
                 </div>
+
+                {/* Export button */}
+                <div className="mt-3 flex items-center gap-3">
+                    <button
+                        onClick={handleExportImage}
+                        className={`text-sm flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors ${
+                            imageCopied
+                                ? 'bg-green-50 border-green-200 text-green-700'
+                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        }`}
+                        title="Export chart as PNG"
+                    >
+                        {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
+                    </button>
+                    {chartImage && (
+                        <button
+                            onClick={() => setChartImage(null)}
+                            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            ✕ Dismiss preview
+                        </button>
+                    )}
+                </div>
+
+                {/* Inline image preview — right-click/long-press to copy or save */}
+                {chartImage && (
+                    <div className="mt-3">
+                        <p className="text-xs text-gray-400 mb-1.5">Right-click or long-press to copy / save</p>
+                        <img
+                            src={chartImage}
+                            alt="Chart export"
+                            className="w-full rounded border border-gray-200"
+                        />
+                    </div>
+                )}
             </div>
 
             {/* ── Controls below chart: scale inputs + line toggle + race mode ── */}
