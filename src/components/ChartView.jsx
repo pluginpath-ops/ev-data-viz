@@ -466,7 +466,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
 
                     {/* Left — Y-Axis Scale */}
                     <div>
-                        <div className="flex items-baseline justify-between mb-2">
+                        <div className="flex items-baseline gap-3 mb-2">
                             <p className="text-sm font-medium text-gray-500">Y-Axis Scale</p>
                             {(chartConfig.yMin != null || chartConfig.yMax != null) && (
                                 <button
@@ -503,7 +503,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
 
                     {/* Right — X-Axis Scale */}
                     <div>
-                        <div className="flex items-baseline justify-between mb-2">
+                        <div className="flex items-baseline gap-3 mb-2">
                             <p className="text-sm font-medium text-gray-500">X-Axis Scale</p>
                             {(chartConfig.xMin != null || chartConfig.xMax != null) && (
                                 <button
