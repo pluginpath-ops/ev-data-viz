@@ -776,10 +776,6 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                     })()}
                                     <div className="flex items-center gap-2 mt-3">
                                         <span className="text-sm text-gray-600">Plot Color:</span>
-                                        <div
-                                            className="w-6 h-6 rounded border border-gray-300"
-                                            style={{backgroundColor: run.color || '#3b82f6'}}
-                                        ></div>
                                         <input
                                             type="color"
                                             value={run.color || '#3b82f6'}
