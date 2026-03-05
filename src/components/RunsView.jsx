@@ -655,22 +655,31 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                             <thead className="bg-gray-50 sticky top-0 z-10 border-b">
                                                                 <tr>
                                                                     <th className="px-2 py-1.5 text-left text-gray-500 font-medium w-8">#</th>
-                                                                    {[['soc','SoC (%)'],['chargeRate','kW'],['time','Time'],['range','Range'],['temperature','Temp']].map(([field, label]) => (
+                                                                    {[['soc','SoC (%)'],['chargeRate','kW'],['time','Time'],['range','Range'],['temperature','Temp']].map(([field, label]) => {
+                                                                        const isEst = editCalculatedFields.includes(field);
+                                                                        return (
                                                                         <th key={field} className="px-2 py-1.5 text-left text-gray-500 font-medium">
                                                                             <div className="flex flex-col gap-0.5">
                                                                                 <span>{label}</span>
-                                                                                {editCalculatedFields.includes(field) && (
-                                                                                    <button
-                                                                                        onClick={() => setEditCalculatedFields(prev => prev.filter(f => f !== field))}
-                                                                                        title="Click to mark as measured data"
-                                                                                        className="text-[10px] font-normal text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 leading-tight hover:bg-amber-100 w-fit"
-                                                                                    >
-                                                                                        ~est
-                                                                                    </button>
-                                                                                )}
+                                                                                <button
+                                                                                    onClick={() => setEditCalculatedFields(prev =>
+                                                                                        isEst
+                                                                                            ? prev.filter(f => f !== field)
+                                                                                            : [...prev, field]
+                                                                                    )}
+                                                                                    title={isEst ? 'Estimated — click to mark as actual' : 'Actual — click to mark as estimated'}
+                                                                                    className={`text-[10px] font-normal rounded px-1 leading-tight w-fit transition-colors ${
+                                                                                        isEst
+                                                                                            ? 'text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100'
+                                                                                            : 'text-green-700 bg-green-50 border border-green-200 hover:bg-green-100'
+                                                                                    }`}
+                                                                                >
+                                                                                    {isEst ? '~est' : 'act'}
+                                                                                </button>
                                                                             </div>
                                                                         </th>
-                                                                    ))}
+                                                                        );
+                                                                    })}
                                                                     {isOwner && <th className="w-6"></th>}
                                                                 </tr>
                                                             </thead>
