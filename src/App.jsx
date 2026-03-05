@@ -88,14 +88,13 @@ export default function App() {
         urlApplied.current = true;
         const s = pendingUrlState.current;
 
-        // Derive vehicle IDs from run IDs (v param is optional / omitted from new URLs)
-        let vehicleIds = s.vehicleIds;
-        if (vehicleIds.length === 0 && s.runIds.length > 0) {
-            const runIdSet = new Set(s.runIds.map(String));
-            vehicleIds = vehicles
-                .filter(v => (v.runs || []).some(r => runIdSet.has(String(r.id))))
-                .map(v => v.id);
-        }
+        // Derive vehicle IDs from run IDs, then merge with any explicit v= IDs
+        // (v= carries vehicles that have no runs selected)
+        const runIdSet = new Set(s.runIds.map(String));
+        const fromRuns = vehicles
+            .filter(v => (v.runs || []).some(r => runIdSet.has(String(r.id))))
+            .map(v => v.id);
+        const vehicleIds = [...new Set([...s.vehicleIds, ...fromRuns])];
         if (vehicleIds.length > 0) setVehicleSelection(vehicleIds);
 
         setChartConfig(prev => ({
@@ -119,7 +118,15 @@ export default function App() {
         if (view !== 'chart') return;
         const p = new URLSearchParams();
         p.set('tab', 'chart');
-        if (chartConfig.selectedRuns.length > 0)  p.set('r',    chartConfig.selectedRuns.join(','));
+        if (chartConfig.selectedRuns.length > 0)  p.set('r', chartConfig.selectedRuns.join(','));
+        // Include v= only for selected vehicles that have no runs in r (run-less selections)
+        const runVehicleIds = new Set(
+            vehicles
+                .filter(v => (v.runs || []).some(r => chartConfig.selectedRuns.includes(r.id)))
+                .map(v => String(v.id))
+        );
+        const runlessVehicles = selectedVehicles.filter(id => !runVehicleIds.has(String(id)));
+        if (runlessVehicles.length > 0)           p.set('v', runlessVehicles.join(','));
         p.set('x', chartConfig.xAxis);
         p.set('y', chartConfig.yAxis);
         if (chartConfig.raceMode)                 p.set('race', '1');
