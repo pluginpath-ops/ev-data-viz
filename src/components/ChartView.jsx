@@ -8,6 +8,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
     const [expandedVehicles, setExpandedVehicles] = useState({});
     const [runDataCache, setRunDataCache] = useState({});
     const [loadingData, setLoadingData] = useState(false);
+    const [runsExpanded, setRunsExpanded] = useState(true);
 
     const selectedVehicles = vehicles.filter(v => selectedVehicleIds.includes(v.id));
 
@@ -203,6 +204,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
             type: 'scatter',
             data: { datasets },
             options: {
+                animation: false,
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
@@ -237,12 +239,16 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
         };
     }, [chartConfig, selectedVehicles, runDataCache]);
 
+    // ── Shared input class ────────────────────────────────────────────────────
+    const numInputCls = 'px-2 py-1 border rounded text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+
     // ── Render ────────────────────────────────────────────────────────────────
 
     return (
         <div>
             <h2 className="text-2xl font-bold mb-6">Charts - {selectedVehicles.length} Vehicle{selectedVehicles.length !== 1 ? 's' : ''} Selected</h2>
 
+            {/* ── Top card: presets, axis selectors, run selector ── */}
             <div className="card mb-6">
                 <h3 className="text-lg font-bold mb-4">Chart Configuration</h3>
 
@@ -261,7 +267,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                 </div>
 
                 {/* Axis selectors */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-2 gap-4 mb-6">
                     <div>
                         <label className="block font-medium mb-2">X-Axis:</label>
                         <select
@@ -288,57 +294,247 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                     </div>
                 </div>
 
-                {/* ── Axis scale controls + line toggle ── */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                    {[
-                        { axisKey: 'x', minKey: 'xMin', maxKey: 'xMax', label: 'X-Axis Scale' },
-                        { axisKey: 'y', minKey: 'yMin', maxKey: 'yMax', label: 'Y-Axis Scale' },
-                    ].map(({ minKey, maxKey, label }) => (
-                        <div key={label}>
-                            <label className="block text-sm font-medium text-gray-500 mb-1">{label}</label>
+                {/* ── Collapsible run selector ── */}
+                <div>
+                    <button
+                        onClick={() => setRunsExpanded(prev => !prev)}
+                        className="flex items-center gap-2 w-full text-left font-medium hover:text-gray-600 transition-colors mb-1"
+                    >
+                        <span
+                            style={{ display: 'inline-block', transform: runsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+                        >&#9660;</span>
+                        Select Runs to Display
+                        <span className="text-sm font-normal text-gray-500">
+                            ({chartConfig.selectedRuns.length} selected)
+                        </span>
+                    </button>
+
+                    {runsExpanded && (
+                        <div className="space-y-4 mt-3">
+                            {selectedVehicles.map(vehicle => {
+                                const isExpanded = expandedVehicles[vehicle.id];
+                                const activeRuns   = vehicle.runs?.filter(r =>  chartConfig.selectedRuns.includes(r.id)) || [];
+                                const inactiveRuns = vehicle.runs?.filter(r => !chartConfig.selectedRuns.includes(r.id)) || [];
+                                const hasInactiveRuns = inactiveRuns.length > 0;
+
+                                const RunLabel = ({ run }) => {
+                                    const exclusionReason = getRaceExclusionReason(run.id);
+                                    const offset = getRaceOffset(run.id);
+                                    const noTrim = offset !== null && offset === 0;
+                                    return (
+                                        <span className="flex-1 flex items-center gap-2 flex-wrap">
+                                            <span>
+                                                {run.name}
+                                                <span className="text-sm text-gray-500"> ({run.date})</span>
+                                                {run.isDefault && (
+                                                    <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded"
+                                                        style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
+                                                        Default
+                                                    </span>
+                                                )}
+                                            </span>
+                                            {exclusionReason && (
+                                                <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full" title={`Hidden in race mode: ${exclusionReason}`}>
+                                                    ⚠ {exclusionReason}
+                                                </span>
+                                            )}
+                                            {!exclusionReason && offset !== null && (
+                                                noTrim ? (
+                                                    <span className="text-xs bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded-full" title="Data starts at or above the threshold — no time was trimmed">
+                                                        no offset
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded-full" title={`${offset} min of pre-threshold data trimmed`}>
+                                                        −{offset} min offset
+                                                    </span>
+                                                )
+                                            )}
+                                        </span>
+                                    );
+                                };
+
+                                const ColorInputs = ({ run }) => (
+                                    <>
+                                        <input
+                                            type="color"
+                                            value={run.color || '#3b82f6'}
+                                            onChange={(e) => { e.stopPropagation(); handleColorChange(vehicle.id, run.id, e.target.value); }}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-8 h-6 border-0 rounded cursor-pointer"
+                                            title="Change color"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={run.color || '#3b82f6'}
+                                            onChange={(e) => { e.stopPropagation(); handleColorChange(vehicle.id, run.id, e.target.value); }}
+                                            onBlur={(e) => {
+                                                if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
+                                                    handleColorChange(vehicle.id, run.id, run.color || '#3b82f6');
+                                                }
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-20 px-2 py-0.5 border rounded text-xs font-mono"
+                                            placeholder="#3b82f6"
+                                            maxLength={7}
+                                        />
+                                    </>
+                                );
+
+                                return (
+                                    <div key={vehicle.id} className="border-l-4 pl-4" style={{ borderColor: 'var(--color-primary)' }}>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <h4 className="font-semibold text-gray-700">{vehicle.name}</h4>
+                                            {hasInactiveRuns && (
+                                                <button
+                                                    onClick={() => toggleVehicleExpanded(vehicle.id)}
+                                                    className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                                                >
+                                                    <span style={{ display: 'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
+                                                    <span>{isExpanded ? 'Hide' : 'Show'} all ({vehicle.runs?.length || 0})</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            {/* Active runs — always shown */}
+                                            {activeRuns.map(run => (
+                                                <label key={run.id} className="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={true}
+                                                        onChange={() => setChartConfig({ ...chartConfig, selectedRuns: chartConfig.selectedRuns.filter(id => id !== run.id) })}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <ColorInputs run={run} />
+                                                    <RunLabel run={run} />
+                                                </label>
+                                            ))}
+
+                                            {/* Inactive runs — shown when expanded */}
+                                            {isExpanded && inactiveRuns.map(run => (
+                                                <label key={run.id} className="flex items-center gap-2 opacity-60 hover:opacity-100">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={false}
+                                                        onChange={() => setChartConfig({ ...chartConfig, selectedRuns: [...chartConfig.selectedRuns, run.id] })}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <ColorInputs run={run} />
+                                                    <RunLabel run={run} />
+                                                </label>
+                                            ))}
+
+                                            {(!vehicle.runs || vehicle.runs.length === 0) && (
+                                                <p className="text-sm text-gray-500 italic">No runs available</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ── Chart canvas ── */}
+            <div className="card mb-4">
+                {loadingData && (
+                    <div className="text-center py-4 text-gray-500 text-sm">Loading run data...</div>
+                )}
+                <div style={{ height: '500px' }}>
+                    <canvas ref={chartRef}></canvas>
+                </div>
+            </div>
+
+            {/* ── Controls below chart: scale inputs + line toggle + race mode ── */}
+            <div className="card mb-6">
+
+                {/* 3-column: Y scale | line toggle | X scale */}
+                <div className="grid grid-cols-3 gap-6 items-center">
+
+                    {/* Left — Y-Axis Scale (stacked: Max on top, Min below) */}
+                    <div>
+                        <p className="text-sm font-medium text-gray-500 mb-2">Y-Axis Scale</p>
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400 w-7 text-right">Max</span>
+                                <input
+                                    type="number"
+                                    placeholder="Auto"
+                                    value={chartConfig.yMax ?? ''}
+                                    onChange={e => setChartConfig({ ...chartConfig, yMax: e.target.value === '' ? null : Number(e.target.value) })}
+                                    className={`w-24 ${numInputCls}`}
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400 w-7 text-right">Min</span>
+                                <input
+                                    type="number"
+                                    placeholder="Auto"
+                                    value={chartConfig.yMin ?? ''}
+                                    onChange={e => setChartConfig({ ...chartConfig, yMin: e.target.value === '' ? null : Number(e.target.value) })}
+                                    className={`w-24 ${numInputCls}`}
+                                />
+                            </div>
+                            {(chartConfig.yMin != null || chartConfig.yMax != null) && (
+                                <button
+                                    onClick={() => setChartConfig({ ...chartConfig, yMin: null, yMax: null })}
+                                    className="text-xs text-gray-400 hover:text-gray-700 transition-colors ml-9"
+                                >
+                                    Reset
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Center — line toggle */}
+                    <div className="flex justify-center">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={chartConfig.showLine || false}
+                                onChange={e => setChartConfig({ ...chartConfig, showLine: e.target.checked })}
+                                className="w-4 h-4"
+                            />
+                            <span className="text-sm font-medium">Connect points with lines</span>
+                        </label>
+                    </div>
+
+                    {/* Right — X-Axis Scale (Min | Max side by side) */}
+                    <div>
+                        <p className="text-sm font-medium text-gray-500 mb-2">X-Axis Scale</p>
+                        <div className="flex flex-col gap-1.5">
                             <div className="flex items-center gap-2">
                                 <input
                                     type="number"
                                     placeholder="Min"
-                                    value={chartConfig[minKey] ?? ''}
-                                    onChange={e => setChartConfig({ ...chartConfig, [minKey]: e.target.value === '' ? null : Number(e.target.value) })}
-                                    className="w-20 px-2 py-1 border rounded text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    value={chartConfig.xMin ?? ''}
+                                    onChange={e => setChartConfig({ ...chartConfig, xMin: e.target.value === '' ? null : Number(e.target.value) })}
+                                    className={`w-24 ${numInputCls}`}
                                 />
                                 <span className="text-gray-400 text-sm">–</span>
                                 <input
                                     type="number"
                                     placeholder="Max"
-                                    value={chartConfig[maxKey] ?? ''}
-                                    onChange={e => setChartConfig({ ...chartConfig, [maxKey]: e.target.value === '' ? null : Number(e.target.value) })}
-                                    className="w-20 px-2 py-1 border rounded text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    value={chartConfig.xMax ?? ''}
+                                    onChange={e => setChartConfig({ ...chartConfig, xMax: e.target.value === '' ? null : Number(e.target.value) })}
+                                    className={`w-24 ${numInputCls}`}
                                 />
-                                {(chartConfig[minKey] != null || chartConfig[maxKey] != null) && (
-                                    <button
-                                        onClick={() => setChartConfig({ ...chartConfig, [minKey]: null, [maxKey]: null })}
-                                        className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                                    >
-                                        Reset
-                                    </button>
-                                )}
                             </div>
+                            {(chartConfig.xMin != null || chartConfig.xMax != null) && (
+                                <button
+                                    onClick={() => setChartConfig({ ...chartConfig, xMin: null, xMax: null })}
+                                    className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                                >
+                                    Reset
+                                </button>
+                            )}
                         </div>
-                    ))}
-                </div>
-                <div className="mb-4">
-                    <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
-                        <input
-                            type="checkbox"
-                            checked={chartConfig.showLine || false}
-                            onChange={e => setChartConfig({ ...chartConfig, showLine: e.target.checked })}
-                            className="w-4 h-4"
-                        />
-                        <span className="text-sm font-medium">Connect points with lines</span>
-                    </label>
+                    </div>
                 </div>
 
                 {/* ── Race mode panel — only visible when X = Time ── */}
                 {chartConfig.xAxis === 'time' && (
-                    <div className={`mb-6 p-3 rounded-lg border ${chartConfig.raceMode ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className={`mt-4 p-3 rounded-lg border ${chartConfig.raceMode ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-gray-200'}`}>
                         <div className="flex flex-wrap items-center gap-3">
                             <label className="flex items-center gap-2 cursor-pointer select-none">
                                 <input
@@ -396,141 +592,6 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                         )}
                     </div>
                 )}
-
-                {/* Run selector */}
-                <div>
-                    <label className="block font-medium mb-2">Select Runs to Display:</label>
-                    <div className="space-y-4">
-                        {selectedVehicles.map(vehicle => {
-                            const isExpanded = expandedVehicles[vehicle.id];
-                            const activeRuns   = vehicle.runs?.filter(r =>  chartConfig.selectedRuns.includes(r.id)) || [];
-                            const inactiveRuns = vehicle.runs?.filter(r => !chartConfig.selectedRuns.includes(r.id)) || [];
-                            const hasInactiveRuns = inactiveRuns.length > 0;
-
-                            const RunLabel = ({ run }) => {
-                                const exclusionReason = getRaceExclusionReason(run.id);
-                                const offset = getRaceOffset(run.id);
-                                const noTrim = offset !== null && offset === 0;
-                                return (
-                                    <span className="flex-1 flex items-center gap-2 flex-wrap">
-                                        <span>
-                                            {run.name}
-                                            <span className="text-sm text-gray-500"> ({run.date})</span>
-                                            {run.isDefault && (
-                                                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded"
-                                                    style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
-                                                    Default
-                                                </span>
-                                            )}
-                                        </span>
-                                        {exclusionReason && (
-                                            <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded-full" title={`Hidden in race mode: ${exclusionReason}`}>
-                                                ⚠ {exclusionReason}
-                                            </span>
-                                        )}
-                                        {!exclusionReason && offset !== null && (
-                                            noTrim ? (
-                                                <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded-full" title="Data starts at or above the threshold — no time was trimmed">
-                                                    no offset
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded-full" title={`${offset} min of pre-threshold data trimmed`}>
-                                                    −{offset} min offset
-                                                </span>
-                                            )
-                                        )}
-                                    </span>
-                                );
-                            };
-
-                            const ColorInputs = ({ run }) => (
-                                <>
-                                    <input
-                                        type="color"
-                                        value={run.color || '#3b82f6'}
-                                        onChange={(e) => { e.stopPropagation(); handleColorChange(vehicle.id, run.id, e.target.value); }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="w-8 h-6 border-0 rounded cursor-pointer"
-                                        title="Change color"
-                                    />
-                                    <input
-                                        type="text"
-                                        value={run.color || '#3b82f6'}
-                                        onChange={(e) => { e.stopPropagation(); handleColorChange(vehicle.id, run.id, e.target.value); }}
-                                        onBlur={(e) => {
-                                            if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
-                                                handleColorChange(vehicle.id, run.id, run.color || '#3b82f6');
-                                            }
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="w-20 px-2 py-0.5 border rounded text-xs font-mono"
-                                        placeholder="#3b82f6"
-                                        maxLength={7}
-                                    />
-                                </>
-                            );
-
-                            return (
-                                <div key={vehicle.id} className="border-l-4 pl-4" style={{ borderColor: 'var(--color-primary)' }}>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <h4 className="font-semibold text-gray-700">{vehicle.name}</h4>
-                                        {hasInactiveRuns && (
-                                            <button
-                                                onClick={() => toggleVehicleExpanded(vehicle.id)}
-                                                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
-                                            >
-                                                <span style={{ display: 'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                                                <span>{isExpanded ? 'Hide' : 'Show'} all ({vehicle.runs?.length || 0})</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        {/* Active runs — always shown */}
-                                        {activeRuns.map(run => (
-                                            <label key={run.id} className="flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={true}
-                                                    onChange={() => setChartConfig({ ...chartConfig, selectedRuns: chartConfig.selectedRuns.filter(id => id !== run.id) })}
-                                                    className="w-4 h-4"
-                                                />
-                                                <ColorInputs run={run} />
-                                                <RunLabel run={run} />
-                                            </label>
-                                        ))}
-
-                                        {/* Inactive runs — shown when expanded */}
-                                        {isExpanded && inactiveRuns.map(run => (
-                                            <label key={run.id} className="flex items-center gap-2 opacity-60 hover:opacity-100">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={false}
-                                                    onChange={() => setChartConfig({ ...chartConfig, selectedRuns: [...chartConfig.selectedRuns, run.id] })}
-                                                    className="w-4 h-4"
-                                                />
-                                                <ColorInputs run={run} />
-                                                <RunLabel run={run} />
-                                            </label>
-                                        ))}
-
-                                        {(!vehicle.runs || vehicle.runs.length === 0) && (
-                                            <p className="text-sm text-gray-500 italic">No runs available</p>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            </div>
-
-            <div className="card">
-                {loadingData && (
-                    <div className="text-center py-4 text-gray-500 text-sm">Loading run data...</div>
-                )}
-                <div style={{ height: '500px' }}>
-                    <canvas ref={chartRef}></canvas>
-                </div>
             </div>
 
             {chartConfig.selectedRuns.length === 0 && (
