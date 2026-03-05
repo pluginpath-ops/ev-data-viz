@@ -68,8 +68,8 @@ export default function App() {
         const p = new URLSearchParams(window.location.search);
         if (p.get('tab') !== 'chart') return;
         pendingUrlState.current = {
-            vehicleIds:    p.get('v')?.split(',').filter(Boolean) || [],
-            runIds:        p.get('r')?.split(',').filter(Boolean) || [],
+            vehicleIds:    (p.get('v')?.split(',').filter(Boolean) || []).map(id => isNaN(Number(id)) ? id : Number(id)),
+            runIds:        (p.get('r')?.split(',').filter(Boolean) || []).map(id => isNaN(Number(id)) ? id : Number(id)),
             xAxis:         p.get('x')  || null,
             yAxis:         p.get('y')  || null,
             raceMode:      p.get('race') === '1',
