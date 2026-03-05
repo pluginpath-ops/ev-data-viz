@@ -193,9 +193,12 @@ class DataService {
         if (batchError) throw batchError;
       }
 
-      if (populatedFields.length > 0) {
-        await getSupabase().from('runs').update({ populated_fields: populatedFields }).eq('id', newRun.id);
-        newRun.populated_fields = populatedFields;
+      const fieldsUpdate = {};
+      if (populatedFields.length > 0)           fieldsUpdate.populated_fields  = populatedFields;
+      if (run.calculated_fields?.length > 0)    fieldsUpdate.calculated_fields = run.calculated_fields;
+      if (Object.keys(fieldsUpdate).length > 0) {
+        await getSupabase().from('runs').update(fieldsUpdate).eq('id', newRun.id);
+        Object.assign(newRun, fieldsUpdate);
       }
     }
     return { ...newRun, data: run.data };
@@ -213,7 +216,8 @@ class DataService {
     }
     const { error } = await getSupabase().from('runs').update({
       name: updates.name, date: updates.date,
-      software_version: updates.softwareVersion, conditions: updates.conditions, color: updates.color
+      software_version: updates.softwareVersion, conditions: updates.conditions, color: updates.color,
+      ...(updates.calculated_fields !== undefined ? { calculated_fields: updates.calculated_fields } : {}),
     }).eq('id', runId);
     if (error) throw error;
   }

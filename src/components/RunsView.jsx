@@ -36,6 +36,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const [editDataDirty, setEditDataDirty]     = useState(false);  // cells modified
     const [showDataTable, setShowDataTable]     = useState(false);  // expand/collapse
     const [savingData, setSavingData]           = useState(false);
+    const [editCalculatedFields, setEditCalculatedFields] = useState([]); // which fields are estimated
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -103,6 +104,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         });
 
         // Apply opted-in estimations
+        const calculatedFields = [];
         if (estimations.range && offerRangeEstimate) {
             const ratedRange = vehicle.range;
             transformedData = transformedData.map(row => ({
@@ -110,12 +112,14 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                 range: row.range != null ? row.range
                     : roundField((parseFloat(row.soc) / 100) * ratedRange, 1),
             }));
+            calculatedFields.push('range');
         }
 
         const run = {
             ...runMetadata,
             data: transformedData,
             fieldMapping,
+            calculated_fields: calculatedFields,
             uploadDate: new Date().toISOString()
         };
 
@@ -146,6 +150,11 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                 range: row.range != null ? row.range
                     : roundField((parseFloat(row.soc) / 100) * ratedRange, 1),
             }));
+            // Flag range as calculated on the target run
+            const current = mergeTargetRun?.calculated_fields || [];
+            if (!current.includes('range')) {
+                onUpdateRun(mergeTargetRun.id, { ...mergeTargetRun, calculated_fields: [...current, 'range'] });
+            }
         }
 
         // Determine the effective join key: auto-select when only one is mapped
@@ -175,13 +184,14 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             softwareVersion: run.softwareVersion || '',
             conditions: run.conditions || ''
         });
+        setEditCalculatedFields(run.calculated_fields || []);
     };
 
     const handleSaveEdit = async (runId) => {
         setSavingData(true);
         try {
-            // Always save metadata
-            onUpdateRun(runId, editFormData);
+            // Always save metadata (include calculated_fields so it persists)
+            onUpdateRun(runId, { ...editFormData, calculated_fields: editCalculatedFields });
             // Save table data only if the owner made changes
             if (editDataDirty && isOwner && editData !== null) {
                 await onReplaceRunData(runId, editData.map((row, i) => ({ ...row, frame: i })));
@@ -199,6 +209,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const handleCancelEdit = () => {
         setEditingRunId(null);
         setEditFormData({});
+        setEditCalculatedFields([]);
         setEditData(null);
         setEditDataDirty(false);
         setShowDataTable(false);
@@ -263,6 +274,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             range: row.range != null ? row.range
                 : (row.soc != null ? Math.round((row.soc / 100) * ratedRange * 10) / 10 : null),
         })));
+        setEditCalculatedFields(prev => prev.includes('range') ? prev : [...prev, 'range']);
         setEditDataDirty(true);
     };
 
@@ -643,8 +655,21 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                             <thead className="bg-gray-50 sticky top-0 z-10 border-b">
                                                                 <tr>
                                                                     <th className="px-2 py-1.5 text-left text-gray-500 font-medium w-8">#</th>
-                                                                    {[['soc','SoC (%)'],['chargeRate','kW'],['time','Time'],['range','Range'],['temperature','Temp']].map(([,label]) => (
-                                                                        <th key={label} className="px-2 py-1.5 text-left text-gray-500 font-medium">{label}</th>
+                                                                    {[['soc','SoC (%)'],['chargeRate','kW'],['time','Time'],['range','Range'],['temperature','Temp']].map(([field, label]) => (
+                                                                        <th key={field} className="px-2 py-1.5 text-left text-gray-500 font-medium">
+                                                                            <div className="flex flex-col gap-0.5">
+                                                                                <span>{label}</span>
+                                                                                {editCalculatedFields.includes(field) && (
+                                                                                    <button
+                                                                                        onClick={() => setEditCalculatedFields(prev => prev.filter(f => f !== field))}
+                                                                                        title="Click to mark as measured data"
+                                                                                        className="text-[10px] font-normal text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 leading-tight hover:bg-amber-100 w-fit"
+                                                                                    >
+                                                                                        ~est
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        </th>
                                                                     ))}
                                                                     {isOwner && <th className="w-6"></th>}
                                                                 </tr>
@@ -714,21 +739,29 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         {run.conditions && <p>Conditions: {run.conditions}</p>}
                                         <p>Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</p>
                                     </div>
-                                    {/* Field tags — which data columns are populated */}
+                                    {/* Field tags — populated fields; amber = estimated, blue = measured */}
                                     {(() => {
                                         const fields = run.populated_fields || [];
+                                        const calcFields = run.calculated_fields || [];
                                         if (fields.length === 0) return null;
                                         return (
                                             <div className="flex flex-wrap gap-1 mt-2">
-                                                {FIELD_META.filter(f => fields.includes(f.key)).map(f => (
-                                                    <span
-                                                        key={f.key}
-                                                        title={f.title}
-                                                        className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-medium"
-                                                    >
-                                                        {f.label}
-                                                    </span>
-                                                ))}
+                                                {FIELD_META.filter(f => fields.includes(f.key)).map(f => {
+                                                    const isCalc = calcFields.includes(f.key);
+                                                    return (
+                                                        <span
+                                                            key={f.key}
+                                                            title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
+                                                            className={`px-2 py-0.5 text-xs rounded-full font-medium border ${
+                                                                isCalc
+                                                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                            }`}
+                                                        >
+                                                            {isCalc ? `~${f.label}` : f.label}
+                                                        </span>
+                                                    );
+                                                })}
                                             </div>
                                         );
                                     })()}
