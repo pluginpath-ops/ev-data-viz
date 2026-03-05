@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAppContext } from './context/AppContext';
 import AuthModal from './components/AuthModal';
 import ImportTableauModal from './components/ImportTableauModal';
@@ -19,6 +19,7 @@ export default function App() {
         toggleVehicleSelection,
         removeVehicleSelection,
         clearAllSelections,
+        setVehicleSelection,
         addVehicle,
         updateVehicle,
         deleteVehicle,
@@ -59,6 +60,68 @@ export default function App() {
     const [showImportMenu, setShowImportMenu] = useState(false);
     const [showTableauModal, setShowTableauModal] = useState(false);
     const jsonImportRef = useRef();
+    const pendingUrlState = useRef(null);
+    const urlApplied = useRef(false);
+
+    // ── Parse URL on mount ──────────────────────────────────────────────────
+    useEffect(() => {
+        const p = new URLSearchParams(window.location.search);
+        if (p.get('tab') !== 'chart') return;
+        pendingUrlState.current = {
+            vehicleIds:    p.get('v')?.split(',').filter(Boolean) || [],
+            runIds:        p.get('r')?.split(',').filter(Boolean) || [],
+            xAxis:         p.get('x')  || null,
+            yAxis:         p.get('y')  || null,
+            raceMode:      p.get('race') === '1',
+            raceThreshold: p.get('rt')  ? Number(p.get('rt'))  : 10,
+            xMin: p.get('xn') !== null && p.get('xn') !== '' ? Number(p.get('xn')) : null,
+            xMax: p.get('xx') !== null && p.get('xx') !== '' ? Number(p.get('xx')) : null,
+            yMin: p.get('yn') !== null && p.get('yn') !== '' ? Number(p.get('yn')) : null,
+            yMax: p.get('yx') !== null && p.get('yx') !== '' ? Number(p.get('yx')) : null,
+            showLine: p.get('line') === '1',
+        };
+    }, []);
+
+    // ── Apply pending URL state once data has loaded ────────────────────────
+    useEffect(() => {
+        if (loading || urlApplied.current || !pendingUrlState.current) return;
+        urlApplied.current = true;
+        const s = pendingUrlState.current;
+        if (s.vehicleIds.length > 0) setVehicleSelection(s.vehicleIds);
+        setChartConfig(prev => ({
+            ...prev,
+            ...(s.xAxis         && { xAxis: s.xAxis }),
+            ...(s.yAxis         && { yAxis: s.yAxis }),
+            ...(s.runIds.length  > 0 && { selectedRuns: s.runIds }),
+            raceMode:      s.raceMode,
+            raceThreshold: s.raceThreshold,
+            xMin:          s.xMin,
+            xMax:          s.xMax,
+            yMin:          s.yMin,
+            yMax:          s.yMax,
+            showLine:      s.showLine,
+        }));
+        setView('chart');
+    }, [loading]);
+
+    // ── Keep URL in sync while on chart tab ─────────────────────────────────
+    useEffect(() => {
+        if (view !== 'chart') return;
+        const p = new URLSearchParams();
+        p.set('tab', 'chart');
+        if (selectedVehicles.length > 0)          p.set('v',    selectedVehicles.join(','));
+        if (chartConfig.selectedRuns.length > 0)  p.set('r',    chartConfig.selectedRuns.join(','));
+        p.set('x', chartConfig.xAxis);
+        p.set('y', chartConfig.yAxis);
+        if (chartConfig.raceMode)                 p.set('race', '1');
+        if (chartConfig.raceThreshold !== 10)     p.set('rt',   String(chartConfig.raceThreshold));
+        if (chartConfig.xMin != null)             p.set('xn',   String(chartConfig.xMin));
+        if (chartConfig.xMax != null)             p.set('xx',   String(chartConfig.xMax));
+        if (chartConfig.yMin != null)             p.set('yn',   String(chartConfig.yMin));
+        if (chartConfig.yMax != null)             p.set('yx',   String(chartConfig.yMax));
+        if (chartConfig.showLine)                 p.set('line', '1');
+        history.replaceState(null, '', '?' + p.toString());
+    }, [view, chartConfig, selectedVehicles]);
 
     // Keep activeVehicle in sync with vehicles state
     const currentActiveVehicle = activeVehicle
