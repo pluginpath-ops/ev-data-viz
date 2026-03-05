@@ -26,12 +26,17 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const [joinKey, setJoinKey] = useState('soc');
     const [merging, setMerging] = useState(false);
 
+    // ── Estimation opts (import / merge step) ────────────────────────────────
+    // Tracks which derived-column offers the user has accepted
+    const [estimations, setEstimations] = useState({ range: false });
+
     // ── Inline data-table state (edit mode) ──────────────────────────────────
     const [editData, setEditData]               = useState(null);   // null=not fetched, []=loaded
     const [editDataLoading, setEditDataLoading] = useState(false);
     const [editDataDirty, setEditDataDirty]     = useState(false);  // cells modified
     const [showDataTable, setShowDataTable]     = useState(false);  // expand/collapse
     const [savingData, setSavingData]           = useState(false);
+    const [editCalculatedFields, setEditCalculatedFields] = useState([]); // which fields are estimated
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -48,6 +53,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
+        setEstimations({ range: false });
         setJoinKey('soc');
         setMerging(false);
     };
@@ -87,7 +93,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const handleImport = () => {
         if (!csvData) return;
 
-        const transformedData = csvData.data.map(row => {
+        let transformedData = csvData.data.map(row => {
             const newRow = {};
             Object.keys(fieldMapping).forEach(key => {
                 if (fieldMapping[key]) {
@@ -97,10 +103,23 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             return newRow;
         });
 
+        // Apply opted-in estimations
+        const calculatedFields = [];
+        if (estimations.range && offerRangeEstimate) {
+            const ratedRange = vehicle.range;
+            transformedData = transformedData.map(row => ({
+                ...row,
+                range: row.range != null ? row.range
+                    : roundField((parseFloat(row.soc) / 100) * ratedRange, 1),
+            }));
+            calculatedFields.push('range');
+        }
+
         const run = {
             ...runMetadata,
             data: transformedData,
             fieldMapping,
+            calculated_fields: calculatedFields,
             uploadDate: new Date().toISOString()
         };
 
@@ -113,7 +132,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const handleMerge = async () => {
         if (!csvData || !mergeTargetRun) return;
 
-        const transformedData = csvData.data.map(row => {
+        let transformedData = csvData.data.map(row => {
             const newRow = {};
             Object.keys(fieldMapping).forEach(key => {
                 if (fieldMapping[key]) {
@@ -122,6 +141,21 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             });
             return newRow;
         });
+
+        // Apply opted-in estimations
+        if (estimations.range && offerRangeEstimate) {
+            const ratedRange = vehicle.range;
+            transformedData = transformedData.map(row => ({
+                ...row,
+                range: row.range != null ? row.range
+                    : roundField((parseFloat(row.soc) / 100) * ratedRange, 1),
+            }));
+            // Flag range as calculated on the target run
+            const current = mergeTargetRun?.calculated_fields || [];
+            if (!current.includes('range')) {
+                onUpdateRun(mergeTargetRun.id, { ...mergeTargetRun, calculated_fields: [...current, 'range'] });
+            }
+        }
 
         // Determine the effective join key: auto-select when only one is mapped
         const effectiveJoinKey = canJoinBySoc && !canJoinByTime ? 'soc'
@@ -150,13 +184,14 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             softwareVersion: run.softwareVersion || '',
             conditions: run.conditions || ''
         });
+        setEditCalculatedFields(run.calculated_fields || []);
     };
 
     const handleSaveEdit = async (runId) => {
         setSavingData(true);
         try {
-            // Always save metadata
-            onUpdateRun(runId, editFormData);
+            // Always save metadata (include calculated_fields so it persists)
+            onUpdateRun(runId, { ...editFormData, calculated_fields: editCalculatedFields });
             // Save table data only if the owner made changes
             if (editDataDirty && isOwner && editData !== null) {
                 await onReplaceRunData(runId, editData.map((row, i) => ({ ...row, frame: i })));
@@ -174,6 +209,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const handleCancelEdit = () => {
         setEditingRunId(null);
         setEditFormData({});
+        setEditCalculatedFields([]);
         setEditData(null);
         setEditDataDirty(false);
         setShowDataTable(false);
@@ -229,6 +265,19 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setEditDataDirty(true);
     };
 
+    // Fill null range values from SoC × rated range for the currently-loaded edit table
+    const handleEstimateRangeInEdit = () => {
+        if (!editData || !vehicle?.range) return;
+        const ratedRange = vehicle.range;
+        setEditData(prev => prev.map(row => ({
+            ...row,
+            range: row.range != null ? row.range
+                : (row.soc != null ? Math.round((row.soc / 100) * ratedRange * 10) / 10 : null),
+        })));
+        setEditCalculatedFields(prev => prev.includes('range') ? prev : [...prev, 'range']);
+        setEditDataDirty(true);
+    };
+
     // ── Join key logic (merge mode only) ─────────────────────────────────────
     const canJoinBySoc  = uploadMode === 'merge' && !!fieldMapping.soc;
     const canJoinByTime = uploadMode === 'merge' && !!fieldMapping.time;
@@ -236,6 +285,13 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const showJoinSelector  = canJoinBySoc && canJoinByTime;
     // Disable confirm when there's no key to join on at all
     const missingJoinKey    = uploadMode === 'merge' && !canJoinBySoc && !canJoinByTime;
+
+    // ── Derived-column offer logic ────────────────────────────────────────────
+    // Range can be estimated when: SoC is mapped, Range is NOT mapped, and vehicle has a rated range
+    const offerRangeEstimate = !!fieldMapping.soc && !fieldMapping.range && !!vehicle?.range;
+
+    // ── Tiny rounding helper (mirrors DataService.roundField, used for estimations) ──
+    const roundField = (v, dp) => (v == null || isNaN(Number(v))) ? null : Math.round(Number(v) * 10 ** dp) / 10 ** dp;
 
     // ── Field tag metadata (ordered for display) ─────────────────────────────
     const FIELD_META = [
@@ -414,6 +470,32 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                 ))}
                             </div>
 
+                            {/* ── Derived-column offers ── */}
+                            {offerRangeEstimate && (
+                                <div className={`mt-5 p-4 rounded-lg border flex items-start justify-between gap-4 ${estimations.range ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+                                    <div>
+                                        <p className={`text-sm font-semibold ${estimations.range ? 'text-green-800' : 'text-blue-800'}`}>
+                                            {estimations.range ? '✓ Range will be estimated' : 'ℹ No Range column mapped'}
+                                        </p>
+                                        <p className={`text-xs mt-0.5 ${estimations.range ? 'text-green-700' : 'text-blue-700'}`}>
+                                            {estimations.range
+                                                ? `range = SoC% × ${vehicle.range} mi for each row`
+                                                : `Estimate from vehicle rated range (${vehicle.range} mi × SoC%)?`}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setEstimations(prev => ({ ...prev, range: !prev.range }))}
+                                        className={`shrink-0 text-xs px-3 py-1 rounded border transition-colors ${
+                                            estimations.range
+                                                ? 'bg-white text-green-700 border-green-300 hover:bg-green-100'
+                                                : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                                        }`}
+                                    >
+                                        {estimations.range ? 'Undo' : 'Yes, estimate'}
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Join key selector — merge mode only */}
                             {uploadMode === 'merge' && (
                                 <div className={`mt-5 p-4 rounded-lg border ${missingJoinKey ? 'bg-red-50 border-red-200' : showJoinSelector ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
@@ -547,6 +629,23 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
                                     {showDataTable && (
                                         <div className="mt-3">
+                                            {/* Range estimation offer — shown when range is absent but SoC exists */}
+                                            {isOwner && !editDataLoading && editData !== null && vehicle?.range &&
+                                             editData.some(r => r.soc != null) &&
+                                             editData.every(r => r.range == null) && (
+                                                <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200 flex items-center justify-between gap-4">
+                                                    <p className="text-xs text-blue-800">
+                                                        <span className="font-semibold">ℹ No range data.</span>{' '}
+                                                        Estimate from vehicle rated range ({vehicle.range} mi × SoC%)?
+                                                    </p>
+                                                    <button
+                                                        onClick={handleEstimateRangeInEdit}
+                                                        className="shrink-0 text-xs px-3 py-1 rounded border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
+                                                    >
+                                                        Estimate
+                                                    </button>
+                                                </div>
+                                            )}
                                             {editDataLoading ? (
                                                 <p className="text-sm text-gray-500 py-4 text-center">Loading…</p>
                                             ) : (
@@ -556,9 +655,31 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                             <thead className="bg-gray-50 sticky top-0 z-10 border-b">
                                                                 <tr>
                                                                     <th className="px-2 py-1.5 text-left text-gray-500 font-medium w-8">#</th>
-                                                                    {[['soc','SoC (%)'],['chargeRate','kW'],['time','Time'],['range','Range'],['temperature','Temp']].map(([,label]) => (
-                                                                        <th key={label} className="px-2 py-1.5 text-left text-gray-500 font-medium">{label}</th>
-                                                                    ))}
+                                                                    {[['soc','SoC (%)'],['chargeRate','kW'],['time','Time'],['range','Range'],['temperature','Temp']].map(([field, label]) => {
+                                                                        const isEst = editCalculatedFields.includes(field);
+                                                                        return (
+                                                                        <th key={field} className="px-2 py-1.5 text-left text-gray-500 font-medium">
+                                                                            <div className="flex flex-col gap-0.5">
+                                                                                <span>{label}</span>
+                                                                                <button
+                                                                                    onClick={() => setEditCalculatedFields(prev =>
+                                                                                        isEst
+                                                                                            ? prev.filter(f => f !== field)
+                                                                                            : [...prev, field]
+                                                                                    )}
+                                                                                    title={isEst ? 'Estimated — click to mark as actual' : 'Actual — click to mark as estimated'}
+                                                                                    className={`text-[10px] font-normal rounded px-1 leading-tight w-fit transition-colors ${
+                                                                                        isEst
+                                                                                            ? 'text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100'
+                                                                                            : 'text-green-700 bg-green-50 border border-green-200 hover:bg-green-100'
+                                                                                    }`}
+                                                                                >
+                                                                                    {isEst ? '~est' : 'act'}
+                                                                                </button>
+                                                                            </div>
+                                                                        </th>
+                                                                        );
+                                                                    })}
                                                                     {isOwner && <th className="w-6"></th>}
                                                                 </tr>
                                                             </thead>
@@ -627,21 +748,29 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         {run.conditions && <p>Conditions: {run.conditions}</p>}
                                         <p>Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</p>
                                     </div>
-                                    {/* Field tags — which data columns are populated */}
+                                    {/* Field tags — populated fields; amber = estimated, blue = measured */}
                                     {(() => {
                                         const fields = run.populated_fields || [];
+                                        const calcFields = run.calculated_fields || [];
                                         if (fields.length === 0) return null;
                                         return (
                                             <div className="flex flex-wrap gap-1 mt-2">
-                                                {FIELD_META.filter(f => fields.includes(f.key)).map(f => (
-                                                    <span
-                                                        key={f.key}
-                                                        title={f.title}
-                                                        className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-medium"
-                                                    >
-                                                        {f.label}
-                                                    </span>
-                                                ))}
+                                                {FIELD_META.filter(f => fields.includes(f.key)).map(f => {
+                                                    const isCalc = calcFields.includes(f.key);
+                                                    return (
+                                                        <span
+                                                            key={f.key}
+                                                            title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
+                                                            className={`px-2 py-0.5 text-xs rounded-full font-medium border ${
+                                                                isCalc
+                                                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                            }`}
+                                                        >
+                                                            {isCalc ? `~${f.label}` : f.label}
+                                                        </span>
+                                                    );
+                                                })}
                                             </div>
                                         );
                                     })()}

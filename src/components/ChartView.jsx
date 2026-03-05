@@ -79,12 +79,14 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
     };
 
     const axisOptions = [
-        { value: 'soc', label: 'State of Charge (%)' },
+        { value: 'soc',        label: 'State of Charge (%)' },
         { value: 'chargeRate', label: 'Charge Rate (kW)' },
-        { value: 'time', label: 'Time' },
-        { value: 'range', label: 'Range (mi)' },
-        { value: 'temperature', label: 'Temperature' },
-        { value: 'frame', label: 'Frame' }
+        { value: 'time',       label: 'Time (min)' },
+        { value: 'range',      label: 'Range (mi)' },
+        { value: 'temperature',label: 'Temperature' },
+        { value: 'cRate',      label: 'C-Rate  (~kW ÷ battery)' },
+        { value: 'rangeRate',  label: 'Range Rate (mi/min)' },
+        { value: 'frame',      label: 'Frame' },
     ];
 
     const chartPresets = [
@@ -92,6 +94,26 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
         { name: 'Range vs Time', x: 'time', y: 'range' },
         { name: 'Charge Rate vs Time', x: 'time', y: 'chargeRate' }
     ];
+
+    /**
+     * Get the value for a field key, computing virtual fields (cRate, rangeRate)
+     * on-the-fly from stored chargeRate + vehicle metadata.
+     * vehicleBattery = kWh, vehicleRange = rated miles
+     */
+    const getFieldValue = (point, fieldKey, vehicleBattery, vehicleRange) => {
+        if (fieldKey === 'cRate') {
+            return (point.chargeRate != null && vehicleBattery)
+                ? Math.round((point.chargeRate / vehicleBattery) * 1000) / 1000
+                : null;
+        }
+        if (fieldKey === 'rangeRate') {
+            // miles per minute: (rated_range / battery_kWh) × charge_kW ÷ 60
+            return (point.chargeRate != null && vehicleRange && vehicleBattery)
+                ? Math.round((vehicleRange / vehicleBattery) * point.chargeRate / 60 * 1000) / 1000
+                : null;
+        }
+        return point[fieldKey] ?? null;
+    };
 
     // ── Race mode helpers ────────────────────────────────────────────────────
 
@@ -130,19 +152,20 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
     /**
      * Apply the race-mode time offset transform to a run's raw data.
      * Returns null if the run must be excluded (can't participate).
+     * vBattery / vRange are the vehicle's kWh and rated-mile values for virtual axes.
      */
-    const applyRaceTransform = (rawData) => {
+    const applyRaceTransform = (rawData, vBattery, vRange) => {
         const anchor = rawData.findIndex(p => p.soc != null && p.soc >= raceThreshold);
         if (anchor === -1) return null;
         const offset = rawData[anchor].time;
         if (offset == null) return null;
         return rawData
             .slice(anchor)
-            .filter(d => d.time != null && d[chartConfig.yAxis] != null)
             .map(d => ({
                 x: Math.round((d.time - offset) * 10) / 10,
-                y: d[chartConfig.yAxis],
-            }));
+                y: getFieldValue(d, chartConfig.yAxis, vBattery, vRange),
+            }))
+            .filter(p => p.x != null && p.y != null);
     };
 
     // ── Chart rendering ───────────────────────────────────────────────────────
@@ -161,7 +184,12 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
             if (vehicle.runs) {
                 vehicle.runs.forEach(run => {
                     if (chartConfig.selectedRuns.includes(run.id)) {
-                        allSelectedRuns.push({ ...run, vehicleName: vehicle.name });
+                        allSelectedRuns.push({
+                            ...run,
+                            vehicleName: vehicle.name,
+                            vehicleBattery: vehicle.battery ?? null,
+                            vehicleRange: vehicle.range ?? null,
+                        });
                     }
                 });
             }
@@ -173,13 +201,17 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
 
             let points;
             if (raceActive) {
-                const transformed = applyRaceTransform(rawData);
+                const transformed = applyRaceTransform(rawData, run.vehicleBattery, run.vehicleRange);
                 if (!transformed) return []; // excluded — skip this run
                 points = transformed;
             } else {
+                const { vehicleBattery, vehicleRange } = run;
                 points = rawData
-                    .filter(d => d[chartConfig.xAxis] != null && d[chartConfig.yAxis] != null)
-                    .map(d => ({ x: d[chartConfig.xAxis], y: d[chartConfig.yAxis] }));
+                    .map(d => ({
+                        x: getFieldValue(d, chartConfig.xAxis, vehicleBattery, vehicleRange),
+                        y: getFieldValue(d, chartConfig.yAxis, vehicleBattery, vehicleRange),
+                    }))
+                    .filter(p => p.x != null && p.y != null);
             }
 
             return [{
