@@ -152,7 +152,8 @@ function EditForm({
 
 export default function VehiclesView({
     vehicles, selectedVehicles, onToggleSelection, onAdd, onUpdate, onDelete, onViewRuns,
-    isOwner, onToggleVisibility, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage
+    isOwner, onToggleVisibility, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
+    onReorderVehicles,
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -165,6 +166,8 @@ export default function VehiclesView({
     const [activeTagFilters, setActiveTagFilters] = useState([]);
     const [imageUploading, setImageUploading] = useState(false);
     const [viewMode, setViewMode] = useState('card'); // 'card' | 'list'
+    const [sortBy, setSortBy] = useState('default');
+    const [textFilter, setTextFilter] = useState('');
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -250,12 +253,38 @@ export default function VehiclesView({
         );
     };
 
-    const filteredVehicles = (activeTagFilters.length === 0
+    // Stage 1: tag + committed-delete filter
+    const tagFiltered = (activeTagFilters.length === 0
         ? vehicles
-        : vehicles.filter(v =>
-            activeTagFilters.every(tagId => v.tags?.some(t => t.id === tagId))
-        )
+        : vehicles.filter(v => activeTagFilters.every(tagId => v.tags?.some(t => t.id === tagId)))
     ).filter(v => !committedDeletes.has(v.id));
+
+    // Stage 2: text filter
+    const textLower = textFilter.trim().toLowerCase();
+    const textFiltered = !textLower ? tagFiltered : tagFiltered.filter(v =>
+        [v.name, v.make, v.model, String(v.year || '')].some(f => (f || '').toLowerCase().includes(textLower))
+    );
+
+    // Stage 3: sort
+    const sortedFilteredVehicles = [...textFiltered].sort((a, b) => {
+        switch (sortBy) {
+            case 'default': {
+                const aN = a.sort_order == null, bN = b.sort_order == null;
+                if (!aN && !bN) return a.sort_order - b.sort_order;
+                if (!aN) return -1; if (!bN) return 1;
+                return new Date(b.created_at) - new Date(a.created_at);
+            }
+            case 'date_newest': return new Date(b.created_at) - new Date(a.created_at);
+            case 'date_oldest': return new Date(a.created_at) - new Date(b.created_at);
+            case 'brand_az':    return (a.make  || '').localeCompare(b.make  || '');
+            case 'brand_za':    return (b.make  || '').localeCompare(a.make  || '');
+            case 'model_az':    return (a.model || '').localeCompare(b.model || '');
+            case 'model_za':    return (b.model || '').localeCompare(a.model || '');
+            case 'year_newest': return Number(b.year || 0) - Number(a.year || 0);
+            case 'year_oldest': return Number(a.year || 0) - Number(b.year || 0);
+            default: return 0;
+        }
+    });
 
     const availableTagsForForm = tags.filter(t => !formTags.some(ft => ft.id === t.id));
     const editingVehicle = editingId ? vehicles.find(v => v.id === editingId) : null;
@@ -354,6 +383,25 @@ export default function VehiclesView({
         onSubmit: handleSubmit, onCancel: handleCancel,
     };
 
+    const handleMoveVehicle = async (vehicleId, direction) => {
+        const allOrdered = [...vehicles]
+            .filter(v => !committedDeletes.has(v.id))
+            .sort((a, b) => {
+                const aN = a.sort_order == null, bN = b.sort_order == null;
+                if (!aN && !bN) return a.sort_order - b.sort_order;
+                if (!aN) return -1; if (!bN) return 1;
+                return new Date(b.created_at) - new Date(a.created_at);
+            });
+        const idx = allOrdered.findIndex(v => v.id === vehicleId);
+        const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+        if (idx === -1 || swapIdx < 0 || swapIdx >= allOrdered.length) return;
+        [allOrdered[idx], allOrdered[swapIdx]] = [allOrdered[swapIdx], allOrdered[idx]];
+        await onReorderVehicles(allOrdered.map((v, i) => ({ id: v.id, sort_order: i })));
+    };
+
+    const showReorderButtons = isOwner && sortBy === 'default'
+        && textFilter.trim() === '' && activeTagFilters.length === 0;
+
     // ────────────────────────────────────────────────────────────────────────
 
     const barVisible = pendingDeletes.size > 0 || !!undoState;
@@ -388,6 +436,32 @@ export default function VehiclesView({
                         {showForm && !editingId ? 'Cancel' : '+ Add Vehicle'}
                     </button>
                 </div>
+            </div>
+
+            {/* Sort + search bar */}
+            <div className="flex gap-3 items-center mb-3">
+                <input
+                    type="text"
+                    placeholder="Search by name, make, model, year…"
+                    value={textFilter}
+                    onChange={e => setTextFilter(e.target.value)}
+                    className="border p-2 rounded text-sm flex-1"
+                />
+                <select
+                    value={sortBy}
+                    onChange={e => setSortBy(e.target.value)}
+                    className="border p-2 rounded text-sm"
+                >
+                    <option value="default">Default Order</option>
+                    <option value="date_newest">Date Added (Newest)</option>
+                    <option value="date_oldest">Date Added (Oldest)</option>
+                    <option value="brand_az">Brand A→Z</option>
+                    <option value="brand_za">Brand Z→A</option>
+                    <option value="model_az">Model A→Z</option>
+                    <option value="model_za">Model Z→A</option>
+                    <option value="year_newest">Year (Newest)</option>
+                    <option value="year_oldest">Year (Oldest)</option>
+                </select>
             </div>
 
             {/* Tag filter bar */}
@@ -429,7 +503,7 @@ export default function VehiclesView({
             {/* ── CARD VIEW ── */}
             {viewMode === 'card' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {filteredVehicles.map(vehicle => {
+                    {sortedFilteredVehicles.map(vehicle => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
                         const isPending  = pendingDeletes.has(vehicle.id);
                         return (
@@ -456,6 +530,22 @@ export default function VehiclesView({
                                             />
                                             <div className="absolute inset-0 bg-white/80" />
                                         </>
+                                    )}
+
+                                    {/* Reorder buttons — owner only, default sort, no filters */}
+                                    {showReorderButtons && (
+                                        <div className="absolute top-1 left-1 flex flex-col gap-0.5 z-20">
+                                            <button
+                                                onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'up'); }}
+                                                className="w-6 h-6 flex items-center justify-center rounded bg-white/80 text-gray-500 hover:bg-white hover:text-gray-800 border border-gray-200 text-xs shadow-sm"
+                                                title="Move up"
+                                            >▲</button>
+                                            <button
+                                                onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }}
+                                                className="w-6 h-6 flex items-center justify-center rounded bg-white/80 text-gray-500 hover:bg-white hover:text-gray-800 border border-gray-200 text-xs shadow-sm"
+                                                title="Move down"
+                                            >▼</button>
+                                        </div>
                                     )}
 
                                     <div className="relative z-10 flex flex-col flex-1">
@@ -510,7 +600,7 @@ export default function VehiclesView({
             {/* ── LIST VIEW ── */}
             {viewMode === 'list' && (
                 <div className="flex flex-col gap-2">
-                    {filteredVehicles.map(vehicle => {
+                    {sortedFilteredVehicles.map(vehicle => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
                         const isPending  = pendingDeletes.has(vehicle.id);
                         return (
@@ -530,6 +620,22 @@ export default function VehiclesView({
                                             style={{ backgroundColor: 'var(--color-primary)' }}
                                         >
                                             &#10003;
+                                        </div>
+                                    )}
+
+                                    {/* Reorder buttons — owner only, default sort, no filters */}
+                                    {showReorderButtons && (
+                                        <div className="flex flex-col gap-0.5 flex-shrink-0">
+                                            <button
+                                                onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'up'); }}
+                                                className="w-6 h-6 flex items-center justify-center rounded bg-gray-100 text-gray-500 hover:bg-gray-200 border border-gray-200 text-xs"
+                                                title="Move up"
+                                            >▲</button>
+                                            <button
+                                                onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }}
+                                                className="w-6 h-6 flex items-center justify-center rounded bg-gray-100 text-gray-500 hover:bg-gray-200 border border-gray-200 text-xs"
+                                                title="Move down"
+                                            >▼</button>
                                         </div>
                                     )}
 
@@ -575,11 +681,13 @@ export default function VehiclesView({
                 </div>
             )}
 
-            {filteredVehicles.length === 0 && !showForm && (
+            {sortedFilteredVehicles.length === 0 && !showForm && (
                 <div className="text-center py-12 text-gray-500">
-                    {activeTagFilters.length > 0
-                        ? <p className="text-lg">No vehicles match the selected tags.</p>
-                        : <p className="text-lg">No vehicles yet. Click "Add Vehicle" to get started!</p>
+                    {textFilter.trim()
+                        ? <p className="text-lg">No vehicles match "{textFilter.trim()}".</p>
+                        : activeTagFilters.length > 0
+                            ? <p className="text-lg">No vehicles match the selected tags.</p>
+                            : <p className="text-lg">No vehicles yet. Click "Add Vehicle" to get started!</p>
                     }
                 </div>
             )}
