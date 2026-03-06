@@ -168,6 +168,7 @@ export default function VehiclesView({
     const [viewMode, setViewMode] = useState('card'); // 'card' | 'list'
     const [sortBy, setSortBy] = useState('default');
     const [textFilter, setTextFilter] = useState('');
+    const [editingOrder, setEditingOrder] = useState(false);
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -400,7 +401,8 @@ export default function VehiclesView({
     };
 
     const showReorderButtons = isOwner && sortBy === 'default'
-        && textFilter.trim() === '' && activeTagFilters.length === 0;
+        && textFilter.trim() === '' && activeTagFilters.length === 0
+        && editingOrder;
 
     // ────────────────────────────────────────────────────────────────────────
 
@@ -462,6 +464,19 @@ export default function VehiclesView({
                     <option value="year_newest">Year (Newest)</option>
                     <option value="year_oldest">Year (Oldest)</option>
                 </select>
+                {isOwner && sortBy === 'default' && textFilter.trim() === '' && activeTagFilters.length === 0 && (
+                    <button
+                        onClick={() => setEditingOrder(v => !v)}
+                        className={`text-sm px-3 py-2 rounded border transition flex-shrink-0 ${
+                            editingOrder
+                                ? 'bg-blue-50 border-blue-300 text-blue-700'
+                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                        }`}
+                        style={editingOrder ? { backgroundColor: 'var(--color-primary-light)', borderColor: 'var(--color-primary)', color: 'var(--color-primary-text)' } : {}}
+                    >
+                        ✏️ Edit Order
+                    </button>
+                )}
             </div>
 
             {/* Tag filter bar */}
