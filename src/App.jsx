@@ -22,6 +22,7 @@ export default function App() {
         setVehicleSelection,
         addVehicle,
         updateVehicle,
+        reorderVehicles,
         deleteVehicle,
         addRun,
         updateRun,
@@ -369,6 +370,7 @@ export default function App() {
                             onCreateTag={createTag}
                             onSyncVehicleTags={syncVehicleTags}
                             onUploadVehicleImage={uploadVehicleImage}
+                            onReorderVehicles={reorderVehicles}
                         />
                     )}
                     {view === 'runs' && currentActiveVehicle && (

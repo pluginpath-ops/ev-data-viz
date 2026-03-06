@@ -143,6 +143,15 @@ class DataService {
     if (error) throw error;
   }
 
+  async updateVehicleSortOrders(sortUpdates) {
+    // sortUpdates: [{ id, sort_order }, ...]
+    if (!this.useSupabase || !this.user) return; // no-op in localStorage mode
+    const { error } = await getSupabase()
+      .from('vehicles')
+      .upsert(sortUpdates, { onConflict: 'id' });
+    if (error) throw error;
+  }
+
   async deleteVehicle(vehicleId) {
     if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');

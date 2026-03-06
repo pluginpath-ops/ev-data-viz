@@ -78,6 +78,18 @@ export function AppProvider({ children }) {
         }
     };
 
+    const reorderVehicles = async (sortUpdates) => {
+        try {
+            await dataService.updateVehicleSortOrders(sortUpdates);
+            setVehicles(prev => prev.map(v => {
+                const u = sortUpdates.find(u => u.id === v.id);
+                return u ? { ...v, sort_order: u.sort_order } : v;
+            }));
+        } catch (error) {
+            alert('Error reordering vehicles: ' + error.message);
+        }
+    };
+
     const deleteVehicle = async (vehicleId) => {
         try {
             await dataService.deleteVehicle(vehicleId);
@@ -372,6 +384,7 @@ export function AppProvider({ children }) {
         setVehicleSelection,
         addVehicle,
         updateVehicle,
+        reorderVehicles,
         deleteVehicle,
         addRun,
         updateRun,
