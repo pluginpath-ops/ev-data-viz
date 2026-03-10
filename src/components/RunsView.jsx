@@ -201,8 +201,18 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setEditFormData({
             name: run.name,
             date: run.date,
-            softwareVersion: run.softwareVersion || '',
-            conditions: run.conditions || ''
+            softwareVersion: run.softwareVersion || run.software_version || '',
+            conditions: run.conditions || '',
+            recordType: run.record_type || 'charging',
+            source: run.source || '',
+            startSoc: run.start_soc ?? '',
+            endSoc: run.end_soc ?? '',
+            speedMph: run.speed_mph ?? '',
+            distanceMiles: run.distance_miles ?? '',
+            energyKwh: run.energy_kwh ?? '',
+            temperatureF: run.temperature_f ?? '',
+            elevationGainFt: run.elevation_gain_ft ?? '',
+            url: run.url || '',
         });
         setEditCalculatedFields(run.calculated_fields || []);
     };
@@ -694,10 +704,26 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                     >
                         {editingRunId === run.id ? (
                             <div>
-                                <h3 className="text-lg font-bold mb-4">Edit Run</h3>
+                                <h3 className="text-lg font-bold mb-4">Edit Record</h3>
                                 <div className="space-y-3">
+                                    {/* Record type toggle */}
+                                    <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+                                        {[
+                                            { key: 'charging', label: 'Charging' },
+                                            { key: 'range', label: 'Range Test' },
+                                        ].map(({ key, label }) => (
+                                            <button
+                                                key={key}
+                                                type="button"
+                                                onClick={() => setEditFormData(f => ({ ...f, recordType: key }))}
+                                                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${editFormData.recordType === key ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
                                     <input
-                                        placeholder="Run Name"
+                                        placeholder="Name"
                                         value={editFormData.name}
                                         onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
                                         className="border p-2 rounded w-full"
@@ -715,11 +741,83 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         className="border p-2 rounded w-full"
                                     />
                                     <input
-                                        placeholder="Conditions"
+                                        placeholder="Notes"
                                         value={editFormData.conditions}
                                         onChange={(e) => setEditFormData({...editFormData, conditions: e.target.value})}
                                         className="border p-2 rounded w-full"
                                     />
+                                    {/* Range test fields */}
+                                    {editFormData.recordType === 'range' && (
+                                        <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
+                                            <p className="text-sm font-semibold text-gray-700">Range Test Details</p>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <input
+                                                    placeholder="Source (e.g., Out of Spec)"
+                                                    value={editFormData.source}
+                                                    onChange={(e) => setEditFormData({...editFormData, source: e.target.value})}
+                                                    className="border p-2 rounded col-span-2"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    placeholder="Start SoC (%)"
+                                                    value={editFormData.startSoc}
+                                                    onChange={(e) => setEditFormData({...editFormData, startSoc: e.target.value})}
+                                                    className="border p-2 rounded"
+                                                    min="0" max="100"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    placeholder="End SoC (%)"
+                                                    value={editFormData.endSoc}
+                                                    onChange={(e) => setEditFormData({...editFormData, endSoc: e.target.value})}
+                                                    className="border p-2 rounded"
+                                                    min="0" max="100"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    placeholder="Speed (mph)"
+                                                    value={editFormData.speedMph}
+                                                    onChange={(e) => setEditFormData({...editFormData, speedMph: e.target.value})}
+                                                    className="border p-2 rounded"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    placeholder="Distance (miles)"
+                                                    value={editFormData.distanceMiles}
+                                                    onChange={(e) => setEditFormData({...editFormData, distanceMiles: e.target.value})}
+                                                    className="border p-2 rounded"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    placeholder="Energy used (kWh)"
+                                                    value={editFormData.energyKwh}
+                                                    onChange={(e) => setEditFormData({...editFormData, energyKwh: e.target.value})}
+                                                    className="border p-2 rounded"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    placeholder="Ambient temp (°F)"
+                                                    value={editFormData.temperatureF}
+                                                    onChange={(e) => setEditFormData({...editFormData, temperatureF: e.target.value})}
+                                                    className="border p-2 rounded"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    placeholder="Elevation gain (ft)"
+                                                    value={editFormData.elevationGainFt}
+                                                    onChange={(e) => setEditFormData({...editFormData, elevationGainFt: e.target.value})}
+                                                    className="border p-2 rounded col-span-2"
+                                                />
+                                                <input
+                                                    type="url"
+                                                    placeholder="Source URL"
+                                                    value={editFormData.url}
+                                                    onChange={(e) => setEditFormData({...editFormData, url: e.target.value})}
+                                                    className="border p-2 rounded col-span-2"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex gap-2 mt-4">
                                     <button
@@ -860,8 +958,13 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                         ) : (
                             <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <h3 className="text-lg font-bold">{run.name}</h3>
+                                        {run.record_type === 'range' && (
+                                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium border border-purple-200">
+                                                Range Test
+                                            </span>
+                                        )}
                                         {run.isDefault && (
                                             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-semibold" style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}>
                                                 Default
@@ -870,9 +973,25 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                     </div>
                                     <div className="text-sm text-gray-600 mt-2 space-y-1">
                                         <p>Date: {run.date}</p>
-                                        {run.softwareVersion && <p>Software: {run.softwareVersion}</p>}
-                                        {run.conditions && <p>Conditions: {run.conditions}</p>}
-                                        <p>Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</p>
+                                        {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
+                                        {run.conditions && <p>Notes: {run.conditions}</p>}
+                                        {run.record_type === 'range' ? (
+                                            <div className="flex flex-wrap gap-1.5 mt-1">
+                                                {run.source && <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{run.source}</span>}
+                                                {run.speed_mph != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{run.speed_mph} mph</span>}
+                                                {run.distance_miles != null && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-200">{run.distance_miles} mi</span>}
+                                                {run.energy_kwh != null && run.distance_miles != null && (
+                                                    <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
+                                                        {Math.round(run.distance_miles / run.energy_kwh * 100) / 100} mi/kWh
+                                                    </span>
+                                                )}
+                                                {run.temperature_f != null && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded border border-orange-200">{run.temperature_f}°F</span>}
+                                                {run.start_soc != null && run.end_soc != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">SoC {run.start_soc}→{run.end_soc}%</span>}
+                                                {run.url && <a href={run.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline px-2 py-0.5 rounded">Source ↗</a>}
+                                            </div>
+                                        ) : (
+                                            <p>Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</p>
+                                        )}
                                     </div>
                                     {/* Field tags — populated fields; amber = estimated, blue = measured */}
                                     {(() => {

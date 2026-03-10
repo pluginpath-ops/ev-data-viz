@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
+import RangeChartView from './RangeChartView';
 
 export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode }) {
     const chartRef = useRef(null);
@@ -28,30 +29,51 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
     // Reads chartConfig.selectedRuns directly (no ref) so it always sees the
     // current value — this is what prevents URL-restored runs from being wiped.
     // Safe against loops: if kept+added equals current, no state update fires.
-    // Skipped in non-charging modes — each mode manages its own selection.
+    // Handles both charging mode (pick one default per vehicle) and range mode
+    // (pick all range-type runs for each vehicle with none selected).
     useEffect(() => {
-        if (chartModeRef.current !== 'charging') return;
+        const mode = chartModeRef.current;
         const currentRuns = chartConfig.selectedRuns;
-        const validRunIds = new Set(selectedVehicles.flatMap(v => (v.runs || []).map(r => String(r.id))));
 
-        // Drop stale run IDs that no longer belong to any selected vehicle
-        const kept = currentRuns.filter(id => validRunIds.has(String(id)));
-
-        // For vehicles with no run currently selected, auto-pick default or newest
-        const added = [];
-        selectedVehicles.forEach(vehicle => {
-            if (!vehicle.runs?.length) return;
-            const hasRun = kept.some(id => vehicle.runs.some(r => String(r.id) === String(id)));
-            if (!hasRun) {
-                const defaultRun = vehicle.runs.find(r => r.isDefault);
-                const pick = defaultRun || [...vehicle.runs].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-                if (pick) added.push(pick.id);
+        if (mode === 'charging') {
+            const validRunIds = new Set(selectedVehicles.flatMap(v => (v.runs || []).map(r => String(r.id))));
+            const kept = currentRuns.filter(id => validRunIds.has(String(id)));
+            const added = [];
+            selectedVehicles.forEach(vehicle => {
+                if (!vehicle.runs?.length) return;
+                const hasRun = kept.some(id => vehicle.runs.some(r => String(r.id) === String(id)));
+                if (!hasRun) {
+                    const defaultRun = vehicle.runs.find(r => r.isDefault);
+                    const pick = defaultRun || [...vehicle.runs].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+                    if (pick) added.push(pick.id);
+                }
+            });
+            const newRuns = [...kept, ...added];
+            if (newRuns.join(',') !== currentRuns.join(',')) {
+                setChartConfig(prev => ({ ...prev, selectedRuns: newRuns }));
             }
-        });
 
-        const newRuns = [...kept, ...added];
-        if (newRuns.join(',') !== currentRuns.join(',')) {
-            setChartConfig(prev => ({ ...prev, selectedRuns: newRuns }));
+        } else if (mode === 'range') {
+            // Collect all range-type run IDs from selected vehicles
+            const allRangeIds = selectedVehicles.flatMap(v =>
+                (v.runs || []).filter(r => r.record_type === 'range').map(r => r.id)
+            );
+            const validSet = new Set(allRangeIds.map(String));
+            // Drop stale IDs (runs that no longer belong to selected vehicles)
+            const kept = currentRuns.filter(id => validSet.has(String(id)));
+            // For each vehicle with NO range run currently selected, auto-select all its range runs
+            const keptSet = new Set(kept.map(String));
+            const added = [];
+            selectedVehicles.forEach(vehicle => {
+                const vRangeRuns = (vehicle.runs || []).filter(r => r.record_type === 'range');
+                if (!vRangeRuns.length) return;
+                const hasAny = vRangeRuns.some(r => keptSet.has(String(r.id)));
+                if (!hasAny) vRangeRuns.forEach(r => added.push(r.id));
+            });
+            const newRuns = [...kept, ...added];
+            if (newRuns.join(',') !== currentRuns.join(',')) {
+                setChartConfig(prev => ({ ...prev, selectedRuns: newRuns }));
+            }
         }
     }, [selectedVehicleIds, chartConfig.selectedRuns]);
 
@@ -306,6 +328,17 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
 
     // ── Render ────────────────────────────────────────────────────────────────
 
+    if (chartMode === 'range') {
+        return (
+            <RangeChartView
+                selectedVehicles={selectedVehicles}
+                selectedRuns={chartConfig.selectedRuns}
+                setChartConfig={setChartConfig}
+                onUpdateRunColor={onUpdateRunColor}
+            />
+        );
+    }
+
     return (
         <div>
             {/* ── Top card: presets, axis selectors, run selector ── */}
@@ -402,7 +435,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
 
                     {runsExpanded && (
                         <div className="mt-3">
-                        {chartMode === 'charging' ? (
+                        {/* chartMode === 'charging' is guaranteed here — range mode returns early above */}
                         <div className="space-y-4">
                             {selectedVehicles.map(vehicle => {
                                 const isExpanded = expandedVehicles[vehicle.id];
@@ -524,13 +557,6 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                                 );
                             })}
                         </div>
-                        ) : (
-                            <div className="text-center py-8 text-gray-400">
-                                <div className="text-2xl mb-2">📏</div>
-                                <p className="text-sm font-medium text-gray-500">Range &amp; Efficiency</p>
-                                <p className="text-xs mt-1">Range test records will appear here once added to vehicles.</p>
-                            </div>
-                        )}
                         </div>
                     )}
                 </div>
