@@ -59,6 +59,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     const [xMax, setXMax] = useState(null);
     const [yMin, setYMin] = useState(0);
     const [yMax, setYMax] = useState(null);
+    const [runsExpanded,    setRunsExpanded]    = useState(true);
+    const [expandedVehicles, setExpandedVehicles] = useState({});
 
     const handleScaleChange = (key, val) => {
         if (key === 'xMin') setXMin(val);
@@ -253,7 +255,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
             {/* ── Config card ── */}
             <div className="card mb-6">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold">Range &amp; Efficiency</h3>
+                    <h3 className="text-lg font-bold">Chart Options — Range &amp; Efficiency</h3>
                     {/* Efficiency unit toggle — relevant for efficiency charts */}
                     <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
                         {[{ key: 'mi_kwh', label: 'mi/kWh' }, { key: 'wh_mi', label: 'Wh/mi' }].map(({ key, label }) => (
@@ -288,83 +290,129 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     ))}
                 </div>
 
-                {/* ── Run selector ── */}
-                {noRangeRunsAtAll ? (
-                    <div className="text-center py-6 text-gray-400">
-                        <p className="text-sm">No range test records yet.</p>
-                        <p className="text-xs mt-1">Add records using the Test Runs tab with "Range Test" type.</p>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {selectedVehicles.map(vehicle => {
-                            const rangeRuns = (vehicle.runs || []).filter(r => r.record_type === 'range');
-                            return (
-                                <div key={vehicle.id} className="border-l-4 pl-4" style={{ borderColor: 'var(--color-primary)' }}>
-                                    <h4 className="font-semibold text-gray-700 mb-2">{vehicle.name}</h4>
-                                    {rangeRuns.length === 0 ? (
-                                        <p className="text-sm text-gray-400 italic">No range test records</p>
-                                    ) : (
-                                        <div className="space-y-1.5">
-                                            {rangeRuns.map(run => {
-                                                const isChecked = selectedRuns.some(id => String(id) === String(run.id));
-                                                const eff      = calcEff(run, effUnit);
-                                                const range    = calcRange(run);
-                                                const effLabel = effUnit === 'mi_kwh' ? 'mi/kWh' : 'Wh/mi';
-                                                // Show "(proj.)" badge when range was SoC-adjusted
-                                                const socUsed  = (run.start_soc != null && run.end_soc != null)
-                                                    ? run.start_soc - run.end_soc : null;
-                                                const isProjected = socUsed != null && socUsed !== 100;
-                                                const canPlot  = hasDataForType(run, chartType);
-                                                return (
-                                                    <label key={run.id} className={`flex items-center gap-2 cursor-pointer ${!canPlot && isChecked ? 'opacity-60' : ''}`}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isChecked}
-                                                            onChange={() => toggleRun(run.id)}
-                                                            className="w-4 h-4 shrink-0"
-                                                        />
-                                                        <input
-                                                            type="color"
-                                                            value={run.color || '#3b82f6'}
-                                                            onChange={(e) => { e.stopPropagation(); onUpdateRunColor(vehicle.id, run.id, e.target.value); }}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
-                                                            title="Change color (also sets line color for first run per vehicle)"
-                                                        />
-                                                        <span className="text-sm flex-1 flex items-center gap-1.5 flex-wrap">
-                                                            <span className="font-medium">{run.name}</span>
-                                                            <span className="text-gray-400 text-xs">({run.date})</span>
-                                                            {run.speed_mph != null && (
-                                                                <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{run.speed_mph} mph</span>
-                                                            )}
-                                                            {run.temperature_f != null && (
-                                                                <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{run.temperature_f}°F</span>
-                                                            )}
-                                                            {range != null && (
-                                                                <span
-                                                                    className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200"
-                                                                    title={isProjected ? `Projected from ${run.distance_miles} mi driven over ${socUsed}% SoC` : 'Measured distance'}
-                                                                >
-                                                                    {range} mi{isProjected ? ' ⟳' : ''}
-                                                                </span>
-                                                            )}
-                                                            {eff != null && (
-                                                                <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">{eff} {effLabel}</span>
-                                                            )}
-                                                            {!canPlot && isChecked && (
-                                                                <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200" title="Missing fields required for this chart type">⚠ missing data</span>
-                                                            )}
-                                                        </span>
-                                                    </label>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
+                {/* ── Run selector — collapsible, matching charging chart pattern ── */}
+                <div>
+                    <button
+                        onClick={() => setRunsExpanded(prev => !prev)}
+                        className="flex items-center gap-2 w-full text-left font-medium hover:text-gray-600 transition-colors mb-1"
+                    >
+                        <span style={{ display: 'inline-block', transform: runsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
+                        Select Runs to Display
+                        <span className="text-sm font-normal text-gray-500">
+                            ({selectedRangeRuns.length} selected)
+                        </span>
+                    </button>
+
+                    {runsExpanded && (
+                        <div className="mt-3">
+                            {noRangeRunsAtAll ? (
+                                <div className="text-center py-6 text-gray-400">
+                                    <p className="text-sm">No range test records yet.</p>
+                                    <p className="text-xs mt-1">Add records using the Test Runs tab with "Range Test" type.</p>
                                 </div>
-                            );
-                        })}
-                    </div>
-                )}
+                            ) : (
+                                <div className="space-y-4">
+                                    {selectedVehicles.map(vehicle => {
+                                        const rangeRuns    = (vehicle.runs || []).filter(r => r.record_type === 'range');
+                                        const activeRuns   = rangeRuns.filter(r =>  selectedRuns.some(id => String(id) === String(r.id)));
+                                        const inactiveRuns = rangeRuns.filter(r => !selectedRuns.some(id => String(id) === String(r.id)));
+                                        const isVehicleExpanded = expandedVehicles[vehicle.id];
+
+                                        const RunRow = ({ run, dimmed }) => {
+                                            const isChecked   = selectedRuns.some(id => String(id) === String(run.id));
+                                            const eff         = calcEff(run, effUnit);
+                                            const range       = calcRange(run);
+                                            const effLabel    = effUnit === 'mi_kwh' ? 'mi/kWh' : 'Wh/mi';
+                                            const socUsed     = (run.start_soc != null && run.end_soc != null) ? run.start_soc - run.end_soc : null;
+                                            const isProjected = socUsed != null && socUsed !== 100;
+                                            const canPlot     = hasDataForType(run, chartType);
+                                            return (
+                                                <label key={run.id} className={`flex items-center gap-2 cursor-pointer ${dimmed ? 'opacity-60 hover:opacity-100' : ''}`}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={() => toggleRun(run.id)}
+                                                        className="w-4 h-4 shrink-0"
+                                                    />
+                                                    <input
+                                                        type="color"
+                                                        value={run.color || '#3b82f6'}
+                                                        onChange={(e) => { e.stopPropagation(); onUpdateRunColor(vehicle.id, run.id, e.target.value); }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
+                                                        title="Change color (also sets line color for first run per vehicle)"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={run.color || '#3b82f6'}
+                                                        onChange={(e) => { e.stopPropagation(); onUpdateRunColor(vehicle.id, run.id, e.target.value); }}
+                                                        onBlur={(e) => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRunColor(vehicle.id, run.id, run.color || '#3b82f6'); }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="w-20 px-2 py-0.5 border rounded text-xs font-mono shrink-0"
+                                                        placeholder="#3b82f6"
+                                                        maxLength={7}
+                                                    />
+                                                    <span className="text-sm flex-1 flex items-center gap-1.5 flex-wrap">
+                                                        <span className="font-medium">{run.name}</span>
+                                                        <span className="text-gray-400 text-xs">({run.date})</span>
+                                                        {run.speed_mph != null && (
+                                                            <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{run.speed_mph} mph</span>
+                                                        )}
+                                                        {run.temperature_f != null && (
+                                                            <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{run.temperature_f}°F</span>
+                                                        )}
+                                                        {range != null && (
+                                                            <span
+                                                                className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200"
+                                                                title={isProjected ? `Projected from ${run.distance_miles} mi driven over ${socUsed}% SoC` : 'Measured distance'}
+                                                            >
+                                                                {range} mi{isProjected ? ' ⟳' : ''}
+                                                            </span>
+                                                        )}
+                                                        {eff != null && (
+                                                            <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">{eff} {effLabel}</span>
+                                                        )}
+                                                        {!canPlot && isChecked && (
+                                                            <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200" title="Missing fields required for this chart type">⚠ missing data</span>
+                                                        )}
+                                                    </span>
+                                                </label>
+                                            );
+                                        };
+
+                                        return (
+                                            <div key={vehicle.id} className="border-l-4 pl-4" style={{ borderColor: 'var(--color-primary)' }}>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <h4 className="font-semibold text-gray-700">{vehicle.name}</h4>
+                                                    {inactiveRuns.length > 0 && (
+                                                        <button
+                                                            onClick={() => setExpandedVehicles(prev => ({ ...prev, [vehicle.id]: !prev[vehicle.id] }))}
+                                                            className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                                                        >
+                                                            <span style={{ display: 'inline-block', transform: isVehicleExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
+                                                            <span>{isVehicleExpanded ? 'Hide' : 'Show all'} ({rangeRuns.length})</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {rangeRuns.length === 0 ? (
+                                                    <p className="text-sm text-gray-400 italic">No range test records</p>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {activeRuns.map(run => <RunRow key={run.id} run={run} dimmed={false} />)}
+                                                        {isVehicleExpanded && inactiveRuns.map(run => <RunRow key={run.id} run={run} dimmed={true} />)}
+                                                        {activeRuns.length === 0 && !isVehicleExpanded && (
+                                                            <p className="text-xs text-gray-400 italic">No runs selected — click Show all to re-add</p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* ── Chart card ── */}

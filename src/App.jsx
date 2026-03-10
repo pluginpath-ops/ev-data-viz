@@ -4,7 +4,7 @@ import AuthModal from './components/AuthModal';
 import ImportTableauModal from './components/ImportTableauModal';
 import VehiclesView from './components/VehiclesView';
 import RunsView from './components/RunsView';
-import ChartView from './components/ChartView';
+import ChargingView from './components/ChargingView';
 import SpecsView from './components/SpecsView';
 
 export default function App() {
@@ -418,7 +418,7 @@ export default function App() {
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && (
-                        <ChartView
+                        <ChargingView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
                             chartConfig={chartConfig}

@@ -4,7 +4,7 @@ import { dataService } from '../services/DataService';
 import RangeChartView from './RangeChartView';
 import AxisScaleControls from './AxisScaleControls';
 
-export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode }) {
+export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode }) {
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
     const [expandedVehicles, setExpandedVehicles] = useState({});
@@ -126,9 +126,9 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
     ];
 
     const chartPresets = [
-        { name: 'Charge Rate vs SoC', x: 'soc', y: 'chargeRate' },
-        { name: 'Range vs Time', x: 'time', y: 'range' },
-        { name: 'Charge Rate vs Time', x: 'time', y: 'chargeRate' }
+        { emoji: '⚡', name: 'Charge Rate vs SoC',  x: 'soc',  y: 'chargeRate' },
+        { emoji: '🛣️', name: 'Range vs Time',         x: 'time', y: 'range'      },
+        { emoji: '⏱️', name: 'Charge Rate vs Time',  x: 'time', y: 'chargeRate' },
     ];
 
     /**
@@ -345,7 +345,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
             {/* ── Top card: presets, axis selectors, run selector ── */}
             <div className="card mb-6">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold">Chart Configuration</h3>
+                    <h3 className="text-lg font-bold">Chart Options — Charging Performance</h3>
                     <button
                         onClick={() => {
                             navigator.clipboard.writeText(window.location.href).then(() => {
@@ -365,15 +365,15 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                 </div>
 
                 {/* Presets */}
-                <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="flex flex-wrap gap-2 mb-6">
                     {chartPresets.map(preset => (
                         <button
                             key={preset.name}
                             onClick={() => setChartConfig({ ...chartConfig, xAxis: preset.x, yAxis: preset.y })}
-                            className="btn"
+                            className="btn text-sm"
                             style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
                         >
-                            {preset.name}
+                            {preset.emoji} {preset.name}
                         </button>
                     ))}
                 </div>

@@ -1,6 +1,6 @@
 /**
  * Shared Y/X axis min-max scale controls.
- * Used by ChartView (charging) and RangeChartView (range & efficiency).
+ * Used by ChargingView (charging) and RangeChartView (range & efficiency).
  *
  * Props:
  *   xMin, xMax, yMin, yMax  – current values (null = auto)
