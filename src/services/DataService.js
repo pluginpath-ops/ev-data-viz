@@ -181,7 +181,17 @@ class DataService {
       vehicle_id: vehicleId, name: run.name, date: run.date,
       software_version: run.softwareVersion, conditions: run.conditions,
       color: run.color || '#3b82f6', is_default: run.isDefault || false,
-      synthetic: run.synthetic || false
+      synthetic: run.synthetic || false,
+      record_type: run.recordType || 'charging',
+      source: run.source || null,
+      start_soc: run.startSoc != null && run.startSoc !== '' ? Number(run.startSoc) : null,
+      end_soc: run.endSoc != null && run.endSoc !== '' ? Number(run.endSoc) : null,
+      speed_mph: run.speedMph != null && run.speedMph !== '' ? Number(run.speedMph) : null,
+      distance_miles: run.distanceMiles != null && run.distanceMiles !== '' ? Number(run.distanceMiles) : null,
+      energy_kwh: run.energyKwh != null && run.energyKwh !== '' ? Number(run.energyKwh) : null,
+      temperature_f: run.temperatureF != null && run.temperatureF !== '' ? Number(run.temperatureF) : null,
+      elevation_gain_ft: run.elevationGainFt != null && run.elevationGainFt !== '' ? Number(run.elevationGainFt) : null,
+      url: run.url || null,
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
@@ -227,6 +237,16 @@ class DataService {
       name: updates.name, date: updates.date,
       software_version: updates.softwareVersion, conditions: updates.conditions, color: updates.color,
       ...(updates.calculated_fields !== undefined ? { calculated_fields: updates.calculated_fields } : {}),
+      ...(updates.recordType !== undefined ? { record_type: updates.recordType } : {}),
+      ...(updates.source !== undefined ? { source: updates.source || null } : {}),
+      ...(updates.startSoc !== undefined ? { start_soc: updates.startSoc !== '' ? Number(updates.startSoc) : null } : {}),
+      ...(updates.endSoc !== undefined ? { end_soc: updates.endSoc !== '' ? Number(updates.endSoc) : null } : {}),
+      ...(updates.speedMph !== undefined ? { speed_mph: updates.speedMph !== '' ? Number(updates.speedMph) : null } : {}),
+      ...(updates.distanceMiles !== undefined ? { distance_miles: updates.distanceMiles !== '' ? Number(updates.distanceMiles) : null } : {}),
+      ...(updates.energyKwh !== undefined ? { energy_kwh: updates.energyKwh !== '' ? Number(updates.energyKwh) : null } : {}),
+      ...(updates.temperatureF !== undefined ? { temperature_f: updates.temperatureF !== '' ? Number(updates.temperatureF) : null } : {}),
+      ...(updates.elevationGainFt !== undefined ? { elevation_gain_ft: updates.elevationGainFt !== '' ? Number(updates.elevationGainFt) : null } : {}),
+      ...(updates.url !== undefined ? { url: updates.url || null } : {}),
     }).eq('id', runId);
     if (error) throw error;
   }

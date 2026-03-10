@@ -121,6 +121,24 @@
     cursor: not-allowed;
 }
 
+/* Chart mode sub-nav — slightly smaller than .btn-tab */
+.btn-chart-mode {
+    padding: 0.3rem 0.75rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    color: rgb(75, 85, 99);
+    background-color: transparent;
+}
+.btn-chart-mode:hover {
+    background-color: rgb(243, 244, 246);
+}
+.btn-chart-mode.active {
+    background-color: var(--color-primary-light);
+    color: var(--color-primary-text);
+}
+
 /* Background and Card Styles */
 body {
     background-color: var(--color-background);

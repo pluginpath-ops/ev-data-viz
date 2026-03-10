@@ -45,6 +45,7 @@ export default function App() {
 
     const [activeVehicle, setActiveVehicle] = useState(null);
     const [view, setView] = useState('vehicles');
+    const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range'
     const [chartConfig, setChartConfig] = useState({
         xAxis: 'soc',
         yAxis: 'chargeRate',
@@ -57,6 +58,11 @@ export default function App() {
         yMax: null,
         showLine: false,
     });
+    const handleChartModeChange = (newMode) => {
+        setChartMode(newMode);
+        setChartConfig(prev => ({ ...prev, selectedRuns: [] }));
+    };
+
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [showImportMenu, setShowImportMenu] = useState(false);
     const [showTableauModal, setShowTableauModal] = useState(false);
@@ -80,6 +86,7 @@ export default function App() {
             yMin: p.get('yn') !== null && p.get('yn') !== '' ? Number(p.get('yn')) : null,
             yMax: p.get('yx') !== null && p.get('yx') !== '' ? Number(p.get('yx')) : null,
             showLine: p.get('line') === '1',
+            chartMode: p.get('m') || 'charging',
         };
     }, []);
 
@@ -97,12 +104,13 @@ export default function App() {
             .map(v => v.id);
         const vehicleIds = [...new Set([...s.vehicleIds, ...fromRuns])];
         if (vehicleIds.length > 0) setVehicleSelection(vehicleIds);
+        if (s.chartMode) setChartMode(s.chartMode);
 
         setChartConfig(prev => ({
             ...prev,
             ...(s.xAxis         && { xAxis: s.xAxis }),
             ...(s.yAxis         && { yAxis: s.yAxis }),
-            ...(s.runIds.length  > 0 && { selectedRuns: s.runIds }),
+            ...(s.runIds.length  > 0 && s.chartMode === 'charging' && { selectedRuns: s.runIds }),
             raceMode:      s.raceMode,
             raceThreshold: s.raceThreshold,
             xMin:          s.xMin,
@@ -119,7 +127,7 @@ export default function App() {
         if (view !== 'chart') return;
         const p = new URLSearchParams();
         p.set('tab', 'chart');
-        if (chartConfig.selectedRuns.length > 0)  p.set('r', chartConfig.selectedRuns.join(','));
+        if (chartMode === 'charging' && chartConfig.selectedRuns.length > 0)  p.set('r', chartConfig.selectedRuns.join(','));
         // Include v= only for selected vehicles that have no runs in r (run-less selections)
         const runVehicleIds = new Set(
             vehicles
@@ -137,8 +145,9 @@ export default function App() {
         if (chartConfig.yMin != null)             p.set('yn',   String(chartConfig.yMin));
         if (chartConfig.yMax != null)             p.set('yx',   String(chartConfig.yMax));
         if (chartConfig.showLine)                 p.set('line', '1');
+        if (chartMode !== 'charging')             p.set('m', chartMode);
         history.replaceState(null, '', '?' + p.toString());
-    }, [view, chartConfig, selectedVehicles]);
+    }, [view, chartConfig, selectedVehicles, chartMode]);
 
     // Keep activeVehicle in sync with vehicles state
     const currentActiveVehicle = activeVehicle
@@ -219,13 +228,13 @@ export default function App() {
                 </header>
 
                 <nav className="bg-white shadow-sm border-b">
-                    <div className="max-w-7xl mx-auto px-6 py-3">
+                    <div className="max-w-7xl mx-auto px-6 pt-3 pb-2">
                         {/*
                           * flex-col-reverse on mobile: DOM order is tabs first, actions second,
                           * but col-reverse flips that so actions render on TOP and tabs below.
                           * sm:flex-row restores the normal side-by-side layout on wider screens.
                           */}
-                        <div className="flex flex-col-reverse gap-y-2 sm:flex-row sm:items-center mb-3">
+                        <div className={`flex flex-col-reverse gap-y-2 sm:flex-row sm:items-center ${view === 'chart' ? 'mb-1' : 'mb-3'}`}>
                             {/* Tab group */}
                             <div className="flex gap-1 items-center flex-wrap">
                                 <button
@@ -313,8 +322,29 @@ export default function App() {
                             </div>
                         </div>
 
+                        {/* Chart mode sub-nav — only visible in chart view */}
+                        {view === 'chart' && (
+                            <div className="flex gap-0.5 pb-2">
+                                {[
+                                    { key: 'charging', label: 'Charging' },
+                                    { key: 'range',    label: 'Range & Efficiency' },
+                                ].map(({ key, label }) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => handleChartModeChange(key)}
+                                        className={`btn-chart-mode ${chartMode === key ? 'active' : ''}`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                    </div>
+                    <div className="border-t">
+                        <div className="max-w-7xl mx-auto px-6 py-2">
                         {/* Selected vehicles row */}
-                        <div className="flex gap-2 items-center flex-wrap pt-2 border-t">
+                        <div className="flex gap-2 items-center flex-wrap">
                             <span className="text-sm text-gray-600 font-medium">Selected:</span>
                             {selectedVehicles.length === 0 ? (
                                 <div className="px-3 py-1 bg-gray-100 text-gray-500 rounded-full text-sm">
@@ -350,6 +380,7 @@ export default function App() {
                                     </button>
                                 </>
                             )}
+                        </div>
                         </div>
                     </div>
                 </nav>
@@ -393,6 +424,7 @@ export default function App() {
                             chartConfig={chartConfig}
                             setChartConfig={setChartConfig}
                             onUpdateRunColor={updateRunColor}
+                            chartMode={chartMode}
                         />
                     )}
                     {view === 'specs' && (

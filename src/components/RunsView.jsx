@@ -13,7 +13,17 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         name: '',
         date: new Date().toISOString().split('T')[0],
         softwareVersion: '',
-        conditions: ''
+        conditions: '',
+        recordType: 'charging',
+        source: '',
+        startSoc: '',
+        endSoc: '',
+        speedMph: '',
+        distanceMiles: '',
+        energyKwh: '',
+        temperatureF: '',
+        elevationGainFt: '',
+        url: '',
     });
     const [editingRunId, setEditingRunId] = useState(null);
     const [editFormData, setEditFormData] = useState({});
@@ -50,7 +60,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '' });
+        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', recordType: 'charging', source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', temperatureF: '', elevationGainFt: '', url: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: false });
@@ -89,6 +99,16 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     };
 
     // ── Create-mode import ────────────────────────────────────────────────────
+
+    const handleSaveRecord = () => {
+        const run = {
+            ...runMetadata,
+            data: [],
+            uploadDate: new Date().toISOString()
+        };
+        onAddRun(run);
+        resetUploadState();
+    };
 
     const handleImport = () => {
         if (!csvData) return;
@@ -333,7 +353,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                         }}
                         className="btn btn-primary"
                     >
-                        {showUpload && uploadMode === 'create' ? 'Cancel' : '+ Upload CSV'}
+                        {showUpload && uploadMode === 'create' ? 'Cancel' : '+ Add new record'}
                     </button>
                     {vehicle.runs?.length > 0 && (
                         <button
@@ -364,14 +384,32 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                     {uploadStep === 'file' && (
                         <div>
                             <h3 className="text-lg font-bold mb-4">
-                                {uploadMode === 'merge' ? 'Upload Additional Data' : 'Upload Test Run Data'}
+                                {uploadMode === 'merge' ? 'Upload Additional Data' : 'Add new record'}
                             </h3>
                             <div className="space-y-4">
                                 {/* Only show metadata inputs in create mode */}
                                 {uploadMode === 'create' && (
                                     <>
+                                        {/* Record type toggle */}
+                                        <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+                                            {[
+                                                { key: 'charging', label: 'Charging' },
+                                                { key: 'range', label: 'Range Test' },
+                                            ].map(({ key, label }) => (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => setRunMetadata(m => ({ ...m, recordType: key }))}
+                                                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${runMetadata.recordType === key ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Core metadata */}
                                         <input
-                                            placeholder="Run Name (e.g., Highway Test - Winter 2024)"
+                                            placeholder="Name (e.g., Highway Test - Winter 2024)"
                                             value={runMetadata.name}
                                             onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
                                             className="border p-2 rounded w-full"
@@ -390,16 +428,90 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             className="border p-2 rounded w-full"
                                         />
                                         <input
-                                            placeholder="Conditions (e.g., 20°F, highway speeds)"
+                                            placeholder="Notes (e.g., 20°F, highway speeds)"
                                             value={runMetadata.conditions}
                                             onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
                                             className="border p-2 rounded w-full"
                                         />
+
+                                        {/* Range test fields */}
+                                        {runMetadata.recordType === 'range' && (
+                                            <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
+                                                <p className="text-sm font-semibold text-gray-700">Range Test Details</p>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <input
+                                                        placeholder="Source (e.g., Out of Spec)"
+                                                        value={runMetadata.source}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, source: e.target.value})}
+                                                        className="border p-2 rounded col-span-2"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Start SoC (%)"
+                                                        value={runMetadata.startSoc}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, startSoc: e.target.value})}
+                                                        className="border p-2 rounded"
+                                                        min="0" max="100"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        placeholder="End SoC (%)"
+                                                        value={runMetadata.endSoc}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, endSoc: e.target.value})}
+                                                        className="border p-2 rounded"
+                                                        min="0" max="100"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Speed (mph)"
+                                                        value={runMetadata.speedMph}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, speedMph: e.target.value})}
+                                                        className="border p-2 rounded"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Distance (miles)"
+                                                        value={runMetadata.distanceMiles}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, distanceMiles: e.target.value})}
+                                                        className="border p-2 rounded"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Energy used (kWh)"
+                                                        value={runMetadata.energyKwh}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, energyKwh: e.target.value})}
+                                                        className="border p-2 rounded"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Ambient temp (°F)"
+                                                        value={runMetadata.temperatureF}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, temperatureF: e.target.value})}
+                                                        className="border p-2 rounded"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Elevation gain (ft)"
+                                                        value={runMetadata.elevationGainFt}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, elevationGainFt: e.target.value})}
+                                                        className="border p-2 rounded col-span-2"
+                                                    />
+                                                    <input
+                                                        type="url"
+                                                        placeholder="Source URL"
+                                                        value={runMetadata.url}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, url: e.target.value})}
+                                                        className="border p-2 rounded col-span-2"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
                                     </>
                                 )}
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                                     <label className="cursor-pointer">
                                         <span className="text-blue-600 font-medium">Click to upload CSV file</span>
+                                        <span className="block text-xs text-gray-400 mt-1">Optional — attach data points to this record</span>
                                         <input
                                             type="file"
                                             accept=".csv"
@@ -408,6 +520,20 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         />
                                     </label>
                                 </div>
+                                {uploadMode === 'create' && (
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleSaveRecord}
+                                            disabled={!runMetadata.name}
+                                            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save record
+                                        </button>
+                                        <button onClick={resetUploadState} className="btn btn-secondary">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -423,7 +549,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                     <h4 className="font-semibold mb-3">Run Metadata</h4>
                                     <div className="space-y-3">
                                         <input
-                                            placeholder="Run Name (e.g., Highway Test - Winter 2024)"
+                                            placeholder="Name (e.g., Highway Test - Winter 2024)"
                                             value={runMetadata.name}
                                             onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
                                             className="border p-2 rounded w-full"
@@ -442,7 +568,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             className="border p-2 rounded w-full"
                                         />
                                         <input
-                                            placeholder="Conditions (e.g., 20°F, highway speeds)"
+                                            placeholder="Notes (e.g., 20°F, highway speeds)"
                                             value={runMetadata.conditions}
                                             onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
                                             className="border p-2 rounded w-full"
@@ -843,7 +969,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
             {vehicle.runs?.length === 0 && !showUpload && (
                 <div className="text-center py-12 text-gray-500">
-                    <p className="text-lg">No test runs yet. Upload a CSV to get started!</p>
+                    <p className="text-lg">No test runs yet. Add a record to get started!</p>
                 </div>
             )}
 

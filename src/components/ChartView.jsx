@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
 
-export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor }) {
+export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode }) {
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
     const [expandedVehicles, setExpandedVehicles] = useState({});
@@ -19,11 +19,18 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
         onUpdateRunColor(vehicleId, runId, color);
     };
 
+    // Ref so the auto-select effect can read chartMode without it being a dep
+    // (avoids changing the deps array size, which React disallows mid-session).
+    const chartModeRef = useRef(chartMode);
+    chartModeRef.current = chartMode;
+
     // Auto-select runs when the vehicle selection changes.
     // Reads chartConfig.selectedRuns directly (no ref) so it always sees the
     // current value — this is what prevents URL-restored runs from being wiped.
     // Safe against loops: if kept+added equals current, no state update fires.
+    // Skipped in non-charging modes — each mode manages its own selection.
     useEffect(() => {
+        if (chartModeRef.current !== 'charging') return;
         const currentRuns = chartConfig.selectedRuns;
         const validRunIds = new Set(selectedVehicles.flatMap(v => (v.runs || []).map(r => String(r.id))));
 
@@ -301,8 +308,6 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
 
     return (
         <div>
-            <h2 className="text-2xl font-bold mb-6">Charts - {selectedVehicles.length} Vehicle{selectedVehicles.length !== 1 ? 's' : ''} Selected</h2>
-
             {/* ── Top card: presets, axis selectors, run selector ── */}
             <div className="card mb-6">
                 <div className="flex items-center justify-between mb-4">
@@ -396,7 +401,9 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                     </button>
 
                     {runsExpanded && (
-                        <div className="space-y-4 mt-3">
+                        <div className="mt-3">
+                        {chartMode === 'charging' ? (
+                        <div className="space-y-4">
                             {selectedVehicles.map(vehicle => {
                                 const isExpanded = expandedVehicles[vehicle.id];
                                 const activeRuns   = vehicle.runs?.filter(r =>  chartConfig.selectedRuns.includes(r.id)) || [];
@@ -516,6 +523,14 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                                     </div>
                                 );
                             })}
+                        </div>
+                        ) : (
+                            <div className="text-center py-8 text-gray-400">
+                                <div className="text-2xl mb-2">📏</div>
+                                <p className="text-sm font-medium text-gray-500">Range &amp; Efficiency</p>
+                                <p className="text-xs mt-1">Range test records will appear here once added to vehicles.</p>
+                            </div>
+                        )}
                         </div>
                     )}
                 </div>
