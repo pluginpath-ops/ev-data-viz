@@ -169,7 +169,8 @@ export default function VehiclesView({
     const [sortBy, setSortBy] = useState('default');
     const [textFilter, setTextFilter] = useState('');
     const [editingOrder, setEditingOrder] = useState(false);
-    const [pendingOrder, setPendingOrder] = useState(null); // [{id, sort_order}] or null
+    const [pendingOrder, setPendingOrder] = useState(null);   // [{id, sort_order}] or null
+    const [savingOrder, setSavingOrder]   = useState(false);
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -416,8 +417,13 @@ export default function VehiclesView({
 
     const handleSaveOrder = async () => {
         if (!pendingOrder) return;
-        await onReorderVehicles(pendingOrder);
-        setPendingOrder(null);
+        setSavingOrder(true);
+        try {
+            await onReorderVehicles(pendingOrder);
+            setPendingOrder(null);
+        } finally {
+            setSavingOrder(false);
+        }
     };
 
     const handleCancelOrder = () => {
@@ -735,13 +741,19 @@ export default function VehiclesView({
                 <div className="fixed bottom-0 left-0 right-0 z-40 bg-blue-50 border-t-2 border-blue-200 shadow-2xl">
                     <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
                         <span className="font-medium flex-1" style={{ color: 'var(--color-primary-text)' }}>
-                            ↕ Order changed — save to keep?
+                            Vehicle default order changed
                         </span>
-                        <button onClick={handleCancelOrder} className="btn btn-secondary text-sm">
+                        <button onClick={handleCancelOrder} disabled={savingOrder} className="btn btn-secondary text-sm">
                             Cancel
                         </button>
-                        <button onClick={handleSaveOrder} className="btn btn-primary text-sm">
-                            Save Order →
+                        <button onClick={handleSaveOrder} disabled={savingOrder} className="btn btn-primary text-sm flex items-center gap-2">
+                            {savingOrder && (
+                                <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                </svg>
+                            )}
+                            {savingOrder ? 'Saving…' : 'Save Order →'}
                         </button>
                     </div>
                 </div>
