@@ -12,20 +12,12 @@ const DATA_FLAGS = [
     { key: 'range',    label: '📏 Range',    pillStyle: 'bg-purple-100 text-purple-800 border-purple-300', desc: 'Range/efficiency test (distance, SoC, speed, efficiency)' },
 ];
 
-/** Map a flags array to the record_type stored in the DB. */
-const flagsToRecordType = (flags) => {
-    const c = flags.includes('charging'), r = flags.includes('range');
-    if (c && r) return 'combined';
-    if (r) return 'range';
-    return 'charging';
-};
-
-/** Infer the flags array from a run object fetched from the DB. */
+/** Infer the active data-type flags from a run's boolean columns. */
 const inferRunFlags = (run) => {
-    const rt = run?.record_type || 'charging';
-    if (rt === 'combined') return ['charging', 'range'];
-    if (rt === 'range') return ['range'];
-    return ['charging'];
+    const flags = [];
+    if (run?.has_charging ?? true)  flags.push('charging');
+    if (run?.has_range    ?? false) flags.push('range');
+    return flags;
 };
 
 export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onViewChart }) {
@@ -133,7 +125,8 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         const { dataFlags, ...metaRest } = runMetadata;
         const run = {
             ...metaRest,
-            recordType: flagsToRecordType(dataFlags),
+            hasCharging: dataFlags.includes('charging'),
+            hasRange:    dataFlags.includes('range'),
             data: [],
             uploadDate: new Date().toISOString()
         };
@@ -169,7 +162,8 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         const { dataFlags, ...metaRest } = runMetadata;
         const run = {
             ...metaRest,
-            recordType: flagsToRecordType(dataFlags),
+            hasCharging: dataFlags.includes('charging'),
+            hasRange:    dataFlags.includes('range'),
             data: transformedData,
             fieldMapping,
             calculated_fields: calculatedFields,
@@ -253,11 +247,12 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const handleSaveEdit = async (runId) => {
         setSavingData(true);
         try {
-            // Convert dataFlags → recordType (DataService API) and drop the flags field
+            // Convert dataFlags → boolean columns and drop the flags field
             const { dataFlags, ...formRest } = editFormData;
             onUpdateRun(runId, {
                 ...formRest,
-                recordType: flagsToRecordType(dataFlags),
+                hasCharging: dataFlags.includes('charging'),
+                hasRange:    dataFlags.includes('range'),
                 calculated_fields: editCalculatedFields,
             });
             // Save table data only if the owner made changes

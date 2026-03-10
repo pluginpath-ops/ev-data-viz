@@ -82,7 +82,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     // ── Derived: all range runs across selected vehicles ──────────────────────
     const allRangeRuns = selectedVehicles.flatMap(v =>
         (v.runs || [])
-            .filter(r => r.record_type === 'range')
+            .filter(r => r.has_range)
             .map(r => ({ ...r, vehicleName: v.name, vehicleId: v.id }))
     );
 
@@ -246,7 +246,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     };
 
     const noRangeRunsAtAll = selectedVehicles.every(
-        v => !(v.runs || []).some(r => r.record_type === 'range')
+        v => !(v.runs || []).some(r => r.has_range)
     );
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -313,7 +313,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                             ) : (
                                 <div className="space-y-4">
                                     {selectedVehicles.map(vehicle => {
-                                        const rangeRuns    = (vehicle.runs || []).filter(r => r.record_type === 'range');
+                                        const rangeRuns    = (vehicle.runs || []).filter(r => r.has_range);
                                         const activeRuns   = rangeRuns.filter(r =>  selectedRuns.some(id => String(id) === String(r.id)));
                                         const inactiveRuns = rangeRuns.filter(r => !selectedRuns.some(id => String(id) === String(r.id)));
                                         const isVehicleExpanded = expandedVehicles[vehicle.id];

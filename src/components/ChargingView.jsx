@@ -37,15 +37,18 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         const currentRuns = chartConfig.selectedRuns;
 
         if (mode === 'charging') {
-            const validRunIds = new Set(selectedVehicles.flatMap(v => (v.runs || []).map(r => String(r.id))));
+            // Only charging-capable runs are valid in this mode
+            const chargingRuns = selectedVehicles.flatMap(v => (v.runs || []).filter(r => r.has_charging !== false));
+            const validRunIds = new Set(chargingRuns.map(r => String(r.id)));
             const kept = currentRuns.filter(id => validRunIds.has(String(id)));
             const added = [];
             selectedVehicles.forEach(vehicle => {
-                if (!vehicle.runs?.length) return;
-                const hasRun = kept.some(id => vehicle.runs.some(r => String(r.id) === String(id)));
+                const vChargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
+                if (!vChargingRuns.length) return;
+                const hasRun = kept.some(id => vChargingRuns.some(r => String(r.id) === String(id)));
                 if (!hasRun) {
-                    const defaultRun = vehicle.runs.find(r => r.isDefault);
-                    const pick = defaultRun || [...vehicle.runs].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+                    const defaultRun = vChargingRuns.find(r => r.isDefault);
+                    const pick = defaultRun || [...vChargingRuns].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
                     if (pick) added.push(pick.id);
                 }
             });
@@ -57,7 +60,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         } else if (mode === 'range') {
             // Collect all range-type run IDs from selected vehicles
             const allRangeIds = selectedVehicles.flatMap(v =>
-                (v.runs || []).filter(r => r.record_type === 'range').map(r => r.id)
+                (v.runs || []).filter(r => r.has_range).map(r => r.id)
             );
             const validSet = new Set(allRangeIds.map(String));
             // Drop stale IDs (runs that no longer belong to selected vehicles)
@@ -66,7 +69,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             const keptSet = new Set(kept.map(String));
             const added = [];
             selectedVehicles.forEach(vehicle => {
-                const vRangeRuns = (vehicle.runs || []).filter(r => r.record_type === 'range');
+                const vRangeRuns = (vehicle.runs || []).filter(r => r.has_range);
                 if (!vRangeRuns.length) return;
                 const hasAny = vRangeRuns.some(r => keptSet.has(String(r.id)));
                 if (!hasAny) vRangeRuns.forEach(r => added.push(r.id));
