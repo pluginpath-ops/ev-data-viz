@@ -169,6 +169,7 @@ export default function VehiclesView({
     const [sortBy, setSortBy] = useState('default');
     const [textFilter, setTextFilter] = useState('');
     const [editingOrder, setEditingOrder] = useState(false);
+    const [pendingOrder, setPendingOrder] = useState(null); // [{id, sort_order}] or null
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -270,8 +271,11 @@ export default function VehiclesView({
     const sortedFilteredVehicles = [...textFiltered].sort((a, b) => {
         switch (sortBy) {
             case 'default': {
-                const aN = a.sort_order == null, bN = b.sort_order == null;
-                if (!aN && !bN) return a.sort_order - b.sort_order;
+                // Use pending sort_order when available (instant visual feedback before DB save)
+                const aOrder = pendingOrder?.find(u => u.id === a.id)?.sort_order ?? a.sort_order;
+                const bOrder = pendingOrder?.find(u => u.id === b.id)?.sort_order ?? b.sort_order;
+                const aN = aOrder == null, bN = bOrder == null;
+                if (!aN && !bN) return aOrder - bOrder;
                 if (!aN) return -1; if (!bN) return 1;
                 return new Date(b.created_at) - new Date(a.created_at);
             }
@@ -384,12 +388,21 @@ export default function VehiclesView({
         onSubmit: handleSubmit, onCancel: handleCancel,
     };
 
-    const handleMoveVehicle = async (vehicleId, direction) => {
+    const handleMoveVehicle = (vehicleId, direction) => {
+        // Build current order using any in-flight pending order, falling back to DB sort_order
+        const getEffectiveOrder = (v) => {
+            if (pendingOrder) {
+                const p = pendingOrder.find(u => u.id === v.id);
+                if (p) return p.sort_order;
+            }
+            return v.sort_order;
+        };
         const allOrdered = [...vehicles]
             .filter(v => !committedDeletes.has(v.id))
             .sort((a, b) => {
-                const aN = a.sort_order == null, bN = b.sort_order == null;
-                if (!aN && !bN) return a.sort_order - b.sort_order;
+                const aO = getEffectiveOrder(a), bO = getEffectiveOrder(b);
+                const aN = aO == null, bN = bO == null;
+                if (!aN && !bN) return aO - bO;
                 if (!aN) return -1; if (!bN) return 1;
                 return new Date(b.created_at) - new Date(a.created_at);
             });
@@ -397,7 +410,18 @@ export default function VehiclesView({
         const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
         if (idx === -1 || swapIdx < 0 || swapIdx >= allOrdered.length) return;
         [allOrdered[idx], allOrdered[swapIdx]] = [allOrdered[swapIdx], allOrdered[idx]];
-        await onReorderVehicles(allOrdered.map((v, i) => ({ id: v.id, sort_order: i })));
+        // Update local state immediately — no DB call yet
+        setPendingOrder(allOrdered.map((v, i) => ({ id: v.id, sort_order: i })));
+    };
+
+    const handleSaveOrder = async () => {
+        if (!pendingOrder) return;
+        await onReorderVehicles(pendingOrder);
+        setPendingOrder(null);
+    };
+
+    const handleCancelOrder = () => {
+        setPendingOrder(null);
     };
 
     const showReorderButtons = isOwner && sortBy === 'default'
@@ -406,7 +430,7 @@ export default function VehiclesView({
 
     // ────────────────────────────────────────────────────────────────────────
 
-    const barVisible = pendingDeletes.size > 0 || !!undoState;
+    const barVisible = pendingDeletes.size > 0 || !!undoState || !!pendingOrder;
 
     return (
         <div className={barVisible ? 'pb-20' : ''}>
@@ -466,7 +490,7 @@ export default function VehiclesView({
                 </select>
                 {isOwner && sortBy === 'default' && textFilter.trim() === '' && activeTagFilters.length === 0 && (
                     <button
-                        onClick={() => setEditingOrder(v => !v)}
+                        onClick={() => { if (editingOrder) setPendingOrder(null); setEditingOrder(v => !v); }}
                         className={`text-sm px-3 py-2 rounded border transition flex-shrink-0 ${
                             editingOrder
                                 ? 'bg-blue-50 border-blue-300 text-blue-700'
@@ -704,6 +728,22 @@ export default function VehiclesView({
                             ? <p className="text-lg">No vehicles match the selected tags.</p>
                             : <p className="text-lg">No vehicles yet. Click "Add Vehicle" to get started!</p>
                     }
+                </div>
+            )}
+
+            {pendingOrder && (
+                <div className="fixed bottom-0 left-0 right-0 z-40 bg-blue-50 border-t-2 border-blue-200 shadow-2xl">
+                    <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
+                        <span className="font-medium flex-1" style={{ color: 'var(--color-primary-text)' }}>
+                            ↕ Order changed — save to keep?
+                        </span>
+                        <button onClick={handleCancelOrder} className="btn btn-secondary text-sm">
+                            Cancel
+                        </button>
+                        <button onClick={handleSaveOrder} className="btn btn-primary text-sm">
+                            Save Order →
+                        </button>
+                    </div>
                 </div>
             )}
 
