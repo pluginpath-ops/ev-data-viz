@@ -47,6 +47,11 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const [showDataTable, setShowDataTable]     = useState(false);  // expand/collapse
     const [savingData, setSavingData]           = useState(false);
     const [editCalculatedFields, setEditCalculatedFields] = useState([]); // which fields are estimated
+    const [editCalcKwh, setEditCalcKwh]         = useState(null);   // kWh derived from data_points in edit mode
+
+    // ── Per-card lazy kWh check (card view, not edit mode) ───────────────────
+    // { [runId]: { kwh: number|null, loading: bool } }
+    const [calcKwhByRun, setCalcKwhByRun]       = useState({});
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -233,6 +238,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             setEditData(null);
             setEditDataDirty(false);
             setShowDataTable(false);
+            setEditCalcKwh(null);
         }
     };
 
@@ -243,6 +249,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setEditData(null);
         setEditDataDirty(false);
         setShowDataTable(false);
+        setEditCalcKwh(null);
     };
 
     // ── Update data (merge mode entry) ────────────────────────────────────────
@@ -266,6 +273,8 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             try {
                 const data = await dataService.getRunData(runId);
                 setEditData(data);
+                // Auto-calculate kWh for charging runs that have time + chargeRate
+                setEditCalcKwh(calcKwhFromPoints(data));
             } catch (err) {
                 console.error('Error loading run data:', err);
                 setEditData([]);
@@ -322,6 +331,37 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
     // ── Tiny rounding helper (mirrors DataService.roundField, used for estimations) ──
     const roundField = (v, dp) => (v == null || isNaN(Number(v))) ? null : Math.round(Number(v) * 10 ** dp) / 10 ** dp;
+
+    // ── kWh calculator from data_points ──────────────────────────────────────
+    // Trapezoidal integration of chargeRate (kW) over time.
+    // Time-unit auto-detection: if max time_value > 300 assume seconds, else minutes.
+    // Returns rounded kWh, or null if insufficient data.
+    const calcKwhFromPoints = (points) => {
+        const pts = points.filter(p => p.chargeRate != null && p.time != null);
+        if (pts.length < 2) return null;
+        const sorted = [...pts].sort((a, b) => a.time - b.time);
+        const maxTime = sorted[sorted.length - 1].time;
+        const toHours = maxTime > 300 ? 1 / 3600 : 1 / 60;
+        let kwh = 0;
+        for (let i = 1; i < sorted.length; i++) {
+            const dt = (sorted[i].time - sorted[i - 1].time) * toHours;
+            const avgKw = (sorted[i].chargeRate + sorted[i - 1].chargeRate) / 2;
+            if (dt > 0 && avgKw >= 0) kwh += avgKw * dt;
+        }
+        return kwh < 0.1 ? null : Math.round(kwh * 10) / 10;
+    };
+
+    // ── On-demand kWh comparison for card view (non-edit) ────────────────────
+    const handleCheckKwh = async (run) => {
+        setCalcKwhByRun(prev => ({ ...prev, [run.id]: { loading: true } }));
+        try {
+            const data = await dataService.getRunData(run.id);
+            const kwh = calcKwhFromPoints(data);
+            setCalcKwhByRun(prev => ({ ...prev, [run.id]: { kwh, loading: false } }));
+        } catch {
+            setCalcKwhByRun(prev => ({ ...prev, [run.id]: { kwh: null, loading: false, error: true } }));
+        }
+    };
 
     // ── Field tag metadata (ordered for display) ─────────────────────────────
     const FIELD_META = [
@@ -444,6 +484,24 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             className="border p-2 rounded w-full"
                                         />
 
+                                        {/* Charging energy field (create mode) */}
+                                        {runMetadata.recordType === 'charging' && (
+                                            <div className="border rounded-lg p-3 bg-gray-50">
+                                                <p className="text-sm font-semibold text-gray-700 mb-2">Charging Energy <span className="font-normal text-gray-400">(optional)</span></p>
+                                                <input
+                                                    type="number"
+                                                    placeholder="Energy added (kWh)"
+                                                    title="Energy measured at charger or vehicle — energy in"
+                                                    value={runMetadata.energyKwh}
+                                                    onChange={(e) => setRunMetadata({...runMetadata, energyKwh: e.target.value})}
+                                                    className="border p-2 rounded w-full"
+                                                />
+                                                <p className="text-xs text-gray-400 mt-1">
+                                                    Energy measured at charger or vehicle — <em>energy in</em>
+                                                </p>
+                                            </div>
+                                        )}
+
                                         {/* Range test fields */}
                                         {runMetadata.recordType === 'range' && (
                                             <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
@@ -487,7 +545,8 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                     />
                                                     <input
                                                         type="number"
-                                                        placeholder="Energy used (kWh)"
+                                                        placeholder="Energy consumed (kWh)"
+                                                        title="Energy consumed on the drive — energy out"
                                                         value={runMetadata.energyKwh}
                                                         onChange={(e) => setRunMetadata({...runMetadata, energyKwh: e.target.value})}
                                                         className="border p-2 rounded"
@@ -746,6 +805,23 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         onChange={(e) => setEditFormData({...editFormData, conditions: e.target.value})}
                                         className="border p-2 rounded w-full"
                                     />
+                                    {/* Charging energy field — shows energy_kwh for charging runs */}
+                                    {editFormData.recordType === 'charging' && (
+                                        <div className="border rounded-lg p-3 bg-gray-50">
+                                            <p className="text-sm font-semibold text-gray-700 mb-2">Charging Energy</p>
+                                            <input
+                                                type="number"
+                                                placeholder="Energy added (kWh)"
+                                                value={editFormData.energyKwh}
+                                                onChange={(e) => setEditFormData({...editFormData, energyKwh: e.target.value})}
+                                                className="border p-2 rounded w-full"
+                                            />
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                Energy measured at charger or vehicle — <em>energy in</em> (not equal to energy used driving due to charging losses)
+                                            </p>
+                                        </div>
+                                    )}
+
                                     {/* Range test fields */}
                                     {editFormData.recordType === 'range' && (
                                         <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
@@ -789,7 +865,8 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                 />
                                                 <input
                                                     type="number"
-                                                    placeholder="Energy used (kWh)"
+                                                    placeholder="Energy consumed (kWh)"
+                                                    title="Energy consumed on the drive — energy out"
                                                     value={editFormData.energyKwh}
                                                     onChange={(e) => setEditFormData({...editFormData, energyKwh: e.target.value})}
                                                     className="border p-2 rounded"
@@ -870,6 +947,35 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                     </button>
                                                 </div>
                                             )}
+                                            {/* kWh comparison — charging runs only, once data is loaded */}
+                                            {!editDataLoading && editCalcKwh != null && editFormData.recordType === 'charging' && (() => {
+                                                const manual = editFormData.energyKwh !== '' ? parseFloat(editFormData.energyKwh) : NaN;
+                                                const hasManual = !isNaN(manual) && manual > 0;
+                                                const pct = hasManual
+                                                    ? Math.abs(manual - editCalcKwh) / Math.max(manual, editCalcKwh) * 100
+                                                    : null;
+                                                return (
+                                                    <div className={`mb-3 p-3 rounded-lg border flex flex-wrap items-center gap-3 ${pct != null && pct > 5 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+                                                        <span className="text-xs text-gray-700">
+                                                            ⚡ <strong>Data points → {editCalcKwh} kWh</strong>
+                                                            {hasManual && <span className="text-gray-500"> (entered: {manual} kWh)</span>}
+                                                        </span>
+                                                        {pct != null && pct > 5 && (
+                                                            <span className="text-xs bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-medium">
+                                                                ⚠️ {pct.toFixed(1)}% mismatch
+                                                            </span>
+                                                        )}
+                                                        {pct != null && pct <= 5 && (
+                                                            <span className="text-xs bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full font-medium">
+                                                                ✓ within 5%
+                                                            </span>
+                                                        )}
+                                                        {!hasManual && (
+                                                            <span className="text-xs text-gray-400">Enter energy (kWh) above to compare</span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                             {editDataLoading ? (
                                                 <p className="text-sm text-gray-500 py-4 text-center">Loading…</p>
                                             ) : (
@@ -980,6 +1086,14 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                 {run.source && <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{run.source}</span>}
                                                 {run.speed_mph != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{run.speed_mph} mph</span>}
                                                 {run.distance_miles != null && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-200">{run.distance_miles} mi</span>}
+                                                {run.energy_kwh != null && (
+                                                    <span
+                                                        title="Energy consumed on the drive — energy out (measured at vehicle)"
+                                                        className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200"
+                                                    >
+                                                        {run.energy_kwh} kWh <span className="opacity-60 text-[10px]">out</span>
+                                                    </span>
+                                                )}
                                                 {run.energy_kwh != null && run.distance_miles != null && (
                                                     <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
                                                         {Math.round(run.distance_miles / run.energy_kwh * 100) / 100} mi/kWh
@@ -990,7 +1104,41 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                 {run.url && <a href={run.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline px-2 py-0.5 rounded">Source ↗</a>}
                                             </div>
                                         ) : (
-                                            <p>Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</p>
+                                            <div className="flex flex-wrap gap-1.5 mt-1 items-center">
+                                                <span className="text-sm">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>
+                                                {/* energy_kwh for charging = energy in (measured at charger/vehicle) */}
+                                                {run.energy_kwh != null && (
+                                                    <span
+                                                        title="Energy added during this charging session — energy in (measured at charger or vehicle)"
+                                                        className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200"
+                                                    >
+                                                        {run.energy_kwh} kWh <span className="opacity-60 text-[10px]">in</span>
+                                                    </span>
+                                                )}
+                                                {/* Lazy kWh compare button — only shown when energy_kwh is set and data exists */}
+                                                {run.energy_kwh != null && (run.dataPointCount ?? 0) > 1 && (() => {
+                                                    const check = calcKwhByRun[run.id];
+                                                    if (!check) return (
+                                                        <button
+                                                            onClick={() => handleCheckKwh(run)}
+                                                            className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 transition-colors"
+                                                            title="Calculate kWh from data points and compare to entered value"
+                                                        >
+                                                            Compare ↔
+                                                        </button>
+                                                    );
+                                                    if (check.loading) return <span className="text-xs text-gray-400">Calculating…</span>;
+                                                    if (check.error || check.kwh == null) return <span className="text-xs text-gray-400">—</span>;
+                                                    const pct = Math.abs(run.energy_kwh - check.kwh) / Math.max(run.energy_kwh, check.kwh) * 100;
+                                                    return (
+                                                        <span className={`text-xs px-2 py-0.5 rounded border font-medium ${pct > 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-green-50 text-green-700 border-green-200'}`}
+                                                            title={`Calculated from data points: ${check.kwh} kWh`}
+                                                        >
+                                                            {pct > 5 ? `⚠️ ` : `✓ `}data: {check.kwh} kWh ({pct.toFixed(1)}%)
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </div>
                                         )}
                                     </div>
                                     {/* Field tags — populated fields; amber = estimated, blue = measured */}
