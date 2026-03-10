@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
 import RangeChartView from './RangeChartView';
+import AxisScaleControls from './AxisScaleControls';
 
 export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode }) {
     const chartRef = useRef(null);
@@ -610,83 +611,11 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
             {/* ── Controls below chart: scale inputs + line toggle + race mode ── */}
             <div className="card mb-6">
 
-                {/* 2-column: Y scale | X scale — both stacked symmetrically */}
-                <div className="grid grid-cols-2 gap-8">
-
-                    {/* Left — Y-Axis Scale */}
-                    <div>
-                        <div className="flex items-baseline gap-3 mb-2">
-                            <p className="text-sm font-medium text-gray-500">Y-Axis Scale</p>
-                            {(chartConfig.yMin != null || chartConfig.yMax != null) && (
-                                <button
-                                    onClick={() => setChartConfig({ ...chartConfig, yMin: null, yMax: null })}
-                                    className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                                >
-                                    Reset
-                                </button>
-                            )}
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400 w-7 text-right">Max</span>
-                                <input
-                                    type="number"
-                                    placeholder="Auto"
-                                    value={chartConfig.yMax ?? ''}
-                                    onChange={e => setChartConfig({ ...chartConfig, yMax: e.target.value === '' ? null : Number(e.target.value) })}
-                                    className={`w-24 ${numInputCls}`}
-                                />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400 w-7 text-right">Min</span>
-                                <input
-                                    type="number"
-                                    placeholder="Auto"
-                                    value={chartConfig.yMin ?? ''}
-                                    onChange={e => setChartConfig({ ...chartConfig, yMin: e.target.value === '' ? null : Number(e.target.value) })}
-                                    className={`w-24 ${numInputCls}`}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right — X-Axis Scale */}
-                    <div>
-                        <div className="flex items-baseline gap-3 mb-2">
-                            <p className="text-sm font-medium text-gray-500">X-Axis Scale</p>
-                            {(chartConfig.xMin != null || chartConfig.xMax != null) && (
-                                <button
-                                    onClick={() => setChartConfig({ ...chartConfig, xMin: null, xMax: null })}
-                                    className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                                >
-                                    Reset
-                                </button>
-                            )}
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400 w-7 text-right">Max</span>
-                                <input
-                                    type="number"
-                                    placeholder="Auto"
-                                    value={chartConfig.xMax ?? ''}
-                                    onChange={e => setChartConfig({ ...chartConfig, xMax: e.target.value === '' ? null : Number(e.target.value) })}
-                                    className={`w-24 ${numInputCls}`}
-                                />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400 w-7 text-right">Min</span>
-                                <input
-                                    type="number"
-                                    placeholder="Auto"
-                                    value={chartConfig.xMin ?? ''}
-                                    onChange={e => setChartConfig({ ...chartConfig, xMin: e.target.value === '' ? null : Number(e.target.value) })}
-                                    className={`w-24 ${numInputCls}`}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <AxisScaleControls
+                    xMin={chartConfig.xMin} xMax={chartConfig.xMax}
+                    yMin={chartConfig.yMin} yMax={chartConfig.yMax}
+                    onChange={(key, val) => setChartConfig(prev => ({ ...prev, [key]: val }))}
+                />
 
                 {/* ── Race mode panel — only visible when X = Time ── */}
                 {chartConfig.xAxis === 'time' && (

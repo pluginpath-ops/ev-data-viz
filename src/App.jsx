@@ -54,7 +54,7 @@ export default function App() {
         raceThreshold: 10,  // % SoC at which all runs are normalised to t = 0
         xMin: null,
         xMax: null,
-        yMin: null,
+        yMin: 0,
         yMax: null,
         showLine: false,
     });
@@ -83,7 +83,7 @@ export default function App() {
             raceThreshold: p.get('rt')  ? Number(p.get('rt'))  : 10,
             xMin: p.get('xn') !== null && p.get('xn') !== '' ? Number(p.get('xn')) : null,
             xMax: p.get('xx') !== null && p.get('xx') !== '' ? Number(p.get('xx')) : null,
-            yMin: p.get('yn') !== null && p.get('yn') !== '' ? Number(p.get('yn')) : null,
+            yMin: p.get('yn') !== null && p.get('yn') !== '' ? Number(p.get('yn')) : 0,
             yMax: p.get('yx') !== null && p.get('yx') !== '' ? Number(p.get('yx')) : null,
             showLine: p.get('line') === '1',
             chartMode: p.get('m') || 'charging',
@@ -142,7 +142,7 @@ export default function App() {
         if (chartConfig.raceThreshold !== 10)     p.set('rt',   String(chartConfig.raceThreshold));
         if (chartConfig.xMin != null)             p.set('xn',   String(chartConfig.xMin));
         if (chartConfig.xMax != null)             p.set('xx',   String(chartConfig.xMax));
-        if (chartConfig.yMin != null)             p.set('yn',   String(chartConfig.yMin));
+        if (chartConfig.yMin != null && chartConfig.yMin !== 0) p.set('yn', String(chartConfig.yMin));
         if (chartConfig.yMax != null)             p.set('yx',   String(chartConfig.yMax));
         if (chartConfig.showLine)                 p.set('line', '1');
         if (chartMode !== 'charging')             p.set('m', chartMode);

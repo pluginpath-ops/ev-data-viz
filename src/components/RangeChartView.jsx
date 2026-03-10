@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
+import AxisScaleControls from './AxisScaleControls';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -52,6 +53,29 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     const [chartType, setChartType] = useState('range-vehicle-bar');
     const [effUnit,   setEffUnit]   = useState('mi_kwh'); // 'mi_kwh' | 'wh_mi'
     const [copied,    setCopied]    = useState(false);
+
+    // ── Axis scale state — yMin defaults to 0, rest auto ─────────────────────
+    const [xMin, setXMin] = useState(null);
+    const [xMax, setXMax] = useState(null);
+    const [yMin, setYMin] = useState(0);
+    const [yMax, setYMax] = useState(null);
+
+    const handleScaleChange = (key, val) => {
+        if (key === 'xMin') setXMin(val);
+        else if (key === 'xMax') setXMax(val);
+        else if (key === 'yMin') setYMin(val);
+        else if (key === 'yMax') setYMax(val);
+    };
+
+    // Reset all scale overrides (back to defaults) when switching chart types,
+    // since axis semantics change between chart types.
+    const handleChartTypeChange = (newType) => {
+        setChartType(newType);
+        setXMin(null);
+        setXMax(null);
+        setYMin(0);
+        setYMax(null);
+    };
 
     // ── Derived: all range runs across selected vehicles ──────────────────────
     const allRangeRuns = selectedVehicles.flatMap(v =>
@@ -186,10 +210,14 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         // Linear axis for line charts (numeric x); category for bar
                         type: built.kind === 'line' ? 'linear' : 'category',
                         title: { display: true, text: built.xLabel },
+                        ...(built.kind === 'line' && xMin != null ? { min: xMin } : {}),
+                        ...(built.kind === 'line' && xMax != null ? { max: xMax } : {}),
                     },
                     y: {
                         title: { display: true, text: built.yLabel },
                         beginAtZero: false,
+                        ...(yMin != null ? { min: yMin } : {}),
+                        ...(yMax != null ? { max: yMax } : {}),
                     },
                 },
             },
@@ -201,7 +229,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 chartInstance.current = null;
             }
         };
-    }, [chartType, effUnit, selectedRuns, selectedVehicles]);
+    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax]);
 
     // ── Copy chart PNG ────────────────────────────────────────────────────────
     const handleCopyImage = async () => {
@@ -246,7 +274,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     {CHART_TYPES.map(t => (
                         <button
                             key={t.key}
-                            onClick={() => setChartType(t.key)}
+                            onClick={() => handleChartTypeChange(t.key)}
                             title={t.desc}
                             className="btn text-sm"
                             style={
@@ -340,7 +368,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
             </div>
 
             {/* ── Chart card ── */}
-            <div className="card mb-4">
+            <div className="card mb-6">
                 <div style={{ height: '500px', position: 'relative' }}>
                     {/* Canvas always mounted so ref stays valid */}
                     <canvas
@@ -378,6 +406,15 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         {copied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
                     </button>
                 </div>
+            </div>
+            {/* ── Axis scale controls card ── */}
+            <div className="card mb-4">
+                <AxisScaleControls
+                    xMin={xMin} xMax={xMax}
+                    yMin={yMin} yMax={yMax}
+                    onChange={handleScaleChange}
+                    showX={CHART_TYPES.find(t => t.key === chartType)?.kind === 'line'}
+                />
             </div>
         </div>
     );
