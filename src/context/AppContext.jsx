@@ -117,9 +117,28 @@ export function AppProvider({ children }) {
     const updateRun = async (vehicleId, runId, updates) => {
         try {
             await dataService.updateRun(vehicleId, runId, updates);
+            // Convert the camelCase editFormData keys back to the snake_case keys that
+            // the rest of the UI expects (matching what Supabase returns on next load).
+            const toNum = (v) => (v === '' || v == null) ? null : Number(v);
+            const normalized = {};
+            for (const [k, v] of Object.entries(updates)) {
+                switch (k) {
+                    case 'hasCharging':     normalized.has_charging       = v;         break;
+                    case 'hasRange':        normalized.has_range          = v;         break;
+                    case 'softwareVersion': normalized.software_version   = v;         break;
+                    case 'startSoc':        normalized.start_soc          = toNum(v);  break;
+                    case 'endSoc':          normalized.end_soc            = toNum(v);  break;
+                    case 'speedMph':        normalized.speed_mph          = toNum(v);  break;
+                    case 'distanceMiles':   normalized.distance_miles     = toNum(v);  break;
+                    case 'energyKwh':       normalized.energy_kwh         = toNum(v);  break;
+                    case 'temperatureF':    normalized.temperature_f      = toNum(v);  break;
+                    case 'elevationGainFt': normalized.elevation_gain_ft  = toNum(v);  break;
+                    default:                normalized[k] = v;                         break;
+                }
+            }
             setVehicles(prev => prev.map(v =>
                 v.id === vehicleId
-                    ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, ...updates } : r) }
+                    ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, ...normalized } : r) }
                     : v
             ));
         } catch (error) {

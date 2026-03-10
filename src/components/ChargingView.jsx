@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
 import RangeChartView from './RangeChartView';
+import AxisScaleControls from './AxisScaleControls';
 
-export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode }) {
+export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode }) {
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
     const [expandedVehicles, setExpandedVehicles] = useState({});
@@ -36,15 +37,18 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
         const currentRuns = chartConfig.selectedRuns;
 
         if (mode === 'charging') {
-            const validRunIds = new Set(selectedVehicles.flatMap(v => (v.runs || []).map(r => String(r.id))));
+            // Only charging-capable runs are valid in this mode
+            const chargingRuns = selectedVehicles.flatMap(v => (v.runs || []).filter(r => r.has_charging !== false));
+            const validRunIds = new Set(chargingRuns.map(r => String(r.id)));
             const kept = currentRuns.filter(id => validRunIds.has(String(id)));
             const added = [];
             selectedVehicles.forEach(vehicle => {
-                if (!vehicle.runs?.length) return;
-                const hasRun = kept.some(id => vehicle.runs.some(r => String(r.id) === String(id)));
+                const vChargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
+                if (!vChargingRuns.length) return;
+                const hasRun = kept.some(id => vChargingRuns.some(r => String(r.id) === String(id)));
                 if (!hasRun) {
-                    const defaultRun = vehicle.runs.find(r => r.isDefault);
-                    const pick = defaultRun || [...vehicle.runs].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+                    const defaultRun = vChargingRuns.find(r => r.isDefault);
+                    const pick = defaultRun || [...vChargingRuns].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
                     if (pick) added.push(pick.id);
                 }
             });
@@ -56,7 +60,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
         } else if (mode === 'range') {
             // Collect all range-type run IDs from selected vehicles
             const allRangeIds = selectedVehicles.flatMap(v =>
-                (v.runs || []).filter(r => r.record_type === 'range').map(r => r.id)
+                (v.runs || []).filter(r => r.has_range).map(r => r.id)
             );
             const validSet = new Set(allRangeIds.map(String));
             // Drop stale IDs (runs that no longer belong to selected vehicles)
@@ -65,7 +69,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
             const keptSet = new Set(kept.map(String));
             const added = [];
             selectedVehicles.forEach(vehicle => {
-                const vRangeRuns = (vehicle.runs || []).filter(r => r.record_type === 'range');
+                const vRangeRuns = (vehicle.runs || []).filter(r => r.has_range);
                 if (!vRangeRuns.length) return;
                 const hasAny = vRangeRuns.some(r => keptSet.has(String(r.id)));
                 if (!hasAny) vRangeRuns.forEach(r => added.push(r.id));
@@ -125,9 +129,9 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
     ];
 
     const chartPresets = [
-        { name: 'Charge Rate vs SoC', x: 'soc', y: 'chargeRate' },
-        { name: 'Range vs Time', x: 'time', y: 'range' },
-        { name: 'Charge Rate vs Time', x: 'time', y: 'chargeRate' }
+        { emoji: '⚡', name: 'Charge Rate vs SoC',  x: 'soc',  y: 'chargeRate' },
+        { emoji: '🛣️', name: 'Range vs Time',         x: 'time', y: 'range'      },
+        { emoji: '⏱️', name: 'Charge Rate vs Time',  x: 'time', y: 'chargeRate' },
     ];
 
     /**
@@ -344,7 +348,7 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
             {/* ── Top card: presets, axis selectors, run selector ── */}
             <div className="card mb-6">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold">Chart Configuration</h3>
+                    <h3 className="text-lg font-bold">Chart Options — Charging Performance</h3>
                     <button
                         onClick={() => {
                             navigator.clipboard.writeText(window.location.href).then(() => {
@@ -364,15 +368,15 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
                 </div>
 
                 {/* Presets */}
-                <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="flex flex-wrap gap-2 mb-6">
                     {chartPresets.map(preset => (
                         <button
                             key={preset.name}
                             onClick={() => setChartConfig({ ...chartConfig, xAxis: preset.x, yAxis: preset.y })}
-                            className="btn"
+                            className="btn text-sm"
                             style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
                         >
-                            {preset.name}
+                            {preset.emoji} {preset.name}
                         </button>
                     ))}
                 </div>
@@ -610,83 +614,11 @@ export default function ChartView({ vehicles, selectedVehicleIds, chartConfig, s
             {/* ── Controls below chart: scale inputs + line toggle + race mode ── */}
             <div className="card mb-6">
 
-                {/* 2-column: Y scale | X scale — both stacked symmetrically */}
-                <div className="grid grid-cols-2 gap-8">
-
-                    {/* Left — Y-Axis Scale */}
-                    <div>
-                        <div className="flex items-baseline gap-3 mb-2">
-                            <p className="text-sm font-medium text-gray-500">Y-Axis Scale</p>
-                            {(chartConfig.yMin != null || chartConfig.yMax != null) && (
-                                <button
-                                    onClick={() => setChartConfig({ ...chartConfig, yMin: null, yMax: null })}
-                                    className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                                >
-                                    Reset
-                                </button>
-                            )}
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400 w-7 text-right">Max</span>
-                                <input
-                                    type="number"
-                                    placeholder="Auto"
-                                    value={chartConfig.yMax ?? ''}
-                                    onChange={e => setChartConfig({ ...chartConfig, yMax: e.target.value === '' ? null : Number(e.target.value) })}
-                                    className={`w-24 ${numInputCls}`}
-                                />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400 w-7 text-right">Min</span>
-                                <input
-                                    type="number"
-                                    placeholder="Auto"
-                                    value={chartConfig.yMin ?? ''}
-                                    onChange={e => setChartConfig({ ...chartConfig, yMin: e.target.value === '' ? null : Number(e.target.value) })}
-                                    className={`w-24 ${numInputCls}`}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right — X-Axis Scale */}
-                    <div>
-                        <div className="flex items-baseline gap-3 mb-2">
-                            <p className="text-sm font-medium text-gray-500">X-Axis Scale</p>
-                            {(chartConfig.xMin != null || chartConfig.xMax != null) && (
-                                <button
-                                    onClick={() => setChartConfig({ ...chartConfig, xMin: null, xMax: null })}
-                                    className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                                >
-                                    Reset
-                                </button>
-                            )}
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400 w-7 text-right">Max</span>
-                                <input
-                                    type="number"
-                                    placeholder="Auto"
-                                    value={chartConfig.xMax ?? ''}
-                                    onChange={e => setChartConfig({ ...chartConfig, xMax: e.target.value === '' ? null : Number(e.target.value) })}
-                                    className={`w-24 ${numInputCls}`}
-                                />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400 w-7 text-right">Min</span>
-                                <input
-                                    type="number"
-                                    placeholder="Auto"
-                                    value={chartConfig.xMin ?? ''}
-                                    onChange={e => setChartConfig({ ...chartConfig, xMin: e.target.value === '' ? null : Number(e.target.value) })}
-                                    className={`w-24 ${numInputCls}`}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <AxisScaleControls
+                    xMin={chartConfig.xMin} xMax={chartConfig.xMax}
+                    yMin={chartConfig.yMin} yMax={chartConfig.yMax}
+                    onChange={(key, val) => setChartConfig(prev => ({ ...prev, [key]: val }))}
+                />
 
                 {/* ── Race mode panel — only visible when X = Time ── */}
                 {chartConfig.xAxis === 'time' && (
