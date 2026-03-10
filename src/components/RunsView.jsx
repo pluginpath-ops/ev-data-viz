@@ -4,6 +4,30 @@ import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 
+// ── Data-type flag definitions ────────────────────────────────────────────────
+// Each flag represents a data domain that can independently be present in a run.
+// Flags are stored as an array so future types can be added without schema changes.
+const DATA_FLAGS = [
+    { key: 'charging', label: '⚡ Charging', pillStyle: 'bg-blue-100 text-blue-800 border-blue-300',   desc: 'Time-series charging data (charge rate, SoC)' },
+    { key: 'range',    label: '📏 Range',    pillStyle: 'bg-purple-100 text-purple-800 border-purple-300', desc: 'Range/efficiency test (distance, SoC, speed, efficiency)' },
+];
+
+/** Map a flags array to the record_type stored in the DB. */
+const flagsToRecordType = (flags) => {
+    const c = flags.includes('charging'), r = flags.includes('range');
+    if (c && r) return 'combined';
+    if (r) return 'range';
+    return 'charging';
+};
+
+/** Infer the flags array from a run object fetched from the DB. */
+const inferRunFlags = (run) => {
+    const rt = run?.record_type || 'charging';
+    if (rt === 'combined') return ['charging', 'range'];
+    if (rt === 'range') return ['range'];
+    return ['charging'];
+};
+
 export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onViewChart }) {
     const [showUpload, setShowUpload] = useState(false);
     const [uploadStep, setUploadStep] = useState('file');
@@ -14,7 +38,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         date: new Date().toISOString().split('T')[0],
         softwareVersion: '',
         conditions: '',
-        recordType: 'charging',
+        dataFlags: ['charging'],
         source: '',
         startSoc: '',
         endSoc: '',
@@ -65,7 +89,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', recordType: 'charging', source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', temperatureF: '', elevationGainFt: '', url: '' });
+        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', temperatureF: '', elevationGainFt: '', url: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: false });
@@ -106,8 +130,10 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     // ── Create-mode import ────────────────────────────────────────────────────
 
     const handleSaveRecord = () => {
+        const { dataFlags, ...metaRest } = runMetadata;
         const run = {
-            ...runMetadata,
+            ...metaRest,
+            recordType: flagsToRecordType(dataFlags),
             data: [],
             uploadDate: new Date().toISOString()
         };
@@ -140,8 +166,10 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             calculatedFields.push('range');
         }
 
+        const { dataFlags, ...metaRest } = runMetadata;
         const run = {
-            ...runMetadata,
+            ...metaRest,
+            recordType: flagsToRecordType(dataFlags),
             data: transformedData,
             fieldMapping,
             calculated_fields: calculatedFields,
@@ -208,7 +236,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             date: run.date,
             softwareVersion: run.softwareVersion || run.software_version || '',
             conditions: run.conditions || '',
-            recordType: run.record_type || 'charging',
+            dataFlags: inferRunFlags(run),
             source: run.source || '',
             startSoc: run.start_soc ?? '',
             endSoc: run.end_soc ?? '',
@@ -225,8 +253,13 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const handleSaveEdit = async (runId) => {
         setSavingData(true);
         try {
-            // Always save metadata (include calculated_fields so it persists)
-            onUpdateRun(runId, { ...editFormData, calculated_fields: editCalculatedFields });
+            // Convert dataFlags → recordType (DataService API) and drop the flags field
+            const { dataFlags, ...formRest } = editFormData;
+            onUpdateRun(runId, {
+                ...formRest,
+                recordType: flagsToRecordType(dataFlags),
+                calculated_fields: editCalculatedFields,
+            });
             // Save table data only if the owner made changes
             if (editDataDirty && isOwner && editData !== null) {
                 await onReplaceRunData(runId, editData.map((row, i) => ({ ...row, frame: i })));
@@ -440,21 +473,30 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                 {/* Only show metadata inputs in create mode */}
                                 {uploadMode === 'create' && (
                                     <>
-                                        {/* Record type toggle */}
-                                        <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
-                                            {[
-                                                { key: 'charging', label: 'Charging' },
-                                                { key: 'range', label: 'Range Test' },
-                                            ].map(({ key, label }) => (
-                                                <button
-                                                    key={key}
-                                                    type="button"
-                                                    onClick={() => setRunMetadata(m => ({ ...m, recordType: key }))}
-                                                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${runMetadata.recordType === key ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                                                >
-                                                    {label}
-                                                </button>
-                                            ))}
+                                        {/* Data-type flags — multi-select, at least one must remain active */}
+                                        <div>
+                                            <p className="text-xs text-gray-500 mb-1">Data types (select all that apply)</p>
+                                            <div className="flex gap-2 flex-wrap">
+                                                {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
+                                                    const active = runMetadata.dataFlags.includes(key);
+                                                    return (
+                                                        <button
+                                                            key={key}
+                                                            type="button"
+                                                            title={desc}
+                                                            onClick={() => setRunMetadata(m => {
+                                                                const next = active
+                                                                    ? m.dataFlags.filter(f => f !== key)
+                                                                    : [...m.dataFlags, key];
+                                                                return { ...m, dataFlags: next.length ? next : m.dataFlags };
+                                                            })}
+                                                            className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-gray-100 text-gray-400 border-gray-200 hover:border-gray-300'}`}
+                                                        >
+                                                            {label}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
 
                                         {/* Core metadata */}
@@ -485,7 +527,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         />
 
                                         {/* Charging energy field (create mode) */}
-                                        {runMetadata.recordType === 'charging' && (
+                                        {runMetadata.dataFlags.includes('charging') && (
                                             <div className="border rounded-lg p-3 bg-gray-50">
                                                 <p className="text-sm font-semibold text-gray-700 mb-2">Charging Energy <span className="font-normal text-gray-400">(optional)</span></p>
                                                 <input
@@ -503,7 +545,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         )}
 
                                         {/* Range test fields */}
-                                        {runMetadata.recordType === 'range' && (
+                                        {runMetadata.dataFlags.includes('range') && (
                                             <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
                                                 <p className="text-sm font-semibold text-gray-700">Range Test Details</p>
                                                 <div className="grid grid-cols-2 gap-3">
@@ -765,21 +807,31 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                             <div>
                                 <h3 className="text-lg font-bold mb-4">Edit Record</h3>
                                 <div className="space-y-3">
-                                    {/* Record type toggle */}
-                                    <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
-                                        {[
-                                            { key: 'charging', label: 'Charging' },
-                                            { key: 'range', label: 'Range Test' },
-                                        ].map(({ key, label }) => (
-                                            <button
-                                                key={key}
-                                                type="button"
-                                                onClick={() => setEditFormData(f => ({ ...f, recordType: key }))}
-                                                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${editFormData.recordType === key ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                                            >
-                                                {label}
-                                            </button>
-                                        ))}
+                                    {/* Data-type flags — multi-select, at least one must remain active */}
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-1">Data types (select all that apply)</p>
+                                        <div className="flex gap-2 flex-wrap">
+                                            {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
+                                                const active = (editFormData.dataFlags || ['charging']).includes(key);
+                                                return (
+                                                    <button
+                                                        key={key}
+                                                        type="button"
+                                                        title={desc}
+                                                        onClick={() => setEditFormData(f => {
+                                                            const cur = f.dataFlags || ['charging'];
+                                                            const next = active
+                                                                ? cur.filter(x => x !== key)
+                                                                : [...cur, key];
+                                                            return { ...f, dataFlags: next.length ? next : cur };
+                                                        })}
+                                                        className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-gray-100 text-gray-400 border-gray-200 hover:border-gray-300'}`}
+                                                    >
+                                                        {label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                     <input
                                         placeholder="Name"
@@ -806,7 +858,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         className="border p-2 rounded w-full"
                                     />
                                     {/* Charging energy field — shows energy_kwh for charging runs */}
-                                    {editFormData.recordType === 'charging' && (
+                                    {(editFormData.dataFlags || ['charging']).includes('charging') && (
                                         <div className="border rounded-lg p-3 bg-gray-50">
                                             <p className="text-sm font-semibold text-gray-700 mb-2">Charging Energy</p>
                                             <input
@@ -823,7 +875,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                     )}
 
                                     {/* Range test fields */}
-                                    {editFormData.recordType === 'range' && (
+                                    {(editFormData.dataFlags || ['charging']).includes('range') && (
                                         <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
                                             <p className="text-sm font-semibold text-gray-700">Range Test Details</p>
                                             <div className="grid grid-cols-2 gap-3">
@@ -948,7 +1000,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                 </div>
                                             )}
                                             {/* kWh comparison — charging runs only, once data is loaded */}
-                                            {!editDataLoading && editCalcKwh != null && editFormData.recordType === 'charging' && (() => {
+                                            {!editDataLoading && editCalcKwh != null && (editFormData.dataFlags || ['charging']).includes('charging') && (() => {
                                                 const manual = editFormData.energyKwh !== '' ? parseFloat(editFormData.energyKwh) : NaN;
                                                 const hasManual = !isNaN(manual) && manual > 0;
                                                 const pct = hasManual
@@ -1066,11 +1118,17 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h3 className="text-lg font-bold">{run.name}</h3>
-                                        {run.record_type === 'range' && (
-                                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium border border-purple-200">
-                                                Range Test
-                                            </span>
-                                        )}
+                                        {/* Data-type flag pills — one per active data domain */}
+                                        {inferRunFlags(run).map(key => {
+                                            const flag = DATA_FLAGS.find(f => f.key === key);
+                                            if (!flag) return null;
+                                            return (
+                                                <span key={key} title={flag.desc}
+                                                    className={`text-xs px-2 py-0.5 rounded-full font-medium border ${flag.pillStyle}`}>
+                                                    {flag.label}
+                                                </span>
+                                            );
+                                        })}
                                         {run.isDefault && (
                                             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-semibold" style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}>
                                                 Default
@@ -1081,7 +1139,8 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         <p>Date: {run.date}</p>
                                         {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
                                         {run.conditions && <p>Notes: {run.conditions}</p>}
-                                        {run.record_type === 'range' ? (
+                                        {/* Range data section — shown whenever the run has range data */}
+                                        {inferRunFlags(run).includes('range') && (
                                             <div className="flex flex-wrap gap-1.5 mt-1">
                                                 {run.source && <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{run.source}</span>}
                                                 {run.speed_mph != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{run.speed_mph} mph</span>}
@@ -1103,11 +1162,13 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                 {run.start_soc != null && run.end_soc != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">SoC {run.start_soc}→{run.end_soc}%</span>}
                                                 {run.url && <a href={run.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline px-2 py-0.5 rounded">Source ↗</a>}
                                             </div>
-                                        ) : (
+                                        )}
+                                        {/* Charging data section — shown whenever the run has time-series data */}
+                                        {inferRunFlags(run).includes('charging') && (
                                             <div className="flex flex-wrap gap-1.5 mt-1 items-center">
                                                 <span className="text-sm">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>
                                                 {/* energy_kwh for charging = energy in (measured at charger/vehicle) */}
-                                                {run.energy_kwh != null && (
+                                                {run.energy_kwh != null && !inferRunFlags(run).includes('range') && (
                                                     <span
                                                         title="Energy added during this charging session — energy in (measured at charger or vehicle)"
                                                         className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200"
@@ -1115,7 +1176,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                         {run.energy_kwh} kWh <span className="opacity-60 text-[10px]">in</span>
                                                     </span>
                                                 )}
-                                                {/* Lazy kWh compare button — only shown when energy_kwh is set and data exists */}
+                                                {/* Lazy kWh compare button — only when energy_kwh is set and data points exist */}
                                                 {run.energy_kwh != null && (run.dataPointCount ?? 0) > 1 && (() => {
                                                     const check = calcKwhByRun[run.id];
                                                     if (!check) return (
@@ -1134,7 +1195,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                         <span className={`text-xs px-2 py-0.5 rounded border font-medium ${pct > 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-green-50 text-green-700 border-green-200'}`}
                                                             title={`Calculated from data points: ${check.kwh} kWh`}
                                                         >
-                                                            {pct > 5 ? `⚠️ ` : `✓ `}data: {check.kwh} kWh ({pct.toFixed(1)}%)
+                                                            {pct > 5 ? '⚠️ ' : '✓ '}data: {check.kwh} kWh ({pct.toFixed(1)}%)
                                                         </span>
                                                     );
                                                 })()}
