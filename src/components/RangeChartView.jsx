@@ -148,21 +148,34 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
             const datasets = [];
             vehicleMap.forEach(({ name, runs }) => {
                 if (runs.length === 0) return;
+                // Include run metadata in each point so tooltip and per-point
+                // color can reference it; Chart.js ignores extra fields on {x,y}.
                 const points = runs
-                    .map(r => ({ x: isSpeed ? r.speed_mph : r.temperature_f, y: getY(r) }))
+                    .map(r => ({
+                        x:        isSpeed ? r.speed_mph : r.temperature_f,
+                        y:        getY(r),
+                        _color:   r.color   || '#3b82f6',
+                        _runName: r.name,
+                    }))
                     .filter(p => p.x != null && p.y != null)
                     .sort((a, b) => a.x - b.x);
                 if (points.length === 0) return;
-                // Line color = first run's color
-                const color = runs[0].color || '#3b82f6';
+
+                // Line stroke = first run's color; individual points use their
+                // own run color so multiple runs per vehicle are distinguishable.
+                const lineColor   = runs[0].color || '#3b82f6';
+                const pointColors = points.map(p => p._color);
+
                 datasets.push({
-                    label: name,
-                    data: points,
-                    backgroundColor: color,
-                    borderColor: color,
-                    pointRadius: 6,
-                    pointHoverRadius: 9,
-                    tension: 0.2,
+                    label:                name,
+                    data:                 points,
+                    borderColor:          lineColor,
+                    backgroundColor:      lineColor,   // legend swatch
+                    pointBackgroundColor: pointColors,
+                    pointBorderColor:     pointColors,
+                    pointRadius:          6,
+                    pointHoverRadius:     9,
+                    tension:              0.2,
                 });
             });
 
@@ -347,7 +360,12 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                 if (built.kind === 'bar') {
                                     return `${ctx.dataset.label}: ${ctx.parsed.y ?? '—'}`;
                                 }
-                                return `${ctx.dataset.label}: ${ctx.parsed.y ?? ctx.raw?.y ?? '—'}`;
+                                // For line charts, show run name if the point carries one
+                                const runName = ctx.raw?._runName;
+                                const val     = ctx.parsed.y ?? ctx.raw?.y ?? '—';
+                                return runName
+                                    ? `${runName}: ${val}`
+                                    : `${ctx.dataset.label}: ${val}`;
                             },
                         },
                     },
