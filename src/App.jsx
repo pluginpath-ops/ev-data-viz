@@ -204,7 +204,7 @@ export default function App() {
         if (chartConfig.showPoints === false)      p.set('pts',    '0');
         if (chartMode !== 'charging')             p.set('m', chartMode);
         history.replaceState({ view: 'chart', chartMode }, '', '?' + p.toString());
-    }, [view, chartConfig, selectedVehicles, chartMode]);
+    }, [view, chartConfig, selectedVehicles, chartMode, vehicles]);
 
     // Keep activeVehicle in sync with vehicles state
     const currentActiveVehicle = activeVehicle
