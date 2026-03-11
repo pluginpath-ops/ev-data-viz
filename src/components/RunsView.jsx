@@ -399,10 +399,19 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setEditDataDirty(true);
     };
 
-    // Fill null range values from SoC × rated range for the currently-loaded edit table
-    const handleEstimateRangeInEdit = () => {
-        if (!editData || !vehicle?.range) return;
-        const ratedRange = vehicle.range;
+    const handleClearColumn = (field) => {
+        setEditData(prev => prev.map(row => ({ ...row, [field]: null })));
+        setEditCalculatedFields(prev => prev.filter(f => f !== field));
+        setEditDataDirty(true);
+    };
+
+    // Fill null range values from SoC × rated range (or measured test range) for the currently-loaded edit table.
+    // source: 'epa' (default) | 'measured'
+    const handleEstimateRangeInEdit = (source = 'epa') => {
+        const ratedRange = source === 'measured' && effectiveRangeFromTest
+            ? effectiveRangeFromTest
+            : vehicle?.range;
+        if (!editData || !ratedRange) return;
         setEditData(prev => prev.map(row => ({
             ...row,
             range: row.range != null ? row.range
@@ -1143,20 +1152,30 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                     {showDataTable && (
                                         <div className="mt-3">
                                             {/* Range estimation offer — shown when range is absent but SoC exists */}
-                                            {isOwner && !editDataLoading && editData !== null && vehicle?.range &&
+                                            {isOwner && !editDataLoading && editData !== null &&
                                              editData.some(r => r.soc != null) &&
                                              editData.every(r => r.range == null) && (
-                                                <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200 flex items-center justify-between gap-4">
-                                                    <p className="text-xs text-blue-800">
-                                                        <span className="font-semibold">ℹ No range data.</span>{' '}
-                                                        Estimate from vehicle rated range ({vehicle.range} mi × SoC%)?
-                                                    </p>
-                                                    <button
-                                                        onClick={handleEstimateRangeInEdit}
-                                                        className="shrink-0 text-xs px-3 py-1 rounded border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
-                                                    >
-                                                        Estimate
-                                                    </button>
+                                                <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200">
+                                                    <p className="text-xs text-blue-800 font-semibold mb-2">ℹ No range data — estimate from SoC%:</p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {vehicle?.range && (
+                                                            <button
+                                                                onClick={() => handleEstimateRangeInEdit('epa')}
+                                                                className="text-xs px-3 py-1 rounded border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
+                                                            >
+                                                                EPA rated ({vehicle.range} mi)
+                                                            </button>
+                                                        )}
+                                                        {effectiveRangeFromTest && (
+                                                            <button
+                                                                onClick={() => handleEstimateRangeInEdit('measured')}
+                                                                className="text-xs px-3 py-1 rounded border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
+                                                                title={`From: ${selectedRangeTestRun?.name}`}
+                                                            >
+                                                                Measured ({effectiveRangeFromTest} mi effective)
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
                                             {/* kWh comparison — charging runs only, once data is loaded */}
@@ -1211,21 +1230,32 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                                                 >
                                                                                     {label}{indicator}
                                                                                 </button>
-                                                                                <button
-                                                                                    onClick={() => setEditCalculatedFields(prev =>
-                                                                                        isEst
-                                                                                            ? prev.filter(f => f !== field)
-                                                                                            : [...prev, field]
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <button
+                                                                                        onClick={() => setEditCalculatedFields(prev =>
+                                                                                            isEst
+                                                                                                ? prev.filter(f => f !== field)
+                                                                                                : [...prev, field]
+                                                                                        )}
+                                                                                        title={isEst ? 'Estimated — click to mark as actual' : 'Actual — click to mark as estimated'}
+                                                                                        className={`text-[10px] font-normal rounded px-1 leading-tight w-fit transition-colors ${
+                                                                                            isEst
+                                                                                                ? 'text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100'
+                                                                                                : 'text-green-700 bg-green-50 border border-green-200 hover:bg-green-100'
+                                                                                        }`}
+                                                                                    >
+                                                                                        {isEst ? '~est' : 'act'}
+                                                                                    </button>
+                                                                                    {isOwner && editData?.some(r => r[field] != null) && (
+                                                                                        <button
+                                                                                            onClick={() => handleClearColumn(field)}
+                                                                                            title={`Clear all ${label} values`}
+                                                                                            className="text-[10px] font-normal rounded px-1 leading-tight w-fit text-gray-400 border border-transparent hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors"
+                                                                                        >
+                                                                                            ×clr
+                                                                                        </button>
                                                                                     )}
-                                                                                    title={isEst ? 'Estimated — click to mark as actual' : 'Actual — click to mark as estimated'}
-                                                                                    className={`text-[10px] font-normal rounded px-1 leading-tight w-fit transition-colors ${
-                                                                                        isEst
-                                                                                            ? 'text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100'
-                                                                                            : 'text-green-700 bg-green-50 border border-green-200 hover:bg-green-100'
-                                                                                    }`}
-                                                                                >
-                                                                                    {isEst ? '~est' : 'act'}
-                                                                                </button>
+                                                                                </div>
                                                                             </div>
                                                                         </th>
                                                                         );
