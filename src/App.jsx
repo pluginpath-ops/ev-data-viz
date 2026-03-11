@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppContext } from './context/AppContext';
 import AuthModal from './components/AuthModal';
 import ImportTableauModal from './components/ImportTableauModal';
@@ -41,7 +41,16 @@ export default function App() {
         importTableauSessions,
         signOut,
         initializeApp,
+        appNotification,
+        clearNotification,
     } = useAppContext();
+
+    // Auto-dismiss notifications after 6 s
+    useEffect(() => {
+        if (!appNotification) return;
+        const t = setTimeout(clearNotification, 6000);
+        return () => clearTimeout(t);
+    }, [appNotification, clearNotification]);
 
     const [activeVehicle, setActiveVehicle] = useState(null);
     const [view, setView] = useState('vehicles');
@@ -435,6 +444,31 @@ export default function App() {
                     )}
                 </main>
             </div>
+
+            {/* ── Global notification banner ──────────────────────────────── */}
+            {appNotification && (
+                <div className={`fixed bottom-0 left-0 right-0 z-[60] border-t-2 shadow-2xl ${
+                    appNotification.type === 'error'
+                        ? 'bg-red-50 border-red-400'
+                        : 'bg-green-50 border-green-500'
+                }`}>
+                    <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
+                        <span className="text-xl">{appNotification.type === 'error' ? '⚠️' : '✓'}</span>
+                        <p className={`flex-1 text-sm font-medium ${
+                            appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'
+                        }`}>
+                            {appNotification.message}
+                        </p>
+                        <button
+                            onClick={clearNotification}
+                            className={`text-lg leading-none opacity-50 hover:opacity-100 transition ${
+                                appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'
+                            }`}
+                            aria-label="Dismiss"
+                        >×</button>
+                    </div>
+                </div>
+            )}
         </>
     );
 }
