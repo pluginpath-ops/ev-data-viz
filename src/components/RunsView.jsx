@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { parseCSV } from '../utils/parseCSV';
+import { parseCSV, parseCSVText } from '../utils/parseCSV';
 import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
@@ -40,6 +40,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         temperatureF: '',
         elevationGainFt: '',
         url: '',
+        chargingUrl: '',
     });
     const [editingRunId, setEditingRunId] = useState(null);
     const [editFormData, setEditFormData] = useState({});
@@ -54,7 +55,13 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
     // ── Estimation opts (import / merge step) ────────────────────────────────
     // Tracks which derived-column offers the user has accepted
-    const [estimations, setEstimations] = useState({ range: false });
+    // range: null | 'epa' | 'measured'
+    const [estimations, setEstimations] = useState({ range: null });
+
+    // ── CSV paste / headerless state ──────────────────────────────────────────
+    const [csvText, setCsvText]                       = useState('');
+    const [noHeaders, setNoHeaders]                   = useState(false);
+    const [selectedRangeTestRunId, setSelectedRangeTestRunId] = useState(null);
 
     // ── Inline data-table state (edit mode) ──────────────────────────────────
     const [editData, setEditData]               = useState(null);   // null=not fetched, []=loaded
@@ -83,41 +90,63 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', temperatureF: '', elevationGainFt: '', url: '' });
+        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', temperatureF: '', elevationGainFt: '', url: '', chargingUrl: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
-        setEstimations({ range: false });
+        setEstimations({ range: null });
         setJoinKey('soc');
         setMerging(false);
+        setCsvText('');
+        setNoHeaders(false);
     };
 
     // ── File upload ───────────────────────────────────────────────────────────
 
+    const autoMapHeaders = (headers) => {
+        const autoMapping = {};
+        headers.forEach(header => {
+            const lower = String(header).toLowerCase();
+            if (lower.includes('soc') || lower.includes('state of charge')) autoMapping.soc = header;
+            if (lower.includes('charge') && lower.includes('rate')) autoMapping.chargeRate = header;
+            if (lower.includes('time')) autoMapping.time = header;
+            if (lower.includes('range')) autoMapping.range = header;
+            if (lower.includes('temp')) autoMapping.temperature = header;
+            if (lower.includes('frame')) autoMapping.frame = header;
+        });
+        return autoMapping;
+    };
+
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
+        setCsvText(''); // clear any pasted text
         try {
-            const result = await parseCSV(file);
+            const result = await parseCSV(file, { noHeaders });
             setCsvData(result);
-
-            const headers = result.meta.fields;
-            const autoMapping = {};
-
-            headers.forEach(header => {
-                const lower = header.toLowerCase();
-                if (lower.includes('soc') || lower.includes('state of charge')) autoMapping.soc = header;
-                if (lower.includes('charge') && lower.includes('rate')) autoMapping.chargeRate = header;
-                if (lower.includes('time')) autoMapping.time = header;
-                if (lower.includes('range')) autoMapping.range = header;
-                if (lower.includes('temp')) autoMapping.temperature = header;
-                if (lower.includes('frame')) autoMapping.frame = header;
-            });
-
-            setFieldMapping(autoMapping);
+            setFieldMapping(noHeaders ? {} : autoMapHeaders(result.meta.fields));
             setUploadStep('mapping');
         } catch (error) {
             alert('Error parsing CSV: ' + error.message);
+        }
+    };
+
+    const handleCsvTextPaste = async (text) => {
+        setCsvText(text);
+        if (!text.trim()) {
+            setCsvData(null);
+            setFieldMapping({});
+            setUploadStep('file');
+            return;
+        }
+        try {
+            const result = await parseCSVText(text, { noHeaders });
+            if (result.data.length > 0) {
+                setCsvData(result);
+                setFieldMapping(noHeaders ? {} : autoMapHeaders(result.meta.fields));
+                setUploadStep('mapping');
+            }
+        } catch (error) {
+            alert('Error parsing CSV text: ' + error.message);
         }
     };
 
@@ -180,14 +209,16 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
         // Apply opted-in estimations
         const calculatedFields = [];
-        if (estimations.range && offerRangeEstimate) {
-            const ratedRange = vehicle.range;
-            transformedData = transformedData.map(row => ({
-                ...row,
-                range: row.range != null ? row.range
-                    : roundField((parseFloat(row.soc) / 100) * ratedRange, 1),
-            }));
-            calculatedFields.push('range');
+        if (estimations.range) {
+            const ratedRange = estimations.range === 'measured' ? effectiveRangeFromTest : vehicle.range;
+            if (ratedRange) {
+                transformedData = transformedData.map(row => ({
+                    ...row,
+                    range: row.range != null ? row.range
+                        : roundField((parseFloat(row.soc) / 100) * ratedRange, 1),
+                }));
+                calculatedFields.push('range');
+            }
         }
 
         const { dataFlags, ...metaRest } = runMetadata;
@@ -221,17 +252,19 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         });
 
         // Apply opted-in estimations
-        if (estimations.range && offerRangeEstimate) {
-            const ratedRange = vehicle.range;
-            transformedData = transformedData.map(row => ({
-                ...row,
-                range: row.range != null ? row.range
-                    : roundField((parseFloat(row.soc) / 100) * ratedRange, 1),
-            }));
-            // Flag range as calculated on the target run
-            const current = mergeTargetRun?.calculated_fields || [];
-            if (!current.includes('range')) {
-                onUpdateRun(mergeTargetRun.id, { ...mergeTargetRun, calculated_fields: [...current, 'range'] });
+        if (estimations.range) {
+            const ratedRange = estimations.range === 'measured' ? effectiveRangeFromTest : vehicle.range;
+            if (ratedRange) {
+                transformedData = transformedData.map(row => ({
+                    ...row,
+                    range: row.range != null ? row.range
+                        : roundField((parseFloat(row.soc) / 100) * ratedRange, 1),
+                }));
+                // Flag range as calculated on the target run
+                const current = mergeTargetRun?.calculated_fields || [];
+                if (!current.includes('range')) {
+                    onUpdateRun(mergeTargetRun.id, { ...mergeTargetRun, calculated_fields: [...current, 'range'] });
+                }
             }
         }
 
@@ -271,6 +304,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             temperatureF: run.temperature_f ?? '',
             elevationGainFt: run.elevation_gain_ft ?? '',
             url: run.url || '',
+            chargingUrl: run.charging_url || '',
         });
         setEditCalculatedFields(run.calculated_fields || []);
     };
@@ -389,6 +423,17 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     // ── Derived-column offer logic ────────────────────────────────────────────
     // Range can be estimated when: SoC is mapped, Range is NOT mapped, and vehicle has a rated range
     const offerRangeEstimate = !!fieldMapping.soc && !fieldMapping.range && !!vehicle?.range;
+
+    // Range test runs available for measured-range estimation
+    const rangeTestRuns = (vehicle?.runs ?? [])
+        .filter(r => r.has_range && r.start_soc != null && r.end_soc != null
+            && r.distance_miles > 0 && (r.start_soc - r.end_soc) > 0)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const selectedRangeTestRun = rangeTestRuns.find(r => r.id === selectedRangeTestRunId) ?? rangeTestRuns[0] ?? null;
+    const effectiveRangeFromTest = selectedRangeTestRun
+        ? Math.round(selectedRangeTestRun.distance_miles * 100 / (selectedRangeTestRun.start_soc - selectedRangeTestRun.end_soc))
+        : null;
+    const offerRangeEstimateTest = !!fieldMapping.soc && !fieldMapping.range && rangeTestRuns.length > 0;
 
     // ── Tiny rounding helper (mirrors DataService.roundField, used for estimations) ──
     const roundField = (v, dp) => (v == null || isNaN(Number(v))) ? null : Math.round(Number(v) * 10 ** dp) / 10 ** dp;
@@ -569,6 +614,13 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                 <p className="text-xs text-gray-400 mt-1">
                                                     Energy measured at charger or vehicle — <em>energy in</em>
                                                 </p>
+                                                <input
+                                                    type="url"
+                                                    placeholder="Charging source URL (optional)"
+                                                    value={runMetadata.chargingUrl}
+                                                    onChange={(e) => setRunMetadata({...runMetadata, chargingUrl: e.target.value})}
+                                                    className="border p-2 rounded w-full mt-2"
+                                                />
                                             </div>
                                         )}
 
@@ -647,17 +699,44 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         )}
                                     </>
                                 )}
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                                    <label className="cursor-pointer">
-                                        <span className="text-blue-600 font-medium">Click to upload CSV file</span>
-                                        <span className="block text-xs text-gray-400 mt-1">Optional — attach data points to this record</span>
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer mb-2">
                                         <input
-                                            type="file"
-                                            accept=".csv"
-                                            className="hidden"
-                                            onChange={handleFileUpload}
+                                            type="checkbox"
+                                            checked={noHeaders}
+                                            onChange={e => {
+                                                setNoHeaders(e.target.checked);
+                                                setCsvData(null);
+                                                setCsvText('');
+                                                setFieldMapping({});
+                                                setUploadStep('file');
+                                            }}
+                                            className="rounded"
                                         />
+                                        CSV has no header row (use column numbers)
                                     </label>
+                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                                        <label className="cursor-pointer">
+                                            <span className="text-blue-600 font-medium">Click to upload CSV file</span>
+                                            <span className="block text-xs text-gray-400 mt-1">Optional — attach data points to this record</span>
+                                            <input
+                                                type="file"
+                                                accept=".csv"
+                                                className="hidden"
+                                                onChange={handleFileUpload}
+                                            />
+                                        </label>
+                                    </div>
+                                    <div className="mt-3">
+                                        <p className="text-xs text-gray-400 mb-1">Or paste CSV text directly:</p>
+                                        <textarea
+                                            rows={4}
+                                            placeholder={"soc,chargeRate,time\n50,100,0\n80,75,15\n…"}
+                                            value={csvText}
+                                            onChange={e => handleCsvTextPaste(e.target.value)}
+                                            className="border p-2 rounded w-full text-xs font-mono resize-y"
+                                        />
+                                    </div>
                                 </div>
                                 {uploadMode === 'create' && (
                                     <div className="flex gap-2">
@@ -727,8 +806,10 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             className="border p-2 rounded flex-1"
                                         >
                                             <option value="">-- Not mapped --</option>
-                                            {availableFields.map(f => (
-                                                <option key={f} value={f}>{f}</option>
+                                            {availableFields.map((f, i) => (
+                                                <option key={f} value={f}>
+                                                    {noHeaders && f.startsWith('col_') ? `Column ${i + 1}` : f}
+                                                </option>
                                             ))}
                                         </select>
                                     </div>
@@ -736,28 +817,72 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                             </div>
 
                             {/* ── Derived-column offers ── */}
-                            {offerRangeEstimate && (
-                                <div className={`mt-5 p-4 rounded-lg border flex items-start justify-between gap-4 ${estimations.range ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
-                                    <div>
-                                        <p className={`text-sm font-semibold ${estimations.range ? 'text-green-800' : 'text-blue-800'}`}>
-                                            {estimations.range ? '✓ Range will be estimated' : 'ℹ No Range column mapped'}
-                                        </p>
-                                        <p className={`text-xs mt-0.5 ${estimations.range ? 'text-green-700' : 'text-blue-700'}`}>
-                                            {estimations.range
-                                                ? `range = SoC% × ${vehicle.range} mi for each row`
-                                                : `Estimate from vehicle rated range (${vehicle.range} mi × SoC%)?`}
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={() => setEstimations(prev => ({ ...prev, range: !prev.range }))}
-                                        className={`shrink-0 text-xs px-3 py-1 rounded border transition-colors ${
-                                            estimations.range
-                                                ? 'bg-white text-green-700 border-green-300 hover:bg-green-100'
-                                                : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                                        }`}
-                                    >
-                                        {estimations.range ? 'Undo' : 'Yes, estimate'}
-                                    </button>
+                            {(offerRangeEstimate || offerRangeEstimateTest) && (
+                                <div className="mt-5 space-y-3">
+                                    {/* Option 1: EPA rated range */}
+                                    {offerRangeEstimate && (
+                                        <div className={`p-4 rounded-lg border flex items-start justify-between gap-4 ${estimations.range === 'epa' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+                                            <div>
+                                                <p className={`text-sm font-semibold ${estimations.range === 'epa' ? 'text-green-800' : 'text-blue-800'}`}>
+                                                    {estimations.range === 'epa' ? '✓ Range will be estimated (EPA)' : 'ℹ No Range column mapped'}
+                                                </p>
+                                                <p className={`text-xs mt-0.5 ${estimations.range === 'epa' ? 'text-green-700' : 'text-blue-700'}`}>
+                                                    {estimations.range === 'epa'
+                                                        ? `range = SoC% × ${vehicle.range} mi (EPA rated)`
+                                                        : `Estimate from EPA rated range (${vehicle.range} mi × SoC%)?`}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => setEstimations(prev => ({ ...prev, range: prev.range === 'epa' ? null : 'epa' }))}
+                                                className={`shrink-0 text-xs px-3 py-1 rounded border transition-colors ${
+                                                    estimations.range === 'epa'
+                                                        ? 'bg-white text-green-700 border-green-300 hover:bg-green-100'
+                                                        : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                                                }`}
+                                            >
+                                                {estimations.range === 'epa' ? 'Undo' : 'Use EPA range'}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Option 2: Measured range from test data */}
+                                    {offerRangeEstimateTest && (
+                                        <div className={`p-4 rounded-lg border flex items-start justify-between gap-4 ${estimations.range === 'measured' ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+                                            <div className="flex-1 min-w-0">
+                                                <p className={`text-sm font-semibold ${estimations.range === 'measured' ? 'text-green-800' : 'text-amber-800'}`}>
+                                                    {estimations.range === 'measured' ? '✓ Range will be estimated (test data)' : '📏 Estimate from measured range test'}
+                                                </p>
+                                                {rangeTestRuns.length > 1 && (
+                                                    <select
+                                                        value={selectedRangeTestRunId ?? rangeTestRuns[0]?.id ?? ''}
+                                                        onChange={e => setSelectedRangeTestRunId(Number(e.target.value))}
+                                                        onClick={e => e.stopPropagation()}
+                                                        className="mt-1 border p-1 rounded text-xs w-full max-w-xs"
+                                                    >
+                                                        {rangeTestRuns.map(r => {
+                                                            const eff = Math.round(r.distance_miles * 100 / (r.start_soc - r.end_soc));
+                                                            return <option key={r.id} value={r.id}>{r.name} — {eff} mi effective</option>;
+                                                        })}
+                                                    </select>
+                                                )}
+                                                <p className={`text-xs mt-0.5 ${estimations.range === 'measured' ? 'text-green-700' : 'text-amber-700'}`}>
+                                                    {estimations.range === 'measured'
+                                                        ? `range = SoC% × ${effectiveRangeFromTest} mi (${selectedRangeTestRun?.name})`
+                                                        : `${selectedRangeTestRun?.name}: ${selectedRangeTestRun?.distance_miles} mi @ ${selectedRangeTestRun?.start_soc}→${selectedRangeTestRun?.end_soc}% SoC → ${effectiveRangeFromTest} mi effective`}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => setEstimations(prev => ({ ...prev, range: prev.range === 'measured' ? null : 'measured' }))}
+                                                className={`shrink-0 text-xs px-3 py-1 rounded border transition-colors ${
+                                                    estimations.range === 'measured'
+                                                        ? 'bg-white text-green-700 border-green-300 hover:bg-green-100'
+                                                        : 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'
+                                                }`}
+                                            >
+                                                {estimations.range === 'measured' ? 'Undo' : 'Use test data'}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -899,6 +1024,13 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             <p className="text-xs text-gray-400 mt-1">
                                                 Energy measured at charger or vehicle — <em>energy in</em> (not equal to energy used driving due to charging losses)
                                             </p>
+                                            <input
+                                                type="url"
+                                                placeholder="Charging source URL (optional)"
+                                                value={editFormData.chargingUrl ?? ''}
+                                                onChange={(e) => setEditFormData({...editFormData, chargingUrl: e.target.value})}
+                                                className="border p-2 rounded w-full mt-2"
+                                            />
                                         </div>
                                     )}
 
@@ -1212,6 +1344,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                         {run.energy_kwh} kWh <span className="opacity-60 text-[10px]">in</span>
                                                     </span>
                                                 )}
+                                                {run.charging_url && <a href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline px-2 py-0.5 rounded">Source ↗</a>}
                                                 {/* Lazy kWh compare button — only when energy_kwh is set and data points exist */}
                                                 {run.energy_kwh != null && (run.dataPointCount ?? 0) > 1 && (() => {
                                                     const check = calcKwhByRun[run.id];
@@ -1308,7 +1441,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             onClick={() => handleUpdateData(run)}
                                             className="btn btn-secondary text-sm"
                                         >
-                                            Update data…
+                                            Upload additional data
                                         </button>
                                     )}
                                     <button
