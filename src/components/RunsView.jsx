@@ -64,6 +64,8 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     const [savingData, setSavingData]           = useState(false);
     const [editCalculatedFields, setEditCalculatedFields] = useState([]); // which fields are estimated
     const [editCalcKwh, setEditCalcKwh]         = useState(null);   // kWh derived from data_points in edit mode
+    const [sortField, setSortField]             = useState(null);   // active sort column key
+    const [sortDir, setSortDir]                 = useState('asc');  // 'asc' | 'desc'
 
     // ── Per-card lazy kWh check (card view, not edit mode) ───────────────────
     // { [runId]: { kwh: number|null, loading: bool } }
@@ -134,6 +136,32 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
         resetUploadState();
     };
 
+    // Sort data points by a field, toggling direction on repeated clicks.
+    // Actually reorders editData so the new order is persisted on save.
+    const handleSortByField = (field) => {
+        const newDir = sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
+        setSortField(field);
+        setSortDir(newDir);
+        setEditData(prev => {
+            if (!prev) return prev;
+            return [...prev].sort((a, b) => {
+                const aVal = a[field] ?? (newDir === 'asc' ? Infinity : -Infinity);
+                const bVal = b[field] ?? (newDir === 'asc' ? Infinity : -Infinity);
+                return newDir === 'asc' ? aVal - bVal : bVal - aVal;
+            });
+        });
+        setEditDataDirty(true);
+    };
+
+    // Sort an array of data-point objects by time (primary) then soc (secondary).
+    // Used automatically on import to fix out-of-order CSV data.
+    const sortPointsByTime = (points) =>
+        [...points].sort((a, b) => {
+            const tA = a.time ?? Infinity, tB = b.time ?? Infinity;
+            if (tA !== tB) return tA - tB;
+            return (a.soc ?? Infinity) - (b.soc ?? Infinity);
+        });
+
     const handleImport = () => {
         if (!csvData) return;
 
@@ -146,6 +174,9 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             });
             return newRow;
         });
+
+        // Sort by time → soc so out-of-order CSV files don't create jumbled charts
+        transformedData = sortPointsByTime(transformedData);
 
         // Apply opted-in estimations
         const calculatedFields = [];
@@ -301,6 +332,8 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             try {
                 const data = await dataService.getRunData(runId);
                 setEditData(data);
+                setSortField(null);
+                setSortDir('asc');
                 // Auto-calculate kWh for charging runs that have time + chargeRate
                 setEditCalcKwh(calcKwhFromPoints(data));
             } catch (err) {
@@ -1033,11 +1066,19 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                                 <tr>
                                                                     <th className="px-2 py-1.5 text-left text-gray-500 font-medium w-8">#</th>
                                                                     {[['soc','SoC (%)'],['chargeRate','kW'],['time','Time'],['range','Range'],['temperature','Temp']].map(([field, label]) => {
-                                                                        const isEst = editCalculatedFields.includes(field);
+                                                                        const isEst      = editCalculatedFields.includes(field);
+                                                                        const isActive   = sortField === field;
+                                                                        const indicator  = isActive ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
                                                                         return (
                                                                         <th key={field} className="px-2 py-1.5 text-left text-gray-500 font-medium">
                                                                             <div className="flex flex-col gap-0.5">
-                                                                                <span>{label}</span>
+                                                                                <button
+                                                                                    onClick={() => handleSortByField(field)}
+                                                                                    title={`Sort by ${label}`}
+                                                                                    className={`text-left hover:text-gray-800 transition-colors ${isActive ? 'text-blue-600 font-semibold' : ''}`}
+                                                                                >
+                                                                                    {label}{indicator}
+                                                                                </button>
                                                                                 <button
                                                                                     onClick={() => setEditCalculatedFields(prev =>
                                                                                         isEst
