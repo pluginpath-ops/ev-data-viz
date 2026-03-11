@@ -304,13 +304,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 .filter(p => p.x != null && p.y != null);
             if (y1Points.length === 0) return [];
 
+            const showPts = chartConfig.showPoints ?? true;
+
             const result = [{
                 label:            `${run.vehicleName} - ${run.name}`,
                 data:             y1Points,
                 backgroundColor:  color,
                 borderColor:      color,
-                pointRadius:      3,
-                pointHoverRadius: 5,
+                pointRadius:      showPts ? 3 : 0,
+                pointHoverRadius: showPts ? 5 : 0,
                 showLine:         chartConfig.showLine || false,
                 tension:          0.1,
                 yAxisID:          'y',
@@ -327,8 +329,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         data:             y2Points,
                         backgroundColor:  color,
                         borderColor:      color,
-                        pointRadius:      4,
-                        pointHoverRadius: 6,
+                        pointRadius:      showPts ? 4 : 0,
+                        pointHoverRadius: showPts ? 6 : 0,
                         pointStyle:       'triangle',
                         showLine:         chartConfig.showLine || false,
                         borderDash:       chartConfig.showLine ? [6, 3] : undefined,
@@ -491,7 +493,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         </select>
                     </div>
                     <div>
-                        <label className="block font-medium mb-2">Y-Axis:</label>
+                        <label className="block font-medium mb-2">Left Axis (Y):</label>
                         <select
                             value={chartConfig.yAxis}
                             onChange={(e) => setChartConfig({ ...chartConfig, yAxis: e.target.value })}
@@ -503,7 +505,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         </select>
                     </div>
                     <div>
-                        <label className="block font-medium mb-2">Secondary Y:</label>
+                        <label className="block font-medium mb-2">Right Axis (Y2):</label>
                         <select
                             value={chartConfig.y2Axis ?? ''}
                             onChange={(e) => setChartConfig({ ...chartConfig, y2Axis: e.target.value || null })}
@@ -517,16 +519,33 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     </div>
                 </div>
 
-                {/* ── Line toggle ── */}
-                <div className="mb-4">
+                {/* ── Line / points toggles ── */}
+                <div className="flex flex-wrap gap-4 mb-4">
                     <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
                         <input
                             type="checkbox"
                             checked={chartConfig.showLine || false}
-                            onChange={e => setChartConfig({ ...chartConfig, showLine: e.target.checked })}
+                            onChange={e => {
+                                // Must keep at least one of line/points enabled
+                                if (!e.target.checked && !chartConfig.showPoints) return;
+                                setChartConfig({ ...chartConfig, showLine: e.target.checked });
+                            }}
                             className="w-4 h-4"
                         />
                         <span className="text-sm font-medium">Connect points with lines</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+                        <input
+                            type="checkbox"
+                            checked={chartConfig.showPoints ?? true}
+                            onChange={e => {
+                                // Must keep at least one of line/points enabled
+                                if (!e.target.checked && !chartConfig.showLine) return;
+                                setChartConfig({ ...chartConfig, showPoints: e.target.checked });
+                            }}
+                            className="w-4 h-4"
+                        />
+                        <span className="text-sm font-medium">Show points</span>
                     </label>
                 </div>
 

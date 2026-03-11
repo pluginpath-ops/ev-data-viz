@@ -59,6 +59,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     const [xMax, setXMax] = useState(null);
     const [yMin, setYMin] = useState(0);
     const [yMax, setYMax] = useState(null);
+    const [showPoints,       setShowPoints]       = useState(true);
     const [runsExpanded,    setRunsExpanded]    = useState(true);
     const [expandedVehicles, setExpandedVehicles] = useState({});
 
@@ -173,8 +174,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     backgroundColor:      lineColor,   // legend swatch
                     pointBackgroundColor: pointColors,
                     pointBorderColor:     pointColors,
-                    pointRadius:          6,
-                    pointHoverRadius:     9,
+                    pointRadius:          showPoints ? 6 : 0,
+                    pointHoverRadius:     showPoints ? 9 : 0,
                     tension:              0.2,
                 });
             });
@@ -394,7 +395,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 chartInstance.current = null;
             }
         };
-    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax]);
+    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints]);
 
     // ── Copy chart PNG ────────────────────────────────────────────────────────
     const handleCopyImage = async () => {
@@ -435,7 +436,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 </div>
 
                 {/* Chart type buttons */}
-                <div className="flex flex-wrap gap-2 mb-6">
+                <div className="flex flex-wrap gap-2 mb-4">
                     {CHART_TYPES.map(t => (
                         <button
                             key={t.key}
@@ -452,6 +453,21 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         </button>
                     ))}
                 </div>
+
+                {/* Show points toggle — only relevant for line charts */}
+                {CHART_TYPES.find(t => t.key === chartType)?.kind === 'line' && (
+                    <div className="mb-6">
+                        <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+                            <input
+                                type="checkbox"
+                                checked={showPoints}
+                                onChange={e => setShowPoints(e.target.checked)}
+                                className="w-4 h-4"
+                            />
+                            <span className="text-sm font-medium">Show points</span>
+                        </label>
+                    </div>
+                )}
 
                 {/* ── Run selector — collapsible, matching charging chart pattern ── */}
                 <div>

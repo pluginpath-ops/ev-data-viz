@@ -28,7 +28,7 @@ export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max
             {/* ── Y-Axis Scale ─────────────────────────────────────────────── */}
             <div>
                 <div className="flex items-baseline gap-3 mb-2">
-                    <p className="text-sm font-medium text-gray-500">Y-Axis Scale</p>
+                    <p className="text-sm font-medium text-gray-500">Left Axis Scale</p>
                     {(yMin != null || yMax != null) && (
                         <button
                             onClick={() => { onChange('yMin', null); onChange('yMax', null); }}
@@ -105,15 +105,13 @@ export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max
             {showY2 && (
                 <div>
                     <div className="flex items-baseline gap-3 mb-2">
-                        <p className="text-sm font-medium text-gray-500">Right Y Scale</p>
-                        {(y2Min != null || y2Max != null) && (
-                            <button
-                                onClick={() => { onChange('y2Min', null); onChange('y2Max', null); }}
-                                className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                            >
-                                Reset
-                            </button>
-                        )}
+                        <p className="text-sm font-medium text-gray-500">Right Axis Scale</p>
+                        <button
+                            onClick={() => { onChange('y2Min', null); onChange('y2Max', null); }}
+                            className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                        >
+                            Reset
+                        </button>
                     </div>
                     <div className="flex flex-col gap-1.5">
                         <div className="flex items-center gap-2">
