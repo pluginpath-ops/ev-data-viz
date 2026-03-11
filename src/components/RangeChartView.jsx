@@ -117,22 +117,24 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         const getY     = (run) => isRange ? calcRange(run) : calcEff(run, effUnit);
         const yLabel   = isRange ? 'Range (miles)' : effLabel;
 
-        // ── Bar: each run grouped by vehicle name ─────────────────────────────
+        // ── Bar: flat single dataset — one bar per run, vehicle grouping via plugin ─
         if (typeInfo.kind === 'bar') {
-            const vehicleNames = [...new Set(plottableRuns.map(r => r.vehicleName))];
-            const datasets = plottableRuns.map(run => ({
-                label: `${run.vehicleName} — ${run.name}`,
-                data: vehicleNames.map(v => v === run.vehicleName ? getY(run) : null),
-                backgroundColor: run.color || '#3b82f6',
-                borderColor:     run.color || '#3b82f6',
-                borderRadius: 4,
-                borderSkipped: false,
-            }));
+            const yUnit  = isRange ? 'mi' : (effUnit === 'mi_kwh' ? 'mi/kWh' : 'Wh/mi');
+            const labels = plottableRuns.map(r => r.name);
+            const datasets = [{
+                label:           yLabel,
+                data:            plottableRuns.map(r => getY(r)),
+                backgroundColor: plottableRuns.map(r => r.color || '#3b82f6'),
+                borderColor:     plottableRuns.map(r => r.color || '#3b82f6'),
+                borderRadius:    4,
+                borderSkipped:   false,
+            }];
             return {
-                kind: 'bar',
-                data: { labels: vehicleNames, datasets },
-                xLabel: 'Vehicle',
+                kind:     'bar',
+                data:     { labels, datasets },
+                xLabel:   '',
                 yLabel,
+                flatRuns: plottableRuns.map(r => ({ ...r, _yValue: getY(r), _yUnit: yUnit })),
             };
         }
 
@@ -182,19 +184,159 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         const built = buildChart();
         if (!built) return;
 
+        // ── Bar: vehicle grouping labels + speed/temp pills ───────────────────
+        const barGroupPlugin = {
+            id: 'barGroupLabels',
+            afterDraw(chart) {
+                if (!built.flatRuns?.length) return;
+                const runs   = built.flatRuns;
+                const ctx2   = chart.ctx;
+                const meta   = chart.getDatasetMeta(0);
+                const xScale = chart.scales.x;
+                const area   = chart.chartArea;
+
+                // Build consecutive vehicle groups
+                const groups = [];
+                runs.forEach((run, i) => {
+                    const last = groups[groups.length - 1];
+                    if (last && last.vehicleName === run.vehicleName) {
+                        last.endIdx = i;
+                    } else {
+                        groups.push({ vehicleName: run.vehicleName, startIdx: i, endIdx: i });
+                    }
+                });
+
+                // ── Badges inside each bar: value (bold), speed, temp ────────
+                runs.forEach((run, i) => {
+                    const bar = meta.data[i];
+                    if (!bar) return;
+
+                    const barH = bar.base - bar.y;
+                    const barW = bar.width;
+
+                    // Build ordered badge list
+                    const badges = [];
+                    if (run._yValue != null) badges.push({ text: `${run._yValue} ${run._yUnit}`, primary: true });
+                    if (run.speed_mph     != null) badges.push({ text: `${run.speed_mph} mph` });
+                    if (run.temperature_f != null) badges.push({ text: `${run.temperature_f}°F` });
+                    if (badges.length === 0) return;
+
+                    const pillH  = 15, pillPad = 5, gap = 3, topPad = 6;
+                    let drawY = bar.y + topPad;
+
+                    badges.forEach(({ text, primary }) => {
+                        // Skip if no vertical room left inside the bar
+                        if (drawY + pillH > bar.base - topPad) return;
+
+                        ctx2.save();
+                        ctx2.font = primary ? 'bold 10px sans-serif' : '9px sans-serif';
+                        const tw = ctx2.measureText(text).width;
+                        const pw = tw + pillPad * 2;
+
+                        // Skip if pill is wider than the bar
+                        if (pw > barW - 4) { ctx2.restore(); drawY += pillH + gap; return; }
+
+                        const px = bar.x - pw / 2;
+                        const rr = 3;
+
+                        // Semi-transparent dark pill — bar colour shows through
+                        ctx2.fillStyle = 'rgba(0,0,0,0.28)';
+                        ctx2.beginPath();
+                        ctx2.moveTo(px + rr, drawY);
+                        ctx2.lineTo(px + pw - rr, drawY);
+                        ctx2.quadraticCurveTo(px + pw, drawY,        px + pw, drawY + rr);
+                        ctx2.lineTo(px + pw, drawY + pillH - rr);
+                        ctx2.quadraticCurveTo(px + pw, drawY + pillH, px + pw - rr, drawY + pillH);
+                        ctx2.lineTo(px + rr, drawY + pillH);
+                        ctx2.quadraticCurveTo(px,       drawY + pillH, px,       drawY + pillH - rr);
+                        ctx2.lineTo(px, drawY + rr);
+                        ctx2.quadraticCurveTo(px, drawY, px + rr, drawY);
+                        ctx2.closePath();
+                        ctx2.fill();
+
+                        ctx2.fillStyle    = '#fff';
+                        ctx2.textAlign    = 'center';
+                        ctx2.textBaseline = 'middle';
+                        ctx2.fillText(text, bar.x, drawY + pillH / 2);
+                        ctx2.restore();
+
+                        drawY += pillH + gap;
+                    });
+                });
+
+                // ── Vehicle group labels + dashed separators below x-axis ────
+                const groupLabelY = xScale.bottom + 5;
+                groups.forEach((group, gi) => {
+                    const startBar = meta.data[group.startIdx];
+                    const endBar   = meta.data[group.endIdx];
+                    if (!startBar || !endBar) return;
+
+                    const x1 = startBar.x - startBar.width / 2;
+                    const x2 = endBar.x   + endBar.width / 2;
+                    const cx = (x1 + x2) / 2;
+
+                    // Underline spanning the group
+                    ctx2.save();
+                    ctx2.strokeStyle = 'rgba(107,114,128,0.55)';
+                    ctx2.lineWidth   = 1.5;
+                    ctx2.beginPath();
+                    ctx2.moveTo(x1 + 3, groupLabelY);
+                    ctx2.lineTo(x2 - 3, groupLabelY);
+                    ctx2.stroke();
+                    ctx2.restore();
+
+                    // Centered bold vehicle name
+                    ctx2.save();
+                    ctx2.font         = 'bold 12px sans-serif';
+                    ctx2.fillStyle    = '#374151';
+                    ctx2.textAlign    = 'center';
+                    ctx2.textBaseline = 'top';
+                    ctx2.fillText(group.vehicleName, cx, groupLabelY + 4);
+                    ctx2.restore();
+
+                    // Dashed vertical separator between groups
+                    if (gi < groups.length - 1) {
+                        const nextStartBar = meta.data[groups[gi + 1].startIdx];
+                        if (nextStartBar) {
+                            const sepX = (x2 + (nextStartBar.x - nextStartBar.width / 2)) / 2;
+                            ctx2.save();
+                            ctx2.strokeStyle = 'rgba(107,114,128,0.35)';
+                            ctx2.lineWidth   = 1;
+                            ctx2.setLineDash([5, 4]);
+                            ctx2.beginPath();
+                            ctx2.moveTo(sepX, area.top);
+                            ctx2.lineTo(sepX, area.bottom);
+                            ctx2.stroke();
+                            ctx2.restore();
+                        }
+                    }
+                });
+            },
+        };
+
         chartInstance.current = new Chart(chartRef.current.getContext('2d'), {
-            type: built.kind,
-            data: built.data,
+            type:    built.kind,
+            data:    built.data,
+            plugins: built.kind === 'bar' ? [barGroupPlugin] : [],
             options: {
+                layout: {
+                    padding: {
+                        top:    0,
+                        bottom: built.kind === 'bar' ? 55 : 0,
+                    },
+                },
                 animation: false,
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'top' },
+                    legend: { display: built.kind !== 'bar', position: 'top' },
                     tooltip: {
                         callbacks: {
                             title(items) {
-                                // For line charts show the x-axis value in the title
+                                if (built.kind === 'bar' && items.length > 0) {
+                                    const run = built.flatRuns?.[items[0].dataIndex];
+                                    return run ? `${run.name} — ${run.vehicleName}` : undefined;
+                                }
                                 if (built.kind === 'line' && items.length > 0) {
                                     const x = items[0].raw?.x ?? items[0].parsed.x;
                                     return `${built.xLabel}: ${x}`;
@@ -202,6 +344,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                 return undefined;
                             },
                             label(ctx) {
+                                if (built.kind === 'bar') {
+                                    return `${ctx.dataset.label}: ${ctx.parsed.y ?? '—'}`;
+                                }
                                 return `${ctx.dataset.label}: ${ctx.parsed.y ?? ctx.raw?.y ?? '—'}`;
                             },
                         },
@@ -209,9 +354,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 },
                 scales: {
                     x: {
-                        // Linear axis for line charts (numeric x); category for bar
-                        type: built.kind === 'line' ? 'linear' : 'category',
-                        title: { display: true, text: built.xLabel },
+                        type:  built.kind === 'line' ? 'linear' : 'category',
+                        grid:  { display: built.kind !== 'bar' },
+                        title: { display: !!built.xLabel, text: built.xLabel },
                         ...(built.kind === 'line' && xMin != null ? { min: xMin } : {}),
                         ...(built.kind === 'line' && xMax != null ? { max: xMax } : {}),
                     },

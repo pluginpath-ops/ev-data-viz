@@ -26,60 +26,94 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const chartModeRef = useRef(chartMode);
     chartModeRef.current = chartMode;
 
-    // Auto-select runs when the vehicle selection changes.
-    // Reads chartConfig.selectedRuns directly (no ref) so it always sees the
-    // current value — this is what prevents URL-restored runs from being wiped.
-    // Safe against loops: if kept+added equals current, no state update fires.
-    // Handles both charging mode (pick one default per vehicle) and range mode
-    // (pick all range-type runs for each vehicle with none selected).
+    // Tracks which vehicle IDs have already had auto-selection applied IN THE
+    // CURRENT MODE. Cleared on mode switch so entering Range (or Charging) always
+    // triggers a fresh auto-select — the old mode's runs may be entirely invalid here.
+    // - Empty on mount/mode-change → all vehicles treated as new.
+    // - Vehicle removed → evicted → re-adding it auto-selects again.
+    // - Vehicle initialized + user deselects within same mode → no forced re-add.
+    const autoSelectedRef = useRef(new Set());
+    const lastModeRef     = useRef(chartMode);
+
+    // Auto-select runs when vehicle selection, run list, or chart mode changes.
+    // chartMode is in deps so the effect fires on Charging ↔ Range tab switch.
+    // Safe against infinite loops: state update only fires when newRuns !== currentRuns.
     useEffect(() => {
-        const mode = chartModeRef.current;
+        const mode        = chartModeRef.current;
         const currentRuns = chartConfig.selectedRuns;
+        const currentVehicleIdSet = new Set(selectedVehicleIds.map(String));
+
+        // Mode switch → wipe initialized set so each vehicle gets a fresh auto-select.
+        // (Runs valid in charging mode may not exist in range mode and vice-versa.)
+        if (mode !== lastModeRef.current) {
+            autoSelectedRef.current.clear();
+            lastModeRef.current = mode;
+        }
+
+        // Evict any vehicle that left the selection so re-adding it auto-selects fresh.
+        autoSelectedRef.current.forEach(id => {
+            if (!currentVehicleIdSet.has(id)) autoSelectedRef.current.delete(id);
+        });
 
         if (mode === 'charging') {
-            // Only charging-capable runs are valid in this mode
             const chargingRuns = selectedVehicles.flatMap(v => (v.runs || []).filter(r => r.has_charging !== false));
-            const validRunIds = new Set(chargingRuns.map(r => String(r.id)));
-            const kept = currentRuns.filter(id => validRunIds.has(String(id)));
-            const added = [];
+            const validRunIds  = new Set(chargingRuns.map(r => String(r.id)));
+            const kept         = currentRuns.filter(id => validRunIds.has(String(id)));
+            const added        = [];
+
             selectedVehicles.forEach(vehicle => {
+                const vid           = String(vehicle.id);
                 const vChargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
-                if (!vChargingRuns.length) return;
+                if (!vChargingRuns.length) { autoSelectedRef.current.add(vid); return; }
+
                 const hasRun = kept.some(id => vChargingRuns.some(r => String(r.id) === String(id)));
-                if (!hasRun) {
+                if (hasRun) {
+                    // Valid run already selected (e.g. URL-restored) — mark done, keep it.
+                    autoSelectedRef.current.add(vid);
+                } else if (!autoSelectedRef.current.has(vid)) {
+                    // First time we see this vehicle with nothing selected — auto-pick default.
                     const defaultRun = vChargingRuns.find(r => r.isDefault);
                     const pick = defaultRun || [...vChargingRuns].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
                     if (pick) added.push(pick.id);
+                    autoSelectedRef.current.add(vid); // mark done (attempt made)
                 }
+                // else: vehicle already initialized, user deliberately has nothing selected — leave it.
             });
+
             const newRuns = [...kept, ...added];
             if (newRuns.join(',') !== currentRuns.join(',')) {
                 setChartConfig(prev => ({ ...prev, selectedRuns: newRuns }));
             }
 
         } else if (mode === 'range') {
-            // Collect all range-type run IDs from selected vehicles
             const allRangeIds = selectedVehicles.flatMap(v =>
                 (v.runs || []).filter(r => r.has_range).map(r => r.id)
             );
             const validSet = new Set(allRangeIds.map(String));
-            // Drop stale IDs (runs that no longer belong to selected vehicles)
-            const kept = currentRuns.filter(id => validSet.has(String(id)));
-            // For each vehicle with NO range run currently selected, auto-select all its range runs
-            const keptSet = new Set(kept.map(String));
-            const added = [];
+            const kept     = currentRuns.filter(id => validSet.has(String(id)));
+            const keptSet  = new Set(kept.map(String));
+            const added    = [];
+
             selectedVehicles.forEach(vehicle => {
+                const vid        = String(vehicle.id);
                 const vRangeRuns = (vehicle.runs || []).filter(r => r.has_range);
-                if (!vRangeRuns.length) return;
+                if (!vRangeRuns.length) { autoSelectedRef.current.add(vid); return; }
+
                 const hasAny = vRangeRuns.some(r => keptSet.has(String(r.id)));
-                if (!hasAny) vRangeRuns.forEach(r => added.push(r.id));
+                if (hasAny) {
+                    autoSelectedRef.current.add(vid);
+                } else if (!autoSelectedRef.current.has(vid)) {
+                    vRangeRuns.forEach(r => added.push(r.id));
+                    autoSelectedRef.current.add(vid);
+                }
             });
+
             const newRuns = [...kept, ...added];
             if (newRuns.join(',') !== currentRuns.join(',')) {
                 setChartConfig(prev => ({ ...prev, selectedRuns: newRuns }));
             }
         }
-    }, [selectedVehicleIds, chartConfig.selectedRuns]);
+    }, [selectedVehicleIds, chartConfig.selectedRuns, chartMode]);
 
     // Lazy-load data_points for newly selected runs
     useEffect(() => {
@@ -443,8 +477,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         <div className="space-y-4">
                             {selectedVehicles.map(vehicle => {
                                 const isExpanded = expandedVehicles[vehicle.id];
-                                const activeRuns   = vehicle.runs?.filter(r =>  chartConfig.selectedRuns.includes(r.id)) || [];
-                                const inactiveRuns = vehicle.runs?.filter(r => !chartConfig.selectedRuns.includes(r.id)) || [];
+                                // Only show runs that have charging data in charging mode
+                                const chargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
+                                const activeRuns   = chargingRuns.filter(r =>  chartConfig.selectedRuns.includes(r.id));
+                                const inactiveRuns = chargingRuns.filter(r => !chartConfig.selectedRuns.includes(r.id));
                                 const hasInactiveRuns = inactiveRuns.length > 0;
 
                                 const RunLabel = ({ run }) => {
@@ -520,7 +556,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                     className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
                                                 >
                                                     <span style={{ display: 'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                                                    <span>{isExpanded ? 'Hide' : 'Show'} all ({vehicle.runs?.length || 0})</span>
+                                                    <span>{isExpanded ? 'Hide' : 'Show'} all ({chargingRuns.length})</span>
                                                 </button>
                                             )}
                                         </div>
@@ -553,8 +589,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                 </label>
                                             ))}
 
-                                            {(!vehicle.runs || vehicle.runs.length === 0) && (
-                                                <p className="text-sm text-gray-500 italic">No runs available</p>
+                                            {chargingRuns.length === 0 && (
+                                                <p className="text-sm text-gray-500 italic">No charging test records</p>
                                             )}
                                         </div>
                                     </div>
