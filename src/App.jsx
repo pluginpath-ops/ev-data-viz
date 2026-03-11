@@ -68,8 +68,8 @@ export default function App() {
         yMax: null,
         y2Min: null,
         y2Max: null,
-        showLine:   false,
-        showPoints: true,
+        showLine:   true,
+        showPoints: false,
     });
     const handleChartModeChange = (newMode) => {
         // Push a history entry so "back" can return to the previous chart mode.
@@ -117,8 +117,8 @@ export default function App() {
             yMax:  p.get('yx')  !== null && p.get('yx')  !== '' ? Number(p.get('yx'))  : null,
             y2Min: p.get('y2n') !== null && p.get('y2n') !== '' ? Number(p.get('y2n')) : null,
             y2Max: p.get('y2x') !== null && p.get('y2x') !== '' ? Number(p.get('y2x')) : null,
-            showLine:   p.get('line') === '1',
-            showPoints: p.get('pts') !== '0',
+            showLine:   p.get('line') !== '0', // default to true if not present, false if explicitly set to 0
+            showPoints: p.get('pts') === '1', // default to false if not present, true if explicitly set to 1
             chartMode: p.get('m') || 'charging',
         };
     }, []);
@@ -169,8 +169,8 @@ export default function App() {
             yMax:          s.yMax,
             y2Min:         s.y2Min ?? null,
             y2Max:         s.y2Max ?? null,
-            showLine:   s.showLine,
-            showPoints: s.showPoints ?? true,
+            showLine:   s.showLine ?? true, // default to true if not present, false if explicitly set to 0
+            showPoints: s.showPoints ?? false, // default to false if not present, true if explicitly set to 1
         }));
         setView('chart');
     }, [loading]);
@@ -200,8 +200,8 @@ export default function App() {
         if (chartConfig.yMax != null)             p.set('yx',   String(chartConfig.yMax));
         if (chartConfig.y2Min != null)            p.set('y2n',  String(chartConfig.y2Min));
         if (chartConfig.y2Max != null)            p.set('y2x',  String(chartConfig.y2Max));
-        if (chartConfig.showLine)                  p.set('line',   '1');
-        if (chartConfig.showPoints === false)      p.set('pts',    '0');
+        if (chartConfig.showLine === false)       p.set('line',   '0'); // default to true if not present, false if explicitly set to 0
+        if (chartConfig.showPoints)               p.set('pts',    '1'); 
         if (chartMode !== 'charging')             p.set('m', chartMode);
         history.replaceState({ view: 'chart', chartMode }, '', '?' + p.toString());
     }, [view, chartConfig, selectedVehicles, chartMode, vehicles]);

@@ -304,7 +304,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 .filter(p => p.x != null && p.y != null);
             if (y1Points.length === 0) return [];
 
-            const showPts = chartConfig.showPoints ?? true;
+            const showPts = chartConfig.showPoints || false;
 
             const result = [{
                 label:            `${run.vehicleName} - ${run.name}`,
@@ -313,7 +313,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 borderColor:      color,
                 pointRadius:      showPts ? 3 : 0,
                 pointHoverRadius: showPts ? 5 : 0,
-                showLine:         chartConfig.showLine || false,
+                showLine:         chartConfig.showLine ?? true,
                 tension:          0.1,
                 yAxisID:          'y',
             }];
@@ -332,7 +332,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         pointRadius:      showPts ? 4 : 0,
                         pointHoverRadius: showPts ? 6 : 0,
                         pointStyle:       'triangle',
-                        showLine:         chartConfig.showLine || false,
+                        showLine:         chartConfig.showLine ?? true,
                         borderDash:       chartConfig.showLine ? [6, 3] : undefined,
                         tension:          0.1,
                         yAxisID:          'y2',
@@ -524,7 +524,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
                         <input
                             type="checkbox"
-                            checked={chartConfig.showLine || false}
+                            checked={chartConfig.showLine ?? true}
                             onChange={e => {
                                 // Must keep at least one of line/points enabled
                                 if (!e.target.checked && !chartConfig.showPoints) return;
@@ -537,7 +537,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
                         <input
                             type="checkbox"
-                            checked={chartConfig.showPoints ?? true}
+                            checked={chartConfig.showPoints || false}
                             onChange={e => {
                                 // Must keep at least one of line/points enabled
                                 if (!e.target.checked && !chartConfig.showLine) return;
