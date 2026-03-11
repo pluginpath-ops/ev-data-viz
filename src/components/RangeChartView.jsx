@@ -119,6 +119,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
 
         // ── Bar: flat single dataset — one bar per run, vehicle grouping via plugin ─
         if (typeInfo.kind === 'bar') {
+            const yUnit  = isRange ? 'mi' : (effUnit === 'mi_kwh' ? 'mi/kWh' : 'Wh/mi');
             const labels = plottableRuns.map(r => r.name);
             const datasets = [{
                 label:           yLabel,
@@ -133,7 +134,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 data:     { labels, datasets },
                 xLabel:   '',
                 yLabel,
-                flatRuns: plottableRuns,
+                flatRuns: plottableRuns.map(r => ({ ...r, _yValue: getY(r), _yUnit: yUnit })),
             };
         }
 
@@ -205,48 +206,61 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     }
                 });
 
-                // ── Speed/temp pills above each bar ──────────────────────────
+                // ── Badges inside each bar: value (bold), speed, temp ────────
                 runs.forEach((run, i) => {
                     const bar = meta.data[i];
                     if (!bar) return;
-                    const pills = [];
-                    if (run.speed_mph     != null) pills.push(`${run.speed_mph} mph`);
-                    if (run.temperature_f != null) pills.push(`${run.temperature_f}°F`);
-                    if (pills.length === 0) return;
 
-                    const pillH = 14, pillPad = 5, gap = 3;
-                    let nextY = bar.y - 6;
+                    const barH = bar.base - bar.y;
+                    const barW = bar.width;
 
-                    pills.forEach((text) => {
+                    // Build ordered badge list
+                    const badges = [];
+                    if (run._yValue != null) badges.push({ text: `${run._yValue} ${run._yUnit}`, primary: true });
+                    if (run.speed_mph     != null) badges.push({ text: `${run.speed_mph} mph` });
+                    if (run.temperature_f != null) badges.push({ text: `${run.temperature_f}°F` });
+                    if (badges.length === 0) return;
+
+                    const pillH  = 15, pillPad = 5, gap = 3, topPad = 6;
+                    let drawY = bar.y + topPad;
+
+                    badges.forEach(({ text, primary }) => {
+                        // Skip if no vertical room left inside the bar
+                        if (drawY + pillH > bar.base - topPad) return;
+
                         ctx2.save();
-                        ctx2.font = 'bold 9px sans-serif';
+                        ctx2.font = primary ? 'bold 10px sans-serif' : '9px sans-serif';
                         const tw = ctx2.measureText(text).width;
                         const pw = tw + pillPad * 2;
-                        const py = nextY - pillH;
+
+                        // Skip if pill is wider than the bar
+                        if (pw > barW - 4) { ctx2.restore(); drawY += pillH + gap; return; }
+
                         const px = bar.x - pw / 2;
                         const rr = 3;
 
-                        ctx2.fillStyle = 'rgba(55,65,81,0.82)';
+                        // Semi-transparent dark pill — bar colour shows through
+                        ctx2.fillStyle = 'rgba(0,0,0,0.28)';
                         ctx2.beginPath();
-                        ctx2.moveTo(px + rr, py);
-                        ctx2.lineTo(px + pw - rr, py);
-                        ctx2.quadraticCurveTo(px + pw, py,        px + pw, py + rr);
-                        ctx2.lineTo(px + pw, py + pillH - rr);
-                        ctx2.quadraticCurveTo(px + pw, py + pillH, px + pw - rr, py + pillH);
-                        ctx2.lineTo(px + rr, py + pillH);
-                        ctx2.quadraticCurveTo(px,       py + pillH, px,       py + pillH - rr);
-                        ctx2.lineTo(px, py + rr);
-                        ctx2.quadraticCurveTo(px, py, px + rr, py);
+                        ctx2.moveTo(px + rr, drawY);
+                        ctx2.lineTo(px + pw - rr, drawY);
+                        ctx2.quadraticCurveTo(px + pw, drawY,        px + pw, drawY + rr);
+                        ctx2.lineTo(px + pw, drawY + pillH - rr);
+                        ctx2.quadraticCurveTo(px + pw, drawY + pillH, px + pw - rr, drawY + pillH);
+                        ctx2.lineTo(px + rr, drawY + pillH);
+                        ctx2.quadraticCurveTo(px,       drawY + pillH, px,       drawY + pillH - rr);
+                        ctx2.lineTo(px, drawY + rr);
+                        ctx2.quadraticCurveTo(px, drawY, px + rr, drawY);
                         ctx2.closePath();
                         ctx2.fill();
 
                         ctx2.fillStyle    = '#fff';
                         ctx2.textAlign    = 'center';
                         ctx2.textBaseline = 'middle';
-                        ctx2.fillText(text, bar.x, py + pillH / 2);
+                        ctx2.fillText(text, bar.x, drawY + pillH / 2);
                         ctx2.restore();
 
-                        nextY = py - gap;
+                        drawY += pillH + gap;
                     });
                 });
 
@@ -307,7 +321,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
             options: {
                 layout: {
                     padding: {
-                        top:    built.kind === 'bar' ? 32 : 0,
+                        top:    0,
                         bottom: built.kind === 'bar' ? 55 : 0,
                     },
                 },
