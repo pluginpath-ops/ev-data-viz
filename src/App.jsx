@@ -58,6 +58,7 @@ export default function App() {
     const [chartConfig, setChartConfig] = useState({
         xAxis: 'soc',
         yAxis: 'chargeRate',
+        y2Axis: null,
         selectedRuns: [],
         raceMode: false,
         raceThreshold: 10,  // % SoC at which all runs are normalised to t = 0
@@ -65,6 +66,8 @@ export default function App() {
         xMax: null,
         yMin: 0,
         yMax: null,
+        y2Min: null,
+        y2Max: null,
         showLine: false,
     });
     const handleChartModeChange = (newMode) => {
@@ -104,12 +107,15 @@ export default function App() {
             runIds:        (p.get('r')?.split(',').filter(Boolean) || []).map(id => isNaN(Number(id)) ? id : Number(id)),
             xAxis:         p.get('x')  || null,
             yAxis:         p.get('y')  || null,
+            y2Axis:        p.get('y2') || null,
             raceMode:      p.get('race') === '1',
             raceThreshold: p.get('rt')  ? Number(p.get('rt'))  : 10,
-            xMin: p.get('xn') !== null && p.get('xn') !== '' ? Number(p.get('xn')) : null,
-            xMax: p.get('xx') !== null && p.get('xx') !== '' ? Number(p.get('xx')) : null,
-            yMin: p.get('yn') !== null && p.get('yn') !== '' ? Number(p.get('yn')) : 0,
-            yMax: p.get('yx') !== null && p.get('yx') !== '' ? Number(p.get('yx')) : null,
+            xMin:  p.get('xn')  !== null && p.get('xn')  !== '' ? Number(p.get('xn'))  : null,
+            xMax:  p.get('xx')  !== null && p.get('xx')  !== '' ? Number(p.get('xx'))  : null,
+            yMin:  p.get('yn')  !== null && p.get('yn')  !== '' ? Number(p.get('yn'))  : 0,
+            yMax:  p.get('yx')  !== null && p.get('yx')  !== '' ? Number(p.get('yx'))  : null,
+            y2Min: p.get('y2n') !== null && p.get('y2n') !== '' ? Number(p.get('y2n')) : null,
+            y2Max: p.get('y2x') !== null && p.get('y2x') !== '' ? Number(p.get('y2x')) : null,
             showLine: p.get('line') === '1',
             chartMode: p.get('m') || 'charging',
         };
@@ -151,6 +157,7 @@ export default function App() {
             ...prev,
             ...(s.xAxis         && { xAxis: s.xAxis }),
             ...(s.yAxis         && { yAxis: s.yAxis }),
+            ...(s.y2Axis        && { y2Axis: s.y2Axis }),
             ...(s.runIds.length  > 0 && s.chartMode === 'charging' && { selectedRuns: s.runIds }),
             raceMode:      s.raceMode,
             raceThreshold: s.raceThreshold,
@@ -158,6 +165,8 @@ export default function App() {
             xMax:          s.xMax,
             yMin:          s.yMin,
             yMax:          s.yMax,
+            y2Min:         s.y2Min ?? null,
+            y2Max:         s.y2Max ?? null,
             showLine:      s.showLine,
         }));
         setView('chart');
@@ -179,12 +188,15 @@ export default function App() {
         if (runlessVehicles.length > 0)           p.set('v', runlessVehicles.join(','));
         p.set('x', chartConfig.xAxis);
         p.set('y', chartConfig.yAxis);
+        if (chartConfig.y2Axis)                   p.set('y2',   chartConfig.y2Axis);
         if (chartConfig.raceMode)                 p.set('race', '1');
         if (chartConfig.raceThreshold !== 10)     p.set('rt',   String(chartConfig.raceThreshold));
         if (chartConfig.xMin != null)             p.set('xn',   String(chartConfig.xMin));
         if (chartConfig.xMax != null)             p.set('xx',   String(chartConfig.xMax));
         if (chartConfig.yMin != null && chartConfig.yMin !== 0) p.set('yn', String(chartConfig.yMin));
         if (chartConfig.yMax != null)             p.set('yx',   String(chartConfig.yMax));
+        if (chartConfig.y2Min != null)            p.set('y2n',  String(chartConfig.y2Min));
+        if (chartConfig.y2Max != null)            p.set('y2x',  String(chartConfig.y2Max));
         if (chartConfig.showLine)                 p.set('line', '1');
         if (chartMode !== 'charging')             p.set('m', chartMode);
         history.replaceState({ view: 'chart', chartMode }, '', '?' + p.toString());

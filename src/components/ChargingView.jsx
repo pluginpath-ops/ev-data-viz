@@ -153,9 +153,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
     const axisOptions = [
         { value: 'soc',        label: 'State of Charge (%)' },
+        { value: 'deltaSoc',   label: 'SoC Added (%)' },
         { value: 'chargeRate', label: 'Charge Rate (kW)' },
         { value: 'time',       label: 'Time (min)' },
         { value: 'range',      label: 'Range (mi)' },
+        { value: 'deltaRange', label: 'Range Added (mi)' },
         { value: 'temperature',label: 'Temperature' },
         { value: 'cRate',      label: 'C-Rate  (~kW ÷ battery)' },
         { value: 'rangeRate',  label: 'Range Rate (mi/min)' },
@@ -163,9 +165,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     ];
 
     const chartPresets = [
-        { emoji: '⚡', name: 'Charge Rate vs SoC',  x: 'soc',  y: 'chargeRate' },
-        { emoji: '🛣️', name: 'Range vs Time',         x: 'time', y: 'range'      },
-        { emoji: '⏱️', name: 'Charge Rate vs Time',  x: 'time', y: 'chargeRate' },
+        { emoji: '⚡', name: 'Rate vs SoC',            x: 'soc',  y: 'chargeRate', y2: null       },
+        { emoji: '🛣️', name: 'Range vs Time',           x: 'time', y: 'range',      y2: null       },
+        { emoji: '⏱️', name: 'Rate vs Time',            x: 'time', y: 'chargeRate', y2: null       },
+        { emoji: '📊', name: 'Rate + SoC vs Time',      x: 'time', y: 'chargeRate', y2: 'deltaSoc'   },
+        { emoji: '📊', name: 'Rate + Range vs Time',    x: 'time', y: 'chargeRate', y2: 'deltaRange' },
     ];
 
     /**
@@ -223,22 +227,22 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     };
 
     /**
-     * Apply the race-mode time offset transform to a run's raw data.
-     * Returns null if the run must be excluded (can't participate).
-     * vBattery / vRange are the vehicle's kWh and rated-mile values for virtual axes.
+     * Augment each data point with cumulative delta fields computed from the
+     * first valid reading in the array.  Must be called AFTER any race-mode
+     * slice so that deltas start at 0 at the session / race anchor.
      */
-    const applyRaceTransform = (rawData, vBattery, vRange) => {
-        const anchor = rawData.findIndex(p => p.soc != null && p.soc >= raceThreshold);
-        if (anchor === -1) return null;
-        const offset = rawData[anchor].time;
-        if (offset == null) return null;
-        return rawData
-            .slice(anchor)
-            .map(d => ({
-                x: Math.round((d.time - offset) * 10) / 10,
-                y: getFieldValue(d, chartConfig.yAxis, vBattery, vRange),
-            }))
-            .filter(p => p.x != null && p.y != null);
+    const augmentDeltas = (data) => {
+        const baseRange = data.find(p => p.range != null)?.range ?? null;
+        const baseSoc   = data.find(p => p.soc   != null)?.soc   ?? null;
+        return data.map(p => ({
+            ...p,
+            deltaRange: baseRange != null && p.range != null
+                ? Math.round((p.range - baseRange) * 10) / 10
+                : null,
+            deltaSoc: baseSoc != null && p.soc != null
+                ? Math.round((p.soc - baseSoc) * 10) / 10
+                : null,
+        }));
     };
 
     // ── Chart rendering ───────────────────────────────────────────────────────
@@ -271,40 +275,80 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
         const datasets = allSelectedRuns.flatMap((run) => {
             const rawData = runDataCache[run.id] ?? run.data ?? [];
+            const { vehicleBattery, vehicleRange } = run;
             const color = run.color || '#3b82f6';
 
-            let points;
+            // 1. Apply race-mode trim (slice from anchor; exclude if ineligible)
+            let workingData = rawData;
+            let timeOffset  = 0;
             if (raceActive) {
-                const transformed = applyRaceTransform(rawData, run.vehicleBattery, run.vehicleRange);
-                if (!transformed) return []; // excluded — skip this run
-                points = transformed;
-            } else {
-                const { vehicleBattery, vehicleRange } = run;
-                points = rawData
-                    .map(d => ({
-                        x: getFieldValue(d, chartConfig.xAxis, vehicleBattery, vehicleRange),
-                        y: getFieldValue(d, chartConfig.yAxis, vehicleBattery, vehicleRange),
-                    }))
-                    .filter(p => p.x != null && p.y != null);
+                const anchor = rawData.findIndex(p => p.soc != null && p.soc >= raceThreshold);
+                if (anchor === -1) return [];
+                const anchorTime = rawData[anchor].time;
+                if (anchorTime == null) return [];
+                timeOffset   = anchorTime;
+                workingData  = rawData.slice(anchor);
             }
 
-            return [{
-                label: `${run.vehicleName} - ${run.name}`,
-                data: points,
-                backgroundColor: color,
-                borderColor: color,
-                pointRadius: 3,
+            // 2. Augment with cumulative delta fields (start at 0 from first point)
+            workingData = augmentDeltas(workingData);
+
+            // 3. X value mapper
+            const getX = raceActive
+                ? (d) => (d.time != null ? Math.round((d.time - timeOffset) * 10) / 10 : null)
+                : (d) => getFieldValue(d, chartConfig.xAxis, vehicleBattery, vehicleRange);
+
+            // 4. Y1 dataset
+            const y1Points = workingData
+                .map(d => ({ x: getX(d), y: getFieldValue(d, chartConfig.yAxis, vehicleBattery, vehicleRange) }))
+                .filter(p => p.x != null && p.y != null);
+            if (y1Points.length === 0) return [];
+
+            const result = [{
+                label:            `${run.vehicleName} - ${run.name}`,
+                data:             y1Points,
+                backgroundColor:  color,
+                borderColor:      color,
+                pointRadius:      3,
                 pointHoverRadius: 5,
-                showLine: chartConfig.showLine || false,
-                tension: 0.1,
+                showLine:         chartConfig.showLine || false,
+                tension:          0.1,
+                yAxisID:          'y',
             }];
+
+            // 5. Y2 dataset (hidden from legend; dashed line + triangle points)
+            if (chartConfig.y2Axis) {
+                const y2Points = workingData
+                    .map(d => ({ x: getX(d), y: getFieldValue(d, chartConfig.y2Axis, vehicleBattery, vehicleRange) }))
+                    .filter(p => p.x != null && p.y != null);
+                if (y2Points.length > 0) {
+                    result.push({
+                        label:            `${run.vehicleName} - ${run.name} (right)`,
+                        data:             y2Points,
+                        backgroundColor:  color,
+                        borderColor:      color,
+                        pointRadius:      4,
+                        pointHoverRadius: 6,
+                        pointStyle:       'triangle',
+                        showLine:         chartConfig.showLine || false,
+                        borderDash:       chartConfig.showLine ? [6, 3] : undefined,
+                        tension:          0.1,
+                        yAxisID:          'y2',
+                    });
+                }
+            }
+
+            return result;
         });
 
-        // X axis label: update when race mode is active
-        const xLabel = raceActive
+        // Axis labels
+        const xLabel  = raceActive
             ? `Time from ${raceThreshold}% SoC (min)`
-            : (axisOptions.find(a => a.value === chartConfig.xAxis)?.label || chartConfig.xAxis);
-        const yLabel = axisOptions.find(a => a.value === chartConfig.yAxis)?.label || chartConfig.yAxis;
+            : (axisOptions.find(a => a.value === chartConfig.xAxis)?.label  || chartConfig.xAxis);
+        const yLabel  = axisOptions.find(a => a.value === chartConfig.yAxis)?.label  || chartConfig.yAxis;
+        const y2Label = chartConfig.y2Axis
+            ? (axisOptions.find(a => a.value === chartConfig.y2Axis)?.label || chartConfig.y2Axis)
+            : '';
 
         chartInstance.current = new Chart(ctx, {
             type: 'scatter',
@@ -314,7 +358,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'top' },
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            // Y2 datasets share color+style with their Y1 pair — hide duplicates
+                            filter: (item, data) => data.datasets[item.datasetIndex].yAxisID !== 'y2',
+                        },
+                    },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
@@ -333,7 +383,18 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         title: { display: true, text: yLabel },
                         ...(chartConfig.yMin != null ? { min: chartConfig.yMin } : {}),
                         ...(chartConfig.yMax != null ? { max: chartConfig.yMax } : {}),
-                    }
+                    },
+                    ...(chartConfig.y2Axis ? {
+                        y2: {
+                            type:     'linear',
+                            display:  true,
+                            position: 'right',
+                            title:    { display: true, text: y2Label },
+                            grid:     { drawOnChartArea: false },
+                            ...(chartConfig.y2Min != null ? { min: chartConfig.y2Min } : {}),
+                            ...(chartConfig.y2Max != null ? { max: chartConfig.y2Max } : {}),
+                        },
+                    } : {}),
                 }
             }
         });
@@ -406,7 +467,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     {chartPresets.map(preset => (
                         <button
                             key={preset.name}
-                            onClick={() => setChartConfig({ ...chartConfig, xAxis: preset.x, yAxis: preset.y })}
+                            onClick={() => setChartConfig({ ...chartConfig, xAxis: preset.x, yAxis: preset.y, y2Axis: preset.y2 ?? null })}
                             className="btn text-sm"
                             style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
                         >
@@ -416,7 +477,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 </div>
 
                 {/* Axis selectors */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-3 gap-4 mb-6">
                     <div>
                         <label className="block font-medium mb-2">X-Axis:</label>
                         <select
@@ -436,6 +497,19 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             onChange={(e) => setChartConfig({ ...chartConfig, yAxis: e.target.value })}
                             className="border p-2 rounded w-full"
                         >
+                            {axisOptions.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block font-medium mb-2">Secondary Y:</label>
+                        <select
+                            value={chartConfig.y2Axis ?? ''}
+                            onChange={(e) => setChartConfig({ ...chartConfig, y2Axis: e.target.value || null })}
+                            className="border p-2 rounded w-full"
+                        >
+                            <option value="">— None —</option>
                             {axisOptions.map(opt => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
                             ))}
@@ -651,9 +725,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             <div className="card mb-6">
 
                 <AxisScaleControls
-                    xMin={chartConfig.xMin} xMax={chartConfig.xMax}
-                    yMin={chartConfig.yMin} yMax={chartConfig.yMax}
+                    xMin={chartConfig.xMin}  xMax={chartConfig.xMax}
+                    yMin={chartConfig.yMin}  yMax={chartConfig.yMax}
+                    y2Min={chartConfig.y2Min} y2Max={chartConfig.y2Max}
                     onChange={(key, val) => setChartConfig(prev => ({ ...prev, [key]: val }))}
+                    showY2={!!chartConfig.y2Axis}
                 />
 
                 {/* ── Race mode panel — only visible when X = Time ── */}
