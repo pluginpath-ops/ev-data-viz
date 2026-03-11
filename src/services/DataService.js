@@ -196,6 +196,7 @@ class DataService {
       temperature_f: run.temperatureF != null && run.temperatureF !== '' ? Number(run.temperatureF) : null,
       elevation_gain_ft: run.elevationGainFt != null && run.elevationGainFt !== '' ? Number(run.elevationGainFt) : null,
       url: run.url || null,
+      charging_url: run.chargingUrl || null,
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
@@ -252,6 +253,7 @@ class DataService {
       ...(updates.temperatureF !== undefined ? { temperature_f: updates.temperatureF !== '' ? Number(updates.temperatureF) : null } : {}),
       ...(updates.elevationGainFt !== undefined ? { elevation_gain_ft: updates.elevationGainFt !== '' ? Number(updates.elevationGainFt) : null } : {}),
       ...(updates.url !== undefined ? { url: updates.url || null } : {}),
+      ...(updates.chargingUrl !== undefined ? { charging_url: updates.chargingUrl || null } : {}),
     }).eq('id', runId);
     if (error) throw error;
   }
