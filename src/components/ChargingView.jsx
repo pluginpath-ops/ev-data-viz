@@ -26,27 +26,37 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const chartModeRef = useRef(chartMode);
     chartModeRef.current = chartMode;
 
+    // Track the previous vehicle ID list so we can detect newly-added vehicles.
+    // Initialized to [] so the very first effect run treats all vehicles as new.
+    const prevVehicleIdsRef = useRef([]);
+
     // Auto-select runs when the vehicle selection changes.
-    // Reads chartConfig.selectedRuns directly (no ref) so it always sees the
-    // current value — this is what prevents URL-restored runs from being wiped.
+    // Reads chartConfig.selectedRuns directly so it always sees the current
+    // value — this prevents URL-restored runs from being wiped on initial mount.
+    // Auto-selection only fires for NEWLY ADDED vehicles; deselecting the last
+    // run for an existing vehicle is respected and not overridden.
     // Safe against loops: if kept+added equals current, no state update fires.
-    // Handles both charging mode (pick one default per vehicle) and range mode
-    // (pick all range-type runs for each vehicle with none selected).
     useEffect(() => {
-        const mode = chartModeRef.current;
+        const mode        = chartModeRef.current;
         const currentRuns = chartConfig.selectedRuns;
+
+        // Compute which vehicles just appeared in the selection list
+        const prevIds       = prevVehicleIdsRef.current;
+        const newlyAddedIds = new Set(selectedVehicleIds.filter(id => !prevIds.includes(id)));
+        prevVehicleIdsRef.current = selectedVehicleIds;
 
         if (mode === 'charging') {
             // Only charging-capable runs are valid in this mode
             const chargingRuns = selectedVehicles.flatMap(v => (v.runs || []).filter(r => r.has_charging !== false));
-            const validRunIds = new Set(chargingRuns.map(r => String(r.id)));
-            const kept = currentRuns.filter(id => validRunIds.has(String(id)));
-            const added = [];
+            const validRunIds  = new Set(chargingRuns.map(r => String(r.id)));
+            const kept         = currentRuns.filter(id => validRunIds.has(String(id)));
+            const added        = [];
             selectedVehicles.forEach(vehicle => {
                 const vChargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
                 if (!vChargingRuns.length) return;
                 const hasRun = kept.some(id => vChargingRuns.some(r => String(r.id) === String(id)));
-                if (!hasRun) {
+                // Only auto-pick a default for vehicles that were just added and have nothing kept
+                if (!hasRun && newlyAddedIds.has(vehicle.id)) {
                     const defaultRun = vChargingRuns.find(r => r.isDefault);
                     const pick = defaultRun || [...vChargingRuns].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
                     if (pick) added.push(pick.id);
@@ -64,15 +74,17 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             );
             const validSet = new Set(allRangeIds.map(String));
             // Drop stale IDs (runs that no longer belong to selected vehicles)
-            const kept = currentRuns.filter(id => validSet.has(String(id)));
-            // For each vehicle with NO range run currently selected, auto-select all its range runs
+            const kept    = currentRuns.filter(id => validSet.has(String(id)));
             const keptSet = new Set(kept.map(String));
-            const added = [];
+            const added   = [];
             selectedVehicles.forEach(vehicle => {
                 const vRangeRuns = (vehicle.runs || []).filter(r => r.has_range);
                 if (!vRangeRuns.length) return;
                 const hasAny = vRangeRuns.some(r => keptSet.has(String(r.id)));
-                if (!hasAny) vRangeRuns.forEach(r => added.push(r.id));
+                // Only auto-select all range runs for vehicles that were just added and have nothing kept
+                if (!hasAny && newlyAddedIds.has(vehicle.id)) {
+                    vRangeRuns.forEach(r => added.push(r.id));
+                }
             });
             const newRuns = [...kept, ...added];
             if (newRuns.join(',') !== currentRuns.join(',')) {

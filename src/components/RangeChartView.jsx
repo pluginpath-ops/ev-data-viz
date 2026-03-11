@@ -117,9 +117,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         const getY     = (run) => isRange ? calcRange(run) : calcEff(run, effUnit);
         const yLabel   = isRange ? 'Range (miles)' : effLabel;
 
-        // ── Bar: flat single dataset — one bar per run, two-line tick label ──────
+        // ── Bar: flat single dataset — one bar per run, vehicle grouping via plugin ─
         if (typeInfo.kind === 'bar') {
-            const labels   = plottableRuns.map(r => [r.name, r.vehicleName]);
+            const labels = plottableRuns.map(r => r.name);
             const datasets = [{
                 label:           yLabel,
                 data:            plottableRuns.map(r => getY(r)),
@@ -183,10 +183,134 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         const built = buildChart();
         if (!built) return;
 
+        // ── Bar: vehicle grouping labels + speed/temp pills ───────────────────
+        const barGroupPlugin = {
+            id: 'barGroupLabels',
+            afterDraw(chart) {
+                if (!built.flatRuns?.length) return;
+                const runs   = built.flatRuns;
+                const ctx2   = chart.ctx;
+                const meta   = chart.getDatasetMeta(0);
+                const xScale = chart.scales.x;
+                const area   = chart.chartArea;
+
+                // Build consecutive vehicle groups
+                const groups = [];
+                runs.forEach((run, i) => {
+                    const last = groups[groups.length - 1];
+                    if (last && last.vehicleName === run.vehicleName) {
+                        last.endIdx = i;
+                    } else {
+                        groups.push({ vehicleName: run.vehicleName, startIdx: i, endIdx: i });
+                    }
+                });
+
+                // ── Speed/temp pills above each bar ──────────────────────────
+                runs.forEach((run, i) => {
+                    const bar = meta.data[i];
+                    if (!bar) return;
+                    const pills = [];
+                    if (run.speed_mph     != null) pills.push(`${run.speed_mph} mph`);
+                    if (run.temperature_f != null) pills.push(`${run.temperature_f}°F`);
+                    if (pills.length === 0) return;
+
+                    const pillH = 14, pillPad = 5, gap = 3;
+                    let nextY = bar.y - 6;
+
+                    pills.forEach((text) => {
+                        ctx2.save();
+                        ctx2.font = 'bold 9px sans-serif';
+                        const tw = ctx2.measureText(text).width;
+                        const pw = tw + pillPad * 2;
+                        const py = nextY - pillH;
+                        const px = bar.x - pw / 2;
+                        const rr = 3;
+
+                        ctx2.fillStyle = 'rgba(55,65,81,0.82)';
+                        ctx2.beginPath();
+                        ctx2.moveTo(px + rr, py);
+                        ctx2.lineTo(px + pw - rr, py);
+                        ctx2.quadraticCurveTo(px + pw, py,        px + pw, py + rr);
+                        ctx2.lineTo(px + pw, py + pillH - rr);
+                        ctx2.quadraticCurveTo(px + pw, py + pillH, px + pw - rr, py + pillH);
+                        ctx2.lineTo(px + rr, py + pillH);
+                        ctx2.quadraticCurveTo(px,       py + pillH, px,       py + pillH - rr);
+                        ctx2.lineTo(px, py + rr);
+                        ctx2.quadraticCurveTo(px, py, px + rr, py);
+                        ctx2.closePath();
+                        ctx2.fill();
+
+                        ctx2.fillStyle    = '#fff';
+                        ctx2.textAlign    = 'center';
+                        ctx2.textBaseline = 'middle';
+                        ctx2.fillText(text, bar.x, py + pillH / 2);
+                        ctx2.restore();
+
+                        nextY = py - gap;
+                    });
+                });
+
+                // ── Vehicle group labels + dashed separators below x-axis ────
+                const groupLabelY = xScale.bottom + 5;
+                groups.forEach((group, gi) => {
+                    const startBar = meta.data[group.startIdx];
+                    const endBar   = meta.data[group.endIdx];
+                    if (!startBar || !endBar) return;
+
+                    const x1 = startBar.x - startBar.width / 2;
+                    const x2 = endBar.x   + endBar.width / 2;
+                    const cx = (x1 + x2) / 2;
+
+                    // Underline spanning the group
+                    ctx2.save();
+                    ctx2.strokeStyle = 'rgba(107,114,128,0.55)';
+                    ctx2.lineWidth   = 1.5;
+                    ctx2.beginPath();
+                    ctx2.moveTo(x1 + 3, groupLabelY);
+                    ctx2.lineTo(x2 - 3, groupLabelY);
+                    ctx2.stroke();
+                    ctx2.restore();
+
+                    // Centered bold vehicle name
+                    ctx2.save();
+                    ctx2.font         = 'bold 12px sans-serif';
+                    ctx2.fillStyle    = '#374151';
+                    ctx2.textAlign    = 'center';
+                    ctx2.textBaseline = 'top';
+                    ctx2.fillText(group.vehicleName, cx, groupLabelY + 4);
+                    ctx2.restore();
+
+                    // Dashed vertical separator between groups
+                    if (gi < groups.length - 1) {
+                        const nextStartBar = meta.data[groups[gi + 1].startIdx];
+                        if (nextStartBar) {
+                            const sepX = (x2 + (nextStartBar.x - nextStartBar.width / 2)) / 2;
+                            ctx2.save();
+                            ctx2.strokeStyle = 'rgba(107,114,128,0.35)';
+                            ctx2.lineWidth   = 1;
+                            ctx2.setLineDash([5, 4]);
+                            ctx2.beginPath();
+                            ctx2.moveTo(sepX, area.top);
+                            ctx2.lineTo(sepX, area.bottom);
+                            ctx2.stroke();
+                            ctx2.restore();
+                        }
+                    }
+                });
+            },
+        };
+
         chartInstance.current = new Chart(chartRef.current.getContext('2d'), {
-            type: built.kind,
-            data: built.data,
+            type:    built.kind,
+            data:    built.data,
+            plugins: built.kind === 'bar' ? [barGroupPlugin] : [],
             options: {
+                layout: {
+                    padding: {
+                        top:    built.kind === 'bar' ? 32 : 0,
+                        bottom: built.kind === 'bar' ? 55 : 0,
+                    },
+                },
                 animation: false,
                 responsive: true,
                 maintainAspectRatio: false,
@@ -196,11 +320,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         callbacks: {
                             title(items) {
                                 if (built.kind === 'bar' && items.length > 0) {
-                                    // Show "RunName — VehicleName" in the tooltip title
                                     const run = built.flatRuns?.[items[0].dataIndex];
                                     return run ? `${run.name} — ${run.vehicleName}` : undefined;
                                 }
-                                // For line charts show the x-axis value in the title
                                 if (built.kind === 'line' && items.length > 0) {
                                     const x = items[0].raw?.x ?? items[0].parsed.x;
                                     return `${built.xLabel}: ${x}`;
@@ -218,8 +340,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 },
                 scales: {
                     x: {
-                        // Linear axis for line charts (numeric x); category for bar
-                        type: built.kind === 'line' ? 'linear' : 'category',
+                        type:  built.kind === 'line' ? 'linear' : 'category',
+                        grid:  { display: built.kind !== 'bar' },
                         title: { display: !!built.xLabel, text: built.xLabel },
                         ...(built.kind === 'line' && xMin != null ? { min: xMin } : {}),
                         ...(built.kind === 'line' && xMax != null ? { max: xMax } : {}),
