@@ -26,19 +26,29 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const chartModeRef = useRef(chartMode);
     chartModeRef.current = chartMode;
 
-    // Tracks which vehicle IDs have already had auto-selection applied.
-    // - Empty Set on mount → all currently-selected vehicles are treated as new on first load.
-    // - When a vehicle leaves the selection its entry is evicted → re-adding it triggers
-    //   auto-selection again (the remove-then-readd case the user expects).
-    // - Once a vehicle is marked, user-driven deselects are respected (no forced re-add).
+    // Tracks which vehicle IDs have already had auto-selection applied IN THE
+    // CURRENT MODE. Cleared on mode switch so entering Range (or Charging) always
+    // triggers a fresh auto-select — the old mode's runs may be entirely invalid here.
+    // - Empty on mount/mode-change → all vehicles treated as new.
+    // - Vehicle removed → evicted → re-adding it auto-selects again.
+    // - Vehicle initialized + user deselects within same mode → no forced re-add.
     const autoSelectedRef = useRef(new Set());
+    const lastModeRef     = useRef(chartMode);
 
-    // Auto-select runs when the vehicle selection or run list changes.
+    // Auto-select runs when vehicle selection, run list, or chart mode changes.
+    // chartMode is in deps so the effect fires on Charging ↔ Range tab switch.
     // Safe against infinite loops: state update only fires when newRuns !== currentRuns.
     useEffect(() => {
         const mode        = chartModeRef.current;
         const currentRuns = chartConfig.selectedRuns;
         const currentVehicleIdSet = new Set(selectedVehicleIds.map(String));
+
+        // Mode switch → wipe initialized set so each vehicle gets a fresh auto-select.
+        // (Runs valid in charging mode may not exist in range mode and vice-versa.)
+        if (mode !== lastModeRef.current) {
+            autoSelectedRef.current.clear();
+            lastModeRef.current = mode;
+        }
 
         // Evict any vehicle that left the selection so re-adding it auto-selects fresh.
         autoSelectedRef.current.forEach(id => {
@@ -103,7 +113,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 setChartConfig(prev => ({ ...prev, selectedRuns: newRuns }));
             }
         }
-    }, [selectedVehicleIds, chartConfig.selectedRuns]);
+    }, [selectedVehicleIds, chartConfig.selectedRuns, chartMode]);
 
     // Lazy-load data_points for newly selected runs
     useEffect(() => {
