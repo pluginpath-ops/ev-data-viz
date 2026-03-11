@@ -527,7 +527,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                                         onChange={(e) => { e.stopPropagation(); onUpdateRunColor(vehicle.id, run.id, e.target.value); }}
                                                         onBlur={(e) => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRunColor(vehicle.id, run.id, run.color || '#3b82f6'); }}
                                                         onClick={(e) => e.stopPropagation()}
-                                                        className="w-20 px-2 py-0.5 border rounded text-xs font-mono shrink-0"
+                                                        className="hidden w-20 px-2 py-0.5 border rounded text-xs font-mono shrink-0"
                                                         placeholder="#3b82f6"
                                                         maxLength={7}
                                                     />

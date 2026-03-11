@@ -632,7 +632,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                 }
                                             }}
                                             onClick={(e) => e.stopPropagation()}
-                                            className="w-20 px-2 py-0.5 border rounded text-xs font-mono"
+                                            className="hidden w-20 px-2 py-0.5 border rounded text-xs font-mono"
                                             placeholder="#3b82f6"
                                             maxLength={7}
                                         />
