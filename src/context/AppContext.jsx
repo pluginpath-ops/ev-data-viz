@@ -11,6 +11,11 @@ export function AppProvider({ children }) {
     const [isOwner, setIsOwner] = useState(false);
     const [loading, setLoading] = useState(true);
     const [headerImageUrl, setHeaderImageUrl] = useState('');
+    const [appNotification, setAppNotification] = useState(null); // { message, type: 'error'|'success' }
+
+    const showError   = (message) => setAppNotification({ message, type: 'error' });
+    const showSuccess = (message) => setAppNotification({ message, type: 'success' });
+    const clearNotification = () => setAppNotification(null);
 
     useEffect(() => {
         initializeApp();
@@ -65,7 +70,7 @@ export function AppProvider({ children }) {
             const newVehicle = await dataService.addVehicle(vehicle);
             setVehicles(prev => [...prev, newVehicle]);
         } catch (error) {
-            alert('Error adding vehicle: ' + error.message);
+            showError('Error adding vehicle: ' + error.message);
         }
     };
 
@@ -74,7 +79,7 @@ export function AppProvider({ children }) {
             await dataService.updateVehicle(vehicleId, updates);
             setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, ...updates } : v));
         } catch (error) {
-            alert('Error updating vehicle: ' + error.message);
+            showError('Error updating vehicle: ' + error.message);
         }
     };
 
@@ -86,7 +91,7 @@ export function AppProvider({ children }) {
                 return u ? { ...v, sort_order: u.sort_order } : v;
             }));
         } catch (error) {
-            alert('Error reordering vehicles: ' + error.message);
+            showError('Error reordering vehicles: ' + error.message);
         }
     };
 
@@ -96,7 +101,7 @@ export function AppProvider({ children }) {
             setVehicles(prev => prev.filter(v => v.id !== vehicleId));
             setSelectedVehicles(prev => prev.filter(id => id !== vehicleId));
         } catch (error) {
-            alert('Error deleting vehicle: ' + error.message);
+            showError('Error deleting vehicle: ' + error.message);
         }
     };
 
@@ -110,7 +115,7 @@ export function AppProvider({ children }) {
             ));
             return vehicleId;
         } catch (error) {
-            alert('Error adding run: ' + error.message);
+            showError('Error adding run: ' + error.message);
         }
     };
 
@@ -142,7 +147,7 @@ export function AppProvider({ children }) {
                     : v
             ));
         } catch (error) {
-            alert('Error updating run: ' + error.message);
+            showError('Error updating run: ' + error.message);
         }
     };
 
@@ -161,7 +166,7 @@ export function AppProvider({ children }) {
                     : v
             ));
         } catch (error) {
-            alert('Error setting default run: ' + error.message);
+            showError('Error setting default run: ' + error.message);
         }
     };
 
@@ -174,7 +179,7 @@ export function AppProvider({ children }) {
                     : v
             ));
         } catch (error) {
-            console.error('Error updating color:', error);
+            showError('Error updating run color: ' + error.message);
         }
     };
 
@@ -187,7 +192,7 @@ export function AppProvider({ children }) {
                     : v
             ));
         } catch (error) {
-            alert('Error deleting run: ' + error.message);
+            showError('Error deleting run: ' + error.message);
         }
     };
 
@@ -204,7 +209,7 @@ export function AppProvider({ children }) {
             ));
             return result;
         } catch (error) {
-            alert('Error saving data: ' + error.message);
+            showError('Error saving data: ' + error.message);
             throw error;
         }
     };
@@ -224,7 +229,7 @@ export function AppProvider({ children }) {
             }
             return result;
         } catch (error) {
-            alert('Error updating run data: ' + error.message);
+            showError('Error updating run data: ' + error.message);
             throw error; // re-throw so the caller knows it failed
         }
     };
@@ -307,13 +312,13 @@ export function AppProvider({ children }) {
                     const dupNote = suspectedDupLines.length > 0
                         ? ` ${suspectedDupLines.length} suspected duplicate(s) ${addDups ? 'added' : 'skipped'}.`
                         : '';
-                    alert(`Import complete: ${vehiclesImported} new vehicle(s), ${runsImported} run(s) added.${dupNote}`);
+                    showSuccess(`Import complete: ${vehiclesImported} new vehicle(s), ${runsImported} run(s) added.${dupNote}`);
                 } else {
                     setVehicles(vehiclesToImport);
-                    alert('Data imported successfully!');
+                    showSuccess('Data imported successfully!');
                 }
             } catch (error) {
-                alert('Error importing data: ' + error.message);
+                showError('Error importing data: ' + error.message);
             }
         };
         reader.readAsText(file);
@@ -328,7 +333,7 @@ export function AppProvider({ children }) {
             const message = error.message?.includes('row-level security')
                 ? 'Only vehicle owners can create tags.'
                 : 'Error creating tag: ' + error.message;
-            alert(message);
+            showError(message);
         }
     };
 
@@ -338,7 +343,7 @@ export function AppProvider({ children }) {
             const vehicleTags = tags.filter(t => tagIds.includes(t.id));
             setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, tags: vehicleTags } : v));
         } catch (error) {
-            alert('Error updating tags: ' + error.message);
+            showError('Error updating tags: ' + error.message);
         }
     };
 
@@ -348,7 +353,7 @@ export function AppProvider({ children }) {
             setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, image_url: imageUrl } : v));
             return imageUrl;
         } catch (error) {
-            alert('Error uploading image: ' + error.message);
+            showError('Error uploading image: ' + error.message);
         }
     };
 
@@ -358,7 +363,7 @@ export function AppProvider({ children }) {
             // Only update UI after confirmed DB write
             setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, visibility: newVisibility } : v));
         } catch (error) {
-            alert('Error updating visibility: ' + error.message);
+            showError('Error updating visibility: ' + error.message);
             // Re-sync from DB so the UI doesn't show stale state
             await initializeApp();
         }
@@ -370,7 +375,7 @@ export function AppProvider({ children }) {
             setHeaderImageUrl(url);
             return url;
         } catch (error) {
-            alert('Error uploading header image: ' + error.message);
+            showError('Error uploading header image: ' + error.message);
         }
     };
 
@@ -396,6 +401,8 @@ export function AppProvider({ children }) {
         isOwner,
         loading,
         headerImageUrl,
+        appNotification,
+        clearNotification,
         uploadHeaderImage,
         toggleVehicleSelection,
         removeVehicleSelection,
