@@ -68,9 +68,25 @@ export default function App() {
         showLine: false,
     });
     const handleChartModeChange = (newMode) => {
+        // Push a history entry so "back" can return to the previous chart mode.
+        history.pushState(
+            { view: 'chart', chartMode: newMode },
+            '',
+            `?tab=chart&m=${newMode}`,   // URL sync effect will replaceState with full params
+        );
         setChartMode(newMode);
         setChartConfig(prev => ({ ...prev, selectedRuns: [] }));
     };
+
+    // Navigate to a new top-level view and push a browser history entry so the
+    // back button works within the app instead of exiting to the auth page.
+    const navigateTo = useCallback((newView) => {
+        const url = newView === 'chart'
+            ? (window.location.search.includes('tab=chart') ? window.location.search : '?tab=chart')
+            : `?tab=${newView}`;
+        history.pushState({ view: newView, chartMode }, '', url);
+        setView(newView);
+    }, [chartMode]);
 
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [showImportMenu, setShowImportMenu] = useState(false);
@@ -98,6 +114,22 @@ export default function App() {
             chartMode: p.get('m') || 'charging',
         };
     }, []);
+
+    // ── Handle browser back/forward ─────────────────────────────────────────
+    useEffect(() => {
+        const onPopState = (e) => {
+            // Only act on history entries we created (they carry a state object).
+            // If state is null the user has navigated outside our app — let the
+            // browser handle it naturally.
+            if (!e.state?.view) return;
+            setView(e.state.view);
+            // Restore chart mode without clearing runs — auto-select re-initialises
+            // them for the restored mode automatically.
+            if (e.state.chartMode) setChartMode(e.state.chartMode);
+        };
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+    }, []); // setState setters are stable — no deps needed
 
     // ── Apply pending URL state once data has loaded ────────────────────────
     useEffect(() => {
@@ -155,7 +187,7 @@ export default function App() {
         if (chartConfig.yMax != null)             p.set('yx',   String(chartConfig.yMax));
         if (chartConfig.showLine)                 p.set('line', '1');
         if (chartMode !== 'charging')             p.set('m', chartMode);
-        history.replaceState(null, '', '?' + p.toString());
+        history.replaceState({ view: 'chart', chartMode }, '', '?' + p.toString());
     }, [view, chartConfig, selectedVehicles, chartMode]);
 
     // Keep activeVehicle in sync with vehicles state
@@ -214,7 +246,7 @@ export default function App() {
                     <div className="relative max-w-7xl mx-auto px-6 py-6">
                         {/* Clickable title → home */}
                         <button
-                            onClick={() => setView('vehicles')}
+                            onClick={() => navigateTo('vehicles')}
                             className="text-left group"
                         >
                             <h1 className="text-3xl font-bold group-hover:underline decoration-white/60">EV Data Visualization</h1>
@@ -247,27 +279,27 @@ export default function App() {
                             {/* Tab group */}
                             <div className="flex gap-1 items-center flex-wrap">
                                 <button
-                                    onClick={() => setView('vehicles')}
+                                    onClick={() => navigateTo('vehicles')}
                                     className={`btn-tab ${view === 'vehicles' ? 'active' : ''}`}
                                 >
                                     Vehicles
                                 </button>
                                 <button
-                                    onClick={() => currentActiveVehicle && setView('runs')}
+                                    onClick={() => currentActiveVehicle && navigateTo('runs')}
                                     disabled={!currentActiveVehicle}
                                     className={`btn-tab ${view === 'runs' ? 'active' : ''}`}
                                 >
                                     Test Runs {currentActiveVehicle ? `(${currentActiveVehicle.name})` : ''}
                                 </button>
                                 <button
-                                    onClick={() => selectedVehicles.length > 0 && setView('chart')}
+                                    onClick={() => selectedVehicles.length > 0 && navigateTo('chart')}
                                     disabled={selectedVehicles.length === 0}
                                     className={`btn-tab ${view === 'chart' ? 'active' : ''}`}
                                 >
                                     Charts
                                 </button>
                                 <button
-                                    onClick={() => setView('specs')}
+                                    onClick={() => navigateTo('specs')}
                                     className={`btn-tab ${view === 'specs' ? 'active' : ''}`}
                                 >
                                     Compare Specs
@@ -403,7 +435,7 @@ export default function App() {
                             onAdd={addVehicle}
                             onUpdate={updateVehicle}
                             onDelete={deleteVehicle}
-                            onViewRuns={(v) => { setActiveVehicle(v); setView('runs'); }}
+                            onViewRuns={(v) => { setActiveVehicle(v); navigateTo('runs'); }}
                             isOwner={isOwner}
                             onToggleVisibility={toggleVehicleVisibility}
                             tags={tags}
@@ -423,7 +455,7 @@ export default function App() {
                             onDeleteRun={(runId) => deleteRun(currentActiveVehicle.id, runId)}
                             onMergeRunData={(runId, pts, joinKey) => mergeRunData(currentActiveVehicle.id, runId, pts, joinKey)}
                             onReplaceRunData={(runId, pts) => replaceRunData(currentActiveVehicle.id, runId, pts)}
-                            onViewChart={() => setView('chart')}
+                            onViewChart={() => navigateTo('chart')}
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && (
