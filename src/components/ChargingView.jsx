@@ -477,8 +477,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         <div className="space-y-4">
                             {selectedVehicles.map(vehicle => {
                                 const isExpanded = expandedVehicles[vehicle.id];
-                                const activeRuns   = vehicle.runs?.filter(r =>  chartConfig.selectedRuns.includes(r.id)) || [];
-                                const inactiveRuns = vehicle.runs?.filter(r => !chartConfig.selectedRuns.includes(r.id)) || [];
+                                // Only show runs that have charging data in charging mode
+                                const chargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
+                                const activeRuns   = chargingRuns.filter(r =>  chartConfig.selectedRuns.includes(r.id));
+                                const inactiveRuns = chargingRuns.filter(r => !chartConfig.selectedRuns.includes(r.id));
                                 const hasInactiveRuns = inactiveRuns.length > 0;
 
                                 const RunLabel = ({ run }) => {
@@ -554,7 +556,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                     className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
                                                 >
                                                     <span style={{ display: 'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                                                    <span>{isExpanded ? 'Hide' : 'Show'} all ({vehicle.runs?.length || 0})</span>
+                                                    <span>{isExpanded ? 'Hide' : 'Show'} all ({chargingRuns.length})</span>
                                                 </button>
                                             )}
                                         </div>
@@ -587,8 +589,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                 </label>
                                             ))}
 
-                                            {(!vehicle.runs || vehicle.runs.length === 0) && (
-                                                <p className="text-sm text-gray-500 italic">No runs available</p>
+                                            {chargingRuns.length === 0 && (
+                                                <p className="text-sm text-gray-500 italic">No charging test records</p>
                                             )}
                                         </div>
                                     </div>
