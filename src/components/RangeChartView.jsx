@@ -117,22 +117,23 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         const getY     = (run) => isRange ? calcRange(run) : calcEff(run, effUnit);
         const yLabel   = isRange ? 'Range (miles)' : effLabel;
 
-        // ── Bar: each run grouped by vehicle name ─────────────────────────────
+        // ── Bar: flat single dataset — one bar per run, two-line tick label ──────
         if (typeInfo.kind === 'bar') {
-            const vehicleNames = [...new Set(plottableRuns.map(r => r.vehicleName))];
-            const datasets = plottableRuns.map(run => ({
-                label: `${run.vehicleName} — ${run.name}`,
-                data: vehicleNames.map(v => v === run.vehicleName ? getY(run) : null),
-                backgroundColor: run.color || '#3b82f6',
-                borderColor:     run.color || '#3b82f6',
-                borderRadius: 4,
-                borderSkipped: false,
-            }));
+            const labels   = plottableRuns.map(r => [r.name, r.vehicleName]);
+            const datasets = [{
+                label:           yLabel,
+                data:            plottableRuns.map(r => getY(r)),
+                backgroundColor: plottableRuns.map(r => r.color || '#3b82f6'),
+                borderColor:     plottableRuns.map(r => r.color || '#3b82f6'),
+                borderRadius:    4,
+                borderSkipped:   false,
+            }];
             return {
-                kind: 'bar',
-                data: { labels: vehicleNames, datasets },
-                xLabel: 'Vehicle',
+                kind:     'bar',
+                data:     { labels, datasets },
+                xLabel:   '',
                 yLabel,
+                flatRuns: plottableRuns,
             };
         }
 
@@ -190,10 +191,15 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'top' },
+                    legend: { display: built.kind !== 'bar', position: 'top' },
                     tooltip: {
                         callbacks: {
                             title(items) {
+                                if (built.kind === 'bar' && items.length > 0) {
+                                    // Show "RunName — VehicleName" in the tooltip title
+                                    const run = built.flatRuns?.[items[0].dataIndex];
+                                    return run ? `${run.name} — ${run.vehicleName}` : undefined;
+                                }
                                 // For line charts show the x-axis value in the title
                                 if (built.kind === 'line' && items.length > 0) {
                                     const x = items[0].raw?.x ?? items[0].parsed.x;
@@ -202,6 +208,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                 return undefined;
                             },
                             label(ctx) {
+                                if (built.kind === 'bar') {
+                                    return `${ctx.dataset.label}: ${ctx.parsed.y ?? '—'}`;
+                                }
                                 return `${ctx.dataset.label}: ${ctx.parsed.y ?? ctx.raw?.y ?? '—'}`;
                             },
                         },
@@ -211,7 +220,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     x: {
                         // Linear axis for line charts (numeric x); category for bar
                         type: built.kind === 'line' ? 'linear' : 'category',
-                        title: { display: true, text: built.xLabel },
+                        title: { display: !!built.xLabel, text: built.xLabel },
                         ...(built.kind === 'line' && xMin != null ? { min: xMin } : {}),
                         ...(built.kind === 'line' && xMax != null ? { max: xMax } : {}),
                     },
