@@ -26,66 +26,78 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const chartModeRef = useRef(chartMode);
     chartModeRef.current = chartMode;
 
-    // Track the previous vehicle ID list so we can detect newly-added vehicles.
-    // Initialized to [] so the very first effect run treats all vehicles as new.
-    const prevVehicleIdsRef = useRef([]);
+    // Tracks which vehicle IDs have already had auto-selection applied.
+    // - Empty Set on mount → all currently-selected vehicles are treated as new on first load.
+    // - When a vehicle leaves the selection its entry is evicted → re-adding it triggers
+    //   auto-selection again (the remove-then-readd case the user expects).
+    // - Once a vehicle is marked, user-driven deselects are respected (no forced re-add).
+    const autoSelectedRef = useRef(new Set());
 
-    // Auto-select runs when the vehicle selection changes.
-    // Reads chartConfig.selectedRuns directly so it always sees the current
-    // value — this prevents URL-restored runs from being wiped on initial mount.
-    // Auto-selection only fires for NEWLY ADDED vehicles; deselecting the last
-    // run for an existing vehicle is respected and not overridden.
-    // Safe against loops: if kept+added equals current, no state update fires.
+    // Auto-select runs when the vehicle selection or run list changes.
+    // Safe against infinite loops: state update only fires when newRuns !== currentRuns.
     useEffect(() => {
         const mode        = chartModeRef.current;
         const currentRuns = chartConfig.selectedRuns;
+        const currentVehicleIdSet = new Set(selectedVehicleIds.map(String));
 
-        // Compute which vehicles just appeared in the selection list
-        const prevIds       = prevVehicleIdsRef.current;
-        const newlyAddedIds = new Set(selectedVehicleIds.filter(id => !prevIds.includes(id)));
-        prevVehicleIdsRef.current = selectedVehicleIds;
+        // Evict any vehicle that left the selection so re-adding it auto-selects fresh.
+        autoSelectedRef.current.forEach(id => {
+            if (!currentVehicleIdSet.has(id)) autoSelectedRef.current.delete(id);
+        });
 
         if (mode === 'charging') {
-            // Only charging-capable runs are valid in this mode
             const chargingRuns = selectedVehicles.flatMap(v => (v.runs || []).filter(r => r.has_charging !== false));
             const validRunIds  = new Set(chargingRuns.map(r => String(r.id)));
             const kept         = currentRuns.filter(id => validRunIds.has(String(id)));
             const added        = [];
+
             selectedVehicles.forEach(vehicle => {
+                const vid           = String(vehicle.id);
                 const vChargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
-                if (!vChargingRuns.length) return;
+                if (!vChargingRuns.length) { autoSelectedRef.current.add(vid); return; }
+
                 const hasRun = kept.some(id => vChargingRuns.some(r => String(r.id) === String(id)));
-                // Only auto-pick a default for vehicles that were just added and have nothing kept
-                if (!hasRun && newlyAddedIds.has(vehicle.id)) {
+                if (hasRun) {
+                    // Valid run already selected (e.g. URL-restored) — mark done, keep it.
+                    autoSelectedRef.current.add(vid);
+                } else if (!autoSelectedRef.current.has(vid)) {
+                    // First time we see this vehicle with nothing selected — auto-pick default.
                     const defaultRun = vChargingRuns.find(r => r.isDefault);
                     const pick = defaultRun || [...vChargingRuns].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
                     if (pick) added.push(pick.id);
+                    autoSelectedRef.current.add(vid); // mark done (attempt made)
                 }
+                // else: vehicle already initialized, user deliberately has nothing selected — leave it.
             });
+
             const newRuns = [...kept, ...added];
             if (newRuns.join(',') !== currentRuns.join(',')) {
                 setChartConfig(prev => ({ ...prev, selectedRuns: newRuns }));
             }
 
         } else if (mode === 'range') {
-            // Collect all range-type run IDs from selected vehicles
             const allRangeIds = selectedVehicles.flatMap(v =>
                 (v.runs || []).filter(r => r.has_range).map(r => r.id)
             );
             const validSet = new Set(allRangeIds.map(String));
-            // Drop stale IDs (runs that no longer belong to selected vehicles)
-            const kept    = currentRuns.filter(id => validSet.has(String(id)));
-            const keptSet = new Set(kept.map(String));
-            const added   = [];
+            const kept     = currentRuns.filter(id => validSet.has(String(id)));
+            const keptSet  = new Set(kept.map(String));
+            const added    = [];
+
             selectedVehicles.forEach(vehicle => {
+                const vid        = String(vehicle.id);
                 const vRangeRuns = (vehicle.runs || []).filter(r => r.has_range);
-                if (!vRangeRuns.length) return;
+                if (!vRangeRuns.length) { autoSelectedRef.current.add(vid); return; }
+
                 const hasAny = vRangeRuns.some(r => keptSet.has(String(r.id)));
-                // Only auto-select all range runs for vehicles that were just added and have nothing kept
-                if (!hasAny && newlyAddedIds.has(vehicle.id)) {
+                if (hasAny) {
+                    autoSelectedRef.current.add(vid);
+                } else if (!autoSelectedRef.current.has(vid)) {
                     vRangeRuns.forEach(r => added.push(r.id));
+                    autoSelectedRef.current.add(vid);
                 }
             });
+
             const newRuns = [...kept, ...added];
             if (newRuns.join(',') !== currentRuns.join(',')) {
                 setChartConfig(prev => ({ ...prev, selectedRuns: newRuns }));
