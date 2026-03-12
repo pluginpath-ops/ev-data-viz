@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
 import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
@@ -20,7 +21,7 @@ const inferRunFlags = (run) => {
     return flags;
 };
 
-export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onViewChart }) {
+export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart }) {
     const [showUpload, setShowUpload] = useState(false);
     const [uploadStep, setUploadStep] = useState('file');
     const [csvData, setCsvData] = useState(null);
@@ -77,6 +78,8 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
     // ── Per-card lazy kWh check (card view, not edit mode) ───────────────────
     // { [runId]: { kwh: number|null, loading: bool } }
     const [calcKwhByRun, setCalcKwhByRun]       = useState({});
+    const [duplicatingRunId, setDuplicatingRunId] = useState(null);
+    const [exportingRunId, setExportingRunId]     = useState(null);
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -475,6 +478,41 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             setCalcKwhByRun(prev => ({ ...prev, [run.id]: { kwh, loading: false } }));
         } catch {
             setCalcKwhByRun(prev => ({ ...prev, [run.id]: { kwh: null, loading: false, error: true } }));
+        }
+    };
+
+    // ── Duplicate run ─────────────────────────────────────────────────────────
+    const handleDuplicateRun = async (run) => {
+        setDuplicatingRunId(run.id);
+        try {
+            await onDuplicateRun(run.id);
+        } finally {
+            setDuplicatingRunId(null);
+        }
+    };
+
+    // ── Export run data to CSV ────────────────────────────────────────────────
+    const handleExportCsv = async (run) => {
+        setExportingRunId(run.id);
+        try {
+            const points = await dataService.getRunData(run.id);
+            const csv = Papa.unparse(points.map(p => ({
+                frame:       p.frame,
+                soc:         p.soc,
+                charge_rate: p.chargeRate,
+                time:        p.time,
+                range:       p.range,
+                temperature: p.temperature,
+            })));
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${run.name.replace(/[^a-z0-9]/gi, '_')}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } finally {
+            setExportingRunId(null);
         }
     };
 
@@ -1472,6 +1510,24 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             className="btn btn-secondary text-sm"
                                         >
                                             Upload additional data
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => handleExportCsv(run)}
+                                        disabled={exportingRunId === run.id}
+                                        title="Download run data as CSV"
+                                        className="btn btn-secondary text-sm disabled:opacity-50"
+                                    >
+                                        {exportingRunId === run.id ? '…' : '↓ CSV'}
+                                    </button>
+                                    {isOwner && (
+                                        <button
+                                            onClick={() => handleDuplicateRun(run)}
+                                            disabled={duplicatingRunId !== null}
+                                            title="Duplicate this run and its data"
+                                            className="btn btn-secondary text-sm disabled:opacity-50"
+                                        >
+                                            {duplicatingRunId === run.id ? '…' : '⧉ Copy'}
                                         </button>
                                     )}
                                     <button

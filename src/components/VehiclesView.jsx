@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 
@@ -153,7 +153,7 @@ function EditForm({
 export default function VehiclesView({
     vehicles, selectedVehicles, onToggleSelection, onAdd, onUpdate, onDelete, onViewRuns,
     isOwner, onToggleVisibility, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
-    onReorderVehicles,
+    onReorderVehicles, onDuplicateVehicle,
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -171,6 +171,9 @@ export default function VehiclesView({
     const [editingOrder, setEditingOrder] = useState(false);
     const [pendingOrder, setPendingOrder] = useState(null);   // [{id, sort_order}] or null
     const [savingOrder, setSavingOrder]   = useState(false);
+    const [duplicatingId, setDuplicatingId] = useState(null);
+    const [vehiclePage, setVehiclePage] = useState(1);
+    const VEHICLES_PER_PAGE = 24;
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -213,6 +216,16 @@ export default function VehiclesView({
         setFormTags([]);
         setNewTagName('');
         setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '', power: '' });
+    };
+
+    const handleDuplicateVehicle = async (vehicle, e) => {
+        e.stopPropagation();
+        setDuplicatingId(vehicle.id);
+        try {
+            await onDuplicateVehicle(vehicle.id);
+        } finally {
+            setDuplicatingId(null);
+        }
     };
 
     const handleCardClick = (vehicle) => {
@@ -294,6 +307,11 @@ export default function VehiclesView({
 
     const availableTagsForForm = tags.filter(t => !formTags.some(ft => ft.id === t.id));
     const editingVehicle = editingId ? vehicles.find(v => v.id === editingId) : null;
+    const totalPages = Math.max(1, Math.ceil(sortedFilteredVehicles.length / VEHICLES_PER_PAGE));
+    const pagedVehicles = sortedFilteredVehicles.slice(
+        (vehiclePage - 1) * VEHICLES_PER_PAGE,
+        vehiclePage * VEHICLES_PER_PAGE
+    );
 
     // ── Shared sub-components ────────────────────────────────────────────────
 
@@ -336,6 +354,16 @@ export default function VehiclesView({
                         className="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
                     >
                         Edit
+                    </button>
+                )}
+                {isOwner && (
+                    <button
+                        onClick={(e) => handleDuplicateVehicle(vehicle, e)}
+                        disabled={duplicatingId !== null}
+                        title="Duplicate vehicle and all runs"
+                        className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-50"
+                    >
+                        {duplicatingId === vehicle.id ? '…' : '⧉ Copy'}
                     </button>
                 )}
                 {isOwner && (() => {
@@ -415,6 +443,31 @@ export default function VehiclesView({
         setPendingOrder(allOrdered.map((v, i) => ({ id: v.id, sort_order: i })));
     };
 
+    const handleMoveVehicleToIndex = (vehicleId, targetIndex) => {
+        const getEffectiveOrder = (v) => {
+            if (pendingOrder) {
+                const p = pendingOrder.find(u => u.id === v.id);
+                if (p) return p.sort_order;
+            }
+            return v.sort_order;
+        };
+        const allOrdered = [...vehicles]
+            .filter(v => !committedDeletes.has(v.id))
+            .sort((a, b) => {
+                const aO = getEffectiveOrder(a), bO = getEffectiveOrder(b);
+                const aN = aO == null, bN = bO == null;
+                if (!aN && !bN) return aO - bO;
+                if (!aN) return -1; if (!bN) return 1;
+                return new Date(b.created_at) - new Date(a.created_at);
+            });
+        const idx = allOrdered.findIndex(v => v.id === vehicleId);
+        if (idx === -1) return;
+        const clamped = Math.max(0, Math.min(targetIndex, allOrdered.length - 1));
+        const [moved] = allOrdered.splice(idx, 1);
+        allOrdered.splice(clamped, 0, moved);
+        setPendingOrder(allOrdered.map((v, i) => ({ id: v.id, sort_order: i })));
+    };
+
     const handleSaveOrder = async () => {
         if (!pendingOrder) return;
         setSavingOrder(true);
@@ -429,6 +482,9 @@ export default function VehiclesView({
     const handleCancelOrder = () => {
         setPendingOrder(null);
     };
+
+    // Reset to page 1 when filter/sort changes
+    useEffect(() => { setVehiclePage(1); }, [textFilter, activeTagFilters, sortBy]);
 
     const showReorderButtons = isOwner && sortBy === 'default'
         && textFilter.trim() === '' && activeTagFilters.length === 0
@@ -548,9 +604,11 @@ export default function VehiclesView({
             {/* ── CARD VIEW ── */}
             {viewMode === 'card' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {sortedFilteredVehicles.map(vehicle => {
+                    {pagedVehicles.map(vehicle => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
                         const isPending  = pendingDeletes.has(vehicle.id);
+                        const globalPos  = sortedFilteredVehicles.findIndex(v => v.id === vehicle.id);
+                        const totalCount = sortedFilteredVehicles.length;
                         return (
                             <div key={vehicle.id} className="contents">
                                 <div
@@ -577,22 +635,6 @@ export default function VehiclesView({
                                         </>
                                     )}
 
-                                    {/* Reorder buttons — owner only, default sort, no filters */}
-                                    {showReorderButtons && (
-                                        <div className="absolute top-1 left-1 flex flex-col gap-0.5 z-20">
-                                            <button
-                                                onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'up'); }}
-                                                className="w-6 h-6 flex items-center justify-center rounded bg-white/80 text-gray-500 hover:bg-white hover:text-gray-800 border border-gray-200 text-xs shadow-sm"
-                                                title="Move up"
-                                            >▲</button>
-                                            <button
-                                                onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }}
-                                                className="w-6 h-6 flex items-center justify-center rounded bg-white/80 text-gray-500 hover:bg-white hover:text-gray-800 border border-gray-200 text-xs shadow-sm"
-                                                title="Move down"
-                                            >▼</button>
-                                        </div>
-                                    )}
-
                                     <div className="relative z-10 flex flex-col flex-1">
                                         {isSelected && (
                                             <div
@@ -600,6 +642,27 @@ export default function VehiclesView({
                                                 style={{ backgroundColor: 'var(--color-primary)' }}
                                             >
                                                 &#10003;
+                                            </div>
+                                        )}
+
+                                        {/* Reorder controls — shown in edit order mode */}
+                                        {showReorderButtons && (
+                                            <div className="flex items-center gap-0.5 mb-2 flex-wrap" onClick={e => e.stopPropagation()}>
+                                                <button title="Top" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, 0); }} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500">⇈</button>
+                                                <button title="-10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos - 10); }} disabled={globalPos < 1} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▲▲</button>
+                                                <button title="Up" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'up'); }} disabled={globalPos === 0} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▲</button>
+                                                <input
+                                                    type="number" min={1} max={totalCount}
+                                                    defaultValue={globalPos + 1}
+                                                    key={`pos-${vehicle.id}-${globalPos}`}
+                                                    onClick={e => e.stopPropagation()}
+                                                    onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value); if (!isNaN(v)) handleMoveVehicleToIndex(vehicle.id, v - 1); e.target.blur(); } }}
+                                                    onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
+                                                    className="w-10 h-6 text-center text-xs border rounded bg-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                />
+                                                <button title="Down" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }} disabled={globalPos === totalCount - 1} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▼</button>
+                                                <button title="+10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos + 10); }} disabled={globalPos >= totalCount - 1} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▼▼</button>
+                                                <button title="Bottom" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, totalCount - 1); }} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500">⇊</button>
                                             </div>
                                         )}
 
@@ -645,9 +708,11 @@ export default function VehiclesView({
             {/* ── LIST VIEW ── */}
             {viewMode === 'list' && (
                 <div className="flex flex-col gap-2">
-                    {sortedFilteredVehicles.map(vehicle => {
+                    {pagedVehicles.map(vehicle => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
                         const isPending  = pendingDeletes.has(vehicle.id);
+                        const globalPos  = sortedFilteredVehicles.findIndex(v => v.id === vehicle.id);
+                        const totalCount = sortedFilteredVehicles.length;
                         return (
                             <div key={vehicle.id}>
                                 <div
@@ -668,19 +733,24 @@ export default function VehiclesView({
                                         </div>
                                     )}
 
-                                    {/* Reorder buttons — owner only, default sort, no filters */}
+                                    {/* Reorder controls — owner only, default sort, no filters */}
                                     {showReorderButtons && (
-                                        <div className="flex flex-col gap-0.5 flex-shrink-0">
-                                            <button
-                                                onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'up'); }}
-                                                className="w-6 h-6 flex items-center justify-center rounded bg-gray-100 text-gray-500 hover:bg-gray-200 border border-gray-200 text-xs"
-                                                title="Move up"
-                                            >▲</button>
-                                            <button
-                                                onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }}
-                                                className="w-6 h-6 flex items-center justify-center rounded bg-gray-100 text-gray-500 hover:bg-gray-200 border border-gray-200 text-xs"
-                                                title="Move down"
-                                            >▼</button>
+                                        <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                                            <button title="Top" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, 0); }} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500">⇈</button>
+                                            <button title="-10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos - 10); }} disabled={globalPos < 1} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▲▲</button>
+                                            <button title="Up" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'up'); }} disabled={globalPos === 0} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▲</button>
+                                            <input
+                                                type="number" min={1} max={totalCount}
+                                                defaultValue={globalPos + 1}
+                                                key={`pos-${vehicle.id}-${globalPos}`}
+                                                onClick={e => e.stopPropagation()}
+                                                onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value); if (!isNaN(v)) handleMoveVehicleToIndex(vehicle.id, v - 1); e.target.blur(); } }}
+                                                onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
+                                                className="w-10 h-6 text-center text-xs border rounded bg-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                            />
+                                            <button title="Down" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }} disabled={globalPos === totalCount - 1} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▼</button>
+                                            <button title="+10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos + 10); }} disabled={globalPos >= totalCount - 1} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▼▼</button>
+                                            <button title="Bottom" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, totalCount - 1); }} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500">⇊</button>
                                         </div>
                                     )}
 
@@ -723,6 +793,17 @@ export default function VehiclesView({
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-6">
+                    <button onClick={() => setVehiclePage(1)} disabled={vehiclePage === 1} className="px-2 py-1 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-40">«</button>
+                    <button onClick={() => setVehiclePage(p => p - 1)} disabled={vehiclePage === 1} className="px-2 py-1 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-40">‹</button>
+                    <span className="text-sm text-gray-600">Page {vehiclePage} of {totalPages}</span>
+                    <button onClick={() => setVehiclePage(p => p + 1)} disabled={vehiclePage === totalPages} className="px-2 py-1 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-40">›</button>
+                    <button onClick={() => setVehiclePage(totalPages)} disabled={vehiclePage === totalPages} className="px-2 py-1 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-40">»</button>
                 </div>
             )}
 

@@ -23,7 +23,9 @@ export default function App() {
         addVehicle,
         updateVehicle,
         reorderVehicles,
+        duplicateVehicle,
         deleteVehicle,
+        duplicateRun,
         addRun,
         updateRun,
         setDefaultRun,
@@ -459,6 +461,7 @@ export default function App() {
                             onSyncVehicleTags={syncVehicleTags}
                             onUploadVehicleImage={uploadVehicleImage}
                             onReorderVehicles={reorderVehicles}
+                            onDuplicateVehicle={duplicateVehicle}
                         />
                     )}
                     {view === 'runs' && currentActiveVehicle && (
@@ -471,6 +474,7 @@ export default function App() {
                             onDeleteRun={(runId) => deleteRun(currentActiveVehicle.id, runId)}
                             onMergeRunData={(runId, pts, joinKey) => mergeRunData(currentActiveVehicle.id, runId, pts, joinKey)}
                             onReplaceRunData={(runId, pts) => replaceRunData(currentActiveVehicle.id, runId, pts)}
+                            onDuplicateRun={(runId) => duplicateRun(currentActiveVehicle.id, runId)}
                             onViewChart={() => navigateTo('chart')}
                         />
                     )}

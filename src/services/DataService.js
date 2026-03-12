@@ -155,6 +155,34 @@ class DataService {
     }
   }
 
+  async duplicateVehicle(vehicleId, vehicles) {
+    const src = vehicles.find(v => v.id === vehicleId);
+    if (!src) throw new Error('Vehicle not found');
+    const newVehicle = await this.addVehicle({ ...src, name: src.name + ' (copy)' });
+    for (const run of (src.runs || [])) {
+      const points = await this.getRunData(run.id);
+      await this.addRun(newVehicle.id, {
+        ...run,
+        name: run.name,
+        isDefault: false,
+        data: points,
+        calculated_fields: run.calculated_fields || [],
+      });
+    }
+    return newVehicle.id;
+  }
+
+  async duplicateRun(vehicleId, run) {
+    const points = await this.getRunData(run.id);
+    return await this.addRun(vehicleId, {
+      ...run,
+      name: run.name + ' (copy)',
+      isDefault: false,
+      data: points,
+      calculated_fields: run.calculated_fields || [],
+    });
+  }
+
   async deleteVehicle(vehicleId) {
     if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');

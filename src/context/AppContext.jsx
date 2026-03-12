@@ -95,6 +95,15 @@ export function AppProvider({ children }) {
         }
     };
 
+    const duplicateVehicle = async (vehicleId) => {
+        try {
+            await dataService.duplicateVehicle(vehicleId, vehicles);
+            await initializeApp();
+        } catch (error) {
+            showError('Error duplicating vehicle: ' + error.message);
+        }
+    };
+
     const deleteVehicle = async (vehicleId) => {
         try {
             await dataService.deleteVehicle(vehicleId);
@@ -102,6 +111,22 @@ export function AppProvider({ children }) {
             setSelectedVehicles(prev => prev.filter(id => id !== vehicleId));
         } catch (error) {
             showError('Error deleting vehicle: ' + error.message);
+        }
+    };
+
+    const duplicateRun = async (vehicleId, runId) => {
+        try {
+            const vehicle = vehicles.find(v => v.id === vehicleId);
+            const run = vehicle?.runs.find(r => r.id === runId);
+            if (!run) throw new Error('Run not found');
+            const newRun = await dataService.duplicateRun(vehicleId, run);
+            setVehicles(prev => prev.map(v =>
+                v.id === vehicleId
+                    ? { ...v, runs: [...(v.runs || []), newRun] }
+                    : v
+            ));
+        } catch (error) {
+            showError('Error duplicating run: ' + error.message);
         }
     };
 
@@ -411,7 +436,9 @@ export function AppProvider({ children }) {
         addVehicle,
         updateVehicle,
         reorderVehicles,
+        duplicateVehicle,
         deleteVehicle,
+        duplicateRun,
         addRun,
         updateRun,
         setDefaultRun,
