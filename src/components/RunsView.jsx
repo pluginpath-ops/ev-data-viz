@@ -1353,7 +1353,25 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                             <div className="flex justify-between items-start">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <h3 className="text-lg font-bold">{run.name}</h3>
+                                        <h3 className="text-lg font-bold">
+                                            {run.name}
+                                            {run.url && (
+                                                <a href={run.url} target="_blank" rel="noopener noreferrer"
+                                                    title="Range test source"
+                                                    onClick={e => e.stopPropagation()}
+                                                    className="text-blue-400 hover:text-blue-600 transition-colors ml-1 text-sm font-normal">
+                                                    ↗
+                                                </a>
+                                            )}
+                                            {run.charging_url && (
+                                                <a href={run.charging_url} target="_blank" rel="noopener noreferrer"
+                                                    title="Charging test source"
+                                                    onClick={e => e.stopPropagation()}
+                                                    className="text-blue-400 hover:text-blue-600 transition-colors ml-1 text-sm font-normal">
+                                                    ↗
+                                                </a>
+                                            )}
+                                        </h3>
                                         {/* Data-type flag pills — one per active data domain */}
                                         {inferRunFlags(run).map(key => {
                                             const flag = DATA_FLAGS.find(f => f.key === key);

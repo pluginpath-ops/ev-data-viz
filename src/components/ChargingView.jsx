@@ -584,6 +584,22 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                         <span className="flex-1 flex items-center gap-2 flex-wrap">
                                             <span>
                                                 {run.name}
+                                                {run.url && (
+                                                    <a href={run.url} target="_blank" rel="noopener noreferrer"
+                                                        title="Range test source"
+                                                        onClick={e => e.stopPropagation()}
+                                                        className="text-blue-400 hover:text-blue-600 transition-colors ml-0.5">
+                                                        ↗
+                                                    </a>
+                                                )}
+                                                {run.charging_url && (
+                                                    <a href={run.charging_url} target="_blank" rel="noopener noreferrer"
+                                                        title="Charging test source"
+                                                        onClick={e => e.stopPropagation()}
+                                                        className="text-blue-400 hover:text-blue-600 transition-colors ml-0.5">
+                                                        ↗
+                                                    </a>
+                                                )}
                                                 <span className="text-sm text-gray-500"> ({run.date})</span>
                                                 {run.isDefault && (
                                                     <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded"

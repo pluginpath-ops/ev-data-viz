@@ -532,7 +532,25 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                                         maxLength={7}
                                                     />
                                                     <span className="text-sm flex-1 flex items-center gap-1.5 flex-wrap">
-                                                        <span className="font-medium">{run.name}</span>
+                                                        <span className="font-medium">
+                                                        {run.name}
+                                                        {run.url && (
+                                                            <a href={run.url} target="_blank" rel="noopener noreferrer"
+                                                                title="Range test source"
+                                                                onClick={e => e.stopPropagation()}
+                                                                className="text-blue-400 hover:text-blue-600 transition-colors ml-0.5 font-normal">
+                                                                ↗
+                                                            </a>
+                                                        )}
+                                                        {run.charging_url && (
+                                                            <a href={run.charging_url} target="_blank" rel="noopener noreferrer"
+                                                                title="Charging test source"
+                                                                onClick={e => e.stopPropagation()}
+                                                                className="text-blue-400 hover:text-blue-600 transition-colors ml-0.5 font-normal">
+                                                                ↗
+                                                            </a>
+                                                        )}
+                                                    </span>
                                                         <span className="text-gray-400 text-xs">({run.date})</span>
                                                         {run.speed_mph != null && (
                                                             <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{run.speed_mph} mph</span>
