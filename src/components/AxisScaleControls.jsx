@@ -12,10 +12,6 @@
  *                                    Set true when a secondary Y axis is active.
  */
 
-const numInputCls =
-    'px-2 py-1 border rounded text-sm ' +
-    '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
-
 export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max, onChange, showX = true, showY2 = false }) {
     const colCount = 1 + (showX ? 1 : 0) + (showY2 ? 1 : 0);
     const gridClass = colCount === 3 ? 'grid-cols-3'
@@ -38,7 +34,7 @@ export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max
                         </button>
                     )}
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div className="axis-scale-group">
                     <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-400 w-7 text-right">Max</span>
                         <input
@@ -46,7 +42,7 @@ export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max
                             placeholder="Auto"
                             value={yMax ?? ''}
                             onChange={e => onChange('yMax', e.target.value === '' ? null : Number(e.target.value))}
-                            className={`w-24 ${numInputCls}`}
+                            className="axis-input"
                         />
                     </div>
                     <div className="flex items-center gap-2">
@@ -56,7 +52,7 @@ export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max
                             placeholder="Auto"
                             value={yMin ?? ''}
                             onChange={e => onChange('yMin', e.target.value === '' ? null : Number(e.target.value))}
-                            className={`w-24 ${numInputCls}`}
+                            className="axis-input"
                         />
                     </div>
                 </div>
@@ -76,25 +72,25 @@ export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max
                             </button>
                         )}
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center gap-2">
+                    <div className="axis-scale-group">
+                        <div className="inline-row">
                             <span className="text-xs text-gray-400 w-7 text-right">Max</span>
                             <input
                                 type="number"
                                 placeholder="Auto"
                                 value={xMax ?? ''}
                                 onChange={e => onChange('xMax', e.target.value === '' ? null : Number(e.target.value))}
-                                className={`w-24 ${numInputCls}`}
+                                className="axis-input"
                             />
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="inline-row">
                             <span className="text-xs text-gray-400 w-7 text-right">Min</span>
                             <input
                                 type="number"
                                 placeholder="Auto"
                                 value={xMin ?? ''}
                                 onChange={e => onChange('xMin', e.target.value === '' ? null : Number(e.target.value))}
-                                className={`w-24 ${numInputCls}`}
+                                className="axis-input"
                             />
                         </div>
                     </div>
@@ -113,25 +109,25 @@ export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max
                             Reset
                         </button>
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center gap-2">
+                    <div className="axis-scale-group">
+                        <div className="inline-row">
                             <span className="text-xs text-gray-400 w-7 text-right">Max</span>
                             <input
                                 type="number"
                                 placeholder="Auto"
                                 value={y2Max ?? ''}
                                 onChange={e => onChange('y2Max', e.target.value === '' ? null : Number(e.target.value))}
-                                className={`w-24 ${numInputCls}`}
+                                className="axis-input"
                             />
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="inline-row">
                             <span className="text-xs text-gray-400 w-7 text-right">Min</span>
                             <input
                                 type="number"
                                 placeholder="Auto"
                                 value={y2Min ?? ''}
                                 onChange={e => onChange('y2Min', e.target.value === '' ? null : Number(e.target.value))}
-                                className={`w-24 ${numInputCls}`}
+                                className="axis-input"
                             />
                         </div>
                     </div>

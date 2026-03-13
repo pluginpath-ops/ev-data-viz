@@ -24,14 +24,14 @@ export default function DeleteQueueBar({
     // ── Undo toast ────────────────────────────────────────────────────────────
     if (undoState) {
         return (
-            <div className="fixed bottom-0 left-0 right-0 z-50 bg-gray-800 text-white shadow-2xl overflow-hidden">
+            <div className="fixed-action-bar z-50 bg-gray-800 text-white overflow-hidden">
                 {/* Draining progress bar — CSS animation restarts on each new undoState */}
                 <div
                     key={undoState.startTime}
                     className="h-1 bg-blue-400"
                     style={{ animation: 'drain 5s linear forwards' }}
                 />
-                <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
+                <div className="page-container py-3 flex items-center gap-4">
                     <span className="font-medium flex-1">
                         ✓ {plural(undoState.count)} deleted
                     </span>
@@ -49,8 +49,8 @@ export default function DeleteQueueBar({
     // ── Queue bar ─────────────────────────────────────────────────────────────
     if (pendingCount > 0) {
         return (
-            <div className="fixed bottom-0 left-0 right-0 z-50 bg-red-50 border-t-2 border-red-200 shadow-2xl">
-                <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
+            <div className="fixed-action-bar z-50 bg-red-50 border-t-2 border-red-200">
+                <div className="page-container py-3 flex items-center gap-4">
                     <span className="text-red-700 font-medium flex-1">
                         🗑 {plural(pendingCount)} queued for deletion
                     </span>

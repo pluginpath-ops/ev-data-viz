@@ -535,9 +535,9 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
     return (
         <div className={barVisible ? 'pb-20' : ''}>
-            <div className="flex justify-between items-center mb-6">
+            <div className="runs-view-header">
                 <div>
-                    <h2 className="text-2xl font-bold">{vehicle.name} - Test Runs</h2>
+                    <h2 className="page-title">{vehicle.name} - Test Runs</h2>
                     <p className="text-gray-600">Manage charging test data for this vehicle</p>
                 </div>
                 <div className="flex gap-2">
@@ -573,7 +573,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                 <div className="card mb-6">
                     {/* ── Merge-mode banner ── */}
                     {uploadMode === 'merge' && mergeTargetRun && (
-                        <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                        <div className="merge-target-banner">
                             <div>
                                 <span className="text-sm font-semibold text-blue-800">Adding data to: </span>
                                 <span className="text-sm text-blue-700">{mergeTargetRun.name}</span>
@@ -586,7 +586,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
                     {uploadStep === 'file' && (
                         <div>
-                            <h3 className="text-lg font-bold mb-4">
+                            <h3 className="section-title mb-4">
                                 {uploadMode === 'merge' ? 'Upload Additional Data' : 'Add new record'}
                             </h3>
                             <div className="space-y-4">
@@ -596,7 +596,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         {/* Data-type flags — multi-select, at least one must remain active */}
                                         <div>
                                             <p className="text-xs text-gray-500 mb-1">Data types (select all that apply)</p>
-                                            <div className="flex gap-2 flex-wrap">
+                                            <div className="data-type-flags">
                                                 {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
                                                     const active = runMetadata.dataFlags.includes(key);
                                                     return (
@@ -624,31 +624,31 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             placeholder="Name (e.g., Highway Test - Winter 2024)"
                                             value={runMetadata.name}
                                             onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
-                                            className="border p-2 rounded w-full"
+                                            className="form-input w-full"
                                             required
                                         />
                                         <input
                                             type="date"
                                             value={runMetadata.date}
                                             onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
-                                            className="border p-2 rounded w-full"
+                                            className="form-input w-full"
                                         />
                                         <input
                                             placeholder="Software Version (e.g., 2024.1.5)"
                                             value={runMetadata.softwareVersion}
                                             onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
-                                            className="border p-2 rounded w-full"
+                                            className="form-input w-full"
                                         />
                                         <input
                                             placeholder="Notes (e.g., 20°F, highway speeds)"
                                             value={runMetadata.conditions}
                                             onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
-                                            className="border p-2 rounded w-full"
+                                            className="form-input w-full"
                                         />
 
                                         {/* Charging energy field (create mode) */}
                                         {runMetadata.dataFlags.includes('charging') && (
-                                            <div className="border rounded-lg p-3 bg-gray-50">
+                                            <div className="data-subpanel p-3">
                                                 <p className="text-sm font-semibold text-gray-700 mb-2">Charging Energy <span className="font-normal text-gray-400">(optional)</span></p>
                                                 <input
                                                     type="number"
@@ -656,7 +656,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                     title="Energy measured at charger or vehicle — energy in"
                                                     value={runMetadata.energyKwh}
                                                     onChange={(e) => setRunMetadata({...runMetadata, energyKwh: e.target.value})}
-                                                    className="border p-2 rounded w-full"
+                                                    className="form-input w-full"
                                                 />
                                                 <p className="text-xs text-gray-400 mt-1">
                                                     Energy measured at charger or vehicle — <em>energy in</em>
@@ -666,28 +666,28 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                     placeholder="Charging source URL (optional)"
                                                     value={runMetadata.chargingUrl}
                                                     onChange={(e) => setRunMetadata({...runMetadata, chargingUrl: e.target.value})}
-                                                    className="border p-2 rounded w-full mt-2"
+                                                    className="form-input w-full mt-2"
                                                 />
                                             </div>
                                         )}
 
                                         {/* Range test fields */}
                                         {runMetadata.dataFlags.includes('range') && (
-                                            <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
+                                            <div className="data-subpanel p-4 space-y-3">
                                                 <p className="text-sm font-semibold text-gray-700">Range Test Details</p>
-                                                <div className="grid grid-cols-2 gap-3">
+                                                <div className="form-grid gap-3">
                                                     <input
                                                         placeholder="Source (e.g., Out of Spec)"
                                                         value={runMetadata.source}
                                                         onChange={(e) => setRunMetadata({...runMetadata, source: e.target.value})}
-                                                        className="border p-2 rounded col-span-2"
+                                                        className="form-input col-span-2"
                                                     />
                                                     <input
                                                         type="number"
                                                         placeholder="Start SoC (%)"
                                                         value={runMetadata.startSoc}
                                                         onChange={(e) => setRunMetadata({...runMetadata, startSoc: e.target.value})}
-                                                        className="border p-2 rounded"
+                                                        className="form-input"
                                                         min="0" max="100"
                                                     />
                                                     <input
@@ -695,7 +695,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                         placeholder="End SoC (%)"
                                                         value={runMetadata.endSoc}
                                                         onChange={(e) => setRunMetadata({...runMetadata, endSoc: e.target.value})}
-                                                        className="border p-2 rounded"
+                                                        className="form-input"
                                                         min="0" max="100"
                                                     />
                                                     <input
@@ -703,14 +703,14 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                         placeholder="Speed (mph)"
                                                         value={runMetadata.speedMph}
                                                         onChange={(e) => setRunMetadata({...runMetadata, speedMph: e.target.value})}
-                                                        className="border p-2 rounded"
+                                                        className="form-input"
                                                     />
                                                     <input
                                                         type="number"
                                                         placeholder="Distance (miles)"
                                                         value={runMetadata.distanceMiles}
                                                         onChange={(e) => setRunMetadata({...runMetadata, distanceMiles: e.target.value})}
-                                                        className="border p-2 rounded"
+                                                        className="form-input"
                                                     />
                                                     <input
                                                         type="number"
@@ -718,28 +718,28 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                         title="Energy consumed on the drive — energy out"
                                                         value={runMetadata.energyKwh}
                                                         onChange={(e) => setRunMetadata({...runMetadata, energyKwh: e.target.value})}
-                                                        className="border p-2 rounded"
+                                                        className="form-input"
                                                     />
                                                     <input
                                                         type="number"
                                                         placeholder="Ambient temp (°F)"
                                                         value={runMetadata.temperatureF}
                                                         onChange={(e) => setRunMetadata({...runMetadata, temperatureF: e.target.value})}
-                                                        className="border p-2 rounded"
+                                                        className="form-input"
                                                     />
                                                     <input
                                                         type="number"
                                                         placeholder="Elevation gain (ft)"
                                                         value={runMetadata.elevationGainFt}
                                                         onChange={(e) => setRunMetadata({...runMetadata, elevationGainFt: e.target.value})}
-                                                        className="border p-2 rounded col-span-2"
+                                                        className="form-input col-span-2"
                                                     />
                                                     <input
                                                         type="url"
                                                         placeholder="Source URL"
                                                         value={runMetadata.url}
                                                         onChange={(e) => setRunMetadata({...runMetadata, url: e.target.value})}
-                                                        className="border p-2 rounded col-span-2"
+                                                        className="form-input col-span-2"
                                                     />
                                                 </div>
                                             </div>
@@ -762,7 +762,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         />
                                         CSV has no header row (use column numbers)
                                     </label>
-                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                                    <div className="csv-drop-zone">
                                         <label className="cursor-pointer">
                                             <span className="text-blue-600 font-medium">Click to upload CSV file</span>
                                             <span className="block text-xs text-gray-400 mt-1">Optional — attach data points to this record</span>
@@ -781,12 +781,12 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             placeholder={"soc,chargeRate,time\n50,100,0\n80,75,15\n…"}
                                             value={csvText}
                                             onChange={e => handleCsvTextPaste(e.target.value)}
-                                            className="border p-2 rounded w-full text-xs font-mono resize-y"
+                                            className="form-input w-full text-xs font-mono resize-y"
                                         />
                                     </div>
                                 </div>
                                 {uploadMode === 'create' && (
-                                    <div className="flex gap-2">
+                                    <div className="form-actions">
                                         <button
                                             onClick={handleSaveRecord}
                                             disabled={!runMetadata.name}
@@ -805,7 +805,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
                     {uploadStep === 'mapping' && (
                         <div>
-                            <h3 className="text-lg font-bold mb-4">Map CSV Fields</h3>
+                            <h3 className="section-title mb-4">Map CSV Fields</h3>
                             <p className="text-gray-600 mb-4">Match your CSV columns to standard fields. We've auto-detected some for you.</p>
 
                             {/* In create mode, allow editing metadata here too */}
@@ -817,26 +817,26 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             placeholder="Name (e.g., Highway Test - Winter 2024)"
                                             value={runMetadata.name}
                                             onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
-                                            className="border p-2 rounded w-full"
+                                            className="form-input w-full"
                                             required
                                         />
                                         <input
                                             type="date"
                                             value={runMetadata.date}
                                             onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
-                                            className="border p-2 rounded w-full"
+                                            className="form-input w-full"
                                         />
                                         <input
                                             placeholder="Software Version (e.g., 2024.1.5)"
                                             value={runMetadata.softwareVersion}
                                             onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
-                                            className="border p-2 rounded w-full"
+                                            className="form-input w-full"
                                         />
                                         <input
                                             placeholder="Notes (e.g., 20°F, highway speeds)"
                                             value={runMetadata.conditions}
                                             onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
-                                            className="border p-2 rounded w-full"
+                                            className="form-input w-full"
                                         />
                                     </div>
                                 </div>
@@ -845,12 +845,12 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                             <h4 className="font-semibold mb-3">Field Mapping</h4>
                             <div className="space-y-3">
                                 {['soc', 'chargeRate', 'time', 'range', 'temperature', 'frame'].map(field => (
-                                    <div key={field} className="flex items-center gap-4">
+                                    <div key={field} className="field-mapping-row">
                                         <label className="w-40 font-medium capitalize">{field.replace(/([A-Z])/g, ' $1')}:</label>
                                         <select
                                             value={fieldMapping[field] || ''}
                                             onChange={(e) => setFieldMapping({...fieldMapping, [field]: e.target.value})}
-                                            className="border p-2 rounded flex-1"
+                                            className="form-input flex-1"
                                         >
                                             <option value="">-- Not mapped --</option>
                                             {availableFields.map((f, i) => (
@@ -868,7 +868,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                 <div className="mt-5 space-y-3">
                                     {/* Option 1: EPA rated range */}
                                     {offerRangeEstimate && (
-                                        <div className={`p-4 rounded-lg border flex items-start justify-between gap-4 ${estimations.range === 'epa' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+                                        <div className={`estimation-panel ${estimations.range === 'epa' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
                                             <div>
                                                 <p className={`text-sm font-semibold ${estimations.range === 'epa' ? 'text-green-800' : 'text-blue-800'}`}>
                                                     {estimations.range === 'epa' ? '✓ Range will be estimated (EPA)' : 'ℹ No Range column mapped'}
@@ -894,7 +894,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
                                     {/* Option 2: Measured range from test data */}
                                     {offerRangeEstimateTest && (
-                                        <div className={`p-4 rounded-lg border flex items-start justify-between gap-4 ${estimations.range === 'measured' ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+                                        <div className={`estimation-panel ${estimations.range === 'measured' ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
                                             <div className="flex-1 min-w-0">
                                                 <p className={`text-sm font-semibold ${estimations.range === 'measured' ? 'text-green-800' : 'text-amber-800'}`}>
                                                     {estimations.range === 'measured' ? '✓ Range will be estimated (test data)' : '📏 Estimate from measured range test'}
@@ -935,7 +935,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
                             {/* Join key selector — merge mode only */}
                             {uploadMode === 'merge' && (
-                                <div className={`mt-5 p-4 rounded-lg border ${missingJoinKey ? 'bg-red-50 border-red-200' : showJoinSelector ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
+                                <div className={`join-key-panel ${missingJoinKey ? 'bg-red-50 border-red-200' : showJoinSelector ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
                                     {missingJoinKey ? (
                                         <p className="text-sm font-semibold text-red-700">
                                             ⚠ Map at least one of <strong>SoC</strong> or <strong>Time</strong> — it's needed to link incoming rows to existing ones.
@@ -966,7 +966,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                 </div>
                             )}
 
-                            <div className="mt-6 flex gap-2">
+                            <div className="form-actions mt-6">
                                 <button
                                     onClick={() => setUploadStep('file')}
                                     className="btn btn-secondary"
@@ -1005,12 +1005,12 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                     >
                         {editingRunId === run.id ? (
                             <div>
-                                <h3 className="text-lg font-bold mb-4">Edit Record</h3>
+                                <h3 className="section-title mb-4">Edit Record</h3>
                                 <div className="space-y-3">
                                     {/* Data-type flags — multi-select, at least one must remain active */}
                                     <div>
                                         <p className="text-xs text-gray-500 mb-1">Data types (select all that apply)</p>
-                                        <div className="flex gap-2 flex-wrap">
+                                        <div className="data-type-flags">
                                             {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
                                                 const active = (editFormData.dataFlags || ['charging']).includes(key);
                                                 return (
@@ -1037,36 +1037,36 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         placeholder="Name"
                                         value={editFormData.name}
                                         onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
-                                        className="border p-2 rounded w-full"
+                                        className="form-input w-full"
                                     />
                                     <input
                                         type="date"
                                         value={editFormData.date}
                                         onChange={(e) => setEditFormData({...editFormData, date: e.target.value})}
-                                        className="border p-2 rounded w-full"
+                                        className="form-input w-full"
                                     />
                                     <input
                                         placeholder="Software Version"
                                         value={editFormData.softwareVersion}
                                         onChange={(e) => setEditFormData({...editFormData, softwareVersion: e.target.value})}
-                                        className="border p-2 rounded w-full"
+                                        className="form-input w-full"
                                     />
                                     <input
                                         placeholder="Notes"
                                         value={editFormData.conditions}
                                         onChange={(e) => setEditFormData({...editFormData, conditions: e.target.value})}
-                                        className="border p-2 rounded w-full"
+                                        className="form-input w-full"
                                     />
                                     {/* Charging energy field — shows energy_kwh for charging runs */}
                                     {(editFormData.dataFlags || ['charging']).includes('charging') && (
-                                        <div className="border rounded-lg p-3 bg-gray-50">
+                                        <div className="data-subpanel p-3">
                                             <p className="text-sm font-semibold text-gray-700 mb-2">Charging Energy</p>
                                             <input
                                                 type="number"
                                                 placeholder="Energy added (kWh)"
                                                 value={editFormData.energyKwh}
                                                 onChange={(e) => setEditFormData({...editFormData, energyKwh: e.target.value})}
-                                                className="border p-2 rounded w-full"
+                                                className="form-input w-full"
                                             />
                                             <p className="text-xs text-gray-400 mt-1">
                                                 Energy measured at charger or vehicle — <em>energy in</em> (not equal to energy used driving due to charging losses)
@@ -1076,28 +1076,28 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                 placeholder="Charging source URL (optional)"
                                                 value={editFormData.chargingUrl ?? ''}
                                                 onChange={(e) => setEditFormData({...editFormData, chargingUrl: e.target.value})}
-                                                className="border p-2 rounded w-full mt-2"
+                                                className="form-input w-full mt-2"
                                             />
                                         </div>
                                     )}
 
                                     {/* Range test fields */}
                                     {(editFormData.dataFlags || ['charging']).includes('range') && (
-                                        <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
+                                        <div className="data-subpanel p-4 space-y-3">
                                             <p className="text-sm font-semibold text-gray-700">Range Test Details</p>
-                                            <div className="grid grid-cols-2 gap-3">
+                                            <div className="form-grid gap-3">
                                                 <input
                                                     placeholder="Source (e.g., Out of Spec)"
                                                     value={editFormData.source}
                                                     onChange={(e) => setEditFormData({...editFormData, source: e.target.value})}
-                                                    className="border p-2 rounded col-span-2"
+                                                    className="form-input col-span-2"
                                                 />
                                                 <input
                                                     type="number"
                                                     placeholder="Start SoC (%)"
                                                     value={editFormData.startSoc}
                                                     onChange={(e) => setEditFormData({...editFormData, startSoc: e.target.value})}
-                                                    className="border p-2 rounded"
+                                                    className="form-input"
                                                     min="0" max="100"
                                                 />
                                                 <input
@@ -1105,7 +1105,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                     placeholder="End SoC (%)"
                                                     value={editFormData.endSoc}
                                                     onChange={(e) => setEditFormData({...editFormData, endSoc: e.target.value})}
-                                                    className="border p-2 rounded"
+                                                    className="form-input"
                                                     min="0" max="100"
                                                 />
                                                 <input
@@ -1113,14 +1113,14 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                     placeholder="Speed (mph)"
                                                     value={editFormData.speedMph}
                                                     onChange={(e) => setEditFormData({...editFormData, speedMph: e.target.value})}
-                                                    className="border p-2 rounded"
+                                                    className="form-input"
                                                 />
                                                 <input
                                                     type="number"
                                                     placeholder="Distance (miles)"
                                                     value={editFormData.distanceMiles}
                                                     onChange={(e) => setEditFormData({...editFormData, distanceMiles: e.target.value})}
-                                                    className="border p-2 rounded"
+                                                    className="form-input"
                                                 />
                                                 <input
                                                     type="number"
@@ -1128,34 +1128,34 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                     title="Energy consumed on the drive — energy out"
                                                     value={editFormData.energyKwh}
                                                     onChange={(e) => setEditFormData({...editFormData, energyKwh: e.target.value})}
-                                                    className="border p-2 rounded"
+                                                    className="form-input"
                                                 />
                                                 <input
                                                     type="number"
                                                     placeholder="Ambient temp (°F)"
                                                     value={editFormData.temperatureF}
                                                     onChange={(e) => setEditFormData({...editFormData, temperatureF: e.target.value})}
-                                                    className="border p-2 rounded"
+                                                    className="form-input"
                                                 />
                                                 <input
                                                     type="number"
                                                     placeholder="Elevation gain (ft)"
                                                     value={editFormData.elevationGainFt}
                                                     onChange={(e) => setEditFormData({...editFormData, elevationGainFt: e.target.value})}
-                                                    className="border p-2 rounded col-span-2"
+                                                    className="form-input col-span-2"
                                                 />
                                                 <input
                                                     type="url"
                                                     placeholder="Source URL"
                                                     value={editFormData.url}
                                                     onChange={(e) => setEditFormData({...editFormData, url: e.target.value})}
-                                                    className="border p-2 rounded col-span-2"
+                                                    className="form-input col-span-2"
                                                 />
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex gap-2 mt-4">
+                                <div className="form-actions mt-4">
                                     <button
                                         onClick={() => handleSaveEdit(run.id)}
                                         disabled={savingData}
@@ -1350,10 +1350,10 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex justify-between items-start">
+                            <div className="run-card-header">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <h3 className="text-lg font-bold">
+                                        <h3 className="section-title">
                                             {run.name}
                                             {run.url && (
                                                 <a href={run.url} target="_blank" rel="noopener noreferrer"
@@ -1389,13 +1389,13 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             </span>
                                         )}
                                     </div>
-                                    <div className="text-sm text-gray-600 mt-2 space-y-1">
+                                    <div className="run-meta">
                                         <p>Date: {run.date}</p>
                                         {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
                                         {run.conditions && <p>Notes: {run.conditions}</p>}
                                         {/* Range data section — shown whenever the run has range data */}
                                         {inferRunFlags(run).includes('range') && (
-                                            <div className="flex flex-wrap gap-1.5 mt-1">
+                                            <div className="run-stat-badges">
                                                 {run.source && <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{run.source}</span>}
                                                 {run.speed_mph != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{run.speed_mph} mph</span>}
                                                 {run.distance_miles != null && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-200">{run.distance_miles} mi</span>}
@@ -1419,7 +1419,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         )}
                                         {/* Charging data section — shown whenever the run has time-series data */}
                                         {inferRunFlags(run).includes('charging') && (
-                                            <div className="flex flex-wrap gap-1.5 mt-1 items-center">
+                                            <div className="run-stat-badges items-center">
                                                 <span className="text-sm">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>
                                                 {/* energy_kwh for charging = energy in (measured at charger/vehicle) */}
                                                 {run.energy_kwh != null && !inferRunFlags(run).includes('range') && (
@@ -1483,7 +1483,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             </div>
                                         );
                                     })()}
-                                    <div className="flex items-center gap-2 mt-3">
+                                    <div className="inline-row mt-3">
                                         <span className="text-sm text-gray-600">Plot Color:</span>
                                         <input
                                             type="color"
@@ -1513,7 +1513,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         />
                                     </div>
                                 </div>
-                                <div className="flex gap-2 flex-wrap justify-end">
+                                <div className="run-actions">
                                     {!run.isDefault && (
                                         <button
                                             onClick={() => onSetDefaultRun(run.id)}
@@ -1569,7 +1569,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
             </div>
 
             {vehicle.runs?.length === 0 && !showUpload && (
-                <div className="text-center py-12 text-gray-500">
+                <div className="empty-state">
                     <p className="text-lg">No test runs yet. Add a record to get started!</p>
                 </div>
             )}

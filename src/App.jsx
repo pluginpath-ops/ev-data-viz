@@ -261,7 +261,7 @@ export default function App() {
                             </div>
                         </div>
                     )}
-                    <div className="relative max-w-7xl mx-auto px-6 py-6">
+                    <div className="relative page-container py-6">
                         {/* Clickable title → home */}
                         <button
                             onClick={() => navigateTo('vehicles')}
@@ -287,7 +287,7 @@ export default function App() {
                 </header>
 
                 <nav className="bg-white shadow-sm border-b">
-                    <div className="max-w-7xl mx-auto px-6 pt-3 pb-2">
+                    <div className="page-container pt-3 pb-2">
                         {/*
                           * flex-col-reverse on mobile: DOM order is tabs first, actions second,
                           * but col-reverse flips that so actions render on TOP and tabs below.
@@ -295,7 +295,7 @@ export default function App() {
                           */}
                         <div className={`flex flex-col-reverse gap-y-2 sm:flex-row sm:items-center ${view === 'chart' ? 'mb-1' : 'mb-3'}`}>
                             {/* Tab group */}
-                            <div className="flex gap-1 items-center flex-wrap">
+                            <div className="nav-tab-group">
                                 <button
                                     onClick={() => navigateTo('vehicles')}
                                     className={`btn-tab ${view === 'vehicles' ? 'active' : ''}`}
@@ -324,12 +324,12 @@ export default function App() {
                                 </button>
                             </div>
                             {/* Action group — right-aligned on desktop, full-width right-justified on mobile */}
-                            <div className="flex gap-2 items-center justify-end sm:ml-auto">
+                            <div className="nav-actions sm:ml-auto">
                                 {user ? (
                                     <>
                                         <span className="text-sm text-gray-600">
                                             {user.email}
-                                            {isOwner && <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-bold">OWNER</span>}
+                                            {isOwner && <span className="owner-badge">OWNER</span>}
                                         </span>
                                         <button onClick={signOut} className="btn btn-secondary">
                                             Sign Out
@@ -354,9 +354,9 @@ export default function App() {
                                     {showImportMenu && (
                                         <>
                                             <div className="fixed inset-0 z-10" onClick={() => setShowImportMenu(false)} />
-                                            <div className="absolute right-0 mt-1 w-44 bg-white border rounded-lg shadow-lg z-20 overflow-hidden">
+                                            <div className="dropdown-menu w-44">
                                                 <label
-                                                    className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer"
+                                                    className="dropdown-item cursor-pointer"
                                                     onClick={() => setShowImportMenu(false)}
                                                 >
                                                     📄 App JSON
@@ -369,7 +369,7 @@ export default function App() {
                                                     />
                                                 </label>
                                                 <button
-                                                    className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 w-full text-left"
+                                                    className="dropdown-item w-full text-left"
                                                     onClick={() => { setShowImportMenu(false); setShowTableauModal(true); }}
                                                 >
                                                     📊 Tableau CSV
@@ -401,9 +401,9 @@ export default function App() {
 
                     </div>
                     <div className="border-t">
-                        <div className="max-w-7xl mx-auto px-6 py-2">
+                        <div className="page-container py-2">
                         {/* Selected vehicles row */}
-                        <div className="flex gap-2 items-center flex-wrap">
+                        <div className="inline-row flex-wrap">
                             <span className="text-sm text-gray-600 font-medium">Selected:</span>
                             {selectedVehicles.length === 0 ? (
                                 <div className="px-3 py-1 bg-gray-100 text-gray-500 rounded-full text-sm">
@@ -417,7 +417,7 @@ export default function App() {
                                         return (
                                             <div
                                                 key={vehicleId}
-                                                className="flex items-center gap-1 px-3 py-1 rounded-full text-sm"
+                                                className="selected-vehicle-chip"
                                                 style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}
                                             >
                                                 <span>{vehicle.name}</span>
@@ -444,7 +444,7 @@ export default function App() {
                     </div>
                 </nav>
 
-                <main className="max-w-7xl mx-auto p-6">
+                <main className="page-container py-6">
                     {view === 'vehicles' && (
                         <VehiclesView
                             vehicles={vehicles}
@@ -504,7 +504,7 @@ export default function App() {
                         ? 'bg-red-50 border-red-400'
                         : 'bg-green-50 border-green-500'
                 }`}>
-                    <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
+                    <div className="page-container py-3 flex items-center gap-4">
                         <span className="text-xl">{appNotification.type === 'error' ? '⚠️' : '✓'}</span>
                         <p className={`flex-1 text-sm font-medium ${
                             appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'

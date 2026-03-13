@@ -138,11 +138,11 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
     // ────────────────────────────────────────────────────────────────────────
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+        <div className="modal-overlay p-4">
+            <div className="modal-panel rounded-xl shadow-2xl max-w-5xl max-h-[90vh] flex flex-col">
 
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
+                <div className="modal-header px-6 py-4 border-b flex-shrink-0">
                     <div>
                         <h2 className="text-xl font-bold">Import Tableau CSV</h2>
                         <p className="text-sm text-gray-500 mt-0.5">
@@ -156,7 +156,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                 </div>
 
                 {/* Body */}
-                <div className="overflow-y-auto flex-1 px-6 py-5">
+                <div className="modal-body">
 
                     {/* ── UPLOAD STEP ── */}
                     {step === 'upload' && (
@@ -245,10 +245,10 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                 return (
                                     <div
                                         key={raw}
-                                        className={`border rounded-lg overflow-hidden transition ${skipped ? 'opacity-50' : ''}`}
+                                        className={`import-vehicle-panel ${skipped ? 'opacity-50' : ''}`}
                                     >
                                         {/* Vehicle header */}
-                                        <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b">
+                                        <div className="import-vehicle-header">
                                             <button
                                                 type="button"
                                                 onClick={() => toggleSkip(raw)}
@@ -288,7 +288,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                         {!skipped && (
                                             <div className="divide-y">
                                                 {vehicleSessions.map(({ idx, date, synthetic }) => (
-                                                    <div key={idx} className="px-4 py-2 flex items-center gap-2">
+                                                    <div key={idx} className="import-session-row">
                                                         <input
                                                             type="text"
                                                             value={sessionNames[idx] ?? ''}
@@ -380,7 +380,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t flex-shrink-0 flex justify-end gap-2">
+                <div className="modal-footer">
                     {step === 'upload' && (
                         <button onClick={onClose} className="btn btn-secondary">Cancel</button>
                     )}

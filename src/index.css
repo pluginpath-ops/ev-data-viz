@@ -174,3 +174,372 @@ body {
     from { width: 100%; }
     to   { width: 0%; }
 }
+
+/* ── Shared Layout ──────────────────────────────────────────────────────────── */
+
+/* Centered page-width column used in header, nav, main, bars */
+.page-container {
+    @apply max-w-7xl mx-auto px-6;
+}
+
+/* Page-level heading (h2) */
+.page-title {
+    @apply text-2xl font-bold;
+}
+
+/* Card/section heading (h3, h4) */
+.section-title {
+    @apply text-lg font-bold;
+}
+
+/* Horizontal inline group — flex row with standard gap */
+.inline-row {
+    @apply flex items-center gap-2;
+}
+
+/* Fixed bottom action bar (delete queue, undo toast, notification) */
+.fixed-action-bar {
+    @apply fixed bottom-0 left-0 right-0 shadow-2xl;
+}
+
+/* Empty-state placeholder content */
+.empty-state {
+    @apply text-center py-12 text-gray-500;
+}
+
+
+/* ── Modals ─────────────────────────────────────────────────────────────────── */
+
+.modal-overlay {
+    @apply fixed inset-0 flex items-center justify-center z-50;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+.modal-panel {
+    @apply bg-white w-full;
+    background-color: var(--color-card);
+}
+.modal-header {
+    @apply flex items-center justify-between;
+}
+.modal-body {
+    @apply overflow-y-auto flex-1 px-6 py-5;
+}
+.modal-footer {
+    @apply px-6 py-4 border-t flex-shrink-0 flex justify-end gap-2;
+}
+
+
+/* ── Forms ──────────────────────────────────────────────────────────────────── */
+
+/* Two-column form field grid; gap added inline (gap-3 or gap-4) */
+.form-grid {
+    @apply grid grid-cols-2;
+}
+
+/* Divider between form sections; mt added inline (mt-4 or mt-5) */
+.form-section {
+    @apply border-t pt-4;
+}
+
+/* Action button row at the bottom of a form; mt added inline */
+.form-actions {
+    @apply flex gap-2 justify-end;
+}
+
+/* Standard text/select/number input field */
+.form-input {
+    @apply border p-2 rounded;
+}
+
+/* CSV file upload drag-drop target */
+.csv-drop-zone {
+    @apply border-2 border-dashed border-gray-300 rounded-lg p-6 text-center;
+}
+
+/* Label wrapping a file input (image or CSV upload) */
+.image-upload-label {
+    @apply flex items-center gap-2 cursor-pointer;
+}
+
+
+/* ── Badges and Tags ────────────────────────────────────────────────────────── */
+
+/* Base pill — full-radius small badge; color classes added inline */
+.tag-pill {
+    @apply px-2 py-0.5 rounded-full text-xs font-medium;
+}
+
+/* Square-radius informational badge (blue by default) */
+.badge-default {
+    @apply text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded;
+}
+
+/* Border-style status badge (full-radius); color classes added inline */
+.badge-status {
+    @apply text-xs px-1.5 py-0.5 rounded-full border;
+}
+
+
+/* ── Navigation (App.jsx) ───────────────────────────────────────────────────── */
+
+/* Tab button group in the main nav bar */
+.nav-tab-group {
+    @apply flex gap-1 items-center flex-wrap;
+}
+
+/* Right-side action buttons in the nav bar */
+.nav-actions {
+    @apply flex gap-2 items-center justify-end;
+}
+
+/* Selected vehicle chip in the nav selected-vehicles strip */
+.selected-vehicle-chip {
+    @apply flex items-center gap-1 px-3 py-1 rounded-full text-sm;
+}
+
+/* OWNER role badge next to user email */
+.owner-badge {
+    @apply ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-bold;
+}
+
+/* Import ▾ dropdown panel */
+.dropdown-menu {
+    @apply absolute right-0 mt-1 bg-white border rounded-lg shadow-lg z-20 overflow-hidden;
+}
+
+/* Single item inside a dropdown menu */
+.dropdown-item {
+    @apply flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50;
+}
+
+
+/* ── Vehicles View ──────────────────────────────────────────────────────────── */
+
+/* Responsive card grid: 1 col mobile → 2 col tablet → 3 col desktop */
+.vehicle-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3;
+}
+
+/* List-mode vehicle container */
+.vehicle-list {
+    @apply flex flex-col gap-2;
+}
+
+/* Search / filter row above the vehicle grid */
+.vehicle-filter-bar {
+    @apply flex gap-3 items-center mb-3;
+}
+
+/* Card / list view mode toggle widget */
+.view-toggle {
+    @apply flex border rounded-lg overflow-hidden text-gray-500;
+}
+
+/* Tag filter chip strip below the search bar */
+.tag-filter-bar {
+    @apply flex flex-wrap gap-2 items-center mb-6;
+}
+
+/* Vehicle tag chip cluster on a card or list row */
+.vehicle-tags {
+    @apply flex flex-wrap gap-1;
+}
+
+/* Reorder arrow button cluster (Up/Down/Top/Bottom/±10) */
+.reorder-controls {
+    @apply flex items-center gap-0.5;
+}
+
+/* Individual reorder direction button */
+.reorder-btn {
+    @apply w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500;
+}
+
+/* Pagination button strip below the vehicle grid */
+.vehicle-pagination {
+    @apply flex items-center justify-center gap-2 mt-6;
+}
+
+/* Individual pagination navigation button */
+.pagination-btn {
+    @apply px-2 py-1 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-40;
+}
+
+
+/* ── Chart Views (Charging + Range) ────────────────────────────────────────── */
+
+/* X / Y / Y2 axis dropdown grid */
+.axis-selectors {
+    @apply grid grid-cols-3 gap-4 mb-6;
+}
+
+/* Chart type / preset button row; mb added inline */
+.chart-type-buttons {
+    @apply flex flex-wrap gap-2;
+}
+
+/* Checkbox toggle label (lines, points, race mode, etc.) */
+.toggle-label {
+    @apply flex items-center gap-2 cursor-pointer select-none w-fit;
+}
+
+/* Checkbox toggle row container */
+.chart-toggles {
+    @apply flex flex-wrap gap-4 mb-4;
+}
+
+/* Collapsible "Select Runs" section header button */
+.run-selector-header {
+    @apply flex items-center gap-2 w-full text-left font-medium hover:text-gray-600 transition-colors mb-1;
+}
+
+/* Vehicle group list inside the run selector */
+.runs-list {
+    @apply space-y-4;
+}
+
+/* Per-vehicle left-bordered group in the run selector */
+.vehicle-run-group {
+    @apply border-l-4 pl-4;
+}
+
+/* Run list within a vehicle group */
+.run-items {
+    @apply space-y-2;
+}
+
+/* Run name area: text + source link arrows + date/status badges */
+.run-label {
+    @apply flex-1 flex items-center gap-2 flex-wrap;
+}
+
+/* Copy chart as PNG button */
+.chart-copy-btn {
+    @apply text-sm flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors;
+}
+
+/* Race mode configuration panel */
+.race-mode-panel {
+    @apply mt-4 p-3 rounded-lg border;
+}
+
+/* Efficiency unit toggle (mi/kWh ↔ Wh/mi) */
+.efficiency-unit-toggle {
+    @apply flex gap-1 p-1 bg-gray-100 rounded-lg;
+}
+
+
+/* ── Runs View ──────────────────────────────────────────────────────────────── */
+
+/* Top header bar of the runs view (title + action buttons) */
+.runs-view-header {
+    @apply flex justify-between items-center mb-6;
+}
+
+/* "Adding data to: X" merge-mode banner */
+.merge-target-banner {
+    @apply mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between;
+}
+
+/* Data-type flag toggle chip strip */
+.data-type-flags {
+    @apply flex gap-2 flex-wrap;
+}
+
+/* Sub-section panel within a form (Charging Energy, Range Test Details) */
+.data-subpanel {
+    @apply border rounded-lg bg-gray-50;
+}
+
+/* CSV field mapping label + select row */
+.field-mapping-row {
+    @apply flex items-center gap-4;
+}
+
+/* Range estimation option panel; color classes added inline */
+.estimation-panel {
+    @apply p-4 rounded-lg border flex items-start justify-between gap-4;
+}
+
+/* Join key / merge-mode info panel; color classes added inline */
+.join-key-panel {
+    @apply mt-5 p-4 rounded-lg border;
+}
+
+/* Run card top section (title + action buttons) */
+.run-card-header {
+    @apply flex justify-between items-start;
+}
+
+/* Run metadata block (date, conditions, notes) */
+.run-meta {
+    @apply text-sm text-gray-600 mt-2 space-y-1;
+}
+
+/* Inline badge cluster for run stats (speed, distance, energy, temp) */
+.run-stat-badges {
+    @apply flex flex-wrap gap-1.5 mt-1;
+}
+
+/* Run card action button row */
+.run-actions {
+    @apply flex gap-2 flex-wrap justify-end;
+}
+
+
+/* ── Auth Modal ─────────────────────────────────────────────────────────────── */
+
+/* OAuth provider button (GitHub, Google) */
+.auth-provider-btn {
+    @apply w-full flex items-center justify-center gap-3 font-medium py-3 px-4 rounded-lg transition;
+}
+
+
+/* ── Import Tableau Modal ───────────────────────────────────────────────────── */
+
+/* Per-vehicle accordion panel */
+.import-vehicle-panel {
+    @apply border rounded-lg overflow-hidden transition;
+}
+
+/* Vehicle panel header row */
+.import-vehicle-header {
+    @apply flex items-center gap-3 px-4 py-3 bg-gray-50 border-b;
+}
+
+/* Individual session row within a vehicle panel */
+.import-session-row {
+    @apply px-4 py-2 flex items-center gap-2;
+}
+
+
+/* ── Axis Scale Controls ────────────────────────────────────────────────────── */
+
+/* Min/Max input stack for one axis */
+.axis-scale-group {
+    @apply flex flex-col gap-1.5;
+}
+
+/* Numeric axis-bound input — hides browser spin buttons */
+.axis-input {
+    @apply px-2 py-1 border rounded text-sm w-24;
+    appearance: textfield;
+}
+.axis-input::-webkit-inner-spin-button,
+.axis-input::-webkit-outer-spin-button {
+    appearance: none;
+}
+
+
+/* ── Specs View ─────────────────────────────────────────────────────────────── */
+
+/* Specs comparison table outer wrapper */
+.specs-table-container {
+    @apply rounded-lg shadow overflow-x-auto;
+    background-color: var(--color-card);
+}
+
+/* Specs table cell — both <th> and <td> */
+.specs-table-cell {
+    @apply px-6 py-4;
+}
