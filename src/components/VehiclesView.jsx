@@ -315,8 +315,8 @@ export default function VehiclesView({
 
     // ── Shared sub-components ────────────────────────────────────────────────
 
-    const VisibilityPill = ({ vehicle }) => {
-        const base = 'flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition';
+    const VisibilityPill = ({ vehicle, fullWidth }) => {
+        const base = `flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition${fullWidth ? ' w-full justify-center' : ''}`;
         const pubCls = 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200';
         const privCls = 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200';
         const isPublic = vehicle.visibility === 'public';
@@ -338,16 +338,10 @@ export default function VehiclesView({
         );
     };
 
-    const ActionButtons = ({ vehicle, layout }) => {
-        const isVertical = layout === 'list';
+    const ActionButtons = ({ vehicle }) => {
+        const isPending = pendingDeletes.has(vehicle.id);
         return (
-            <div className={isVertical ? 'flex flex-col gap-1' : 'flex gap-2'}>
-                <button
-                    onClick={(e) => { e.stopPropagation(); onViewRuns(vehicle); }}
-                    className={`px-3 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition${isVertical ? '' : ' flex-1'}`}
-                >
-                    View Runs
-                </button>
+            <div className="flex flex-col gap-1 items-stretch">
                 {isOwner && (
                     <button
                         onClick={(e) => handleEdit(vehicle, e)}
@@ -360,30 +354,20 @@ export default function VehiclesView({
                     <button
                         onClick={(e) => handleDuplicateVehicle(vehicle, e)}
                         disabled={duplicatingId !== null}
-                        title="Duplicate vehicle and all runs"
+                        title="Duplicate vehicle and all tests"
                         className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-50"
                     >
                         {duplicatingId === vehicle.id ? '…' : '⧉ Copy'}
                     </button>
                 )}
-                {isOwner && (() => {
-                    const isPending = pendingDeletes.has(vehicle.id);
-                    return (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                isPending ? restoreItem(vehicle.id) : queueDelete(vehicle.id);
-                            }}
-                            className={`px-3 py-1 rounded-md text-xs font-medium transition${isVertical ? '' : ''} ${
-                                isPending
-                                    ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                                    : 'bg-red-50 text-red-600 hover:bg-red-100'
-                            }`}
-                        >
-                            {isPending ? '↩ Restore' : 'Delete'}
-                        </button>
-                    );
-                })()}
+                {isOwner && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); isPending ? restoreItem(vehicle.id) : queueDelete(vehicle.id); }}
+                        className={`px-3 py-1 rounded-md text-xs font-medium transition ${isPending ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                    >
+                        {isPending ? '↩ Restore' : 'Delete'}
+                    </button>
+                )}
             </div>
         );
     };
@@ -666,29 +650,39 @@ export default function VehiclesView({
                                             </div>
                                         )}
 
-                                        {/* Top content */}
-                                        <div>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <h3 className="text-xl font-bold">{vehicle.name}</h3>
-                                                <VisibilityPill vehicle={vehicle} />
+                                        {/* Main row: left content + right action column */}
+                                        <div className="flex flex-1 gap-3">
+                                            {/* Left: vehicle info */}
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-xl font-bold mb-1">{vehicle.name}</h3>
+                                                <p className="text-gray-600 mb-2">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                                                <div className="text-sm text-gray-700 space-y-1">
+                                                    {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
+                                                    {vehicle.range && <p>Range: {vehicle.range} mi</p>}
+                                                    {vehicle.power && <p>Power: {vehicle.power} kW</p>}
+                                                </div>
+                                                <p className="text-sm font-semibold mt-2">Tests: {vehicle.runs?.length || 0}</p>
+                                                {vehicle.tags?.length > 0 && (
+                                                    <div className="mt-2">
+                                                        <TagPills vehicle={vehicle} />
+                                                    </div>
+                                                )}
                                             </div>
-                                            <p className="text-gray-600 mb-2">{vehicle.make} {vehicle.model} {vehicle.year}</p>
-                                            <div className="text-sm text-gray-700 space-y-1">
-                                                {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
-                                                {vehicle.range && <p>Range: {vehicle.range} mi</p>}
-                                                {vehicle.power && <p>Power: {vehicle.power} kW</p>}
+                                            {/* Right: vertical action column */}
+                                            <div className="flex flex-col gap-1 flex-shrink-0 items-stretch" onClick={e => e.stopPropagation()}>
+                                                <VisibilityPill vehicle={vehicle} fullWidth />
+                                                <ActionButtons vehicle={vehicle} />
                                             </div>
                                         </div>
 
-                                        {/* Bottom anchor — Test Runs, tags, buttons always at card base */}
-                                        <div className="mt-auto pt-3">
-                                            <p className="text-sm font-semibold mb-2">Test Runs: {vehicle.runs?.length || 0}</p>
-                                            {vehicle.tags?.length > 0 && (
-                                                <div className="mb-2">
-                                                    <TagPills vehicle={vehicle} />
-                                                </div>
-                                            )}
-                                            <ActionButtons vehicle={vehicle} layout="card" />
+                                        {/* Footer: View Tests & Data full width */}
+                                        <div className="mt-auto pt-3" onClick={e => e.stopPropagation()}>
+                                            <button
+                                                onClick={() => onViewRuns(vehicle)}
+                                                className="w-full px-3 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
+                                            >
+                                                View Tests &amp; Data →
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -774,13 +768,21 @@ export default function VehiclesView({
                                         {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                         {vehicle.range && <p>Range: {vehicle.range} mi</p>}
                                         {vehicle.power && <p>Power: {vehicle.power} kW</p>}
-                                        <p className="font-medium">Runs: {vehicle.runs?.length || 0}</p>
+                                        <p className="font-medium">Tests: {vehicle.runs?.length || 0}</p>
                                     </div>
 
-                                    {/* Visibility + action buttons */}
-                                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                                        <VisibilityPill vehicle={vehicle} />
-                                        <ActionButtons vehicle={vehicle} layout="list" />
+                                    {/* View Tests & Data — dedicated column */}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onViewRuns(vehicle); }}
+                                        className="px-4 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition flex-shrink-0"
+                                    >
+                                        View Tests &amp; Data →
+                                    </button>
+
+                                    {/* Action column: Visibility → Edit → Copy → Delete */}
+                                    <div className="flex flex-col gap-1 flex-shrink-0 items-stretch w-28" onClick={e => e.stopPropagation()}>
+                                        <VisibilityPill vehicle={vehicle} fullWidth />
+                                        <ActionButtons vehicle={vehicle} />
                                     </div>
                                 </div>
 
