@@ -421,7 +421,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold">Chart Options — Range &amp; Efficiency</h3>
                     {/* Efficiency unit toggle — relevant for efficiency charts */}
-                    <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
+                    <div className="efficiency-unit-toggle">
                         {[{ key: 'mi_kwh', label: 'mi/kWh' }, { key: 'wh_mi', label: 'Wh/mi' }].map(({ key, label }) => (
                             <button
                                 key={key}
@@ -436,7 +436,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 </div>
 
                 {/* Chart type buttons */}
-                <div className="flex flex-wrap gap-2 mb-4">
+                <div className="chart-type-buttons mb-4">
                     {CHART_TYPES.map(t => (
                         <button
                             key={t.key}
@@ -457,7 +457,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 {/* Show points toggle — only relevant for line charts */}
                 {CHART_TYPES.find(t => t.key === chartType)?.kind === 'line' && (
                     <div className="mb-6">
-                        <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+                        <label className="toggle-label">
                             <input
                                 type="checkbox"
                                 checked={showPoints}
@@ -473,7 +473,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 <div>
                     <button
                         onClick={() => setRunsExpanded(prev => !prev)}
-                        className="flex items-center gap-2 w-full text-left font-medium hover:text-gray-600 transition-colors mb-1"
+                        className="run-selector-header"
                     >
                         <span style={{ display: 'inline-block', transform: runsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
                         Select Runs to Display
@@ -490,7 +490,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                     <p className="text-xs mt-1">Add records using the Test Runs tab with "Range Test" type.</p>
                                 </div>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="runs-list">
                                     {selectedVehicles.map(vehicle => {
                                         const rangeRuns    = (vehicle.runs || []).filter(r => r.has_range);
                                         const activeRuns   = rangeRuns.filter(r =>  selectedRuns.some(id => String(id) === String(r.id)));
@@ -578,7 +578,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                         };
 
                                         return (
-                                            <div key={vehicle.id} className="border-l-4 pl-4" style={{ borderColor: 'var(--color-primary)' }}>
+                                            <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <h4 className="font-semibold text-gray-700">{vehicle.name}</h4>
                                                     {inactiveRuns.length > 0 && (
@@ -594,7 +594,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                                 {rangeRuns.length === 0 ? (
                                                     <p className="text-sm text-gray-400 italic">No range test records</p>
                                                 ) : (
-                                                    <div className="space-y-2">
+                                                    <div className="run-items">
                                                         {activeRuns.map(run => <RunRow key={run.id} run={run} dimmed={false} />)}
                                                         {isVehicleExpanded && inactiveRuns.map(run => <RunRow key={run.id} run={run} dimmed={true} />)}
                                                         {activeRuns.length === 0 && !isVehicleExpanded && (
@@ -641,7 +641,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     <button
                         onClick={handleCopyImage}
                         disabled={plottableRuns.length === 0}
-                        className={`text-sm flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                        className={`chart-copy-btn disabled:opacity-40 disabled:cursor-not-allowed ${
                             copied
                                 ? 'bg-green-50 border-green-200 text-green-700'
                                 : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'

@@ -35,26 +35,26 @@ function EditForm({
 }) {
     return (
         <form onSubmit={onSubmit} className="card">
-            <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <h3 className="section-title mb-4">{editingId ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
+            <div className="form-grid gap-4">
                 <input
                     placeholder="Display Name (e.g., Model 3 LR 2024)"
                     value={formData.name}
                     onChange={(e) => onFormChange({ ...formData, name: e.target.value })}
-                    className="border p-2 rounded col-span-2"
+                    className="form-input col-span-2"
                     required
                 />
-                <input placeholder="Make"           value={formData.make}    onChange={(e) => onFormChange({ ...formData, make: e.target.value })}    className="border p-2 rounded" />
-                <input placeholder="Model"          value={formData.model}   onChange={(e) => onFormChange({ ...formData, model: e.target.value })}   className="border p-2 rounded" />
-                <input placeholder="Year"           value={formData.year}    onChange={(e) => onFormChange({ ...formData, year: e.target.value })}    className="border p-2 rounded" />
-                <input placeholder="Battery (kWh)"  value={formData.battery} onChange={(e) => onFormChange({ ...formData, battery: e.target.value })} className="border p-2 rounded" />
-                <input placeholder="EPA Range (mi)" value={formData.range}   onChange={(e) => onFormChange({ ...formData, range: e.target.value })}   className="border p-2 rounded" />
-                <input placeholder="Peak Power (kW)" value={formData.power}  onChange={(e) => onFormChange({ ...formData, power: e.target.value })}   className="border p-2 rounded" />
+                <input placeholder="Make"           value={formData.make}    onChange={(e) => onFormChange({ ...formData, make: e.target.value })}    className="form-input" />
+                <input placeholder="Model"          value={formData.model}   onChange={(e) => onFormChange({ ...formData, model: e.target.value })}   className="form-input" />
+                <input placeholder="Year"           value={formData.year}    onChange={(e) => onFormChange({ ...formData, year: e.target.value })}    className="form-input" />
+                <input placeholder="Battery (kWh)"  value={formData.battery} onChange={(e) => onFormChange({ ...formData, battery: e.target.value })} className="form-input" />
+                <input placeholder="EPA Range (mi)" value={formData.range}   onChange={(e) => onFormChange({ ...formData, range: e.target.value })}   className="form-input" />
+                <input placeholder="Peak Power (kW)" value={formData.power}  onChange={(e) => onFormChange({ ...formData, power: e.target.value })}   className="form-input" />
             </div>
 
             {/* Tags — edit mode only */}
             {editingId && (
-                <div className="mt-5 border-t pt-4">
+                <div className="form-section mt-5">
                     <label className="block font-medium mb-2">Tags</label>
                     {formTags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-3">
@@ -85,7 +85,7 @@ function EditForm({
                                     if (tag) onAddTag(tag);
                                     e.target.value = '';
                                 }}
-                                className="border p-2 rounded text-sm w-full"
+                                className="form-input w-full text-sm"
                                 defaultValue=""
                             >
                                 <option value="" disabled>Add existing tag…</option>
@@ -102,7 +102,7 @@ function EditForm({
                             value={newTagName}
                             onChange={(e) => onNewTagNameChange(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onCreateTag(); } }}
-                            className="border p-2 rounded text-sm flex-1"
+                            className="form-input text-sm flex-1"
                         />
                         <button type="button" onClick={onCreateTag} className="btn btn-primary text-sm">
                             Create tag
@@ -113,7 +113,7 @@ function EditForm({
 
             {/* Image upload — edit mode only */}
             {editingId && (
-                <div className="mt-4 border-t pt-4">
+                <div className="form-section mt-4">
                     <label className="block font-medium mb-2">Card Background Image</label>
                     {editingVehicle?.image_url && (
                         <img
@@ -122,7 +122,7 @@ function EditForm({
                             className="h-24 w-full object-cover rounded mb-2 border"
                         />
                     )}
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label className="image-upload-label">
                         <span className="btn btn-primary text-sm">
                             {imageUploading ? 'Uploading…' : editingVehicle?.image_url ? 'Replace image' : 'Upload image'}
                         </span>
@@ -138,7 +138,7 @@ function EditForm({
             )}
 
             {/* Footer: Cancel left, Save right, both text-sm to match image button */}
-            <div className="mt-4 flex gap-2 justify-end">
+            <div className="form-actions mt-4">
                 <button type="button" onClick={onCancel} className="btn btn-secondary text-sm">
                     Cancel
                 </button>
@@ -391,7 +391,7 @@ export default function VehiclesView({
     const TagPills = ({ vehicle }) => {
         if (!vehicle.tags?.length) return null;
         return (
-            <div className="flex flex-wrap gap-1">
+            <div className="vehicle-tags">
                 {vehicle.tags.map(tag => (
                     <span
                         key={tag.id}
@@ -499,9 +499,9 @@ export default function VehiclesView({
             {/* Header */}
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">Vehicles</h2>
-                <div className="flex items-center gap-2">
+                <div className="inline-row">
                     {/* View mode toggle */}
-                    <div className="flex border rounded-lg overflow-hidden text-gray-500">
+                    <div className="view-toggle">
                         <button
                             onClick={() => setViewMode('card')}
                             title="Card view"
@@ -527,18 +527,18 @@ export default function VehiclesView({
             </div>
 
             {/* Sort + search bar */}
-            <div className="flex gap-3 items-center mb-3">
+            <div className="vehicle-filter-bar">
                 <input
                     type="text"
                     placeholder="Search by name, make, model, year…"
                     value={textFilter}
                     onChange={e => setTextFilter(e.target.value)}
-                    className="border p-2 rounded text-sm flex-1"
+                    className="form-input text-sm flex-1"
                 />
                 <select
                     value={sortBy}
                     onChange={e => setSortBy(e.target.value)}
-                    className="border p-2 rounded text-sm"
+                    className="form-input text-sm"
                 >
                     <option value="default">Default Order</option>
                     <option value="date_newest">Date Added (Newest)</option>
@@ -567,7 +567,7 @@ export default function VehiclesView({
 
             {/* Tag filter bar */}
             {tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 items-center mb-6">
+                <div className="tag-filter-bar">
                     <span className="text-sm font-medium text-gray-500">Filter:</span>
                     {tags.map(tag => (
                         <button
@@ -603,7 +603,7 @@ export default function VehiclesView({
 
             {/* ── CARD VIEW ── */}
             {viewMode === 'card' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="vehicle-grid">
                     {pagedVehicles.map(vehicle => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
                         const isPending  = pendingDeletes.has(vehicle.id);
@@ -647,10 +647,10 @@ export default function VehiclesView({
 
                                         {/* Reorder controls — shown in edit order mode */}
                                         {showReorderButtons && (
-                                            <div className="flex items-center gap-0.5 mb-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                                                <button title="Top" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, 0); }} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500">⇈</button>
-                                                <button title="-10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos - 10); }} disabled={globalPos < 1} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▲▲</button>
-                                                <button title="Up" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'up'); }} disabled={globalPos === 0} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▲</button>
+                                            <div className="reorder-controls mb-2 flex-wrap" onClick={e => e.stopPropagation()}>
+                                                <button title="Top" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, 0); }} className="reorder-btn">⇈</button>
+                                                <button title="-10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos - 10); }} disabled={globalPos < 1} className="reorder-btn disabled:opacity-30">▲▲</button>
+                                                <button title="Up" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'up'); }} disabled={globalPos === 0} className="reorder-btn disabled:opacity-30">▲</button>
                                                 <input
                                                     type="number" min={1} max={totalCount}
                                                     defaultValue={globalPos + 1}
@@ -660,9 +660,9 @@ export default function VehiclesView({
                                                     onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
                                                     className="w-10 h-6 text-center text-xs border rounded bg-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                                 />
-                                                <button title="Down" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }} disabled={globalPos === totalCount - 1} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▼</button>
-                                                <button title="+10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos + 10); }} disabled={globalPos >= totalCount - 1} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▼▼</button>
-                                                <button title="Bottom" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, totalCount - 1); }} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500">⇊</button>
+                                                <button title="Down" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }} disabled={globalPos === totalCount - 1} className="reorder-btn disabled:opacity-30">▼</button>
+                                                <button title="+10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos + 10); }} disabled={globalPos >= totalCount - 1} className="reorder-btn disabled:opacity-30">▼▼</button>
+                                                <button title="Bottom" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, totalCount - 1); }} className="reorder-btn">⇊</button>
                                             </div>
                                         )}
 
@@ -707,7 +707,7 @@ export default function VehiclesView({
 
             {/* ── LIST VIEW ── */}
             {viewMode === 'list' && (
-                <div className="flex flex-col gap-2">
+                <div className="vehicle-list">
                     {pagedVehicles.map(vehicle => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
                         const isPending  = pendingDeletes.has(vehicle.id);
@@ -735,10 +735,10 @@ export default function VehiclesView({
 
                                     {/* Reorder controls — owner only, default sort, no filters */}
                                     {showReorderButtons && (
-                                        <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                                            <button title="Top" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, 0); }} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500">⇈</button>
-                                            <button title="-10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos - 10); }} disabled={globalPos < 1} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▲▲</button>
-                                            <button title="Up" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'up'); }} disabled={globalPos === 0} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▲</button>
+                                        <div className="reorder-controls flex-shrink-0" onClick={e => e.stopPropagation()}>
+                                            <button title="Top" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, 0); }} className="reorder-btn">⇈</button>
+                                            <button title="-10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos - 10); }} disabled={globalPos < 1} className="reorder-btn disabled:opacity-30">▲▲</button>
+                                            <button title="Up" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'up'); }} disabled={globalPos === 0} className="reorder-btn disabled:opacity-30">▲</button>
                                             <input
                                                 type="number" min={1} max={totalCount}
                                                 defaultValue={globalPos + 1}
@@ -748,9 +748,9 @@ export default function VehiclesView({
                                                 onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
                                                 className="w-10 h-6 text-center text-xs border rounded bg-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                             />
-                                            <button title="Down" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }} disabled={globalPos === totalCount - 1} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▼</button>
-                                            <button title="+10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos + 10); }} disabled={globalPos >= totalCount - 1} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500 disabled:opacity-30">▼▼</button>
-                                            <button title="Bottom" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, totalCount - 1); }} className="w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500">⇊</button>
+                                            <button title="Down" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }} disabled={globalPos === totalCount - 1} className="reorder-btn disabled:opacity-30">▼</button>
+                                            <button title="+10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos + 10); }} disabled={globalPos >= totalCount - 1} className="reorder-btn disabled:opacity-30">▼▼</button>
+                                            <button title="Bottom" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, totalCount - 1); }} className="reorder-btn">⇊</button>
                                         </div>
                                     )}
 
@@ -798,17 +798,17 @@ export default function VehiclesView({
 
             {/* Pagination */}
             {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 mt-6">
-                    <button onClick={() => setVehiclePage(1)} disabled={vehiclePage === 1} className="px-2 py-1 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-40">«</button>
-                    <button onClick={() => setVehiclePage(p => p - 1)} disabled={vehiclePage === 1} className="px-2 py-1 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-40">‹</button>
+                <div className="vehicle-pagination">
+                    <button onClick={() => setVehiclePage(1)} disabled={vehiclePage === 1} className="pagination-btn">«</button>
+                    <button onClick={() => setVehiclePage(p => p - 1)} disabled={vehiclePage === 1} className="pagination-btn">‹</button>
                     <span className="text-sm text-gray-600">Page {vehiclePage} of {totalPages}</span>
-                    <button onClick={() => setVehiclePage(p => p + 1)} disabled={vehiclePage === totalPages} className="px-2 py-1 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-40">›</button>
-                    <button onClick={() => setVehiclePage(totalPages)} disabled={vehiclePage === totalPages} className="px-2 py-1 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-40">»</button>
+                    <button onClick={() => setVehiclePage(p => p + 1)} disabled={vehiclePage === totalPages} className="pagination-btn">›</button>
+                    <button onClick={() => setVehiclePage(totalPages)} disabled={vehiclePage === totalPages} className="pagination-btn">»</button>
                 </div>
             )}
 
             {sortedFilteredVehicles.length === 0 && !showForm && (
-                <div className="text-center py-12 text-gray-500">
+                <div className="empty-state">
                     {textFilter.trim()
                         ? <p className="text-lg">No vehicles match "{textFilter.trim()}".</p>
                         : activeTagFilters.length > 0

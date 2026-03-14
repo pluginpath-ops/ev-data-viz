@@ -424,9 +424,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         }
     };
 
-    // ── Shared input class ────────────────────────────────────────────────────
-    const numInputCls = 'px-2 py-1 border rounded text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
-
     // ── Render ────────────────────────────────────────────────────────────────
 
     if (chartMode === 'range') {
@@ -445,7 +442,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             {/* ── Top card: presets, axis selectors, run selector ── */}
             <div className="card mb-6">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold">Chart Options — Charging Performance</h3>
+                    <h3 className="section-title">Chart Options — Charging Performance</h3>
                     <button
                         onClick={() => {
                             navigator.clipboard.writeText(window.location.href).then(() => {
@@ -453,7 +450,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                 setTimeout(() => setCopied(false), 2000);
                             });
                         }}
-                        className={`text-sm flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors ${
+                        className={`chart-copy-btn ${
                             copied
                                 ? 'bg-green-50 border-green-200 text-green-700'
                                 : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
@@ -479,7 +476,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 </div>
 
                 {/* Axis selectors */}
-                <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="axis-selectors">
                     <div>
                         <label className="block font-medium mb-2">X-Axis:</label>
                         <select
@@ -520,8 +517,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 </div>
 
                 {/* ── Line / points toggles ── */}
-                <div className="flex flex-wrap gap-4 mb-4">
-                    <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+                <div className="chart-toggles">
+                    <label className="toggle-label">
                         <input
                             type="checkbox"
                             checked={chartConfig.showLine ?? true}
@@ -534,7 +531,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         />
                         <span className="text-sm font-medium">Connect points with lines</span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+                    <label className="toggle-label">
                         <input
                             type="checkbox"
                             checked={chartConfig.showPoints || false}
@@ -553,7 +550,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 <div>
                     <button
                         onClick={() => setRunsExpanded(prev => !prev)}
-                        className="flex items-center gap-2 w-full text-left font-medium hover:text-gray-600 transition-colors mb-1"
+                        className="run-selector-header"
                     >
                         <span
                             style={{ display: 'inline-block', transform: runsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
@@ -567,7 +564,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     {runsExpanded && (
                         <div className="mt-3">
                         {/* chartMode === 'charging' is guaranteed here — range mode returns early above */}
-                        <div className="space-y-4">
+                        <div className="runs-list">
                             {selectedVehicles.map(vehicle => {
                                 const isExpanded = expandedVehicles[vehicle.id];
                                 // Only show runs that have charging data in charging mode
@@ -581,7 +578,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                     const offset = getRaceOffset(run.id);
                                     const noTrim = offset !== null && offset === 0;
                                     return (
-                                        <span className="flex-1 flex items-center gap-2 flex-wrap">
+                                        <span className="run-label">
                                             <span>
                                                 {run.name}
                                                 {run.url && (
@@ -602,24 +599,24 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                 )}
                                                 <span className="text-sm text-gray-500"> ({run.date})</span>
                                                 {run.isDefault && (
-                                                    <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded"
+                                                    <span className="badge-default ml-2"
                                                         style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
                                                         Default
                                                     </span>
                                                 )}
                                             </span>
                                             {exclusionReason && (
-                                                <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full" title={`Hidden in race mode: ${exclusionReason}`}>
+                                                <span className="badge-status bg-amber-50 text-amber-700 border-amber-200" title={`Hidden in race mode: ${exclusionReason}`}>
                                                     ⚠ {exclusionReason}
                                                 </span>
                                             )}
                                             {!exclusionReason && offset !== null && (
                                                 noTrim ? (
-                                                    <span className="text-xs bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded-full" title="Data starts at or above the threshold — no time was trimmed">
+                                                    <span className="badge-status bg-red-50 text-red-700 border-red-200" title="Data starts at or above the threshold — no time was trimmed">
                                                         no offset
                                                     </span>
                                                 ) : (
-                                                    <span className="text-xs bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded-full" title={`${offset} min of pre-threshold data trimmed`}>
+                                                    <span className="badge-status bg-gray-100 text-gray-500 border-gray-200" title={`${offset} min of pre-threshold data trimmed`}>
                                                         −{offset} min offset
                                                     </span>
                                                 )
@@ -656,7 +653,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                 );
 
                                 return (
-                                    <div key={vehicle.id} className="border-l-4 pl-4" style={{ borderColor: 'var(--color-primary)' }}>
+                                    <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
                                         <div className="flex items-center gap-2 mb-2">
                                             <h4 className="font-semibold text-gray-700">{vehicle.name}</h4>
                                             {hasInactiveRuns && (
@@ -669,7 +666,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                 </button>
                                             )}
                                         </div>
-                                        <div className="space-y-2">
+                                        <div className="run-items">
                                             {/* Active runs — always shown */}
                                             {activeRuns.map(run => (
                                                 <label key={run.id} className="flex items-center gap-2">
@@ -724,7 +721,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 <div className="mt-3 flex items-center gap-3">
                     <button
                         onClick={handleExportImage}
-                        className={`text-sm flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors ${
+                        className={`chart-copy-btn ${
                             imageCopied
                                 ? 'bg-green-50 border-green-200 text-green-700'
                                 : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
@@ -769,9 +766,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
                 {/* ── Race mode panel — only visible when X = Time ── */}
                 {chartConfig.xAxis === 'time' && (
-                    <div className={`mt-4 p-3 rounded-lg border ${chartConfig.raceMode ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className={`race-mode-panel ${chartConfig.raceMode ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-gray-200'}`}>
                         <div className="flex flex-wrap items-center gap-3">
-                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <label className="toggle-label">
                                 <input
                                     type="checkbox"
                                     checked={chartConfig.raceMode || false}

@@ -5,13 +5,13 @@ export default function SpecsView({ vehicles, selectedVehicleIds }) {
 
     return (
         <div>
-            <h2 className="text-2xl font-bold mb-6">
+            <h2 className="page-title mb-6">
                 Vehicle Specifications Comparison
                 {selectedVehicleIds.length > 0 && ` (${selectedVehicleIds.length} Selected)`}
             </h2>
 
             {displayVehicles.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
+                <div className="empty-state">
                     <p className="text-lg">
                         {vehicles.length === 0
                             ? 'No vehicles to compare. Add vehicles first!'
@@ -19,7 +19,7 @@ export default function SpecsView({ vehicles, selectedVehicleIds }) {
                     </p>
                 </div>
             ) : (
-                <div className="bg-white rounded-lg shadow overflow-x-auto" style={{backgroundColor: 'var(--color-card)'}}>
+                <div className="specs-table-container">
                     <table className="w-full">
                         <thead className="bg-gray-50">
                             <tr>
@@ -31,32 +31,32 @@ export default function SpecsView({ vehicles, selectedVehicleIds }) {
                         </thead>
                         <tbody className="divide-y">
                             <tr>
-                                <td className="px-6 py-4 font-medium">Make</td>
-                                {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.make || '-'}</td>)}
+                                <td className="specs-table-cell font-medium">Make</td>
+                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.make || '-'}</td>)}
                             </tr>
                             <tr>
-                                <td className="px-6 py-4 font-medium">Model</td>
-                                {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.model || '-'}</td>)}
+                                <td className="specs-table-cell font-medium">Model</td>
+                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.model || '-'}</td>)}
                             </tr>
                             <tr>
-                                <td className="px-6 py-4 font-medium">Year</td>
-                                {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.year || '-'}</td>)}
+                                <td className="specs-table-cell font-medium">Year</td>
+                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.year || '-'}</td>)}
                             </tr>
                             <tr>
-                                <td className="px-6 py-4 font-medium">Battery (kWh)</td>
-                                {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.battery || '-'}</td>)}
+                                <td className="specs-table-cell font-medium">Battery (kWh)</td>
+                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.battery || '-'}</td>)}
                             </tr>
                             <tr>
-                                <td className="px-6 py-4 font-medium">EPA Range (mi)</td>
-                                {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.range || '-'}</td>)}
+                                <td className="specs-table-cell font-medium">EPA Range (mi)</td>
+                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.range || '-'}</td>)}
                             </tr>
                             <tr>
-                                <td className="px-6 py-4 font-medium">Peak Power (kW)</td>
-                                {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.power || '-'}</td>)}
+                                <td className="specs-table-cell font-medium">Peak Power (kW)</td>
+                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.power || '-'}</td>)}
                             </tr>
                             <tr>
-                                <td className="px-6 py-4 font-medium">Test Runs</td>
-                                {displayVehicles.map(v => <td key={v.id} className="px-6 py-4">{v.runs?.length || 0}</td>)}
+                                <td className="specs-table-cell font-medium">Test Runs</td>
+                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.runs?.length || 0}</td>)}
                             </tr>
                         </tbody>
                     </table>
