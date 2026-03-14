@@ -450,12 +450,6 @@ export default function VehiclesView({
                 </div>
             )}
 
-            {/* Add form — above grid, only when not editing */}
-            {showForm && !editingId && (
-                <div className="mb-6">
-                    <EditVehicleForm {...editFormProps} />
-                </div>
-            )}
 
             {/* ── CARD VIEW ── */}
             {viewMode === 'card' && (
@@ -559,12 +553,6 @@ export default function VehiclesView({
                                     </div>
                                 </div>
 
-                                {/* Inline edit form — spans full grid width below the edited card's row */}
-                                {editingId === vehicle.id && showForm && (
-                                    <div className="col-span-full">
-                                        <EditVehicleForm {...editFormProps} />
-                                    </div>
-                                )}
                             </div>
                         );
                     })}
@@ -658,12 +646,6 @@ export default function VehiclesView({
                                     </div>
                                 </div>
 
-                                {/* Inline edit form below this list row */}
-                                {editingId === vehicle.id && showForm && (
-                                    <div className="mt-2">
-                                        <EditVehicleForm {...editFormProps} />
-                                    </div>
-                                )}
                             </div>
                         );
                     })}
@@ -723,6 +705,15 @@ export default function VehiclesView({
                 onUndo={undoDelete}
                 noun="vehicle"
             />
+
+            {/* Add / Edit vehicle modal */}
+            {showForm && (
+                <div className="modal-overlay" onClick={handleCancel}>
+                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4" onClick={e => e.stopPropagation()}>
+                        <EditVehicleForm {...editFormProps} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
