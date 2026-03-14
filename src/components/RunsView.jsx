@@ -4,6 +4,7 @@ import { parseCSV, parseCSVText } from '../utils/parseCSV';
 import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
+import EditVehicleForm from './EditVehicleForm';
 
 // ── Data-type flag definitions ────────────────────────────────────────────────
 // Each flag represents a data domain that can independently be present in a run.
@@ -21,7 +22,54 @@ const inferRunFlags = (run) => {
     return flags;
 };
 
-export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onEditVehicle, onDuplicateVehicle, onDeleteVehicle }) {
+export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage }) {
+    // ── Vehicle edit form state ───────────────────────────────────────────────
+    const [showEditVehicle, setShowEditVehicle] = useState(false);
+    const [vehicleFormData, setVehicleFormData] = useState({
+        name: '', make: '', model: '', year: '', battery: '', range: '', power: ''
+    });
+    const [vehicleFormTags, setVehicleFormTags] = useState([]);
+    const [vehicleNewTagName, setVehicleNewTagName] = useState('');
+    const [vehicleImageUploading, setVehicleImageUploading] = useState(false);
+
+    const openEditVehicle = () => {
+        setVehicleFormData({
+            name: vehicle.name,
+            make: vehicle.make || '',
+            model: vehicle.model || '',
+            year: vehicle.year || '',
+            battery: vehicle.battery || '',
+            range: vehicle.range || '',
+            power: vehicle.power || '',
+        });
+        setVehicleFormTags(vehicle.tags || []);
+        setVehicleNewTagName('');
+        setShowEditVehicle(true);
+    };
+
+    const closeEditVehicle = () => {
+        setShowEditVehicle(false);
+        setVehicleFormTags([]);
+        setVehicleNewTagName('');
+    };
+
+    const handleVehicleSubmit = async (e) => {
+        e.preventDefault();
+        await onUpdateVehicle(vehicle.id, vehicleFormData);
+        await onSyncVehicleTags(vehicle.id, vehicleFormTags.map(t => t.id));
+        closeEditVehicle();
+    };
+
+    const handleVehicleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setVehicleImageUploading(true);
+        await onUploadVehicleImage(file);
+        setVehicleImageUploading(false);
+    };
+
+    const vehicleAvailableTags = (tags || []).filter(t => !vehicleFormTags.some(ft => ft.id === t.id));
+
     const [showUpload, setShowUpload] = useState(false);
     const [uploadStep, setUploadStep] = useState('file');
     const [csvData, setCsvData] = useState(null);
@@ -570,7 +618,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                         );
                     })()}
                     {isOwner && (
-                        <button onClick={onEditVehicle} className="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
+                        <button onClick={openEditVehicle} className="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
                             Edit
                         </button>
                     )}
@@ -1638,6 +1686,39 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                 onUndo={undoDelete}
                 noun="test"
             />
+
+            {/* Edit vehicle modal */}
+            {showEditVehicle && (
+                <div className="modal-overlay" onClick={closeEditVehicle}>
+                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4" onClick={e => e.stopPropagation()}>
+                        <EditVehicleForm
+                            formData={vehicleFormData}
+                            onFormChange={setVehicleFormData}
+                            editingId={vehicle.id}
+                            formTags={vehicleFormTags}
+                            onAddTag={(tag) => { if (!vehicleFormTags.some(t => t.id === tag.id)) setVehicleFormTags(prev => [...prev, tag]); }}
+                            onRemoveTag={(tagId) => setVehicleFormTags(prev => prev.filter(t => t.id !== tagId))}
+                            newTagName={vehicleNewTagName}
+                            onNewTagNameChange={setVehicleNewTagName}
+                            onCreateTag={async () => {
+                                const trimmed = vehicleNewTagName.trim();
+                                if (!trimmed) return;
+                                const existing = (tags || []).find(t => t.name.toLowerCase() === trimmed.toLowerCase());
+                                const tag = existing || await onCreateTag(trimmed);
+                                if (tag && !vehicleFormTags.some(t => t.id === tag.id)) setVehicleFormTags(prev => [...prev, tag]);
+                                setVehicleNewTagName('');
+                            }}
+                            tags={tags || []}
+                            availableTagsForForm={vehicleAvailableTags}
+                            editingVehicle={vehicle}
+                            imageUploading={vehicleImageUploading}
+                            onImageUpload={handleVehicleImageUpload}
+                            onSubmit={handleVehicleSubmit}
+                            onCancel={closeEditVehicle}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

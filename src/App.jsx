@@ -477,9 +477,13 @@ export default function App() {
                             onDuplicateRun={(runId) => duplicateRun(currentActiveVehicle.id, runId)}
                             onViewChart={() => navigateTo('chart')}
                             onToggleVehicleVisibility={toggleVehicleVisibility}
-                            onEditVehicle={() => navigateTo('vehicles')}
+                            onUpdateVehicle={updateVehicle}
                             onDuplicateVehicle={(id) => duplicateVehicle(id)}
                             onDeleteVehicle={async (id) => { await deleteVehicle(id); navigateTo('vehicles'); }}
+                            tags={tags}
+                            onCreateTag={createTag}
+                            onSyncVehicleTags={syncVehicleTags}
+                            onUploadVehicleImage={(file) => uploadVehicleImage(currentActiveVehicle.id, file)}
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && (
