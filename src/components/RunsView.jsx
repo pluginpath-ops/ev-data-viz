@@ -4,6 +4,7 @@ import { parseCSV, parseCSVText } from '../utils/parseCSV';
 import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
+import EditVehicleForm from './EditVehicleForm';
 
 // ── Data-type flag definitions ────────────────────────────────────────────────
 // Each flag represents a data domain that can independently be present in a run.
@@ -21,7 +22,54 @@ const inferRunFlags = (run) => {
     return flags;
 };
 
-export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart }) {
+export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage }) {
+    // ── Vehicle edit form state ───────────────────────────────────────────────
+    const [showEditVehicle, setShowEditVehicle] = useState(false);
+    const [vehicleFormData, setVehicleFormData] = useState({
+        name: '', make: '', model: '', year: '', battery: '', range: '', power: ''
+    });
+    const [vehicleFormTags, setVehicleFormTags] = useState([]);
+    const [vehicleNewTagName, setVehicleNewTagName] = useState('');
+    const [vehicleImageUploading, setVehicleImageUploading] = useState(false);
+
+    const openEditVehicle = () => {
+        setVehicleFormData({
+            name: vehicle.name,
+            make: vehicle.make || '',
+            model: vehicle.model || '',
+            year: vehicle.year || '',
+            battery: vehicle.battery || '',
+            range: vehicle.range || '',
+            power: vehicle.power || '',
+        });
+        setVehicleFormTags(vehicle.tags || []);
+        setVehicleNewTagName('');
+        setShowEditVehicle(true);
+    };
+
+    const closeEditVehicle = () => {
+        setShowEditVehicle(false);
+        setVehicleFormTags([]);
+        setVehicleNewTagName('');
+    };
+
+    const handleVehicleSubmit = async (e) => {
+        e.preventDefault();
+        await onUpdateVehicle(vehicle.id, vehicleFormData);
+        await onSyncVehicleTags(vehicle.id, vehicleFormTags.map(t => t.id));
+        closeEditVehicle();
+    };
+
+    const handleVehicleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setVehicleImageUploading(true);
+        await onUploadVehicleImage(file);
+        setVehicleImageUploading(false);
+    };
+
+    const vehicleAvailableTags = (tags || []).filter(t => !vehicleFormTags.some(ft => ft.id === t.id));
+
     const [showUpload, setShowUpload] = useState(false);
     const [uploadStep, setUploadStep] = useState('file');
     const [csvData, setCsvData] = useState(null);
@@ -535,9 +583,64 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
     return (
         <div className={barVisible ? 'pb-20' : ''}>
+            {/* Vehicle summary header */}
+            <div className="card py-3 px-4 flex items-center gap-4 mb-6">
+                <div className="list-thumbnail">
+                    {vehicle.image_url
+                        ? <img src={vehicle.image_url} alt={vehicle.name} className="w-full h-full object-cover" />
+                        : <span>🚗</span>
+                    }
+                </div>
+                <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-lg leading-tight">{vehicle.name}</h3>
+                    <p className="text-gray-500 text-sm">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                    <div className="text-sm text-gray-600 mt-0.5 flex flex-wrap gap-x-3">
+                        {vehicle.battery && <span>Battery: {vehicle.battery} kWh</span>}
+                        {vehicle.range && <span>Range: {vehicle.range} mi</span>}
+                        {vehicle.power && <span>Power: {vehicle.power} kW</span>}
+                    </div>
+                </div>
+                <div className="flex flex-col gap-1 flex-shrink-0 items-stretch w-28">
+                    {(() => {
+                        const isPublic = vehicle.visibility === 'public';
+                        const base = 'w-full flex items-center justify-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition';
+                        return isOwner ? (
+                            <button
+                                onClick={() => onToggleVehicleVisibility(vehicle.id, isPublic ? 'private' : 'public')}
+                                className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200' : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200'}`}
+                            >
+                                {isPublic ? '🌐 Public' : '🔒 Private'}
+                            </button>
+                        ) : (
+                            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-100 text-gray-500 border-gray-300'}`}>
+                                {isPublic ? '🌐 Public' : '🔒 Private'}
+                            </span>
+                        );
+                    })()}
+                    {isOwner && (
+                        <button onClick={openEditVehicle} className="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
+                            Edit
+                        </button>
+                    )}
+                    {isOwner && (
+                        <button onClick={() => onDuplicateVehicle(vehicle.id)} className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition">
+                            ⧉ Copy
+                        </button>
+                    )}
+                    {isOwner && (
+                        <button
+                            onClick={() => { if (window.confirm(`Delete "${vehicle.name}" and all its tests?`)) onDeleteVehicle(vehicle.id); }}
+                            className="px-3 py-1 rounded-md text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition"
+                        >
+                            Delete
+                        </button>
+                    )}
+                </div>
+            </div>
+
             <div className="runs-view-header">
                 <div>
-                    <h2 className="page-title">{vehicle.name} - Test Runs</h2>
+                    <h2 className="page-title">{vehicle.name} - Tests &amp; Data</h2>
                     <p className="text-gray-600">Manage charging test data for this vehicle</p>
                 </div>
                 <div className="flex gap-2">
@@ -811,7 +914,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                             {/* In create mode, allow editing metadata here too */}
                             {uploadMode === 'create' && (
                                 <div className="mb-6 p-4 bg-gray-50 rounded">
-                                    <h4 className="font-semibold mb-3">Run Metadata</h4>
+                                    <h4 className="font-semibold mb-3">Test Metadata</h4>
                                     <div className="space-y-3">
                                         <input
                                             placeholder="Name (e.g., Highway Test - Winter 2024)"
@@ -1533,7 +1636,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                     <button
                                         onClick={() => handleExportCsv(run)}
                                         disabled={exportingRunId === run.id}
-                                        title="Download run data as CSV"
+                                        title="Download test data as CSV"
                                         className="btn btn-secondary text-sm disabled:opacity-50"
                                     >
                                         {exportingRunId === run.id ? '…' : '↓ CSV'}
@@ -1542,7 +1645,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                         <button
                                             onClick={() => handleDuplicateRun(run)}
                                             disabled={duplicatingRunId !== null}
-                                            title="Duplicate this run and its data"
+                                            title="Duplicate this test and its data"
                                             className="btn btn-secondary text-sm disabled:opacity-50"
                                         >
                                             {duplicatingRunId === run.id ? '…' : '⧉ Copy'}
@@ -1570,7 +1673,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
 
             {vehicle.runs?.length === 0 && !showUpload && (
                 <div className="empty-state">
-                    <p className="text-lg">No test runs yet. Add a record to get started!</p>
+                    <p className="text-lg">No tests yet. Add a record to get started!</p>
                 </div>
             )}
 
@@ -1581,8 +1684,41 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                 undoState={undoState}
                 secondsLeft={secondsLeft}
                 onUndo={undoDelete}
-                noun="run"
+                noun="test"
             />
+
+            {/* Edit vehicle modal */}
+            {showEditVehicle && (
+                <div className="modal-overlay" onClick={closeEditVehicle}>
+                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4" onClick={e => e.stopPropagation()}>
+                        <EditVehicleForm
+                            formData={vehicleFormData}
+                            onFormChange={setVehicleFormData}
+                            editingId={vehicle.id}
+                            formTags={vehicleFormTags}
+                            onAddTag={(tag) => { if (!vehicleFormTags.some(t => t.id === tag.id)) setVehicleFormTags(prev => [...prev, tag]); }}
+                            onRemoveTag={(tagId) => setVehicleFormTags(prev => prev.filter(t => t.id !== tagId))}
+                            newTagName={vehicleNewTagName}
+                            onNewTagNameChange={setVehicleNewTagName}
+                            onCreateTag={async () => {
+                                const trimmed = vehicleNewTagName.trim();
+                                if (!trimmed) return;
+                                const existing = (tags || []).find(t => t.name.toLowerCase() === trimmed.toLowerCase());
+                                const tag = existing || await onCreateTag(trimmed);
+                                if (tag && !vehicleFormTags.some(t => t.id === tag.id)) setVehicleFormTags(prev => [...prev, tag]);
+                                setVehicleNewTagName('');
+                            }}
+                            tags={tags || []}
+                            availableTagsForForm={vehicleAvailableTags}
+                            editingVehicle={vehicle}
+                            imageUploading={vehicleImageUploading}
+                            onImageUpload={handleVehicleImageUpload}
+                            onSubmit={handleVehicleSubmit}
+                            onCancel={closeEditVehicle}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

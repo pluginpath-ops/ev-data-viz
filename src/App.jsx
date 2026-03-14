@@ -307,7 +307,7 @@ export default function App() {
                                     disabled={!currentActiveVehicle}
                                     className={`btn-tab ${view === 'runs' ? 'active' : ''}`}
                                 >
-                                    Test Runs {currentActiveVehicle ? `(${currentActiveVehicle.name})` : ''}
+                                    Tests &amp; Data {currentActiveVehicle ? `(${currentActiveVehicle.name})` : ''}
                                 </button>
                                 <button
                                     onClick={() => selectedVehicles.length > 0 && navigateTo('chart')}
@@ -476,6 +476,14 @@ export default function App() {
                             onReplaceRunData={(runId, pts) => replaceRunData(currentActiveVehicle.id, runId, pts)}
                             onDuplicateRun={(runId) => duplicateRun(currentActiveVehicle.id, runId)}
                             onViewChart={() => navigateTo('chart')}
+                            onToggleVehicleVisibility={toggleVehicleVisibility}
+                            onUpdateVehicle={updateVehicle}
+                            onDuplicateVehicle={(id) => duplicateVehicle(id)}
+                            onDeleteVehicle={async (id) => { await deleteVehicle(id); navigateTo('vehicles'); }}
+                            tags={tags}
+                            onCreateTag={createTag}
+                            onSyncVehicleTags={syncVehicleTags}
+                            onUploadVehicleImage={(file) => uploadVehicleImage(currentActiveVehicle.id, file)}
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && (

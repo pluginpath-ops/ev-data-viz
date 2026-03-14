@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
+import EditVehicleForm from './EditVehicleForm';
 
 // Icons for view toggle
 const CardViewIcon = () => (
@@ -20,135 +21,6 @@ const ListViewIcon = () => (
     </svg>
 );
 
-// ── EditForm lifted outside VehiclesView so its identity is stable across re-renders.
-// Defining it inside the parent causes React to unmount+remount it on every keystroke
-// (new function reference = new component type), which kills input focus.
-function EditForm({
-    formData, onFormChange,
-    editingId,
-    formTags, onAddTag, onRemoveTag,
-    newTagName, onNewTagNameChange, onCreateTag,
-    tags, availableTagsForForm,
-    editingVehicle,
-    imageUploading, onImageUpload,
-    onSubmit, onCancel,
-}) {
-    return (
-        <form onSubmit={onSubmit} className="card">
-            <h3 className="section-title mb-4">{editingId ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
-            <div className="form-grid gap-4">
-                <input
-                    placeholder="Display Name (e.g., Model 3 LR 2024)"
-                    value={formData.name}
-                    onChange={(e) => onFormChange({ ...formData, name: e.target.value })}
-                    className="form-input col-span-2"
-                    required
-                />
-                <input placeholder="Make"           value={formData.make}    onChange={(e) => onFormChange({ ...formData, make: e.target.value })}    className="form-input" />
-                <input placeholder="Model"          value={formData.model}   onChange={(e) => onFormChange({ ...formData, model: e.target.value })}   className="form-input" />
-                <input placeholder="Year"           value={formData.year}    onChange={(e) => onFormChange({ ...formData, year: e.target.value })}    className="form-input" />
-                <input placeholder="Battery (kWh)"  value={formData.battery} onChange={(e) => onFormChange({ ...formData, battery: e.target.value })} className="form-input" />
-                <input placeholder="EPA Range (mi)" value={formData.range}   onChange={(e) => onFormChange({ ...formData, range: e.target.value })}   className="form-input" />
-                <input placeholder="Peak Power (kW)" value={formData.power}  onChange={(e) => onFormChange({ ...formData, power: e.target.value })}   className="form-input" />
-            </div>
-
-            {/* Tags — edit mode only */}
-            {editingId && (
-                <div className="form-section mt-5">
-                    <label className="block font-medium mb-2">Tags</label>
-                    {formTags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-3">
-                            {formTags.map(tag => (
-                                <div
-                                    key={tag.id}
-                                    className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium"
-                                    style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
-                                >
-                                    <span>{tag.name}</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => onRemoveTag(tag.id)}
-                                        className="ml-1 rounded-full w-4 h-4 flex items-center justify-center hover:opacity-70"
-                                        style={{ fontSize: '12px' }}
-                                    >
-                                        &times;
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                    {availableTagsForForm.length > 0 && (
-                        <div className="mb-2">
-                            <select
-                                onChange={(e) => {
-                                    const tag = tags.find(t => t.id === parseInt(e.target.value));
-                                    if (tag) onAddTag(tag);
-                                    e.target.value = '';
-                                }}
-                                className="form-input w-full text-sm"
-                                defaultValue=""
-                            >
-                                <option value="" disabled>Add existing tag…</option>
-                                {availableTagsForForm.map(tag => (
-                                    <option key={tag.id} value={tag.id}>{tag.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            placeholder="New tag name"
-                            value={newTagName}
-                            onChange={(e) => onNewTagNameChange(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onCreateTag(); } }}
-                            className="form-input text-sm flex-1"
-                        />
-                        <button type="button" onClick={onCreateTag} className="btn btn-primary text-sm">
-                            Create tag
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Image upload — edit mode only */}
-            {editingId && (
-                <div className="form-section mt-4">
-                    <label className="block font-medium mb-2">Card Background Image</label>
-                    {editingVehicle?.image_url && (
-                        <img
-                            src={editingVehicle.image_url}
-                            alt="Current"
-                            className="h-24 w-full object-cover rounded mb-2 border"
-                        />
-                    )}
-                    <label className="image-upload-label">
-                        <span className="btn btn-primary text-sm">
-                            {imageUploading ? 'Uploading…' : editingVehicle?.image_url ? 'Replace image' : 'Upload image'}
-                        </span>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={onImageUpload}
-                            disabled={imageUploading}
-                        />
-                    </label>
-                </div>
-            )}
-
-            {/* Footer: Cancel left, Save right, both text-sm to match image button */}
-            <div className="form-actions mt-4">
-                <button type="button" onClick={onCancel} className="btn btn-secondary text-sm">
-                    Cancel
-                </button>
-                <button type="submit" className="btn btn-primary text-sm">
-                    {editingId ? 'Save Changes' : 'Add Vehicle'}
-                </button>
-            </div>
-        </form>
-    );
-}
 
 export default function VehiclesView({
     vehicles, selectedVehicles, onToggleSelection, onAdd, onUpdate, onDelete, onViewRuns,
@@ -315,8 +187,8 @@ export default function VehiclesView({
 
     // ── Shared sub-components ────────────────────────────────────────────────
 
-    const VisibilityPill = ({ vehicle }) => {
-        const base = 'flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition';
+    const VisibilityPill = ({ vehicle, fullWidth }) => {
+        const base = `flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition${fullWidth ? ' w-full justify-center' : ''}`;
         const pubCls = 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200';
         const privCls = 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200';
         const isPublic = vehicle.visibility === 'public';
@@ -338,16 +210,10 @@ export default function VehiclesView({
         );
     };
 
-    const ActionButtons = ({ vehicle, layout }) => {
-        const isVertical = layout === 'list';
+    const ActionButtons = ({ vehicle }) => {
+        const isPending = pendingDeletes.has(vehicle.id);
         return (
-            <div className={isVertical ? 'flex flex-col gap-1' : 'flex gap-2'}>
-                <button
-                    onClick={(e) => { e.stopPropagation(); onViewRuns(vehicle); }}
-                    className={`px-3 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition${isVertical ? '' : ' flex-1'}`}
-                >
-                    View Runs
-                </button>
+            <div className="flex flex-col gap-1 items-stretch">
                 {isOwner && (
                     <button
                         onClick={(e) => handleEdit(vehicle, e)}
@@ -360,30 +226,20 @@ export default function VehiclesView({
                     <button
                         onClick={(e) => handleDuplicateVehicle(vehicle, e)}
                         disabled={duplicatingId !== null}
-                        title="Duplicate vehicle and all runs"
+                        title="Duplicate vehicle and all tests"
                         className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-50"
                     >
                         {duplicatingId === vehicle.id ? '…' : '⧉ Copy'}
                     </button>
                 )}
-                {isOwner && (() => {
-                    const isPending = pendingDeletes.has(vehicle.id);
-                    return (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                isPending ? restoreItem(vehicle.id) : queueDelete(vehicle.id);
-                            }}
-                            className={`px-3 py-1 rounded-md text-xs font-medium transition${isVertical ? '' : ''} ${
-                                isPending
-                                    ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                                    : 'bg-red-50 text-red-600 hover:bg-red-100'
-                            }`}
-                        >
-                            {isPending ? '↩ Restore' : 'Delete'}
-                        </button>
-                    );
-                })()}
+                {isOwner && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); isPending ? restoreItem(vehicle.id) : queueDelete(vehicle.id); }}
+                        className={`px-3 py-1 rounded-md text-xs font-medium transition ${isPending ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                    >
+                        {isPending ? '↩ Restore' : 'Delete'}
+                    </button>
+                )}
             </div>
         );
     };
@@ -405,7 +261,7 @@ export default function VehiclesView({
         );
     };
 
-    // Shared props bundle for the module-level EditForm component
+    // Shared props bundle for EditVehicleForm
     const editFormProps = {
         formData, onFormChange: setFormData,
         editingId,
@@ -594,12 +450,6 @@ export default function VehiclesView({
                 </div>
             )}
 
-            {/* Add form — above grid, only when not editing */}
-            {showForm && !editingId && (
-                <div className="mb-6">
-                    <EditForm {...editFormProps} />
-                </div>
-            )}
 
             {/* ── CARD VIEW ── */}
             {viewMode === 'card' && (
@@ -666,39 +516,43 @@ export default function VehiclesView({
                                             </div>
                                         )}
 
-                                        {/* Top content */}
-                                        <div>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <h3 className="text-xl font-bold">{vehicle.name}</h3>
-                                                <VisibilityPill vehicle={vehicle} />
+                                        {/* Main row: left content + right action column */}
+                                        <div className="flex flex-1 gap-3">
+                                            {/* Left: vehicle info */}
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-xl font-bold mb-1">{vehicle.name}</h3>
+                                                <p className="text-gray-600 mb-2">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                                                <div className="text-sm text-gray-700 space-y-1">
+                                                    {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
+                                                    {vehicle.range && <p>Range: {vehicle.range} mi</p>}
+                                                    {vehicle.power && <p>Power: {vehicle.power} kW</p>}
+                                                </div>
+                                                <p className="text-sm font-semibold mt-2">Tests: {vehicle.runs?.length || 0}</p>
+                                                {vehicle.tags?.length > 0 && (
+                                                    <div className="mt-2">
+                                                        <TagPills vehicle={vehicle} />
+                                                    </div>
+                                                )}
                                             </div>
-                                            <p className="text-gray-600 mb-2">{vehicle.make} {vehicle.model} {vehicle.year}</p>
-                                            <div className="text-sm text-gray-700 space-y-1">
-                                                {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
-                                                {vehicle.range && <p>Range: {vehicle.range} mi</p>}
-                                                {vehicle.power && <p>Power: {vehicle.power} kW</p>}
+                                            {/* Right: vertical action column */}
+                                            <div className="flex flex-col gap-1 flex-shrink-0 items-stretch" onClick={e => e.stopPropagation()}>
+                                                <VisibilityPill vehicle={vehicle} fullWidth />
+                                                <ActionButtons vehicle={vehicle} />
                                             </div>
                                         </div>
 
-                                        {/* Bottom anchor — Test Runs, tags, buttons always at card base */}
-                                        <div className="mt-auto pt-3">
-                                            <p className="text-sm font-semibold mb-2">Test Runs: {vehicle.runs?.length || 0}</p>
-                                            {vehicle.tags?.length > 0 && (
-                                                <div className="mb-2">
-                                                    <TagPills vehicle={vehicle} />
-                                                </div>
-                                            )}
-                                            <ActionButtons vehicle={vehicle} layout="card" />
+                                        {/* Footer: View Tests & Data full width */}
+                                        <div className="mt-auto pt-3" onClick={e => e.stopPropagation()}>
+                                            <button
+                                                onClick={() => onViewRuns(vehicle)}
+                                                className="w-full px-3 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
+                                            >
+                                                View Tests &amp; Data →
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Inline edit form — spans full grid width below the edited card's row */}
-                                {editingId === vehicle.id && showForm && (
-                                    <div className="col-span-full">
-                                        <EditForm {...editFormProps} />
-                                    </div>
-                                )}
                             </div>
                         );
                     })}
@@ -774,22 +628,24 @@ export default function VehiclesView({
                                         {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                         {vehicle.range && <p>Range: {vehicle.range} mi</p>}
                                         {vehicle.power && <p>Power: {vehicle.power} kW</p>}
-                                        <p className="font-medium">Runs: {vehicle.runs?.length || 0}</p>
+                                        <p className="font-medium">Tests: {vehicle.runs?.length || 0}</p>
                                     </div>
 
-                                    {/* Visibility + action buttons */}
-                                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                                        <VisibilityPill vehicle={vehicle} />
-                                        <ActionButtons vehicle={vehicle} layout="list" />
+                                    {/* View Tests & Data — dedicated column */}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onViewRuns(vehicle); }}
+                                        className="px-4 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition flex-shrink-0"
+                                    >
+                                        View Tests &amp; Data →
+                                    </button>
+
+                                    {/* Action column: Visibility → Edit → Copy → Delete */}
+                                    <div className="flex flex-col gap-1 flex-shrink-0 items-stretch w-28" onClick={e => e.stopPropagation()}>
+                                        <VisibilityPill vehicle={vehicle} fullWidth />
+                                        <ActionButtons vehicle={vehicle} />
                                     </div>
                                 </div>
 
-                                {/* Inline edit form below this list row */}
-                                {editingId === vehicle.id && showForm && (
-                                    <div className="mt-2">
-                                        <EditForm {...editFormProps} />
-                                    </div>
-                                )}
                             </div>
                         );
                     })}
@@ -849,6 +705,15 @@ export default function VehiclesView({
                 onUndo={undoDelete}
                 noun="vehicle"
             />
+
+            {/* Add / Edit vehicle modal */}
+            {showForm && (
+                <div className="modal-overlay" onClick={handleCancel}>
+                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4" onClick={e => e.stopPropagation()}>
+                        <EditVehicleForm {...editFormProps} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
