@@ -340,6 +340,16 @@ body {
     @apply flex flex-wrap gap-2 items-center mb-6;
 }
 
+/* Quad-state tag filter buttons (N/A → OR → AND → NOT) */
+.tag-filter-btn  { @apply px-3 py-1 rounded-full text-sm font-medium transition border cursor-pointer; }
+.tag-filter-na   { @apply bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200; }
+.tag-filter-or   { @apply bg-green-500 text-white border-green-500 hover:bg-green-600; }
+.tag-filter-and  { @apply bg-blue-500 text-white border-blue-500 hover:bg-blue-600; }
+.tag-filter-not  { @apply bg-red-500 text-white border-red-500 hover:bg-red-600; }
+
+/* Small legend explaining OR/AND/NOT color states */
+.tag-filter-legend { @apply text-xs text-gray-400 ml-auto flex items-center gap-2 whitespace-nowrap select-none; }
+
 /* Vehicle tag chip cluster on a card or list row */
 .vehicle-tags {
     @apply flex flex-wrap gap-1;

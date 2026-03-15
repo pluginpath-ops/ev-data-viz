@@ -471,6 +471,9 @@ export default function App() {
                             vehicles={vehicles}
                             selectedVehicles={selectedVehicles}
                             onToggleSelection={toggleVehicleSelection}
+                            onSelectAllVisible={(ids) =>
+                                setVehicleSelection([...new Set([...selectedVehicles, ...ids])])
+                            }
                             onAdd={addVehicle}
                             onUpdate={updateVehicle}
                             onDelete={deleteVehicle}
