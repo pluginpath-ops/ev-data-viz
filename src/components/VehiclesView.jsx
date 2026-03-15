@@ -24,7 +24,8 @@ const ListViewIcon = () => (
 
 export default function VehiclesView({
     vehicles, selectedVehicles, onToggleSelection, onAdd, onUpdate, onDelete, onViewRuns,
-    isOwner, onToggleVisibility, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
+    canCreate, canEdit, canDelete, canPublish, onToggleVisibility,
+    tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
     onReorderVehicles, onDuplicateVehicle,
 }) {
     const [showForm, setShowForm] = useState(false);
@@ -192,7 +193,7 @@ export default function VehiclesView({
         const pubCls = 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200';
         const privCls = 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200';
         const isPublic = vehicle.visibility === 'public';
-        if (isOwner) {
+        if (canPublish()) {
             return (
                 <button
                     onClick={(e) => { e.stopPropagation(); onToggleVisibility(vehicle.id, isPublic ? 'private' : 'public'); }}
@@ -214,7 +215,7 @@ export default function VehiclesView({
         const isPending = pendingDeletes.has(vehicle.id);
         return (
             <div className="flex flex-col gap-1 items-stretch">
-                {isOwner && (
+                {canEdit(vehicle) && (
                     <button
                         onClick={(e) => handleEdit(vehicle, e)}
                         className="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
@@ -222,7 +223,7 @@ export default function VehiclesView({
                         Edit
                     </button>
                 )}
-                {isOwner && (
+                {canEdit(vehicle) && (
                     <button
                         onClick={(e) => handleDuplicateVehicle(vehicle, e)}
                         disabled={duplicatingId !== null}
@@ -232,7 +233,7 @@ export default function VehiclesView({
                         {duplicatingId === vehicle.id ? '…' : '⧉ Copy'}
                     </button>
                 )}
-                {isOwner && (
+                {canDelete(vehicle) && (
                     <button
                         onClick={(e) => { e.stopPropagation(); isPending ? restoreItem(vehicle.id) : queueDelete(vehicle.id); }}
                         className={`px-3 py-1 rounded-md text-xs font-medium transition ${isPending ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
@@ -342,7 +343,7 @@ export default function VehiclesView({
     // Reset to page 1 when filter/sort changes
     useEffect(() => { setVehiclePage(1); }, [textFilter, activeTagFilters, sortBy]);
 
-    const showReorderButtons = isOwner && sortBy === 'default'
+    const showReorderButtons = canEdit({}) && sortBy === 'default'
         && textFilter.trim() === '' && activeTagFilters.length === 0
         && editingOrder;
 
@@ -373,12 +374,14 @@ export default function VehiclesView({
                             <ListViewIcon />
                         </button>
                     </div>
-                    <button
-                        onClick={() => { setEditingId(null); setShowForm(!showForm); }}
-                        className="btn btn-primary"
-                    >
-                        {showForm && !editingId ? 'Cancel' : '+ Add Vehicle'}
-                    </button>
+                    {canCreate && (
+                        <button
+                            onClick={() => { setEditingId(null); setShowForm(!showForm); }}
+                            className="btn btn-primary"
+                        >
+                            {showForm && !editingId ? 'Cancel' : '+ Add Vehicle'}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -406,7 +409,7 @@ export default function VehiclesView({
                     <option value="year_newest">Year (Newest)</option>
                     <option value="year_oldest">Year (Oldest)</option>
                 </select>
-                {isOwner && sortBy === 'default' && textFilter.trim() === '' && activeTagFilters.length === 0 && (
+                {canEdit({}) && sortBy === 'default' && textFilter.trim() === '' && activeTagFilters.length === 0 && (
                     <button
                         onClick={() => { if (editingOrder) setPendingOrder(null); setEditingOrder(v => !v); }}
                         className={`text-sm px-3 py-2 rounded border transition flex-shrink-0 ${

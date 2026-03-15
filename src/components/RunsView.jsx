@@ -22,7 +22,7 @@ const inferRunFlags = (run) => {
     return flags;
 };
 
-export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage }) {
+export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage }) {
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
     const [vehicleFormData, setVehicleFormData] = useState({
@@ -372,7 +372,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                 calculated_fields: editCalculatedFields,
             });
             // Save table data only if the owner made changes
-            if (editDataDirty && isOwner && editData !== null) {
+            if (editDataDirty && canEdit(vehicle) && editData !== null) {
                 await onReplaceRunData(runId, editData.map((row, i) => ({ ...row, frame: i })));
             }
         } finally {
@@ -604,7 +604,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                     {(() => {
                         const isPublic = vehicle.visibility === 'public';
                         const base = 'w-full flex items-center justify-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition';
-                        return isOwner ? (
+                        return canPublish() ? (
                             <button
                                 onClick={() => onToggleVehicleVisibility(vehicle.id, isPublic ? 'private' : 'public')}
                                 className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200' : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200'}`}
@@ -617,17 +617,17 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                             </span>
                         );
                     })()}
-                    {isOwner && (
+                    {canEdit(vehicle) && (
                         <button onClick={openEditVehicle} className="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
                             Edit
                         </button>
                     )}
-                    {isOwner && (
+                    {canEdit(vehicle) && (
                         <button onClick={() => onDuplicateVehicle(vehicle.id)} className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition">
                             ⧉ Copy
                         </button>
                     )}
-                    {isOwner && (
+                    {canDelete(vehicle) && (
                         <button
                             onClick={() => { if (window.confirm(`Delete "${vehicle.name}" and all its tests?`)) onDeleteVehicle(vehicle.id); }}
                             className="px-3 py-1 rounded-md text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition"
@@ -1293,7 +1293,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                     {showDataTable && (
                                         <div className="mt-3">
                                             {/* Range estimation offer — shown when range is absent but SoC exists */}
-                                            {isOwner && !editDataLoading && editData !== null &&
+                                            {canEdit(vehicle) && !editDataLoading && editData !== null &&
                                              editData.some(r => r.soc != null) &&
                                              editData.every(r => r.range == null) && (
                                                 <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200">
@@ -1387,7 +1387,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                                                     >
                                                                                         {isEst ? '~est' : 'act'}
                                                                                     </button>
-                                                                                    {isOwner && editData?.some(r => r[field] != null) && (
+                                                                                    {canEdit(vehicle) && editData?.some(r => r[field] != null) && (
                                                                                         <button
                                                                                             onClick={() => handleClearColumn(field)}
                                                                                             title={`Clear all ${label} values`}
@@ -1401,7 +1401,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                                         </th>
                                                                         );
                                                                     })}
-                                                                    {isOwner && <th className="w-6"></th>}
+                                                                    {canEdit(vehicle) && <th className="w-6"></th>}
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
@@ -1412,19 +1412,19 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                                             <td key={field} className="px-1 py-0.5">
                                                                                 <input
                                                                                     type="number"
-                                                                                    disabled={!isOwner}
+                                                                                    disabled={!canEdit(vehicle)}
                                                                                     value={row[field] ?? ''}
                                                                                     onChange={e => handleEditDataCell(i, field, e.target.value)}
                                                                                     placeholder="—"
                                                                                     className={`w-full text-xs p-0.5 rounded outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                                                                                        isOwner
+                                                                                        canEdit(vehicle)
                                                                                             ? 'bg-transparent hover:bg-white focus:bg-white focus:ring-1 focus:ring-blue-300'
                                                                                             : 'bg-transparent text-gray-600 cursor-default'
                                                                                     }`}
                                                                                 />
                                                                             </td>
                                                                         ))}
-                                                                        {isOwner && (
+                                                                        {canEdit(vehicle) && (
                                                                             <td className="px-1 text-center">
                                                                                 <button
                                                                                     onClick={() => handleDeleteDataRow(i)}
@@ -1438,7 +1438,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                                             </tbody>
                                                         </table>
                                                     </div>
-                                                    {isOwner && (
+                                                    {canEdit(vehicle) && (
                                                         <button
                                                             onClick={handleAddDataRow}
                                                             className="mt-2 text-xs text-blue-600 hover:text-blue-800"
@@ -1625,7 +1625,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                             Set as Default
                                         </button>
                                     )}
-                                    {isOwner && (
+                                    {canEdit(vehicle) && (
                                         <button
                                             onClick={() => handleUpdateData(run)}
                                             className="btn btn-secondary text-sm"
@@ -1641,7 +1641,7 @@ export default function RunsView({ vehicle, isOwner, onAddRun, onUpdateRun, onSe
                                     >
                                         {exportingRunId === run.id ? '…' : '↓ CSV'}
                                     </button>
-                                    {isOwner && (
+                                    {canEdit(vehicle) && (
                                         <button
                                             onClick={() => handleDuplicateRun(run)}
                                             disabled={duplicatingRunId !== null}

@@ -28,9 +28,12 @@ function normalisePoint(point, runId, frame) {
 class DataService {
   constructor() {
     this.user = null;
-    this.isOwner = false;
+    this.role = null; // 'admin' | 'contributor' | 'user' | null (unauthenticated)
     this.useSupabase = false;
   }
+
+  get isAdmin()       { return this.role === 'admin'; }
+  get isContributor() { return this.role === 'admin' || this.role === 'contributor'; }
 
   async initialize() {
     const supabase = getSupabase();
@@ -44,8 +47,8 @@ class DataService {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       this.user = user;
-      const { data: profile } = await getSupabase().from('profiles').select('is_owner').eq('id', user.id).single();
-      this.isOwner = profile?.is_owner || false;
+      const { data: profile } = await getSupabase().from('profiles').select('role').eq('id', user.id).single();
+      this.role = profile?.role || 'user';
     }
   }
 
@@ -120,7 +123,7 @@ class DataService {
       battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
       range: vehicle.range ? parseFloat(vehicle.range) : null,
       power: vehicle.power ? parseFloat(vehicle.power) : null,
-      visibility: this.isOwner ? 'public' : 'private'
+      visibility: 'private'
     }).select().single();
     if (error) throw error;
     return { ...data, runs: [] };
@@ -594,8 +597,24 @@ class DataService {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     this.user = null;
-    this.isOwner = false;
+    this.role = null;
     this.useSupabase = false;
+  }
+
+  // ── Admin RPCs ────────────────────────────────────────────────────────────
+
+  async getUsersForAdmin() {
+    const { data, error } = await getSupabase().rpc('get_admin_users');
+    if (error) throw error;
+    return data || [];
+  }
+
+  async setUserRole(targetUserId, newRole) {
+    const { error } = await getSupabase().rpc('set_user_role', {
+      target_user_id: targetUserId,
+      new_role: newRole,
+    });
+    if (error) throw error;
   }
 }
 
