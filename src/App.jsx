@@ -344,12 +344,12 @@ export default function App() {
                             <div className="nav-actions sm:ml-auto">
                                 {user ? (
                                     <>
-                                        <span className="text-sm text-gray-600">
-                                            {user.email}
+                                        <div className="flex flex-col items-end leading-tight text-sm text-gray-600">
+                                            <span>{user.email}</span>
                                             {userRole && userRole !== 'user' && (
-                                                <span className="owner-badge">{userRole.toUpperCase()}</span>
+                                                <span className="owner-badge mt-0.5">{userRole.toUpperCase()}</span>
                                             )}
-                                        </span>
+                                        </div>
                                         <button onClick={signOut} className="btn btn-secondary">
                                             Sign Out
                                         </button>
