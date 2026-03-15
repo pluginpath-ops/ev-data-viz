@@ -8,7 +8,7 @@ const roleBadgeStyle = {
     user:        { backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db' },
 };
 
-export default function AdminView({ getUsersForAdmin, setUserRole }) {
+export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId }) {
     const [users, setUsers]       = useState([]);
     const [loading, setLoading]   = useState(true);
     const [saving, setSaving]     = useState(null); // userId being saved
@@ -92,22 +92,26 @@ export default function AdminView({ getUsersForAdmin, setUserRole }) {
                                         </span>
                                     </td>
                                     <td className="px-4 py-3">
-                                        <div className="flex gap-1 flex-wrap">
-                                            {ROLES.map(role => (
-                                                <button
-                                                    key={role}
-                                                    onClick={() => handleRoleChange(u.id, role)}
-                                                    disabled={u.role === role || saving === u.id}
-                                                    className={`px-2.5 py-1 rounded border text-xs font-medium transition ${
-                                                        u.role === role
-                                                            ? 'opacity-40 cursor-default'
-                                                            : 'bg-white hover:bg-gray-100 border-gray-300 text-gray-700'
-                                                    }`}
-                                                >
-                                                    {saving === u.id && u.role !== role ? '…' : role}
-                                                </button>
-                                            ))}
-                                        </div>
+                                        {u.id === currentUserId ? (
+                                            <span className="text-xs text-gray-400 italic">can't change own role</span>
+                                        ) : (
+                                            <div className="flex gap-1 flex-wrap">
+                                                {ROLES.map(role => (
+                                                    <button
+                                                        key={role}
+                                                        onClick={() => handleRoleChange(u.id, role)}
+                                                        disabled={u.role === role || saving === u.id}
+                                                        className={`px-2.5 py-1 rounded border text-xs font-medium transition ${
+                                                            u.role === role
+                                                                ? 'opacity-40 cursor-default'
+                                                                : 'bg-white hover:bg-gray-100 border-gray-300 text-gray-700'
+                                                        }`}
+                                                    >
+                                                        {saving === u.id && u.role !== role ? '…' : role}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

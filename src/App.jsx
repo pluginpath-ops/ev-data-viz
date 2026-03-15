@@ -531,6 +531,7 @@ export default function App() {
                         <AdminView
                             getUsersForAdmin={getUsersForAdmin}
                             setUserRole={setUserRole}
+                            currentUserId={user?.id}
                         />
                     )}
                 </main>
