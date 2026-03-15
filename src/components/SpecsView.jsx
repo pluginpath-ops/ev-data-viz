@@ -5,14 +5,15 @@ export default function SpecsView({ vehicles, selectedVehicleIds }) {
         ? vehicles.filter(v => selectedVehicleIds.includes(v.id))
         : vehicles;
 
-    // Collect union of all _custom keys per category across displayed vehicles
+    // Collect union of all _custom keys per category across displayed vehicles.
+    // Order of insertion into the Set determines row order in the table.
     const customKeysByCategory = {};
     for (const vehicle of displayVehicles) {
         if (!vehicle.specs) continue;
         for (const cat of SPEC_CATEGORIES) {
             const custom = vehicle.specs[cat.key]?._custom || {};
             if (!customKeysByCategory[cat.key]) customKeysByCategory[cat.key] = new Set();
-            for (const key of Object.keys(custom)) customKeysByCategory[cat.key].add(key);
+            for (const customKey of Object.keys(custom)) customKeysByCategory[cat.key].add(customKey);
         }
     }
 
@@ -21,6 +22,64 @@ export default function SpecsView({ vehicles, selectedVehicleIds }) {
         if (type === 'boolean') return value ? 'Yes' : 'No';
         return String(value);
     };
+
+    // Build a flat array of <tr> elements for all spec categories.
+    // Using flatMap (not map returning arrays) so React gets a flat child list
+    // with stable, unique keys — avoids stale reconciliation with nested arrays.
+    const specRows = SPEC_CATEGORIES.flatMap(cat => {
+        const customKeys = [...(customKeysByCategory[cat.key] || new Set())];
+
+        const hasAnyData = displayVehicles.some(v => {
+            const catData = v.specs?.[cat.key];
+            if (!catData) return false;
+            return cat.fields.some(f => {
+                const val = catData[f.key];
+                return val !== null && val !== undefined && val !== '';
+            }) || customKeys.some(ck => catData._custom?.[ck] != null);
+        });
+        if (!hasAnyData) return [];
+
+        const headerRow = (
+            <tr key={`${cat.key}--header`}>
+                <td className="specs-table-category-header" colSpan={displayVehicles.length + 1}>
+                    {cat.label}
+                </td>
+            </tr>
+        );
+
+        const predefinedRows = cat.fields.flatMap(field => {
+            const hasValue = displayVehicles.some(v => {
+                const val = v.specs?.[cat.key]?.[field.key];
+                return val !== null && val !== undefined && val !== '';
+            });
+            if (!hasValue) return [];
+            return [(
+                <tr key={`${cat.key}--${field.key}`}>
+                    <td className="specs-table-cell font-medium text-sm">{field.label}</td>
+                    {displayVehicles.map(v => (
+                        <td key={String(v.id)} className="specs-table-cell text-sm">
+                            {formatValue(v.specs?.[cat.key]?.[field.key], field.type)}
+                        </td>
+                    ))}
+                </tr>
+            )];
+        });
+
+        const customRows = customKeys.map(customKey => (
+            <tr key={`${cat.key}--custom--${customKey}`}>
+                <td className="specs-table-cell font-medium text-sm text-gray-500 italic">
+                    {formatCustomKey(customKey)}
+                </td>
+                {displayVehicles.map(v => (
+                    <td key={String(v.id)} className="specs-table-cell text-sm">
+                        {v.specs?.[cat.key]?._custom?.[customKey] ?? '—'}
+                    </td>
+                ))}
+            </tr>
+        ));
+
+        return [headerRow, ...predefinedRows, ...customRows];
+    });
 
     return (
         <div>
@@ -44,7 +103,7 @@ export default function SpecsView({ vehicles, selectedVehicleIds }) {
                             <tr>
                                 <th className="px-6 py-3 text-left font-semibold">Specification</th>
                                 {displayVehicles.map(v => (
-                                    <th key={v.id} className="px-6 py-3 text-left font-semibold">{v.name}</th>
+                                    <th key={String(v.id)} className="px-6 py-3 text-left font-semibold">{v.name}</th>
                                 ))}
                             </tr>
                         </thead>
@@ -52,88 +111,35 @@ export default function SpecsView({ vehicles, selectedVehicleIds }) {
                             {/* ── Core vehicle fields ── */}
                             <tr>
                                 <td className="specs-table-cell font-medium">Make</td>
-                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.make || '—'}</td>)}
+                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.make || '—'}</td>)}
                             </tr>
                             <tr>
                                 <td className="specs-table-cell font-medium">Model</td>
-                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.model || '—'}</td>)}
+                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.model || '—'}</td>)}
                             </tr>
                             <tr>
                                 <td className="specs-table-cell font-medium">Year</td>
-                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.year || '—'}</td>)}
+                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.year || '—'}</td>)}
                             </tr>
                             <tr>
                                 <td className="specs-table-cell font-medium">Battery (kWh, usable)</td>
-                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.battery || '—'}</td>)}
+                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.battery || '—'}</td>)}
                             </tr>
                             <tr>
                                 <td className="specs-table-cell font-medium">EPA Range (mi)</td>
-                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.range || '—'}</td>)}
+                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.range || '—'}</td>)}
                             </tr>
                             <tr>
                                 <td className="specs-table-cell font-medium">Peak Power (kW)</td>
-                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.power || '—'}</td>)}
+                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.power || '—'}</td>)}
                             </tr>
                             <tr>
                                 <td className="specs-table-cell font-medium">Test Runs</td>
-                                {displayVehicles.map(v => <td key={v.id} className="specs-table-cell">{v.runs?.length || 0}</td>)}
+                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.runs?.length || 0}</td>)}
                             </tr>
 
-                            {/* ── Structured spec categories ── */}
-                            {SPEC_CATEGORIES.map(cat => {
-                                const customKeys = [...(customKeysByCategory[cat.key] || new Set())];
-
-                                // Only render this category block if at least one vehicle has data for it
-                                const hasAnyData = displayVehicles.some(v => {
-                                    const catData = v.specs?.[cat.key];
-                                    if (!catData) return false;
-                                    return cat.fields.some(f => {
-                                        const val = catData[f.key];
-                                        return val !== null && val !== undefined && val !== '';
-                                    }) || customKeys.some(k => catData._custom?.[k] != null);
-                                });
-                                if (!hasAnyData) return null;
-
-                                return [
-                                    // Category header row
-                                    <tr key={`${cat.key}-header`}>
-                                        <td className="specs-table-category-header" colSpan={displayVehicles.length + 1}>
-                                            {cat.label}
-                                        </td>
-                                    </tr>,
-                                    // Predefined field rows
-                                    ...cat.fields.map(field => {
-                                        const hasValue = displayVehicles.some(v => {
-                                            const val = v.specs?.[cat.key]?.[field.key];
-                                            return val !== null && val !== undefined && val !== '';
-                                        });
-                                        if (!hasValue) return null;
-                                        return (
-                                            <tr key={`${cat.key}-${field.key}`}>
-                                                <td className="specs-table-cell font-medium text-sm">{field.label}</td>
-                                                {displayVehicles.map(v => (
-                                                    <td key={v.id} className="specs-table-cell text-sm">
-                                                        {formatValue(v.specs?.[cat.key]?.[field.key], field.type)}
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        );
-                                    }).filter(Boolean),
-                                    // Custom field rows
-                                    ...customKeys.map(key => (
-                                        <tr key={`${cat.key}-custom-${key}`}>
-                                            <td className="specs-table-cell font-medium text-sm text-gray-500 italic">
-                                                {formatCustomKey(key)}
-                                            </td>
-                                            {displayVehicles.map(v => (
-                                                <td key={v.id} className="specs-table-cell text-sm">
-                                                    {v.specs?.[cat.key]?._custom?.[key] ?? '—'}
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    )),
-                                ];
-                            })}
+                            {/* ── Structured spec categories (flat array, no nested arrays) ── */}
+                            {specRows}
                         </tbody>
                     </table>
                 </div>
