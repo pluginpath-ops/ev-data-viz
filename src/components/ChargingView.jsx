@@ -156,8 +156,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         { value: 'deltaSoc',   label: 'SoC Added (%)' },
         { value: 'chargeRate', label: 'Charge Rate (kW)' },
         { value: 'time',       label: 'Time (min)' },
-        { value: 'range',      label: 'Range (mi)' },
-        { value: 'deltaRange', label: 'Range Added (mi)' },
+        { value: 'range',        label: 'Range - Tested (mi)' },
+        { value: 'deltaRange',   label: 'Range Added - Tested (mi)' },
+        { value: 'rangeEpa',     label: 'Range - EPA (mi)' },
+        { value: 'deltaRangeEpa',label: 'Range Added - EPA (mi)' },
         { value: 'temperature',label: 'Temperature' },
         { value: 'cRate',      label: 'C-Rate  (~kW ÷ battery)' },
         { value: 'rangeRate',  label: 'Range Rate (mi/min)' },
@@ -166,7 +168,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
     const chartPresets = [
         { emoji: '⚡', name: 'Rate vs SoC',            x: 'soc',  y: 'chargeRate', y2: null       },
-        { emoji: '🛣️', name: 'Range vs Time',           x: 'time', y: 'range',      y2: null       },
+        { emoji: '🛣️', name: 'Range vs Time',           x: 'time', y: 'range',      y2: 'rangeEpa' },
         { emoji: '⏱️', name: 'Rate vs Time',            x: 'time', y: 'chargeRate', y2: null       },
         { emoji: '📊', name: 'Rate + SoC vs Time',      x: 'time', y: 'chargeRate', y2: 'deltaSoc'   },
         { emoji: '📊', name: 'Rate + Range vs Time',    x: 'time', y: 'chargeRate', y2: 'deltaRange' },
@@ -230,19 +232,32 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
      * Augment each data point with cumulative delta fields computed from the
      * first valid reading in the array.  Must be called AFTER any race-mode
      * slice so that deltas start at 0 at the session / race anchor.
+     * vehicleRange (EPA rated miles) is used to compute on-the-fly EPA range fields.
      */
-    const augmentDeltas = (data) => {
-        const baseRange = data.find(p => p.range != null)?.range ?? null;
-        const baseSoc   = data.find(p => p.soc   != null)?.soc   ?? null;
-        return data.map(p => ({
-            ...p,
-            deltaRange: baseRange != null && p.range != null
-                ? Math.round((p.range - baseRange) * 10) / 10
-                : null,
-            deltaSoc: baseSoc != null && p.soc != null
-                ? Math.round((p.soc - baseSoc) * 10) / 10
-                : null,
-        }));
+    const augmentDeltas = (data, vehicleRange) => {
+        const baseRange    = data.find(p => p.range != null)?.range ?? null;
+        const baseSoc      = data.find(p => p.soc   != null)?.soc   ?? null;
+        const baseEpaRange = baseSoc != null && vehicleRange
+            ? Math.round((baseSoc / 100) * vehicleRange * 10) / 10
+            : null;
+        return data.map(p => {
+            const epaRange = p.soc != null && vehicleRange
+                ? Math.round((p.soc / 100) * vehicleRange * 10) / 10
+                : null;
+            return {
+                ...p,
+                deltaRange: baseRange != null && p.range != null
+                    ? Math.round((p.range - baseRange) * 10) / 10
+                    : null,
+                deltaSoc: baseSoc != null && p.soc != null
+                    ? Math.round((p.soc - baseSoc) * 10) / 10
+                    : null,
+                rangeEpa: epaRange,
+                deltaRangeEpa: baseEpaRange != null && epaRange != null
+                    ? Math.round((epaRange - baseEpaRange) * 10) / 10
+                    : null,
+            };
+        });
     };
 
     // ── Chart rendering ───────────────────────────────────────────────────────
@@ -291,7 +306,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             }
 
             // 2. Augment with cumulative delta fields (start at 0 from first point)
-            workingData = augmentDeltas(workingData);
+            workingData = augmentDeltas(workingData, vehicleRange);
 
             // 3. X value mapper
             const getX = raceActive

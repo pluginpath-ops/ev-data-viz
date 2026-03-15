@@ -460,12 +460,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setEditDataDirty(true);
     };
 
-    // Fill null range values from SoC × rated range (or measured test range) for the currently-loaded edit table.
-    // source: 'epa' (default) | 'measured'
-    const handleEstimateRangeInEdit = (source = 'epa') => {
-        const ratedRange = source === 'measured' && effectiveRangeFromTest
-            ? effectiveRangeFromTest
-            : vehicle?.range;
+    // Fill null range values from SoC × effective range from the selected test run.
+    const handleEstimateRangeInEdit = () => {
+        const ratedRange = effectiveRangeFromTest;
         if (!editData || !ratedRange) return;
         setEditData(prev => prev.map(row => ({
             ...row,
@@ -485,9 +482,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const missingJoinKey    = uploadMode === 'merge' && !canJoinBySoc && !canJoinByTime;
 
     // ── Derived-column offer logic ────────────────────────────────────────────
-    // Range can be estimated when: SoC is mapped, Range is NOT mapped, and vehicle has a rated range
-    const offerRangeEstimate = !!fieldMapping.soc && !fieldMapping.range && !!vehicle?.range;
-
     // Range test runs available for measured-range estimation
     const rangeTestRuns = (vehicle?.runs ?? [])
         .filter(r => r.has_range && r.start_soc != null && r.end_soc != null
@@ -980,35 +974,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             </div>
 
                             {/* ── Derived-column offers ── */}
-                            {(offerRangeEstimate || offerRangeEstimateTest) && (
+                            {offerRangeEstimateTest && (
                                 <div className="mt-5 space-y-3">
-                                    {/* Option 1: EPA rated range */}
-                                    {offerRangeEstimate && (
-                                        <div className={`estimation-panel ${estimations.range === 'epa' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
-                                            <div>
-                                                <p className={`text-sm font-semibold ${estimations.range === 'epa' ? 'text-green-800' : 'text-blue-800'}`}>
-                                                    {estimations.range === 'epa' ? '✓ Range will be estimated (EPA)' : 'ℹ No Range column mapped'}
-                                                </p>
-                                                <p className={`text-xs mt-0.5 ${estimations.range === 'epa' ? 'text-green-700' : 'text-blue-700'}`}>
-                                                    {estimations.range === 'epa'
-                                                        ? `range = SoC% × ${vehicle.range} mi (EPA rated)`
-                                                        : `Estimate from EPA rated range (${vehicle.range} mi × SoC%)?`}
-                                                </p>
-                                            </div>
-                                            <button
-                                                onClick={() => setEstimations(prev => ({ ...prev, range: prev.range === 'epa' ? null : 'epa' }))}
-                                                className={`shrink-0 text-xs px-3 py-1 rounded border transition-colors ${
-                                                    estimations.range === 'epa'
-                                                        ? 'bg-white text-green-700 border-green-300 hover:bg-green-100'
-                                                        : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                                                }`}
-                                            >
-                                                {estimations.range === 'epa' ? 'Undo' : 'Use EPA range'}
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {/* Option 2: Measured range from test data */}
+                                    {/* Measured range from test data */}
                                     {offerRangeEstimateTest && (
                                         <div className={`estimation-panel ${estimations.range === 'measured' ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
                                             <div className="flex-1 min-w-0">
@@ -1312,17 +1280,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200">
                                                     <p className="text-xs text-blue-800 font-semibold mb-2">ℹ No range data — estimate from SoC%:</p>
                                                     <div className="flex flex-wrap gap-2">
-                                                        {vehicle?.range && (
-                                                            <button
-                                                                onClick={() => handleEstimateRangeInEdit('epa')}
-                                                                className="text-xs px-3 py-1 rounded border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
-                                                            >
-                                                                EPA rated ({vehicle.range} mi)
-                                                            </button>
-                                                        )}
                                                         {effectiveRangeFromTest && (
                                                             <button
-                                                                onClick={() => handleEstimateRangeInEdit('measured')}
+                                                                onClick={() => handleEstimateRangeInEdit()}
                                                                 className="text-xs px-3 py-1 rounded border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
                                                                 title={`From: ${selectedRangeTestRun?.name}`}
                                                             >
