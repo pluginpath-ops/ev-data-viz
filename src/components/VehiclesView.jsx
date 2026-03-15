@@ -500,14 +500,14 @@ export default function VehiclesView({
                 <div className="flex justify-end gap-2 mb-4 -mt-3">
                     <button
                         onClick={() => onSelectAllVisible(textFiltered.map(v => v.id))}
-                        className="btn btn-primary text-sm"
+                        className="btn btn-primary btn-sm"
                         title="Add all currently visible vehicles to the comparison selection"
                     >
                         Select All Visible ({textFiltered.length})
                     </button>
                     <button
                         onClick={() => onClearAllVisible(textFiltered.map(v => v.id))}
-                        className="btn btn-secondary text-sm"
+                        className="btn btn-secondary btn-sm"
                         title="Remove all currently visible vehicles from the comparison selection"
                     >
                         Clear All Visible

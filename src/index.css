@@ -45,6 +45,12 @@
     text-align: center;
 }
 
+/* Small button modifier — matches vehicle card action button sizing */
+.btn.btn-sm {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+}
+
 /*
  * BUTTON SEMANTIC GUIDE
  * ─────────────────────────────────────────────────────────────────

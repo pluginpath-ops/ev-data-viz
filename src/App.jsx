@@ -454,7 +454,7 @@ export default function App() {
                                     })}
                                     <button
                                         onClick={clearAllSelections}
-                                        className="btn btn-warning text-xs"
+                                        className="btn btn-warning btn-sm"
                                     >
                                         Clear all
                                     </button>
