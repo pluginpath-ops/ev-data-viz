@@ -234,6 +234,7 @@ Runs inherit ownership from their parent vehicle via subquery join.
 | File | Description |
 |------|-------------|
 | `migrations/001_rbac.sql` | Add `profiles.role`, RBAC helper functions, rebuild RLS on vehicles + runs |
+| `migrations/002_fix_get_admin_users.sql` | Backfill `profiles` rows for pre-existing auth users; fix `get_admin_users()` to use LEFT JOIN so users without a profile row still appear |
 
 ### Applying migrations
 

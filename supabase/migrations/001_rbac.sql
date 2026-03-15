@@ -67,9 +67,9 @@ BEGIN
     au.id,
     au.email::text,
     au.created_at,
-    p.role
+    COALESCE(p.role, 'user')::text AS role
   FROM auth.users au
-  JOIN public.profiles p ON p.id = au.id
+  LEFT JOIN public.profiles p ON p.id = au.id
   ORDER BY au.created_at DESC;
 END;
 $$;
