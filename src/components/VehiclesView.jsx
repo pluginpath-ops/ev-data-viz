@@ -25,7 +25,7 @@ const ListViewIcon = () => (
 
 
 export default function VehiclesView({
-    vehicles, selectedVehicles, onToggleSelection, onAdd, onUpdate, onDelete, onViewRuns,
+    vehicles, selectedVehicles, onToggleSelection, onSelectAllVisible, onClearAllVisible, onAdd, onUpdate, onDelete, onViewRuns,
     canCreate, canEdit, canDelete, canPublish, onToggleVisibility,
     tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
     onReorderVehicles, onDuplicateVehicle,
@@ -39,7 +39,7 @@ export default function VehiclesView({
     });
     const [formTags, setFormTags] = useState([]);
     const [newTagName, setNewTagName] = useState('');
-    const [activeTagFilters, setActiveTagFilters] = useState([]);
+    const [tagFilterStates, setTagFilterStates] = useState({}); // { [tagId]: 'or' | 'and' | 'not' }
     const [imageUploading, setImageUploading] = useState(false);
     const [viewMode, setViewMode] = useState('card'); // 'card' | 'list'
     const [sortBy, setSortBy] = useState('default');
@@ -141,17 +141,28 @@ export default function VehiclesView({
         setImageUploading(false);
     };
 
-    const toggleTagFilter = (tagId) => {
-        setActiveTagFilters(prev =>
-            prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
-        );
+    // Cycle tag filter state: N/A → OR (green) → AND (blue) → NOT (red) → N/A
+    const cycleTagFilter = (tagId) => {
+        setTagFilterStates(prev => {
+            const cur = prev[tagId];
+            if (!cur)          return { ...prev, [tagId]: 'or' };
+            if (cur === 'or')  return { ...prev, [tagId]: 'and' };
+            if (cur === 'and') return { ...prev, [tagId]: 'not' };
+            const next = { ...prev }; delete next[tagId]; return next; // not → N/A
+        });
     };
 
-    // Stage 1: tag + committed-delete filter
-    const tagFiltered = (activeTagFilters.length === 0
-        ? vehicles
-        : vehicles.filter(v => activeTagFilters.every(tagId => v.tags?.some(t => t.id === tagId)))
-    ).filter(v => !committedDeletes.has(v.id));
+    // Stage 1: quad-state tag filter + committed-delete filter
+    const orTags  = Object.entries(tagFilterStates).filter(([, s]) => s === 'or' ).map(([id]) => Number(id));
+    const andTags = Object.entries(tagFilterStates).filter(([, s]) => s === 'and').map(([id]) => Number(id));
+    const notTags = Object.entries(tagFilterStates).filter(([, s]) => s === 'not').map(([id]) => Number(id));
+
+    const tagFiltered = vehicles.filter(v => {
+        if (notTags.some(id => v.tags?.some(t => t.id === id))) return false;
+        if (andTags.length && !andTags.every(id => v.tags?.some(t => t.id === id))) return false;
+        if (orTags.length  && !orTags.some(id  => v.tags?.some(t => t.id === id))) return false;
+        return true;
+    }).filter(v => !committedDeletes.has(v.id));
 
     // Stage 2: text filter
     const textLower = textFilter.trim().toLowerCase();
@@ -361,10 +372,10 @@ export default function VehiclesView({
     };
 
     // Reset to page 1 when filter/sort changes
-    useEffect(() => { setVehiclePage(1); }, [textFilter, activeTagFilters, sortBy]);
+    useEffect(() => { setVehiclePage(1); }, [textFilter, tagFilterStates, sortBy]);
 
     const showReorderButtons = canEdit({}) && sortBy === 'default'
-        && textFilter.trim() === '' && activeTagFilters.length === 0
+        && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0
         && editingOrder;
 
     // ────────────────────────────────────────────────────────────────────────
@@ -429,7 +440,7 @@ export default function VehiclesView({
                     <option value="year_newest">Year (Newest)</option>
                     <option value="year_oldest">Year (Oldest)</option>
                 </select>
-                {canEdit({}) && sortBy === 'default' && textFilter.trim() === '' && activeTagFilters.length === 0 && (
+                {canEdit({}) && sortBy === 'default' && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0 && (
                     <button
                         onClick={() => { if (editingOrder) setPendingOrder(null); setEditingOrder(v => !v); }}
                         className={`text-sm px-3 py-2 rounded border transition flex-shrink-0 ${
@@ -444,32 +455,63 @@ export default function VehiclesView({
                 )}
             </div>
 
-            {/* Tag filter bar */}
+            {/* Tag filter bar — quad-state: N/A → OR (green) → AND (blue) → NOT (red) */}
             {tags.length > 0 && (
                 <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-gray-500">Filter:</span>
-                    {tags.map(tag => (
+                    <span className="text-sm font-medium text-gray-500 flex-shrink-0">Filter:</span>
+                    {tags.map(tag => {
+                        const state = tagFilterStates[tag.id]; // undefined = 'na'
+                        const stateClass = state === 'or' ? 'tag-filter-or'
+                            : state === 'and' ? 'tag-filter-and'
+                            : state === 'not' ? 'tag-filter-not'
+                            : 'tag-filter-na';
+                        const tooltip = state === 'or'  ? `OR — any vehicle with "${tag.name}" is shown. Click for AND.`
+                            : state === 'and' ? `AND — vehicles must have "${tag.name}". Click for NOT.`
+                            : state === 'not' ? `NOT — vehicles with "${tag.name}" are hidden. Click to clear.`
+                            : `Click to filter: OR (show any vehicle with "${tag.name}")`;
+                        return (
+                            <button
+                                key={tag.id}
+                                onClick={() => cycleTagFilter(tag.id)}
+                                className={`tag-filter-btn ${stateClass}`}
+                                title={tooltip}
+                            >
+                                {tag.name}
+                            </button>
+                        );
+                    })}
+                    {Object.keys(tagFilterStates).length > 0 && (
                         <button
-                            key={tag.id}
-                            onClick={() => toggleTagFilter(tag.id)}
-                            className={`px-3 py-1 rounded-full text-sm font-medium transition border ${
-                                activeTagFilters.includes(tag.id)
-                                    ? 'bg-blue-500 text-white border-blue-500'
-                                    : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
-                            }`}
-                            style={activeTagFilters.includes(tag.id) ? { backgroundColor: 'var(--color-primary)', borderColor: 'var(--color-primary)' } : {}}
-                        >
-                            {tag.name}
-                        </button>
-                    ))}
-                    {activeTagFilters.length > 0 && (
-                        <button
-                            onClick={() => setActiveTagFilters([])}
-                            className="text-xs text-gray-400 hover:text-gray-600 underline ml-1"
+                            onClick={() => setTagFilterStates({})}
+                            className="text-xs text-gray-400 hover:text-gray-600 underline ml-1 flex-shrink-0"
                         >
                             Clear
                         </button>
                     )}
+                    <span className="tag-filter-legend" title="Click a tag to cycle: OR (green) shows vehicles with any matching tag · AND (blue) requires all matching tags · NOT (red) hides matching vehicles">
+                        <span className="text-green-500">●</span> OR
+                        <span className="text-blue-500 ml-1">●</span> AND
+                        <span className="text-red-500 ml-1">●</span> NOT
+                    </span>
+                </div>
+            )}
+            {/* Select All / Clear All Visible */}
+            {textFiltered.length > 0 && (
+                <div className="flex justify-end gap-2 mb-4 -mt-3">
+                    <button
+                        onClick={() => onSelectAllVisible(textFiltered.map(v => v.id))}
+                        className="btn btn-primary btn-sm"
+                        title="Add all currently visible vehicles to the comparison selection"
+                    >
+                        Select All Visible ({textFiltered.length})
+                    </button>
+                    <button
+                        onClick={() => onClearAllVisible(textFiltered.map(v => v.id))}
+                        className="btn btn-secondary btn-sm"
+                        title="Remove all currently visible vehicles from the comparison selection"
+                    >
+                        Clear All Visible
+                    </button>
                 </div>
             )}
 
@@ -690,8 +732,8 @@ export default function VehiclesView({
                 <div className="empty-state">
                     {textFilter.trim()
                         ? <p className="text-lg">No vehicles match "{textFilter.trim()}".</p>
-                        : activeTagFilters.length > 0
-                            ? <p className="text-lg">No vehicles match the selected tags.</p>
+                        : Object.keys(tagFilterStates).length > 0
+                            ? <p className="text-lg">No vehicles match the selected tag filters.</p>
                             : <p className="text-lg">No vehicles yet. Click "Add Vehicle" to get started!</p>
                     }
                 </div>

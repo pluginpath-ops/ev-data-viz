@@ -24,6 +24,9 @@
     --color-edit: rgb(34, 197, 94);
     --color-edit-hover: rgb(22, 163, 74);
 
+    --color-warning: rgb(245, 158, 11);
+    --color-warning-hover: rgb(217, 119, 6);
+
     /* Background and layout colors */
     --color-background: rgb(249, 250, 251);
     --color-card: rgb(255, 255, 255);
@@ -42,6 +45,12 @@
     text-align: center;
 }
 
+/* Small button modifier — matches vehicle card action button sizing */
+.btn.btn-sm {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+}
+
 /*
  * BUTTON SEMANTIC GUIDE
  * ─────────────────────────────────────────────────────────────────
@@ -58,9 +67,13 @@
  *                        Rule: "This permanently removes data."
  *                        Examples: Delete (vehicle, run)
  *
- * btn-secondary (grey) — Neutral / non-data-changing actions.
- *                        Rule: "This cancels, goes back, or exports without mutating state."
- *                        Examples: Cancel, Back, Sign Out, Export Data, Set as Default
+ * btn-secondary (grey)  — Neutral / non-data-changing actions.
+ *                         Rule: "This cancels, goes back, or exports without mutating state."
+ *                         Examples: Cancel, Back, Sign Out, Export Data, Set as Default
+ *
+ * btn-warning  (amber)  — Alert / attention-drawing but non-destructive actions.
+ *                         Rule: "This resets or clears state in a reversible but notable way."
+ *                         Examples: Clear all selections
  * ─────────────────────────────────────────────────────────────────
  */
 
@@ -98,6 +111,15 @@
 }
 .btn-secondary:hover {
     background-color: var(--color-secondary-hover);
+}
+
+/* Warning / Alert Button (amber) — attention-drawing but not destructive */
+.btn-warning {
+    background-color: var(--color-warning);
+    color: white;
+}
+.btn-warning:hover {
+    background-color: var(--color-warning-hover);
 }
 
 /* Tab/Navigation Button - Used for: Top navigation tabs */
@@ -339,6 +361,16 @@ body {
 .tag-filter-bar {
     @apply flex flex-wrap gap-2 items-center mb-6;
 }
+
+/* Quad-state tag filter buttons (N/A → OR → AND → NOT) */
+.tag-filter-btn  { @apply px-3 py-1 rounded-full text-sm font-medium transition border cursor-pointer; }
+.tag-filter-na   { @apply bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200; }
+.tag-filter-or   { @apply bg-green-500 text-white border-green-500 hover:bg-green-600; }
+.tag-filter-and  { @apply bg-blue-500 text-white border-blue-500 hover:bg-blue-600; }
+.tag-filter-not  { @apply bg-red-500 text-white border-red-500 hover:bg-red-600; }
+
+/* Small legend explaining OR/AND/NOT color states */
+.tag-filter-legend { @apply text-xs text-gray-400 ml-auto flex items-center gap-2 whitespace-nowrap select-none; }
 
 /* Vehicle tag chip cluster on a card or list row */
 .vehicle-tags {

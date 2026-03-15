@@ -454,7 +454,7 @@ export default function App() {
                                     })}
                                     <button
                                         onClick={clearAllSelections}
-                                        className="text-xs text-gray-400 hover:text-gray-600 underline ml-1"
+                                        className="btn btn-warning btn-sm"
                                     >
                                         Clear all
                                     </button>
@@ -471,6 +471,12 @@ export default function App() {
                             vehicles={vehicles}
                             selectedVehicles={selectedVehicles}
                             onToggleSelection={toggleVehicleSelection}
+                            onSelectAllVisible={(ids) =>
+                                setVehicleSelection([...new Set([...selectedVehicles, ...ids])])
+                            }
+                            onClearAllVisible={(ids) =>
+                                setVehicleSelection(selectedVehicles.filter(id => !ids.includes(id)))
+                            }
                             onAdd={addVehicle}
                             onUpdate={updateVehicle}
                             onDelete={deleteVehicle}
