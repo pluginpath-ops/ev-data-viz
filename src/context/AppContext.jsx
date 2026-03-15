@@ -440,12 +440,9 @@ export function AppProvider({ children }) {
 
     // ── Admin actions ─────────────────────────────────────────────────────────
     const getUsersForAdmin = async () => {
-        try {
-            return await dataService.getUsersForAdmin();
-        } catch (error) {
-            showError('Error loading users: ' + error.message);
-            return [];
-        }
+        // Let the error propagate to AdminView so it can show it inline.
+        // showError would only flash the global banner and return [], hiding the cause.
+        return await dataService.getUsersForAdmin();
     };
 
     const setUserRoleAction = async (targetUserId, newRole) => {
