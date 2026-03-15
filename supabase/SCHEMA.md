@@ -52,7 +52,14 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 | `visibility` | `text` | `'private'` | `'public'` or `'private'`. New vehicles always default to `'private'`. |
 | `image_url` | `text` | — | Card background image (Supabase Storage) |
 | `sort_order` | `integer` | — | Manual drag-to-reorder position |
+| `specs` | `jsonb` | `NULL` | Structured vehicle specifications (see below) |
 | `created_at` | `timestamptz` | `now()` | |
+
+> **`specs` JSONB structure:** Each category key maps to an object of predefined field keys plus `_custom` (user-defined key-value pairs). Categories: `pricing`, `powertrain`, `compute`, `infotainment`, `dimensions`, `wheels`, `suspension`, `lighting`, `charging`, `interior`. See `src/utils/vehicleSpecSchema.js` for the full field list. `specs = NULL` means no specs entered yet — handled gracefully by all UI components.
+>
+> ```json
+> { "powertrain": { "motors": 2, "motor_type": "Permanent Magnet", "_custom": { "gear_ratio": "9.73:1" } } }
+> ```
 
 > **Note:** Vehicles created before `user_id` tracking was added will have `user_id = NULL`. Only admins can edit/delete them until ownership is assigned:
 > ```sql
@@ -235,6 +242,7 @@ Runs inherit ownership from their parent vehicle via subquery join.
 |------|-------------|
 | `migrations/001_rbac.sql` | Add `profiles.role`, RBAC helper functions, rebuild RLS on vehicles + runs |
 | `migrations/002_fix_get_admin_users.sql` | Backfill `profiles` rows for pre-existing auth users; fix `get_admin_users()` to use LEFT JOIN so users without a profile row still appear |
+| `migrations/003_vehicle_specs.sql` | Add `specs jsonb` column to `vehicles` for structured vehicle specifications |
 
 ### Applying migrations
 

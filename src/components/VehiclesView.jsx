@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 import EditVehicleForm from './EditVehicleForm';
+import VehicleSpecsDisplay from './VehicleSpecsDisplay';
+import EditSpecsForm from './EditSpecsForm';
 
 // Icons for view toggle
 const CardViewIcon = () => (
@@ -27,6 +29,7 @@ export default function VehiclesView({
     canCreate, canEdit, canDelete, canPublish, onToggleVisibility,
     tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
     onReorderVehicles, onDuplicateVehicle,
+    onUpdateVehicleSpecs, specCustomFieldSuggestions,
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -46,6 +49,7 @@ export default function VehiclesView({
     const [savingOrder, setSavingOrder]   = useState(false);
     const [duplicatingId, setDuplicatingId] = useState(null);
     const [vehiclePage, setVehiclePage] = useState(1);
+    const [specsEditingVehicle, setSpecsEditingVehicle] = useState(null);
     const VEHICLES_PER_PAGE = 24;
 
     const {
@@ -221,6 +225,14 @@ export default function VehiclesView({
                         className="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
                     >
                         Edit
+                    </button>
+                )}
+                {canEdit(vehicle) && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setSpecsEditingVehicle(vehicle); }}
+                        className="px-3 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition"
+                    >
+                        Specs
                     </button>
                 )}
                 {canEdit(vehicle) && (
@@ -536,6 +548,7 @@ export default function VehiclesView({
                                                         <TagPills vehicle={vehicle} />
                                                     </div>
                                                 )}
+                                                <VehicleSpecsDisplay specs={vehicle.specs} />
                                             </div>
                                             {/* Right: vertical action column */}
                                             <div className="flex flex-col gap-1 flex-shrink-0 items-stretch" onClick={e => e.stopPropagation()}>
@@ -716,6 +729,16 @@ export default function VehiclesView({
                         <EditVehicleForm {...editFormProps} />
                     </div>
                 </div>
+            )}
+
+            {/* Edit Specs modal */}
+            {specsEditingVehicle && (
+                <EditSpecsForm
+                    vehicle={specsEditingVehicle}
+                    specCustomFieldSuggestions={specCustomFieldSuggestions}
+                    onSave={onUpdateVehicleSpecs}
+                    onClose={() => setSpecsEditingVehicle(null)}
+                />
             )}
         </div>
     );

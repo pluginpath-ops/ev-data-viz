@@ -146,6 +146,15 @@ class DataService {
     if (error) throw error;
   }
 
+  async updateVehicleSpecs(vehicleId, specs) {
+    if (!this.useSupabase || !this.user) return;
+    const { error } = await getSupabase()
+      .from('vehicles')
+      .update({ specs })
+      .eq('id', vehicleId);
+    if (error) throw error;
+  }
+
   async updateVehicleSortOrders(sortUpdates) {
     // sortUpdates: [{ id, sort_order }, ...]
     if (!this.useSupabase || !this.user) return; // no-op in localStorage mode

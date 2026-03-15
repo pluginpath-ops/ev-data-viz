@@ -12,6 +12,7 @@ export function AppProvider({ children }) {
     const [loading, setLoading] = useState(true);
     const [headerImageUrl, setHeaderImageUrl] = useState('');
     const [appNotification, setAppNotification] = useState(null); // { message, type: 'error'|'success' }
+    const [specCustomFieldSuggestions, setSpecCustomFieldSuggestions] = useState({}); // { [category]: Set<normalizedKey> }
 
     const showError   = (message) => setAppNotification({ message, type: 'error' });
     const showSuccess = (message) => setAppNotification({ message, type: 'success' });
@@ -31,6 +32,20 @@ export function AppProvider({ children }) {
         const selectedIds = await dataService.getSelectedVehicles();
         const tagsData = dataService.useSupabase ? await dataService.getTags() : [];
         const siteSettings = await dataService.getSiteSettings();
+
+        // Derive custom field name suggestions from all vehicles' specs._custom objects
+        const suggestions = {};
+        for (const vehicle of vehiclesData) {
+            if (!vehicle.specs) continue;
+            for (const [cat, catData] of Object.entries(vehicle.specs)) {
+                if (!catData?._custom) continue;
+                if (!suggestions[cat]) suggestions[cat] = new Set();
+                for (const key of Object.keys(catData._custom)) {
+                    suggestions[cat].add(key);
+                }
+            }
+        }
+        setSpecCustomFieldSuggestions(suggestions);
 
         setVehicles(vehiclesData);
         setSelectedVehicles(selectedIds);
@@ -373,6 +388,26 @@ export function AppProvider({ children }) {
         }
     };
 
+    const updateVehicleSpecs = async (vehicleId, specs) => {
+        try {
+            await dataService.updateVehicleSpecs(vehicleId, specs);
+            setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, specs } : v));
+            // Update custom field suggestions with any new keys from the saved specs
+            setSpecCustomFieldSuggestions(prev => {
+                const next = { ...prev };
+                for (const [cat, catData] of Object.entries(specs)) {
+                    if (!catData?._custom) continue;
+                    const existing = next[cat] ? new Set(next[cat]) : new Set();
+                    for (const key of Object.keys(catData._custom)) existing.add(key);
+                    next[cat] = existing;
+                }
+                return next;
+            });
+        } catch (error) {
+            showError('Error updating specs: ' + error.message);
+        }
+    };
+
     const uploadVehicleImage = async (vehicleId, file) => {
         try {
             const imageUrl = await dataService.uploadVehicleImage(vehicleId, file);
@@ -500,6 +535,8 @@ export function AppProvider({ children }) {
         exportData,
         importData,
         importTableauSessions,
+        updateVehicleSpecs,
+        specCustomFieldSuggestions,
         getUsersForAdmin,
         setUserRole: setUserRoleAction,
         signOut,

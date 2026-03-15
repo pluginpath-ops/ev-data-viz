@@ -54,6 +54,8 @@ export default function App() {
         initializeApp,
         appNotification,
         clearNotification,
+        updateVehicleSpecs,
+        specCustomFieldSuggestions,
     } = useAppContext();
 
     // Auto-dismiss notifications after 6 s
@@ -484,6 +486,8 @@ export default function App() {
                             onUploadVehicleImage={uploadVehicleImage}
                             onReorderVehicles={reorderVehicles}
                             onDuplicateVehicle={duplicateVehicle}
+                            onUpdateVehicleSpecs={updateVehicleSpecs}
+                            specCustomFieldSuggestions={specCustomFieldSuggestions}
                         />
                     )}
                     {view === 'runs' && currentActiveVehicle && (
@@ -509,6 +513,8 @@ export default function App() {
                             onCreateTag={createTag}
                             onSyncVehicleTags={syncVehicleTags}
                             onUploadVehicleImage={(file) => uploadVehicleImage(currentActiveVehicle.id, file)}
+                            onUpdateVehicleSpecs={updateVehicleSpecs}
+                            specCustomFieldSuggestions={specCustomFieldSuggestions}
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && (

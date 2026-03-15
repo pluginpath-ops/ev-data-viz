@@ -5,6 +5,7 @@ import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 import EditVehicleForm from './EditVehicleForm';
+import EditSpecsForm from './EditSpecsForm';
 
 // ── Data-type flag definitions ────────────────────────────────────────────────
 // Each flag represents a data domain that can independently be present in a run.
@@ -22,9 +23,10 @@ const inferRunFlags = (run) => {
     return flags;
 };
 
-export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage }) {
+export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions }) {
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
+    const [showEditSpecs, setShowEditSpecs] = useState(false);
     const [vehicleFormData, setVehicleFormData] = useState({
         name: '', make: '', model: '', year: '', battery: '', range: '', power: ''
     });
@@ -620,6 +622,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                     {canEdit(vehicle) && (
                         <button onClick={openEditVehicle} className="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
                             Edit
+                        </button>
+                    )}
+                    {canEdit(vehicle) && (
+                        <button onClick={() => setShowEditSpecs(true)} className="px-3 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition">
+                            Specs
                         </button>
                     )}
                     {canEdit(vehicle) && (
@@ -1686,6 +1693,16 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 onUndo={undoDelete}
                 noun="test"
             />
+
+            {/* Edit Specs modal */}
+            {showEditSpecs && (
+                <EditSpecsForm
+                    vehicle={vehicle}
+                    specCustomFieldSuggestions={specCustomFieldSuggestions}
+                    onSave={onUpdateVehicleSpecs}
+                    onClose={() => setShowEditSpecs(false)}
+                />
+            )}
 
             {/* Edit vehicle modal */}
             {showEditVehicle && (
