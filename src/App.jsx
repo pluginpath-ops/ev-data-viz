@@ -278,9 +278,9 @@ export default function App() {
                             onClick={() => navigateTo('vehicles')}
                             className="text-left group"
                         >
-                            <h1 className="text-3xl font-bold group-hover:underline decoration-white/60">EV Data Visualization</h1>
+                            <h1 className="text-3xl font-bold group-hover:underline decoration-white/60">EVBench</h1>
                         </button>
-                        <p className="mt-1" style={{color: 'rgba(255,255,255,0.8)'}}>Compare and analyze electric vehicle performance data</p>
+                        <p className="mt-1" style={{color: 'rgba(255,255,255,0.8)'}}>Compare and benchmark electric vehicle performance data</p>
 
                         {/* Admin-only: change header image */}
                         {isAdmin && (
