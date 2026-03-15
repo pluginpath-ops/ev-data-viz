@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 import EditVehicleForm from './EditVehicleForm';
-import VehicleSpecsDisplay from './VehicleSpecsDisplay';
 import EditSpecsForm from './EditSpecsForm';
 
 // Icons for view toggle
@@ -548,7 +547,6 @@ export default function VehiclesView({
                                                         <TagPills vehicle={vehicle} />
                                                     </div>
                                                 )}
-                                                <VehicleSpecsDisplay specs={vehicle.specs} />
                                             </div>
                                             {/* Right: vertical action column */}
                                             <div className="flex flex-col gap-1 flex-shrink-0 items-stretch" onClick={e => e.stopPropagation()}>

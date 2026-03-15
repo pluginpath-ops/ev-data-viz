@@ -116,7 +116,7 @@ function SpecField({ field, value, onChange }) {
 
 export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onSave, onClose }) {
     const [localSpecs, setLocalSpecs] = useState(() => buildInitialSpecs(vehicle.specs));
-    const [openCategories, setOpenCategories] = useState(new Set());
+    const [openCategories, setOpenCategories] = useState(() => new Set(SPEC_CATEGORIES.map(c => c.key)));
     const [saving, setSaving] = useState(false);
     // Per-category "add custom field" input state
     const [newCustomKey, setNewCustomKey] = useState({});
@@ -207,9 +207,19 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
 
                 {/* Scrollable body */}
                 <div className="modal-body flex-1 overflow-y-auto">
-                    <p className="text-sm text-gray-500 mb-4">
-                        Click a category to expand it. Fields left blank are not saved.
-                    </p>
+                    <div className="flex items-center justify-between mb-4">
+                        <p className="text-sm text-gray-500">Fields left blank are not saved.</p>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const allOpen = openCategories.size === SPEC_CATEGORIES.length;
+                                setOpenCategories(allOpen ? new Set() : new Set(SPEC_CATEGORIES.map(c => c.key)));
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800 underline flex-shrink-0 ml-4"
+                        >
+                            {openCategories.size === SPEC_CATEGORIES.length ? 'Collapse All' : 'Expand All'}
+                        </button>
+                    </div>
 
                     {SPEC_CATEGORIES.map(cat => {
                         const isOpen = openCategories.has(cat.key);
