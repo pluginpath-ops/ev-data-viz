@@ -8,8 +8,10 @@ import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
  * Renders nothing if specs is null/undefined or all categories are empty.
  * Each category is collapsed by default; only categories with ≥1 value are shown.
  */
-export default function VehicleSpecsDisplay({ specs }) {
-    const [openCategories, setOpenCategories] = useState(new Set());
+export default function VehicleSpecsDisplay({ specs, defaultAllOpen = false }) {
+    const [openCategories, setOpenCategories] = useState(() =>
+        defaultAllOpen ? new Set(SPEC_CATEGORIES.map(c => c.key)) : new Set()
+    );
 
     if (!specs) return null;
 
