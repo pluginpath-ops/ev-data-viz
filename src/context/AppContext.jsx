@@ -8,7 +8,7 @@ export function AppProvider({ children }) {
     const [selectedVehicles, setSelectedVehicles] = useState([]);
     const [tags, setTags] = useState([]);
     const [user, setUser] = useState(null);
-    const [isOwner, setIsOwner] = useState(false);
+    const [userRole, setUserRole] = useState(null); // 'admin'|'contributor'|'user'|null
     const [loading, setLoading] = useState(true);
     const [headerImageUrl, setHeaderImageUrl] = useState('');
     const [appNotification, setAppNotification] = useState(null); // { message, type: 'error'|'success' }
@@ -25,7 +25,7 @@ export function AppProvider({ children }) {
         setLoading(true);
         await dataService.initialize();
         setUser(dataService.user);
-        setIsOwner(dataService.isOwner);
+        setUserRole(dataService.role);
 
         const vehiclesData = await dataService.getVehicles();
         const selectedIds = await dataService.getSelectedVehicles();
@@ -415,6 +415,48 @@ export function AppProvider({ children }) {
         }
     };
 
+    // ── RBAC helpers ──────────────────────────────────────────────────────────
+    const isAdmin       = userRole === 'admin';
+    const isContributor = userRole === 'admin' || userRole === 'contributor';
+    const canCreate     = !!user; // any authenticated user can add vehicles/runs
+
+    // Can this user edit a vehicle or run record?
+    // resource: { user_id } for vehicles; for runs pass the parent vehicle
+    const canEdit = (resource) => {
+        if (!user) return false;
+        if (isContributor) return true;        // admin + contributor can edit anything
+        return resource?.user_id === user.id;  // user can only edit their own
+    };
+
+    // Can this user delete a record?
+    const canDelete = (resource) => {
+        if (!user) return false;
+        if (isAdmin) return true;              // only admin can delete others' items
+        return resource?.user_id === user.id;
+    };
+
+    // Can this user toggle public/private visibility?
+    const canPublish = () => isContributor;
+
+    // ── Admin actions ─────────────────────────────────────────────────────────
+    const getUsersForAdmin = async () => {
+        try {
+            return await dataService.getUsersForAdmin();
+        } catch (error) {
+            showError('Error loading users: ' + error.message);
+            return [];
+        }
+    };
+
+    const setUserRoleAction = async (targetUserId, newRole) => {
+        try {
+            await dataService.setUserRole(targetUserId, newRole);
+        } catch (error) {
+            showError('Error updating role: ' + error.message);
+            throw error;
+        }
+    };
+
     const signOut = async () => {
         await dataService.signOut();
         window.location.reload();
@@ -424,7 +466,13 @@ export function AppProvider({ children }) {
         vehicles,
         selectedVehicles,
         user,
-        isOwner,
+        userRole,
+        isAdmin,
+        isContributor,
+        canCreate,
+        canEdit,
+        canDelete,
+        canPublish,
         loading,
         headerImageUrl,
         appNotification,
@@ -455,6 +503,8 @@ export function AppProvider({ children }) {
         exportData,
         importData,
         importTableauSessions,
+        getUsersForAdmin,
+        setUserRole: setUserRoleAction,
         signOut,
         initializeApp,
     };

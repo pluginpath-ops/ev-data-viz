@@ -6,13 +6,20 @@ import VehiclesView from './components/VehiclesView';
 import RunsView from './components/RunsView';
 import ChargingView from './components/ChargingView';
 import SpecsView from './components/SpecsView';
+import AdminView from './components/AdminView';
 
 export default function App() {
     const {
         vehicles,
         selectedVehicles,
         user,
-        isOwner,
+        userRole,
+        isAdmin,
+        isContributor,
+        canCreate,
+        canEdit,
+        canDelete,
+        canPublish,
         loading,
         headerImageUrl,
         uploadHeaderImage,
@@ -41,6 +48,8 @@ export default function App() {
         exportData,
         importData,
         importTableauSessions,
+        getUsersForAdmin,
+        setUserRole,
         signOut,
         initializeApp,
         appNotification,
@@ -271,8 +280,8 @@ export default function App() {
                         </button>
                         <p className="mt-1" style={{color: 'rgba(255,255,255,0.8)'}}>Compare and analyze electric vehicle performance data</p>
 
-                        {/* Owner-only: change header image */}
-                        {isOwner && (
+                        {/* Admin-only: change header image */}
+                        {isAdmin && (
                             <label className="absolute top-3 right-6 cursor-pointer flex items-center gap-1 text-xs text-white/60 hover:text-white/90 transition">
                                 📷 Change header image
                                 <input
@@ -322,6 +331,14 @@ export default function App() {
                                 >
                                     Compare Specs
                                 </button>
+                                {isAdmin && (
+                                    <button
+                                        onClick={() => navigateTo('admin')}
+                                        className={`btn-tab ${view === 'admin' ? 'active' : ''}`}
+                                    >
+                                        Admin
+                                    </button>
+                                )}
                             </div>
                             {/* Action group — right-aligned on desktop, full-width right-justified on mobile */}
                             <div className="nav-actions sm:ml-auto">
@@ -329,7 +346,9 @@ export default function App() {
                                     <>
                                         <span className="text-sm text-gray-600">
                                             {user.email}
-                                            {isOwner && <span className="owner-badge">OWNER</span>}
+                                            {userRole && userRole !== 'user' && (
+                                                <span className="owner-badge">{userRole.toUpperCase()}</span>
+                                            )}
                                         </span>
                                         <button onClick={signOut} className="btn btn-secondary">
                                             Sign Out
@@ -454,7 +473,10 @@ export default function App() {
                             onUpdate={updateVehicle}
                             onDelete={deleteVehicle}
                             onViewRuns={(v) => { setActiveVehicle(v); navigateTo('runs'); }}
-                            isOwner={isOwner}
+                            canCreate={canCreate}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                            canPublish={canPublish}
                             onToggleVisibility={toggleVehicleVisibility}
                             tags={tags}
                             onCreateTag={createTag}
@@ -467,7 +489,10 @@ export default function App() {
                     {view === 'runs' && currentActiveVehicle && (
                         <RunsView
                             vehicle={currentActiveVehicle}
-                            isOwner={isOwner}
+                            canCreate={canCreate}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                            canPublish={canPublish}
                             onAddRun={(run) => addRun(currentActiveVehicle.id, run)}
                             onUpdateRun={(runId, updates) => updateRun(currentActiveVehicle.id, runId, updates)}
                             onSetDefaultRun={(runId) => setDefaultRun(currentActiveVehicle.id, runId)}
@@ -500,6 +525,12 @@ export default function App() {
                         <SpecsView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
+                        />
+                    )}
+                    {view === 'admin' && isAdmin && (
+                        <AdminView
+                            getUsersForAdmin={getUsersForAdmin}
+                            setUserRole={setUserRole}
                         />
                     )}
                 </main>
