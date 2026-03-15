@@ -1,0 +1,257 @@
+# Database Schema
+
+Supabase (PostgreSQL) backend for EV Data Visualization.
+
+---
+
+## Tables
+
+### `profiles`
+
+One row per authenticated user. Created automatically by the `on_auth_user_created` trigger.
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `id` | `uuid` | — | FK → `auth.users.id` (PK) |
+| `is_owner` | `boolean` | `false` | **Deprecated** — superseded by `role`. Keep until fully removed. |
+| `role` | `text` | `'user'` | `CHECK (role IN ('admin','contributor','user'))` |
+
+**Trigger:** `on_auth_user_created` calls `handle_new_user()` after every insert on `auth.users`, inserting a `profiles` row with `role = 'user'` (ON CONFLICT DO NOTHING so manual bootstrapping survives).
+
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+  RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, role)
+  VALUES (new.id, 'user')
+  ON CONFLICT (id) DO NOTHING;
+  RETURN new;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+```
+
+---
+
+### `vehicles`
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `id` | `bigint` | auto | PK |
+| `user_id` | `uuid` | — | FK → `auth.users.id`. Owner of the record. NULL on pre-RBAC rows. |
+| `name` | `text` | — | Display name |
+| `make` | `text` | — | |
+| `model` | `text` | — | |
+| `year` | `text` | — | |
+| `battery` | `numeric` | — | kWh |
+| `range` | `numeric` | — | EPA miles |
+| `power` | `numeric` | — | Peak kW |
+| `visibility` | `text` | `'private'` | `'public'` or `'private'`. New vehicles always default to `'private'`. |
+| `image_url` | `text` | — | Card background image (Supabase Storage) |
+| `sort_order` | `integer` | — | Manual drag-to-reorder position |
+| `created_at` | `timestamptz` | `now()` | |
+
+> **Note:** Vehicles created before `user_id` tracking was added will have `user_id = NULL`. Only admins can edit/delete them until ownership is assigned:
+> ```sql
+> UPDATE public.vehicles SET user_id = '<admin-uuid>' WHERE user_id IS NULL;
+> ```
+
+---
+
+### `runs`
+
+One charging or range test session per vehicle.
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `id` | `bigint` | auto | PK |
+| `vehicle_id` | `bigint` | — | FK → `vehicles.id` |
+| `name` | `text` | — | |
+| `date` | `text` | — | ISO date string |
+| `color` | `text` | `'#3b82f6'` | Chart series color |
+| `is_default` | `boolean` | `false` | |
+| `synthetic` | `boolean` | `false` | True for estimated/simulated data |
+| `has_charging` | `boolean` | `true` | |
+| `has_range` | `boolean` | `false` | |
+| `software_version` | `text` | — | |
+| `conditions` | `text` | — | Freeform notes |
+| `source` | `text` | — | URL to source video/post |
+| `url` | `text` | — | Range test source link |
+| `charging_url` | `text` | — | Charging test source link |
+| `start_soc` | `numeric` | — | % |
+| `end_soc` | `numeric` | — | % |
+| `speed_mph` | `numeric` | — | |
+| `distance_miles` | `numeric` | — | |
+| `energy_kwh` | `numeric` | — | |
+| `temperature_f` | `numeric` | — | |
+| `elevation_gain_ft` | `numeric` | — | |
+| `populated_fields` | `text[]` | — | Which data columns have values: `['soc','chargeRate','time','range','temperature']` |
+| `calculated_fields` | `text[]` | — | Fields computed rather than measured |
+| `created_at` | `timestamptz` | `now()` | |
+
+> Runs have no `user_id`. Ownership and edit permission are inherited from the parent vehicle via RLS subquery joins.
+
+---
+
+### `data_points`
+
+Individual time-series frames within a run.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `bigint` | PK |
+| `run_id` | `bigint` | FK → `runs.id` |
+| `frame` | `integer` | Sequential index within the run |
+| `timestamp` | `timestamptz` | Wall-clock time (optional) |
+| `soc` | `numeric(5,1)` | State of charge 0–100% |
+| `charge_rate` | `numeric(8,2)` | kW |
+| `time_value` | `numeric(8,1)` | Minutes or seconds |
+| `range_value` | `numeric(8,1)` | Miles or km |
+| `temperature` | `numeric(6,1)` | °C or °F |
+
+---
+
+### `tags`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `bigint` | PK |
+| `name` | `text` | Unique |
+
+### `vehicle_tags`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `vehicle_id` | `bigint` | FK → `vehicles.id` |
+| `tag_id` | `bigint` | FK → `tags.id` |
+
+---
+
+### `site_settings`
+
+Key-value store for global site configuration.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `key` | `text` | PK |
+| `value` | `text` | |
+
+Current keys: `header_image_url`
+
+Written via the `update_site_setting(key, value)` RPC (SECURITY DEFINER, admin-only).
+
+---
+
+## Storage Buckets
+
+| Bucket | Public | Notes |
+|--------|--------|-------|
+| `vehicle-images` | Yes | Card background images. Path: `{vehicleId}.{ext}` |
+| `site-assets` | Yes | Site-wide assets. Path: `header_image.{ext}` |
+
+---
+
+## Functions (RPCs)
+
+All functions are in the `public` schema and callable via `supabase.rpc(name, args)`.
+
+### `current_user_role() → text`
+
+Returns the `role` of the currently authenticated user from `profiles`. Declared `STABLE` so PostgreSQL can cache the result within a single query — used inside RLS policies to avoid a per-row subquery.
+
+```sql
+CREATE OR REPLACE FUNCTION public.current_user_role()
+  RETURNS text LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT role FROM public.profiles WHERE id = auth.uid();
+$$;
+```
+
+---
+
+### `get_admin_users() → table`
+
+Returns all registered users with their roles. **Admin-only** (raises exception otherwise). Requires `SECURITY DEFINER` to read `auth.users`.
+
+Returns: `id uuid, email text, created_at timestamptz, role text`
+
+---
+
+### `set_user_role(target_user_id uuid, new_role text) → void`
+
+Updates a user's role. **Admin-only**. Validates that `new_role` is one of `'admin'`, `'contributor'`, `'user'`.
+
+---
+
+### `update_site_setting(setting_key text, setting_value text) → void`
+
+Upserts a row in `site_settings`. Admin-only SECURITY DEFINER function used because direct upsert on `site_settings` hits a double-RLS issue (INSERT + ON CONFLICT UPDATE).
+
+---
+
+### `merge_run_data_points(p_run_id, p_join_key, p_rows) → json`
+
+Merges new data points into an existing run using a set-based UPDATE + INSERT. Join key is `'soc'` or `'time'`. Returns `{ updated: N, inserted: M }`.
+
+---
+
+### `replace_run_data_points(p_run_id, p_rows) → void`
+
+Deletes all existing data points for a run and inserts the new set. Used when replacing data wholesale (e.g. re-uploading a CSV).
+
+---
+
+## Row-Level Security
+
+RLS is enabled on `vehicles`, `runs`, and `site_settings`.
+
+### `vehicles`
+
+| Operation | Allowed when |
+|-----------|-------------|
+| SELECT | `visibility = 'public'` OR `user_id = auth.uid()` OR role is `admin`/`contributor` |
+| INSERT | Any authenticated user (`auth.uid() IS NOT NULL`) |
+| UPDATE | `user_id = auth.uid()` OR role is `admin`/`contributor` |
+| DELETE | `user_id = auth.uid()` OR role is `admin` |
+
+### `runs`
+
+Runs inherit ownership from their parent vehicle via subquery join.
+
+| Operation | Allowed when |
+|-----------|-------------|
+| SELECT | Parent vehicle is visible (same SELECT rule as vehicles) |
+| INSERT | Parent vehicle is owned by user OR role is `admin`/`contributor` |
+| UPDATE | Parent vehicle is owned by user OR role is `admin`/`contributor` |
+| DELETE | Parent vehicle is owned by user OR role is `admin` |
+
+---
+
+## Migrations
+
+| File | Description |
+|------|-------------|
+| `migrations/001_rbac.sql` | Add `profiles.role`, RBAC helper functions, rebuild RLS on vehicles + runs |
+
+### Applying migrations
+
+Supabase does not auto-apply files in `supabase/migrations/` unless you use the Supabase CLI with a linked project. For now, **paste each file's contents into the Supabase SQL Editor** and run it.
+
+### Bootstrap checklist (first deploy)
+
+1. Run `001_rbac.sql` in the SQL Editor
+2. Verify the `on_auth_user_created` trigger exists (create it if not — SQL above)
+3. Set the first admin:
+   ```sql
+   UPDATE public.profiles SET role = 'admin' WHERE id = '<your-uuid>';
+   ```
+4. Assign ownership of pre-RBAC vehicles:
+   ```sql
+   UPDATE public.vehicles SET user_id = '<admin-uuid>' WHERE user_id IS NULL;
+   ```
+5. *(Future)* Drop the deprecated `is_owner` column once confirmed stable:
+   ```sql
+   ALTER TABLE public.profiles DROP COLUMN IF EXISTS is_owner;
+   ```
