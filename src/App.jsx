@@ -229,7 +229,7 @@ export default function App() {
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
                 <div className="text-center">
                     <div className="text-6xl mb-4">&#9889;</div>
-                    <div className="text-2xl font-semibold text-gray-700">Loading EV Data...</div>
+                    <div className="text-2xl font-semibold text-gray-700">Loading EVBench...</div>
                 </div>
             </div>
         );
@@ -278,9 +278,9 @@ export default function App() {
                             onClick={() => navigateTo('vehicles')}
                             className="text-left group"
                         >
-                            <h1 className="text-3xl font-bold group-hover:underline decoration-white/60">EV Data Visualization</h1>
+                            <h1 className="text-3xl font-bold group-hover:underline decoration-white/60">EVBench</h1>
                         </button>
-                        <p className="mt-1" style={{color: 'rgba(255,255,255,0.8)'}}>Compare and analyze electric vehicle performance data</p>
+                        <p className="mt-1" style={{color: 'rgba(255,255,255,0.8)'}}>Compare and benchmark electric vehicle performance data</p>
 
                         {/* Admin-only: change header image */}
                         {isAdmin && (
