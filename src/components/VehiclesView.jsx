@@ -25,7 +25,7 @@ const ListViewIcon = () => (
 
 
 export default function VehiclesView({
-    vehicles, selectedVehicles, onToggleSelection, onSelectAllVisible, onAdd, onUpdate, onDelete, onViewRuns,
+    vehicles, selectedVehicles, onToggleSelection, onSelectAllVisible, onClearAllVisible, onAdd, onUpdate, onDelete, onViewRuns,
     canCreate, canEdit, canDelete, canPublish, onToggleVisibility,
     tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
     onReorderVehicles, onDuplicateVehicle,
@@ -495,15 +495,22 @@ export default function VehiclesView({
                     </span>
                 </div>
             )}
-            {/* Select All Visible */}
+            {/* Select All / Clear All Visible */}
             {textFiltered.length > 0 && (
-                <div className="flex justify-end mb-4 -mt-3">
+                <div className="flex justify-end gap-2 mb-4 -mt-3">
                     <button
                         onClick={() => onSelectAllVisible(textFiltered.map(v => v.id))}
-                        className="text-xs text-gray-400 hover:text-gray-600 underline"
+                        className="btn btn-primary text-sm"
                         title="Add all currently visible vehicles to the comparison selection"
                     >
                         Select All Visible ({textFiltered.length})
+                    </button>
+                    <button
+                        onClick={() => onClearAllVisible(textFiltered.map(v => v.id))}
+                        className="btn btn-secondary text-sm"
+                        title="Remove all currently visible vehicles from the comparison selection"
+                    >
+                        Clear All Visible
                     </button>
                 </div>
             )}

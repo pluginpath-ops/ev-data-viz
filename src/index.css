@@ -24,6 +24,9 @@
     --color-edit: rgb(34, 197, 94);
     --color-edit-hover: rgb(22, 163, 74);
 
+    --color-warning: rgb(245, 158, 11);
+    --color-warning-hover: rgb(217, 119, 6);
+
     /* Background and layout colors */
     --color-background: rgb(249, 250, 251);
     --color-card: rgb(255, 255, 255);
@@ -58,9 +61,13 @@
  *                        Rule: "This permanently removes data."
  *                        Examples: Delete (vehicle, run)
  *
- * btn-secondary (grey) — Neutral / non-data-changing actions.
- *                        Rule: "This cancels, goes back, or exports without mutating state."
- *                        Examples: Cancel, Back, Sign Out, Export Data, Set as Default
+ * btn-secondary (grey)  — Neutral / non-data-changing actions.
+ *                         Rule: "This cancels, goes back, or exports without mutating state."
+ *                         Examples: Cancel, Back, Sign Out, Export Data, Set as Default
+ *
+ * btn-warning  (amber)  — Alert / attention-drawing but non-destructive actions.
+ *                         Rule: "This resets or clears state in a reversible but notable way."
+ *                         Examples: Clear all selections
  * ─────────────────────────────────────────────────────────────────
  */
 
@@ -98,6 +105,15 @@
 }
 .btn-secondary:hover {
     background-color: var(--color-secondary-hover);
+}
+
+/* Warning / Alert Button (amber) — attention-drawing but not destructive */
+.btn-warning {
+    background-color: var(--color-warning);
+    color: white;
+}
+.btn-warning:hover {
+    background-color: var(--color-warning-hover);
 }
 
 /* Tab/Navigation Button - Used for: Top navigation tabs */
