@@ -1,14 +1,29 @@
 import { useState } from 'react';
+import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
+import { SpecFieldFlagButton } from './VoteButtons';
 
 /**
  * Read-only collapsible display of a vehicle's structured specs.
- * Used inside vehicle cards (VehiclesView) and potentially other places.
+ *
+ * Props:
+ *   specs          — vehicle.specs JSONB object
+ *   flaggedSpecs   — vehicle.flagged_specs string[] (e.g. ['powertrain.horsepower_hp'])
+ *   vehicleId      — vehicle.id (needed for flag actions)
+ *   defaultAllOpen — start with all categories expanded
+ *   showFlagButtons — show 🚩 flag buttons on each field (default false)
  *
  * Renders nothing if specs is null/undefined or all categories are empty.
- * Each category is collapsed by default; only categories with ≥1 value are shown.
  */
-export default function VehicleSpecsDisplay({ specs, defaultAllOpen = false }) {
+export default function VehicleSpecsDisplay({
+    specs,
+    flaggedSpecs = [],
+    vehicleId,
+    defaultAllOpen = false,
+    showFlagButtons = false,
+}) {
+    const { flagSpecField, unflagSpecField, isAdmin } = useAppContext();
+
     const [openCategories, setOpenCategories] = useState(() =>
         defaultAllOpen ? new Set(SPEC_CATEGORIES.map(c => c.key)) : new Set()
     );
@@ -51,11 +66,12 @@ export default function VehicleSpecsDisplay({ specs, defaultAllOpen = false }) {
                 const isOpen = openCategories.has(cat.key);
 
                 const predefinedRows = cat.fields
-                    .map(f => ({ label: f.label, value: formatValue(catData[f.key], f.type) }))
+                    .map(f => ({ label: f.label, key: `${cat.key}.${f.key}`, value: formatValue(catData[f.key], f.type) }))
                     .filter(row => row.value !== null);
 
                 const customRows = Object.entries(catData._custom || {}).map(([k, v]) => ({
                     label: formatCustomKey(k),
+                    key: `${cat.key}._custom.${k}`,
                     value: String(v),
                 }));
 
@@ -78,15 +94,35 @@ export default function VehicleSpecsDisplay({ specs, defaultAllOpen = false }) {
                         {isOpen && (
                             <div className="mt-1 mb-2">
                                 {predefinedRows.map(row => (
-                                    <div key={row.label} className="specs-field-row">
+                                    <div key={row.key} className="specs-field-row items-center">
                                         <span className="specs-field-label">{row.label}</span>
-                                        <span className="specs-field-value">{row.value}</span>
+                                        <span className="specs-field-value flex items-center gap-1">
+                                            {row.value}
+                                            {showFlagButtons && (
+                                                <SpecFieldFlagButton
+                                                    isFlagged={flaggedSpecs.includes(row.key)}
+                                                    onFlag={() => flagSpecField(vehicleId, row.key)}
+                                                    onUnflag={() => unflagSpecField(vehicleId, row.key)}
+                                                    isAdmin={isAdmin}
+                                                />
+                                            )}
+                                        </span>
                                     </div>
                                 ))}
                                 {customRows.map(row => (
-                                    <div key={row.label} className="specs-field-row">
+                                    <div key={row.key} className="specs-field-row items-center">
                                         <span className="specs-field-label">{row.label}</span>
-                                        <span className="specs-field-value">{row.value}</span>
+                                        <span className="specs-field-value flex items-center gap-1">
+                                            {row.value}
+                                            {showFlagButtons && (
+                                                <SpecFieldFlagButton
+                                                    isFlagged={flaggedSpecs.includes(row.key)}
+                                                    onFlag={() => flagSpecField(vehicleId, row.key)}
+                                                    onUnflag={() => unflagSpecField(vehicleId, row.key)}
+                                                    isAdmin={isAdmin}
+                                                />
+                                            )}
+                                        </span>
                                     </div>
                                 ))}
                             </div>

@@ -13,6 +13,8 @@ export function AppProvider({ children }) {
     const [headerImageUrl, setHeaderImageUrl] = useState('');
     const [appNotification, setAppNotification] = useState(null); // { message, type: 'error'|'success' }
     const [specCustomFieldSuggestions, setSpecCustomFieldSuggestions] = useState({}); // { [category]: Set<normalizedKey> }
+    const [specVouches, setSpecVouches] = useState({});   // { [vehicleId]: { count, myVouch } }
+    const [runVotes, setRunVotes] = useState({});          // { [runId]: { vouch, flag, myVote } }
 
     const showError   = (message) => setAppNotification({ message, type: 'error' });
     const showSuccess = (message) => setAppNotification({ message, type: 'success' });
@@ -533,6 +535,104 @@ export function AppProvider({ children }) {
     // Can this user toggle public/private visibility?
     const canPublish = () => isContributor;
 
+    // ── Voting actions ────────────────────────────────────────────────────────
+
+    /** Load vouch count for a vehicle's specs (called when specs modal opens). */
+    const loadSpecVouches = async (vehicleId) => {
+        try {
+            const data = await dataService.getVehicleSpecVouches(vehicleId);
+            setSpecVouches(prev => ({ ...prev, [vehicleId]: data }));
+        } catch (error) {
+            showError('Error loading votes: ' + error.message);
+        }
+    };
+
+    /** Toggle vouch on a vehicle's specs. Optimistic update. */
+    const toggleSpecVouch = async (vehicleId) => {
+        const current = specVouches[vehicleId] ?? { count: 0, myVouch: false };
+        const optimistic = {
+            count: current.myVouch ? current.count - 1 : current.count + 1,
+            myVouch: !current.myVouch,
+        };
+        setSpecVouches(prev => ({ ...prev, [vehicleId]: optimistic }));
+        try {
+            const updated = await dataService.toggleSpecVouch(vehicleId);
+            setSpecVouches(prev => ({ ...prev, [vehicleId]: updated }));
+        } catch (error) {
+            setSpecVouches(prev => ({ ...prev, [vehicleId]: current }));
+            showError('Error saving vote: ' + error.message);
+        }
+    };
+
+    /** Load run votes for an array of run IDs (called when a vehicle's runs are expanded). */
+    const loadRunVotes = async (runIds) => {
+        if (!runIds.length) return;
+        try {
+            const data = await dataService.getRunVotes(runIds);
+            setRunVotes(prev => ({ ...prev, ...data }));
+        } catch (error) {
+            showError('Error loading run votes: ' + error.message);
+        }
+    };
+
+    /** Toggle vouch/flag on a run. Optimistic update. */
+    const toggleRunVote = async (runId, voteType) => {
+        const current = runVotes[runId] ?? { vouch: 0, flag: 0, myVote: null };
+        const removing = current.myVote === voteType;
+        const optimistic = {
+            vouch: current.vouch + (voteType === 'vouch' ? (removing ? -1 : (current.myVote === 'flag' ? 0 : 1)) : (current.myVote === 'vouch' ? -1 : 0)),
+            flag:  current.flag  + (voteType === 'flag'  ? (removing ? -1 : (current.myVote === 'vouch' ? 0 : 1)) : (current.myVote === 'flag'  ? -1 : 0)),
+            myVote: removing ? null : voteType,
+        };
+        setRunVotes(prev => ({ ...prev, [runId]: optimistic }));
+        try {
+            const updated = await dataService.toggleRunVote(runId, voteType);
+            setRunVotes(prev => ({ ...prev, [runId]: updated }));
+        } catch (error) {
+            setRunVotes(prev => ({ ...prev, [runId]: current }));
+            showError('Error saving vote: ' + error.message);
+        }
+    };
+
+    /** Flag a spec field as inaccurate. Updates vehicles state optimistically. */
+    const flagSpecField = async (vehicleId, fieldKey) => {
+        setVehicles(prev => prev.map(v =>
+            v.id === vehicleId
+                ? { ...v, flagged_specs: v.flagged_specs?.includes(fieldKey) ? v.flagged_specs : [...(v.flagged_specs || []), fieldKey] }
+                : v
+        ));
+        try {
+            await dataService.flagSpecField(vehicleId, fieldKey);
+        } catch (error) {
+            setVehicles(prev => prev.map(v =>
+                v.id === vehicleId
+                    ? { ...v, flagged_specs: (v.flagged_specs || []).filter(k => k !== fieldKey) }
+                    : v
+            ));
+            showError('Error flagging field: ' + error.message);
+        }
+    };
+
+    /** Unflag a spec field. Admin only — enforced here. */
+    const unflagSpecField = async (vehicleId, fieldKey) => {
+        if (!isAdmin) return;
+        setVehicles(prev => prev.map(v =>
+            v.id === vehicleId
+                ? { ...v, flagged_specs: (v.flagged_specs || []).filter(k => k !== fieldKey) }
+                : v
+        ));
+        try {
+            await dataService.unflagSpecField(vehicleId, fieldKey);
+        } catch (error) {
+            setVehicles(prev => prev.map(v =>
+                v.id === vehicleId
+                    ? { ...v, flagged_specs: [...(v.flagged_specs || []), fieldKey] }
+                    : v
+            ));
+            showError('Error removing flag: ' + error.message);
+        }
+    };
+
     // ── Admin actions ─────────────────────────────────────────────────────────
     const getUsersForAdmin = async () => {
         // Let the error propagate to AdminView so it can show it inline.
@@ -601,6 +701,14 @@ export function AppProvider({ children }) {
         importTableauSessions,
         updateVehicleSpecs,
         specCustomFieldSuggestions,
+        specVouches,
+        runVotes,
+        loadSpecVouches,
+        toggleSpecVouch,
+        loadRunVotes,
+        toggleRunVote,
+        flagSpecField,
+        unflagSpecField,
         getUsersForAdmin,
         setUserRole: setUserRoleAction,
         signOut,

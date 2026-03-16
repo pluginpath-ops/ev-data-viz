@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, normalizeCustomKey, formatCustomKey } from '../utils/vehicleSpecSchema';
+import { SpecVouchButton, SpecFieldFlagButton } from './VoteButtons';
 
 /**
  * Modal form for editing all spec categories of a vehicle.
@@ -115,12 +117,19 @@ function SpecField({ field, value, onChange }) {
 }
 
 export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onSave, onClose }) {
+    const { specVouches, loadSpecVouches, flagSpecField, unflagSpecField, isAdmin } = useAppContext();
+
     const [localSpecs, setLocalSpecs] = useState(() => buildInitialSpecs(vehicle.specs));
     const [openCategories, setOpenCategories] = useState(() => new Set(SPEC_CATEGORIES.map(c => c.key)));
     const [saving, setSaving] = useState(false);
     // Per-category "add custom field" input state
     const [newCustomKey, setNewCustomKey] = useState({});
     const [newCustomVal, setNewCustomVal] = useState({});
+
+    // Load vouch count for display in footer
+    useEffect(() => { loadSpecVouches(vehicle.id); }, [vehicle.id]);
+    const vouches = specVouches[vehicle.id] ?? { count: 0, myVouch: false };
+    const flaggedSpecs = vehicle.flagged_specs || [];
 
     const toggleCategory = (key) => {
         setOpenCategories(prev => {
@@ -248,18 +257,29 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                     <div className="mt-2 mb-3">
                                         {/* Predefined fields */}
                                         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                            {cat.fields.map(field => (
-                                                <div key={field.key}>
-                                                    <label className="block text-xs text-gray-500 mb-0.5">
-                                                        {field.label}
-                                                    </label>
-                                                    <SpecField
-                                                        field={field}
-                                                        value={catData[field.key]}
-                                                        onChange={v => setFieldValue(cat.key, field.key, v)}
-                                                    />
-                                                </div>
-                                            ))}
+                                            {cat.fields.map(field => {
+                                                const fieldKey = `${cat.key}.${field.key}`;
+                                                const isFlagged = flaggedSpecs.includes(fieldKey);
+                                                return (
+                                                    <div key={field.key}>
+                                                        <label className="block text-xs text-gray-500 mb-0.5 flex items-center gap-1">
+                                                            {field.label}
+                                                            {isFlagged && (
+                                                                <SpecFieldFlagButton
+                                                                    isFlagged={true}
+                                                                    onUnflag={() => unflagSpecField(vehicle.id, fieldKey)}
+                                                                    isAdmin={isAdmin}
+                                                                />
+                                                            )}
+                                                        </label>
+                                                        <SpecField
+                                                            field={field}
+                                                            value={catData[field.key]}
+                                                            onChange={v => setFieldValue(cat.key, field.key, v)}
+                                                        />
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
 
                                         {/* Custom fields */}
@@ -331,7 +351,9 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                 </div>
 
                 {/* Footer */}
-                <div className="modal-footer">
+                <div className="modal-footer justify-between">
+                    <SpecVouchButton count={vouches.count} readOnly />
+                    <div className="flex gap-2">
                     <button type="button" onClick={onClose} className="btn btn-secondary text-sm">
                         Cancel
                     </button>
@@ -343,6 +365,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                     >
                         {saving ? 'Saving…' : 'Save Specs'}
                     </button>
+                    </div>
                 </div>
             </div>
         </div>
