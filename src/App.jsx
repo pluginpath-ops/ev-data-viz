@@ -56,6 +56,9 @@ export default function App() {
         clearNotification,
         updateVehicleSpecs,
         specCustomFieldSuggestions,
+        addTrim,
+        deleteTrim,
+        copyRunToVehicle,
     } = useAppContext();
 
     // Auto-dismiss notifications after 6 s
@@ -494,6 +497,8 @@ export default function App() {
                             onDuplicateVehicle={duplicateVehicle}
                             onUpdateVehicleSpecs={updateVehicleSpecs}
                             specCustomFieldSuggestions={specCustomFieldSuggestions}
+                            onAddTrim={addTrim}
+                            onDeleteTrim={deleteTrim}
                         />
                     )}
                     {view === 'runs' && currentActiveVehicle && (
@@ -521,6 +526,10 @@ export default function App() {
                             onUploadVehicleImage={(file) => uploadVehicleImage(currentActiveVehicle.id, file)}
                             onUpdateVehicleSpecs={updateVehicleSpecs}
                             specCustomFieldSuggestions={specCustomFieldSuggestions}
+                            onAddTrim={addTrim}
+                            onDeleteTrim={deleteTrim}
+                            vehicles={vehicles}
+                            onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && (

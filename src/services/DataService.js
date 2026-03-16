@@ -59,11 +59,12 @@ class DataService {
     }
     const { data } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name))`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), trims(*)`)
       .order('created_at', { ascending: false });
     return (data || []).map(v => ({
       ...v,
       tags: (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
+      trims: (v.trims || []).sort((a, b) => a.id - b.id),
       runs: (v.runs || []).map(r => ({
         ...r,
         // data_points(count) returns [{ count: N }]; normalise to a plain number
@@ -187,6 +188,48 @@ class DataService {
   async duplicateRun(vehicleId, run) {
     const points = await this.getRunData(run.id);
     return await this.addRun(vehicleId, {
+      ...run,
+      name: run.name + ' (copy)',
+      isDefault: false,
+      data: points,
+      calculated_fields: run.calculated_fields || [],
+    });
+  }
+
+  // ── Trims ─────────────────────────────────────────────────────────────────
+
+  async addTrim(vehicleId, { name, wheel_size, tire_size }) {
+    const { data, error } = await getSupabase()
+      .from('trims')
+      .insert({ vehicle_id: vehicleId, name, wheel_size: wheel_size || null, tire_size: tire_size || null })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async updateTrim(trimId, updates) {
+    const { error } = await getSupabase()
+      .from('trims')
+      .update({
+        name: updates.name,
+        wheel_size: updates.wheel_size || null,
+        tire_size: updates.tire_size || null,
+      })
+      .eq('id', trimId);
+    if (error) throw error;
+  }
+
+  async deleteTrim(trimId) {
+    const { error } = await getSupabase().from('trims').delete().eq('id', trimId);
+    if (error) throw error;
+  }
+
+  // ── Copy run to a different vehicle ───────────────────────────────────────
+
+  async copyRunToVehicle(run, targetVehicleId) {
+    const points = await this.getRunData(run.id);
+    return await this.addRun(targetVehicleId, {
       ...run,
       name: run.name + ' (copy)',
       isDefault: false,

@@ -30,6 +30,7 @@ export default function VehiclesView({
     tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
     onReorderVehicles, onDuplicateVehicle,
     onUpdateVehicleSpecs, specCustomFieldSuggestions,
+    onAddTrim, onDeleteTrim,
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -300,6 +301,9 @@ export default function VehiclesView({
         newTagName, onNewTagNameChange: setNewTagName, onCreateTag: handleCreateTag,
         tags, availableTagsForForm,
         editingVehicle,
+        trims: editingVehicle?.trims || [],
+        onAddTrim: (trimData) => onAddTrim(editingId, trimData),
+        onRemoveTrim: (trimId) => onDeleteTrim(editingId, trimId),
         imageUploading, onImageReady: handleImageReady,
         onSubmit: handleSubmit, onCancel: handleCancel,
     };

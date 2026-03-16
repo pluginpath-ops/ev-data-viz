@@ -137,6 +137,25 @@ Individual time-series frames within a run.
 
 ---
 
+### `trims`
+
+Named trim configurations for a vehicle (e.g. different wheel/tire packages).
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `id` | `bigint` | auto | PK |
+| `vehicle_id` | `bigint` | — | FK → `vehicles.id` ON DELETE CASCADE |
+| `name` | `text` | — | e.g. "Long Range AWD 19\"" |
+| `wheel_size` | `text` | `NULL` | e.g. "19 inch" |
+| `tire_size` | `text` | `NULL` | e.g. "255/45R19" |
+| `created_at` | `timestamptz` | `now()` | |
+
+RLS mirrors `runs`: SELECT when parent vehicle is visible; INSERT/UPDATE/DELETE when vehicle is owned by user or role is `admin`/`contributor`. See `migrations/004_vehicle_trims.sql`.
+
+> Schema supports a future FK from `runs.trim_id → trims.id` for per-run trim association.
+
+---
+
 ### `site_settings`
 
 Key-value store for global site configuration.
@@ -212,7 +231,7 @@ Deletes all existing data points for a run and inserts the new set. Used when re
 
 ## Row-Level Security
 
-RLS is enabled on `vehicles`, `runs`, and `site_settings`.
+RLS is enabled on `vehicles`, `runs`, `trims`, and `site_settings`.
 
 ### `vehicles`
 
@@ -243,6 +262,7 @@ Runs inherit ownership from their parent vehicle via subquery join.
 | `migrations/001_rbac.sql` | Add `profiles.role`, RBAC helper functions, rebuild RLS on vehicles + runs |
 | `migrations/002_fix_get_admin_users.sql` | Backfill `profiles` rows for pre-existing auth users; fix `get_admin_users()` to use LEFT JOIN so users without a profile row still appear |
 | `migrations/003_vehicle_specs.sql` | Add `specs jsonb` column to `vehicles` for structured vehicle specifications |
+| `migrations/004_vehicle_trims.sql` | Add `trims` table for named vehicle trim configurations (wheel/tire size) |
 
 ### Applying migrations
 

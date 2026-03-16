@@ -24,7 +24,7 @@ const inferRunFlags = (run) => {
     return flags;
 };
 
-export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions }) {
+export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, onAddTrim, onDeleteTrim, vehicles, onCopyRunToVehicle }) {
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
     const [showEditSpecs, setShowEditSpecs] = useState(false);
@@ -131,6 +131,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [calcKwhByRun, setCalcKwhByRun]       = useState({});
     const [duplicatingRunId, setDuplicatingRunId] = useState(null);
     const [exportingRunId, setExportingRunId]     = useState(null);
+    const [copyToRun, setCopyToRun]               = useState(null);  // run being copied to another vehicle
+    const [copyingToVehicleId, setCopyingToVehicleId] = useState('');
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -535,6 +537,19 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             setDuplicatingRunId(null);
         }
     };
+
+    // ── Copy run to another vehicle ───────────────────────────────────────────
+    const handleCopyToConfirm = async () => {
+        if (!copyToRun || !copyingToVehicleId) return;
+        await onCopyRunToVehicle(copyToRun, Number(copyingToVehicleId));
+        setCopyToRun(null);
+        setCopyingToVehicleId('');
+    };
+
+    // Vehicles the current user can edit, excluding the current vehicle
+    const copyTargetVehicles = (vehicles || []).filter(v =>
+        v.id !== vehicle.id && canEdit(v)
+    );
 
     // ── Export run data to CSV ────────────────────────────────────────────────
     const handleExportCsv = async (run) => {
@@ -1623,6 +1638,15 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             {duplicatingRunId === run.id ? '…' : '⧉ Copy'}
                                         </button>
                                     )}
+                                    {canEdit(vehicle) && copyTargetVehicles.length > 0 && (
+                                        <button
+                                            onClick={() => { setCopyToRun(run); setCopyingToVehicleId(''); }}
+                                            title="Copy this test to another vehicle"
+                                            className="btn btn-secondary text-sm"
+                                        >
+                                            Copy to…
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => handleEditRun(run)}
                                         className="btn btn-edit"
@@ -1701,11 +1725,56 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             tags={tags || []}
                             availableTagsForForm={vehicleAvailableTags}
                             editingVehicle={vehicle}
+                            trims={vehicle.trims || []}
+                            onAddTrim={(trimData) => onAddTrim(vehicle.id, trimData)}
+                            onRemoveTrim={(trimId) => onDeleteTrim(vehicle.id, trimId)}
                             imageUploading={vehicleImageUploading}
                             onImageReady={handleVehicleImageReady}
                             onSubmit={handleVehicleSubmit}
                             onCancel={closeEditVehicle}
                         />
+                    </div>
+                </div>
+            )}
+
+            {/* Copy to vehicle modal */}
+            {copyToRun && (
+                <div className="modal-overlay">
+                    <div className="copy-to-modal-panel">
+                        <div className="modal-header px-5 py-4 border-b">
+                            <h3 className="font-semibold text-base">Copy test to another vehicle</h3>
+                            <p className="text-xs text-gray-500 mt-0.5">"{copyToRun.name}" will be copied as an independent run</p>
+                        </div>
+                        <div className="px-5 py-4">
+                            <label className="block text-sm font-medium mb-2">Select destination vehicle</label>
+                            <select
+                                value={copyingToVehicleId}
+                                onChange={e => setCopyingToVehicleId(e.target.value)}
+                                className="form-input w-full"
+                            >
+                                <option value="" disabled>Choose a vehicle…</option>
+                                {copyTargetVehicles.map(v => (
+                                    <option key={v.id} value={v.id}>{v.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="px-5 py-4 border-t flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => { setCopyToRun(null); setCopyingToVehicleId(''); }}
+                                className="btn btn-secondary text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleCopyToConfirm}
+                                disabled={!copyingToVehicleId}
+                                className="btn btn-primary text-sm disabled:opacity-40"
+                            >
+                                Copy test
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
