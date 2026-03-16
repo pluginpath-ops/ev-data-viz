@@ -133,11 +133,10 @@ export default function VehiclesView({
         setNewTagName('');
     };
 
-    const handleImageUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file || !editingId) return;
+    const handleImageReady = async (blob) => {
+        if (!blob || !editingId) return;
         setImageUploading(true);
-        await onUploadVehicleImage(editingId, file);
+        await onUploadVehicleImage(editingId, blob);
         setImageUploading(false);
     };
 
@@ -301,7 +300,7 @@ export default function VehiclesView({
         newTagName, onNewTagNameChange: setNewTagName, onCreateTag: handleCreateTag,
         tags, availableTagsForForm,
         editingVehicle,
-        imageUploading, onImageUpload: handleImageUpload,
+        imageUploading, onImageReady: handleImageReady,
         onSubmit: handleSubmit, onCancel: handleCancel,
     };
 

@@ -64,11 +64,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         closeEditVehicle();
     };
 
-    const handleVehicleImageUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    const handleVehicleImageReady = async (blob) => {
+        if (!blob) return;
         setVehicleImageUploading(true);
-        await onUploadVehicleImage(file);
+        await onUploadVehicleImage(blob);
         setVehicleImageUploading(false);
     };
 
@@ -1703,7 +1702,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             availableTagsForForm={vehicleAvailableTags}
                             editingVehicle={vehicle}
                             imageUploading={vehicleImageUploading}
-                            onImageUpload={handleVehicleImageUpload}
+                            onImageReady={handleVehicleImageReady}
                             onSubmit={handleVehicleSubmit}
                             onCancel={closeEditVehicle}
                         />
