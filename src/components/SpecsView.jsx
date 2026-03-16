@@ -1,6 +1,9 @@
+import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
+import { SpecFieldFlagButton } from './VoteButtons';
 
 export default function SpecsView({ vehicles, selectedVehicleIds }) {
+    const { flagSpecField, unflagSpecField, isAdmin } = useAppContext();
     const displayVehicles = selectedVehicleIds.length > 0
         ? vehicles.filter(v => selectedVehicleIds.includes(v.id))
         : vehicles;
@@ -53,14 +56,26 @@ export default function SpecsView({ vehicles, selectedVehicleIds }) {
                 return val !== null && val !== undefined && val !== '';
             });
             if (!hasValue) return [];
+            const fieldKey = `${cat.key}.${field.key}`;
             return [(
                 <tr key={`${cat.key}--${field.key}`}>
                     <td className="specs-table-cell font-medium text-sm">{field.label}</td>
-                    {displayVehicles.map(v => (
-                        <td key={String(v.id)} className="specs-table-cell text-sm">
-                            {formatValue(v.specs?.[cat.key]?.[field.key], field.type)}
-                        </td>
-                    ))}
+                    {displayVehicles.map(v => {
+                        const isFlagged = (v.flagged_specs || []).includes(fieldKey);
+                        return (
+                            <td key={String(v.id)} className="specs-table-cell text-sm">
+                                <span className="flex items-center gap-1">
+                                    {formatValue(v.specs?.[cat.key]?.[field.key], field.type)}
+                                        <SpecFieldFlagButton
+                                        isFlagged={isFlagged}
+                                        onFlag={() => flagSpecField(v.id, fieldKey)}
+                                        onUnflag={() => unflagSpecField(v.id, fieldKey)}
+                                        isAdmin={isAdmin}
+                                    />
+                                </span>
+                            </td>
+                        );
+                    })}
                 </tr>
             )];
         });

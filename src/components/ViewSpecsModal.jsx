@@ -10,12 +10,14 @@ import { SpecVouchButton } from './VoteButtons';
  * Includes a vouch button for anonymous / non-editor users.
  */
 export default function ViewSpecsModal({ vehicle, onClose }) {
-    const { specVouches, loadSpecVouches, toggleSpecVouch } = useAppContext();
+    const { vehicles, specVouches, loadSpecVouches, toggleSpecVouch } = useAppContext();
 
     useEffect(() => {
         loadSpecVouches(vehicle.id);
     }, [vehicle.id]);
 
+    // Use the live vehicle from context so flagged_specs updates are reflected immediately
+    const liveVehicle = vehicles.find(v => v.id === vehicle.id) || vehicle;
     const vouches = specVouches[vehicle.id] ?? { count: 0, myVouch: false };
 
     return (
@@ -26,7 +28,7 @@ export default function ViewSpecsModal({ vehicle, onClose }) {
                 onClick={e => e.stopPropagation()}
             >
                 <div className="modal-header px-6 pt-5 pb-3">
-                    <h3 className="section-title mb-0">Specs — {vehicle.name}</h3>
+                    <h3 className="section-title mb-0">Specs — {liveVehicle.name}</h3>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 text-xl leading-none"
@@ -38,9 +40,9 @@ export default function ViewSpecsModal({ vehicle, onClose }) {
 
                 <div className="modal-body flex-1 overflow-y-auto">
                     <VehicleSpecsDisplay
-                        specs={vehicle.specs}
-                        flaggedSpecs={vehicle.flagged_specs || []}
-                        vehicleId={vehicle.id}
+                        specs={liveVehicle.specs}
+                        flaggedSpecs={liveVehicle.flagged_specs || []}
+                        vehicleId={liveVehicle.id}
                         defaultAllOpen={true}
                         showFlagButtons={true}
                     />

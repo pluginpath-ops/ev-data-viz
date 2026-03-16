@@ -35,9 +35,12 @@ ALTER TABLE public.vehicles
 -- ── 3. RPCs for atomic flag operations ──
 
 -- Flag a specific spec field (idempotent — skips if already flagged)
+-- SECURITY DEFINER so anonymous callers can UPDATE vehicles.flagged_specs
+-- without needing general UPDATE permission on the vehicles table.
 CREATE OR REPLACE FUNCTION public.flag_spec_field(p_vehicle_id bigint, p_field_key text)
 RETURNS void
 LANGUAGE sql
+SECURITY DEFINER
 AS $$
     UPDATE public.vehicles
     SET flagged_specs = array_append(flagged_specs, p_field_key)
