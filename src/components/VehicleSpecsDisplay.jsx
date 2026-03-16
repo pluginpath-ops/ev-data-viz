@@ -104,7 +104,8 @@ export default function VehicleSpecsDisplay({
                         {isOpen && (
                             <div className="mt-1 mb-2">
                                 {predefinedRows.map(row => {
-                                    const effectiveIsFlagged = flaggedSpecs.includes(row.key) || (pendingFlags?.has(row.key) ?? false);
+                                    const committedIsFlagged = flaggedSpecs.includes(row.key);
+                                    const isPending = pendingFlags?.has(row.key) ?? false;
                                     return (
                                         <div key={row.key} className="specs-field-row items-center">
                                             <span className="specs-field-label">{row.label}</span>
@@ -112,7 +113,8 @@ export default function VehicleSpecsDisplay({
                                                 {row.value}
                                                 {showFlagButtons && (
                                                     <SpecFieldFlagButton
-                                                        isFlagged={effectiveIsFlagged}
+                                                        isFlagged={committedIsFlagged || isPending}
+                                                        isPending={isPending && !committedIsFlagged}
                                                         onFlag={onFlagField
                                                             ? () => onFlagField(row.key)
                                                             : () => flagSpecField(vehicleId, row.key)}
@@ -125,7 +127,8 @@ export default function VehicleSpecsDisplay({
                                     );
                                 })}
                                 {customRows.map(row => {
-                                    const effectiveIsFlagged = flaggedSpecs.includes(row.key) || (pendingFlags?.has(row.key) ?? false);
+                                    const committedIsFlagged = flaggedSpecs.includes(row.key);
+                                    const isPending = pendingFlags?.has(row.key) ?? false;
                                     return (
                                         <div key={row.key} className="specs-field-row items-center">
                                             <span className="specs-field-label">{row.label}</span>
@@ -133,7 +136,8 @@ export default function VehicleSpecsDisplay({
                                                 {row.value}
                                                 {showFlagButtons && (
                                                     <SpecFieldFlagButton
-                                                        isFlagged={effectiveIsFlagged}
+                                                        isFlagged={committedIsFlagged || isPending}
+                                                        isPending={isPending && !committedIsFlagged}
                                                         onFlag={onFlagField
                                                             ? () => onFlagField(row.key)
                                                             : () => flagSpecField(vehicleId, row.key)}

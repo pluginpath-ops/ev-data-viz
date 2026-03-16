@@ -117,7 +117,7 @@ function SpecField({ field, value, onChange }) {
 }
 
 export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onSave, onClose }) {
-    const { specVouches, loadSpecVouches, flagSpecField, unflagSpecField, isAdmin } = useAppContext();
+    const { vehicles, specVouches, loadSpecVouches, flagSpecField, unflagSpecField, isAdmin } = useAppContext();
 
     const [localSpecs, setLocalSpecs] = useState(() => buildInitialSpecs(vehicle.specs));
     const [openCategories, setOpenCategories] = useState(() => new Set(SPEC_CATEGORIES.map(c => c.key)));
@@ -129,7 +129,10 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     // Load vouch count for display in footer
     useEffect(() => { loadSpecVouches(vehicle.id); }, [vehicle.id]);
     const vouches = specVouches[vehicle.id] ?? { count: 0, myVouch: false };
-    const flaggedSpecs = vehicle.flagged_specs || [];
+
+    // Read flagged_specs from live context so admin unflag reflects immediately
+    const liveVehicle = vehicles.find(v => v.id === vehicle.id) || vehicle;
+    const flaggedSpecs = liveVehicle.flagged_specs || [];
 
     const toggleCategory = (key) => {
         setOpenCategories(prev => {

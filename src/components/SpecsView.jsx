@@ -89,14 +89,15 @@ export default function SpecsView({ vehicles, selectedVehicleIds }) {
                 <tr key={`${cat.key}--${field.key}`}>
                     <td className="specs-table-cell font-medium text-sm">{field.label}</td>
                     {displayVehicles.map(v => {
-                        const isFlagged = (v.flagged_specs || []).includes(fieldKey)
-                            || (pendingFlags.get(v.id)?.has(fieldKey) ?? false);
+                        const committedIsFlagged = (v.flagged_specs || []).includes(fieldKey);
+                        const isPending = pendingFlags.get(v.id)?.has(fieldKey) ?? false;
                         return (
                             <td key={String(v.id)} className="specs-table-cell text-sm">
                                 <span className="flex items-center gap-1">
                                     {formatValue(v.specs?.[cat.key]?.[field.key], field.type)}
                                     <SpecFieldFlagButton
-                                        isFlagged={isFlagged}
+                                        isFlagged={committedIsFlagged || isPending}
+                                        isPending={isPending && !committedIsFlagged}
                                         onFlag={() => handleFlag(v.id, fieldKey)}
                                         onUnflag={() => unflagSpecField(v.id, fieldKey)}
                                         isAdmin={isAdmin}

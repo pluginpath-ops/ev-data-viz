@@ -41,21 +41,34 @@ export function SpecVouchButton({ count = 0, myVouch = false, onVouch, readOnly 
  * Small inline 🚩 button shown next to a spec field value.
  *
  * Props:
- *   isFlagged {boolean}  — whether this field is currently flagged
- *   onFlag    {function} — called to add a flag
- *   onUnflag  {function} — called to remove a flag (admin only)
+ *   isFlagged {boolean}  — whether this field is currently flagged (DB or pending)
+ *   isPending {boolean}  — flag is locally buffered (not yet in DB); non-admin can click to undo
+ *   onFlag    {function} — called to add a flag (also called to undo when isPending)
+ *   onUnflag  {function} — called to remove a committed flag (admin only)
  *   isAdmin   {boolean}  — shows unflag option if true and field is already flagged
  */
-export function SpecFieldFlagButton({ isFlagged = false, onFlag, onUnflag, isAdmin = false }) {
+export function SpecFieldFlagButton({ isFlagged = false, isPending = false, onFlag, onUnflag, isAdmin = false }) {
     if (isFlagged) {
+        // Determine click action:
+        //   admin               → onUnflag (immediate DB remove)
+        //   non-admin + pending → onFlag again (toggles out of pending buffer)
+        //   non-admin + committed → nothing (can't undo without admin)
+        const handleClick = isAdmin ? onUnflag : (isPending ? onFlag : undefined);
+        const clickable = !!handleClick;
         return (
             <button
                 className="vote-btn vote-btn-flag vote-btn-active"
-                onClick={isAdmin ? onUnflag : undefined}
-                style={{ cursor: isAdmin ? 'pointer' : 'default' }}
-                title={isAdmin ? '🚩 Users flagged this value — click to clear' : '🚩 Users have flagged this value as potentially inaccurate'}
+                onClick={handleClick}
+                style={{ cursor: clickable ? 'pointer' : 'default' }}
+                title={
+                    isAdmin
+                        ? '🚩 Users flagged this value — click to clear'
+                        : isPending
+                            ? '🚩 Click to undo flag'
+                            : '🚩 Users have flagged this value as potentially inaccurate'
+                }
             >
-                🚩{isAdmin && <span className="text-xs opacity-70 ml-0.5">×</span>}
+                🚩{(isAdmin || isPending) && <span className="text-xs opacity-70 ml-0.5">×</span>}
             </button>
         );
     }
