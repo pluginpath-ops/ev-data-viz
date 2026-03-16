@@ -50,10 +50,10 @@ export function SpecVouchButton({ count = 0, myVouch = false, onVouch, readOnly 
 export function SpecFieldFlagButton({ isFlagged = false, isPending = false, onFlag, onUnflag, isAdmin = false }) {
     if (isFlagged) {
         // Determine click action:
-        //   admin               → onUnflag (immediate DB remove)
-        //   non-admin + pending → onFlag again (toggles out of pending buffer)
-        //   non-admin + committed → nothing (can't undo without admin)
-        const handleClick = isAdmin ? onUnflag : (isPending ? onFlag : undefined);
+        //   pending (any user)  → onFlag again (toggles out of pending buffer, never in DB yet)
+        //   committed + admin   → onUnflag (immediate DB remove)
+        //   committed + non-admin → nothing (can't undo without admin)
+        const handleClick = isPending ? onFlag : (isAdmin ? onUnflag : undefined);
         const clickable = !!handleClick;
         return (
             <button
