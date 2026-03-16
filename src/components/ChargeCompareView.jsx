@@ -4,15 +4,24 @@ import { dataService } from '../services/DataService';
 
 // ── Interpolation helper ──────────────────────────────────────────────────────
 // Returns the interpolated yField value at targetX, given points sorted by xField.
-// Returns null if targetX is outside the data range (can't interpolate).
-function interpolate(points, xField, yField, targetX) {
+// If allowExtrapolateBefore=true, extends linearly backward past the first data point
+// using the slope of the first two points (useful for normalizing SoC baselines).
+function interpolate(points, xField, yField, targetX, allowExtrapolateBefore = false) {
     const valid = points.filter(p => p[xField] != null && p[yField] != null);
+    if (valid.length === 0) return null;
     const before = [...valid].filter(p => p[xField] <= targetX).at(-1);
     const after  = valid.find(p => p[xField] > targetX);
-    if (!before || !after) return null;
-    if (before[xField] === targetX) return before[yField];
-    const t = (targetX - before[xField]) / (after[xField] - before[xField]);
-    return before[yField] + t * (after[yField] - before[yField]);
+    if (before && after) {
+        if (before[xField] === targetX) return before[yField];
+        const t = (targetX - before[xField]) / (after[xField] - before[xField]);
+        return before[yField] + t * (after[yField] - before[yField]);
+    }
+    if (!before && allowExtrapolateBefore && valid.length >= 2) {
+        const [p0, p1] = valid;
+        const slope = (p1[yField] - p0[yField]) / (p1[xField] - p0[xField]);
+        return p0[yField] + slope * (targetX - p0[xField]);
+    }
+    return null;
 }
 
 // ── Bar label plugin (same style as RangeChartView barGroupPlugin) ────────────
@@ -49,7 +58,10 @@ function makeBarPlugin(flatRuns) {
                     badges.push({ text: 'No data', primary: true });
                 } else {
                     if (run._yValue != null) badges.push({ text: `${run._yValue} ${run._yUnit}`, primary: true });
-                    if (run._startSoc  != null) badges.push({ text: run._endSoc != null ? `${run._startSoc}%→${run._endSoc}%` : `${run._startSoc}% SoC` });
+                    if (run._startSoc  != null) {
+                        const socText = run._endSoc != null ? `${run._startSoc}%→${run._endSoc}%` : `${run._startSoc}% SoC`;
+                        badges.push({ text: socText, socDeviation: run._socDeviation ?? 0 });
+                    }
                     if (run._startRange != null) badges.push({ text: `${run._startRange} mi` });
                     if (run.speed_mph   != null) badges.push({ text: `${run.speed_mph} mph` });
                     if (run.temperature_f != null) badges.push({ text: `${run.temperature_f}°F` });
@@ -59,7 +71,7 @@ function makeBarPlugin(flatRuns) {
                 const pillH = 15, pillPad = 5, gap = 3, topPad = 6;
                 let drawY = bar.y + topPad;
 
-                badges.forEach(({ text, primary }) => {
+                badges.forEach(({ text, primary, socDeviation }) => {
                     if (drawY + pillH > bar.base - topPad) return;
 
                     ctx2.save();
@@ -72,7 +84,13 @@ function makeBarPlugin(flatRuns) {
                     const px = bar.x - pw / 2;
                     const rr = 3;
 
-                    ctx2.fillStyle = 'rgba(0,0,0,0.28)';
+                    // Fuzzy orange: fades in from 1% deviation, fully amber by 5%
+                    const dev      = Math.abs(socDeviation ?? 0);
+                    const alertAmt = socDeviation != null ? Math.min(1, Math.max(0, (dev - 1) / 4)) : 0;
+                    const bgColor  = alertAmt > 0
+                        ? `rgba(217,119,6,${(0.25 + alertAmt * 0.6).toFixed(2)})`
+                        : 'rgba(0,0,0,0.28)';
+                    ctx2.fillStyle = bgColor;
                     ctx2.beginPath();
                     ctx2.moveTo(px + rr, drawY);
                     ctx2.lineTo(px + pw - rr, drawY);
@@ -146,16 +164,30 @@ function makeBarPlugin(flatRuns) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
-    const [xMinutes, setXMinutes] = useState(15);
-    const [mMiles,   setMMiles]   = useState(150);
-    const [startSoc, setStartSoc] = useState(10);
+    // Read initial values from URL params (populated by Copy URL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const [xMinutes, setXMinutes] = useState(() => Number(urlParams.get('cmp_mins')) || 15);
+    const [mMiles,   setMMiles]   = useState(() => Number(urlParams.get('cmp_mi'))   || 150);
+    const [startSoc, setStartSoc] = useState(() => Number(urlParams.get('cmp_soc'))  || 10);
     const [runDataCache, setRunDataCache] = useState({});
     const [loading,  setLoading]  = useState(false);
+    const [copied,   setCopied]   = useState(false);
 
     const chart1Ref      = useRef(null);
     const chart1Instance = useRef(null);
     const chart2Ref      = useRef(null);
     const chart2Instance = useRef(null);
+
+    const handleCopyUrl = () => {
+        const p = new URLSearchParams(window.location.search);
+        p.set('cmp_soc',  startSoc);
+        p.set('cmp_mins', xMinutes);
+        p.set('cmp_mi',   mMiles);
+        const url = `${window.location.origin}${window.location.pathname}?${p.toString()}`;
+        navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
     const selectedVehicles = useMemo(
         () => vehicles.filter(v => selectedVehicleIds.includes(v.id)),
@@ -245,46 +277,58 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
             }
 
             // Filter to points that have all three fields we need
-            const points = (runDataCache[chargingRunId] || []).filter(
+            const raw = (runDataCache[chargingRunId] || []).filter(
                 p => p.soc != null && p.time != null && p.range != null
             );
 
-            if (points.length === 0) {
-                flatRuns.push({ ...base, _yValue: 0, _startSoc: null, _startRange: null, _noData: true });
+            if (raw.length === 0) {
+                flatRuns.push({ ...base, _yValue: 0, _startSoc: startSoc, _startRange: null, _noData: true });
                 continue;
             }
 
-            // Z point: data point nearest to startSoc%
-            const zPoint = points.reduce((best, p) =>
-                Math.abs(p.soc - startSoc) < Math.abs(best.soc - startSoc) ? p : best
-            );
-            const Tz = zPoint.time;
-            const Rz = zPoint.range;
-            const Sz = zPoint.soc;
+            // Sort by each axis for clean interpolation
+            const bySoc   = [...raw].sort((a, b) => a.soc   - b.soc);
+            const byTime  = [...raw].sort((a, b) => a.time  - b.time);
+            const byRange = [...raw].sort((a, b) => a.range - b.range);
+
+            // Z baseline: exact interpolation (or backward extrapolation) to startSoc.
+            // allowExtrapolateBefore=true lets us normalize runs whose data starts above startSoc.
+            const Tz = interpolate(bySoc, 'soc', 'time',  startSoc, true);
+            const Rz = interpolate(bySoc, 'soc', 'range', startSoc, true);
+
+            if (Tz == null || Rz == null) {
+                flatRuns.push({ ...base, _yValue: 0, _startSoc: startSoc, _startRange: null, _noData: true });
+                continue;
+            }
+
+            // How far below the actual first data point did we extrapolate?
+            const socDeviation = Math.round((bySoc[0].soc - startSoc) * 10) / 10;
 
             if (chartType === 'range_added') {
-                const Rend    = interpolate(points, 'time', 'range', Tz + xMinutes);
-                const SocEnd  = interpolate(points, 'time', 'soc',   Tz + xMinutes);
-                const yValue  = Rend != null ? Math.round((Rend - Rz) * 10) / 10 : null;
+                const Rend   = interpolate(byTime, 'time', 'range', Tz + xMinutes);
+                const SocEnd = interpolate(byTime, 'time', 'soc',   Tz + xMinutes);
+                const yValue = Rend != null ? Math.round((Rend - Rz) * 10) / 10 : null;
                 flatRuns.push({
                     ...base,
-                    _yValue:     yValue ?? 0,
-                    _startSoc:   Math.round(Sz * 10) / 10,
-                    _endSoc:     SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
-                    _startRange: Math.round(Rz * 10) / 10,
-                    _noData:     yValue == null,
+                    _yValue:       yValue ?? 0,
+                    _startSoc:     startSoc,
+                    _endSoc:       SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
+                    _startRange:   Math.round(Rz * 10) / 10,
+                    _socDeviation: socDeviation,
+                    _noData:       yValue == null,
                 });
             } else {
-                const Tend    = interpolate(points, 'range', 'time', Rz + mMiles);
-                const SocEnd  = interpolate(points, 'range', 'soc',  Rz + mMiles);
-                const yValue  = Tend != null ? Math.round((Tend - Tz) * 10) / 10 : null;
+                const Tend   = interpolate(byRange, 'range', 'time', Rz + mMiles);
+                const SocEnd = interpolate(byRange, 'range', 'soc',  Rz + mMiles);
+                const yValue = Tend != null ? Math.round((Tend - Tz) * 10) / 10 : null;
                 flatRuns.push({
                     ...base,
-                    _yValue:     yValue ?? 0,
-                    _startSoc:   Math.round(Sz * 10) / 10,
-                    _endSoc:     SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
-                    _startRange: Math.round(Rz * 10) / 10,
-                    _noData:     yValue == null,
+                    _yValue:       yValue ?? 0,
+                    _startSoc:     startSoc,
+                    _endSoc:       SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
+                    _startRange:   Math.round(Rz * 10) / 10,
+                    _socDeviation: socDeviation,
+                    _noData:       yValue == null,
                 });
             }
         }
@@ -388,12 +432,17 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
             <div className="card mb-6">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold">Chart Options — Charge Compare</h3>
-                    {loading && (
-                        <span className="flex items-center gap-2 text-sm text-gray-500">
-                            <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-                            Loading charging data…
-                        </span>
-                    )}
+                    <div className="flex items-center gap-3">
+                        {loading && (
+                            <span className="flex items-center gap-2 text-sm text-gray-500">
+                                <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+                                Loading charging data…
+                            </span>
+                        )}
+                        <button onClick={handleCopyUrl} className="btn-secondary text-sm px-3 py-1">
+                            {copied ? 'Copied!' : 'Copy URL'}
+                        </button>
+                    </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-6">
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
