@@ -84,11 +84,11 @@ function makeBarPlugin(flatRuns) {
                     const px = bar.x - pw / 2;
                     const rr = 3;
 
-                    // Fuzzy orange: fades in from 1% deviation, fully amber by 5%
+                    // Fuzzy orange: invisible ≤1%, fades to full amber at 5%+
                     const dev      = Math.abs(socDeviation ?? 0);
                     const alertAmt = socDeviation != null ? Math.min(1, Math.max(0, (dev - 1) / 4)) : 0;
                     const bgColor  = alertAmt > 0
-                        ? `rgba(217,119,6,${(0.25 + alertAmt * 0.6).toFixed(2)})`
+                        ? `rgba(217,119,6,${(alertAmt * 0.85).toFixed(2)})`
                         : 'rgba(0,0,0,0.28)';
                     ctx2.fillStyle = bgColor;
                     ctx2.beginPath();
