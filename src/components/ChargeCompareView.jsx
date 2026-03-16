@@ -146,8 +146,9 @@ function makeBarPlugin(flatRuns) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
-    const [xMinutes, setXMinutes] = useState(30);
-    const [mMiles,   setMMiles]   = useState(50);
+    const [xMinutes, setXMinutes] = useState(15);
+    const [mMiles,   setMMiles]   = useState(150);
+    const [startSoc, setStartSoc] = useState(10);
     const [runDataCache, setRunDataCache] = useState({});
     const [loading,  setLoading]  = useState(false);
 
@@ -253,9 +254,9 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                 continue;
             }
 
-            // Z point: data point nearest to 10% SoC
+            // Z point: data point nearest to startSoc%
             const zPoint = points.reduce((best, p) =>
-                Math.abs(p.soc - 10) < Math.abs(best.soc - 10) ? p : best
+                Math.abs(p.soc - startSoc) < Math.abs(best.soc - startSoc) ? p : best
             );
             const Tz = zPoint.time;
             const Rz = zPoint.range;
@@ -372,7 +373,7 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                 if (inst.current) { inst.current.destroy(); inst.current = null; }
             });
         };
-    }, [selectedVehicleIds, xMinutes, mMiles, runDataCache]);
+    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache]);
 
     const hasRangeRuns = resolvedRuns.length > 0;
 
@@ -392,11 +393,18 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                 </div>
                 <div className="flex flex-wrap items-center gap-6">
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                        Starting SoC:
-                        <span className="px-2 py-1 bg-gray-100 rounded text-gray-600 text-sm">~10% (fixed)</span>
+                        Starting SoC (%):
+                        <input
+                            type="number"
+                            value={startSoc}
+                            min={1}
+                            max={80}
+                            onChange={e => setStartSoc(Math.min(80, Math.max(1, Number(e.target.value))))}
+                            className="w-20 px-2 py-1 border rounded text-sm"
+                        />
                     </label>
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                        X minutes:
+                        Charging Time (minutes):
                         <input
                             type="number"
                             value={xMinutes}
@@ -407,7 +415,7 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                         />
                     </label>
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                        M miles:
+                        Range to add (miles):
                         <input
                             type="number"
                             value={mMiles}
@@ -430,7 +438,7 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                     {/* ── Chart 1: Range Added in X Minutes ── */}
                     <div className="card mb-6">
                         <h4 className="text-base font-semibold mb-3">
-                            Range Added in {xMinutes} Minutes <span className="text-gray-400 font-normal">(from ~10% SoC)</span>
+                            Range Added in {xMinutes} Minutes <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
                         <div style={{ height: '450px', position: 'relative' }}>
                             <canvas ref={chart1Ref} />
@@ -440,7 +448,7 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                     {/* ── Chart 2: Time to Add M Miles ── */}
                     <div className="card mb-6">
                         <h4 className="text-base font-semibold mb-3">
-                            Time to Add {mMiles} Miles of Range <span className="text-gray-400 font-normal">(from ~10% SoC)</span>
+                            Time to Add {mMiles} Miles of Range <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
                         <div style={{ height: '450px', position: 'relative' }}>
                             <canvas ref={chart2Ref} />
