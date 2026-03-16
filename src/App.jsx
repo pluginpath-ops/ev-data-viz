@@ -5,6 +5,7 @@ import ImportTableauModal from './components/ImportTableauModal';
 import VehiclesView from './components/VehiclesView';
 import RunsView from './components/RunsView';
 import ChargingView from './components/ChargingView';
+import ChargeCompareView from './components/ChargeCompareView';
 import SpecsView from './components/SpecsView';
 import AdminView from './components/AdminView';
 
@@ -412,6 +413,7 @@ export default function App() {
                                 {[
                                     { key: 'charging', label: 'Charging' },
                                     { key: 'range',    label: 'Range & Efficiency' },
+                                    { key: 'compare',  label: 'Charge Compare' },
                                 ].map(({ key, label }) => (
                                     <button
                                         key={key}
@@ -538,7 +540,7 @@ export default function App() {
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                         />
                     )}
-                    {view === 'chart' && selectedVehicles.length > 0 && (
+                    {view === 'chart' && selectedVehicles.length > 0 && chartMode !== 'compare' && (
                         <ChargingView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -546,6 +548,12 @@ export default function App() {
                             setChartConfig={setChartConfig}
                             onUpdateRunColor={updateRunColor}
                             chartMode={chartMode}
+                        />
+                    )}
+                    {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'compare' && (
+                        <ChargeCompareView
+                            vehicles={vehicles}
+                            selectedVehicleIds={selectedVehicles}
                         />
                     )}
                     {view === 'specs' && (
