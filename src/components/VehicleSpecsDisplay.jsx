@@ -21,6 +21,11 @@ export default function VehicleSpecsDisplay({
     vehicleId,
     defaultAllOpen = false,
     showFlagButtons = false,
+    // Optional: Set of fieldKey strings buffered locally (not yet in DB).
+    // Clicking 🚩 on a pending field removes it from the buffer (undo).
+    pendingFlags,
+    // Optional: override the default flag handler (used for deferred commit).
+    onFlagField,
 }) {
     const { vehicles, flagSpecField, unflagSpecField, isAdmin } = useAppContext();
 
@@ -98,38 +103,48 @@ export default function VehicleSpecsDisplay({
 
                         {isOpen && (
                             <div className="mt-1 mb-2">
-                                {predefinedRows.map(row => (
-                                    <div key={row.key} className="specs-field-row items-center">
-                                        <span className="specs-field-label">{row.label}</span>
-                                        <span className="specs-field-value flex items-center gap-1">
-                                            {row.value}
-                                            {showFlagButtons && (
-                                                <SpecFieldFlagButton
-                                                    isFlagged={flaggedSpecs.includes(row.key)}
-                                                    onFlag={() => flagSpecField(vehicleId, row.key)}
-                                                    onUnflag={() => unflagSpecField(vehicleId, row.key)}
-                                                    isAdmin={isAdmin}
-                                                />
-                                            )}
-                                        </span>
-                                    </div>
-                                ))}
-                                {customRows.map(row => (
-                                    <div key={row.key} className="specs-field-row items-center">
-                                        <span className="specs-field-label">{row.label}</span>
-                                        <span className="specs-field-value flex items-center gap-1">
-                                            {row.value}
-                                            {showFlagButtons && (
-                                                <SpecFieldFlagButton
-                                                    isFlagged={flaggedSpecs.includes(row.key)}
-                                                    onFlag={() => flagSpecField(vehicleId, row.key)}
-                                                    onUnflag={() => unflagSpecField(vehicleId, row.key)}
-                                                    isAdmin={isAdmin}
-                                                />
-                                            )}
-                                        </span>
-                                    </div>
-                                ))}
+                                {predefinedRows.map(row => {
+                                    const effectiveIsFlagged = flaggedSpecs.includes(row.key) || (pendingFlags?.has(row.key) ?? false);
+                                    return (
+                                        <div key={row.key} className="specs-field-row items-center">
+                                            <span className="specs-field-label">{row.label}</span>
+                                            <span className="specs-field-value flex items-center gap-1">
+                                                {row.value}
+                                                {showFlagButtons && (
+                                                    <SpecFieldFlagButton
+                                                        isFlagged={effectiveIsFlagged}
+                                                        onFlag={onFlagField
+                                                            ? () => onFlagField(row.key)
+                                                            : () => flagSpecField(vehicleId, row.key)}
+                                                        onUnflag={() => unflagSpecField(vehicleId, row.key)}
+                                                        isAdmin={isAdmin}
+                                                    />
+                                                )}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                                {customRows.map(row => {
+                                    const effectiveIsFlagged = flaggedSpecs.includes(row.key) || (pendingFlags?.has(row.key) ?? false);
+                                    return (
+                                        <div key={row.key} className="specs-field-row items-center">
+                                            <span className="specs-field-label">{row.label}</span>
+                                            <span className="specs-field-value flex items-center gap-1">
+                                                {row.value}
+                                                {showFlagButtons && (
+                                                    <SpecFieldFlagButton
+                                                        isFlagged={effectiveIsFlagged}
+                                                        onFlag={onFlagField
+                                                            ? () => onFlagField(row.key)
+                                                            : () => flagSpecField(vehicleId, row.key)}
+                                                        onUnflag={() => unflagSpecField(vehicleId, row.key)}
+                                                        isAdmin={isAdmin}
+                                                    />
+                                                )}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

@@ -1,9 +1,37 @@
+import { useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { SpecFieldFlagButton } from './VoteButtons';
 
 export default function SpecsView({ vehicles, selectedVehicleIds }) {
     const { flagSpecField, unflagSpecField, isAdmin } = useAppContext();
+
+    // Pending flags — buffered locally, committed to DB when the tab is left (unmount).
+    // Map of vehicleId (number) → Set<fieldKey string>.
+    // Using a ref in sync with state so the unmount cleanup reads the latest value.
+    const [pendingFlags, setPendingFlags] = useState(() => new Map());
+    const pendingFlagsRef = useRef(pendingFlags);
+    useEffect(() => { pendingFlagsRef.current = pendingFlags; }, [pendingFlags]);
+
+    // Commit all pending flags on tab leave (component unmount).
+    useEffect(() => {
+        return () => {
+            for (const [vehicleId, fieldKeys] of pendingFlagsRef.current) {
+                fieldKeys.forEach(fieldKey => flagSpecField(vehicleId, fieldKey));
+            }
+        };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: fire only on unmount
+
+    const handleFlag = (vehicleId, fieldKey) => {
+        setPendingFlags(prev => {
+            const next = new Map(prev);
+            const keys = new Set(next.get(vehicleId) ?? []);
+            if (keys.has(fieldKey)) keys.delete(fieldKey); // undo
+            else keys.add(fieldKey);
+            next.set(vehicleId, keys);
+            return next;
+        });
+    };
     const displayVehicles = selectedVehicleIds.length > 0
         ? vehicles.filter(v => selectedVehicleIds.includes(v.id))
         : vehicles;
@@ -61,14 +89,15 @@ export default function SpecsView({ vehicles, selectedVehicleIds }) {
                 <tr key={`${cat.key}--${field.key}`}>
                     <td className="specs-table-cell font-medium text-sm">{field.label}</td>
                     {displayVehicles.map(v => {
-                        const isFlagged = (v.flagged_specs || []).includes(fieldKey);
+                        const isFlagged = (v.flagged_specs || []).includes(fieldKey)
+                            || (pendingFlags.get(v.id)?.has(fieldKey) ?? false);
                         return (
                             <td key={String(v.id)} className="specs-table-cell text-sm">
                                 <span className="flex items-center gap-1">
                                     {formatValue(v.specs?.[cat.key]?.[field.key], field.type)}
-                                        <SpecFieldFlagButton
+                                    <SpecFieldFlagButton
                                         isFlagged={isFlagged}
-                                        onFlag={() => flagSpecField(v.id, fieldKey)}
+                                        onFlag={() => handleFlag(v.id, fieldKey)}
                                         onUnflag={() => unflagSpecField(v.id, fieldKey)}
                                         isAdmin={isAdmin}
                                     />
