@@ -1,14 +1,39 @@
 import { useState } from 'react';
+import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
+import { SpecFieldFlagButton } from './VoteButtons';
 
 /**
  * Read-only collapsible display of a vehicle's structured specs.
- * Used inside vehicle cards (VehiclesView) and potentially other places.
+ *
+ * Props:
+ *   specs          — vehicle.specs JSONB object
+ *   flaggedSpecs   — vehicle.flagged_specs string[] (e.g. ['powertrain.horsepower_hp'])
+ *   vehicleId      — vehicle.id (needed for flag actions)
+ *   defaultAllOpen — start with all categories expanded
+ *   showFlagButtons — show 🚩 flag buttons on each field (default false)
  *
  * Renders nothing if specs is null/undefined or all categories are empty.
- * Each category is collapsed by default; only categories with ≥1 value are shown.
  */
-export default function VehicleSpecsDisplay({ specs, defaultAllOpen = false }) {
+export default function VehicleSpecsDisplay({
+    specs,
+    flaggedSpecs: flaggedSpecsProp = [],
+    vehicleId,
+    defaultAllOpen = false,
+    showFlagButtons = false,
+    // Optional: Set of fieldKey strings buffered locally (not yet in DB).
+    // Clicking 🚩 on a pending field removes it from the buffer (undo).
+    pendingFlags,
+    // Optional: override the default flag handler (used for deferred commit).
+    onFlagField,
+}) {
+    const { vehicles, flagSpecField, unflagSpecField, isAdmin } = useAppContext();
+
+    // Read flagged_specs directly from live context so updates reflect immediately
+    // without depending on the parent prop-chain re-rendering first.
+    const liveVehicle = vehicleId ? vehicles.find(v => v.id === vehicleId) : null;
+    const flaggedSpecs = liveVehicle?.flagged_specs ?? flaggedSpecsProp;
+
     const [openCategories, setOpenCategories] = useState(() =>
         defaultAllOpen ? new Set(SPEC_CATEGORIES.map(c => c.key)) : new Set()
     );
@@ -51,11 +76,12 @@ export default function VehicleSpecsDisplay({ specs, defaultAllOpen = false }) {
                 const isOpen = openCategories.has(cat.key);
 
                 const predefinedRows = cat.fields
-                    .map(f => ({ label: f.label, value: formatValue(catData[f.key], f.type) }))
+                    .map(f => ({ label: f.label, key: `${cat.key}.${f.key}`, value: formatValue(catData[f.key], f.type) }))
                     .filter(row => row.value !== null);
 
                 const customRows = Object.entries(catData._custom || {}).map(([k, v]) => ({
                     label: formatCustomKey(k),
+                    key: `${cat.key}._custom.${k}`,
                     value: String(v),
                 }));
 
@@ -77,18 +103,52 @@ export default function VehicleSpecsDisplay({ specs, defaultAllOpen = false }) {
 
                         {isOpen && (
                             <div className="mt-1 mb-2">
-                                {predefinedRows.map(row => (
-                                    <div key={row.label} className="specs-field-row">
-                                        <span className="specs-field-label">{row.label}</span>
-                                        <span className="specs-field-value">{row.value}</span>
-                                    </div>
-                                ))}
-                                {customRows.map(row => (
-                                    <div key={row.label} className="specs-field-row">
-                                        <span className="specs-field-label">{row.label}</span>
-                                        <span className="specs-field-value">{row.value}</span>
-                                    </div>
-                                ))}
+                                {predefinedRows.map(row => {
+                                    const committedIsFlagged = flaggedSpecs.includes(row.key);
+                                    const isPending = pendingFlags?.has(row.key) ?? false;
+                                    return (
+                                        <div key={row.key} className="specs-field-row items-center">
+                                            <span className="specs-field-label">{row.label}</span>
+                                            <span className="specs-field-value flex items-center gap-1">
+                                                {row.value}
+                                                {showFlagButtons && (
+                                                    <SpecFieldFlagButton
+                                                        isFlagged={committedIsFlagged || isPending}
+                                                        isPending={isPending && !committedIsFlagged}
+                                                        onFlag={onFlagField
+                                                            ? () => onFlagField(row.key)
+                                                            : () => flagSpecField(vehicleId, row.key)}
+                                                        onUnflag={() => unflagSpecField(vehicleId, row.key)}
+                                                        isAdmin={isAdmin}
+                                                    />
+                                                )}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                                {customRows.map(row => {
+                                    const committedIsFlagged = flaggedSpecs.includes(row.key);
+                                    const isPending = pendingFlags?.has(row.key) ?? false;
+                                    return (
+                                        <div key={row.key} className="specs-field-row items-center">
+                                            <span className="specs-field-label">{row.label}</span>
+                                            <span className="specs-field-value flex items-center gap-1">
+                                                {row.value}
+                                                {showFlagButtons && (
+                                                    <SpecFieldFlagButton
+                                                        isFlagged={committedIsFlagged || isPending}
+                                                        isPending={isPending && !committedIsFlagged}
+                                                        onFlag={onFlagField
+                                                            ? () => onFlagField(row.key)
+                                                            : () => flagSpecField(vehicleId, row.key)}
+                                                        onUnflag={() => unflagSpecField(vehicleId, row.key)}
+                                                        isAdmin={isAdmin}
+                                                    />
+                                                )}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

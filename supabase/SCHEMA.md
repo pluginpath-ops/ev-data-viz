@@ -53,6 +53,7 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 | `image_url` | `text` | — | Card background image (Supabase Storage) |
 | `sort_order` | `integer` | — | Manual drag-to-reorder position |
 | `specs` | `jsonb` | `NULL` | Structured vehicle specifications (see below) |
+| `flagged_specs` | `text[]` | `'{}'` | Field keys flagged as potentially inaccurate by public users (e.g. `['powertrain.horsepower_hp']`). Append-only via `flag_spec_field` RPC; cleared by `unflag_spec_field` (admin only). |
 | `created_at` | `timestamptz` | `now()` | |
 
 > **`specs` JSONB structure:** Each category key maps to an object of predefined field keys plus `_custom` (user-defined key-value pairs). Categories: `pricing`, `powertrain`, `compute`, `infotainment`, `dimensions`, `wheels`, `suspension`, `lighting`, `charging`, `interior`. See `src/utils/vehicleSpecSchema.js` for the full field list. `specs = NULL` means no specs entered yet — handled gracefully by all UI components.
@@ -156,6 +157,26 @@ RLS mirrors `runs`: SELECT when parent vehicle is visible; INSERT/UPDATE/DELETE 
 
 ---
 
+### `votes`
+
+Public vote records for accuracy vouching (👍) and run flagging (🚩). Deduplicated by `browser_token` (UUID stored in `localStorage`).
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `id` | `bigint` | auto | PK |
+| `target_type` | `text` | — | `'vehicle_specs'` or `'run'` |
+| `target_id` | `bigint` | — | `vehicle_id` or `run_id` depending on `target_type` |
+| `vote_type` | `text` | — | `'vouch'` or `'flag'` |
+| `browser_token` | `uuid` | — | Client-side identity (from `localStorage`) |
+| `created_at` | `timestamptz` | `now()` | |
+
+**Unique constraint:** `(browser_token, target_type, target_id)` — one vote per browser per target.
+RLS: SELECT/INSERT/DELETE open to all (including anonymous). No UPDATE — change vote by DELETE + INSERT.
+
+> Spec field flags are stored separately on `vehicles.flagged_specs` (see above) as a simple set, not in this table.
+
+---
+
 ### `site_settings`
 
 Key-value store for global site configuration.
@@ -231,7 +252,7 @@ Deletes all existing data points for a run and inserts the new set. Used when re
 
 ## Row-Level Security
 
-RLS is enabled on `vehicles`, `runs`, `trims`, and `site_settings`.
+RLS is enabled on `vehicles`, `runs`, `trims`, `votes`, and `site_settings`.
 
 ### `vehicles`
 
@@ -263,6 +284,7 @@ Runs inherit ownership from their parent vehicle via subquery join.
 | `migrations/002_fix_get_admin_users.sql` | Backfill `profiles` rows for pre-existing auth users; fix `get_admin_users()` to use LEFT JOIN so users without a profile row still appear |
 | `migrations/003_vehicle_specs.sql` | Add `specs jsonb` column to `vehicles` for structured vehicle specifications |
 | `migrations/004_vehicle_trims.sql` | Add `trims` table for named vehicle trim configurations (wheel/tire size) |
+| `migrations/005_votes.sql` | Add `votes` table (vouch/flag counts), `flagged_specs text[]` on vehicles, and `flag_spec_field` / `unflag_spec_field` RPCs |
 
 ### Applying migrations
 

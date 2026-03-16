@@ -668,6 +668,174 @@ class DataService {
     });
     if (error) throw error;
   }
+
+  // ── Voting ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns (or creates) the persistent browser token stored in localStorage.
+   * Used as a client-side identity for vote deduplication.
+   */
+  getBrowserToken() {
+    let t = localStorage.getItem('evbench_browser_token');
+    if (!t) {
+      t = crypto.randomUUID();
+      localStorage.setItem('evbench_browser_token', t);
+    }
+    return t;
+  }
+
+  /**
+   * Fetch vouch count and whether the current browser has vouched
+   * for a vehicle's specs.
+   * Returns { count: number, myVouch: boolean }
+   */
+  async getVehicleSpecVouches(vehicleId) {
+    if (!this.useSupabase) return { count: 0, myVouch: false };
+    const token = this.getBrowserToken();
+    const sb = getSupabase();
+
+    const [{ count }, { data: mine }] = await Promise.all([
+      sb.from('votes')
+        .select('*', { count: 'exact', head: true })
+        .eq('target_type', 'vehicle_specs')
+        .eq('target_id', vehicleId)
+        .eq('vote_type', 'vouch'),
+      sb.from('votes')
+        .select('id')
+        .eq('target_type', 'vehicle_specs')
+        .eq('target_id', vehicleId)
+        .eq('vote_type', 'vouch')
+        .eq('browser_token', token)
+        .maybeSingle(),
+    ]);
+    return { count: count ?? 0, myVouch: !!mine };
+  }
+
+  /**
+   * Toggle a vouch on a vehicle's specs.
+   * If the current browser has already vouched → removes the vouch.
+   * Otherwise → inserts a vouch.
+   * Returns updated { count, myVouch }.
+   */
+  async toggleSpecVouch(vehicleId) {
+    if (!this.useSupabase) return { count: 0, myVouch: false };
+    const token = this.getBrowserToken();
+    const sb = getSupabase();
+
+    const { data: existing } = await sb.from('votes')
+      .select('id')
+      .eq('target_type', 'vehicle_specs')
+      .eq('target_id', vehicleId)
+      .eq('vote_type', 'vouch')
+      .eq('browser_token', token)
+      .maybeSingle();
+
+    if (existing) {
+      await sb.from('votes').delete().eq('id', existing.id);
+    } else {
+      await sb.from('votes').insert({
+        target_type: 'vehicle_specs',
+        target_id: vehicleId,
+        vote_type: 'vouch',
+        browser_token: token,
+      });
+    }
+    return this.getVehicleSpecVouches(vehicleId);
+  }
+
+  /**
+   * Fetch vouch/flag counts and the current browser's vote for each run in runIds.
+   * Returns { [runId]: { vouch: number, flag: number, myVote: 'vouch'|'flag'|null } }
+   */
+  async getRunVotes(runIds) {
+    if (!this.useSupabase || !runIds.length) return {};
+    const token = this.getBrowserToken();
+    const sb = getSupabase();
+
+    const [{ data: all }, { data: mine }] = await Promise.all([
+      sb.from('votes')
+        .select('target_id, vote_type')
+        .eq('target_type', 'run')
+        .in('target_id', runIds),
+      sb.from('votes')
+        .select('target_id, vote_type')
+        .eq('target_type', 'run')
+        .in('target_id', runIds)
+        .eq('browser_token', token),
+    ]);
+
+    const result = {};
+    for (const id of runIds) {
+      result[id] = { vouch: 0, flag: 0, myVote: null };
+    }
+    for (const row of (all || [])) {
+      if (result[row.target_id]) result[row.target_id][row.vote_type]++;
+    }
+    for (const row of (mine || [])) {
+      if (result[row.target_id]) result[row.target_id].myVote = row.vote_type;
+    }
+    return result;
+  }
+
+  /**
+   * Toggle a vouch or flag on a run.
+   * If the browser's current vote matches voteType → removes it (toggle off).
+   * If the browser has a different vote → replaces it.
+   * Returns updated { vouch, flag, myVote } for that run.
+   */
+  async toggleRunVote(runId, voteType) {
+    if (!this.useSupabase) return { vouch: 0, flag: 0, myVote: null };
+    const token = this.getBrowserToken();
+    const sb = getSupabase();
+
+    const { data: existing } = await sb.from('votes')
+      .select('id, vote_type')
+      .eq('target_type', 'run')
+      .eq('target_id', runId)
+      .eq('browser_token', token)
+      .maybeSingle();
+
+    if (existing?.vote_type === voteType) {
+      // Same vote — toggle off
+      await sb.from('votes').delete().eq('id', existing.id);
+    } else {
+      if (existing) await sb.from('votes').delete().eq('id', existing.id);
+      await sb.from('votes').insert({
+        target_type: 'run',
+        target_id: runId,
+        vote_type: voteType,
+        browser_token: token,
+      });
+    }
+    const updated = await this.getRunVotes([runId]);
+    return updated[runId] ?? { vouch: 0, flag: 0, myVote: null };
+  }
+
+  /**
+   * Flag a specific spec field on a vehicle as potentially inaccurate.
+   * Idempotent — no-op if already flagged.
+   * fieldKey format: 'category.fieldKey' e.g. 'powertrain.horsepower_hp'
+   */
+  async flagSpecField(vehicleId, fieldKey) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase().rpc('flag_spec_field', {
+      p_vehicle_id: vehicleId,
+      p_field_key: fieldKey,
+    });
+    if (error) throw error;
+  }
+
+  /**
+   * Remove a flag from a specific spec field. Admin only (enforced in AppContext).
+   */
+  async unflagSpecField(vehicleId, fieldKey) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase().rpc('unflag_spec_field', {
+      p_vehicle_id: vehicleId,
+      p_field_key: fieldKey,
+    });
+    if (error) throw error;
+  }
 }
 
 export const dataService = new DataService();

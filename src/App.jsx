@@ -550,7 +550,6 @@ export default function App() {
                     )}
                     {view === 'specs' && (
                         <SpecsView
-                            vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
                         />
                     )}

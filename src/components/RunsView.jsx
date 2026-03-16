@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAppContext } from '../context/AppContext';
 import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
 import { dataService } from '../services/DataService';
@@ -7,6 +8,7 @@ import DeleteQueueBar from './DeleteQueueBar';
 import EditVehicleForm from './EditVehicleForm';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
+import { RunVoteButtons } from './VoteButtons';
 
 // ── Data-type flag definitions ────────────────────────────────────────────────
 // Each flag represents a data domain that can independently be present in a run.
@@ -25,6 +27,8 @@ const inferRunFlags = (run) => {
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, onAddTrim, onDeleteTrim, vehicles, onCopyRunToVehicle }) {
+    const { runVotes, loadRunVotes, toggleRunVote } = useAppContext();
+
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
     const [showEditSpecs, setShowEditSpecs] = useState(false);
@@ -1100,6 +1104,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
             <div className="space-y-4">
                 {displayRuns.map(run => {
+                  // Ensure vote data is loaded for this run (no-op if already loaded)
+                  if (!runVotes[run.id]) loadRunVotes([run.id]);
+                  const votes = runVotes[run.id] ?? { vouch: 0, flag: 0, myVote: null };
                   const isPending = pendingDeletes.has(run.id);
                   return (
                     <div
@@ -1609,6 +1616,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     </div>
                                 </div>
                                 <div className="run-actions">
+                                    <RunVoteButtons
+                                        vouch={votes.vouch}
+                                        flag={votes.flag}
+                                        myVote={votes.myVote}
+                                        onVote={(voteType) => toggleRunVote(run.id, voteType)}
+                                    />
                                     {!run.isDefault && (
                                         <button
                                             onClick={() => onSetDefaultRun(run.id)}

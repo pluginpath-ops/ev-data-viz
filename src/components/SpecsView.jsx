@@ -1,6 +1,39 @@
+import { useEffect, useRef, useState } from 'react';
+import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
+import { SpecFieldFlagButton } from './VoteButtons';
 
-export default function SpecsView({ vehicles, selectedVehicleIds }) {
+export default function SpecsView({ selectedVehicleIds }) {
+    // Read vehicles directly from context so optimistic updates (e.g. admin unflag)
+    // reflect immediately without depending on the App.jsx prop-chain re-render timing.
+    const { vehicles, flagSpecField, unflagSpecField, isAdmin } = useAppContext();
+
+    // Pending flags — buffered locally, committed to DB when the tab is left (unmount).
+    // Map of vehicleId (number) → Set<fieldKey string>.
+    // Using a ref in sync with state so the unmount cleanup reads the latest value.
+    const [pendingFlags, setPendingFlags] = useState(() => new Map());
+    const pendingFlagsRef = useRef(pendingFlags);
+    useEffect(() => { pendingFlagsRef.current = pendingFlags; }, [pendingFlags]);
+
+    // Commit all pending flags on tab leave (component unmount).
+    useEffect(() => {
+        return () => {
+            for (const [vehicleId, fieldKeys] of pendingFlagsRef.current) {
+                fieldKeys.forEach(fieldKey => flagSpecField(vehicleId, fieldKey));
+            }
+        };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: fire only on unmount
+
+    const handleFlag = (vehicleId, fieldKey) => {
+        setPendingFlags(prev => {
+            const next = new Map(prev);
+            const keys = new Set(next.get(vehicleId) ?? []);
+            if (keys.has(fieldKey)) keys.delete(fieldKey); // undo
+            else keys.add(fieldKey);
+            next.set(vehicleId, keys);
+            return next;
+        });
+    };
     const displayVehicles = selectedVehicleIds.length > 0
         ? vehicles.filter(v => selectedVehicleIds.includes(v.id))
         : vehicles;
@@ -53,14 +86,28 @@ export default function SpecsView({ vehicles, selectedVehicleIds }) {
                 return val !== null && val !== undefined && val !== '';
             });
             if (!hasValue) return [];
+            const fieldKey = `${cat.key}.${field.key}`;
             return [(
                 <tr key={`${cat.key}--${field.key}`}>
                     <td className="specs-table-cell font-medium text-sm">{field.label}</td>
-                    {displayVehicles.map(v => (
-                        <td key={String(v.id)} className="specs-table-cell text-sm">
-                            {formatValue(v.specs?.[cat.key]?.[field.key], field.type)}
-                        </td>
-                    ))}
+                    {displayVehicles.map(v => {
+                        const committedIsFlagged = (v.flagged_specs || []).includes(fieldKey);
+                        const isPending = pendingFlags.get(v.id)?.has(fieldKey) ?? false;
+                        return (
+                            <td key={String(v.id)} className="specs-table-cell text-sm">
+                                <span className="flex items-center gap-1">
+                                    {formatValue(v.specs?.[cat.key]?.[field.key], field.type)}
+                                    <SpecFieldFlagButton
+                                        isFlagged={committedIsFlagged || isPending}
+                                        isPending={isPending && !committedIsFlagged}
+                                        onFlag={() => handleFlag(v.id, fieldKey)}
+                                        onUnflag={() => unflagSpecField(v.id, fieldKey)}
+                                        isAdmin={isAdmin}
+                                    />
+                                </span>
+                            </td>
+                        );
+                    })}
                 </tr>
             )];
         });
