@@ -30,6 +30,8 @@ export default function VehiclesView({
     tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
     onReorderVehicles, onDuplicateVehicle,
     onUpdateVehicleSpecs, specCustomFieldSuggestions,
+    onAddTrim, onDeleteTrim,
+    pendingEditVehicle, onClearPendingEdit,
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -57,6 +59,13 @@ export default function VehiclesView({
         pendingDeletes, committedDeletes, undoState, secondsLeft,
         queueDelete, restoreItem, clearQueue, commitDeletes, undoDelete,
     } = useDeleteQueue(onDelete);
+
+    // Open edit modal for a vehicle duplicated from the Tests tab
+    useEffect(() => {
+        if (!pendingEditVehicle) return;
+        onClearPendingEdit();
+        handleEdit(pendingEditVehicle, { stopPropagation: () => {} });
+    }, []); // run once on mount — pendingEditVehicle is set before navigation
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -100,7 +109,8 @@ export default function VehiclesView({
         e.stopPropagation();
         setDuplicatingId(vehicle.id);
         try {
-            await onDuplicateVehicle(vehicle.id);
+            const newVehicle = await onDuplicateVehicle(vehicle.id);
+            if (newVehicle) handleEdit(newVehicle, { stopPropagation: () => {} });
         } finally {
             setDuplicatingId(null);
         }
@@ -258,9 +268,11 @@ export default function VehiclesView({
                         onClick={(e) => handleDuplicateVehicle(vehicle, e)}
                         disabled={duplicatingId !== null}
                         title="Duplicate vehicle and all tests"
-                        className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-50"
+                        className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-50 flex items-center gap-1"
                     >
-                        {duplicatingId === vehicle.id ? '…' : '⧉ Copy'}
+                        {duplicatingId === vehicle.id
+                            ? <><span className="inline-block w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"/>Copying…</>
+                            : '⧉ Copy'}
                     </button>
                 )}
                 {canDelete(vehicle) && (
@@ -300,6 +312,9 @@ export default function VehiclesView({
         newTagName, onNewTagNameChange: setNewTagName, onCreateTag: handleCreateTag,
         tags, availableTagsForForm,
         editingVehicle,
+        trims: editingVehicle?.trims || [],
+        onAddTrim: (trimData) => onAddTrim(editingId, trimData),
+        onRemoveTrim: (trimId) => onDeleteTrim(editingId, trimId),
         imageUploading, onImageReady: handleImageReady,
         onSubmit: handleSubmit, onCancel: handleCancel,
     };

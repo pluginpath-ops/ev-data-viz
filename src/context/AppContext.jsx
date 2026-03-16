@@ -112,8 +112,11 @@ export function AppProvider({ children }) {
 
     const duplicateVehicle = async (vehicleId) => {
         try {
-            await dataService.duplicateVehicle(vehicleId, vehicles);
-            await initializeApp();
+            const newVehicle = await dataService.duplicateVehicle(vehicleId, vehicles);
+            // Refresh vehicles list without setLoading(true) — initializeApp() would unmount VehiclesView
+            // and wipe the edit modal's local state before it can open.
+            dataService.getVehicles().then(setVehicles).catch(() => {});
+            return newVehicle;
         } catch (error) {
             showError('Error duplicating vehicle: ' + error.message);
         }
@@ -126,6 +129,63 @@ export function AppProvider({ children }) {
             setSelectedVehicles(prev => prev.filter(id => id !== vehicleId));
         } catch (error) {
             showError('Error deleting vehicle: ' + error.message);
+        }
+    };
+
+    // ── Trim CRUD ─────────────────────────────────────────────────────────────
+
+    const addTrim = async (vehicleId, trimData) => {
+        try {
+            const newTrim = await dataService.addTrim(vehicleId, trimData);
+            setVehicles(prev => prev.map(v =>
+                v.id === vehicleId
+                    ? { ...v, trims: [...(v.trims || []), newTrim] }
+                    : v
+            ));
+        } catch (error) {
+            showError('Error adding trim: ' + error.message);
+        }
+    };
+
+    const updateTrim = async (vehicleId, trimId, updates) => {
+        try {
+            await dataService.updateTrim(trimId, updates);
+            setVehicles(prev => prev.map(v =>
+                v.id === vehicleId
+                    ? { ...v, trims: (v.trims || []).map(t => t.id === trimId ? { ...t, ...updates } : t) }
+                    : v
+            ));
+        } catch (error) {
+            showError('Error updating trim: ' + error.message);
+        }
+    };
+
+    const deleteTrim = async (vehicleId, trimId) => {
+        try {
+            await dataService.deleteTrim(trimId);
+            setVehicles(prev => prev.map(v =>
+                v.id === vehicleId
+                    ? { ...v, trims: (v.trims || []).filter(t => t.id !== trimId) }
+                    : v
+            ));
+        } catch (error) {
+            showError('Error deleting trim: ' + error.message);
+        }
+    };
+
+    // ── Copy run to a different vehicle ───────────────────────────────────────
+
+    const copyRunToVehicle = async (sourceVehicleId, run, targetVehicleId) => {
+        try {
+            const newRun = await dataService.copyRunToVehicle(run, targetVehicleId);
+            setVehicles(prev => prev.map(v =>
+                v.id === targetVehicleId
+                    ? { ...v, runs: [...(v.runs || []), newRun] }
+                    : v
+            ));
+            showSuccess(`Test copied to ${vehicles.find(v => v.id === targetVehicleId)?.name || 'vehicle'}`);
+        } catch (error) {
+            showError('Error copying test: ' + error.message);
         }
     };
 
@@ -519,6 +579,10 @@ export function AppProvider({ children }) {
         reorderVehicles,
         duplicateVehicle,
         deleteVehicle,
+        addTrim,
+        updateTrim,
+        deleteTrim,
+        copyRunToVehicle,
         duplicateRun,
         addRun,
         updateRun,

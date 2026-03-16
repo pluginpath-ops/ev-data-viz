@@ -56,6 +56,9 @@ export default function App() {
         clearNotification,
         updateVehicleSpecs,
         specCustomFieldSuggestions,
+        addTrim,
+        deleteTrim,
+        copyRunToVehicle,
     } = useAppContext();
 
     // Auto-dismiss notifications after 6 s
@@ -105,6 +108,7 @@ export default function App() {
         setView(newView);
     }, [chartMode]);
 
+    const [pendingEditVehicle, setPendingEditVehicle] = useState(null);
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [showImportMenu, setShowImportMenu] = useState(false);
     const [showTableauModal, setShowTableauModal] = useState(false);
@@ -494,6 +498,10 @@ export default function App() {
                             onDuplicateVehicle={duplicateVehicle}
                             onUpdateVehicleSpecs={updateVehicleSpecs}
                             specCustomFieldSuggestions={specCustomFieldSuggestions}
+                            onAddTrim={addTrim}
+                            onDeleteTrim={deleteTrim}
+                            pendingEditVehicle={pendingEditVehicle}
+                            onClearPendingEdit={() => setPendingEditVehicle(null)}
                         />
                     )}
                     {view === 'runs' && currentActiveVehicle && (
@@ -513,7 +521,10 @@ export default function App() {
                             onViewChart={() => navigateTo('chart')}
                             onToggleVehicleVisibility={toggleVehicleVisibility}
                             onUpdateVehicle={updateVehicle}
-                            onDuplicateVehicle={(id) => duplicateVehicle(id)}
+                            onDuplicateVehicle={async (id) => {
+                                const newVehicle = await duplicateVehicle(id);
+                                if (newVehicle) { setPendingEditVehicle(newVehicle); navigateTo('vehicles'); }
+                            }}
                             onDeleteVehicle={async (id) => { await deleteVehicle(id); navigateTo('vehicles'); }}
                             tags={tags}
                             onCreateTag={createTag}
@@ -521,6 +532,10 @@ export default function App() {
                             onUploadVehicleImage={(file) => uploadVehicleImage(currentActiveVehicle.id, file)}
                             onUpdateVehicleSpecs={updateVehicleSpecs}
                             specCustomFieldSuggestions={specCustomFieldSuggestions}
+                            onAddTrim={addTrim}
+                            onDeleteTrim={deleteTrim}
+                            vehicles={vehicles}
+                            onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && (
