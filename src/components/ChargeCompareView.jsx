@@ -62,7 +62,7 @@ function makeBarPlugin(flatRuns) {
                         const socText = run._endSoc != null ? `${run._startSoc}%→${run._endSoc}%` : `${run._startSoc}% SoC`;
                         badges.push({ text: socText, socDeviation: run._socDeviation ?? 0 });
                     }
-                    if (run._startRange != null) badges.push({ text: `${run._startRange} mi` });
+                    if (run._startRange != null) badges.push({ text: run._endRange != null ? `${run._startRange}→${run._endRange} mi` : `${run._startRange} mi` });
                     if (run.speed_mph   != null) badges.push({ text: `${run.speed_mph} mph` });
                     if (run.temperature_f != null) badges.push({ text: `${run.temperature_f}°F` });
                 }
@@ -314,7 +314,8 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                     _yValue:       yValue ?? 0,
                     _startSoc:     startSoc,
                     _endSoc:       SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
-                    _startRange:   Math.round(Rz * 10) / 10,
+                    _startRange:   Math.round(Rz),
+                    _endRange:     Rend != null ? Math.round(Rend) : null,
                     _socDeviation: socDeviation,
                     _noData:       yValue == null,
                 });
@@ -327,7 +328,8 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                     _yValue:       yValue ?? 0,
                     _startSoc:     startSoc,
                     _endSoc:       SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
-                    _startRange:   Math.round(Rz * 10) / 10,
+                    _startRange:   Math.round(Rz),
+                    _endRange:     Math.round(Rz + mMiles),
                     _socDeviation: socDeviation,
                     _noData:       yValue == null,
                 });
@@ -389,7 +391,7 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                                     if (!run || run._noData) return [];
                                     const lines = [];
                                     if (run._startSoc  != null) lines.push(run._endSoc != null ? `SoC: ${run._startSoc}% → ${run._endSoc}%` : `Start SoC: ${run._startSoc}%`);
-                                    if (run._startRange != null) lines.push(`Start range: ${run._startRange} mi`);
+                                    if (run._startRange != null) lines.push(run._endRange != null ? `Range: ${run._startRange} → ${run._endRange} mi` : `Start range: ${run._startRange} mi`);
                                     if (run.speed_mph   != null) lines.push(`Speed: ${run.speed_mph} mph`);
                                     if (run.temperature_f != null) lines.push(`Temp: ${run.temperature_f}°F`);
                                     if (run._chargingRunName && run._chargingRunName !== run.name)
