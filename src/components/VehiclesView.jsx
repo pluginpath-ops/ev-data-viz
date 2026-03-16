@@ -268,9 +268,11 @@ export default function VehiclesView({
                         onClick={(e) => handleDuplicateVehicle(vehicle, e)}
                         disabled={duplicatingId !== null}
                         title="Duplicate vehicle and all tests"
-                        className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-50"
+                        className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-50 flex items-center gap-1"
                     >
-                        {duplicatingId === vehicle.id ? '…' : '⧉ Copy'}
+                        {duplicatingId === vehicle.id
+                            ? <><span className="inline-block w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"/>Copying…</>
+                            : '⧉ Copy'}
                     </button>
                 )}
                 {canDelete(vehicle) && (

@@ -130,6 +130,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     // { [runId]: { kwh: number|null, loading: bool } }
     const [calcKwhByRun, setCalcKwhByRun]       = useState({});
     const [duplicatingRunId, setDuplicatingRunId] = useState(null);
+    const [duplicatingVehicle, setDuplicatingVehicle] = useState(false);
     const [exportingRunId, setExportingRunId]     = useState(null);
     const [copyToRun, setCopyToRun]               = useState(null);  // run being copied to another vehicle
     const [copyingToVehicleId, setCopyingToVehicleId] = useState('');
@@ -644,8 +645,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         </button>
                     )}
                     {canEdit(vehicle) && (
-                        <button onClick={() => onDuplicateVehicle(vehicle.id)} className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition">
-                            ⧉ Copy
+                        <button
+                            onClick={async () => { setDuplicatingVehicle(true); await onDuplicateVehicle(vehicle.id); setDuplicatingVehicle(false); }}
+                            disabled={duplicatingVehicle}
+                            className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-50 flex items-center gap-1"
+                        >
+                            {duplicatingVehicle ? <><span className="inline-block w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"/>Copying…</> : '⧉ Copy'}
                         </button>
                     )}
                     {canDelete(vehicle) && (
