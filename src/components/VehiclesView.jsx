@@ -31,6 +31,7 @@ export default function VehiclesView({
     onReorderVehicles, onDuplicateVehicle,
     onUpdateVehicleSpecs, specCustomFieldSuggestions,
     onAddTrim, onDeleteTrim,
+    pendingEditVehicle, onClearPendingEdit,
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -58,6 +59,13 @@ export default function VehiclesView({
         pendingDeletes, committedDeletes, undoState, secondsLeft,
         queueDelete, restoreItem, clearQueue, commitDeletes, undoDelete,
     } = useDeleteQueue(onDelete);
+
+    // Open edit modal for a vehicle duplicated from the Tests tab
+    useEffect(() => {
+        if (!pendingEditVehicle) return;
+        onClearPendingEdit();
+        handleEdit(pendingEditVehicle, { stopPropagation: () => {} });
+    }, []); // run once on mount — pendingEditVehicle is set before navigation
 
     const handleSubmit = async (e) => {
         e.preventDefault();
