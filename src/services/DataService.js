@@ -95,12 +95,12 @@ class DataService {
     }
   }
 
-  async uploadVehicleImage(vehicleId, file) {
-    const ext = file.name.split('.').pop().toLowerCase();
-    const path = `${vehicleId}.${ext}`;
+  async uploadVehicleImage(vehicleId, blob) {
+    // Always store as JPEG — the blob is produced by the crop/resize canvas step
+    const path = `${vehicleId}.jpg`;
     const { error: uploadError } = await getSupabase().storage
       .from('vehicle-images')
-      .upload(path, file, { upsert: true });
+      .upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
     if (uploadError) throw uploadError;
     const { data } = getSupabase().storage.from('vehicle-images').getPublicUrl(path);
     const { error: updateError } = await getSupabase()
