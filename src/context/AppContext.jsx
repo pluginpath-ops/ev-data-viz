@@ -113,7 +113,9 @@ export function AppProvider({ children }) {
     const duplicateVehicle = async (vehicleId) => {
         try {
             const newVehicle = await dataService.duplicateVehicle(vehicleId, vehicles);
-            initializeApp(); // refresh list in background — don't block modal opening
+            // Refresh vehicles list without setLoading(true) — initializeApp() would unmount VehiclesView
+            // and wipe the edit modal's local state before it can open.
+            dataService.getVehicles().then(setVehicles).catch(() => {});
             return newVehicle;
         } catch (error) {
             showError('Error duplicating vehicle: ' + error.message);
