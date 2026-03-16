@@ -112,9 +112,9 @@ export function AppProvider({ children }) {
 
     const duplicateVehicle = async (vehicleId) => {
         try {
-            const newId = await dataService.duplicateVehicle(vehicleId, vehicles);
+            const newVehicle = await dataService.duplicateVehicle(vehicleId, vehicles);
             await initializeApp();
-            return newId;
+            return newVehicle;
         } catch (error) {
             showError('Error duplicating vehicle: ' + error.message);
         }

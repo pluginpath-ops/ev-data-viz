@@ -182,7 +182,7 @@ class DataService {
         calculated_fields: run.calculated_fields || [],
       });
     }
-    return newVehicle.id;
+    return newVehicle;
   }
 
   async duplicateRun(vehicleId, run) {

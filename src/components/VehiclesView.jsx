@@ -49,7 +49,6 @@ export default function VehiclesView({
     const [pendingOrder, setPendingOrder] = useState(null);   // [{id, sort_order}] or null
     const [savingOrder, setSavingOrder]   = useState(false);
     const [duplicatingId, setDuplicatingId] = useState(null);
-    const [pendingEditId, setPendingEditId] = useState(null); // open edit modal once vehicle appears after duplicate
     const [vehiclePage, setVehiclePage] = useState(1);
     const [specsEditingVehicle, setSpecsEditingVehicle] = useState(null);
     const [specsViewingVehicle, setSpecsViewingVehicle] = useState(null);
@@ -59,16 +58,6 @@ export default function VehiclesView({
         pendingDeletes, committedDeletes, undoState, secondsLeft,
         queueDelete, restoreItem, clearQueue, commitDeletes, undoDelete,
     } = useDeleteQueue(onDelete);
-
-    // After a duplicate, open the edit modal once the new vehicle appears in the list
-    useEffect(() => {
-        if (!pendingEditId) return;
-        const newVehicle = vehicles.find(v => v.id === pendingEditId);
-        if (newVehicle) {
-            setPendingEditId(null);
-            handleEdit(newVehicle, { stopPropagation: () => {} });
-        }
-    }, [vehicles, pendingEditId]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -112,8 +101,8 @@ export default function VehiclesView({
         e.stopPropagation();
         setDuplicatingId(vehicle.id);
         try {
-            const newId = await onDuplicateVehicle(vehicle.id);
-            if (newId) setPendingEditId(newId);
+            const newVehicle = await onDuplicateVehicle(vehicle.id);
+            if (newVehicle) handleEdit(newVehicle, { stopPropagation: () => {} });
         } finally {
             setDuplicatingId(null);
         }
