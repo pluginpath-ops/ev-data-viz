@@ -49,16 +49,14 @@ export function SpecVouchButton({ count = 0, myVouch = false, onVouch, readOnly 
 export function SpecFieldFlagButton({ isFlagged = false, onFlag, onUnflag, isAdmin = false }) {
     if (isFlagged) {
         return (
-            <span className="spec-field-flag-indicator" title={isAdmin ? 'Users have flagged this field — click to clear' : 'Users have flagged this field as potentially inaccurate'}>
-                <button
-                    className="vote-btn vote-btn-flag vote-btn-active"
-                    onClick={isAdmin ? onUnflag : undefined}
-                    style={{ cursor: isAdmin ? 'pointer' : 'default' }}
-                    title={isAdmin ? 'Clear this flag' : 'Flagged as potentially inaccurate'}
-                >
-                    🚩
-                </button>
-            </span>
+            <button
+                className="vote-btn vote-btn-flag vote-btn-active"
+                onClick={isAdmin ? onUnflag : undefined}
+                style={{ cursor: isAdmin ? 'pointer' : 'default' }}
+                title={isAdmin ? '🚩 Users flagged this value — click to clear' : '🚩 Users have flagged this value as potentially inaccurate'}
+            >
+                🚩{isAdmin && <span className="text-xs opacity-70 ml-0.5">×</span>}
+            </button>
         );
     }
 

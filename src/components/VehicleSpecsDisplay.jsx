@@ -17,12 +17,17 @@ import { SpecFieldFlagButton } from './VoteButtons';
  */
 export default function VehicleSpecsDisplay({
     specs,
-    flaggedSpecs = [],
+    flaggedSpecs: flaggedSpecsProp = [],
     vehicleId,
     defaultAllOpen = false,
     showFlagButtons = false,
 }) {
-    const { flagSpecField, unflagSpecField, isAdmin } = useAppContext();
+    const { vehicles, flagSpecField, unflagSpecField, isAdmin } = useAppContext();
+
+    // Read flagged_specs directly from live context so updates reflect immediately
+    // without depending on the parent prop-chain re-rendering first.
+    const liveVehicle = vehicleId ? vehicles.find(v => v.id === vehicleId) : null;
+    const flaggedSpecs = liveVehicle?.flagged_specs ?? flaggedSpecsProp;
 
     const [openCategories, setOpenCategories] = useState(() =>
         defaultAllOpen ? new Set(SPEC_CATEGORIES.map(c => c.key)) : new Set()
