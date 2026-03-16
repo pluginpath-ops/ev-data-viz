@@ -49,7 +49,7 @@ function makeBarPlugin(flatRuns) {
                     badges.push({ text: 'No data', primary: true });
                 } else {
                     if (run._yValue != null) badges.push({ text: `${run._yValue} ${run._yUnit}`, primary: true });
-                    if (run._startSoc  != null) badges.push({ text: `${run._startSoc}% SoC` });
+                    if (run._startSoc  != null) badges.push({ text: run._endSoc != null ? `${run._startSoc}%→${run._endSoc}%` : `${run._startSoc}% SoC` });
                     if (run._startRange != null) badges.push({ text: `${run._startRange} mi` });
                     if (run.speed_mph   != null) badges.push({ text: `${run.speed_mph} mph` });
                     if (run.temperature_f != null) badges.push({ text: `${run.temperature_f}°F` });
@@ -263,22 +263,26 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
             const Sz = zPoint.soc;
 
             if (chartType === 'range_added') {
-                const Rend   = interpolate(points, 'time', 'range', Tz + xMinutes);
-                const yValue = Rend != null ? Math.round((Rend - Rz) * 10) / 10 : null;
+                const Rend    = interpolate(points, 'time', 'range', Tz + xMinutes);
+                const SocEnd  = interpolate(points, 'time', 'soc',   Tz + xMinutes);
+                const yValue  = Rend != null ? Math.round((Rend - Rz) * 10) / 10 : null;
                 flatRuns.push({
                     ...base,
                     _yValue:     yValue ?? 0,
                     _startSoc:   Math.round(Sz * 10) / 10,
+                    _endSoc:     SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
                     _startRange: Math.round(Rz * 10) / 10,
                     _noData:     yValue == null,
                 });
             } else {
-                const Tend   = interpolate(points, 'range', 'time', Rz + mMiles);
-                const yValue = Tend != null ? Math.round((Tend - Tz) * 10) / 10 : null;
+                const Tend    = interpolate(points, 'range', 'time', Rz + mMiles);
+                const SocEnd  = interpolate(points, 'range', 'soc',  Rz + mMiles);
+                const yValue  = Tend != null ? Math.round((Tend - Tz) * 10) / 10 : null;
                 flatRuns.push({
                     ...base,
                     _yValue:     yValue ?? 0,
                     _startSoc:   Math.round(Sz * 10) / 10,
+                    _endSoc:     SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
                     _startRange: Math.round(Rz * 10) / 10,
                     _noData:     yValue == null,
                 });
@@ -339,7 +343,7 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                                     const run = built.flatRuns[ctx.dataIndex];
                                     if (!run || run._noData) return [];
                                     const lines = [];
-                                    if (run._startSoc  != null) lines.push(`Start SoC: ${run._startSoc}%`);
+                                    if (run._startSoc  != null) lines.push(run._endSoc != null ? `SoC: ${run._startSoc}% → ${run._endSoc}%` : `Start SoC: ${run._startSoc}%`);
                                     if (run._startRange != null) lines.push(`Start range: ${run._startRange} mi`);
                                     if (run.speed_mph   != null) lines.push(`Speed: ${run.speed_mph} mph`);
                                     if (run.temperature_f != null) lines.push(`Temp: ${run.temperature_f}°F`);
