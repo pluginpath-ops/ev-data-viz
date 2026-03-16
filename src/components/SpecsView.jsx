@@ -3,8 +3,10 @@ import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { SpecFieldFlagButton } from './VoteButtons';
 
-export default function SpecsView({ vehicles, selectedVehicleIds }) {
-    const { flagSpecField, unflagSpecField, isAdmin } = useAppContext();
+export default function SpecsView({ selectedVehicleIds }) {
+    // Read vehicles directly from context so optimistic updates (e.g. admin unflag)
+    // reflect immediately without depending on the App.jsx prop-chain re-render timing.
+    const { vehicles, flagSpecField, unflagSpecField, isAdmin } = useAppContext();
 
     // Pending flags — buffered locally, committed to DB when the tab is left (unmount).
     // Map of vehicleId (number) → Set<fieldKey string>.
