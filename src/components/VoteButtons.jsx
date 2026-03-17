@@ -68,7 +68,7 @@ export function SpecFieldFlagButton({ isFlagged = false, isPending = false, onFl
                             : '🚩 Users have flagged this value as potentially inaccurate'
                 }
             >
-                🚩{(isAdmin || isPending) && <span className="text-xs opacity-70 ml-0.5">×</span>}
+                ⚑{(isAdmin || isPending) && <span className="text-xs opacity-70 ml-0.5">×</span>}
             </button>
         );
     }
@@ -79,7 +79,7 @@ export function SpecFieldFlagButton({ isFlagged = false, isPending = false, onFl
             onClick={onFlag}
             title="Flag this value as potentially inaccurate"
         >
-            🚩
+            ⚑
         </button>
     );
 }

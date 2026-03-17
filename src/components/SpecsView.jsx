@@ -177,10 +177,6 @@ export default function SpecsView({ selectedVehicleIds }) {
                                 {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.range || '—'}</td>)}
                             </tr>
                             <tr>
-                                <td className="specs-table-cell font-medium">Peak Power (kW)</td>
-                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.power || '—'}</td>)}
-                            </tr>
-                            <tr>
                                 <td className="specs-table-cell font-medium">Test Runs</td>
                                 {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.runs?.length || 0}</td>)}
                             </tr>
