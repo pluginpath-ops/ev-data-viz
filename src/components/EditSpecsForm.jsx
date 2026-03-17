@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, normalizeCustomKey, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { SpecVouchButton, SpecFieldFlagButton } from './VoteButtons';
@@ -49,6 +49,56 @@ function cleanSpecs(localSpecs) {
         }
     }
     return result;
+}
+
+/**
+ * Build a "full" export object — includes every predefined field (null if blank)
+ * so the recipient can see what's missing and fill it in.
+ */
+function buildExportSpecs(vehicle, localSpecs) {
+    const full = {};
+    for (const cat of SPEC_CATEGORIES) {
+        const catData = localSpecs[cat.key] || {};
+        const catOut  = {};
+        for (const f of cat.fields) {
+            catOut[f.key] = catData[f.key] !== undefined ? catData[f.key] : null;
+        }
+        const custom = catData._custom;
+        if (custom && Object.keys(custom).length > 0) catOut._custom = { ...custom };
+        full[cat.key] = catOut;
+    }
+    return {
+        vehicleId:   vehicle.id,
+        vehicleName: vehicle.name,
+        specs:       full,
+    };
+}
+
+/** Merge an imported specs object (or full export envelope) into localSpecs state. */
+function mergeImportedSpecs(raw, setLocalSpecs, setImportError) {
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const incoming = parsed?.specs ?? parsed;
+        if (typeof incoming !== 'object' || Array.isArray(incoming)) throw new Error();
+        setLocalSpecs(prev => {
+            const next = { ...prev };
+            for (const cat of SPEC_CATEGORIES) {
+                if (!incoming[cat.key]) continue;
+                const catData = incoming[cat.key];
+                next[cat.key] = { ...next[cat.key] };
+                for (const f of cat.fields) {
+                    if (catData[f.key] !== undefined) next[cat.key][f.key] = catData[f.key];
+                }
+                if (catData._custom) {
+                    next[cat.key]._custom = { ...next[cat.key]._custom, ...catData._custom };
+                }
+            }
+            return next;
+        });
+        setImportError(null);
+    } catch {
+        setImportError('Invalid JSON — could not import specs.');
+    }
 }
 
 function SpecField({ field, value, onChange }) {
@@ -122,6 +172,8 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     const [localSpecs, setLocalSpecs] = useState(() => buildInitialSpecs(vehicle.specs));
     const [openCategories, setOpenCategories] = useState(() => new Set(SPEC_CATEGORIES.map(c => c.key)));
     const [saving, setSaving] = useState(false);
+    const [importError, setImportError] = useState(null);
+    const fileInputRef = useRef(null);
     // Per-category "add custom field" input state
     const [newCustomKey, setNewCustomKey] = useState({});
     const [newCustomVal, setNewCustomVal] = useState({});
@@ -185,6 +237,26 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
         }));
         setNewCustomKey(prev => ({ ...prev, [catKey]: '' }));
         setNewCustomVal(prev => ({ ...prev, [catKey]: '' }));
+    };
+
+    const handleExport = () => {
+        const data = buildExportSpecs(vehicle, localSpecs);
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = `${(vehicle.name || 'vehicle').replace(/\s+/g, '_')}-specs.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => mergeImportedSpecs(ev.target.result, setLocalSpecs, setImportError);
+        reader.readAsText(file);
+        e.target.value = ''; // reset so same file can be re-imported
     };
 
     const handleSave = async () => {
@@ -354,20 +426,50 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                 </div>
 
                 {/* Footer */}
-                <div className="modal-footer justify-between">
-                    <SpecVouchButton count={vouches.count} readOnly />
-                    <div className="flex gap-2">
-                    <button type="button" onClick={onClose} className="btn btn-secondary text-sm">
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="btn btn-primary text-sm"
-                    >
-                        {saving ? 'Saving…' : 'Save Specs'}
-                    </button>
+                <div className="modal-footer flex-col gap-2 items-stretch">
+                    {importError && (
+                        <p className="text-xs text-red-500 w-full">{importError}</p>
+                    )}
+                    <div className="flex justify-between w-full">
+                        <div className="flex gap-2 items-center">
+                            <SpecVouchButton count={vouches.count} readOnly />
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".json,application/json"
+                                className="hidden"
+                                onChange={handleFileChange}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="btn btn-secondary text-xs"
+                                title="Import specs from a JSON file"
+                            >
+                                Import JSON
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleExport}
+                                className="btn btn-secondary text-xs"
+                                title="Export specs as JSON (includes blank fields)"
+                            >
+                                Export JSON
+                            </button>
+                        </div>
+                        <div className="flex gap-2">
+                            <button type="button" onClick={onClose} className="btn btn-secondary text-sm">
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSave}
+                                disabled={saving}
+                                className="btn btn-primary text-sm"
+                            >
+                                {saving ? 'Saving…' : 'Save Specs'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -37,7 +37,7 @@ export default function VehiclesView({
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
         name: '', make: '', model: '', year: '',
-        battery: '', range: '', power: ''
+        battery: '', range: ''
     });
     const [formTags, setFormTags] = useState([]);
     const [newTagName, setNewTagName] = useState('');
@@ -77,7 +77,7 @@ export default function VehiclesView({
             onAdd(formData);
         }
         setFormTags([]);
-        setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '', power: '' });
+        setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '' });
         setShowForm(false);
     };
 
@@ -90,7 +90,6 @@ export default function VehiclesView({
             year: vehicle.year || '',
             battery: vehicle.battery || '',
             range: vehicle.range || '',
-            power: vehicle.power || ''
         });
         setFormTags(vehicle.tags || []);
         setEditingId(vehicle.id);
@@ -102,7 +101,7 @@ export default function VehiclesView({
         setEditingId(null);
         setFormTags([]);
         setNewTagName('');
-        setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '', power: '' });
+        setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '' });
     };
 
     const handleDuplicateVehicle = async (vehicle, e) => {
@@ -604,7 +603,6 @@ export default function VehiclesView({
                                                 <div className="text-sm text-gray-700 space-y-1">
                                                     {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                                     {vehicle.range && <p>Range: {vehicle.range} mi</p>}
-                                                    {vehicle.power && <p>Power: {vehicle.power} kW</p>}
                                                 </div>
                                                 <p className="text-sm font-semibold mt-2">Tests: {vehicle.runs?.length || 0}</p>
                                                 {vehicle.tags?.length > 0 && (

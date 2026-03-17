@@ -34,7 +34,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [showEditSpecs, setShowEditSpecs] = useState(false);
     const [showViewSpecs, setShowViewSpecs] = useState(false);
     const [vehicleFormData, setVehicleFormData] = useState({
-        name: '', make: '', model: '', year: '', battery: '', range: '', power: ''
+        name: '', make: '', model: '', year: '', battery: '', range: ''
     });
     const [vehicleFormTags, setVehicleFormTags] = useState([]);
     const [vehicleNewTagName, setVehicleNewTagName] = useState('');
@@ -48,7 +48,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             year: vehicle.year || '',
             battery: vehicle.battery || '',
             range: vehicle.range || '',
-            power: vehicle.power || '',
         });
         setVehicleFormTags(vehicle.tags || []);
         setVehicleNewTagName('');
@@ -614,7 +613,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                     <div className="text-sm text-gray-600 mt-0.5 flex flex-wrap gap-x-3">
                         {vehicle.battery && <span>Battery: {vehicle.battery} kWh</span>}
                         {vehicle.range && <span>Range: {vehicle.range} mi</span>}
-                        {vehicle.power && <span>Power: {vehicle.power} kW</span>}
                     </div>
                 </div>
                 <div className="flex flex-col gap-1 flex-shrink-0 items-stretch w-28">
