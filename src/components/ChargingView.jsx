@@ -4,7 +4,7 @@ import { dataService } from '../services/DataService';
 import RangeChartView from './RangeChartView';
 import AxisScaleControls from './AxisScaleControls';
 
-export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode }) {
+export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, presentationMode = false }) {
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
     const [expandedVehicles, setExpandedVehicles] = useState({});
@@ -448,14 +448,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 selectedRuns={chartConfig.selectedRuns}
                 setChartConfig={setChartConfig}
                 onUpdateRunColor={onUpdateRunColor}
+                presentationMode={presentationMode}
             />
         );
     }
 
     return (
         <div>
-            {/* ── Top card: presets, axis selectors, run selector ── */}
-            <div className="card mb-6">
+            {/* ── Top card: presets, axis selectors, run selector — hidden in presentation mode ── */}
+            {!presentationMode && <div className="card mb-6">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="section-title">Chart Options — Charging Performance</h3>
                     <button
@@ -721,14 +722,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         </div>
                     )}
                 </div>
-            </div>
+            </div>}
 
             {/* ── Chart canvas ── */}
             <div className="card mb-4">
                 {loadingData && (
                     <div className="text-center py-4 text-gray-500 text-sm">Loading run data...</div>
                 )}
-                <div style={{ height: '500px' }}>
+                <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px' }}>
                     <canvas ref={chartRef}></canvas>
                 </div>
 
@@ -768,8 +769,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 )}
             </div>
 
-            {/* ── Controls below chart: scale inputs + line toggle + race mode ── */}
-            <div className="card mb-6">
+            {/* ── Controls below chart: scale inputs + line toggle + race mode — hidden in presentation mode ── */}
+            {!presentationMode && <div className="card mb-6">
 
                 <AxisScaleControls
                     xMin={chartConfig.xMin}  xMax={chartConfig.xMax}
@@ -839,9 +840,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         )}
                     </div>
                 )}
-            </div>
+            </div>}
 
-            {chartConfig.selectedRuns.length === 0 && (
+            {!presentationMode && chartConfig.selectedRuns.length === 0 && (
                 <div className="text-center py-12 text-gray-500">
                     <p className="text-lg">Select runs to display on the chart</p>
                 </div>

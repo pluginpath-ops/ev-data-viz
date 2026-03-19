@@ -704,3 +704,20 @@ body {
 .spec-field-flag-indicator {
     @apply inline-flex items-center;
 }
+
+/* ── Pop-out presentation mode ──────────────────────────────────────────────── */
+
+.popout-root {
+    @apply relative min-h-screen bg-white p-4;
+}
+
+/* Subtle fixed watermark in bottom-right corner */
+.popout-watermark {
+    @apply fixed bottom-3 right-4 z-50 text-xs text-gray-300 font-medium
+           bg-black/10 px-2 py-1 rounded select-none pointer-events-none;
+}
+
+/* Shown when pop-out is open but no vehicles are selected in the main tab */
+.popout-waiting {
+    @apply flex items-center justify-center min-h-screen text-gray-400 text-lg;
+}
