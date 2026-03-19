@@ -9,6 +9,7 @@ import ChargingView from './components/ChargingView';
 import ChargeCompareView from './components/ChargeCompareView';
 import PopoutView from './components/PopoutView';
 import SpecsView from './components/SpecsView';
+import SpecsChartView from './components/SpecsChartView';
 import AdminView from './components/AdminView';
 
 export default function App() {
@@ -90,6 +91,7 @@ export default function App() {
         y2Max: null,
         showLine:   true,
         showPoints: false,
+        specsField: null,   // selected field key for Spec Chart mode
     });
     const handleChartModeChange = (newMode) => {
         // Push a history entry so "back" can return to the previous chart mode.
@@ -443,6 +445,7 @@ export default function App() {
                                         { key: 'charging', label: 'Charging' },
                                         { key: 'range',    label: 'Range & Efficiency' },
                                         { key: 'compare',  label: 'Charge Compare' },
+                                        { key: 'specs',    label: 'Spec Chart' },
                                     ].map(({ key, label }) => (
                                         <button
                                             key={key}
@@ -581,7 +584,7 @@ export default function App() {
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                         />
                     )}
-                    {view === 'chart' && selectedVehicles.length > 0 && chartMode !== 'compare' && (
+                    {view === 'chart' && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && (
                         <ChargingView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -601,6 +604,13 @@ export default function App() {
                             setXMinutes={v => setCompareConfig(p => ({ ...p, xMinutes: v }))}
                             setMMiles={v => setCompareConfig(p => ({ ...p, mMiles: v }))}
                             setStartSoc={v => setCompareConfig(p => ({ ...p, startSoc: v }))}
+                        />
+                    )}
+                    {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'specs' && (
+                        <SpecsChartView
+                            vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
+                            selectedField={chartConfig.specsField}
+                            onFieldChange={field => setChartConfig(p => ({ ...p, specsField: field }))}
                         />
                     )}
                     {view === 'specs' && (

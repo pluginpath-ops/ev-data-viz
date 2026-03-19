@@ -1,5 +1,6 @@
 import ChargingView from './ChargingView';
 import ChargeCompareView from './ChargeCompareView';
+import SpecsChartView from './SpecsChartView';
 
 /**
  * Minimal fullscreen chart-only view rendered in the pop-out tab.
@@ -20,7 +21,14 @@ export default function PopoutView({
                 </div>
             )}
 
-            {selectedVehicles.length > 0 && chartMode !== 'compare' && (
+            {selectedVehicles.length > 0 && chartMode === 'specs' && (
+                <SpecsChartView
+                    vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
+                    selectedField={chartConfig.specsField}
+                />
+            )}
+
+            {selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && (
                 <ChargingView
                     vehicles={vehicles}
                     selectedVehicleIds={selectedVehicles}

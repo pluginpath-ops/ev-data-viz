@@ -705,6 +705,21 @@ body {
     @apply inline-flex items-center;
 }
 
+/* ── Specs comparison chart ──────────────────────────────────────────────────── */
+
+.specs-chart-card {
+    @apply bg-white rounded-xl border border-gray-200 p-6;
+}
+
+.specs-chart-controls {
+    @apply flex items-center gap-3 mb-5;
+}
+
+.specs-chart-field-select {
+    @apply border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white
+           focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+
 /* ── Pop-out presentation mode ──────────────────────────────────────────────── */
 
 .popout-root {
