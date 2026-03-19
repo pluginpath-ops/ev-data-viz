@@ -164,12 +164,15 @@ function makeBarPlugin(flatRuns) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
-    // Read initial values from URL params (populated by Copy URL)
-    const urlParams = new URLSearchParams(window.location.search);
-    const [xMinutes, setXMinutes] = useState(() => Number(urlParams.get('cmp_mins')) || 15);
-    const [mMiles,   setMMiles]   = useState(() => Number(urlParams.get('cmp_mi'))   || 150);
-    const [startSoc, setStartSoc] = useState(() => Number(urlParams.get('cmp_soc'))  || 10);
+export default function ChargeCompareView({
+    vehicles, selectedVehicleIds,
+    // Controls — lifted to App.jsx so they can be synced to the pop-out via BroadcastChannel.
+    // Default values match the URL-param fallback previously handled internally.
+    xMinutes = 15, setXMinutes,
+    mMiles   = 150, setMMiles,
+    startSoc = 10,  setStartSoc,
+    presentationMode = false,
+}) {
     const [runDataCache, setRunDataCache] = useState({});
     const [loading,  setLoading]  = useState(false);
     const [copied,   setCopied]   = useState(false);
@@ -431,8 +434,8 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
     // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div>
-            {/* ── Controls card ── */}
-            <div className="card mb-6">
+            {/* ── Controls card — hidden in presentation/pop-out mode ── */}
+            {!presentationMode && <div className="card mb-6">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold">Chart Options — Charge Compare</h3>
                     <div className="flex items-center gap-3">
@@ -482,7 +485,7 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                         />
                     </label>
                 </div>
-            </div>
+            </div>}
 
             {!hasRangeRuns ? (
                 <div className="card text-center py-12 text-gray-400">
@@ -496,7 +499,7 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                         <h4 className="text-base font-semibold mb-3">
                             Range Added in {xMinutes} Minutes <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
-                        <div style={{ height: '450px', position: 'relative' }}>
+                        <div style={{ height: presentationMode ? '45vh' : '450px', position: 'relative' }}>
                             <canvas ref={chart1Ref} />
                         </div>
                     </div>
@@ -506,7 +509,7 @@ export default function ChargeCompareView({ vehicles, selectedVehicleIds }) {
                         <h4 className="text-base font-semibold mb-3">
                             Time to Add {mMiles} Miles of Range <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
-                        <div style={{ height: '450px', position: 'relative' }}>
+                        <div style={{ height: presentationMode ? '45vh' : '450px', position: 'relative' }}>
                             <canvas ref={chart2Ref} />
                         </div>
                     </div>

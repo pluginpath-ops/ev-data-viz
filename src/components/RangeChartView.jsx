@@ -47,7 +47,7 @@ const hasDataForType = (run, type) => {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, onUpdateRunColor }) {
+export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, onUpdateRunColor, presentationMode = false }) {
     const chartRef      = useRef(null);
     const chartInstance = useRef(null);
     const [chartType, setChartType] = useState('range-vehicle-bar');
@@ -416,8 +416,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div>
-            {/* ── Config card ── */}
-            <div className="card mb-6">
+            {/* ── Config card — hidden in presentation mode ── */}
+            {!presentationMode && <div className="card mb-6">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold">Chart Options — Range &amp; Efficiency</h3>
                     {/* Efficiency unit toggle — relevant for efficiency charts */}
@@ -610,11 +610,11 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         </div>
                     )}
                 </div>
-            </div>
+            </div>}
 
             {/* ── Chart card ── */}
             <div className="card mb-6">
-                <div style={{ height: '500px', position: 'relative' }}>
+                <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px', position: 'relative' }}>
                     {/* Canvas always mounted so ref stays valid */}
                     <canvas
                         ref={chartRef}

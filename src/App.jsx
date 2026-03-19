@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppContext } from './context/AppContext';
+import { useChartSync } from './hooks/useChartSync';
 import AuthModal from './components/AuthModal';
 import ImportTableauModal from './components/ImportTableauModal';
 import VehiclesView from './components/VehiclesView';
 import RunsView from './components/RunsView';
 import ChargingView from './components/ChargingView';
 import ChargeCompareView from './components/ChargeCompareView';
+import PopoutView from './components/PopoutView';
 import SpecsView from './components/SpecsView';
 import AdminView from './components/AdminView';
 
@@ -71,7 +73,8 @@ export default function App() {
 
     const [activeVehicle, setActiveVehicle] = useState(null);
     const [view, setView] = useState('vehicles');
-    const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range'
+    const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare'
+    const [compareConfig, setCompareConfig] = useState({ xMinutes: 15, mMiles: 150, startSoc: 10 });
     const [chartConfig, setChartConfig] = useState({
         xAxis: 'soc',
         yAxis: 'chargeRate',
@@ -98,6 +101,11 @@ export default function App() {
         setChartMode(newMode);
         setChartConfig(prev => ({ ...prev, selectedRuns: [] }));
     };
+
+    const { isPopout, sendState } = useChartSync({
+        chartMode, chartConfig, selectedVehicles, compareConfig,
+        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig,
+    });
 
     // Navigate to a new top-level view and push a browser history entry so the
     // back button works within the app instead of exiting to the auth page.
@@ -195,6 +203,7 @@ export default function App() {
 
     // ── Keep URL in sync while on chart tab ─────────────────────────────────
     useEffect(() => {
+        if (isPopout) return;   // pop-out doesn't manage its own URL
         if (view !== 'chart') return;
         const p = new URLSearchParams();
         p.set('tab', 'chart');
@@ -224,6 +233,11 @@ export default function App() {
         history.replaceState({ view: 'chart', chartMode }, '', '?' + p.toString());
     }, [view, chartConfig, selectedVehicles, chartMode, vehicles]);
 
+    // ── Broadcast chart state to any open pop-out windows ───────────────────
+    useEffect(() => {
+        sendState();
+    }, [chartMode, chartConfig, selectedVehicles, compareConfig, sendState]);
+
     // Keep activeVehicle in sync with vehicles state
     const currentActiveVehicle = activeVehicle
         ? vehicles.find(v => v.id === activeVehicle.id) || activeVehicle
@@ -237,6 +251,20 @@ export default function App() {
                     <div className="text-2xl font-semibold text-gray-700">Loading EV Data...</div>
                 </div>
             </div>
+        );
+    }
+
+    if (isPopout) {
+        return (
+            <PopoutView
+                vehicles={vehicles}
+                selectedVehicles={selectedVehicles}
+                chartMode={chartMode}
+                chartConfig={chartConfig}
+                setChartConfig={setChartConfig}
+                compareConfig={compareConfig}
+                onUpdateRunColor={updateRunColor}
+            />
         );
     }
 
@@ -409,20 +437,33 @@ export default function App() {
 
                         {/* Chart mode sub-nav — only visible in chart view */}
                         {view === 'chart' && (
-                            <div className="flex gap-0.5 pb-2">
-                                {[
-                                    { key: 'charging', label: 'Charging' },
-                                    { key: 'range',    label: 'Range & Efficiency' },
-                                    { key: 'compare',  label: 'Charge Compare' },
-                                ].map(({ key, label }) => (
-                                    <button
-                                        key={key}
-                                        onClick={() => handleChartModeChange(key)}
-                                        className={`btn-chart-mode ${chartMode === key ? 'active' : ''}`}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
+                            <div className="flex items-center gap-2 pb-2">
+                                <div className="flex gap-0.5">
+                                    {[
+                                        { key: 'charging', label: 'Charging' },
+                                        { key: 'range',    label: 'Range & Efficiency' },
+                                        { key: 'compare',  label: 'Charge Compare' },
+                                    ].map(({ key, label }) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => handleChartModeChange(key)}
+                                            className={`btn-chart-mode ${chartMode === key ? 'active' : ''}`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button
+                                    onClick={() => window.open(
+                                        window.location.origin + window.location.pathname + window.location.search + '&popout=1',
+                                        'evbench-popout',
+                                        `width=${window.screen.availWidth},height=${window.screen.availHeight},left=0,top=0`
+                                    )}
+                                    className="btn btn-sm btn-primary ml-auto"
+                                    title="Open chart in a separate window for presentation"
+                                >
+                                    ⧉ Open Chart in New Window
+                                </button>
                             </div>
                         )}
 
@@ -554,6 +595,12 @@ export default function App() {
                         <ChargeCompareView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
+                            xMinutes={compareConfig.xMinutes}
+                            mMiles={compareConfig.mMiles}
+                            startSoc={compareConfig.startSoc}
+                            setXMinutes={v => setCompareConfig(p => ({ ...p, xMinutes: v }))}
+                            setMMiles={v => setCompareConfig(p => ({ ...p, mMiles: v }))}
+                            setStartSoc={v => setCompareConfig(p => ({ ...p, startSoc: v }))}
                         />
                     )}
                     {view === 'specs' && (
