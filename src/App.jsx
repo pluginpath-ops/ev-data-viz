@@ -91,6 +91,7 @@ export default function App() {
         y2Max: null,
         showLine:   true,
         showPoints: false,
+        specsField: null,   // selected field key for Spec Chart mode
     });
     const handleChartModeChange = (newMode) => {
         // Push a history entry so "back" can return to the previous chart mode.
@@ -608,6 +609,8 @@ export default function App() {
                     {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'specs' && (
                         <SpecsChartView
                             vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
+                            selectedField={chartConfig.specsField}
+                            onFieldChange={field => setChartConfig(p => ({ ...p, specsField: field }))}
                         />
                     )}
                     {view === 'specs' && (

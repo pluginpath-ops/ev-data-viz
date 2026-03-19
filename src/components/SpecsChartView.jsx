@@ -113,11 +113,17 @@ function makeInsideLabelPlugin(getLabelFn) {
 
 // ── SpecsChartView ────────────────────────────────────────────────────────────
 
-export default function SpecsChartView({ vehicles }) {
+export default function SpecsChartView({ vehicles, selectedField: controlledField = null, onFieldChange }) {
     const fieldGroups = useMemo(() => buildFieldGroups(vehicles), [vehicles]);
     const allFields   = useMemo(() => fieldGroups.flatMap(g => g.fields), [fieldGroups]);
 
-    const [selectedField, setSelectedField] = useState('');
+    const [localField, setLocalField] = useState('');
+    const selectedField = controlledField || localField;
+
+    const setSelectedField = (field) => {
+        setLocalField(field);
+        onFieldChange?.(field);
+    };
 
     // Auto-select the first field that has any data across vehicles
     useEffect(() => {
