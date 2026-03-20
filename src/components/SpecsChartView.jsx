@@ -89,21 +89,21 @@ function makeInsideLabelPlugin(getLabelFn) {
                 chart.getDatasetMeta(di).data.forEach((bar, bi) => {
                     const text = getLabelFn(bi);
                     if (!text || text === '—') return;
-                    const barH = Math.abs(bar.base - bar.y);
-                    if (barH < 20) return;
+                    // Horizontal bars: bar.x = right edge, bar.base = left edge, bar.y = center
+                    const barLen = Math.abs(bar.x - bar.base);
+                    if (barLen < 20) return;
                     ctx.save();
                     ctx.font = 'bold 12px system-ui, sans-serif';
                     ctx.fillStyle = '#fff';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    // Truncate long text to fit inside bar
-                    const maxW = bar.width - 8;
+                    const maxW = barLen - 8;
                     let label = text;
                     while (label.length > 1 && ctx.measureText(label).width > maxW) {
                         label = label.slice(0, -1);
                     }
                     if (label !== text) label += '…';
-                    ctx.fillText(label, bar.x, (bar.y + bar.base) / 2);
+                    ctx.fillText(label, (bar.x + bar.base) / 2, bar.y);
                     ctx.restore();
                 });
             });
@@ -148,7 +148,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
         const rawValues = vehicles.map(v => extractValue(v, selectedField));
         const labels    = vehicles.map(v => v.name);
 
-        let barData, bgColors, insideLabelFn, yOptions;
+        let barData, bgColors, insideLabelFn, valueAxisOptions;
 
         if (mode === 'boolean') {
             barData = rawValues.map(v =>
@@ -163,7 +163,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                 v === null || v === undefined || v === '' ? '—' : v ? 'Yes' : 'No'
             );
             insideLabelFn = i => insideLabels[i];
-            yOptions = { display: false, max: 1.15 };
+            valueAxisOptions = { display: false, max: 1.15 };
 
         } else if (mode === 'categorical') {
             barData = rawValues.map(() => 1.0);
@@ -172,7 +172,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                 v === null || v === undefined || v === '' ? '—' : String(v)
             );
             insideLabelFn = i => insideLabels[i];
-            yOptions = { display: false, max: 1.15 };
+            valueAxisOptions = { display: false, max: 1.15 };
 
         } else {
             // numeric
@@ -186,7 +186,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
             );
             const insideLabels = barData.map(n => n !== null ? formatNumericLabel(n) : null);
             insideLabelFn = i => insideLabels[i];
-            yOptions = { display: true, beginAtZero: true };
+            valueAxisOptions = { display: true, beginAtZero: true };
         }
 
         // Destroy previous instance
@@ -210,6 +210,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                 }],
             },
             options: {
+                indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
@@ -226,11 +227,11 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                     },
                 },
                 scales: {
-                    x: {
+                    x: valueAxisOptions,
+                    y: {
                         grid: { display: false },
                         ticks: { font: { size: 13 } },
                     },
-                    y: yOptions,
                 },
             },
             plugins: [makeInsideLabelPlugin(insideLabelFn)],
@@ -261,7 +262,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                 </select>
             </div>
 
-            <div style={{ height: '380px', position: 'relative' }}>
+            <div style={{ height: `${Math.max(220, vehicles.length * 52)}px`, position: 'relative' }}>
                 <canvas ref={canvasRef} />
             </div>
         </div>

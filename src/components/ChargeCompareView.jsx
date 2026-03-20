@@ -25,7 +25,7 @@ function interpolate(points, xField, yField, targetX, allowExtrapolateBefore = f
 }
 
 // ── Bar label plugin (same style as RangeChartView barGroupPlugin) ────────────
-function makeBarPlugin(flatRuns) {
+function makeBarPlugin(flatRuns, isHorizontal) {
     return {
         id: 'compareBarLabels',
         afterDraw(chart) {
@@ -50,8 +50,6 @@ function makeBarPlugin(flatRuns) {
             flatRuns.forEach((run, i) => {
                 const bar = meta.data[i];
                 if (!bar) return;
-                const barH = bar.base - bar.y;
-                const barW = bar.width;
 
                 const badges = [];
                 if (run._noData) {
@@ -68,24 +66,9 @@ function makeBarPlugin(flatRuns) {
                 }
                 if (badges.length === 0) return;
 
-                const pillH = 15, pillPad = 5, gap = 3, topPad = 6;
-                let drawY = bar.y + topPad;
+                const pillH = 15, pillPad = 5, rr = 3;
 
-                badges.forEach(({ text, primary, socDeviation }) => {
-                    if (drawY + pillH > bar.base - topPad) return;
-
-                    ctx2.save();
-                    ctx2.font = primary ? 'bold 10px sans-serif' : '9px sans-serif';
-                    const tw = ctx2.measureText(text).width;
-                    const pw = tw + pillPad * 2;
-
-                    if (pw > barW - 4) { ctx2.restore(); drawY += pillH + gap; return; }
-
-                    const px = bar.x - pw / 2;
-                    const rr = 3;
-
-                    // Fuzzy orange: only when data starts ABOVE startSoc (extrapolation was needed).
-                    // Negative socDeviation means data extends below startSoc — no alert.
+                function drawPill(px, py, pw, text, socDeviation) {
                     const dev      = socDeviation ?? 0;
                     const alertAmt = Math.min(1, Math.max(0, (dev - 1) / 4));
                     const bgColor  = alertAmt > 0
@@ -93,72 +76,156 @@ function makeBarPlugin(flatRuns) {
                         : 'rgba(0,0,0,0.28)';
                     ctx2.fillStyle = bgColor;
                     ctx2.beginPath();
-                    ctx2.moveTo(px + rr, drawY);
-                    ctx2.lineTo(px + pw - rr, drawY);
-                    ctx2.quadraticCurveTo(px + pw, drawY,        px + pw, drawY + rr);
-                    ctx2.lineTo(px + pw, drawY + pillH - rr);
-                    ctx2.quadraticCurveTo(px + pw, drawY + pillH, px + pw - rr, drawY + pillH);
-                    ctx2.lineTo(px + rr, drawY + pillH);
-                    ctx2.quadraticCurveTo(px,       drawY + pillH, px,       drawY + pillH - rr);
-                    ctx2.lineTo(px, drawY + rr);
-                    ctx2.quadraticCurveTo(px, drawY, px + rr, drawY);
+                    ctx2.moveTo(px + rr, py);
+                    ctx2.lineTo(px + pw - rr, py);
+                    ctx2.quadraticCurveTo(px + pw, py,           px + pw, py + rr);
+                    ctx2.lineTo(px + pw, py + pillH - rr);
+                    ctx2.quadraticCurveTo(px + pw, py + pillH,   px + pw - rr, py + pillH);
+                    ctx2.lineTo(px + rr, py + pillH);
+                    ctx2.quadraticCurveTo(px, py + pillH,        px, py + pillH - rr);
+                    ctx2.lineTo(px, py + rr);
+                    ctx2.quadraticCurveTo(px, py,                px + rr, py);
                     ctx2.closePath();
                     ctx2.fill();
-
                     ctx2.fillStyle    = '#fff';
                     ctx2.textAlign    = 'center';
                     ctx2.textBaseline = 'middle';
-                    ctx2.fillText(text, bar.x, drawY + pillH / 2);
-                    ctx2.restore();
+                    ctx2.fillText(text, px + pw / 2, py + pillH / 2);
+                }
 
-                    drawY += pillH + gap;
-                });
-            });
+                if (isHorizontal) {
+                    // Horizontal bars: bar.x=right, bar.base=left, bar.y=center, bar.height=bar height
+                    // Show only: primary value, SoC, speed (data-rich tooltip covers the rest)
+                    const displayBadges = badges.filter(b =>
+                        b.primary || 'socDeviation' in b || (b.text && b.text.includes('mph'))
+                    );
+                    const gap = 4, leftPad = 6;
+                    let drawX = bar.base + leftPad;
 
-            // ── Vehicle group labels + dashed separators below x-axis ─────────
-            const groupLabelY = xScale.bottom + 5;
-            groups.forEach((group, gi) => {
-                const startBar = meta.data[group.startIdx];
-                const endBar   = meta.data[group.endIdx];
-                if (!startBar || !endBar) return;
-
-                const x1 = startBar.x - startBar.width / 2;
-                const x2 = endBar.x   + endBar.width  / 2;
-                const cx = (x1 + x2) / 2;
-
-                ctx2.save();
-                ctx2.strokeStyle = 'rgba(107,114,128,0.55)';
-                ctx2.lineWidth   = 1.5;
-                ctx2.beginPath();
-                ctx2.moveTo(x1 + 3, groupLabelY);
-                ctx2.lineTo(x2 - 3, groupLabelY);
-                ctx2.stroke();
-                ctx2.restore();
-
-                ctx2.save();
-                ctx2.font         = 'bold 12px sans-serif';
-                ctx2.fillStyle    = '#374151';
-                ctx2.textAlign    = 'center';
-                ctx2.textBaseline = 'top';
-                ctx2.fillText(group.vehicleName, cx, groupLabelY + 4);
-                ctx2.restore();
-
-                if (gi < groups.length - 1) {
-                    const nextStartBar = meta.data[groups[gi + 1].startIdx];
-                    if (nextStartBar) {
-                        const sepX = (x2 + (nextStartBar.x - nextStartBar.width / 2)) / 2;
+                    displayBadges.forEach(({ text, primary, socDeviation }) => {
                         ctx2.save();
-                        ctx2.strokeStyle = 'rgba(107,114,128,0.35)';
-                        ctx2.lineWidth   = 1;
-                        ctx2.setLineDash([5, 4]);
-                        ctx2.beginPath();
-                        ctx2.moveTo(sepX, area.top);
-                        ctx2.lineTo(sepX, area.bottom);
-                        ctx2.stroke();
+                        ctx2.font = primary ? 'bold 10px sans-serif' : '9px sans-serif';
+                        const tw = ctx2.measureText(text).width;
+                        const pw = tw + pillPad * 2;
+                        if (drawX + pw > bar.x - 4) { ctx2.restore(); return; }
+                        const py = bar.y - pillH / 2;
+                        drawPill(drawX, py, pw, text, socDeviation);
                         ctx2.restore();
-                    }
+                        drawX += pw + gap;
+                    });
+                } else {
+                    // Vertical bars: stacked top-to-bottom
+                    const barH = bar.base - bar.y;
+                    const barW = bar.width;
+                    const gap = 3, topPad = 6;
+                    let drawY = bar.y + topPad;
+
+                    badges.forEach(({ text, primary, socDeviation }) => {
+                        if (drawY + pillH > bar.base - topPad) return;
+                        ctx2.save();
+                        ctx2.font = primary ? 'bold 10px sans-serif' : '9px sans-serif';
+                        const tw = ctx2.measureText(text).width;
+                        const pw = tw + pillPad * 2;
+                        if (pw > barW - 4) { ctx2.restore(); drawY += pillH + gap; return; }
+                        const px = bar.x - pw / 2;
+                        drawPill(px, drawY, pw, text, socDeviation);
+                        ctx2.restore();
+                        drawY += pillH + gap;
+                    });
                 }
             });
+
+            // ── Vehicle group labels + dashed separators ──────────────────────
+            if (isHorizontal) {
+                // Right-side bracket + label, horizontal separator between groups
+                groups.forEach((group, gi) => {
+                    const startBar = meta.data[group.startIdx];
+                    const endBar   = meta.data[group.endIdx];
+                    if (!startBar || !endBar) return;
+
+                    const y1 = startBar.y - startBar.height / 2;
+                    const y2 = endBar.y   + endBar.height   / 2;
+                    const cy = (y1 + y2) / 2;
+
+                    ctx2.save();
+                    ctx2.strokeStyle = 'rgba(107,114,128,0.55)';
+                    ctx2.lineWidth   = 1.5;
+                    ctx2.beginPath();
+                    ctx2.moveTo(area.right + 6, y1 + 3);
+                    ctx2.lineTo(area.right + 6, y2 - 3);
+                    ctx2.stroke();
+                    ctx2.restore();
+
+                    ctx2.save();
+                    ctx2.font         = 'bold 11px sans-serif';
+                    ctx2.fillStyle    = '#374151';
+                    ctx2.textAlign    = 'left';
+                    ctx2.textBaseline = 'middle';
+                    ctx2.fillText(group.vehicleName, area.right + 10, cy);
+                    ctx2.restore();
+
+                    if (gi < groups.length - 1) {
+                        const nextStartBar = meta.data[groups[gi + 1].startIdx];
+                        if (nextStartBar) {
+                            const sepY = (y2 + (nextStartBar.y - nextStartBar.height / 2)) / 2;
+                            ctx2.save();
+                            ctx2.strokeStyle = 'rgba(107,114,128,0.35)';
+                            ctx2.lineWidth   = 1;
+                            ctx2.setLineDash([5, 4]);
+                            ctx2.beginPath();
+                            ctx2.moveTo(area.left,  sepY);
+                            ctx2.lineTo(area.right, sepY);
+                            ctx2.stroke();
+                            ctx2.restore();
+                        }
+                    }
+                });
+            } else {
+                // Below x-axis: underline + label, vertical separator between groups
+                const groupLabelY = xScale.bottom + 5;
+                groups.forEach((group, gi) => {
+                    const startBar = meta.data[group.startIdx];
+                    const endBar   = meta.data[group.endIdx];
+                    if (!startBar || !endBar) return;
+
+                    const x1 = startBar.x - startBar.width / 2;
+                    const x2 = endBar.x   + endBar.width  / 2;
+                    const cx = (x1 + x2) / 2;
+
+                    ctx2.save();
+                    ctx2.strokeStyle = 'rgba(107,114,128,0.55)';
+                    ctx2.lineWidth   = 1.5;
+                    ctx2.beginPath();
+                    ctx2.moveTo(x1 + 3, groupLabelY);
+                    ctx2.lineTo(x2 - 3, groupLabelY);
+                    ctx2.stroke();
+                    ctx2.restore();
+
+                    ctx2.save();
+                    ctx2.font         = 'bold 12px sans-serif';
+                    ctx2.fillStyle    = '#374151';
+                    ctx2.textAlign    = 'center';
+                    ctx2.textBaseline = 'top';
+                    ctx2.fillText(group.vehicleName, cx, groupLabelY + 4);
+                    ctx2.restore();
+
+                    if (gi < groups.length - 1) {
+                        const nextStartBar = meta.data[groups[gi + 1].startIdx];
+                        if (nextStartBar) {
+                            const sepX = (x2 + (nextStartBar.x - nextStartBar.width / 2)) / 2;
+                            ctx2.save();
+                            ctx2.strokeStyle = 'rgba(107,114,128,0.35)';
+                            ctx2.lineWidth   = 1;
+                            ctx2.setLineDash([5, 4]);
+                            ctx2.beginPath();
+                            ctx2.moveTo(sepX, area.top);
+                            ctx2.lineTo(sepX, area.bottom);
+                            ctx2.stroke();
+                            ctx2.restore();
+                        }
+                    }
+                });
+            }
         },
     };
 }
@@ -174,8 +241,10 @@ export default function ChargeCompareView({
     presentationMode = false,
 }) {
     const [runDataCache, setRunDataCache] = useState({});
-    const [loading,  setLoading]  = useState(false);
-    const [copied,   setCopied]   = useState(false);
+    const [loading,      setLoading]     = useState(false);
+    const [copied,       setCopied]      = useState(false);
+    const [orientation,  setOrientation] = useState('vertical');
+    const isHorizontal = orientation === 'horizontal';
 
     const chart1Ref      = useRef(null);
     const chart1Instance = useRef(null);
@@ -368,9 +437,10 @@ export default function ChargeCompareView({
             instanceRef.current = new Chart(canvasRef.current.getContext('2d'), {
                 type:    'bar',
                 data:    built.data,
-                plugins: [makeBarPlugin(built.flatRuns)],
+                plugins: [makeBarPlugin(built.flatRuns, isHorizontal)],
                 options: {
-                    layout: { padding: { top: 0, bottom: 55 } },
+                    indexAxis: isHorizontal ? 'y' : undefined,
+                    layout: { padding: isHorizontal ? { top: 0, right: 130 } : { top: 0, bottom: 55 } },
                     animation: false,
                     responsive: true,
                     maintainAspectRatio: false,
@@ -385,9 +455,9 @@ export default function ChargeCompareView({
                                 },
                                 label(ctx) {
                                     const run = built.flatRuns[ctx.dataIndex];
-                                    if (!run)        return `${ctx.parsed.y}`;
+                                    if (!run)        return String(run?._yValue ?? '');
                                     if (run._noData) return 'No charging data available';
-                                    return `${ctx.parsed.y} ${run._yUnit}`;
+                                    return `${run._yValue} ${run._yUnit}`;
                                 },
                                 afterLabel(ctx) {
                                     const run = built.flatRuns[ctx.dataIndex];
@@ -404,16 +474,12 @@ export default function ChargeCompareView({
                             },
                         },
                     },
-                    scales: {
-                        x: {
-                            type: 'category',
-                            grid: { display: false },
-                            title: { display: false },
-                        },
-                        y: {
-                            title:       { display: true, text: built.yLabel },
-                            beginAtZero: true,
-                        },
+                    scales: isHorizontal ? {
+                        x: { title: { display: true, text: built.yLabel }, beginAtZero: true },
+                        y: { type: 'category', grid: { display: false }, title: { display: false } },
+                    } : {
+                        x: { type: 'category', grid: { display: false }, title: { display: false } },
+                        y: { title: { display: true, text: built.yLabel }, beginAtZero: true },
                     },
                 },
             });
@@ -427,7 +493,7 @@ export default function ChargeCompareView({
                 if (inst.current) { inst.current.destroy(); inst.current = null; }
             });
         };
-    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache]);
+    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation]);
 
     const hasRangeRuns = resolvedRuns.length > 0;
 
@@ -484,6 +550,17 @@ export default function ChargeCompareView({
                             className="w-20 px-2 py-1 border rounded text-sm"
                         />
                     </label>
+                    <div className="flex items-center gap-1 ml-auto">
+                        {['vertical', 'horizontal'].map(o => (
+                            <button
+                                key={o}
+                                onClick={() => setOrientation(o)}
+                                className={`btn btn-sm ${orientation === o ? 'btn-primary' : 'btn-secondary'}`}
+                            >
+                                {o === 'vertical' ? '↕ Vertical' : '↔ Horizontal'}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>}
 
@@ -499,7 +576,7 @@ export default function ChargeCompareView({
                         <h4 className="text-base font-semibold mb-3">
                             Range Added in {xMinutes} Minutes <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
-                        <div style={{ height: presentationMode ? '45vh' : '450px', position: 'relative' }}>
+                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, resolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart1Ref} />
                         </div>
                     </div>
@@ -509,7 +586,7 @@ export default function ChargeCompareView({
                         <h4 className="text-base font-semibold mb-3">
                             Time to Add {mMiles} Miles of Range <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
-                        <div style={{ height: presentationMode ? '45vh' : '450px', position: 'relative' }}>
+                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, resolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart2Ref} />
                         </div>
                     </div>
