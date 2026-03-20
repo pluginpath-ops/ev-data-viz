@@ -137,7 +137,20 @@ function makeBarPlugin(flatRuns, isHorizontal) {
 
             // ── Vehicle group labels + dashed separators ──────────────────────
             if (isHorizontal) {
-                // Right-side bracket + label, horizontal separator between groups
+                // Run names drawn to the right of each bar
+                flatRuns.forEach((run, i) => {
+                    const bar = meta.data[i];
+                    if (!bar) return;
+                    ctx2.save();
+                    ctx2.font         = '11px sans-serif';
+                    ctx2.fillStyle    = '#6b7280';
+                    ctx2.textAlign    = 'left';
+                    ctx2.textBaseline = 'middle';
+                    ctx2.fillText(run.name, bar.x + 8, bar.y);
+                    ctx2.restore();
+                });
+
+                // Left-side bracket + vehicle name, horizontal separator between groups
                 groups.forEach((group, gi) => {
                     const startBar = meta.data[group.startIdx];
                     const endBar   = meta.data[group.endIdx];
@@ -151,17 +164,17 @@ function makeBarPlugin(flatRuns, isHorizontal) {
                     ctx2.strokeStyle = 'rgba(107,114,128,0.55)';
                     ctx2.lineWidth   = 1.5;
                     ctx2.beginPath();
-                    ctx2.moveTo(area.right + 6, y1 + 3);
-                    ctx2.lineTo(area.right + 6, y2 - 3);
+                    ctx2.moveTo(area.left - 6, y1 + 3);
+                    ctx2.lineTo(area.left - 6, y2 - 3);
                     ctx2.stroke();
                     ctx2.restore();
 
                     ctx2.save();
                     ctx2.font         = 'bold 11px sans-serif';
                     ctx2.fillStyle    = '#374151';
-                    ctx2.textAlign    = 'left';
+                    ctx2.textAlign    = 'right';
                     ctx2.textBaseline = 'middle';
-                    ctx2.fillText(group.vehicleName, area.right + 10, cy);
+                    ctx2.fillText(group.vehicleName, area.left - 10, cy);
                     ctx2.restore();
 
                     if (gi < groups.length - 1) {
@@ -440,7 +453,7 @@ export default function ChargeCompareView({
                 plugins: [makeBarPlugin(built.flatRuns, isHorizontal)],
                 options: {
                     indexAxis: isHorizontal ? 'y' : undefined,
-                    layout: { padding: isHorizontal ? { top: 0, right: 130 } : { top: 0, bottom: 55 } },
+                    layout: { padding: isHorizontal ? { top: 0, left: 140, right: 10 } : { top: 0, bottom: 55 } },
                     animation: false,
                     responsive: true,
                     maintainAspectRatio: false,
@@ -476,7 +489,7 @@ export default function ChargeCompareView({
                     },
                     scales: isHorizontal ? {
                         x: { title: { display: true, text: built.yLabel }, beginAtZero: true },
-                        y: { type: 'category', grid: { display: false }, title: { display: false } },
+                        y: { type: 'category', grid: { display: false }, title: { display: false }, ticks: { display: false } },
                     } : {
                         x: { type: 'category', grid: { display: false }, title: { display: false } },
                         y: { title: { display: true, text: built.yLabel }, beginAtZero: true },
