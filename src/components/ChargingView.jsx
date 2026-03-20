@@ -1,16 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
+import RunSelector from './RunSelector';
 import RangeChartView from './RangeChartView';
 import AxisScaleControls from './AxisScaleControls';
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, presentationMode = false }) {
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
-    const [expandedVehicles, setExpandedVehicles] = useState({});
     const [runDataCache, setRunDataCache] = useState({});
     const [loadingData, setLoadingData] = useState(false);
-    const [runsExpanded, setRunsExpanded] = useState(true);
     const [copied, setCopied] = useState(false);
     const [chartImage, setChartImage] = useState(null);
     const [imageCopied, setImageCopied] = useState(false);
@@ -143,13 +142,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         };
         fetchMissingData();
     }, [chartConfig.selectedRuns]);
-
-    const toggleVehicleExpanded = (vehicleId) => {
-        setExpandedVehicles(prev => ({
-            ...prev,
-            [vehicleId]: !prev[vehicleId]
-        }));
-    };
 
     const axisOptions = [
         { value: 'soc',        label: 'State of Charge (%)' },
@@ -563,165 +555,50 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 </div>
 
                 {/* ── Collapsible run selector ── */}
-                <div>
-                    <button
-                        onClick={() => setRunsExpanded(prev => !prev)}
-                        className="run-selector-header"
-                    >
-                        <span
-                            style={{ display: 'inline-block', transform: runsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
-                        >&#9660;</span>
-                        Select Runs to Display
-                        <span className="text-sm font-normal text-gray-500">
-                            ({chartConfig.selectedRuns.length} selected)
-                        </span>
-                    </button>
-
-                    {runsExpanded && (
-                        <div className="mt-3">
-                        {/* chartMode === 'charging' is guaranteed here — range mode returns early above */}
-                        <div className="runs-list">
-                            {selectedVehicles.map(vehicle => {
-                                const isExpanded = expandedVehicles[vehicle.id];
-                                // Only show runs that have charging data in charging mode
-                                const chargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
-                                const activeRuns   = chargingRuns.filter(r =>  chartConfig.selectedRuns.includes(r.id));
-                                const inactiveRuns = chargingRuns.filter(r => !chartConfig.selectedRuns.includes(r.id));
-                                const hasInactiveRuns = inactiveRuns.length > 0;
-
-                                const RunLabel = ({ run }) => {
-                                    const exclusionReason = getRaceExclusionReason(run.id);
-                                    const offset = getRaceOffset(run.id);
-                                    const noTrim = offset !== null && offset === 0;
-                                    return (
-                                        <span className="run-label">
-                                            <span>
-                                                {run.name}
-                                                {run.url && (
-                                                    <a href={run.url} target="_blank" rel="noopener noreferrer"
-                                                        title="Range test source"
-                                                        onClick={e => e.stopPropagation()}
-                                                        className="text-blue-400 hover:text-blue-600 transition-colors ml-0.5">
-                                                        ↗
-                                                    </a>
-                                                )}
-                                                {run.charging_url && (
-                                                    <a href={run.charging_url} target="_blank" rel="noopener noreferrer"
-                                                        title="Charging test source"
-                                                        onClick={e => e.stopPropagation()}
-                                                        className="text-blue-400 hover:text-blue-600 transition-colors ml-0.5">
-                                                        ↗
-                                                    </a>
-                                                )}
-                                                <span className="text-sm text-gray-500"> ({run.date})</span>
-                                                {run.isDefault && (
-                                                    <span className="badge-default ml-2"
-                                                        style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
-                                                        Default
-                                                    </span>
-                                                )}
-                                            </span>
-                                            {exclusionReason && (
-                                                <span className="badge-status bg-amber-50 text-amber-700 border-amber-200" title={`Hidden in race mode: ${exclusionReason}`}>
-                                                    ⚠ {exclusionReason}
-                                                </span>
-                                            )}
-                                            {!exclusionReason && offset !== null && (
-                                                noTrim ? (
-                                                    <span className="badge-status bg-red-50 text-red-700 border-red-200" title="Data starts at or above the threshold — no time was trimmed">
-                                                        no offset
-                                                    </span>
-                                                ) : (
-                                                    <span className="badge-status bg-gray-100 text-gray-500 border-gray-200" title={`${offset} min of pre-threshold data trimmed`}>
-                                                        −{offset} min offset
-                                                    </span>
-                                                )
-                                            )}
+                <RunSelector
+                    vehicles={selectedVehicles}
+                    selectedRunIds={chartConfig.selectedRuns}
+                    onToggleRun={runId => setChartConfig(prev => ({
+                        ...prev,
+                        selectedRuns: prev.selectedRuns.includes(runId)
+                            ? prev.selectedRuns.filter(id => id !== runId)
+                            : [...prev.selectedRuns, runId],
+                    }))}
+                    onUpdateRunColor={handleColorChange}
+                    runFilter={r => r.has_charging !== false}
+                    emptyMessage="No charging test records"
+                    renderRunMeta={run => {
+                        const exclusionReason = getRaceExclusionReason(run.id);
+                        const offset = getRaceOffset(run.id);
+                        const noTrim = offset !== null && offset === 0;
+                        return (
+                            <>
+                                {run.isDefault && (
+                                    <span className="badge-default ml-2"
+                                        style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
+                                        Default
+                                    </span>
+                                )}
+                                {exclusionReason && (
+                                    <span className="badge-status bg-amber-50 text-amber-700 border-amber-200" title={`Hidden in race mode: ${exclusionReason}`}>
+                                        ⚠ {exclusionReason}
+                                    </span>
+                                )}
+                                {!exclusionReason && offset !== null && (
+                                    noTrim ? (
+                                        <span className="badge-status bg-red-50 text-red-700 border-red-200" title="Data starts at or above the threshold — no time was trimmed">
+                                            no offset
                                         </span>
-                                    );
-                                };
-
-                                const ColorInputs = ({ run }) => (
-                                    <>
-                                        <input
-                                            type="color"
-                                            value={run.color || '#3b82f6'}
-                                            onChange={(e) => { e.stopPropagation(); handleColorChange(vehicle.id, run.id, e.target.value); }}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="w-8 h-6 border-0 rounded cursor-pointer"
-                                            title="Change color"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={run.color || '#3b82f6'}
-                                            onChange={(e) => { e.stopPropagation(); handleColorChange(vehicle.id, run.id, e.target.value); }}
-                                            onBlur={(e) => {
-                                                if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
-                                                    handleColorChange(vehicle.id, run.id, run.color || '#3b82f6');
-                                                }
-                                            }}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="hidden w-20 px-2 py-0.5 border rounded text-xs font-mono"
-                                            placeholder="#3b82f6"
-                                            maxLength={7}
-                                        />
-                                    </>
-                                );
-
-                                return (
-                                    <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <h4 className="font-semibold text-gray-700">{vehicle.name}</h4>
-                                            {hasInactiveRuns && (
-                                                <button
-                                                    onClick={() => toggleVehicleExpanded(vehicle.id)}
-                                                    className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
-                                                >
-                                                    <span style={{ display: 'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                                                    <span>{isExpanded ? 'Hide' : 'Show'} all ({chargingRuns.length})</span>
-                                                </button>
-                                            )}
-                                        </div>
-                                        <div className="run-items">
-                                            {/* Active runs — always shown */}
-                                            {activeRuns.map(run => (
-                                                <label key={run.id} className="flex items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={true}
-                                                        onChange={() => setChartConfig({ ...chartConfig, selectedRuns: chartConfig.selectedRuns.filter(id => id !== run.id) })}
-                                                        className="w-4 h-4"
-                                                    />
-                                                    <ColorInputs run={run} />
-                                                    <RunLabel run={run} />
-                                                </label>
-                                            ))}
-
-                                            {/* Inactive runs — shown when expanded */}
-                                            {isExpanded && inactiveRuns.map(run => (
-                                                <label key={run.id} className="flex items-center gap-2 opacity-60 hover:opacity-100">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={false}
-                                                        onChange={() => setChartConfig({ ...chartConfig, selectedRuns: [...chartConfig.selectedRuns, run.id] })}
-                                                        className="w-4 h-4"
-                                                    />
-                                                    <ColorInputs run={run} />
-                                                    <RunLabel run={run} />
-                                                </label>
-                                            ))}
-
-                                            {chargingRuns.length === 0 && (
-                                                <p className="text-sm text-gray-500 italic">No charging test records</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        </div>
-                    )}
-                </div>
+                                    ) : (
+                                        <span className="badge-status bg-gray-100 text-gray-500 border-gray-200" title={`${offset} min of pre-threshold data trimmed`}>
+                                            −{offset} min offset
+                                        </span>
+                                    )
+                                )}
+                            </>
+                        );
+                    }}
+                />
             </div>}
 
             {/* ── Chart canvas ── */}

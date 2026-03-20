@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import AxisScaleControls from './AxisScaleControls';
+import RunSelector from './RunSelector';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -60,9 +61,6 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     const [yMin, setYMin] = useState(0);
     const [yMax, setYMax] = useState(null);
     const [showPoints,       setShowPoints]       = useState(true);
-    const [runsExpanded,    setRunsExpanded]    = useState(true);
-    const [expandedVehicles, setExpandedVehicles] = useState({});
-
     const handleScaleChange = (key, val) => {
         if (key === 'xMin') setXMin(val);
         else if (key === 'xMax') setXMax(val);
@@ -409,9 +407,6 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         } catch { /* Clipboard API not supported — chart is still visible */ }
     };
 
-    const noRangeRunsAtAll = selectedVehicles.every(
-        v => !(v.runs || []).some(r => r.has_range)
-    );
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
@@ -469,147 +464,48 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     </div>
                 )}
 
-                {/* ── Run selector — collapsible, matching charging chart pattern ── */}
-                <div>
-                    <button
-                        onClick={() => setRunsExpanded(prev => !prev)}
-                        className="run-selector-header"
-                    >
-                        <span style={{ display: 'inline-block', transform: runsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                        Select Runs to Display
-                        <span className="text-sm font-normal text-gray-500">
-                            ({selectedRangeRuns.length} selected)
-                        </span>
-                    </button>
-
-                    {runsExpanded && (
-                        <div className="mt-3">
-                            {noRangeRunsAtAll ? (
-                                <div className="text-center py-6 text-gray-400">
-                                    <p className="text-sm">No range test records yet.</p>
-                                    <p className="text-xs mt-1">Add records using the Test Runs tab with "Range Test" type.</p>
-                                </div>
-                            ) : (
-                                <div className="runs-list">
-                                    {selectedVehicles.map(vehicle => {
-                                        const rangeRuns    = (vehicle.runs || []).filter(r => r.has_range);
-                                        const activeRuns   = rangeRuns.filter(r =>  selectedRuns.some(id => String(id) === String(r.id)));
-                                        const inactiveRuns = rangeRuns.filter(r => !selectedRuns.some(id => String(id) === String(r.id)));
-                                        const isVehicleExpanded = expandedVehicles[vehicle.id];
-
-                                        const RunRow = ({ run, dimmed }) => {
-                                            const isChecked   = selectedRuns.some(id => String(id) === String(run.id));
-                                            const eff         = calcEff(run, effUnit);
-                                            const range       = calcRange(run);
-                                            const effLabel    = effUnit === 'mi_kwh' ? 'mi/kWh' : 'Wh/mi';
-                                            const socUsed     = (run.start_soc != null && run.end_soc != null) ? run.start_soc - run.end_soc : null;
-                                            const isProjected = socUsed != null && socUsed !== 100;
-                                            const canPlot     = hasDataForType(run, chartType);
-                                            return (
-                                                <label key={run.id} className={`flex items-center gap-2 cursor-pointer ${dimmed ? 'opacity-60 hover:opacity-100' : ''}`}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isChecked}
-                                                        onChange={() => toggleRun(run.id)}
-                                                        className="w-4 h-4 shrink-0"
-                                                    />
-                                                    <input
-                                                        type="color"
-                                                        value={run.color || '#3b82f6'}
-                                                        onChange={(e) => { e.stopPropagation(); onUpdateRunColor(vehicle.id, run.id, e.target.value); }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
-                                                        title="Change color (also sets line color for first run per vehicle)"
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        value={run.color || '#3b82f6'}
-                                                        onChange={(e) => { e.stopPropagation(); onUpdateRunColor(vehicle.id, run.id, e.target.value); }}
-                                                        onBlur={(e) => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRunColor(vehicle.id, run.id, run.color || '#3b82f6'); }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="hidden w-20 px-2 py-0.5 border rounded text-xs font-mono shrink-0"
-                                                        placeholder="#3b82f6"
-                                                        maxLength={7}
-                                                    />
-                                                    <span className="text-sm flex-1 flex items-center gap-1.5 flex-wrap">
-                                                        <span className="font-medium">
-                                                        {run.name}
-                                                        {run.url && (
-                                                            <a href={run.url} target="_blank" rel="noopener noreferrer"
-                                                                title="Range test source"
-                                                                onClick={e => e.stopPropagation()}
-                                                                className="text-blue-400 hover:text-blue-600 transition-colors ml-0.5 font-normal">
-                                                                ↗
-                                                            </a>
-                                                        )}
-                                                        {run.charging_url && (
-                                                            <a href={run.charging_url} target="_blank" rel="noopener noreferrer"
-                                                                title="Charging test source"
-                                                                onClick={e => e.stopPropagation()}
-                                                                className="text-blue-400 hover:text-blue-600 transition-colors ml-0.5 font-normal">
-                                                                ↗
-                                                            </a>
-                                                        )}
-                                                    </span>
-                                                        <span className="text-gray-400 text-xs">({run.date})</span>
-                                                        {run.speed_mph != null && (
-                                                            <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{run.speed_mph} mph</span>
-                                                        )}
-                                                        {run.temperature_f != null && (
-                                                            <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{run.temperature_f}°F</span>
-                                                        )}
-                                                        {range != null && (
-                                                            <span
-                                                                className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200"
-                                                                title={isProjected ? `Projected from ${run.distance_miles} mi driven over ${socUsed}% SoC` : 'Measured distance'}
-                                                            >
-                                                                {range} mi{isProjected ? ' ⟳' : ''}
-                                                            </span>
-                                                        )}
-                                                        {eff != null && (
-                                                            <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">{eff} {effLabel}</span>
-                                                        )}
-                                                        {!canPlot && isChecked && (
-                                                            <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200" title="Missing fields required for this chart type">⚠ missing data</span>
-                                                        )}
-                                                    </span>
-                                                </label>
-                                            );
-                                        };
-
-                                        return (
-                                            <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <h4 className="font-semibold text-gray-700">{vehicle.name}</h4>
-                                                    {inactiveRuns.length > 0 && (
-                                                        <button
-                                                            onClick={() => setExpandedVehicles(prev => ({ ...prev, [vehicle.id]: !prev[vehicle.id] }))}
-                                                            className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
-                                                        >
-                                                            <span style={{ display: 'inline-block', transform: isVehicleExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                                                            <span>{isVehicleExpanded ? 'Hide' : 'Show all'} ({rangeRuns.length})</span>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                {rangeRuns.length === 0 ? (
-                                                    <p className="text-sm text-gray-400 italic">No range test records</p>
-                                                ) : (
-                                                    <div className="run-items">
-                                                        {activeRuns.map(run => <RunRow key={run.id} run={run} dimmed={false} />)}
-                                                        {isVehicleExpanded && inactiveRuns.map(run => <RunRow key={run.id} run={run} dimmed={true} />)}
-                                                        {activeRuns.length === 0 && !isVehicleExpanded && (
-                                                            <p className="text-xs text-gray-400 italic">No runs selected — click Show all to re-add</p>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
+                {/* ── Run selector ── */}
+                <RunSelector
+                    vehicles={selectedVehicles}
+                    selectedRunIds={selectedRuns}
+                    onToggleRun={toggleRun}
+                    onUpdateRunColor={onUpdateRunColor}
+                    runFilter={r => r.has_range}
+                    emptyMessage="No range test records"
+                    renderRunMeta={run => {
+                        const eff         = calcEff(run, effUnit);
+                        const range       = calcRange(run);
+                        const effLabel    = effUnit === 'mi_kwh' ? 'mi/kWh' : 'Wh/mi';
+                        const socUsed     = (run.start_soc != null && run.end_soc != null) ? run.start_soc - run.end_soc : null;
+                        const isProjected = socUsed != null && socUsed !== 100;
+                        const canPlot     = hasDataForType(run, chartType);
+                        const isChecked   = selectedRuns.some(id => String(id) === String(run.id));
+                        return (
+                            <>
+                                {run.speed_mph != null && (
+                                    <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{run.speed_mph} mph</span>
+                                )}
+                                {run.temperature_f != null && (
+                                    <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{run.temperature_f}°F</span>
+                                )}
+                                {range != null && (
+                                    <span
+                                        className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200"
+                                        title={isProjected ? `Projected from ${run.distance_miles} mi driven over ${socUsed}% SoC` : 'Measured distance'}
+                                    >
+                                        {range} mi{isProjected ? ' ⟳' : ''}
+                                    </span>
+                                )}
+                                {eff != null && (
+                                    <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">{eff} {effLabel}</span>
+                                )}
+                                {!canPlot && isChecked && (
+                                    <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200" title="Missing fields required for this chart type">⚠ missing data</span>
+                                )}
+                            </>
+                        );
+                    }}
+                />
             </div>}
 
             {/* ── Chart card ── */}

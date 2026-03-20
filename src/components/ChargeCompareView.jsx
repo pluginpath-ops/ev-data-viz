@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
+import RunSelector from './RunSelector';
 
 // ── Interpolation helper ──────────────────────────────────────────────────────
 // Returns the interpolated yField value at targetX, given points sorted by xField.
@@ -253,10 +254,11 @@ export default function ChargeCompareView({
     startSoc = 10,  setStartSoc,
     presentationMode = false,
 }) {
-    const [runDataCache, setRunDataCache] = useState({});
-    const [loading,      setLoading]     = useState(false);
-    const [copied,       setCopied]      = useState(false);
-    const [orientation,  setOrientation] = useState('horizontal');
+    const [runDataCache,    setRunDataCache]    = useState({});
+    const [loading,         setLoading]         = useState(false);
+    const [copied,          setCopied]          = useState(false);
+    const [orientation,     setOrientation]     = useState('horizontal');
+    const [selectedRuns,    setSelectedRuns]    = useState([]);
     const isHorizontal = orientation === 'horizontal';
 
     const chart1Ref      = useRef(null);
@@ -338,12 +340,23 @@ export default function ChargeCompareView({
         fetchMissing();
     }, [neededRunIds.join(',')]);
 
+    // ── Auto-select any new range runs when vehicles change ───────────────────
+    useEffect(() => {
+        const allRangeRunIds = resolvedRuns.map(r => r.rangeRun.id);
+        setSelectedRuns(prev => {
+            const newIds = allRangeRunIds.filter(id => !prev.includes(id));
+            return newIds.length ? [...prev, ...newIds] : prev;
+        });
+    }, [resolvedRuns]);
+
+    const activeResolvedRuns = resolvedRuns.filter(r => selectedRuns.includes(r.rangeRun.id));
+
     // ── Compute bars for one chart type ──────────────────────────────────────
     // chartType: 'range_added' | 'time_to_range'
     const buildBars = (chartType) => {
         const flatRuns = [];
 
-        for (const { rangeRun, chargingRunId, chargingRunName } of resolvedRuns) {
+        for (const { rangeRun, chargingRunId, chargingRunName } of activeResolvedRuns) {
             const base = {
                 id:              rangeRun.id,
                 name:            rangeRun.name,
@@ -575,6 +588,29 @@ export default function ChargeCompareView({
                         ))}
                     </div>
                 </div>
+
+                <div className="mt-4">
+                    <RunSelector
+                        vehicles={selectedVehicles}
+                        selectedRunIds={selectedRuns}
+                        onToggleRun={runId => setSelectedRuns(prev =>
+                            prev.includes(runId) ? prev.filter(id => id !== runId) : [...prev, runId]
+                        )}
+                        onUpdateRunColor={null}
+                        runFilter={r => r.has_range}
+                        emptyMessage="No range test records"
+                        renderRunMeta={run => (
+                            <>
+                                {run.speed_mph != null && (
+                                    <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{run.speed_mph} mph</span>
+                                )}
+                                {run.temperature_f != null && (
+                                    <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{run.temperature_f}°F</span>
+                                )}
+                            </>
+                        )}
+                    />
+                </div>
             </div>}
 
             {!hasRangeRuns ? (
@@ -589,7 +625,7 @@ export default function ChargeCompareView({
                         <h4 className="text-base font-semibold mb-3">
                             Range Added in {xMinutes} Minutes <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
-                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, resolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
+                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activeResolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart1Ref} />
                         </div>
                     </div>
@@ -599,7 +635,7 @@ export default function ChargeCompareView({
                         <h4 className="text-base font-semibold mb-3">
                             Time to Add {mMiles} Miles of Range <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
-                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, resolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
+                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activeResolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart2Ref} />
                         </div>
                     </div>
