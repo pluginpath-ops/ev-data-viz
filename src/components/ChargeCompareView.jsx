@@ -256,7 +256,7 @@ export default function ChargeCompareView({
     const [runDataCache, setRunDataCache] = useState({});
     const [loading,      setLoading]     = useState(false);
     const [copied,       setCopied]      = useState(false);
-    const [orientation,  setOrientation] = useState('vertical');
+    const [orientation,  setOrientation] = useState('horizontal');
     const isHorizontal = orientation === 'horizontal';
 
     const chart1Ref      = useRef(null);
