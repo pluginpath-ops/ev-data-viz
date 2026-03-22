@@ -44,7 +44,7 @@ function topAlertAmt(overshoot, total) {
 function makeBarPlugin(flatRuns, isHorizontal) {
     return {
         id: 'compareBarLabels',
-        afterDraw(chart) {
+        afterDatasetsDraw(chart) {
             if (!flatRuns?.length) return;
             const ctx2   = chart.ctx;
             const meta   = chart.getDatasetMeta(0);
@@ -497,6 +497,7 @@ export default function ChargeCompareView({
                     plugins: {
                         legend: { display: false },
                         tooltip: {
+                            displayColors: false,
                             callbacks: {
                                 title(items) {
                                     if (!items.length) return;

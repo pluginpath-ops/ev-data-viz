@@ -377,6 +377,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         },
                     },
                     tooltip: {
+                        displayColors: false,
                         callbacks: {
                             title(ctx) {
                                 const run = ctx[0]?.dataset?.runMeta;
@@ -386,7 +387,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             label(ctx) {
                                 const xl = axisOptions.find(a => a.value === chartConfig.xAxis)?.label ?? 'X';
                                 const yl = axisOptions.find(a => a.value === chartConfig.yAxis)?.label ?? 'Y';
-                                return `${xl}: ${ctx.parsed.x}   ${yl}: ${ctx.parsed.y}`;
+                                return [`${xl}: ${ctx.parsed.x}`, `${yl}: ${ctx.parsed.y}`];
                             },
                             afterLabel(ctx) {
                                 return runTooltipLines(ctx.dataset?.runMeta);

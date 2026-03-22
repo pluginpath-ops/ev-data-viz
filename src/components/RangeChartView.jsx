@@ -205,7 +205,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         // ── Bar: vehicle grouping labels + speed/temp pills ───────────────────
         const barGroupPlugin = {
             id: 'barGroupLabels',
-            afterDraw(chart) {
+            afterDatasetsDraw(chart) {
                 if (!built.flatRuns?.length) return;
                 const runs   = built.flatRuns;
                 const ctx2   = chart.ctx;
@@ -349,6 +349,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 plugins: {
                     legend: { display: built.kind !== 'bar', position: 'top' },
                     tooltip: {
+                        displayColors: false,
                         callbacks: {
                             title(items) {
                                 if (built.kind === 'bar' && items.length > 0) {
