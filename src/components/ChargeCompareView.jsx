@@ -4,9 +4,9 @@ import { dataService } from '../services/DataService';
 
 // ── Interpolation helper ──────────────────────────────────────────────────────
 // Returns the interpolated yField value at targetX, given points sorted by xField.
-// If allowExtrapolateBefore=true, extends linearly backward past the first data point
-// using the slope of the first two points (useful for normalizing SoC baselines).
-function interpolate(points, xField, yField, targetX, allowExtrapolateBefore = false) {
+// allowExtrapolateBefore — extends linearly backward past the first point (slope of first two).
+// allowExtrapolateAfter  — extends linearly forward past the last point (slope of last two).
+function interpolate(points, xField, yField, targetX, allowExtrapolateBefore = false, allowExtrapolateAfter = false) {
     const valid = points.filter(p => p[xField] != null && p[yField] != null);
     if (valid.length === 0) return null;
     const before = [...valid].filter(p => p[xField] <= targetX).at(-1);
@@ -21,7 +21,21 @@ function interpolate(points, xField, yField, targetX, allowExtrapolateBefore = f
         const slope = (p1[yField] - p0[yField]) / (p1[xField] - p0[xField]);
         return p0[yField] + slope * (targetX - p0[xField]);
     }
+    if (!after && before && allowExtrapolateAfter && valid.length >= 2) {
+        const last = valid[valid.length - 1];
+        const prev = valid[valid.length - 2];
+        const slope = (last[yField] - prev[yField]) / (last[xField] - prev[xField]);
+        return last[yField] + slope * (targetX - last[xField]);
+    }
     return null;
+}
+
+// Compute 0–1 amber alert intensity for top-end extrapolation.
+// overshoot = how far past the data edge we extrapolated; total = the full requested span.
+// Starts at 1% overshoot, reaches full amber at 20% overshoot.
+function topAlertAmt(overshoot, total) {
+    if (!total || overshoot <= 0) return 0;
+    return Math.min(1, Math.max(0, (overshoot / total * 100 - 1) / 19));
 }
 
 // ── Bar label plugin (same style as RangeChartView barGroupPlugin) ────────────
@@ -53,24 +67,23 @@ function makeBarPlugin(flatRuns, isHorizontal) {
 
                 const badges = [];
                 if (run._noData) {
-                    badges.push({ text: 'No data', primary: true });
+                    badges.push({ text: 'No data', primary: true, alertAmt: 0 });
                 } else {
-                    if (run._yValue != null) badges.push({ text: `${run._yValue} ${run._yUnit}`, primary: true });
+                    const socAlertAmt = Math.min(1, Math.max(0, ((run._socDeviation ?? 0) - 1) / 4));
+                    if (run._yValue != null) badges.push({ text: `${run._yValue} ${run._yUnit}`, primary: true, alertAmt: run._topDeviationAmt ?? 0 });
                     if (run._startSoc  != null) {
                         const socText = run._endSoc != null ? `${run._startSoc}%→${run._endSoc}%` : `${run._startSoc}% SoC`;
-                        badges.push({ text: socText, socDeviation: run._socDeviation ?? 0 });
+                        badges.push({ text: socText, alertAmt: socAlertAmt });
                     }
-                    if (run._startRange != null) badges.push({ text: run._endRange != null ? `${run._startRange}→${run._endRange} mi` : `${run._startRange} mi` });
-                    if (run.speed_mph   != null) badges.push({ text: `${run.speed_mph} mph` });
-                    if (run.temperature_f != null) badges.push({ text: `${run.temperature_f}°F` });
+                    if (run._startRange != null) badges.push({ text: run._endRange != null ? `${run._startRange}→${run._endRange} mi` : `${run._startRange} mi`, alertAmt: 0 });
+                    if (run.speed_mph   != null) badges.push({ text: `${run.speed_mph} mph`, alertAmt: 0 });
+                    if (run.temperature_f != null) badges.push({ text: `${run.temperature_f}°F`, alertAmt: 0 });
                 }
                 if (badges.length === 0) return;
 
                 const pillH = 15, pillPad = 5, rr = 3;
 
-                function drawPill(px, py, pw, text, socDeviation) {
-                    const dev      = socDeviation ?? 0;
-                    const alertAmt = Math.min(1, Math.max(0, (dev - 1) / 4));
+                function drawPill(px, py, pw, text, alertAmt) {
                     const bgColor  = alertAmt > 0
                         ? `rgba(217,119,6,${(alertAmt * 0.85).toFixed(2)})`
                         : 'rgba(0,0,0,0.28)';
@@ -97,19 +110,19 @@ function makeBarPlugin(flatRuns, isHorizontal) {
                     // Horizontal bars: bar.x=right, bar.base=left, bar.y=center, bar.height=bar height
                     // Show only: primary value, SoC, speed (data-rich tooltip covers the rest)
                     const displayBadges = badges.filter(b =>
-                        b.primary || 'socDeviation' in b || (b.text && b.text.includes('mph'))
+                        b.primary || b.alertAmt > 0 || (b.text && b.text.includes('mph'))
                     );
                     const gap = 4, leftPad = 6;
                     let drawX = bar.base + leftPad;
 
-                    displayBadges.forEach(({ text, primary, socDeviation }) => {
+                    displayBadges.forEach(({ text, primary, alertAmt }) => {
                         ctx2.save();
                         ctx2.font = primary ? 'bold 10px sans-serif' : '9px sans-serif';
                         const tw = ctx2.measureText(text).width;
                         const pw = tw + pillPad * 2;
                         if (drawX + pw > bar.x - 4) { ctx2.restore(); return; }
                         const py = bar.y - pillH / 2;
-                        drawPill(drawX, py, pw, text, socDeviation);
+                        drawPill(drawX, py, pw, text, alertAmt);
                         ctx2.restore();
                         drawX += pw + gap;
                     });
@@ -120,7 +133,7 @@ function makeBarPlugin(flatRuns, isHorizontal) {
                     const gap = 3, topPad = 6;
                     let drawY = bar.y + topPad;
 
-                    badges.forEach(({ text, primary, socDeviation }) => {
+                    badges.forEach(({ text, primary, alertAmt }) => {
                         if (drawY + pillH > bar.base - topPad) return;
                         ctx2.save();
                         ctx2.font = primary ? 'bold 10px sans-serif' : '9px sans-serif';
@@ -128,7 +141,7 @@ function makeBarPlugin(flatRuns, isHorizontal) {
                         const pw = tw + pillPad * 2;
                         if (pw > barW - 4) { ctx2.restore(); drawY += pillH + gap; return; }
                         const px = bar.x - pw / 2;
-                        drawPill(px, drawY, pw, text, socDeviation);
+                        drawPill(px, drawY, pw, text, alertAmt);
                         ctx2.restore();
                         drawY += pillH + gap;
                     });
@@ -391,32 +404,40 @@ export default function ChargeCompareView({
             const socDeviation = Math.round((bySoc[0].soc - startSoc) * 10) / 10;
 
             if (chartType === 'range_added') {
-                const Rend   = interpolate(byTime, 'time', 'range', Tz + xMinutes);
-                const SocEnd = interpolate(byTime, 'time', 'soc',   Tz + xMinutes);
+                const targetTime  = Tz + xMinutes;
+                const lastTime    = byTime[byTime.length - 1].time;
+                const timeOvershoot = Math.max(0, targetTime - lastTime);
+                const Rend   = interpolate(byTime, 'time', 'range', targetTime, false, true);
+                const SocEnd = interpolate(byTime, 'time', 'soc',   targetTime, false, true);
                 const yValue = Rend != null ? Math.round((Rend - Rz) * 10) / 10 : null;
                 flatRuns.push({
                     ...base,
-                    _yValue:       yValue ?? 0,
-                    _startSoc:     startSoc,
-                    _endSoc:       SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
-                    _startRange:   Math.round(Rz),
-                    _endRange:     Rend != null ? Math.round(Rend) : null,
-                    _socDeviation: socDeviation,
-                    _noData:       yValue == null,
+                    _yValue:          yValue ?? 0,
+                    _startSoc:        startSoc,
+                    _endSoc:          SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
+                    _startRange:      Math.round(Rz),
+                    _endRange:        Rend != null ? Math.round(Rend) : null,
+                    _socDeviation:    socDeviation,
+                    _topDeviationAmt: topAlertAmt(timeOvershoot, xMinutes),
+                    _noData:          yValue == null,
                 });
             } else {
-                const Tend   = interpolate(byRange, 'range', 'time', Rz + mMiles);
-                const SocEnd = interpolate(byRange, 'range', 'soc',  Rz + mMiles);
+                const targetRange  = Rz + mMiles;
+                const lastRange    = byRange[byRange.length - 1].range;
+                const rangeOvershoot = Math.max(0, targetRange - lastRange);
+                const Tend   = interpolate(byRange, 'range', 'time', targetRange, false, true);
+                const SocEnd = interpolate(byRange, 'range', 'soc',  targetRange, false, true);
                 const yValue = Tend != null ? Math.round((Tend - Tz) * 10) / 10 : null;
                 flatRuns.push({
                     ...base,
-                    _yValue:       yValue ?? 0,
-                    _startSoc:     startSoc,
-                    _endSoc:       SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
-                    _startRange:   Math.round(Rz),
-                    _endRange:     Math.round(Rz + mMiles),
-                    _socDeviation: socDeviation,
-                    _noData:       yValue == null,
+                    _yValue:          yValue ?? 0,
+                    _startSoc:        startSoc,
+                    _endSoc:          SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
+                    _startRange:      Math.round(Rz),
+                    _endRange:        Math.round(Rz + mMiles),
+                    _socDeviation:    socDeviation,
+                    _topDeviationAmt: topAlertAmt(rangeOvershoot, mMiles),
+                    _noData:          yValue == null,
                 });
             }
         }
