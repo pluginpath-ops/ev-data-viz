@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import AxisScaleControls from './AxisScaleControls';
 import RunSelector from './RunSelector';
+import { runTooltipLines } from '../utils/tooltipHelpers';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -149,8 +150,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 if (runs.length === 0) return;
                 // Include run metadata in each point so tooltip and per-point
                 // color can reference it; Chart.js ignores extra fields on {x,y}.
-                const points = runs
+                const runPoints = runs
                     .map(r => ({
+                        run:      r,
                         x:        isSpeed ? r.speed_mph : r.temperature_f,
                         y:        getY(r),
                         _color:   r.color   || '#3b82f6',
@@ -158,12 +160,15 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     }))
                     .filter(p => p.x != null && p.y != null)
                     .sort((a, b) => a.x - b.x);
-                if (points.length === 0) return;
+                if (runPoints.length === 0) return;
 
                 // Line stroke = first run's color; individual points use their
                 // own run color so multiple runs per vehicle are distinguishable.
                 const lineColor   = runs[0].color || '#3b82f6';
-                const pointColors = points.map(p => p._color);
+                const pointColors = runPoints.map(p => p._color);
+                // Keep run objects parallel to points for tooltip access
+                const runMetas    = runPoints.map(p => p.run);
+                const points      = runPoints.map(({ run: _r, ...rest }) => rest);
 
                 datasets.push({
                     label:                name,
@@ -175,6 +180,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     pointRadius:          showPoints ? 6 : 0,
                     pointHoverRadius:     showPoints ? 9 : 0,
                     tension:              0.2,
+                    runMetas,
                 });
             });
 
@@ -199,7 +205,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         // ── Bar: vehicle grouping labels + speed/temp pills ───────────────────
         const barGroupPlugin = {
             id: 'barGroupLabels',
-            afterDraw(chart) {
+            afterDatasetsDraw(chart) {
                 if (!built.flatRuns?.length) return;
                 const runs   = built.flatRuns;
                 const ctx2   = chart.ctx;
@@ -343,6 +349,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 plugins: {
                     legend: { display: built.kind !== 'bar', position: 'top' },
                     tooltip: {
+                        displayColors: false,
                         callbacks: {
                             title(items) {
                                 if (built.kind === 'bar' && items.length > 0) {
@@ -365,6 +372,18 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                 return runName
                                     ? `${runName}: ${val}`
                                     : `${ctx.dataset.label}: ${val}`;
+                            },
+                            afterLabel(ctx) {
+                                if (built.kind === 'bar') {
+                                    const run = built.flatRuns?.[ctx.dataIndex];
+                                    if (!run) return [];
+                                    return runTooltipLines(run, [
+                                        run._yValue != null ? `${built.yLabel}: ${run._yValue}` : null,
+                                    ].filter(Boolean));
+                                }
+                                // Line charts: run objects are stored parallel to points
+                                const run = ctx.dataset?.runMetas?.[ctx.dataIndex];
+                                return run ? runTooltipLines(run) : [];
                             },
                         },
                     },

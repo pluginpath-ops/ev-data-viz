@@ -83,7 +83,7 @@ function vehicleColor(vehicle, idx) {
 function makeInsideLabelPlugin(getLabelFn) {
     return {
         id: 'insideBarLabels',
-        afterDraw(chart) {
+        afterDatasetsDraw(chart) {
             const ctx = chart.ctx;
             chart.data.datasets.forEach((_, di) => {
                 chart.getDatasetMeta(di).data.forEach((bar, bi) => {
@@ -216,6 +216,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                 plugins: {
                     legend: { display: false },
                     tooltip: {
+                        displayColors: false,
                         callbacks: {
                             label: ctx => {
                                 const raw = rawValues[ctx.dataIndex];

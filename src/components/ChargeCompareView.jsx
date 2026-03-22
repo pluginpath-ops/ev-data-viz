@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
 import RunSelector from './RunSelector';
+import { runTooltipLines } from '../utils/tooltipHelpers';
 
 // ── Interpolation helper ──────────────────────────────────────────────────────
 // Returns the interpolated yField value at targetX, given points sorted by xField.
@@ -43,7 +44,7 @@ function topAlertAmt(overshoot, total) {
 function makeBarPlugin(flatRuns, isHorizontal) {
     return {
         id: 'compareBarLabels',
-        afterDraw(chart) {
+        afterDatasetsDraw(chart) {
             if (!flatRuns?.length) return;
             const ctx2   = chart.ctx;
             const meta   = chart.getDatasetMeta(0);
@@ -378,6 +379,8 @@ export default function ChargeCompareView({
                 color:           rangeRun.color || '#3b82f6',
                 speed_mph:       rangeRun.speed_mph,
                 temperature_f:   rangeRun.temperature_f,
+                source:          rangeRun.source,
+                _trim:           rangeRun._trim ?? null,
                 _chargingRunName: chargingRunName,
                 _yUnit:          chartType === 'range_added' ? 'mi' : 'min',
             };
@@ -494,6 +497,7 @@ export default function ChargeCompareView({
                     plugins: {
                         legend: { display: false },
                         tooltip: {
+                            displayColors: false,
                             callbacks: {
                                 title(items) {
                                     if (!items.length) return;
@@ -509,14 +513,11 @@ export default function ChargeCompareView({
                                 afterLabel(ctx) {
                                     const run = built.flatRuns[ctx.dataIndex];
                                     if (!run || run._noData) return [];
-                                    const lines = [];
-                                    if (run._startSoc  != null) lines.push(run._endSoc != null ? `SoC: ${run._startSoc}% → ${run._endSoc}%` : `Start SoC: ${run._startSoc}%`);
-                                    if (run._startRange != null) lines.push(run._endRange != null ? `Range: ${run._startRange} → ${run._endRange} mi` : `Start range: ${run._startRange} mi`);
-                                    if (run.speed_mph   != null) lines.push(`Speed: ${run.speed_mph} mph`);
-                                    if (run.temperature_f != null) lines.push(`Temp: ${run.temperature_f}°F`);
-                                    if (run._chargingRunName && run._chargingRunName !== run.name)
-                                        lines.push(`Charging data: ${run._chargingRunName}`);
-                                    return lines;
+                                    return runTooltipLines(run, [
+                                        run._startSoc  != null ? (run._endSoc  != null ? `SoC: ${run._startSoc}% → ${run._endSoc}%`       : `Start SoC: ${run._startSoc}%`)   : null,
+                                        run._startRange != null ? (run._endRange != null ? `Range: ${run._startRange} → ${run._endRange} mi` : `Start range: ${run._startRange} mi`) : null,
+                                        run._chargingRunName && run._chargingRunName !== run.name ? `Charging data: ${run._chargingRunName}` : null,
+                                    ].filter(Boolean));
                                 },
                             },
                         },

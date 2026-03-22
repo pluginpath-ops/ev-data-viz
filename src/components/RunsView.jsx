@@ -86,6 +86,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         softwareVersion: '',
         conditions: '',
         dataFlags: ['charging'],
+        trimId: '',
         source: '',
         startSoc: '',
         endSoc: '',
@@ -355,6 +356,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             softwareVersion: run.softwareVersion || run.software_version || '',
             conditions: run.conditions || '',
             dataFlags: inferRunFlags(run),
+            trimId: run.trim_id ?? '',
             source: run.source || '',
             startSoc: run.start_soc ?? '',
             endSoc: run.end_soc ?? '',
@@ -777,6 +779,33 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             className="form-input w-full"
                                         />
 
+                                        {/* Trim selector */}
+                                        {vehicle?.trims?.length > 0 && (
+                                            <div>
+                                                <label className="text-sm font-medium text-gray-700">Trim / Configuration</label>
+                                                <select
+                                                    value={runMetadata.trimId}
+                                                    onChange={(e) => setRunMetadata({...runMetadata, trimId: e.target.value})}
+                                                    className="form-input w-full mt-1"
+                                                >
+                                                    <option value="">— Select trim (optional) —</option>
+                                                    {vehicle.trims.map(t => (
+                                                        <option key={t.id} value={t.id}>
+                                                            {t.name}{t.wheel_size ? ` · ${t.wheel_size}` : ''}{t.tire_size ? ` / ${t.tire_size}` : ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                {runMetadata.trimId && (() => {
+                                                    const t = vehicle.trims.find(x => String(x.id) === String(runMetadata.trimId));
+                                                    return t ? (
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                            {[t.wheel_size, t.tire_size, t.epa_range_miles != null && `EPA ${t.epa_range_miles} mi`].filter(Boolean).join(' · ')}
+                                                        </p>
+                                                    ) : null;
+                                                })()}
+                                            </div>
+                                        )}
+
                                         {/* Charging energy field (create mode) */}
                                         {runMetadata.dataFlags.includes('charging') && (
                                             <div className="data-subpanel p-3">
@@ -1165,6 +1194,32 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         onChange={(e) => setEditFormData({...editFormData, conditions: e.target.value})}
                                         className="form-input w-full"
                                     />
+                                    {/* Trim selector (edit mode) */}
+                                    {vehicle?.trims?.length > 0 && (
+                                        <div>
+                                            <label className="text-sm font-medium text-gray-700">Trim / Configuration</label>
+                                            <select
+                                                value={editFormData.trimId ?? ''}
+                                                onChange={(e) => setEditFormData({...editFormData, trimId: e.target.value})}
+                                                className="form-input w-full mt-1"
+                                            >
+                                                <option value="">— Select trim (optional) —</option>
+                                                {vehicle.trims.map(t => (
+                                                    <option key={t.id} value={t.id}>
+                                                        {t.name}{t.wheel_size ? ` · ${t.wheel_size}` : ''}{t.tire_size ? ` / ${t.tire_size}` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {editFormData.trimId && (() => {
+                                                const t = vehicle.trims.find(x => String(x.id) === String(editFormData.trimId));
+                                                return t ? (
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        {[t.wheel_size, t.tire_size, t.epa_range_miles != null && `EPA ${t.epa_range_miles} mi`].filter(Boolean).join(' · ')}
+                                                    </p>
+                                                ) : null;
+                                            })()}
+                                        </div>
+                                    )}
                                     {/* Charging energy field — shows energy_kwh for charging runs */}
                                     {(editFormData.dataFlags || ['charging']).includes('charging') && (
                                         <div className="data-subpanel p-3">

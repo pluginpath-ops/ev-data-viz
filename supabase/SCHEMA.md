@@ -96,6 +96,7 @@ One charging or range test session per vehicle.
 | `energy_kwh` | `numeric` | — | |
 | `temperature_f` | `numeric` | — | |
 | `elevation_gain_ft` | `numeric` | — | |
+| `trim_id` | `bigint` | `NULL` | FK → `trims.id` ON DELETE SET NULL. Which trim/wheel/tire config was used for this test. |
 | `populated_fields` | `text[]` | — | Which data columns have values: `['soc','chargeRate','time','range','temperature']` |
 | `calculated_fields` | `text[]` | — | Fields computed rather than measured |
 | `created_at` | `timestamptz` | `now()` | |
@@ -149,11 +150,10 @@ Named trim configurations for a vehicle (e.g. different wheel/tire packages).
 | `name` | `text` | — | e.g. "Long Range AWD 19\"" |
 | `wheel_size` | `text` | `NULL` | e.g. "19 inch" |
 | `tire_size` | `text` | `NULL` | e.g. "255/45R19" |
+| `epa_range_miles` | `numeric` | `NULL` | EPA-rated range for this trim in miles |
 | `created_at` | `timestamptz` | `now()` | |
 
 RLS mirrors `runs`: SELECT when parent vehicle is visible; INSERT/UPDATE/DELETE when vehicle is owned by user or role is `admin`/`contributor`. See `migrations/004_vehicle_trims.sql`.
-
-> Schema supports a future FK from `runs.trim_id → trims.id` for per-run trim association.
 
 ---
 
@@ -285,6 +285,7 @@ Runs inherit ownership from their parent vehicle via subquery join.
 | `migrations/003_vehicle_specs.sql` | Add `specs jsonb` column to `vehicles` for structured vehicle specifications |
 | `migrations/004_vehicle_trims.sql` | Add `trims` table for named vehicle trim configurations (wheel/tire size) |
 | `migrations/005_votes.sql` | Add `votes` table (vouch/flag counts), `flagged_specs text[]` on vehicles, and `flag_spec_field` / `unflag_spec_field` RPCs |
+| `migrations/006_run_trim_link.sql` | Add `runs.trim_id` FK to trims, add `trims.epa_range_miles` for per-trim EPA range |
 
 ### Applying migrations
 
