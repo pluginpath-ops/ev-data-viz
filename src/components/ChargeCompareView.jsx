@@ -519,7 +519,7 @@ export default function ChargeCompareView({
                 if (inst.current) { inst.current.destroy(); inst.current = null; }
             });
         };
-    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation]);
+    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns]);
 
     const hasRangeRuns = resolvedRuns.length > 0;
 
