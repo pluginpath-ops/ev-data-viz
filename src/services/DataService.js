@@ -69,6 +69,8 @@ class DataService {
         ...r,
         // data_points(count) returns [{ count: N }]; normalise to a plain number
         dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
+        // Resolve the trim FK so chart components can access trim details directly
+        _trim: (v.trims || []).find(t => t.id === r.trim_id) ?? null,
       })),
     }));
   }
@@ -198,10 +200,10 @@ class DataService {
 
   // ── Trims ─────────────────────────────────────────────────────────────────
 
-  async addTrim(vehicleId, { name, wheel_size, tire_size }) {
+  async addTrim(vehicleId, { name, wheel_size, tire_size, epa_range_miles }) {
     const { data, error } = await getSupabase()
       .from('trims')
-      .insert({ vehicle_id: vehicleId, name, wheel_size: wheel_size || null, tire_size: tire_size || null })
+      .insert({ vehicle_id: vehicleId, name, wheel_size: wheel_size || null, tire_size: tire_size || null, epa_range_miles: epa_range_miles != null && epa_range_miles !== '' ? Number(epa_range_miles) : null })
       .select()
       .single();
     if (error) throw error;
@@ -215,6 +217,7 @@ class DataService {
         name: updates.name,
         wheel_size: updates.wheel_size || null,
         tire_size: updates.tire_size || null,
+        epa_range_miles: updates.epa_range_miles != null && updates.epa_range_miles !== '' ? Number(updates.epa_range_miles) : null,
       })
       .eq('id', trimId);
     if (error) throw error;
@@ -280,6 +283,7 @@ class DataService {
       elevation_gain_ft: run.elevationGainFt != null && run.elevationGainFt !== '' ? Number(run.elevationGainFt) : null,
       url: run.url || null,
       charging_url: run.chargingUrl || null,
+      trim_id: run.trimId ? Number(run.trimId) : null,
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
@@ -337,6 +341,7 @@ class DataService {
       ...(updates.elevationGainFt !== undefined ? { elevation_gain_ft: updates.elevationGainFt !== '' ? Number(updates.elevationGainFt) : null } : {}),
       ...(updates.url !== undefined ? { url: updates.url || null } : {}),
       ...(updates.chargingUrl !== undefined ? { charging_url: updates.chargingUrl || null } : {}),
+      ...(updates.trimId !== undefined ? { trim_id: updates.trimId ? Number(updates.trimId) : null } : {}),
     }).eq('id', runId);
     if (error) throw error;
   }

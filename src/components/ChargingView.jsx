@@ -4,6 +4,7 @@ import { dataService } from '../services/DataService';
 import RunSelector from './RunSelector';
 import RangeChartView from './RangeChartView';
 import AxisScaleControls from './AxisScaleControls';
+import { runTooltipLines } from '../utils/tooltipHelpers';
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, presentationMode = false }) {
     const chartRef = useRef(null);
@@ -323,6 +324,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 showLine:         chartConfig.showLine ?? true,
                 tension:          0.1,
                 yAxisID:          'y',
+                runMeta:          run,
             }];
 
             // 5. Y2 dataset (hidden from legend; dashed line + triangle points)
@@ -376,10 +378,20 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
-                                return `${context.dataset.label}: (${context.parsed.x}, ${context.parsed.y})`;
-                            }
-                        }
+                            title(ctx) {
+                                const run = ctx[0]?.dataset?.runMeta;
+                                if (!run) return undefined;
+                                return run.vehicleName ? `${run.vehicleName} — ${run.name}` : run.name;
+                            },
+                            label(ctx) {
+                                const xl = axisOptions.find(a => a.value === chartConfig.xAxis)?.label ?? 'X';
+                                const yl = axisOptions.find(a => a.value === chartConfig.yAxis)?.label ?? 'Y';
+                                return `${xl}: ${ctx.parsed.x}   ${yl}: ${ctx.parsed.y}`;
+                            },
+                            afterLabel(ctx) {
+                                return runTooltipLines(ctx.dataset?.runMeta);
+                            },
+                        },
                     }
                 },
                 scales: {
