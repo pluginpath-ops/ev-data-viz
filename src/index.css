@@ -161,6 +161,11 @@
     color: var(--color-primary-text);
 }
 
+/* Tighten Tailwind's default line-height (1.5 feels too spacious) */
+html {
+    line-height: 1.4;
+}
+
 /* Background and Card Styles */
 body {
     background-color: var(--color-background);

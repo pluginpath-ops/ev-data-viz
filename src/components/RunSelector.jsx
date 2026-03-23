@@ -21,7 +21,7 @@ export default function RunSelector({
     emptyMessage = 'No runs',
     renderRunMeta = null,
 }) {
-    const [expanded, setExpanded] = useState(true);
+    const [expanded, setExpanded] = useState(false);
     const [expandedVehicles, setExpandedVehicles] = useState({});
 
     const toggleVehicle = (vehicleId) =>
@@ -39,7 +39,7 @@ export default function RunSelector({
                 className="run-selector-header"
             >
                 <span style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                Select Runs to Display
+                Select Vehicle Tests to Display
                 <span className="text-sm font-normal text-gray-500">({selectedCount} selected)</span>
             </button>
 
@@ -55,7 +55,7 @@ export default function RunSelector({
                             return (
                                 <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
                                     <div className="flex items-center gap-2 mb-2">
-                                        <h4 className="font-semibold text-gray-700">{vehicle.name}</h4>
+                                        <h4 className="text-sm font-semibold text-gray-700">{vehicle.name}</h4>
                                         {inactiveRuns.length > 0 && (
                                             <button
                                                 onClick={() => toggleVehicle(vehicle.id)}
