@@ -131,6 +131,7 @@ export const SPEC_CATEGORIES = [
             { key: 'seating',                  label: 'Seating Capacity',            type: 'integer' },
             { key: 'cargo_cuft',               label: 'Cargo Volume (cu ft)',         type: 'number' },
             { key: 'frunk_cuft',               label: 'Frunk Capacity (cu ft)',       type: 'number' },
+            { key: 'max_cargo_cuft',           label: 'Max Cargo, Seats Flat (cu ft)', type: 'number' },
             { key: 'screen_size_in',           label: 'Head Unit Screen Size (in)',   type: 'number' },
             { key: 'hud',                      label: 'Heads-Up Display (HUD)',       type: 'boolean' },
             { key: 'front_heated_seats',       label: 'Front Heated Seats',           type: 'boolean' },
