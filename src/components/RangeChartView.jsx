@@ -247,7 +247,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         if (drawY + pillH > bar.base - topPad) return;
 
                         ctx2.save();
-                        ctx2.font = primary ? 'bold 10px sans-serif' : '9px sans-serif';
+                        ctx2.font = primary ? 'bold 11px sans-serif' : '10px sans-serif';
                         const tw = ctx2.measureText(text).width;
                         const pw = tw + pillPad * 2;
 
@@ -305,7 +305,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
 
                     // Centered bold vehicle name
                     ctx2.save();
-                    ctx2.font         = 'bold 12px sans-serif';
+                    ctx2.font         = 'bold 13px sans-serif';
                     ctx2.fillStyle    = '#374151';
                     ctx2.textAlign    = 'center';
                     ctx2.textBaseline = 'top';
@@ -347,6 +347,13 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
+                    title: {
+                        display: true,
+                        text: built.kind === 'bar'
+                            ? built.yLabel.replace(/\s*\(.*?\)$/, '')
+                            : `${built.yLabel.replace(/\s*\(.*?\)$/, '')} vs ${built.xLabel.replace(/\s*\(.*?\)$/, '')}`,
+                        font: { size: 14, weight: 'bold' },
+                    },
                     legend: { display: built.kind !== 'bar', position: 'top' },
                     tooltip: {
                         displayColors: false,

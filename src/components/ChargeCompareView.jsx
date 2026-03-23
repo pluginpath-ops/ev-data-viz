@@ -119,7 +119,7 @@ function makeBarPlugin(flatRuns, isHorizontal) {
 
                     displayBadges.forEach(({ text, primary, alertAmt }) => {
                         ctx2.save();
-                        ctx2.font = primary ? 'bold 10px sans-serif' : '9px sans-serif';
+                        ctx2.font = primary ? 'bold 11px sans-serif' : '10px sans-serif';
                         const tw = ctx2.measureText(text).width;
                         const pw = tw + pillPad * 2;
                         if (drawX + pw > bar.x - 4) { ctx2.restore(); return; }
@@ -138,7 +138,7 @@ function makeBarPlugin(flatRuns, isHorizontal) {
                     badges.forEach(({ text, primary, alertAmt }) => {
                         if (drawY + pillH > bar.base - topPad) return;
                         ctx2.save();
-                        ctx2.font = primary ? 'bold 10px sans-serif' : '9px sans-serif';
+                        ctx2.font = primary ? 'bold 11px sans-serif' : '10px sans-serif';
                         const tw = ctx2.measureText(text).width;
                         const pw = tw + pillPad * 2;
                         if (pw > barW - 4) { ctx2.restore(); drawY += pillH + gap; return; }
@@ -157,7 +157,7 @@ function makeBarPlugin(flatRuns, isHorizontal) {
                     const bar = meta.data[i];
                     if (!bar) return;
                     ctx2.save();
-                    ctx2.font         = '11px sans-serif';
+                    ctx2.font         = '12px sans-serif';
                     ctx2.fillStyle    = '#6b7280';
                     ctx2.textAlign    = 'left';
                     ctx2.textBaseline = 'middle';
@@ -185,7 +185,7 @@ function makeBarPlugin(flatRuns, isHorizontal) {
                     ctx2.restore();
 
                     ctx2.save();
-                    ctx2.font         = 'bold 11px sans-serif';
+                    ctx2.font         = 'bold 13px sans-serif';
                     ctx2.fillStyle    = '#374151';
                     ctx2.textAlign    = 'right';
                     ctx2.textBaseline = 'middle';
@@ -230,7 +230,7 @@ function makeBarPlugin(flatRuns, isHorizontal) {
                     ctx2.restore();
 
                     ctx2.save();
-                    ctx2.font         = 'bold 12px sans-serif';
+                    ctx2.font         = 'bold 13px sans-serif';
                     ctx2.fillStyle    = '#374151';
                     ctx2.textAlign    = 'center';
                     ctx2.textBaseline = 'top';

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
+Chart.defaults.font.size = 13;
 import { dataService } from '../services/DataService';
 import RunSelector from './RunSelector';
 import RangeChartView from './RangeChartView';
@@ -361,6 +362,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             ? (axisOptions.find(a => a.value === chartConfig.y2Axis)?.label || chartConfig.y2Axis)
             : '';
 
+        const stripUnits = s => s.replace(/\s*\(.*?\)$/, '');
+        const chartTitle = raceActive
+            ? `${stripUnits(yLabel)} from ${raceThreshold}% SoC`
+            : `${stripUnits(yLabel)} vs ${stripUnits(xLabel)}`;
+
         chartInstance.current = new Chart(ctx, {
             type: 'scatter',
             data: { datasets },
@@ -369,6 +375,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
+                    title: { display: true, text: chartTitle, font: { size: 14, weight: 'bold' } },
                     legend: {
                         position: 'top',
                         labels: {
