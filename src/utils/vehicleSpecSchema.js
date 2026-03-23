@@ -77,6 +77,7 @@ export const SPEC_CATEGORIES = [
             { key: 'height_in',           label: 'Height (in)',             type: 'number' },
             { key: 'wheelbase_in',        label: 'Wheelbase (in)',          type: 'number' },
             { key: 'ground_clearance_in', label: 'Ground Clearance (in)',   type: 'number' },
+            { key: 'bed_length_in',       label: 'Truck Bed Length (in)',   type: 'number' },
         ],
     },
     {
@@ -114,6 +115,7 @@ export const SPEC_CATEGORIES = [
         label: 'Battery & Charging',
         fields: [
             { key: 'battery_usable_kwh',          label: 'Battery Usable (kWh)',          type: 'number' },
+            { key: 'battery_nominal_voltage_v',   label: 'Battery Nominal Voltage (V)',   type: 'number' },
             { key: 'max_dc_kw',                   label: 'Max DC Charge Rate (kW)',        type: 'number' },
             { key: 'max_ac_kw',                   label: 'Max AC Charge Rate (kW)',        type: 'number' },
             { key: 'charge_time_10_to_80_pct_min',label: 'Charge Time 10→80% (min)',       type: 'number' },
@@ -128,6 +130,7 @@ export const SPEC_CATEGORIES = [
         fields: [
             { key: 'seating',                  label: 'Seating Capacity',            type: 'integer' },
             { key: 'cargo_cuft',               label: 'Cargo Volume (cu ft)',         type: 'number' },
+            { key: 'frunk_cuft',               label: 'Frunk Capacity (cu ft)',       type: 'number' },
             { key: 'screen_size_in',           label: 'Head Unit Screen Size (in)',   type: 'number' },
             { key: 'hud',                      label: 'Heads-Up Display (HUD)',       type: 'boolean' },
             { key: 'front_heated_seats',       label: 'Front Heated Seats',           type: 'boolean' },
