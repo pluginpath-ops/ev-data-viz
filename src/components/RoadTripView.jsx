@@ -118,6 +118,24 @@ function makeRoadTripPlugin(simResults, units) {
                     ctx.restore();
                 }
             });
+
+            // ── ICE Reference finish label ────────────────────────────
+            chart.data.datasets.forEach((ds, di) => {
+                if (!ds._isIce) return;
+                const meta = chart.getDatasetMeta(di);
+                const data = meta.data;
+                if (!data.length) return;
+                const lastPt  = data[data.length - 1];
+                const lastRaw = ds.data[ds.data.length - 1];
+                if (!lastPt || !lastRaw) return;
+                ctx.save();
+                ctx.font = 'bold 11px system-ui, sans-serif';
+                ctx.fillStyle = ds.borderColor;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`ICE Reference — ${formatTime(lastRaw.x)}`, lastPt.x + 6, lastPt.y);
+                ctx.restore();
+            });
         },
     };
 }
