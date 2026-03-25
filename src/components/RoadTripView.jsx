@@ -331,9 +331,13 @@ export default function RoadTripView({
                         min: 0,
                         max: maxTime * 1.15,
                         ticks: {
-                            callback: val => val >= 120
-                                ? `${Math.floor(val / 60)}h${val % 60 ? ` ${Math.round(val % 60)}m` : ''}`
-                                : `${Math.round(val)}m`,
+                            stepSize: 30,
+                            callback: val => {
+                                if (val % 60 === 0) {
+                                    return val === 0 ? '0' : `${val / 60}h`;
+                                }
+                                return null; // sub-tick at 30 min — no label
+                            },
                         },
                     },
                     y: {
