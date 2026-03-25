@@ -68,6 +68,19 @@ export function simulateRoadTrip({
         warnings.push('Insufficient charging data points');
     }
 
+    // ── Pre-flight check (distance mode) ─────────────────────────────────────
+    if (mode === 'distance') {
+        const maxRange = batteryKwh * (100 - minSoc) / 100 * correctedMiPerKwh;
+        if (maxRange < legDistanceMi) {
+            warnings.push(
+                `Insufficient range: max range from 100% SoC is ${round1(maxRange)} mi, ` +
+                `but leg distance is ${round1(legDistanceMi)} mi. ` +
+                `Reduce leg distance or raise minimum SoC.`
+            );
+            return { segments: [], totalTimeMin: 0, totalDistMi: 0, chargeStops: 0, warnings, speedFactor: factor, correctedMiPerKwh };
+        }
+    }
+
     let currentSoc  = startSoc;
     let currentDist = 0;
     let currentTime = 0;
@@ -85,6 +98,14 @@ export function simulateRoadTrip({
         if (mode === 'distance') {
             // Next charger is at the next legDistance multiple
             const distToCharger = (legDistanceMi - (currentDist % legDistanceMi)) || legDistanceMi;
+            // Detect mid-leg range exhaustion (shouldn't happen after pre-flight, but guard anyway)
+            if (rangeFromSoc < distToCharger - 0.1 && distToCharger <= remainingTrip) {
+                warnings.push(
+                    `Ran out of range ${round1(distToCharger - rangeFromSoc)} mi short of charger ` +
+                    `(at ${round1(currentDist + rangeFromSoc)} mi). Increase leg distance or reduce minimum SoC.`
+                );
+                break;
+            }
             driveDist = Math.min(rangeFromSoc, distToCharger, remainingTrip);
         } else {
             // Mode B: drive until minSoc or trip end
@@ -94,7 +115,7 @@ export function simulateRoadTrip({
         driveDist = Math.max(0, driveDist);
 
         if (driveDist < MIN_DRIVE_MI && currentDist < totalDistanceMi) {
-            warnings.push('Battery too small for leg distance at this speed');
+            warnings.push('Battery depleted: cannot drive far enough to reach next charger');
             break;
         }
 
@@ -126,7 +147,7 @@ export function simulateRoadTrip({
             // Charge enough for next leg
             const nextLeg = Math.min(legDistanceMi, totalDistanceMi - currentDist);
             const socNeeded = (nextLeg / (batteryKwh * correctedMiPerKwh)) * 100;
-            targetSoc = Math.min(minSoc + socNeeded + 5, 100); // 5% buffer
+            targetSoc = Math.min(minSoc + socNeeded, 100);
             targetSoc = Math.max(targetSoc, currentSoc + 1);
 
             const tStart = interpolate(chargingBySoc, 'soc', 'time', currentSoc, true, true);
