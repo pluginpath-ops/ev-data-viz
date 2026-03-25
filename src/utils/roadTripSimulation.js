@@ -191,7 +191,7 @@ export function simulateRoadTrip({
 // ── Chart helpers ────────────────────────────────────────────────────────────
 
 /**
- * Convert simulation segments to Chart.js data points.
+ * Convert simulation segments to Chart.js data points (distance mode).
  * Each segment emits its start and end point.
  */
 export function segmentsToChartPoints(segments, units) {
@@ -199,6 +199,25 @@ export function segmentsToChartPoints(segments, units) {
     for (const seg of segments) {
         points.push({ x: round1(seg.startTime), y: convDistance(seg.startDist, units) });
         points.push({ x: round1(seg.endTime),   y: convDistance(seg.endDist, units)   });
+    }
+    return points;
+}
+
+/**
+ * Convert simulation segments to Chart.js data points (charge-time mode).
+ * Y-axis = cumulative minutes spent charging.
+ * Drive segments: Y stays flat.
+ * Charge segments: Y increases by the segment duration.
+ */
+export function segmentsToChartPointsChargeTime(segments) {
+    const points = [];
+    let cumCharge = 0;
+    for (const seg of segments) {
+        points.push({ x: round1(seg.startTime), y: round1(cumCharge) });
+        if (seg.type === 'charge') {
+            cumCharge += seg.endTime - seg.startTime;
+        }
+        points.push({ x: round1(seg.endTime), y: round1(cumCharge) });
     }
     return points;
 }

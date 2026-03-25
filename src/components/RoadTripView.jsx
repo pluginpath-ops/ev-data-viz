@@ -4,8 +4,8 @@ import { dataService } from '../services/DataService';
 import { useAppContext } from '../context/AppContext';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
 import {
-    simulateRoadTrip, segmentsToChartPoints, formatTime,
-    speedCorrectionFactor,
+    simulateRoadTrip, segmentsToChartPoints, segmentsToChartPointsChargeTime,
+    formatTime, speedCorrectionFactor,
 } from '../utils/roadTripSimulation';
 
 // ── Default vehicle colors ───────────────────────────────────────────────────
@@ -39,7 +39,7 @@ function makeRoadTripPlugin(simResults, units) {
                         const segWidth = Math.abs(endPt.x - startPt.x);
                         if (segWidth > 60) {
                             const midX = (startPt.x + endPt.x) / 2;
-                            const midY = startPt.y - 12;
+                            const midY = (startPt.y + endPt.y) / 2 - 12;
                             const rangeAdded = seg.endSoc !== seg.startSoc
                                 ? Math.round((seg.endSoc - seg.startSoc) / 100 * sim._batteryKwh * sim._correctedMiPerKwh)
                                 : 0;
@@ -277,7 +277,8 @@ export default function RoadTripView({
             chartRef.current = null;
         }
 
-        const { totalDistance } = roadTripConfig;
+        const { totalDistance, yAxis } = roadTripConfig;
+        const isChargeTimeMode = yAxis === 'chargeTime';
         const totalDistDisplay = convDistance(totalDistance, units);
 
         const datasets = validPairs.map((pair, i) => {
@@ -286,7 +287,9 @@ export default function RoadTripView({
             if (hiddenVehicleIds.includes(pair.vehicle.id)) return null;
 
             const effectiveColor = colorOverrides[pair.vehicle.id] || pair.color;
-            const points = segmentsToChartPoints(sim.segments, units);
+            const points = isChargeTimeMode
+                ? segmentsToChartPointsChargeTime(sim.segments)
+                : segmentsToChartPoints(sim.segments, units);
 
             // Mark charge-start points with larger radius
             const pointRadii = [];
@@ -316,21 +319,32 @@ export default function RoadTripView({
         const ICE_DRIVE_INTERVAL_MIN = 180; // 3 hours between stops
         const ICE_STOP_MIN = 5;             // 5-minute fuel stop
         const icePoints = [];
-        let iceTime = 0, iceDist = 0, iceIter = 0;
+        let iceTime = 0, iceDist = 0, iceCumStop = 0, iceIter = 0;
         while (iceDist < roadTripConfig.totalDistance && iceIter < 100) {
             iceIter++;
             const remainingMi = roadTripConfig.totalDistance - iceDist;
             const maxDriveMi  = (roadTripConfig.speed * ICE_DRIVE_INTERVAL_MIN) / 60;
             const driveMi     = Math.min(maxDriveMi, remainingMi);
             const driveMin    = (driveMi / roadTripConfig.speed) * 60;
-            icePoints.push({ x: Math.round(iceTime),              y: convDistance(iceDist,          units) });
-            icePoints.push({ x: Math.round(iceTime + driveMin),   y: convDistance(iceDist + driveMi, units) });
+            if (isChargeTimeMode) {
+                icePoints.push({ x: Math.round(iceTime),            y: Math.round(iceCumStop) });
+                icePoints.push({ x: Math.round(iceTime + driveMin), y: Math.round(iceCumStop) });
+            } else {
+                icePoints.push({ x: Math.round(iceTime),            y: convDistance(iceDist,           units) });
+                icePoints.push({ x: Math.round(iceTime + driveMin), y: convDistance(iceDist + driveMi, units) });
+            }
             iceTime += driveMin;
             iceDist += driveMi;
             if (iceDist >= roadTripConfig.totalDistance - 0.01) break;
-            icePoints.push({ x: Math.round(iceTime),                  y: convDistance(iceDist, units) });
-            icePoints.push({ x: Math.round(iceTime + ICE_STOP_MIN),   y: convDistance(iceDist, units) });
+            if (isChargeTimeMode) {
+                icePoints.push({ x: Math.round(iceTime),                y: Math.round(iceCumStop) });
+                icePoints.push({ x: Math.round(iceTime + ICE_STOP_MIN), y: Math.round(iceCumStop + ICE_STOP_MIN) });
+            } else {
+                icePoints.push({ x: Math.round(iceTime),                y: convDistance(iceDist, units) });
+                icePoints.push({ x: Math.round(iceTime + ICE_STOP_MIN), y: convDistance(iceDist, units) });
+            }
             iceTime += ICE_STOP_MIN;
+            iceCumStop += ICE_STOP_MIN;
         }
         datasets.unshift({
             label: 'ICE Reference',
@@ -348,6 +362,12 @@ export default function RoadTripView({
 
         const validSims = simResults.filter(Boolean);
         const maxTime = Math.max(...validSims.map(s => s.totalTimeMin), iceTime, 60);
+        const maxChargeTime = isChargeTimeMode
+            ? Math.max(...validSims.map(s =>
+                s.segments.filter(seg => seg.type === 'charge')
+                          .reduce((sum, seg) => sum + (seg.endTime - seg.startTime), 0)
+              ), iceCumStop, 30)
+            : 0;
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
@@ -376,7 +396,12 @@ export default function RoadTripView({
                             },
                         },
                     },
-                    y: {
+                    y: isChargeTimeMode ? {
+                        reverse: true,
+                        title: { display: true, text: 'Cumulative Charge Time (min)', font: { size: 13 } },
+                        min: 0,
+                        max: Math.ceil(maxChargeTime * 1.2 / 10) * 10,
+                    } : {
                         reverse: true,
                         title: { display: true, text: `Distance Traveled (${dl})`, font: { size: 13 } },
                         min: 0,
@@ -439,13 +464,30 @@ export default function RoadTripView({
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [simResults, validPairs, units, roadTripConfig.totalDistance, hiddenVehicleIds, colorOverrides]);
+    }, [simResults, validPairs, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.speed, hiddenVehicleIds, colorOverrides]);
 
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
 
     // ── Render ───────────────────────────────────────────────────────────────
-    const { startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode } = roadTripConfig;
+    const { startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, yAxis } = roadTripConfig;
+
+    // ICE reference total time (for "vs ICE" column) — same calc as chart useEffect
+    const iceRefTimeMin = useMemo(() => {
+        const ICE_DRIVE_INTERVAL_MIN = 180;
+        const ICE_STOP_MIN = 5;
+        let t = 0, d = 0, iter = 0;
+        while (d < totalDistance && iter < 100) {
+            iter++;
+            const rem = totalDistance - d;
+            const driveMi = Math.min((speed * ICE_DRIVE_INTERVAL_MIN) / 60, rem);
+            t += (driveMi / speed) * 60;
+            d += driveMi;
+            if (d >= totalDistance - 0.01) break;
+            t += ICE_STOP_MIN;
+        }
+        return t;
+    }, [totalDistance, speed]);
 
     // Display values in current units
     const dispLeg   = units === 'metric' ? Math.round(legDistance * MI_TO_KM) : legDistance;
@@ -459,20 +501,42 @@ export default function RoadTripView({
                 <div className="card mb-6">
                     <h3 className="text-lg font-bold mb-4">Road Trip Settings</h3>
 
-                    {/* Mode toggle */}
-                    <div className="flex gap-1 mb-4">
-                        <button
-                            className={`btn btn-sm ${mode === 'distance' ? 'btn-primary' : 'btn-secondary'}`}
-                            onClick={() => setField('mode', 'distance')}
-                        >
-                            Fixed Stop Distance
-                        </button>
-                        <button
-                            className={`btn btn-sm ${mode === 'time' ? 'btn-primary' : 'btn-secondary'}`}
-                            onClick={() => setField('mode', 'time')}
-                        >
-                            Fixed Charge Time
-                        </button>
+                    {/* Toggles row */}
+                    <div className="flex flex-wrap gap-6 mb-4">
+                        <div>
+                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Simulation</span>
+                            <div className="flex gap-1">
+                                <button
+                                    className={`btn btn-sm ${mode === 'distance' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setField('mode', 'distance')}
+                                >
+                                    Fixed Stop Distance
+                                </button>
+                                <button
+                                    className={`btn btn-sm ${mode === 'time' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setField('mode', 'time')}
+                                >
+                                    Fixed Charge Time
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Y Axis</span>
+                            <div className="flex gap-1">
+                                <button
+                                    className={`btn btn-sm ${yAxis === 'distance' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setField('yAxis', 'distance')}
+                                >
+                                    Distance
+                                </button>
+                                <button
+                                    className={`btn btn-sm ${yAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setField('yAxis', 'chargeTime')}
+                                >
+                                    Charge Time
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-4">
@@ -595,6 +659,7 @@ export default function RoadTripView({
                                     <th className="px-3 py-2 text-left font-semibold">Tested Eff</th>
                                     <th className="px-3 py-2 text-left font-semibold">Corrected Eff</th>
                                     <th className="px-3 py-2 text-left font-semibold">Speed Adj</th>
+                                    <th className="px-3 py-2 text-left font-semibold">vs ICE</th>
                                     <th className="px-3 py-2 text-left font-semibold">Runs</th>
                                 </tr>
                             </thead>
@@ -637,6 +702,18 @@ export default function RoadTripView({
                                                         Test: {fmtSpeed(pair.testSpeedMph, units)}
                                                     </span>
                                                 )}
+                                            </td>
+                                            <td className="px-3 py-2 font-medium">
+                                                {(() => {
+                                                    const deltaMin = sim.totalTimeMin - iceRefTimeMin;
+                                                    const absDelta = Math.abs(deltaMin);
+                                                    const h = Math.floor(absDelta / 60);
+                                                    const m = Math.round(absDelta % 60);
+                                                    const label = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                                                    return deltaMin > 0
+                                                        ? <span className="text-amber-600">+{label}</span>
+                                                        : <span className="text-green-600">−{label}</span>;
+                                                })()}
                                             </td>
                                             <td className="px-3 py-2 text-xs text-gray-500">
                                                 <div>Range: {pair.rangeRun.name}</div>

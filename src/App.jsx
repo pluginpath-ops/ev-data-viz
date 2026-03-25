@@ -81,6 +81,7 @@ export default function App() {
         mode: 'distance', startSoc: 90, minSoc: 10,
         legDistance: 150, chargeTime: 30,
         totalDistance: 500, speed: 70,
+        yAxis: 'distance',   // 'distance' | 'chargeTime'
     });
     const [chartConfig, setChartConfig] = useState({
         xAxis: 'soc',
