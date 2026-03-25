@@ -282,7 +282,7 @@ export default function RoadTripView({
 
     // ── Run simulation for each entry ─────────────────────────────────────────
     const simResults = useMemo(() => {
-        const { startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode } = roadTripConfig;
+        const { startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, overhead } = roadTripConfig;
 
         return validEntries.map(entry => {
             const chargingData = runDataCache[entry.run.id];
@@ -300,6 +300,7 @@ export default function RoadTripView({
                 totalDistanceMi:   totalDistance,
                 speedMph:          speed,
                 chargeTimeMinutes: chargeTime,
+                overheadMinutes:   overhead,
                 mode,
             });
 
@@ -320,7 +321,7 @@ export default function RoadTripView({
             chartRef.current = null;
         }
 
-        const { totalDistance, yAxis } = roadTripConfig;
+        const { totalDistance, yAxis, overhead } = roadTripConfig;
         const isChargeTimeMode = yAxis === 'chargeTime';
         const totalDistDisplay = convDistance(totalDistance, units);
 
@@ -366,7 +367,7 @@ export default function RoadTripView({
 
         // ── ICE reference line ───────────────────────────────────────────
         const ICE_DRIVE_INTERVAL_MIN = 180; // 3 hours between stops
-        const ICE_STOP_MIN = 5;             // 5-minute fuel stop
+        const ICE_STOP_MIN = overhead;      // same overhead tax as EV stops
         const icePoints = [];
         let iceTime = 0, iceDist = 0, iceCumStop = 0, iceIter = 0;
         while (iceDist < roadTripConfig.totalDistance && iceIter < 100) {
@@ -515,18 +516,17 @@ export default function RoadTripView({
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [simResults, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.speed]);
+    }, [simResults, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.speed, roadTripConfig.overhead]);
 
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
 
     // ── Render ───────────────────────────────────────────────────────────────
-    const { startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, yAxis } = roadTripConfig;
+    const { startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, yAxis, overhead } = roadTripConfig;
 
     // ICE reference total time (for "vs ICE" column)
     const iceRefTimeMin = useMemo(() => {
         const ICE_DRIVE_INTERVAL_MIN = 180;
-        const ICE_STOP_MIN = 5;
         let t = 0, d = 0, iter = 0;
         while (d < totalDistance && iter < 100) {
             iter++;
@@ -535,10 +535,10 @@ export default function RoadTripView({
             t += (driveMi / speed) * 60;
             d += driveMi;
             if (d >= totalDistance - 0.01) break;
-            t += ICE_STOP_MIN;
+            t += overhead;
         }
         return t;
-    }, [totalDistance, speed]);
+    }, [totalDistance, speed, overhead]);
 
     // Display values in current units
     const dispLeg   = units === 'metric' ? Math.round(legDistance * MI_TO_KM) : legDistance;
@@ -639,6 +639,13 @@ export default function RoadTripView({
                                     const val = Number(e.target.value);
                                     setField('speed', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
                                 }} />
+                        </label>
+                        <label className="text-sm">
+                            <span className="font-medium block mb-1">Stop Overhead (min)</span>
+                            <input type="number" className="w-full border rounded px-2 py-1"
+                                min={0} max={60} value={overhead}
+                                title="Extra minutes added to every stop (parking, walk-in, plug-in). Applies to EV charging and ICE fuel stops."
+                                onChange={e => setField('overhead', Number(e.target.value))} />
                         </label>
                     </div>
 

@@ -81,6 +81,7 @@ export default function App() {
         mode: 'distance', startSoc: 90, minSoc: 10,
         legDistance: 150, chargeTime: 30,
         totalDistance: 500, speed: 70,
+        overhead: 5,         // per-stop overhead minutes (applies to EV and ICE)
         yAxis: 'distance',   // 'distance' | 'chargeTime'
     });
     const [chartConfig, setChartConfig] = useState({
