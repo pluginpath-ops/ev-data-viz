@@ -15,6 +15,13 @@ export function AppProvider({ children }) {
     const [specCustomFieldSuggestions, setSpecCustomFieldSuggestions] = useState({}); // { [category]: Set<normalizedKey> }
     const [specVouches, setSpecVouches] = useState({});   // { [vehicleId]: { count, myVouch } }
     const [runVotes, setRunVotes] = useState({});          // { [runId]: { vouch, flag, myVote } }
+    const [units, setUnits] = useState(() => localStorage.getItem('evbench_units') || 'imperial');
+
+    const toggleUnits = () => setUnits(u => {
+        const next = u === 'imperial' ? 'metric' : 'imperial';
+        localStorage.setItem('evbench_units', next);
+        return next;
+    });
 
     const showError   = (message) => setAppNotification({ message, type: 'error' });
     const showSuccess = (message) => setAppNotification({ message, type: 'success' });
@@ -713,6 +720,8 @@ export function AppProvider({ children }) {
         setUserRole: setUserRoleAction,
         signOut,
         initializeApp,
+        units,
+        toggleUnits,
     };
 
     return (

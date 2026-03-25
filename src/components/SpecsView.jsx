@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
+import { formatSpecValue, fmtDistance, distanceLabel } from '../utils/unitConversions';
 import { SpecFieldFlagButton } from './VoteButtons';
 
 export default function SpecsView({ selectedVehicleIds }) {
     // Read vehicles directly from context so optimistic updates (e.g. admin unflag)
     // reflect immediately without depending on the App.jsx prop-chain re-render timing.
-    const { vehicles, flagSpecField, unflagSpecField, isAdmin } = useAppContext();
+    const { vehicles, flagSpecField, unflagSpecField, isAdmin, units } = useAppContext();
 
     // Pending flags — buffered locally, committed to DB when the tab is left (unmount).
     // Map of vehicleId (number) → Set<fieldKey string>.
@@ -50,9 +51,10 @@ export default function SpecsView({ selectedVehicleIds }) {
         }
     }
 
-    const formatValue = (value, type) => {
+    const formatValue = (value, type, unitGroup) => {
         if (value === null || value === undefined || value === '') return '—';
         if (type === 'boolean') return value ? 'Yes' : 'No';
+        if (unitGroup) return formatSpecValue(value, unitGroup, units);
         return String(value);
     };
 
@@ -96,7 +98,7 @@ export default function SpecsView({ selectedVehicleIds }) {
                         return (
                             <td key={String(v.id)} className="specs-table-cell text-sm">
                                 <span className="flex items-center gap-1">
-                                    {formatValue(v.specs?.[cat.key]?.[field.key], field.type)}
+                                    {formatValue(v.specs?.[cat.key]?.[field.key], field.type, field.unitGroup)}
                                     <SpecFieldFlagButton
                                         isFlagged={committedIsFlagged || isPending}
                                         isPending={isPending && !committedIsFlagged}
@@ -173,8 +175,8 @@ export default function SpecsView({ selectedVehicleIds }) {
                                 {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.battery || '—'}</td>)}
                             </tr>
                             <tr>
-                                <td className="specs-table-cell font-medium">EPA Range (mi)</td>
-                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.range || '—'}</td>)}
+                                <td className="specs-table-cell font-medium">EPA Range ({distanceLabel(units)})</td>
+                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.range ? fmtDistance(v.range, units) : '—'}</td>)}
                             </tr>
                             <tr>
                                 <td className="specs-table-cell font-medium">Test Runs</td>

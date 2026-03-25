@@ -3,6 +3,8 @@ import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
 import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
+import { useAppContext } from '../context/AppContext';
+import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 
 // ── Interpolation helper ──────────────────────────────────────────────────────
 // Returns the interpolated yField value at targetX, given points sorted by xField.
@@ -41,7 +43,7 @@ function topAlertAmt(overshoot, total) {
 }
 
 // ── Bar label plugin (same style as RangeChartView barGroupPlugin) ────────────
-function makeBarPlugin(flatRuns, isHorizontal) {
+function makeBarPlugin(flatRuns, isHorizontal, units) {
     return {
         id: 'compareBarLabels',
         afterDatasetsDraw(chart) {
@@ -77,9 +79,9 @@ function makeBarPlugin(flatRuns, isHorizontal) {
                         const socText = run._endSoc != null ? `${run._startSoc}%→${run._endSoc}%` : `${run._startSoc}% SoC`;
                         badges.push({ text: socText, alertAmt: socAlertAmt });
                     }
-                    if (run._startRange != null) badges.push({ text: run._endRange != null ? `${run._startRange}→${run._endRange} mi` : `${run._startRange} mi`, alertAmt: 0 });
-                    if (run.speed_mph   != null) badges.push({ text: `${run.speed_mph} mph`, alertAmt: 0 });
-                    if (run.temperature_f != null) badges.push({ text: `${run.temperature_f}°F`, alertAmt: 0 });
+                    if (run._startRange != null) badges.push({ text: run._endRange != null ? `${run._startRange}→${run._endRange} ${run._rangeUnit}` : `${run._startRange} ${run._rangeUnit}`, alertAmt: 0 });
+                    if (run.speed_mph   != null) badges.push({ text: fmtSpeed(run.speed_mph, units), alertAmt: 0, type: 'speed' });
+                    if (run.temperature_f != null) badges.push({ text: fmtTemp(run.temperature_f, units), alertAmt: 0 });
                 }
                 if (badges.length === 0) return;
 
@@ -112,7 +114,7 @@ function makeBarPlugin(flatRuns, isHorizontal) {
                     // Horizontal bars: bar.x=right, bar.base=left, bar.y=center, bar.height=bar height
                     // Show only: primary value, SoC, speed (data-rich tooltip covers the rest)
                     const displayBadges = badges.filter(b =>
-                        b.primary || b.alertAmt > 0 || (b.text && b.text.includes('mph'))
+                        b.primary || b.alertAmt > 0 || b.type === 'speed'
                     );
                     const gap = 4, leftPad = 6;
                     let drawX = bar.base + leftPad;
@@ -268,6 +270,7 @@ export default function ChargeCompareView({
     startSoc = 10,  setStartSoc,
     presentationMode = false,
 }) {
+    const { units } = useAppContext();
     const [runDataCache,    setRunDataCache]    = useState({});
     const [loading,         setLoading]         = useState(false);
     const [copied,          setCopied]          = useState(false);
@@ -382,7 +385,8 @@ export default function ChargeCompareView({
                 source:          rangeRun.source,
                 _trim:           rangeRun._trim ?? null,
                 _chargingRunName: chargingRunName,
-                _yUnit:          chartType === 'range_added' ? 'mi' : 'min',
+                _yUnit:          chartType === 'range_added' ? distanceLabel(units) : 'min',
+                _rangeUnit:      distanceLabel(units),
             };
 
             // No charging run resolved, or data not yet loaded
@@ -425,14 +429,15 @@ export default function ChargeCompareView({
                 const timeOvershoot = Math.max(0, targetTime - lastTime);
                 const Rend   = interpolate(byTime, 'time', 'range', targetTime, false, true);
                 const SocEnd = interpolate(byTime, 'time', 'soc',   targetTime, false, true);
-                const yValue = Rend != null ? Math.round((Rend - Rz) * 10) / 10 : null;
+                const yValueMi = Rend != null ? Math.round((Rend - Rz) * 10) / 10 : null;
+                const yValue   = yValueMi != null ? convDistance(yValueMi, units) : null;
                 flatRuns.push({
                     ...base,
                     _yValue:          yValue ?? 0,
                     _startSoc:        startSoc,
                     _endSoc:          SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
-                    _startRange:      Math.round(Rz),
-                    _endRange:        Rend != null ? Math.round(Rend) : null,
+                    _startRange:      Math.round(convDistance(Rz, units)),
+                    _endRange:        Rend != null ? Math.round(convDistance(Rend, units)) : null,
                     _socDeviation:    socDeviation,
                     _topDeviationAmt: topAlertAmt(timeOvershoot, xMinutes),
                     _noData:          yValue == null,
@@ -449,8 +454,8 @@ export default function ChargeCompareView({
                     _yValue:          yValue ?? 0,
                     _startSoc:        startSoc,
                     _endSoc:          SocEnd != null ? Math.round(SocEnd * 10) / 10 : null,
-                    _startRange:      Math.round(Rz),
-                    _endRange:        Math.round(Rz + mMiles),
+                    _startRange:      Math.round(convDistance(Rz, units)),
+                    _endRange:        Math.round(convDistance(Rz + mMiles, units)),
                     _socDeviation:    socDeviation,
                     _topDeviationAmt: topAlertAmt(rangeOvershoot, mMiles),
                     _noData:          yValue == null,
@@ -460,7 +465,7 @@ export default function ChargeCompareView({
 
         if (flatRuns.length === 0) return null;
 
-        const yLabel   = chartType === 'range_added' ? 'Range Added (mi)' : 'Time (min)';
+        const yLabel   = chartType === 'range_added' ? `Range Added (${distanceLabel(units)})` : 'Time (min)';
         const datasets = [{
             label:           yLabel,
             data:            flatRuns.map(r => r._yValue),
@@ -487,7 +492,7 @@ export default function ChargeCompareView({
             instanceRef.current = new Chart(canvasRef.current.getContext('2d'), {
                 type:    'bar',
                 data:    built.data,
-                plugins: [makeBarPlugin(built.flatRuns, isHorizontal)],
+                plugins: [makeBarPlugin(built.flatRuns, isHorizontal, units)],
                 options: {
                     indexAxis: isHorizontal ? 'y' : undefined,
                     layout: { padding: isHorizontal ? { top: 0, left: 140, right: 10 } : { top: 0, bottom: 55 } },
@@ -513,11 +518,12 @@ export default function ChargeCompareView({
                                 afterLabel(ctx) {
                                     const run = built.flatRuns[ctx.dataIndex];
                                     if (!run || run._noData) return [];
+                                    const ru = run._rangeUnit;
                                     return runTooltipLines(run, [
-                                        run._startSoc  != null ? (run._endSoc  != null ? `SoC: ${run._startSoc}% → ${run._endSoc}%`       : `Start SoC: ${run._startSoc}%`)   : null,
-                                        run._startRange != null ? (run._endRange != null ? `Range: ${run._startRange} → ${run._endRange} mi` : `Start range: ${run._startRange} mi`) : null,
+                                        run._startSoc   != null ? (run._endSoc   != null ? `SoC: ${run._startSoc}% → ${run._endSoc}%`                   : `Start SoC: ${run._startSoc}%`)        : null,
+                                        run._startRange != null ? (run._endRange != null ? `Range: ${run._startRange} → ${run._endRange} ${ru}` : `Start range: ${run._startRange} ${ru}`) : null,
                                         run._chargingRunName && run._chargingRunName !== run.name ? `Charging data: ${run._chargingRunName}` : null,
-                                    ].filter(Boolean));
+                                    ].filter(Boolean), units);
                                 },
                             },
                         },
@@ -541,7 +547,7 @@ export default function ChargeCompareView({
                 if (inst.current) { inst.current.destroy(); inst.current = null; }
             });
         };
-    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns]);
+    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns, units]);
 
     const hasRangeRuns = resolvedRuns.length > 0;
 
@@ -588,13 +594,16 @@ export default function ChargeCompareView({
                         />
                     </label>
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                        Range to add (miles):
+                        Range to add ({distanceLabel(units)}):
                         <input
                             type="number"
-                            value={mMiles}
+                            value={units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles}
                             min={1}
-                            max={400}
-                            onChange={e => setMMiles(Math.max(1, Number(e.target.value)))}
+                            max={units === 'metric' ? 650 : 400}
+                            onChange={e => {
+                                const v = Math.max(1, Number(e.target.value));
+                                setMMiles(units === 'metric' ? Math.round(v / MI_TO_KM) : v);
+                            }}
                             className="w-20 px-2 py-1 border rounded text-sm"
                         />
                     </label>
@@ -624,10 +633,10 @@ export default function ChargeCompareView({
                         renderRunMeta={run => (
                             <>
                                 {run.speed_mph != null && (
-                                    <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{run.speed_mph} mph</span>
+                                    <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
                                 )}
                                 {run.temperature_f != null && (
-                                    <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{run.temperature_f}°F</span>
+                                    <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>
                                 )}
                             </>
                         )}
@@ -645,7 +654,7 @@ export default function ChargeCompareView({
                     {/* ── Chart 1: Range Added in X Minutes ── */}
                     <div className="card mb-6">
                         <h4 className="text-base font-semibold mb-3">
-                            Range Added in {xMinutes} Minutes <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC)</span>
+                            Range Added in {xMinutes} Minutes <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC, in {distanceLabel(units)})</span>
                         </h4>
                         <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activeResolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart1Ref} />
@@ -655,7 +664,7 @@ export default function ChargeCompareView({
                     {/* ── Chart 2: Time to Add M Miles ── */}
                     <div className="card mb-6">
                         <h4 className="text-base font-semibold mb-3">
-                            Time to Add {mMiles} Miles of Range <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC)</span>
+                            Time to Add {units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} {distanceLabel(units)} of Range <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
                         <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activeResolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart2Ref} />
