@@ -9,6 +9,38 @@ import {
     formatTime, speedCorrectionFactor,
 } from '../utils/roadTripSimulation';
 
+// ── Efficiency helpers ───────────────────────────────────────────────────────
+
+/**
+ * Derive mi/kWh from a run record, with two fallback methods:
+ *   1. Direct:    distance_miles / energy_kwh          (preferred — measured energy)
+ *   2. SoC-delta: distance_miles / (ΔSoC% × battery)  (estimated — uses usable capacity)
+ * Returns null when there is insufficient data.
+ */
+function computeMiPerKwh(run, batteryKwh) {
+    if (!run?.distance_miles) return null;
+    if (run.energy_kwh)
+        return run.distance_miles / run.energy_kwh;
+    // Estimate via SoC delta × battery capacity
+    if (run.start_soc != null && run.end_soc != null && batteryKwh
+            && run.start_soc > run.end_soc) {
+        const energyEst = (run.start_soc - run.end_soc) / 100 * batteryKwh;
+        if (energyEst > 0) return run.distance_miles / energyEst;
+    }
+    return null;
+}
+
+/** True when computeMiPerKwh will return a non-null value. */
+function hasRangeData(run, batteryKwh) {
+    return computeMiPerKwh(run, batteryKwh) !== null;
+}
+
+/** Human-readable note describing how efficiency was derived. */
+function efficiencyMethod(run) {
+    if (!run?.distance_miles) return null;
+    return run.energy_kwh ? null : 'est. from SoC Δ';
+}
+
 // ── Default vehicle colors ───────────────────────────────────────────────────
 const PALETTE = [
     '#6366f1', '#f59e0b', '#10b981', '#ef4444',
@@ -149,23 +181,34 @@ export default function RoadTripView({
         let colorIdx = 0;
         for (const vehicle of selectedVehicles) {
             const bestRangeRun = [...(vehicle.runs || [])]
-                .filter(r => r.distance_miles && r.energy_kwh)
+                .filter(r => hasRangeData(r, vehicle.battery))
                 .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null;
 
             for (const run of (vehicle.runs || []).filter(r => r.has_charging !== false)) {
-                const hasOwnRange = !!(run.distance_miles && run.energy_kwh);
+                const hasOwnRange = hasRangeData(run, vehicle.battery);
                 const rangeSource  = hasOwnRange ? run : bestRangeRun;
+                const miPerKwh     = rangeSource ? computeMiPerKwh(rangeSource, vehicle.battery) : null;
+
+                // Build a human-readable note about the efficiency source / method
+                let efficiencyNote = null;
+                if (!hasOwnRange && bestRangeRun) {
+                    const method = efficiencyMethod(bestRangeRun);
+                    efficiencyNote = method
+                        ? `eff. from ${bestRangeRun.name} (${method})`
+                        : `eff. from ${bestRangeRun.name}`;
+                } else if (hasOwnRange && efficiencyMethod(run)) {
+                    efficiencyNote = efficiencyMethod(run); // "est. from SoC Δ"
+                }
+
                 map[run.id] = {
                     vehicle,
                     run,
-                    miPerKwh:       rangeSource ? rangeSource.distance_miles / rangeSource.energy_kwh : null,
+                    miPerKwh,
                     // Assume 70 mph if not specified on the run or its range source
                     testSpeedMph:   run.speed_mph ?? bestRangeRun?.speed_mph ?? null,
                     batteryKwh:     vehicle.battery,
                     color:          run.color || PALETTE[colorIdx % PALETTE.length],
-                    efficiencyNote: !hasOwnRange && bestRangeRun
-                        ? `eff. from ${bestRangeRun.name}`
-                        : null,
+                    efficiencyNote,
                 };
                 colorIdx++;
             }
