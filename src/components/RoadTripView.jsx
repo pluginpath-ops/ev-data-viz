@@ -3,6 +3,7 @@ import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
 import { useAppContext } from '../context/AppContext';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
+import RunSelector from './RunSelector';
 import {
     simulateRoadTrip, segmentsToChartPoints, segmentsToChartPointsChargeTime,
     formatTime, speedCorrectionFactor,
@@ -89,64 +90,6 @@ function makeRoadTripPlugin(simResults, units) {
     };
 }
 
-// ── VehicleSelector ──────────────────────────────────────────────────────────
-/**
- * Collapsible vehicle toggle panel for Road Trip — one row per vehicle pair.
- * Styled to match RunSelector for visual consistency.
- */
-function VehicleSelector({ pairs, hiddenIds, onToggle, colorOverrides, onColorChange }) {
-    const [expanded, setExpanded] = useState(false);
-    const selectedCount = pairs.filter(p => !hiddenIds.includes(p.vehicle.id)).length;
-
-    return (
-        <div>
-            <button onClick={() => setExpanded(prev => !prev)} className="run-selector-header">
-                <span style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                Select Vehicles to Display
-                <span className="text-sm font-normal text-gray-500">({selectedCount} of {pairs.length} shown)</span>
-            </button>
-
-            {expanded && (
-                <div className="mt-3">
-                    <div className="run-items">
-                        {pairs.map(pair => {
-                            const hidden = hiddenIds.includes(pair.vehicle.id);
-                            const color = colorOverrides[pair.vehicle.id] || pair.color;
-                            return (
-                                <label
-                                    key={pair.vehicle.id}
-                                    className={`flex items-center gap-2 cursor-pointer ${hidden ? 'opacity-50 hover:opacity-100' : ''}`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={!hidden}
-                                        onChange={() => onToggle(pair.vehicle.id)}
-                                        className="w-4 h-4 shrink-0"
-                                    />
-                                    <input
-                                        type="color"
-                                        value={color}
-                                        onChange={e => { e.stopPropagation(); onColorChange(pair.vehicle.id, e.target.value); }}
-                                        onClick={e => e.stopPropagation()}
-                                        className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
-                                        title="Change color"
-                                    />
-                                    <span className="run-label">
-                                        <span className="font-medium">{pair.vehicle.name}</span>
-                                        <span className="text-xs text-gray-400 ml-2">
-                                            Range: {pair.rangeRun?.name} &middot; Charge: {pair.chargingRun?.name}
-                                        </span>
-                                    </span>
-                                </label>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
 // ── RoadTripView ─────────────────────────────────────────────────────────────
 
 export default function RoadTripView({
@@ -162,8 +105,7 @@ export default function RoadTripView({
 
     const [runDataCache, setRunDataCache] = useState({});
     const [loading, setLoading] = useState(false);
-    const [hiddenVehicleIds, setHiddenVehicleIds] = useState([]);
-    const [colorOverrides, setColorOverrides] = useState({});
+    const [selectedRunIds, setSelectedRunIds] = useState([]);
 
     const dl = distanceLabel(units);
     const sl = speedLabel(units);
@@ -174,42 +116,81 @@ export default function RoadTripView({
         [vehicles, selectedVehicleIds]
     );
 
-    // ── Resolve run pairs (one range + one charging per vehicle) ─────────────
-    const vehicleRunPairs = useMemo(() => {
-        return selectedVehicles.map((vehicle, idx) => {
-            const rangeRuns = (vehicle.runs || []).filter(r => r.has_range);
-            const chargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
+    // ── Sync selectedRunIds when vehicle selection changes ───────────────────
+    // Keep runs from still-selected vehicles; auto-add default run for new ones.
+    useEffect(() => {
+        setSelectedRunIds(prev => {
+            const allChargingRunIds = new Set(
+                selectedVehicles.flatMap(v =>
+                    (v.runs || []).filter(r => r.has_charging !== false).map(r => r.id)
+                )
+            );
+            // Drop runs whose vehicle is no longer selected
+            const kept = prev.filter(id => allChargingRunIds.has(id));
+            const keptSet = new Set(kept);
 
-            const rangeRun = rangeRuns
+            // For each vehicle with no selected runs, add its default/most-recent charging run
+            for (const vehicle of selectedVehicles) {
+                const chargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
+                if (chargingRuns.some(r => keptSet.has(r.id))) continue;
+                const def = chargingRuns.find(r => r.isDefault) ||
+                    [...chargingRuns].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+                if (def) { kept.push(def.id); keptSet.add(def.id); }
+            }
+            return kept;
+        });
+    }, [selectedVehicleIds]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── Build efficiency info for every charging run in the selection ─────────
+    // Keyed by run.id. Derives mi/kWh from the run itself (if it has range data)
+    // or falls back to the vehicle's best range run.
+    const allChargingRunsInfo = useMemo(() => {
+        const map = {};
+        let colorIdx = 0;
+        for (const vehicle of selectedVehicles) {
+            const bestRangeRun = [...(vehicle.runs || [])]
                 .filter(r => r.distance_miles && r.energy_kwh)
                 .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null;
 
-            const chargingRun =
-                chargingRuns.find(r => r.isDefault) ||
-                [...chargingRuns].sort((a, b) => new Date(b.date) - new Date(a.date))[0] ||
-                null;
-
-            const miPerKwh = rangeRun ? rangeRun.distance_miles / rangeRun.energy_kwh : null;
-
-            return {
-                vehicle,
-                rangeRun,
-                chargingRun,
-                miPerKwh,
-                testSpeedMph: rangeRun?.speed_mph ?? null,
-                batteryKwh: vehicle.battery,
-                color: vehicle.color || PALETTE[idx % PALETTE.length],
-            };
-        });
+            for (const run of (vehicle.runs || []).filter(r => r.has_charging !== false)) {
+                const hasOwnRange = !!(run.distance_miles && run.energy_kwh);
+                const rangeSource  = hasOwnRange ? run : bestRangeRun;
+                map[run.id] = {
+                    vehicle,
+                    run,
+                    miPerKwh:       rangeSource ? rangeSource.distance_miles / rangeSource.energy_kwh : null,
+                    // Assume 70 mph if not specified on the run or its range source
+                    testSpeedMph:   run.speed_mph ?? bestRangeRun?.speed_mph ?? null,
+                    batteryKwh:     vehicle.battery,
+                    color:          run.color || PALETTE[colorIdx % PALETTE.length],
+                    efficiencyNote: !hasOwnRange && bestRangeRun
+                        ? `eff. from ${bestRangeRun.name}`
+                        : null,
+                };
+                colorIdx++;
+            }
+        }
+        return map;
     }, [selectedVehicles]);
 
-    const validPairs   = vehicleRunPairs.filter(p => p.rangeRun && p.chargingRun && p.miPerKwh && p.batteryKwh);
-    const skippedPairs = vehicleRunPairs.filter(p => !validPairs.includes(p));
+    // ── Active run entries (in selectedRunIds order) ──────────────────────────
+    const runEntries = useMemo(() =>
+        selectedRunIds.map(id => allChargingRunsInfo[id]).filter(Boolean),
+        [selectedRunIds, allChargingRunsInfo]
+    );
+
+    const validEntries  = runEntries.filter(e => e.miPerKwh && e.batteryKwh);
+    const skippedEntries = runEntries.filter(e => !e.miPerKwh || !e.batteryKwh);
+
+    // Vehicles with no charging runs at all (need separate warning)
+    const vehiclesWithNoChargingRuns = selectedVehicles.filter(
+        v => !(v.runs || []).some(r => r.has_charging !== false)
+    );
 
     // ── Lazy-load charging data ──────────────────────────────────────────────
     const neededRunIds = useMemo(
-        () => [...new Set(validPairs.map(p => p.chargingRun.id).filter(Boolean))],
-        [validPairs]
+        () => [...new Set(validEntries.map(e => e.run.id).filter(Boolean))],
+        [validEntries]
     );
 
     useEffect(() => {
@@ -236,39 +217,40 @@ export default function RoadTripView({
             setLoading(false);
         };
         fetchMissing();
-    }, [neededRunIds.join(',')]);
+    }, [neededRunIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── Run simulation for each vehicle ──────────────────────────────────────
+    // ── Run simulation for each entry ─────────────────────────────────────────
     const simResults = useMemo(() => {
         const { startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode } = roadTripConfig;
 
-        return validPairs.map(pair => {
-            const chargingData = runDataCache[pair.chargingRun.id];
+        return validEntries.map(entry => {
+            const chargingData = runDataCache[entry.run.id];
             if (!chargingData || chargingData.length === 0) return null;
 
             const result = simulateRoadTrip({
-                batteryKwh:       pair.batteryKwh,
-                miPerKwh:         pair.miPerKwh,
-                testSpeedMph:     pair.testSpeedMph || speed,
+                batteryKwh:        entry.batteryKwh,
+                miPerKwh:          entry.miPerKwh,
+                // Use the run's test speed if known; otherwise assume 70 mph per spec
+                testSpeedMph:      entry.testSpeedMph || 70,
                 chargingData,
                 startSoc,
                 minSoc,
-                legDistanceMi:    legDistance,
-                totalDistanceMi:  totalDistance,
-                speedMph:         speed,
+                legDistanceMi:     legDistance,
+                totalDistanceMi:   totalDistance,
+                speedMph:          speed,
                 chargeTimeMinutes: chargeTime,
                 mode,
             });
 
             // Attach helper fields for the plugin
-            result._batteryKwh = pair.batteryKwh;
+            result._batteryKwh        = entry.batteryKwh;
             result._correctedMiPerKwh = result.correctedMiPerKwh;
 
             return result;
         });
-    }, [validPairs, runDataCache, roadTripConfig]);
+    }, [validEntries, runDataCache, roadTripConfig]);
 
-    // ── Build & render chart ─────────────────────────────────────────────────
+    // ── Build & render chart ──────────────────────────────────────────────────
     useEffect(() => {
         if (!canvasRef.current || !simResults.some(Boolean)) return;
 
@@ -281,35 +263,41 @@ export default function RoadTripView({
         const isChargeTimeMode = yAxis === 'chargeTime';
         const totalDistDisplay = convDistance(totalDistance, units);
 
-        const datasets = validPairs.map((pair, i) => {
+        // Label logic: include run name when multiple runs from same vehicle
+        const vehicleRunCount = {};
+        for (const e of validEntries) {
+            vehicleRunCount[e.vehicle.id] = (vehicleRunCount[e.vehicle.id] || 0) + 1;
+        }
+        const entryLabel = e =>
+            vehicleRunCount[e.vehicle.id] > 1
+                ? `${e.vehicle.name} (${e.run.name})`
+                : e.vehicle.name;
+
+        const datasets = validEntries.map((entry, i) => {
             const sim = simResults[i];
             if (!sim) return null;
-            if (hiddenVehicleIds.includes(pair.vehicle.id)) return null;
 
-            const effectiveColor = colorOverrides[pair.vehicle.id] || pair.color;
             const points = isChargeTimeMode
                 ? segmentsToChartPointsChargeTime(sim.segments)
                 : segmentsToChartPoints(sim.segments, units);
 
             // Mark charge-start points with larger radius
             const pointRadii = [];
-            let ptIdx = 0;
             for (const seg of sim.segments) {
-                pointRadii.push(seg.type === 'charge' ? 4 : 0); // start of segment
-                pointRadii.push(0); // end of segment
-                ptIdx += 2;
+                pointRadii.push(seg.type === 'charge' ? 4 : 0);
+                pointRadii.push(0);
             }
 
             return {
-                label: pair.vehicle.name,
+                label: entryLabel(entry),
                 data: points,
-                borderColor: effectiveColor,
-                backgroundColor: effectiveColor + '33',
+                borderColor: entry.color,
+                backgroundColor: entry.color + '33',
                 borderWidth: 2.5,
                 tension: 0,
                 pointRadius: pointRadii,
-                pointBackgroundColor: effectiveColor,
-                pointBorderColor: effectiveColor,
+                pointBackgroundColor: entry.color,
+                pointBorderColor: entry.color,
                 fill: false,
                 _simIndex: i,
             };
@@ -392,7 +380,7 @@ export default function RoadTripView({
                                 if (val % 60 === 0) {
                                     return val === 0 ? '0' : `${val / 60}h`;
                                 }
-                                return null; // sub-tick at 30 min — no label
+                                return null;
                             },
                         },
                     },
@@ -424,10 +412,13 @@ export default function RoadTripView({
                             label: (ctx) => {
                                 const dsIdx = ctx.datasetIndex;
                                 const ptIdx = ctx.dataIndex;
-                                const sim = simResults[validPairs.findIndex((_, i) => datasets.findIndex(d => d._simIndex === i) === dsIdx)];
+                                const sim = simResults[
+                                    validEntries.findIndex((_, i) =>
+                                        datasets.findIndex(d => d._simIndex === i) === dsIdx
+                                    )
+                                ];
                                 if (!sim) return '';
 
-                                // Find which segment this point belongs to
                                 const segIdx = Math.floor(ptIdx / 2);
                                 const seg = sim.segments[segIdx];
                                 if (!seg) return '';
@@ -455,7 +446,6 @@ export default function RoadTripView({
                 },
             },
             plugins: [makeRoadTripPlugin(simResults.map((s, i) => {
-                // Only pass sims that have datasets
                 return datasets.find(d => d._simIndex === i) ? s : null;
             }).filter(Boolean), units)],
         });
@@ -464,7 +454,7 @@ export default function RoadTripView({
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [simResults, validPairs, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.speed, hiddenVehicleIds, colorOverrides]);
+    }, [simResults, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.speed]);
 
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
@@ -472,7 +462,7 @@ export default function RoadTripView({
     // ── Render ───────────────────────────────────────────────────────────────
     const { startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, yAxis } = roadTripConfig;
 
-    // ICE reference total time (for "vs ICE" column) — same calc as chart useEffect
+    // ICE reference total time (for "vs ICE" column)
     const iceRefTimeMin = useMemo(() => {
         const ICE_DRIVE_INTERVAL_MIN = 180;
         const ICE_STOP_MIN = 5;
@@ -591,27 +581,50 @@ export default function RoadTripView({
                         </label>
                     </div>
 
-                    {/* Vehicle selector */}
-                    {validPairs.length > 0 && (
-                        <div className="mt-4">
-                            <VehicleSelector
-                                pairs={validPairs}
-                                hiddenIds={hiddenVehicleIds}
-                                onToggle={id => setHiddenVehicleIds(prev =>
-                                    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-                                )}
-                                colorOverrides={colorOverrides}
-                                onColorChange={(id, color) => setColorOverrides(prev => ({ ...prev, [id]: color }))}
-                            />
-                        </div>
-                    )}
+                    {/* Run selector */}
+                    <div className="mt-4">
+                        <RunSelector
+                            vehicles={selectedVehicles.filter(v =>
+                                (v.runs || []).some(r => r.has_charging !== false)
+                            )}
+                            selectedRunIds={selectedRunIds}
+                            onToggleRun={runId => setSelectedRunIds(prev =>
+                                prev.includes(runId)
+                                    ? prev.filter(x => x !== runId)
+                                    : [...prev, runId]
+                            )}
+                            onUpdateRunColor={null}
+                            runFilter={r => r.has_charging !== false}
+                            emptyMessage="No charging test data"
+                            renderRunMeta={run => {
+                                const info = allChargingRunsInfo[run.id];
+                                if (!info) return null;
+                                if (!info.miPerKwh) {
+                                    return <span className="text-xs text-red-400 ml-1">⚠ No range data</span>;
+                                }
+                                const eff = info.miPerKwh.toFixed(1);
+                                const spd = info.testSpeedMph
+                                    ? `${fmtSpeed(info.testSpeedMph, units)}`
+                                    : '70 mph (assumed)';
+                                return (
+                                    <span className="text-xs text-gray-400 ml-1">
+                                        {eff} {units === 'metric' ? 'km/kWh' : 'mi/kWh'} @ {spd}
+                                        {info.efficiencyNote && ` · ${info.efficiencyNote}`}
+                                    </span>
+                                );
+                            }}
+                        />
+                    </div>
 
-                    {/* Skipped vehicles */}
-                    {skippedPairs.length > 0 && (
-                        <div className="roadtrip-warning mt-2">
-                            {skippedPairs.map(p => (
-                                <p key={p.vehicle.id}>
-                                    ⚠ {p.vehicle.name}: {!p.rangeRun ? 'No range test data' : !p.chargingRun ? 'No charging data' : !p.batteryKwh ? 'No battery size' : 'Missing efficiency data'}
+                    {/* Warnings for vehicles/runs that can't be simulated */}
+                    {(vehiclesWithNoChargingRuns.length > 0 || skippedEntries.length > 0) && (
+                        <div className="roadtrip-warning mt-3">
+                            {vehiclesWithNoChargingRuns.map(v => (
+                                <p key={v.id}>⚠ {v.name}: No charging test data</p>
+                            ))}
+                            {skippedEntries.map(e => (
+                                <p key={e.run.id}>
+                                    ⚠ {e.vehicle.name} – {e.run.name}: {!e.miPerKwh ? 'No range data for efficiency' : 'No battery capacity'}
                                 </p>
                             ))}
                         </div>
@@ -624,21 +637,22 @@ export default function RoadTripView({
                 <div className="text-center py-8 text-gray-500">Loading charging data…</div>
             )}
 
-            {!loading && validPairs.length === 0 && (
+            {!loading && validEntries.length === 0 && (
                 <div className="empty-state">
-                    <p className="text-lg">No vehicles with both range and charging test data.</p>
+                    <p className="text-lg">No runs with usable charging and efficiency data.</p>
                     <p className="text-sm text-gray-500 mt-2">
-                        Each vehicle needs at least one range test (with distance &amp; energy) and one charging test.
+                        Each run needs charging data, and either its own range test result
+                        or another run from the same vehicle with distance &amp; energy data.
                     </p>
                 </div>
             )}
 
-            {!loading && validPairs.length > 0 && (
+            {!loading && validEntries.length > 0 && (
                 <div className="card mb-6">
                     <h3 className="text-lg font-bold mb-2">
                         Road Trip — {Math.round(convDistance(totalDistance, units))} {dl} at {Math.round(convDistance(speed, units))} {sl}
                     </h3>
-                    <div style={{ height: `${Math.max(400, validPairs.length * 40 + 200)}px`, position: 'relative' }}>
+                    <div style={{ height: `${Math.max(400, validEntries.length * 40 + 200)}px`, position: 'relative' }}>
                         <canvas ref={canvasRef} />
                     </div>
                 </div>
@@ -652,54 +666,64 @@ export default function RoadTripView({
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th className="px-3 py-2 text-left font-semibold">Vehicle</th>
+                                    <th className="px-3 py-2 text-left font-semibold">Vehicle / Run</th>
                                     <th className="px-3 py-2 text-left font-semibold">Total Time</th>
                                     <th className="px-3 py-2 text-left font-semibold">Stops</th>
                                     <th className="px-3 py-2 text-left font-semibold">Avg Charge</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Tested Eff</th>
+                                    <th className="px-3 py-2 text-left font-semibold">Efficiency</th>
                                     <th className="px-3 py-2 text-left font-semibold">Corrected Eff</th>
                                     <th className="px-3 py-2 text-left font-semibold">Speed Adj</th>
                                     <th className="px-3 py-2 text-left font-semibold">vs ICE</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Runs</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {validPairs.map((pair, i) => {
+                                {validEntries.map((entry, i) => {
                                     const sim = simResults[i];
                                     if (!sim) return null;
                                     const chargingSegments = sim.segments.filter(s => s.type === 'charge');
                                     const avgChargeTime = chargingSegments.length > 0
                                         ? chargingSegments.reduce((sum, s) => sum + (s.endTime - s.startTime), 0) / chargingSegments.length
                                         : 0;
-                                    const speedDiff = pair.testSpeedMph
-                                        ? Math.abs(speed - pair.testSpeedMph)
+                                    const speedDiff = entry.testSpeedMph
+                                        ? Math.abs(speed - entry.testSpeedMph)
                                         : 0;
                                     const adjPct = Math.round((sim.speedFactor - 1) * 100);
+                                    const effLabel = units === 'metric' ? 'km/kWh' : 'mi/kWh';
 
-                                    const effectiveColor = colorOverrides[pair.vehicle.id] || pair.color;
                                     return (
-                                        <tr key={pair.vehicle.id}>
+                                        <tr key={entry.run.id}>
                                             <td className="px-3 py-2">
-                                                <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: effectiveColor }} />
-                                                {pair.vehicle.name}
+                                                <div className="flex items-start gap-2">
+                                                    <span className="inline-block w-3 h-3 rounded-full mt-1 shrink-0"
+                                                          style={{ backgroundColor: entry.color }} />
+                                                    <div>
+                                                        <div className="font-medium">{entry.vehicle.name}</div>
+                                                        <div className="text-xs text-gray-400">{entry.run.name}</div>
+                                                    </div>
+                                                </div>
                                             </td>
                                             <td className="px-3 py-2 font-medium">{formatTime(sim.totalTimeMin)}</td>
                                             <td className="px-3 py-2">{sim.chargeStops}</td>
                                             <td className="px-3 py-2">{sim.chargeStops > 0 ? formatTime(avgChargeTime) : '—'}</td>
                                             <td className="px-3 py-2">
-                                                {pair.miPerKwh.toFixed(1)} {units === 'metric' ? 'km/kWh' : 'mi/kWh'}
-                                                {pair.testSpeedMph && (
-                                                    <span className="text-gray-400 ml-1">@ {fmtSpeed(pair.testSpeedMph, units)}</span>
+                                                {entry.miPerKwh.toFixed(1)} {effLabel}
+                                                {entry.testSpeedMph ? (
+                                                    <span className="text-gray-400 ml-1">@ {fmtSpeed(entry.testSpeedMph, units)}</span>
+                                                ) : (
+                                                    <span className="text-gray-400 ml-1">@ 70 mph (assumed)</span>
+                                                )}
+                                                {entry.efficiencyNote && (
+                                                    <span className="block text-xs text-gray-400">{entry.efficiencyNote}</span>
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">
-                                                {sim.correctedMiPerKwh.toFixed(1)} {units === 'metric' ? 'km/kWh' : 'mi/kWh'}
+                                                {sim.correctedMiPerKwh.toFixed(1)} {effLabel}
                                             </td>
                                             <td className={`px-3 py-2 ${speedDiff > 5 ? 'roadtrip-warning' : ''}`}>
                                                 {adjPct > 0 ? `+${adjPct}%` : `${adjPct}%`}
-                                                {speedDiff > 5 && pair.testSpeedMph && (
+                                                {speedDiff > 5 && entry.testSpeedMph && (
                                                     <span className="block text-xs">
-                                                        Test: {fmtSpeed(pair.testSpeedMph, units)}
+                                                        Test: {fmtSpeed(entry.testSpeedMph, units)}
                                                     </span>
                                                 )}
                                             </td>
@@ -715,10 +739,6 @@ export default function RoadTripView({
                                                         : <span className="text-green-600">−{label}</span>;
                                                 })()}
                                             </td>
-                                            <td className="px-3 py-2 text-xs text-gray-500">
-                                                <div>Range: {pair.rangeRun.name}</div>
-                                                <div>Charge: {pair.chargingRun.name}</div>
-                                            </td>
                                         </tr>
                                     );
                                 })}
@@ -729,12 +749,12 @@ export default function RoadTripView({
                     {/* Warnings */}
                     {simResults.some(s => s?.warnings?.length > 0) && (
                         <div className="mt-3 text-sm">
-                            {validPairs.map((pair, i) => {
+                            {validEntries.map((entry, i) => {
                                 const sim = simResults[i];
                                 if (!sim?.warnings?.length) return null;
                                 return sim.warnings.map((w, wi) => (
-                                    <p key={`${pair.vehicle.id}-${wi}`} className="roadtrip-warning">
-                                        ⚠ {pair.vehicle.name}: {w}
+                                    <p key={`${entry.run.id}-${wi}`} className="roadtrip-warning">
+                                        ⚠ {entry.vehicle.name} – {entry.run.name}: {w}
                                     </p>
                                 ));
                             })}
