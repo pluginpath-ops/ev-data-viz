@@ -710,7 +710,7 @@ export default function RoadTripView({
                                                 {entry.testSpeedMph ? (
                                                     <span className="text-gray-400 ml-1">@ {fmtSpeed(entry.testSpeedMph, units)}</span>
                                                 ) : (
-                                                    <span className="text-gray-400 ml-1">@ 70 mph (assumed)</span>
+                                                    <span className="text-amber-500 ml-1" title="Set Speed (mph) on the run in Tests &amp; Data for accurate speed correction">@ 70 mph (assumed)</span>
                                                 )}
                                                 {entry.efficiencyNote && (
                                                     <span className="block text-xs text-gray-400">{entry.efficiencyNote}</span>

@@ -1548,11 +1548,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <p>Date: {run.date}</p>
                                         {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
                                         {run.conditions && <p>Notes: {run.conditions}</p>}
-                                        {/* Range data section — shown whenever the run has range data */}
-                                        {inferRunFlags(run).includes('range') && (
+                                        {/* Range data section — shown whenever the run has range data (with or without the range flag) */}
+                                        {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (
                                             <div className="run-stat-badges">
                                                 {run.source && <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{run.source}</span>}
-                                                {run.speed_mph != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{run.speed_mph} mph</span>}
+                                                {run.speed_mph != null
+                                                    ? <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{run.speed_mph} mph</span>
+                                                    : <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-200" title="Set Speed (mph) in the run's metadata for accurate Road Trip efficiency">70 mph (assumed)</span>
+                                                }
                                                 {run.distance_miles != null && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-200">{run.distance_miles} mi</span>}
                                                 {run.energy_kwh != null && (
                                                     <span
