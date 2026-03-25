@@ -20,8 +20,10 @@ function makeRoadTripPlugin(simResults, units) {
         id: 'roadTripLabels',
         afterDatasetsDraw(chart) {
             const ctx = chart.ctx;
+            let simIdx = 0;
             chart.data.datasets.forEach((ds, di) => {
-                const sim = simResults[di];
+                if (ds._isIce) return; // skip ICE reference line
+                const sim = simResults[simIdx++];
                 if (!sim) return;
 
                 const meta = chart.getDatasetMeta(di);
@@ -310,8 +312,42 @@ export default function RoadTripView({
             };
         }).filter(Boolean);
 
+        // ── ICE reference line ───────────────────────────────────────────
+        const ICE_DRIVE_INTERVAL_MIN = 180; // 3 hours between stops
+        const ICE_STOP_MIN = 5;             // 5-minute fuel stop
+        const icePoints = [];
+        let iceTime = 0, iceDist = 0, iceIter = 0;
+        while (iceDist < roadTripConfig.totalDistance && iceIter < 100) {
+            iceIter++;
+            const remainingMi = roadTripConfig.totalDistance - iceDist;
+            const maxDriveMi  = (roadTripConfig.speed * ICE_DRIVE_INTERVAL_MIN) / 60;
+            const driveMi     = Math.min(maxDriveMi, remainingMi);
+            const driveMin    = (driveMi / roadTripConfig.speed) * 60;
+            icePoints.push({ x: Math.round(iceTime),              y: convDistance(iceDist,          units) });
+            icePoints.push({ x: Math.round(iceTime + driveMin),   y: convDistance(iceDist + driveMi, units) });
+            iceTime += driveMin;
+            iceDist += driveMi;
+            if (iceDist >= roadTripConfig.totalDistance - 0.01) break;
+            icePoints.push({ x: Math.round(iceTime),                  y: convDistance(iceDist, units) });
+            icePoints.push({ x: Math.round(iceTime + ICE_STOP_MIN),   y: convDistance(iceDist, units) });
+            iceTime += ICE_STOP_MIN;
+        }
+        datasets.unshift({
+            label: 'ICE Reference',
+            data: icePoints,
+            borderColor: '#9ca3af',
+            backgroundColor: 'transparent',
+            borderWidth: 1.5,
+            borderDash: [6, 4],
+            tension: 0,
+            pointRadius: 0,
+            fill: false,
+            order: 1,
+            _isIce: true,
+        });
+
         const validSims = simResults.filter(Boolean);
-        const maxTime = Math.max(...validSims.map(s => s.totalTimeMin), 60);
+        const maxTime = Math.max(...validSims.map(s => s.totalTimeMin), iceTime, 60);
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
