@@ -1,5 +1,6 @@
 import ChargingView from './ChargingView';
 import ChargeCompareView from './ChargeCompareView';
+import RoadTripView from './RoadTripView';
 import SpecsChartView from './SpecsChartView';
 
 /**
@@ -9,7 +10,7 @@ import SpecsChartView from './SpecsChartView';
  */
 export default function PopoutView({
     vehicles, selectedVehicles, chartMode, chartConfig,
-    setChartConfig, compareConfig, onUpdateRunColor,
+    setChartConfig, compareConfig, roadTripConfig, onUpdateRunColor,
 }) {
     return (
         <div className="popout-root">
@@ -28,7 +29,17 @@ export default function PopoutView({
                 />
             )}
 
-            {selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && (
+            {selectedVehicles.length > 0 && chartMode === 'roadtrip' && roadTripConfig && (
+                <RoadTripView
+                    vehicles={vehicles}
+                    selectedVehicleIds={selectedVehicles}
+                    roadTripConfig={roadTripConfig}
+                    setRoadTripConfig={() => {}}
+                    presentationMode
+                />
+            )}
+
+            {selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'roadtrip' && (
                 <ChargingView
                     vehicles={vehicles}
                     selectedVehicleIds={selectedVehicles}

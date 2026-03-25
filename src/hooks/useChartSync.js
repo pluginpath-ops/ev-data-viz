@@ -10,8 +10,8 @@ const CHANNEL = 'evbench-chart-sync';
  * Pop-out tab: sends 'request-state' on mount + focus, applies received state.
  */
 export function useChartSync({
-    chartMode, chartConfig, selectedVehicles, compareConfig,
-    setChartMode, setChartConfig, setVehicleSelection, setCompareConfig,
+    chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig,
+    setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig,
 }) {
     const isPopout = useRef(
         new URLSearchParams(window.location.search).get('popout') === '1'
@@ -20,9 +20,9 @@ export function useChartSync({
     const channelRef = useRef(null);
 
     // Keep a ref of current state so the onmessage handler never closes over stale values
-    const stateRef = useRef({ chartMode, chartConfig, selectedVehicles, compareConfig });
+    const stateRef = useRef({ chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig });
     useEffect(() => {
-        stateRef.current = { chartMode, chartConfig, selectedVehicles, compareConfig };
+        stateRef.current = { chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig };
     });
 
     useEffect(() => {
@@ -38,7 +38,8 @@ export function useChartSync({
                 setChartMode(data.chartMode);
                 setChartConfig(data.chartConfig);
                 setVehicleSelection(data.selectedVehicleIds);
-                if (data.compareConfig) setCompareConfig(data.compareConfig);
+                if (data.compareConfig)  setCompareConfig(data.compareConfig);
+                if (data.roadTripConfig) setRoadTripConfig(data.roadTripConfig);
             };
             // Request current state on mount and whenever the tab regains focus
             // (covers the case where the main tab refreshed while this was in the background)
@@ -53,13 +54,14 @@ export function useChartSync({
             // Main tab: respond to state requests from pop-outs
             channel.onmessage = ({ data }) => {
                 if (data?.type !== 'request-state') return;
-                const { chartMode, chartConfig, selectedVehicles, compareConfig } = stateRef.current;
+                const { chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig } = stateRef.current;
                 channel.postMessage({
                     type: 'chart-state',
                     chartMode,
                     chartConfig,
                     selectedVehicleIds: selectedVehicles,
                     compareConfig,
+                    roadTripConfig,
                 });
             };
             return () => channel.close();
@@ -69,13 +71,14 @@ export function useChartSync({
     /** Called by App.jsx whenever chart state changes (main tab only). */
     const sendState = useCallback(() => {
         if (isPopout || !channelRef.current) return;
-        const { chartMode, chartConfig, selectedVehicles, compareConfig } = stateRef.current;
+        const { chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig } = stateRef.current;
         channelRef.current.postMessage({
             type: 'chart-state',
             chartMode,
             chartConfig,
             selectedVehicleIds: selectedVehicles,
             compareConfig,
+            roadTripConfig,
         });
     }, [isPopout]);
 

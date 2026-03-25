@@ -7,6 +7,7 @@ import VehiclesView from './components/VehiclesView';
 import RunsView from './components/RunsView';
 import ChargingView from './components/ChargingView';
 import ChargeCompareView from './components/ChargeCompareView';
+import RoadTripView from './components/RoadTripView';
 import PopoutView from './components/PopoutView';
 import SpecsView from './components/SpecsView';
 import SpecsChartView from './components/SpecsChartView';
@@ -76,6 +77,11 @@ export default function App() {
     const [view, setView] = useState('vehicles');
     const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare'
     const [compareConfig, setCompareConfig] = useState({ xMinutes: 15, mMiles: 150, startSoc: 10 });
+    const [roadTripConfig, setRoadTripConfig] = useState({
+        mode: 'distance', startSoc: 90, minSoc: 10,
+        legDistance: 150, chargeTime: 30,
+        totalDistance: 500, speed: 70,
+    });
     const [chartConfig, setChartConfig] = useState({
         xAxis: 'soc',
         yAxis: 'chargeRate',
@@ -105,8 +111,8 @@ export default function App() {
     };
 
     const { isPopout, sendState } = useChartSync({
-        chartMode, chartConfig, selectedVehicles, compareConfig,
-        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig,
+        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig,
+        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig,
     });
 
     // Navigate to a new top-level view and push a browser history entry so the
@@ -265,6 +271,7 @@ export default function App() {
                 chartConfig={chartConfig}
                 setChartConfig={setChartConfig}
                 compareConfig={compareConfig}
+                roadTripConfig={roadTripConfig}
                 onUpdateRunColor={updateRunColor}
             />
         );
@@ -442,10 +449,11 @@ export default function App() {
                             <div className="flex items-center gap-2 pb-2">
                                 <div className="flex gap-0.5">
                                     {[
-                                        { key: 'charging', label: 'Charging' },
-                                        { key: 'range',    label: 'Range & Efficiency' },
-                                        { key: 'compare',  label: 'Charge Compare' },
-                                        { key: 'specs',    label: 'Spec Chart' },
+                                        { key: 'charging',  label: 'Charging' },
+                                        { key: 'range',     label: 'Range & Efficiency' },
+                                        { key: 'compare',   label: 'Charge Compare' },
+                                        { key: 'roadtrip',  label: 'Road Trip' },
+                                        { key: 'specs',     label: 'Spec Chart' },
                                     ].map(({ key, label }) => (
                                         <button
                                             key={key}
@@ -584,7 +592,7 @@ export default function App() {
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                         />
                     )}
-                    {view === 'chart' && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && (
+                    {view === 'chart' && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'roadtrip' && (
                         <ChargingView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -592,6 +600,14 @@ export default function App() {
                             setChartConfig={setChartConfig}
                             onUpdateRunColor={updateRunColor}
                             chartMode={chartMode}
+                        />
+                    )}
+                    {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'roadtrip' && (
+                        <RoadTripView
+                            vehicles={vehicles}
+                            selectedVehicleIds={selectedVehicles}
+                            roadTripConfig={roadTripConfig}
+                            setRoadTripConfig={setRoadTripConfig}
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'compare' && (
