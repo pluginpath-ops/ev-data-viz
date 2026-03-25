@@ -561,7 +561,7 @@ export default function RoadTripView({
                                     className={`btn btn-sm ${mode === 'distance' ? 'btn-primary' : 'btn-secondary'}`}
                                     onClick={() => setField('mode', 'distance')}
                                 >
-                                    Fixed Stop Distance
+                                    Fixed Charge Amount
                                 </button>
                                 <button
                                     className={`btn btn-sm ${mode === 'time' ? 'btn-primary' : 'btn-secondary'}`}
@@ -605,7 +605,7 @@ export default function RoadTripView({
                         </label>
                         {mode === 'distance' && (
                             <label className="text-sm">
-                                <span className="font-medium block mb-1">Between Stops ({dl})</span>
+                                <span className="font-medium block mb-1">Miles per Stop ({dl})</span>
                                 <input type="number" className="w-full border rounded px-2 py-1"
                                     min={10} value={dispLeg}
                                     onChange={e => {
@@ -648,6 +648,21 @@ export default function RoadTripView({
                                 onChange={e => setField('overhead', Number(e.target.value))} />
                         </label>
                     </div>
+
+                    {/* Simulation result warnings — shown here so they're near the controls that triggered them */}
+                    {simResults.some(s => s?.warnings?.length > 0) && (
+                        <div className="mt-3 text-sm">
+                            {validEntries.map((entry, i) => {
+                                const sim = simResults[i];
+                                if (!sim?.warnings?.length) return null;
+                                return sim.warnings.map((w, wi) => (
+                                    <p key={`${entry.run.id}-${wi}`} className="roadtrip-warning">
+                                        ⚠ {entry.vehicle.name} – {entry.run.name}: {w}
+                                    </p>
+                                ));
+                            })}
+                        </div>
+                    )}
 
                     {/* Run selector */}
                     <div className="mt-4">
@@ -814,20 +829,6 @@ export default function RoadTripView({
                         </table>
                     </div>
 
-                    {/* Warnings */}
-                    {simResults.some(s => s?.warnings?.length > 0) && (
-                        <div className="mt-3 text-sm">
-                            {validEntries.map((entry, i) => {
-                                const sim = simResults[i];
-                                if (!sim?.warnings?.length) return null;
-                                return sim.warnings.map((w, wi) => (
-                                    <p key={`${entry.run.id}-${wi}`} className="roadtrip-warning">
-                                        ⚠ {entry.vehicle.name} – {entry.run.name}: {w}
-                                    </p>
-                                ));
-                            })}
-                        </div>
-                    )}
                 </div>
             )}
         </div>

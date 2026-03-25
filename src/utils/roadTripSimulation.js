@@ -33,7 +33,7 @@ export function speedCorrectionFactor(travelMph, testMph) {
  * @param {Array}   params.chargingData     Charging run data points (sorted by frame)
  * @param {number}  params.startSoc         Starting SoC (0–100)
  * @param {number}  params.minSoc           Minimum SoC before charging (0–100)
- * @param {number}  params.legDistanceMi    Distance between charging stops (mode A)
+ * @param {number}  params.legDistanceMi    Miles of range added per charging stop (distance mode)
  * @param {number}  params.totalDistanceMi  Total trip distance
  * @param {number}  params.speedMph         Travel speed
  * @param {number}  params.chargeTimeMinutes Fixed charge duration per stop (mode B)
@@ -68,19 +68,6 @@ export function simulateRoadTrip({
         warnings.push('Insufficient charging data points');
     }
 
-    // ── Pre-flight check (distance mode) ─────────────────────────────────────
-    if (mode === 'distance') {
-        const maxRange = batteryKwh * (100 - minSoc) / 100 * correctedMiPerKwh;
-        if (maxRange < legDistanceMi) {
-            warnings.push(
-                `Insufficient range: max range from 100% SoC is ${round1(maxRange)} mi, ` +
-                `but leg distance is ${round1(legDistanceMi)} mi. ` +
-                `Reduce leg distance or raise minimum SoC.`
-            );
-            return { segments: [], totalTimeMin: 0, totalDistMi: 0, chargeStops: 0, warnings, speedFactor: factor, correctedMiPerKwh };
-        }
-    }
-
     let currentSoc  = startSoc;
     let currentDist = 0;
     let currentTime = 0;
@@ -91,26 +78,12 @@ export function simulateRoadTrip({
         iterations++;
 
         // ── DRIVE ────────────────────────────────────────────────────────
-        const rangeFromSoc = batteryKwh * (currentSoc - minSoc) / 100 * correctedMiPerKwh;
+        const rangeFromSoc  = batteryKwh * (currentSoc - minSoc) / 100 * correctedMiPerKwh;
         const remainingTrip = totalDistanceMi - currentDist;
 
-        let driveDist;
-        if (mode === 'distance') {
-            // Next charger is at the next legDistance multiple
-            const distToCharger = (legDistanceMi - (currentDist % legDistanceMi)) || legDistanceMi;
-            // Detect mid-leg range exhaustion (shouldn't happen after pre-flight, but guard anyway)
-            if (rangeFromSoc < distToCharger - 0.1 && distToCharger <= remainingTrip) {
-                warnings.push(
-                    `Ran out of range ${round1(distToCharger - rangeFromSoc)} mi short of charger ` +
-                    `(at ${round1(currentDist + rangeFromSoc)} mi). Increase leg distance or reduce minimum SoC.`
-                );
-                break;
-            }
-            driveDist = Math.min(rangeFromSoc, distToCharger, remainingTrip);
-        } else {
-            // Mode B: drive until minSoc or trip end
-            driveDist = Math.min(rangeFromSoc, remainingTrip);
-        }
+        // Both modes: drive until minSoc (or trip end).
+        // Distance mode adds a fixed amount of charge at each stop rather than stopping at fixed intervals.
+        const driveDist = Math.min(rangeFromSoc, remainingTrip);
 
         driveDist = Math.max(0, driveDist);
 
@@ -144,10 +117,12 @@ export function simulateRoadTrip({
         let chargeTime, targetSoc;
 
         if (mode === 'distance') {
-            // Charge enough for next leg
-            const nextLeg = Math.min(legDistanceMi, totalDistanceMi - currentDist);
-            const socNeeded = (nextLeg / (batteryKwh * correctedMiPerKwh)) * 100;
-            targetSoc = Math.min(minSoc + socNeeded, 100);
+            // Add a fixed number of miles of range per stop (legDistanceMi), capped at
+            // what's needed for the remaining trip and at 100% SoC.
+            const remaining   = totalDistanceMi - currentDist;
+            const socToAdd    = (legDistanceMi / (batteryKwh * correctedMiPerKwh)) * 100;
+            const socForTrip  = (remaining     / (batteryKwh * correctedMiPerKwh)) * 100;
+            targetSoc = Math.min(currentSoc + Math.min(socToAdd, socForTrip), 100);
             targetSoc = Math.max(targetSoc, currentSoc + 1);
 
             const tStart = interpolate(chargingBySoc, 'soc', 'time', currentSoc, true, true);
