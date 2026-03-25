@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { fmtSpeed, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel } from '../utils/unitConversions';
 import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
 import { dataService } from '../services/DataService';
@@ -27,7 +28,7 @@ const inferRunFlags = (run) => {
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, onAddTrim, onDeleteTrim, vehicles, onCopyRunToVehicle }) {
-    const { runVotes, loadRunVotes, toggleRunVote } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
@@ -1552,8 +1553,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         {inferRunFlags(run).includes('range') && (
                                             <div className="run-stat-badges">
                                                 {run.source && <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{run.source}</span>}
-                                                {run.speed_mph != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{run.speed_mph} mph</span>}
-                                                {run.distance_miles != null && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-200">{run.distance_miles} mi</span>}
+                                                {run.speed_mph != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>}
+                                                {run.distance_miles != null && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-200">{fmtDistance(run.distance_miles, units)}</span>}
                                                 {run.energy_kwh != null && (
                                                     <span
                                                         title="Energy consumed on the drive — energy out (measured at vehicle)"
@@ -1564,10 +1565,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 )}
                                                 {run.energy_kwh != null && run.distance_miles != null && (
                                                     <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
-                                                        {Math.round(run.distance_miles / run.energy_kwh * 100) / 100} mi/kWh
+                                                        {calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}
                                                     </span>
                                                 )}
-                                                {run.temperature_f != null && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded border border-orange-200">{run.temperature_f}°F</span>}
+                                                {run.temperature_f != null && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>}
                                                 {run.start_soc != null && run.end_soc != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">SoC {run.start_soc}→{run.end_soc}%</span>}
                                                 {run.url && <a href={run.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline px-2 py-0.5 rounded">Source ↗</a>}
                                             </div>

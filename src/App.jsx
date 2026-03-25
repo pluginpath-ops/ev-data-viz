@@ -63,6 +63,8 @@ export default function App() {
         addTrim,
         deleteTrim,
         copyRunToVehicle,
+        units,
+        toggleUnits,
     } = useAppContext();
 
     // Auto-dismiss notifications after 6 s
@@ -510,6 +512,9 @@ export default function App() {
                                     </button>
                                 </>
                             )}
+                            <button onClick={toggleUnits} className="units-toggle ml-auto" title="Switch unit system">
+                                ⇄ {units === 'imperial' ? 'Imperial' : 'Metric'}
+                            </button>
                         </div>
                         </div>
                     </div>

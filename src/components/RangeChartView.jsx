@@ -3,6 +3,13 @@ import Chart from 'chart.js/auto';
 import AxisScaleControls from './AxisScaleControls';
 import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
+import { useAppContext } from '../context/AppContext';
+import {
+    convDistance, convSpeed, convTemp,
+    distanceLabel, speedLabel, tempLabel,
+    calcEff, effOptions, effLabel as getEffLabel,
+    fmtSpeed, fmtTemp,
+} from '../utils/unitConversions';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -29,15 +36,6 @@ const calcRange = (run) => {
     return Math.round(d);
 };
 
-// ── Efficiency helper ─────────────────────────────────────────────────────────
-const calcEff = (run, unit) => {
-    const e = run.energy_kwh;
-    const d = run.distance_miles;
-    if (!e || !d || e <= 0 || d <= 0) return null;
-    return unit === 'wh_mi'
-        ? Math.round((e * 1000) / d * 10) / 10
-        : Math.round((d / e) * 100) / 100;
-};
 
 // ── Data availability check ───────────────────────────────────────────────────
 const hasDataForType = (run, type) => {
@@ -50,6 +48,7 @@ const hasDataForType = (run, type) => {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, onUpdateRunColor, presentationMode = false }) {
+    const { units } = useAppContext();
     const chartRef      = useRef(null);
     const chartInstance = useRef(null);
     const [chartType, setChartType] = useState('range-vehicle-bar');
@@ -111,15 +110,17 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         const typeInfo = CHART_TYPES.find(t => t.key === chartType);
         if (!typeInfo || plottableRuns.length === 0) return null;
 
-        const isRange = chartType.includes('range-');
-        const isSpeed = chartType.includes('-speed-');
-        const effLabel = effUnit === 'mi_kwh' ? 'Efficiency (mi/kWh)' : 'Efficiency (Wh/mi)';
-        const getY     = (run) => isRange ? calcRange(run) : calcEff(run, effUnit);
-        const yLabel   = isRange ? 'Range (miles)' : effLabel;
+        const isRange    = chartType.includes('range-');
+        const isSpeed    = chartType.includes('-speed-');
+        const effLabelStr = getEffLabel(effUnit, units);
+        const getY       = isRange
+            ? (run) => convDistance(calcRange(run), units)
+            : (run) => calcEff(run.distance_miles, run.energy_kwh, effUnit, units);
+        const yLabel     = isRange ? `Range (${distanceLabel(units)})` : `Efficiency (${effLabelStr})`;
 
         // ── Bar: flat single dataset — one bar per run, vehicle grouping via plugin ─
         if (typeInfo.kind === 'bar') {
-            const yUnit  = isRange ? 'mi' : (effUnit === 'mi_kwh' ? 'mi/kWh' : 'Wh/mi');
+            const yUnit  = isRange ? distanceLabel(units) : effLabelStr;
             const labels = plottableRuns.map(r => r.name);
             const datasets = [{
                 label:           yLabel,
@@ -153,7 +154,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 const runPoints = runs
                     .map(r => ({
                         run:      r,
-                        x:        isSpeed ? r.speed_mph : r.temperature_f,
+                        x:        isSpeed ? convSpeed(r.speed_mph, units) : convTemp(r.temperature_f, units),
                         y:        getY(r),
                         _color:   r.color   || '#3b82f6',
                         _runName: r.name,
@@ -184,7 +185,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 });
             });
 
-            const xLabel = isSpeed ? 'Speed (mph)' : 'Ambient Temp (°F)';
+            const xLabel = isSpeed ? `Speed (${speedLabel(units)})` : `Ambient Temp (${tempLabel(units)})`;
             return { kind: 'line', data: { datasets }, xLabel, yLabel };
         }
 
@@ -235,8 +236,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     // Build ordered badge list
                     const badges = [];
                     if (run._yValue != null) badges.push({ text: `${run._yValue} ${run._yUnit}`, primary: true });
-                    if (run.speed_mph     != null) badges.push({ text: `${run.speed_mph} mph` });
-                    if (run.temperature_f != null) badges.push({ text: `${run.temperature_f}°F` });
+                    if (run.speed_mph     != null) badges.push({ text: fmtSpeed(run.speed_mph, units) });
+                    if (run.temperature_f != null) badges.push({ text: fmtTemp(run.temperature_f, units) });
                     if (badges.length === 0) return;
 
                     const pillH  = 15, pillPad = 5, gap = 3, topPad = 6;
@@ -386,11 +387,11 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                     if (!run) return [];
                                     return runTooltipLines(run, [
                                         run._yValue != null ? `${built.yLabel}: ${run._yValue}` : null,
-                                    ].filter(Boolean));
+                                    ].filter(Boolean), units);
                                 }
                                 // Line charts: run objects are stored parallel to points
                                 const run = ctx.dataset?.runMetas?.[ctx.dataIndex];
-                                return run ? runTooltipLines(run) : [];
+                                return run ? runTooltipLines(run, [], units) : [];
                             },
                         },
                     },
@@ -419,7 +420,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 chartInstance.current = null;
             }
         };
-    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints]);
+    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units]);
 
     // ── Copy chart PNG ────────────────────────────────────────────────────────
     const handleCopyImage = async () => {
@@ -443,7 +444,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     <h3 className="text-lg font-bold">Chart Options — Range &amp; Efficiency</h3>
                     {/* Efficiency unit toggle — relevant for efficiency charts */}
                     <div className="efficiency-unit-toggle">
-                        {[{ key: 'mi_kwh', label: 'mi/kWh' }, { key: 'wh_mi', label: 'Wh/mi' }].map(({ key, label }) => (
+                        {effOptions(units).map(({ value: key, label }) => (
                             <button
                                 key={key}
                                 type="button"
@@ -499,9 +500,11 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     runFilter={r => r.has_range}
                     emptyMessage="No range test records"
                     renderRunMeta={run => {
-                        const eff         = calcEff(run, effUnit);
-                        const range       = calcRange(run);
-                        const effLabel    = effUnit === 'mi_kwh' ? 'mi/kWh' : 'Wh/mi';
+                        const eff         = calcEff(run.distance_miles, run.energy_kwh, effUnit, units);
+                        const rawRange    = calcRange(run);
+                        const range       = rawRange != null ? convDistance(rawRange, units) : null;
+                        const effLabelStr = getEffLabel(effUnit, units);
+                        const dl          = distanceLabel(units);
                         const socUsed     = (run.start_soc != null && run.end_soc != null) ? run.start_soc - run.end_soc : null;
                         const isProjected = socUsed != null && socUsed !== 100;
                         const canPlot     = hasDataForType(run, chartType);
@@ -509,21 +512,21 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         return (
                             <>
                                 {run.speed_mph != null && (
-                                    <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{run.speed_mph} mph</span>
+                                    <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
                                 )}
                                 {run.temperature_f != null && (
-                                    <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{run.temperature_f}°F</span>
+                                    <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>
                                 )}
                                 {range != null && (
                                     <span
                                         className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200"
                                         title={isProjected ? `Projected from ${run.distance_miles} mi driven over ${socUsed}% SoC` : 'Measured distance'}
                                     >
-                                        {range} mi{isProjected ? ' ⟳' : ''}
+                                        {range} {dl}{isProjected ? ' ⟳' : ''}
                                     </span>
                                 )}
                                 {eff != null && (
-                                    <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">{eff} {effLabel}</span>
+                                    <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">{eff} {effLabelStr}</span>
                                 )}
                                 {!canPlot && isChecked && (
                                     <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200" title="Missing fields required for this chart type">⚠ missing data</span>

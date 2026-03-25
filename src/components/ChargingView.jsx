@@ -6,8 +6,11 @@ import RunSelector from './RunSelector';
 import RangeChartView from './RangeChartView';
 import AxisScaleControls from './AxisScaleControls';
 import { runTooltipLines } from '../utils/tooltipHelpers';
+import { useAppContext } from '../context/AppContext';
+import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, presentationMode = false }) {
+    const { units } = useAppContext();
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
     const [runDataCache, setRunDataCache] = useState({});
@@ -145,19 +148,20 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         fetchMissingData();
     }, [chartConfig.selectedRuns]);
 
+    const dl = distanceLabel(units);
     const axisOptions = [
-        { value: 'soc',        label: 'State of Charge (%)' },
-        { value: 'deltaSoc',   label: 'SoC Added (%)' },
-        { value: 'chargeRate', label: 'Charge Rate (kW)' },
-        { value: 'time',       label: 'Time (min)' },
-        { value: 'range',        label: 'Range - Tested (mi)' },
-        { value: 'deltaRange',   label: 'Range Added - Tested (mi)' },
-        { value: 'rangeEpa',     label: 'Range - EPA (mi)' },
-        { value: 'deltaRangeEpa',label: 'Range Added - EPA (mi)' },
-        { value: 'temperature',label: 'Temperature' },
-        { value: 'cRate',      label: 'C-Rate  (~kW ÷ battery)' },
-        { value: 'rangeRate',  label: 'Range Rate (mi/min)' },
-        { value: 'frame',      label: 'Frame' },
+        { value: 'soc',           label: 'State of Charge (%)' },
+        { value: 'deltaSoc',      label: 'SoC Added (%)' },
+        { value: 'chargeRate',    label: 'Charge Rate (kW)' },
+        { value: 'time',          label: 'Time (min)' },
+        { value: 'range',         label: `Range - Tested (${dl})` },
+        { value: 'deltaRange',    label: `Range Added - Tested (${dl})` },
+        { value: 'rangeEpa',      label: `Range - EPA (${dl})` },
+        { value: 'deltaRangeEpa', label: `Range Added - EPA (${dl})` },
+        { value: 'temperature',   label: `Temperature (${tempLabel(units)})` },
+        { value: 'cRate',         label: 'C-Rate  (~kW ÷ battery)' },
+        { value: 'rangeRate',     label: `Range Rate (${dl}/min)` },
+        { value: 'frame',         label: 'Frame' },
     ];
 
     const chartPresets = [
@@ -167,6 +171,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         { emoji: '📊', name: 'Rate + SoC vs Time',      x: 'time', y: 'chargeRate', y2: 'deltaSoc'   },
         { emoji: '📊', name: 'Rate + Range vs Time',    x: 'time', y: 'chargeRate', y2: 'deltaRange' },
     ];
+
+    // Convert a stored (imperial) field value to the current unit system for display.
+    const DISTANCE_AXES = new Set(['range', 'deltaRange', 'rangeEpa', 'deltaRangeEpa', 'rangeRate']);
+    const convertAxisValue = (value, fieldKey) => {
+        if (value == null) return null;
+        if (DISTANCE_AXES.has(fieldKey)) return convDistance(value, units);
+        if (fieldKey === 'temperature')  return convTemp(value, units);
+        return value;
+    };
 
     /**
      * Get the value for a field key, computing virtual fields (cRate, rangeRate)
@@ -305,11 +318,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // 3. X value mapper
             const getX = raceActive
                 ? (d) => (d.time != null ? Math.round((d.time - timeOffset) * 10) / 10 : null)
-                : (d) => getFieldValue(d, chartConfig.xAxis, vehicleBattery, vehicleRange);
+                : (d) => convertAxisValue(getFieldValue(d, chartConfig.xAxis, vehicleBattery, vehicleRange), chartConfig.xAxis);
 
             // 4. Y1 dataset
             const y1Points = workingData
-                .map(d => ({ x: getX(d), y: getFieldValue(d, chartConfig.yAxis, vehicleBattery, vehicleRange) }))
+                .map(d => ({ x: getX(d), y: convertAxisValue(getFieldValue(d, chartConfig.yAxis, vehicleBattery, vehicleRange), chartConfig.yAxis) }))
                 .filter(p => p.x != null && p.y != null);
             if (y1Points.length === 0) return [];
 
@@ -331,7 +344,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // 5. Y2 dataset (hidden from legend; dashed line + triangle points)
             if (chartConfig.y2Axis) {
                 const y2Points = workingData
-                    .map(d => ({ x: getX(d), y: getFieldValue(d, chartConfig.y2Axis, vehicleBattery, vehicleRange) }))
+                    .map(d => ({ x: getX(d), y: convertAxisValue(getFieldValue(d, chartConfig.y2Axis, vehicleBattery, vehicleRange), chartConfig.y2Axis) }))
                     .filter(p => p.x != null && p.y != null);
                 if (y2Points.length > 0) {
                     result.push({
@@ -397,7 +410,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                 return [`${xl}: ${ctx.parsed.x}`, `${yl}: ${ctx.parsed.y}`];
                             },
                             afterLabel(ctx) {
-                                return runTooltipLines(ctx.dataset?.runMeta);
+                                return runTooltipLines(ctx.dataset?.runMeta, [], units);
                             },
                         },
                     }
@@ -433,7 +446,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 chartInstance.current.destroy();
             }
         };
-    }, [chartConfig, selectedVehicles, runDataCache]);
+    }, [chartConfig, selectedVehicles, runDataCache, units]);
 
     // ── PNG export ───────────────────────────────────────────────────────────
     const handleExportImage = async () => {

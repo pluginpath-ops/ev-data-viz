@@ -1,0 +1,92 @@
+// Conversion factors
+export const MI_TO_KM   = 1.60934;
+export const IN_TO_MM   = 25.4;
+export const LBS_TO_KG  = 0.453592;
+export const CUFT_TO_L  = 28.3168;
+export const LBFT_TO_NM = 1.35582;
+
+// ── Formatted strings (value + unit label) ────────────────────────────────
+
+export const fmtDistance  = (mi,   sys) => sys === 'metric' ? `${r1(mi * MI_TO_KM)} km`           : `${mi} mi`;
+export const fmtSpeed     = (mph,  sys) => sys === 'metric' ? `${r1(mph * MI_TO_KM)} kph`          : `${mph} mph`;
+export const fmtTemp      = (degF, sys) => sys === 'metric' ? `${r1((degF - 32) * 5 / 9)}°C`       : `${degF}°F`;
+export const fmtWeight    = (lbs,  sys) => sys === 'metric' ? `${r1(lbs * LBS_TO_KG)} kg`          : `${lbs} lbs`;
+export const fmtVolume    = (cuft, sys) => sys === 'metric' ? `${r1(cuft * CUFT_TO_L)} L`          : `${cuft} cu ft`;
+export const fmtDimension = (in_,  sys) => sys === 'metric' ? `${Math.round(in_ * IN_TO_MM)} mm`   : `${in_} in`;
+export const fmtTorque    = (lbft, sys) => sys === 'metric' ? `${r1(lbft * LBFT_TO_NM)} Nm`       : `${lbft} lb-ft`;
+export const fmtPower     = (hp,   sys) => sys === 'metric' ? `${r1(hp * 0.7457)} kW`              : `${hp} hp`;
+
+// ── Raw conversions (no label) — for chart data values ────────────────────
+
+export const convDistance = (mi,   sys) => sys === 'metric' ? r1(mi * MI_TO_KM)        : mi;
+export const convSpeed    = (mph,  sys) => sys === 'metric' ? r1(mph * MI_TO_KM)        : mph;
+export const convTemp     = (degF, sys) => sys === 'metric' ? r1((degF - 32) * 5 / 9)  : degF;
+
+// ── Unit label strings ────────────────────────────────────────────────────
+
+export const distanceLabel = sys => sys === 'metric' ? 'km'  : 'mi';
+export const speedLabel    = sys => sys === 'metric' ? 'kph' : 'mph';
+export const tempLabel     = sys => sys === 'metric' ? '°C'  : '°F';
+
+// ── Efficiency ────────────────────────────────────────────────────────────
+
+export function effOptions(sys) {
+    return sys === 'metric'
+        ? [{ value: 'mi_kwh', label: 'km/kWh' }, { value: 'wh_mi', label: 'kWh/100km' }]
+        : [{ value: 'mi_kwh', label: 'mi/kWh' }, { value: 'wh_mi', label: 'Wh/mi'     }];
+}
+
+export function calcEff(distMi, energyKwh, effUnit, sys) {
+    if (!energyKwh || !distMi || energyKwh <= 0 || distMi <= 0) return null;
+    if (sys === 'metric') {
+        const km = distMi * MI_TO_KM;
+        return effUnit === 'wh_mi'
+            ? r2(energyKwh * 100 / km)   // kWh/100km
+            : r2(km / energyKwh);         // km/kWh
+    }
+    return effUnit === 'wh_mi'
+        ? r1(energyKwh * 1000 / distMi)  // Wh/mi
+        : r2(distMi / energyKwh);         // mi/kWh
+}
+
+export const effLabel = (effUnit, sys) =>
+    sys === 'metric'
+        ? (effUnit === 'wh_mi' ? 'kWh/100km' : 'km/kWh')
+        : (effUnit === 'wh_mi' ? 'Wh/mi'     : 'mi/kWh');
+
+// ── Raw conversion via unitGroup (no label) — for chart data ─────────────
+
+export function convValue(value, unitGroup, sys) {
+    if (value == null || sys === 'imperial') return value;
+    switch (unitGroup) {
+        case 'distance':  return r1(value * MI_TO_KM);
+        case 'speed':     return r1(value * MI_TO_KM);
+        case 'weight':    return r1(value * LBS_TO_KG);
+        case 'volume':    return r1(value * CUFT_TO_L);
+        case 'dimension': return Math.round(value * IN_TO_MM);
+        case 'torque':    return r1(value * LBFT_TO_NM);
+        case 'power':     return r1(value * 0.7457);
+        default:          return value;
+    }
+}
+
+// ── Spec field formatting via unitGroup ───────────────────────────────────
+
+export function formatSpecValue(value, unitGroup, sys) {
+    if (value == null) return '—';
+    switch (unitGroup) {
+        case 'distance':  return fmtDistance(value, sys);
+        case 'speed':     return fmtSpeed(value, sys);
+        case 'weight':    return fmtWeight(value, sys);
+        case 'volume':    return fmtVolume(value, sys);
+        case 'dimension': return fmtDimension(value, sys);
+        case 'torque':    return fmtTorque(value, sys);
+        case 'power':     return fmtPower(value, sys);
+        default:          return String(value);
+    }
+}
+
+// ── Internal helpers ──────────────────────────────────────────────────────
+
+function r1(v) { return Math.round(v * 10) / 10; }
+function r2(v) { return Math.round(v * 100) / 100; }

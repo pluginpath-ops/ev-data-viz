@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useAppContext } from '../context/AppContext';
+import { fmtDistance } from '../utils/unitConversions';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 import EditVehicleForm from './EditVehicleForm';
@@ -54,6 +56,8 @@ export default function VehiclesView({
     const [specsEditingVehicle, setSpecsEditingVehicle] = useState(null);
     const [specsViewingVehicle, setSpecsViewingVehicle] = useState(null);
     const VEHICLES_PER_PAGE = 24;
+
+    const { units } = useAppContext();
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -602,7 +606,7 @@ export default function VehiclesView({
                                                 <p className="text-gray-600 mb-2">{vehicle.make} {vehicle.model} {vehicle.year}</p>
                                                 <div className="text-sm text-gray-700 space-y-1">
                                                     {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
-                                                    {vehicle.range && <p>Range: {vehicle.range} mi</p>}
+                                                    {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
                                                 </div>
                                                 <p className="text-sm font-semibold mt-2">Tests: {vehicle.runs?.length || 0}</p>
                                                 {vehicle.tags?.length > 0 && (
@@ -703,7 +707,7 @@ export default function VehiclesView({
                                     {/* Specs */}
                                     <div className="text-sm text-gray-600 space-y-0.5 w-36 flex-shrink-0 hidden sm:block">
                                         {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
-                                        {vehicle.range && <p>Range: {vehicle.range} mi</p>}
+                                        {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
                                         {vehicle.power && <p>Power: {vehicle.power} kW</p>}
                                         <p className="font-medium">Tests: {vehicle.runs?.length || 0}</p>
                                     </div>

@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
+import { useAppContext } from '../context/AppContext';
+import { convValue, formatSpecValue, distanceLabel } from '../utils/unitConversions';
 
 // ── Field definitions ─────────────────────────────────────────────────────────
 
 const VEHICLE_FIELDS = [
-    { key: 'vehicle.year',    label: 'Year',           type: 'integer' },
-    { key: 'vehicle.battery', label: 'Battery (kWh)',  type: 'number'  },
-    { key: 'vehicle.range',   label: 'EPA Range (mi)', type: 'number'  },
+    { key: 'vehicle.year',    label: 'Year',          type: 'integer' },
+    { key: 'vehicle.battery', label: 'Battery (kWh)', type: 'number'  },
+    { key: 'vehicle.range',   label: 'EPA Range',     type: 'number', unitGroup: 'distance' },
 ];
 
-function buildFieldGroups(vehicles) {
+function buildFieldGroups(vehicles, vehicleFields) {
     const catCustomKeys = {};
     for (const v of vehicles) {
         if (!v.specs) continue;
@@ -21,11 +23,11 @@ function buildFieldGroups(vehicles) {
         }
     }
 
-    const groups = [{ groupLabel: 'Vehicle', fields: VEHICLE_FIELDS }];
+    const groups = [{ groupLabel: 'Vehicle', fields: vehicleFields }];
     for (const cat of SPEC_CATEGORIES) {
         const customKeys = [...(catCustomKeys[cat.key] || new Set())];
         const fields = [
-            ...cat.fields.map(f => ({ key: `${cat.key}.${f.key}`, label: f.label, type: f.type })),
+            ...cat.fields.map(f => ({ key: `${cat.key}.${f.key}`, label: f.label, type: f.type, unitGroup: f.unitGroup })),
             ...customKeys.map(ck => ({ key: `${cat.key}._custom.${ck}`, label: formatCustomKey(ck), type: 'text' })),
         ];
         if (fields.length) groups.push({ groupLabel: cat.label, fields });
@@ -114,7 +116,15 @@ function makeInsideLabelPlugin(getLabelFn) {
 // ── SpecsChartView ────────────────────────────────────────────────────────────
 
 export default function SpecsChartView({ vehicles, selectedField: controlledField = null, onFieldChange }) {
-    const fieldGroups = useMemo(() => buildFieldGroups(vehicles), [vehicles]);
+    const { units } = useAppContext();
+
+    const vehicleFields = useMemo(() => [
+        VEHICLE_FIELDS[0],
+        VEHICLE_FIELDS[1],
+        { ...VEHICLE_FIELDS[2], label: `EPA Range (${distanceLabel(units)})` },
+    ], [units]);
+
+    const fieldGroups = useMemo(() => buildFieldGroups(vehicles, vehicleFields), [vehicles, vehicleFields]);
     const allFields   = useMemo(() => fieldGroups.flatMap(g => g.fields), [fieldGroups]);
 
     const [localField, setLocalField] = useState('');
@@ -143,7 +153,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
     useEffect(() => {
         if (!selectedField || !canvasRef.current || !vehicles.length) return;
 
-        const fieldDef  = getFieldDef(selectedField);
+        const fieldDef  = allFields.find(f => f.key === selectedField) || getFieldDef(selectedField);
         const mode      = detectMode(vehicles, selectedField, fieldDef);
         const rawValues = vehicles.map(v => extractValue(v, selectedField));
         const labels    = vehicles.map(v => v.name);
@@ -179,12 +189,16 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
             barData = rawValues.map(v => {
                 if (v === null || v === undefined || v === '') return null;
                 const n = parseFloat(String(v));
-                return isNaN(n) ? null : n;
+                return isNaN(n) ? null : convValue(n, fieldDef.unitGroup, units);
             });
             bgColors = rawValues.map((v, i) =>
                 (v === null || v === undefined || v === '') ? '#d1d5db' : vehicleColor(vehicles[i], i)
             );
-            const insideLabels = barData.map(n => n !== null ? formatNumericLabel(n) : null);
+            const insideLabels = barData.map((n, i) => {
+                if (n === null) return null;
+                if (fieldDef.unitGroup) return formatSpecValue(rawValues[i], fieldDef.unitGroup, units);
+                return formatNumericLabel(n);
+            });
             insideLabelFn = i => insideLabels[i];
             valueAxisOptions = { display: true, beginAtZero: true };
         }
@@ -222,6 +236,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                                 const raw = rawValues[ctx.dataIndex];
                                 if (raw === null || raw === undefined || raw === '') return 'N/A';
                                 if (mode === 'boolean') return raw ? 'Yes' : 'No';
+                                if (fieldDef.unitGroup) return formatSpecValue(raw, fieldDef.unitGroup, units);
                                 return String(raw);
                             },
                         },
@@ -242,7 +257,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [selectedField, vehicles, allFields]);
+    }, [selectedField, vehicles, allFields, units]);
 
     return (
         <div className="specs-chart-card">
