@@ -736,22 +736,22 @@ export default function RoadTripView({
                         </div>
                     )}
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-4">
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-4">
                         <label className="text-sm">
-                            <span className="font-medium block mb-1">Start SoC (%)</span>
+                            <span className="font-medium block mb-1 whitespace-nowrap">Start SoC (%)</span>
                             <input type="number" className="w-full border rounded px-2 py-1"
                                 min={50} max={100} value={startSoc}
                                 onChange={e => setField('startSoc', Number(e.target.value))} />
                         </label>
                         <label className="text-sm">
-                            <span className="font-medium block mb-1">Min SoC (%)</span>
+                            <span className="font-medium block mb-1 whitespace-nowrap">Min SoC (%)</span>
                             <input type="number" className="w-full border rounded px-2 py-1"
                                 min={5} max={30} value={minSoc}
                                 onChange={e => setField('minSoc', Number(e.target.value))} />
                         </label>
                         {mode === 'distance' && (
                             <label className="text-sm">
-                                <span className="font-medium block mb-1">Miles per Stop ({dl})</span>
+                                <span className="font-medium block mb-1 whitespace-nowrap">{dl} between charges</span>
                                 <input type="number" className="w-full border rounded px-2 py-1"
                                     min={10} value={dispLeg}
                                     onChange={e => {
@@ -762,14 +762,14 @@ export default function RoadTripView({
                         )}
                         {mode === 'time' && (
                             <label className="text-sm">
-                                <span className="font-medium block mb-1">Charge Time (min)</span>
+                                <span className="font-medium block mb-1 whitespace-nowrap">Charge Time (min)</span>
                                 <input type="number" className="w-full border rounded px-2 py-1"
                                     min={5} max={120} value={chargeTime}
                                     onChange={e => setField('chargeTime', Number(e.target.value))} />
                             </label>
                         )}
                         <label className="text-sm">
-                            <span className="font-medium block mb-1">Total Distance ({dl})</span>
+                            <span className="font-medium block mb-1 whitespace-nowrap">Total Dist. ({dl})</span>
                             <input type="number" className="w-full border rounded px-2 py-1"
                                 min={10} value={dispTotal}
                                 onChange={e => {
@@ -778,7 +778,7 @@ export default function RoadTripView({
                                 }} />
                         </label>
                         <label className="text-sm">
-                            <span className="font-medium block mb-1">Travel Speed ({sl})</span>
+                            <span className="font-medium block mb-1 whitespace-nowrap">Speed ({sl})</span>
                             <input type="number" className="w-full border rounded px-2 py-1"
                                 min={20} value={dispSpeed}
                                 onChange={e => {
@@ -787,7 +787,7 @@ export default function RoadTripView({
                                 }} />
                         </label>
                         <label className="text-sm">
-                            <span className="font-medium block mb-1">Stop Overhead (min)</span>
+                            <span className="font-medium block mb-1 whitespace-nowrap">Stop Overhead (min)</span>
                             <input type="number" className="w-full border rounded px-2 py-1"
                                 min={0} max={60} value={overhead}
                                 title="Extra minutes added to every stop (parking, walk-in, plug-in). Applies to EV charging and ICE fuel stops."
@@ -942,13 +942,16 @@ export default function RoadTripView({
                             };
                             const SortTh = ({ col, children, className = '' }) => {
                                 const active = sortCol === col;
-                                const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+                                const arrow = active ? (sortDir === 'asc' ? '↑' : '↓') : '↕';
                                 return (
                                     <th
                                         className={`px-3 py-2 text-left font-semibold cursor-pointer select-none hover:bg-gray-100 whitespace-nowrap ${active ? 'text-blue-600' : ''} ${className}`}
                                         onClick={() => handleSort(col)}
                                     >
-                                        {children}{arrow}
+                                        <span className="flex items-center gap-1">
+                                            {children}
+                                            <span className={`text-xs ${active ? 'text-blue-500' : 'text-gray-300'}`}>{arrow}</span>
+                                        </span>
                                     </th>
                                 );
                             };
