@@ -221,8 +221,13 @@ export default function RoadTripView({
 
     const [runDataCache, setRunDataCache] = useState({});
     const [loading, setLoading] = useState(false);
-    const [selectedRunIds, setSelectedRunIds] = useState([]);
+    const [selectedRunIds, setSelectedRunIds] = useState(() => {
+        // Restore run IDs from URL on first render (rt_r=id1,id2,…)
+        const raw = new URLSearchParams(window.location.search).get('rt_r');
+        return raw ? raw.split(',').map(Number).filter(Boolean) : [];
+    });
     const [axisScale, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
+    const [copiedUrl, setCopiedUrl] = useState(false);
     const onAxisChange = (key, val) => setAxisScale(prev => ({ ...prev, [key]: val }));
 
     const dl = distanceLabel(units);
@@ -493,6 +498,12 @@ export default function RoadTripView({
 
         const autoXMax = maxTime * 1.15;
         const autoYMax = isChargeTimeMode ? Math.ceil(maxChargeTime * 1.2 / 10) * 10 : totalDistDisplay;
+        // Default X minimum: time of the earliest first charge stop across all vehicles.
+        // This focuses the chart on charging behaviour rather than the initial drive.
+        const firstChargeStart = Math.min(
+            ...validSims.map(s => s.segments.find(seg => seg.type === 'charge')?.startTime ?? Infinity)
+        );
+        const autoXMin = isFinite(firstChargeStart) && firstChargeStart > 0 ? firstChargeStart : 0;
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
@@ -510,13 +521,14 @@ export default function RoadTripView({
                     x: {
                         type: 'linear',
                         title: { display: true, text: 'Elapsed Time', font: { size: 13 } },
-                        min: axisScale.xMin != null ? axisScale.xMin * 60 : 0,
+                        min: axisScale.xMin != null ? axisScale.xMin * 60 : autoXMin,
                         max: axisScale.xMax != null ? axisScale.xMax * 60 : autoXMax,
                         ticks: {
                             stepSize: 30,
                             callback: val => {
-                                if (val % 60 === 0) return val === 0 ? '0' : `${val / 60}h`;
-                                if (val % 30 === 0) return ''; // tick mark at 30 min, no label
+                                const m = Math.round(val); // guard against FP imprecision (e.g. 59.9999…)
+                                if (m % 60 === 0) return m === 0 ? '0' : `${m / 60}h`;
+                                if (m % 30 === 0) return ''; // tick mark at 30 min, no label
                                 return null;
                             },
                         },
@@ -880,16 +892,38 @@ export default function RoadTripView({
                         <canvas ref={canvasRef} />
                     </div>
                     <p className="text-xs text-gray-400 mt-1 text-center">Drag to zoom · Reset Zoom to restore</p>
-                    <div className="mt-4 border-t pt-4">
-                        <AxisScaleControls
-                            xMin={axisScale.xMin} xMax={axisScale.xMax}
-                            yMin={axisScale.yMin} yMax={axisScale.yMax}
-                            onChange={onAxisChange}
-                            showX={true}
-                            showY2={false}
-                            xAxisLabel="X-Axis Scale (hrs)"
-                        />
+                    <div className="mt-3 flex gap-2">
+                        <button
+                            onClick={() => {
+                                const p = new URLSearchParams(window.location.search);
+                                if (selectedRunIds.length) p.set('rt_r', selectedRunIds.join(','));
+                                else p.delete('rt_r');
+                                const url = `${window.location.origin}${window.location.pathname}?${p.toString()}`;
+                                navigator.clipboard.writeText(url).then(() => {
+                                    setCopiedUrl(true);
+                                    setTimeout(() => setCopiedUrl(false), 2000);
+                                });
+                            }}
+                            className={`chart-copy-btn ${copiedUrl ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                            title="Copy link to this Road Trip chart"
+                        >
+                            {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
+                        </button>
                     </div>
+                </div>
+            )}
+
+            {/* ── Axis Scale Controls ────────────────────────────────────── */}
+            {!loading && simResults.some(Boolean) && !presentationMode && (
+                <div className="card mb-6">
+                    <AxisScaleControls
+                        xMin={axisScale.xMin} xMax={axisScale.xMax}
+                        yMin={axisScale.yMin} yMax={axisScale.yMax}
+                        onChange={onAxisChange}
+                        showX={true}
+                        showY2={false}
+                        xAxisLabel="X-Axis Scale (hrs)"
+                    />
                 </div>
             )}
 

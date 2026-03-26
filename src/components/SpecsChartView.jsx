@@ -127,7 +127,8 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
     const fieldGroups = useMemo(() => buildFieldGroups(vehicles, vehicleFields), [vehicles, vehicleFields]);
     const allFields   = useMemo(() => fieldGroups.flatMap(g => g.fields), [fieldGroups]);
 
-    const [localField, setLocalField] = useState('');
+    const [localField,  setLocalField]  = useState('');
+    const [copiedUrl,   setCopiedUrl]   = useState(false);
     const selectedField = controlledField || localField;
 
     const setSelectedField = (field) => {
@@ -280,6 +281,20 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
 
             <div style={{ height: `${Math.max(220, vehicles.length * 52)}px`, position: 'relative' }}>
                 <canvas ref={canvasRef} />
+            </div>
+            <div className="mt-3 flex gap-2">
+                <button
+                    onClick={() => {
+                        navigator.clipboard.writeText(window.location.href).then(() => {
+                            setCopiedUrl(true);
+                            setTimeout(() => setCopiedUrl(false), 2000);
+                        });
+                    }}
+                    className={`chart-copy-btn ${copiedUrl ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                    title="Copy link to this chart view"
+                >
+                    {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
+                </button>
             </div>
         </div>
     );

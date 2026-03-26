@@ -484,22 +484,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             {!presentationMode && <div className="card mb-6">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="section-title">Chart Options — Charging Performance</h3>
-                    <button
-                        onClick={() => {
-                            navigator.clipboard.writeText(window.location.href).then(() => {
-                                setCopied(true);
-                                setTimeout(() => setCopied(false), 2000);
-                            });
-                        }}
-                        className={`chart-copy-btn ${
-                            copied
-                                ? 'bg-green-50 border-green-200 text-green-700'
-                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                        }`}
-                        title="Copy link to this chart view"
-                    >
-                        {copied ? '✓ Copied!' : '🔗 Copy Link'}
-                    </button>
                 </div>
 
                 {/* Presets */}
@@ -643,8 +627,24 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     <canvas ref={chartRef}></canvas>
                 </div>
 
-                {/* Export button */}
+                {/* Export / share buttons */}
                 <div className="mt-3 flex items-center gap-3">
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(window.location.href).then(() => {
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 2000);
+                            });
+                        }}
+                        className={`chart-copy-btn ${
+                            copied
+                                ? 'bg-green-50 border-green-200 text-green-700'
+                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        }`}
+                        title="Copy link to this chart view"
+                    >
+                        {copied ? '✓ Copied!' : '🔗 Copy URL'}
+                    </button>
                     <button
                         onClick={handleExportImage}
                         className={`chart-copy-btn ${

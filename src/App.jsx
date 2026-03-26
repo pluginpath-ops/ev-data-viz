@@ -84,7 +84,7 @@ export default function App() {
         legDistance: 150, chargeTime: 30,
         totalDistance: 500, speed: 70,
         overhead: 5,              // per-stop overhead minutes (applies to EV and ICE)
-        yAxis: 'distance',        // 'distance' | 'chargeTime'
+        yAxis: 'chargeTime',      // 'distance' | 'chargeTime'  — default to charge time
         towingMode: false,        // override all vehicle efficiencies with a fixed trailer-system value
         towingEfficiency: 1.5,    // mi/kWh for the whole vehicle+trailer system
         towingRefSpeedMph: 70,    // speed at which towingEfficiency was measured
@@ -162,6 +162,37 @@ export default function App() {
             showPoints: p.get('pts') === '1', // default to false if not present, true if explicitly set to 1
             chartMode: p.get('m') || 'charging',
         };
+
+        // Charge Compare config
+        const cmpSoc  = p.get('cmp_soc');
+        const cmpMins = p.get('cmp_mins');
+        const cmpMi   = p.get('cmp_mi');
+        if (cmpSoc != null || cmpMins != null || cmpMi != null) {
+            setCompareConfig(prev => ({
+                ...prev,
+                ...(cmpSoc  != null && { startSoc: Number(cmpSoc)  }),
+                ...(cmpMins != null && { xMinutes: Number(cmpMins) }),
+                ...(cmpMi   != null && { mMiles:   Number(cmpMi)   }),
+            }));
+        }
+
+        // Road Trip config
+        const n = (key) => { const v = p.get(key); return v != null ? Number(v) : null; };
+        const rtOverride = {
+            ...(p.get('rt_m')  && { mode:             p.get('rt_m')           }),
+            ...(n('rt_ss') != null && { startSoc:     n('rt_ss')               }),
+            ...(n('rt_ms') != null && { minSoc:        n('rt_ms')               }),
+            ...(n('rt_ld') != null && { legDistance:   n('rt_ld')               }),
+            ...(n('rt_ct') != null && { chargeTime:    n('rt_ct')               }),
+            ...(n('rt_td') != null && { totalDistance: n('rt_td')               }),
+            ...(n('rt_sp') != null && { speed:         n('rt_sp')               }),
+            ...(n('rt_oh') != null && { overhead:      n('rt_oh')               }),
+            ...(p.get('rt_ya') && { yAxis:              p.get('rt_ya')          }),
+            ...(p.get('rt_tw') === '1' && { towingMode: true                    }),
+            ...(n('rt_te') != null && { towingEfficiency:   n('rt_te')          }),
+            ...(n('rt_tr') != null && { towingRefSpeedMph:  n('rt_tr')          }),
+        };
+        if (Object.keys(rtOverride).length > 0) setRoadTripConfig(prev => ({ ...prev, ...rtOverride }));
     }, []);
 
     // ── Handle browser back/forward ─────────────────────────────────────────
@@ -243,10 +274,37 @@ export default function App() {
         if (chartConfig.y2Min != null)            p.set('y2n',  String(chartConfig.y2Min));
         if (chartConfig.y2Max != null)            p.set('y2x',  String(chartConfig.y2Max));
         if (chartConfig.showLine === false)       p.set('line',   '0'); // default to true if not present, false if explicitly set to 0
-        if (chartConfig.showPoints)               p.set('pts',    '1'); 
+        if (chartConfig.showPoints)               p.set('pts',    '1');
         if (chartMode !== 'charging')             p.set('m', chartMode);
+
+        // Charge Compare options
+        if (chartMode === 'compare') {
+            p.set('cmp_soc',  compareConfig.startSoc);
+            p.set('cmp_mins', compareConfig.xMinutes);
+            p.set('cmp_mi',   compareConfig.mMiles);
+        }
+
+        // Road Trip options
+        if (chartMode === 'roadtrip') {
+            const rt = roadTripConfig;
+            p.set('rt_m',  rt.mode);
+            p.set('rt_ss', rt.startSoc);
+            p.set('rt_ms', rt.minSoc);
+            p.set('rt_ld', rt.legDistance);
+            p.set('rt_ct', rt.chargeTime);
+            p.set('rt_td', rt.totalDistance);
+            p.set('rt_sp', rt.speed);
+            p.set('rt_oh', rt.overhead);
+            p.set('rt_ya', rt.yAxis);
+            if (rt.towingMode)                    p.set('rt_tw', '1');
+            if (rt.towingMode) {
+                p.set('rt_te', rt.towingEfficiency);
+                p.set('rt_tr', rt.towingRefSpeedMph);
+            }
+        }
+
         history.replaceState({ view: 'chart', chartMode }, '', '?' + p.toString());
-    }, [view, chartConfig, selectedVehicles, chartMode, vehicles]);
+    }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig]);
 
     // ── Broadcast chart state to any open pop-out windows ───────────────────
     useEffect(() => {
