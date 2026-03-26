@@ -53,11 +53,11 @@ const PALETTE = [
 ];
 
 // ── Chart.js plugin: charging badges + finish labels ─────────────────────────
-function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin) {
+function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo) {
     return {
         id: 'roadTripLabels',
 
-        // ── Pale green charge-region boxes (byTest mode only) ─────────────
+        // ── Pale green charge/gas-stop region boxes (byTest mode only) ────
         beforeDatasetsDraw(chart) {
             if (yAxis !== 'byTest') return;
             const ctx = chart.ctx;
@@ -68,6 +68,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin) {
             ctx.clip();
             ctx.fillStyle = 'rgba(134,239,172,0.22)'; // green-300 at low opacity
 
+            // EV charge regions
             simResults.forEach((sim, runIndex) => {
                 if (!sim) return;
                 const yTop    = chart.scales.y.getPixelForValue(runIndex + 1); // SoC 100%
@@ -79,6 +80,19 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin) {
                     ctx.fillRect(x1, yTop, x2 - x1, yBottom - yTop);
                 }
             });
+
+            // ICE gas stop regions
+            if (iceByTestInfo) {
+                const { laneIndex, gasStops } = iceByTestInfo;
+                const yTop    = chart.scales.y.getPixelForValue(laneIndex + 1);
+                const yBottom = chart.scales.y.getPixelForValue(laneIndex);
+                for (const stop of gasStops) {
+                    const x1 = chart.scales.x.getPixelForValue(stop.startTime);
+                    const x2 = chart.scales.x.getPixelForValue(stop.endTime);
+                    ctx.fillRect(x1, yTop, x2 - x1, yBottom - yTop);
+                }
+            }
+
             ctx.restore();
         },
 
@@ -123,6 +137,25 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin) {
                     }
                     ctx.restore();
                 });
+
+                // ICE callout
+                if (iceByTestInfo) {
+                    const iceDsIdx = chart.data.datasets.findIndex(d => d._isIce);
+                    if (iceDsIdx >= 0) {
+                        const iceMeta = chart.getDatasetMeta(iceDsIdx);
+                        const lastPt  = iceMeta.data[iceMeta.data.length - 1];
+                        if (lastPt) {
+                            const labelY = lastPt.y - 13;
+                            ctx.save();
+                            ctx.font         = 'bold 11px system-ui, sans-serif';
+                            ctx.fillStyle    = '#6b7280'; // gray-500
+                            ctx.textAlign    = 'left';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(`ICE — ${formatTime(iceByTestInfo.totalTimeMin)}`, lastPt.x + 6, labelY);
+                            ctx.restore();
+                        }
+                    }
+                }
                 return;
             }
 
@@ -517,17 +550,24 @@ export default function RoadTripView({
             };
         }).filter(Boolean);
 
-        // ── ICE reference line (not shown in byTest mode) ───────────────
+        // ── ICE reference line ───────────────────────────────────────────
         const ICE_DRIVE_INTERVAL_MIN = 180; // 3 hours between stops
-        const ICE_STOP_MIN = overhead;      // same overhead tax as EV stops
-        const icePoints = [];
+        const ICE_STOP_MIN  = overhead;     // same overhead tax as EV stops
+        const ICE_MIN_SOC   = 35;           // % "fuel level" at end of a 3h drive
+        const iceLane       = validEntries.length; // byTest lane index for ICE
+
+        const icePoints       = [];  // distance / chargeTime mode
+        const iceByTestPoints = [];  // byTest mode (SoC lane)
+        const iceGasStopSegs  = [];  // gas stop intervals for byTest green boxes
         let iceTime = 0, iceDist = 0, iceCumStop = 0, iceIter = 0;
+
         while (iceDist < roadTripConfig.totalDistance && iceIter < 100) {
             iceIter++;
             const remainingMi = roadTripConfig.totalDistance - iceDist;
             const maxDriveMi  = (roadTripConfig.speed * ICE_DRIVE_INTERVAL_MIN) / 60;
             const driveMi     = Math.min(maxDriveMi, remainingMi);
             const driveMin    = (driveMi / roadTripConfig.speed) * 60;
+
             if (isChargeTimeMode) {
                 icePoints.push({ x: Math.round(iceTime),            y: Math.round(iceCumStop) });
                 icePoints.push({ x: Math.round(iceTime + driveMin), y: Math.round(iceCumStop) });
@@ -535,9 +575,14 @@ export default function RoadTripView({
                 icePoints.push({ x: Math.round(iceTime),            y: convDistance(iceDist,           units) });
                 icePoints.push({ x: Math.round(iceTime + driveMin), y: convDistance(iceDist + driveMi, units) });
             }
+            // byTest: drive depletes "fuel" from 100% → ICE_MIN_SOC%
+            iceByTestPoints.push({ x: Math.round(iceTime),            y: iceLane + 1.0            });
+            iceByTestPoints.push({ x: Math.round(iceTime + driveMin), y: iceLane + ICE_MIN_SOC / 100 });
+
             iceTime += driveMin;
             iceDist += driveMi;
             if (iceDist >= roadTripConfig.totalDistance - 0.01) break;
+
             if (isChargeTimeMode) {
                 icePoints.push({ x: Math.round(iceTime),                y: Math.round(iceCumStop) });
                 icePoints.push({ x: Math.round(iceTime + ICE_STOP_MIN), y: Math.round(iceCumStop + ICE_STOP_MIN) });
@@ -545,10 +590,29 @@ export default function RoadTripView({
                 icePoints.push({ x: Math.round(iceTime),                y: convDistance(iceDist, units) });
                 icePoints.push({ x: Math.round(iceTime + ICE_STOP_MIN), y: convDistance(iceDist, units) });
             }
-            iceTime += ICE_STOP_MIN;
+            // byTest: gas stop refuels from ICE_MIN_SOC% → 100%
+            iceGasStopSegs.push({ startTime: iceTime, endTime: iceTime + ICE_STOP_MIN });
+            iceByTestPoints.push({ x: Math.round(iceTime),                y: iceLane + ICE_MIN_SOC / 100 });
+            iceByTestPoints.push({ x: Math.round(iceTime + ICE_STOP_MIN), y: iceLane + 1.0              });
+
+            iceTime    += ICE_STOP_MIN;
             iceCumStop += ICE_STOP_MIN;
         }
-        if (!isByTestMode) {
+
+        if (isByTestMode) {
+            datasets.push({
+                label: 'ICE Reference',
+                data: iceByTestPoints,
+                borderColor: '#9ca3af',
+                backgroundColor: 'transparent',
+                borderWidth: 1.5,
+                borderDash: [6, 4],
+                tension: 0,
+                pointRadius: 0,
+                fill: false,
+                _isIce: true,
+            });
+        } else {
             datasets.unshift({
                 label: 'ICE Reference',
                 data: icePoints,
@@ -613,21 +677,22 @@ export default function RoadTripView({
                     y: isByTestMode ? {
                         reverse: false,
                         min: axisScale.yMin ?? 0,
-                        max: axisScale.yMax ?? validEntries.length,
+                        max: axisScale.yMax ?? (validEntries.length + 1), // +1 for ICE lane
                         title: { display: false },
                         ticks: {
                             stepSize: 0.5,
                             callback: (val) => {
-                                // Half-integer positions = lane centers → show vehicle/run label
+                                // Half-integer positions = lane centers → show label
                                 const frac = val - Math.floor(val);
                                 if (Math.abs(frac - 0.5) < 0.01) {
-                                    const idx = Math.floor(val); // lane index = runIndex
+                                    const idx = Math.floor(val); // lane index
                                     if (idx >= 0 && idx < validEntries.length) {
                                         const e = validEntries[idx];
                                         return vehicleRunCount[e.vehicle.id] > 1
                                             ? `${e.vehicle.name} · ${e.run.name}`
                                             : e.vehicle.name;
                                     }
+                                    if (idx === validEntries.length) return 'ICE Reference';
                                 }
                                 return ''; // suppress integer tick labels (lane boundaries shown as gridlines)
                             },
@@ -720,7 +785,9 @@ export default function RoadTripView({
             },
             plugins: [makeRoadTripPlugin(simResults.map((s, i) => {
                 return datasets.find(d => d._simIndex === i) ? s : null;
-            }).filter(Boolean), units, yAxis, iceTime)],
+            }).filter(Boolean), units, yAxis, iceTime,
+                isByTestMode ? { laneIndex: iceLane, gasStops: iceGasStopSegs, totalTimeMin: iceTime } : null,
+            )],
         });
 
         return () => {
