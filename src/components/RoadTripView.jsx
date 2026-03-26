@@ -56,9 +56,58 @@ const PALETTE = [
 function makeRoadTripPlugin(simResults, units, yAxis) {
     return {
         id: 'roadTripLabels',
-        afterDatasetsDraw(chart) {
-            if (yAxis === 'byTest') return; // lanes identified by Y-axis labels; no badges needed
+
+        // ── Pale green charge-region boxes (byTest mode only) ─────────────
+        beforeDatasetsDraw(chart) {
+            if (yAxis !== 'byTest') return;
             const ctx = chart.ctx;
+            const { left, right, top, bottom } = chart.chartArea;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(left, top, right - left, bottom - top);
+            ctx.clip();
+            ctx.fillStyle = 'rgba(134,239,172,0.22)'; // green-300 at low opacity
+
+            simResults.forEach((sim, runIndex) => {
+                if (!sim) return;
+                const yTop    = chart.scales.y.getPixelForValue(runIndex + 1); // SoC 100%
+                const yBottom = chart.scales.y.getPixelForValue(runIndex);     // SoC 0%
+                for (const seg of sim.segments) {
+                    if (seg.type !== 'charge') continue;
+                    const x1 = chart.scales.x.getPixelForValue(seg.startTime);
+                    const x2 = chart.scales.x.getPixelForValue(seg.endTime);
+                    ctx.fillRect(x1, yTop, x2 - x1, yBottom - yTop);
+                }
+            });
+            ctx.restore();
+        },
+
+        afterDatasetsDraw(chart) {
+            const ctx = chart.ctx;
+
+            // ── byTest mode: draw elapsed-time callout at end of each run ──
+            if (yAxis === 'byTest') {
+                let simIdx = 0;
+                chart.data.datasets.forEach((ds, di) => {
+                    if (ds._isIce) return;
+                    const sim = simResults[simIdx++];
+                    if (!sim || !ds.data.length) return;
+                    const meta   = chart.getDatasetMeta(di);
+                    const lastPt = meta.data[meta.data.length - 1];
+                    if (!lastPt) return;
+                    const label = formatTime(sim.totalTimeMin);
+                    ctx.save();
+                    ctx.font          = 'bold 11px system-ui, sans-serif';
+                    ctx.fillStyle     = ds.borderColor;
+                    ctx.textAlign     = 'left';
+                    ctx.textBaseline  = 'middle';
+                    ctx.fillText(label, lastPt.x + 6, lastPt.y);
+                    ctx.restore();
+                });
+                return;
+            }
+
+            // ── badge + finish label code for Distance / Charge Time modes ──
 
             // ── Pass 1: charging segment badges (EV lines only) ───────────
             let simIdx = 0;
@@ -434,15 +483,6 @@ export default function RoadTripView({
                 pointRadii.push(0);
             }
 
-            // In byTest mode: color charge segments green so they stand out from drive segments
-            const segments = sim.segments;
-            const segmentColors = isByTestMode ? {
-                borderColor: (ctx) => {
-                    const seg = segments[Math.floor(ctx.p0DataIndex / 2)];
-                    return seg?.type === 'charge' ? '#16a34a' : entry.color;
-                },
-            } : undefined;
-
             return {
                 label: entryLabel(entry),
                 data: points,
@@ -454,7 +494,6 @@ export default function RoadTripView({
                 pointBackgroundColor: entry.color,
                 pointBorderColor: entry.color,
                 fill: false,
-                segment: segmentColors,
                 _simIndex: i,
             };
         }).filter(Boolean);
@@ -554,15 +593,16 @@ export default function RoadTripView({
                     },
                     y: isByTestMode ? {
                         reverse: false,
-                        min: axisScale.yMin ?? 0.5,
-                        max: axisScale.yMax ?? (validEntries.length + 0.5),
+                        min: axisScale.yMin ?? 0,
+                        max: axisScale.yMax ?? validEntries.length,
                         title: { display: false },
                         ticks: {
                             stepSize: 0.5,
                             callback: (val) => {
-                                // Integer positions are lane centers — show vehicle/run name
-                                if (Math.abs(val - Math.round(val)) < 0.01) {
-                                    const idx = Math.round(val) - 1;
+                                // Half-integer positions = lane centers → show vehicle/run label
+                                const frac = val - Math.floor(val);
+                                if (Math.abs(frac - 0.5) < 0.01) {
+                                    const idx = Math.floor(val); // lane index = runIndex
                                     if (idx >= 0 && idx < validEntries.length) {
                                         const e = validEntries[idx];
                                         return vehicleRunCount[e.vehicle.id] > 1
@@ -570,21 +610,21 @@ export default function RoadTripView({
                                             : e.vehicle.name;
                                     }
                                 }
-                                return ''; // suppress half-integer tick labels (lane boundaries)
+                                return ''; // suppress integer tick labels (lane boundaries shown as gridlines)
                             },
                         },
                         grid: {
                             color: (ctx) => {
-                                const v = ctx.tick?.value;
-                                const frac = v != null ? (v - Math.floor(v)) : 1;
-                                return Math.abs(frac - 0.5) < 0.01
-                                    ? 'rgba(0,0,0,0.25)'  // heavy — lane boundary
+                                const v   = ctx.tick?.value;
+                                const frac = v != null ? (v - Math.floor(v)) : 0;
+                                return Math.abs(frac) < 0.01
+                                    ? 'rgba(0,0,0,0.25)'  // heavy — lane boundary (integer)
                                     : 'rgba(0,0,0,0.07)'; // light — lane center
                             },
                             lineWidth: (ctx) => {
-                                const v = ctx.tick?.value;
-                                const frac = v != null ? (v - Math.floor(v)) : 1;
-                                return Math.abs(frac - 0.5) < 0.01 ? 1.5 : 0.5;
+                                const v   = ctx.tick?.value;
+                                const frac = v != null ? (v - Math.floor(v)) : 0;
+                                return Math.abs(frac) < 0.01 ? 1.5 : 0.5;
                             },
                         },
                     } : isChargeTimeMode ? {

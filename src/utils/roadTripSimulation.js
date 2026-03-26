@@ -237,8 +237,8 @@ export function segmentsToChartPointsChargeTime(segments) {
 export function segmentsToChartPointsByTest(segments, runIndex) {
     const points = [];
     for (const seg of segments) {
-        points.push({ x: round1(seg.startTime), y: round1(runIndex + 0.5 + seg.startSoc / 100) });
-        points.push({ x: round1(seg.endTime),   y: round1(runIndex + 0.5 + seg.endSoc   / 100) });
+        points.push({ x: round1(seg.startTime), y: round1(runIndex + seg.startSoc / 100) });
+        points.push({ x: round1(seg.endTime),   y: round1(runIndex + seg.endSoc   / 100) });
     }
     return points;
 }
