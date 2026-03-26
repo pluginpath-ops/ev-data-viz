@@ -891,16 +891,6 @@ export default function RoadTripView({
                         <canvas ref={canvasRef} />
                     </div>
                     <p className="text-xs text-gray-400 mt-1 text-center">Drag to zoom · Reset Zoom to restore</p>
-                    <div className="mt-4 border-t pt-4">
-                        <AxisScaleControls
-                            xMin={axisScale.xMin} xMax={axisScale.xMax}
-                            yMin={axisScale.yMin} yMax={axisScale.yMax}
-                            onChange={onAxisChange}
-                            showX={true}
-                            showY2={false}
-                            xAxisLabel="X-Axis Scale (hrs)"
-                        />
-                    </div>
                     <div className="mt-3 flex gap-2">
                         <button
                             onClick={() => {
@@ -919,6 +909,20 @@ export default function RoadTripView({
                             {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
                         </button>
                     </div>
+                </div>
+            )}
+
+            {/* ── Axis Scale Controls ────────────────────────────────────── */}
+            {!loading && simResults.some(Boolean) && !presentationMode && (
+                <div className="card mb-6">
+                    <AxisScaleControls
+                        xMin={axisScale.xMin} xMax={axisScale.xMax}
+                        yMin={axisScale.yMin} yMax={axisScale.yMax}
+                        onChange={onAxisChange}
+                        showX={true}
+                        showY2={false}
+                        xAxisLabel="X-Axis Scale (hrs)"
+                    />
                 </div>
             )}
 
