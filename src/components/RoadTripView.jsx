@@ -444,14 +444,13 @@ export default function RoadTripView({
                     x: {
                         type: 'linear',
                         title: { display: true, text: 'Elapsed Time', font: { size: 13 } },
-                        min: axisScale.xMin ?? 0,
-                        max: axisScale.xMax ?? autoXMax,
+                        min: axisScale.xMin != null ? axisScale.xMin * 60 : 0,
+                        max: axisScale.xMax != null ? axisScale.xMax * 60 : autoXMax,
                         ticks: {
                             stepSize: 30,
                             callback: val => {
-                                if (val % 60 === 0) {
-                                    return val === 0 ? '0' : `${val / 60}h`;
-                                }
+                                if (val % 60 === 0) return val === 0 ? '0' : `${val / 60}h`;
+                                if (val % 30 === 0) return ''; // tick mark at 30 min, no label
                                 return null;
                             },
                         },
@@ -776,6 +775,7 @@ export default function RoadTripView({
                             onChange={onAxisChange}
                             showX={true}
                             showY2={false}
+                            xAxisLabel="X-Axis Scale (hrs)"
                         />
                     </div>
                 </div>

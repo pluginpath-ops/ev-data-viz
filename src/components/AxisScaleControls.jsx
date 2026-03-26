@@ -10,9 +10,12 @@
  *                                    Set false for categorical bar-chart axes.
  *   showY2                         – whether to show Right Y-axis controls (default false).
  *                                    Set true when a secondary Y axis is active.
+ *   xAxisLabel                     – label for the X-axis section (default "X-Axis Scale").
+ *                                    Pass e.g. "X-Axis Scale (hrs)" to hint at expected units.
+ *   yAxisLabel                     – label for the left Y-axis section (default "Left Axis Scale").
  */
 
-export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max, onChange, showX = true, showY2 = false }) {
+export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max, onChange, showX = true, showY2 = false, xAxisLabel = 'X-Axis Scale', yAxisLabel = 'Left Axis Scale' }) {
     const colCount = 1 + (showX ? 1 : 0) + (showY2 ? 1 : 0);
     const gridClass = colCount === 3 ? 'grid-cols-3'
                     : colCount === 2 ? 'grid-cols-2'
@@ -24,7 +27,7 @@ export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max
             {/* ── Y-Axis Scale ─────────────────────────────────────────────── */}
             <div>
                 <div className="flex items-baseline gap-3 mb-2">
-                    <p className="text-sm font-medium text-gray-500">Left Axis Scale</p>
+                    <p className="text-sm font-medium text-gray-500">{yAxisLabel}</p>
                     {(yMin != null || yMax != null) && (
                         <button
                             onClick={() => { onChange('yMin', null); onChange('yMax', null); }}
@@ -62,7 +65,7 @@ export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max
             {showX && (
                 <div>
                     <div className="flex items-baseline gap-3 mb-2">
-                        <p className="text-sm font-medium text-gray-500">X-Axis Scale</p>
+                        <p className="text-sm font-medium text-gray-500">{xAxisLabel}</p>
                         {(xMin != null || xMax != null) && (
                             <button
                                 onClick={() => { onChange('xMin', null); onChange('xMax', null); }}
