@@ -737,6 +737,12 @@ body {
            focus:outline-none focus:ring-2 focus:ring-blue-500;
 }
 
+/* ── Road trip simulation ────────────────────────────────────────────────────── */
+
+.roadtrip-warning {
+    @apply text-amber-700 text-xs font-medium;
+}
+
 /* ── Pop-out presentation mode ──────────────────────────────────────────────── */
 
 .popout-root {
