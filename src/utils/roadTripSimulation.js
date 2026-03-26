@@ -83,9 +83,7 @@ export function simulateRoadTrip({
 
         // Both modes: drive until minSoc (or trip end).
         // Distance mode adds a fixed amount of charge at each stop rather than stopping at fixed intervals.
-        const driveDist = Math.min(rangeFromSoc, remainingTrip);
-
-        driveDist = Math.max(0, driveDist);
+        const driveDist = Math.max(0, Math.min(rangeFromSoc, remainingTrip));
 
         if (driveDist < MIN_DRIVE_MI && currentDist < totalDistanceMi) {
             warnings.push('Battery depleted: cannot drive far enough to reach next charger');
@@ -119,10 +117,14 @@ export function simulateRoadTrip({
         if (mode === 'distance') {
             // Add a fixed number of miles of range per stop (legDistanceMi), capped at
             // what's needed for the remaining trip and at 100% SoC.
-            const remaining   = totalDistanceMi - currentDist;
-            const socToAdd    = (legDistanceMi / (batteryKwh * correctedMiPerKwh)) * 100;
-            const socForTrip  = (remaining     / (batteryKwh * correctedMiPerKwh)) * 100;
-            targetSoc = Math.min(currentSoc + Math.min(socToAdd, socForTrip), 100);
+            // If the leftover after one legDistanceMi charge would be tiny (< 2 mi),
+            // extend this stop to cover the whole remaining distance — avoids phantom stops
+            // when the trip distance doesn't divide evenly by the leg size.
+            const remaining  = totalDistanceMi - currentDist;
+            const leftover   = remaining - legDistanceMi;
+            const chargeMi   = (leftover > 0 && leftover < 2.0) ? remaining : Math.min(legDistanceMi, remaining);
+            const socToAdd   = (chargeMi / (batteryKwh * correctedMiPerKwh)) * 100;
+            targetSoc = Math.min(currentSoc + socToAdd, 100);
             targetSoc = Math.max(targetSoc, currentSoc + 1);
 
             const tStart = interpolate(chargingBySoc, 'soc', 'time', currentSoc, true, true);
