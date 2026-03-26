@@ -228,6 +228,8 @@ export default function RoadTripView({
     });
     const [axisScale, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
     const [copiedUrl, setCopiedUrl] = useState(false);
+    const [sortCol, setSortCol] = useState(null);   // column key or null
+    const [sortDir, setSortDir] = useState('asc');  // 'asc' | 'desc'
     const onAxisChange = (key, val) => setAxisScale(prev => ({ ...prev, [key]: val }));
 
     const dl = distanceLabel(units);
@@ -932,32 +934,81 @@ export default function RoadTripView({
                 <div className="card">
                     <h3 className="text-lg font-bold mb-3">Results Summary</h3>
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-3 py-2 text-left font-semibold">Vehicle / Run</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Total Time</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Stops</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Avg Charge</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Efficiency</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Corrected Eff</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Speed Adj</th>
-                                    <th className="px-3 py-2 text-left font-semibold">vs ICE</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {validEntries.map((entry, i) => {
+                        {(() => {
+                            // ── Build sortable rows ───────────────────────────────
+                            const handleSort = (col) => {
+                                if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                                else { setSortCol(col); setSortDir('asc'); }
+                            };
+                            const SortTh = ({ col, children, className = '' }) => {
+                                const active = sortCol === col;
+                                const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+                                return (
+                                    <th
+                                        className={`px-3 py-2 text-left font-semibold cursor-pointer select-none hover:bg-gray-100 whitespace-nowrap ${active ? 'text-blue-600' : ''} ${className}`}
+                                        onClick={() => handleSort(col)}
+                                    >
+                                        {children}{arrow}
+                                    </th>
+                                );
+                            };
+
+                            const effLabel = units === 'metric' ? 'km/kWh' : 'mi/kWh';
+
+                            // Zip entries+sims, compute sort keys, sort
+                            const rows = validEntries
+                                .map((entry, i) => {
                                     const sim = simResults[i];
                                     if (!sim) return null;
                                     const chargingSegments = sim.segments.filter(s => s.type === 'charge');
                                     const avgChargeTime = chargingSegments.length > 0
                                         ? chargingSegments.reduce((sum, s) => sum + (s.endTime - s.startTime), 0) / chargingSegments.length
                                         : 0;
-                                    const speedDiff = entry.testSpeedMph
-                                        ? Math.abs(speed - entry.testSpeedMph)
-                                        : 0;
+                                    const speedDiff = entry.testSpeedMph ? Math.abs(speed - entry.testSpeedMph) : 0;
                                     const adjPct = Math.round((sim.speedFactor - 1) * 100);
-                                    const effLabel = units === 'metric' ? 'km/kWh' : 'mi/kWh';
+                                    const vsIce = sim.totalTimeMin - iceRefTimeMin;
+                                    return { entry, sim, avgChargeTime, speedDiff, adjPct, vsIce };
+                                })
+                                .filter(Boolean);
+
+                            if (sortCol) {
+                                const dir = sortDir === 'asc' ? 1 : -1;
+                                rows.sort((a, b) => {
+                                    let av, bv;
+                                    switch (sortCol) {
+                                        case 'vehicle':
+                                            av = (a.entry.vehicle.name + a.entry.run.name).toLowerCase();
+                                            bv = (b.entry.vehicle.name + b.entry.run.name).toLowerCase();
+                                            return dir * av.localeCompare(bv);
+                                        case 'totalTime':  av = a.sim.totalTimeMin;     bv = b.sim.totalTimeMin;     break;
+                                        case 'stops':      av = a.sim.chargeStops;      bv = b.sim.chargeStops;      break;
+                                        case 'avgCharge':  av = a.avgChargeTime;        bv = b.avgChargeTime;        break;
+                                        case 'efficiency': av = a.entry.miPerKwh;       bv = b.entry.miPerKwh;       break;
+                                        case 'corrEff':    av = a.sim.correctedMiPerKwh; bv = b.sim.correctedMiPerKwh; break;
+                                        case 'speedAdj':   av = a.adjPct;               bv = b.adjPct;               break;
+                                        case 'vsIce':      av = a.vsIce;                bv = b.vsIce;                break;
+                                        default: return 0;
+                                    }
+                                    return dir * (av - bv);
+                                });
+                            }
+
+                            return (
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <SortTh col="vehicle">Vehicle / Run</SortTh>
+                                    <SortTh col="totalTime">Total Time</SortTh>
+                                    <SortTh col="stops">Stops</SortTh>
+                                    <SortTh col="avgCharge">Avg Charge</SortTh>
+                                    <SortTh col="efficiency">Efficiency</SortTh>
+                                    <SortTh col="corrEff">Corrected Eff</SortTh>
+                                    <SortTh col="speedAdj">Speed Adj</SortTh>
+                                    <SortTh col="vsIce">vs ICE</SortTh>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {rows.map(({ entry, sim, avgChargeTime, speedDiff, adjPct, vsIce }) => {
 
                                     return (
                                         <tr key={entry.run.id}>
@@ -1007,12 +1058,11 @@ export default function RoadTripView({
                                             </td>
                                             <td className="px-3 py-2 font-medium">
                                                 {(() => {
-                                                    const deltaMin = sim.totalTimeMin - iceRefTimeMin;
-                                                    const absDelta = Math.abs(deltaMin);
+                                                    const absDelta = Math.abs(vsIce);
                                                     const h = Math.floor(absDelta / 60);
                                                     const m = Math.round(absDelta % 60);
                                                     const label = h > 0 ? `${h}h ${m}m` : `${m}m`;
-                                                    return deltaMin > 0
+                                                    return vsIce > 0
                                                         ? <span className="text-amber-600">+{label}</span>
                                                         : <span className="text-green-600">−{label}</span>;
                                                 })()}
@@ -1022,6 +1072,8 @@ export default function RoadTripView({
                                 })}
                             </tbody>
                         </table>
+                            );
+                        })()}
                     </div>
 
                 </div>
