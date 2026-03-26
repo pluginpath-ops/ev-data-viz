@@ -526,8 +526,9 @@ export default function RoadTripView({
                         ticks: {
                             stepSize: 30,
                             callback: val => {
-                                if (val % 60 === 0) return val === 0 ? '0' : `${val / 60}h`;
-                                if (val % 30 === 0) return ''; // tick mark at 30 min, no label
+                                const m = Math.round(val); // guard against FP imprecision (e.g. 59.9999…)
+                                if (m % 60 === 0) return m === 0 ? '0' : `${m / 60}h`;
+                                if (m % 30 === 0) return ''; // tick mark at 30 min, no label
                                 return null;
                             },
                         },
