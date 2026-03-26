@@ -556,17 +556,12 @@ export default function ChargeCompareView({
             {!presentationMode && <div className="card mb-6">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold">Chart Options — Charge Compare</h3>
-                    <div className="flex items-center gap-3">
-                        {loading && (
-                            <span className="flex items-center gap-2 text-sm text-gray-500">
-                                <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-                                Loading charging data…
-                            </span>
-                        )}
-                        <button onClick={handleCopyUrl} className="btn-secondary text-sm px-3 py-1">
-                            {copied ? 'Copied!' : 'Copy URL'}
-                        </button>
-                    </div>
+                    {loading && (
+                        <span className="flex items-center gap-2 text-sm text-gray-500">
+                            <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+                            Loading charging data…
+                        </span>
+                    )}
                 </div>
                 <div className="flex flex-wrap items-center gap-6">
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -666,6 +661,15 @@ export default function ChargeCompareView({
                         </h4>
                         <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activeResolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart2Ref} />
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                            <button
+                                onClick={handleCopyUrl}
+                                className={`chart-copy-btn ${copied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                                title="Copy link to this chart view"
+                            >
+                                {copied ? '✓ Copied!' : '🔗 Copy URL'}
+                            </button>
                         </div>
                     </div>
                 </>

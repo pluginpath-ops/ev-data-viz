@@ -879,31 +879,13 @@ export default function RoadTripView({
                         <h3 className="text-lg font-bold">
                             Road Trip{towingMode ? ' (Towing)' : ''} — {Math.round(convDistance(totalDistance, units))} {dl} at {Math.round(convDistance(speed, units))} {sl}
                         </h3>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => {
-                                    const p = new URLSearchParams(window.location.search);
-                                    if (selectedRunIds.length) p.set('rt_r', selectedRunIds.join(','));
-                                    else p.delete('rt_r');
-                                    const url = `${window.location.origin}${window.location.pathname}?${p.toString()}`;
-                                    navigator.clipboard.writeText(url).then(() => {
-                                        setCopiedUrl(true);
-                                        setTimeout(() => setCopiedUrl(false), 2000);
-                                    });
-                                }}
-                                className={`chart-copy-btn ${copiedUrl ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
-                                title="Copy link to this Road Trip chart"
-                            >
-                                {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
-                            </button>
-                            <button
-                                onClick={() => chartRef.current?.resetZoom()}
-                                className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded px-2 py-1 transition-colors"
-                                title="Reset zoom to full view"
-                            >
-                                Reset Zoom
-                            </button>
-                        </div>
+                        <button
+                            onClick={() => chartRef.current?.resetZoom()}
+                            className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded px-2 py-1 transition-colors"
+                            title="Reset zoom to full view"
+                        >
+                            Reset Zoom
+                        </button>
                     </div>
                     <div style={{ height: `${Math.max(400, validEntries.length * 40 + 200)}px`, position: 'relative' }}>
                         <canvas ref={canvasRef} />
@@ -918,6 +900,24 @@ export default function RoadTripView({
                             showY2={false}
                             xAxisLabel="X-Axis Scale (hrs)"
                         />
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                        <button
+                            onClick={() => {
+                                const p = new URLSearchParams(window.location.search);
+                                if (selectedRunIds.length) p.set('rt_r', selectedRunIds.join(','));
+                                else p.delete('rt_r');
+                                const url = `${window.location.origin}${window.location.pathname}?${p.toString()}`;
+                                navigator.clipboard.writeText(url).then(() => {
+                                    setCopiedUrl(true);
+                                    setTimeout(() => setCopiedUrl(false), 2000);
+                                });
+                            }}
+                            className={`chart-copy-btn ${copiedUrl ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                            title="Copy link to this Road Trip chart"
+                        >
+                            {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
+                        </button>
                     </div>
                 </div>
             )}
