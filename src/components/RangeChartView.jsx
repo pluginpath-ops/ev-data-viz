@@ -51,9 +51,10 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     const { units } = useAppContext();
     const chartRef      = useRef(null);
     const chartInstance = useRef(null);
-    const [chartType, setChartType] = useState('range-vehicle-bar');
-    const [effUnit,   setEffUnit]   = useState('mi_kwh'); // 'mi_kwh' | 'wh_mi'
-    const [copied,    setCopied]    = useState(false);
+    const [chartType,    setChartType]    = useState('range-vehicle-bar');
+    const [effUnit,      setEffUnit]      = useState('mi_kwh'); // 'mi_kwh' | 'wh_mi'
+    const [copied,       setCopied]       = useState(false);
+    const [copiedUrl,    setCopiedUrl]    = useState(false);
 
     // ── Axis scale state — yMin defaults to 0, rest auto ─────────────────────
     const [xMin, setXMin] = useState(null);
@@ -562,7 +563,23 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         </div>
                     )}
                 </div>
-                <div className="mt-3">
+                <div className="mt-3 flex gap-2">
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(window.location.href).then(() => {
+                                setCopiedUrl(true);
+                                setTimeout(() => setCopiedUrl(false), 2000);
+                            });
+                        }}
+                        className={`chart-copy-btn ${
+                            copiedUrl
+                                ? 'bg-green-50 border-green-200 text-green-700'
+                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        }`}
+                        title="Copy link to this chart view"
+                    >
+                        {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
+                    </button>
                     <button
                         onClick={handleCopyImage}
                         disabled={plottableRuns.length === 0}

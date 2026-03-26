@@ -284,14 +284,12 @@ export default function ChargeCompareView({
     const chart2Instance = useRef(null);
 
     const handleCopyUrl = () => {
-        const p = new URLSearchParams(window.location.search);
-        p.set('cmp_soc',  startSoc);
-        p.set('cmp_mins', xMinutes);
-        p.set('cmp_mi',   mMiles);
-        const url = `${window.location.origin}${window.location.pathname}?${p.toString()}`;
-        navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        // App.jsx auto-syncs cmp_soc / cmp_mins / cmp_mi into the URL whenever
+        // compareConfig changes, so window.location.href always has the latest state.
+        navigator.clipboard.writeText(window.location.href).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
     };
 
     const selectedVehicles = useMemo(

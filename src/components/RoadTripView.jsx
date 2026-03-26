@@ -221,8 +221,13 @@ export default function RoadTripView({
 
     const [runDataCache, setRunDataCache] = useState({});
     const [loading, setLoading] = useState(false);
-    const [selectedRunIds, setSelectedRunIds] = useState([]);
+    const [selectedRunIds, setSelectedRunIds] = useState(() => {
+        // Restore run IDs from URL on first render (rt_r=id1,id2,…)
+        const raw = new URLSearchParams(window.location.search).get('rt_r');
+        return raw ? raw.split(',').map(Number).filter(Boolean) : [];
+    });
     const [axisScale, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
+    const [copiedUrl, setCopiedUrl] = useState(false);
     const onAxisChange = (key, val) => setAxisScale(prev => ({ ...prev, [key]: val }));
 
     const dl = distanceLabel(units);
@@ -489,6 +494,12 @@ export default function RoadTripView({
 
         const autoXMax = maxTime * 1.15;
         const autoYMax = isChargeTimeMode ? Math.ceil(maxChargeTime * 1.2 / 10) * 10 : totalDistDisplay;
+        // Default X minimum: time of the earliest first charge stop across all vehicles.
+        // This focuses the chart on charging behaviour rather than the initial drive.
+        const firstChargeStart = Math.min(
+            ...validSims.map(s => s.segments.find(seg => seg.type === 'charge')?.startTime ?? Infinity)
+        );
+        const autoXMin = isFinite(firstChargeStart) && firstChargeStart > 0 ? firstChargeStart : 0;
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
@@ -506,7 +517,7 @@ export default function RoadTripView({
                     x: {
                         type: 'linear',
                         title: { display: true, text: 'Elapsed Time', font: { size: 13 } },
-                        min: axisScale.xMin != null ? axisScale.xMin * 60 : 0,
+                        min: axisScale.xMin != null ? axisScale.xMin * 60 : autoXMin,
                         max: axisScale.xMax != null ? axisScale.xMax * 60 : autoXMax,
                         ticks: {
                             stepSize: 30,
@@ -818,13 +829,31 @@ export default function RoadTripView({
                         <h3 className="text-lg font-bold">
                             Road Trip — {Math.round(convDistance(totalDistance, units))} {dl} at {Math.round(convDistance(speed, units))} {sl}
                         </h3>
-                        <button
-                            onClick={() => chartRef.current?.resetZoom()}
-                            className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded px-2 py-1 transition-colors"
-                            title="Reset zoom to full view"
-                        >
-                            Reset Zoom
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    const p = new URLSearchParams(window.location.search);
+                                    if (selectedRunIds.length) p.set('rt_r', selectedRunIds.join(','));
+                                    else p.delete('rt_r');
+                                    const url = `${window.location.origin}${window.location.pathname}?${p.toString()}`;
+                                    navigator.clipboard.writeText(url).then(() => {
+                                        setCopiedUrl(true);
+                                        setTimeout(() => setCopiedUrl(false), 2000);
+                                    });
+                                }}
+                                className={`chart-copy-btn ${copiedUrl ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                                title="Copy link to this Road Trip chart"
+                            >
+                                {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
+                            </button>
+                            <button
+                                onClick={() => chartRef.current?.resetZoom()}
+                                className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded px-2 py-1 transition-colors"
+                                title="Reset zoom to full view"
+                            >
+                                Reset Zoom
+                            </button>
+                        </div>
                     </div>
                     <div style={{ height: `${Math.max(400, validEntries.length * 40 + 200)}px`, position: 'relative' }}>
                         <canvas ref={canvasRef} />
