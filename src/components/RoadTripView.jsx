@@ -57,9 +57,11 @@ function makeRoadTripPlugin(simResults, units) {
         id: 'roadTripLabels',
         afterDatasetsDraw(chart) {
             const ctx = chart.ctx;
+
+            // ── Pass 1: charging segment badges (EV lines only) ───────────
             let simIdx = 0;
             chart.data.datasets.forEach((ds, di) => {
-                if (ds._isIce) return; // skip ICE reference line
+                if (ds._isIce) return;
                 const sim = simResults[simIdx++];
                 if (!sim) return;
 
@@ -67,12 +69,11 @@ function makeRoadTripPlugin(simResults, units) {
                 const data = meta.data;
                 if (!data.length) return;
 
-                // ── Charging segment badges ──────────────────────────────
                 let ptIdx = 0;
                 for (const seg of sim.segments) {
                     if (seg.type === 'charge' && ptIdx + 1 < data.length) {
-                        const startPt = data[ptIdx];
-                        const endPt   = data[ptIdx + 1];
+                        const startPt  = data[ptIdx];
+                        const endPt    = data[ptIdx + 1];
                         const segWidth = Math.abs(endPt.x - startPt.x);
                         if (segWidth > 60) {
                             const midX = (startPt.x + endPt.x) / 2;
@@ -105,41 +106,84 @@ function makeRoadTripPlugin(simResults, units) {
                             ctx.restore();
                         }
                     }
-                    // Each segment produces 2 chart points
                     ptIdx += 2;
                 }
+            });
 
-                // ── Finish label ─────────────────────────────────────────
-                const lastPt = data[data.length - 1];
-                if (lastPt) {
-                    ctx.save();
-                    ctx.font = 'bold 11px system-ui, sans-serif';
-                    ctx.fillStyle = ds.borderColor;
-                    ctx.textAlign = 'left';
-                    ctx.textBaseline = 'middle';
-                    const finishLabel = `${ds.label} — ${formatTime(sim.totalTimeMin)}`;
-                    ctx.fillText(finishLabel, lastPt.x + 6, lastPt.y);
-                    ctx.restore();
+            // ── Pass 2: collect all finish labels (EV + ICE) ─────────────
+            const finishLabels = [];
+            let si = 0;
+            chart.data.datasets.forEach((ds, di) => {
+                const meta = chart.getDatasetMeta(di);
+                const pts  = meta.data;
+                if (!pts.length) return;
+                const lastPt = pts[pts.length - 1];
+                if (!lastPt) return;
+
+                if (ds._isIce) {
+                    const lastRaw = ds.data[ds.data.length - 1];
+                    if (lastRaw) finishLabels.push({
+                        x: lastPt.x, y: lastPt.y,
+                        text: `ICE Reference — ${formatTime(lastRaw.x)}`,
+                        color: ds.borderColor,
+                    });
+                } else {
+                    const sim = simResults[si++];
+                    if (sim) finishLabels.push({
+                        x: lastPt.x, y: lastPt.y,
+                        text: `${ds.label} — ${formatTime(sim.totalTimeMin)}`,
+                        color: ds.borderColor,
+                    });
                 }
             });
 
-            // ── ICE Reference finish label ────────────────────────────
-            chart.data.datasets.forEach((ds, di) => {
-                if (!ds._isIce) return;
-                const meta = chart.getDatasetMeta(di);
-                const data = meta.data;
-                if (!data.length) return;
-                const lastPt  = data[data.length - 1];
-                const lastRaw = ds.data[ds.data.length - 1];
-                if (!lastPt || !lastRaw) return;
-                ctx.save();
-                ctx.font = 'bold 11px system-ui, sans-serif';
-                ctx.fillStyle = ds.borderColor;
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(`ICE Reference — ${formatTime(lastRaw.x)}`, lastPt.x + 6, lastPt.y);
-                ctx.restore();
+            // ── Pass 3: spread overlapping labels, draw with leader lines ─
+            if (!finishLabels.length) return;
+
+            const LABEL_H = 16; // minimum px between label centres
+            // Fastest finisher (smallest x) → top slot; slowest → bottom
+            finishLabels.sort((a, b) => a.x - b.x);
+
+            const { top, bottom } = chart.chartArea;
+            const avgNatY   = finishLabels.reduce((s, l) => s + l.y, 0) / finishLabels.length;
+            const totalSpan = (finishLabels.length - 1) * LABEL_H;
+            const startY    = Math.max(top + 8, Math.min(bottom - totalSpan - 8, avgNatY - totalSpan / 2));
+
+            ctx.save();
+            ctx.font = 'bold 11px system-ui, sans-serif';
+
+            finishLabels.forEach((l, i) => {
+                const adjY      = Math.min(startY + i * LABEL_H, bottom - 8);
+                const displaced = Math.abs(adjY - l.y) > 4;
+
+                // Filled dot at the actual last data point
+                ctx.fillStyle = l.color;
+                ctx.beginPath();
+                ctx.arc(l.x, l.y, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Dashed leader from dot to label when displaced
+                if (displaced) {
+                    ctx.save();
+                    ctx.strokeStyle = l.color;
+                    ctx.lineWidth   = 0.75;
+                    ctx.globalAlpha = 0.45;
+                    ctx.setLineDash([3, 2]);
+                    ctx.beginPath();
+                    ctx.moveTo(l.x + 4, l.y);
+                    ctx.lineTo(l.x + 8, adjY);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // Label text
+                ctx.fillStyle     = l.color;
+                ctx.textAlign     = 'left';
+                ctx.textBaseline  = 'middle';
+                ctx.fillText(l.text, l.x + 8, adjY);
             });
+
+            ctx.restore();
         },
     };
 }
