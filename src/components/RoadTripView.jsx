@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Chart from 'chart.js/auto';
+import ZoomPlugin from 'chartjs-plugin-zoom';
 import { dataService } from '../services/DataService';
 import { useAppContext } from '../context/AppContext';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
 import RunSelector from './RunSelector';
+import AxisScaleControls from './AxisScaleControls';
 import {
     simulateRoadTrip, segmentsToChartPoints, segmentsToChartPointsChargeTime,
     formatTime, speedCorrectionFactor,
 } from '../utils/roadTripSimulation';
+
+Chart.register(ZoomPlugin);
 
 // ── Efficiency helpers ───────────────────────────────────────────────────────
 
@@ -156,6 +160,8 @@ export default function RoadTripView({
     const [runDataCache, setRunDataCache] = useState({});
     const [loading, setLoading] = useState(false);
     const [selectedRunIds, setSelectedRunIds] = useState([]);
+    const [axisScale, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
+    const onAxisChange = (key, val) => setAxisScale(prev => ({ ...prev, [key]: val }));
 
     const dl = distanceLabel(units);
     const sl = speedLabel(units);
@@ -419,10 +425,14 @@ export default function RoadTripView({
               ), iceCumStop, 30)
             : 0;
 
+        const autoXMax = maxTime * 1.15;
+        const autoYMax = isChargeTimeMode ? Math.ceil(maxChargeTime * 1.2 / 10) * 10 : totalDistDisplay;
+
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
             data: { datasets },
             options: {
+                animation: false,
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: {
@@ -434,8 +444,8 @@ export default function RoadTripView({
                     x: {
                         type: 'linear',
                         title: { display: true, text: 'Elapsed Time', font: { size: 13 } },
-                        min: 0,
-                        max: maxTime * 1.15,
+                        min: axisScale.xMin ?? 0,
+                        max: axisScale.xMax ?? autoXMax,
                         ticks: {
                             stepSize: 30,
                             callback: val => {
@@ -449,13 +459,13 @@ export default function RoadTripView({
                     y: isChargeTimeMode ? {
                         reverse: true,
                         title: { display: true, text: 'Cumulative Charge Time (min)', font: { size: 13 } },
-                        min: 0,
-                        max: Math.ceil(maxChargeTime * 1.2 / 10) * 10,
+                        min: axisScale.yMin ?? 0,
+                        max: axisScale.yMax ?? autoYMax,
                     } : {
                         reverse: true,
                         title: { display: true, text: `Distance Traveled (${dl})`, font: { size: 13 } },
-                        min: 0,
-                        max: totalDistDisplay,
+                        min: axisScale.yMin ?? 0,
+                        max: axisScale.yMax ?? autoYMax,
                     },
                 },
                 plugins: {
@@ -505,6 +515,17 @@ export default function RoadTripView({
                             },
                         },
                     },
+                    zoom: {
+                        zoom: {
+                            drag: {
+                                enabled: true,
+                                backgroundColor: 'rgba(59,130,246,0.08)',
+                                borderColor: '#3b82f6',
+                                borderWidth: 1,
+                            },
+                            mode: 'xy',
+                        },
+                    },
                 },
             },
             plugins: [makeRoadTripPlugin(simResults.map((s, i) => {
@@ -516,7 +537,7 @@ export default function RoadTripView({
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [simResults, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.speed, roadTripConfig.overhead]);
+    }, [simResults, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.speed, roadTripConfig.overhead, axisScale]);
 
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
@@ -732,11 +753,30 @@ export default function RoadTripView({
 
             {!loading && validEntries.length > 0 && (
                 <div className="card mb-6">
-                    <h3 className="text-lg font-bold mb-2">
-                        Road Trip — {Math.round(convDistance(totalDistance, units))} {dl} at {Math.round(convDistance(speed, units))} {sl}
-                    </h3>
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-lg font-bold">
+                            Road Trip — {Math.round(convDistance(totalDistance, units))} {dl} at {Math.round(convDistance(speed, units))} {sl}
+                        </h3>
+                        <button
+                            onClick={() => chartRef.current?.resetZoom()}
+                            className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded px-2 py-1 transition-colors"
+                            title="Reset zoom to full view"
+                        >
+                            Reset Zoom
+                        </button>
+                    </div>
                     <div style={{ height: `${Math.max(400, validEntries.length * 40 + 200)}px`, position: 'relative' }}>
                         <canvas ref={canvasRef} />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1 text-center">Drag to zoom · Reset Zoom to restore</p>
+                    <div className="mt-4 border-t pt-4">
+                        <AxisScaleControls
+                            xMin={axisScale.xMin} xMax={axisScale.xMax}
+                            yMin={axisScale.yMin} yMax={axisScale.yMax}
+                            onChange={onAxisChange}
+                            showX={true}
+                            showY2={false}
+                        />
                     </div>
                 </div>
             )}
