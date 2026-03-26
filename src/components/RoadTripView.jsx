@@ -137,23 +137,41 @@ function makeRoadTripPlugin(simResults, units) {
                 }
             });
 
-            // ── Pass 3: spread overlapping labels, draw with leader lines ─
+            // ── Pass 3: conflict-group spread + draw with leader lines ────
             if (!finishLabels.length) return;
 
             const LABEL_H = 16; // minimum px between label centres
-            // Fastest finisher (smallest x) → top slot; slowest → bottom
-            finishLabels.sort((a, b) => a.x - b.x);
+
+            // Sort by natural Y position; break ties by finish time (faster → top)
+            finishLabels.sort((a, b) => a.y - b.y || a.x - b.x);
 
             const { top, bottom } = chart.chartArea;
-            const avgNatY   = finishLabels.reduce((s, l) => s + l.y, 0) / finishLabels.length;
-            const totalSpan = (finishLabels.length - 1) * LABEL_H;
-            const startY    = Math.max(top + 8, Math.min(bottom - totalSpan - 8, avgNatY - totalSpan / 2));
+
+            // Build adjusted Y positions by finding conflict groups and spreading
+            // only within each group. Labels with no close neighbours stay put.
+            const adjYs = finishLabels.map(l => l.y); // start at natural positions
+            let gi = 0;
+            while (gi < finishLabels.length) {
+                // Extend the group as long as consecutive natural-Y values are too close
+                let gj = gi + 1;
+                while (gj < finishLabels.length && finishLabels[gj].y - finishLabels[gj - 1].y < LABEL_H) gj++;
+
+                if (gj > gi + 1) {
+                    // Spread this conflict group around its natural centroid
+                    const groupN   = gj - gi;
+                    const centroid = finishLabels.slice(gi, gj).reduce((s, l) => s + l.y, 0) / groupN;
+                    const span     = (groupN - 1) * LABEL_H;
+                    const startY   = Math.max(top + 8, Math.min(bottom - span - 8, centroid - span / 2));
+                    for (let k = gi; k < gj; k++) adjYs[k] = startY + (k - gi) * LABEL_H;
+                }
+                gi = gj;
+            }
 
             ctx.save();
             ctx.font = 'bold 11px system-ui, sans-serif';
 
             finishLabels.forEach((l, i) => {
-                const adjY      = Math.min(startY + i * LABEL_H, bottom - 8);
+                const adjY      = adjYs[i];
                 const displaced = Math.abs(adjY - l.y) > 4;
 
                 // Filled dot at the actual last data point
