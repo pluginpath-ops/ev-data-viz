@@ -108,15 +108,18 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin) {
                     ctx.textAlign    = 'left';
                     ctx.textBaseline = 'middle';
 
+                    // Shift block upward so labels sit inside the lane rather than over the boundary
+                    const labelY = lastPt.y - 13;
+
                     // Main elapsed time in vehicle color
                     ctx.fillStyle = ds.borderColor;
-                    ctx.fillText(timeLabel, lastPt.x + 6, lastPt.y);
+                    ctx.fillText(timeLabel, lastPt.x + 6, labelY);
 
                     // vs ICE delta below, in amber (slower) or green (faster)
                     if (vsIce) {
                         ctx.font      = '10px system-ui, sans-serif';
                         ctx.fillStyle = deltaMin > 0 ? '#d97706' : '#16a34a'; // amber-600 / green-600
-                        ctx.fillText(vsIce, lastPt.x + 6, lastPt.y + 13);
+                        ctx.fillText(vsIce, lastPt.x + 6, labelY + 13);
                     }
                     ctx.restore();
                 });
