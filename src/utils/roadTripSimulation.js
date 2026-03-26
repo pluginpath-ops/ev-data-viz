@@ -229,6 +229,21 @@ export function segmentsToChartPointsChargeTime(segments) {
 }
 
 /**
+ * Convert simulation segments to Chart.js data points (by-test / SoC-lane mode).
+ * Each run occupies its own horizontal lane; Y encodes SoC within that lane.
+ * Y formula: runIndex + 0.5 + soc / 100
+ *   → run 0 spans Y ∈ [0.5, 1.5], run 1 spans Y ∈ [1.5, 2.5], etc.
+ */
+export function segmentsToChartPointsByTest(segments, runIndex) {
+    const points = [];
+    for (const seg of segments) {
+        points.push({ x: round1(seg.startTime), y: round1(runIndex + 0.5 + seg.startSoc / 100) });
+        points.push({ x: round1(seg.endTime),   y: round1(runIndex + 0.5 + seg.endSoc   / 100) });
+    }
+    return points;
+}
+
+/**
  * Format minutes as "Xh Ym" or "Xm".
  */
 export function formatTime(minutes) {
