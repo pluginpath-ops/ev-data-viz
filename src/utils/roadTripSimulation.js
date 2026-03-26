@@ -2,22 +2,28 @@ import { interpolate } from './interpolate';
 import { convDistance } from './unitConversions';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const AERO_FRACTION   = 0.7;   // fraction of energy from aero drag at reference speed
-const REFERENCE_SPEED = 70;    // mph
-const MAX_ITERATIONS  = 50;    // safety guard against infinite loops
-const MIN_DRIVE_MI    = 0.1;   // minimum driveable distance before bailing
+const AERO_FRACTION        = 0.70; // fraction of energy from aero drag at ref speed (unladen EV)
+const TOWING_AERO_FRACTION = 0.85; // higher aero fraction when towing — trailer roughly doubles Cd×A
+const REFERENCE_SPEED      = 70;   // mph
+const MAX_ITERATIONS       = 50;   // safety guard against infinite loops
+const MIN_DRIVE_MI         = 0.1;  // minimum driveable distance before bailing
 
 // ── Speed correction ─────────────────────────────────────────────────────────
 
 /**
  * Physics-based speed correction factor for efficiency.
- * At 70 mph, ~70% of energy is aerodynamic drag (∝ v²).
+ * Models energy ∝ aeroFraction×(v/v_ref)² + (1−aeroFraction).
  * Returns a multiplier on Wh/mi (>1 = worse, <1 = better).
+ *
+ * @param {number} travelMph  Actual travel speed
+ * @param {number} testMph    Speed at which efficiency was measured
+ * @param {number} [aeroFraction]  Fraction of energy from aero drag at ref speed.
+ *   Use TOWING_AERO_FRACTION (~0.85) when towing, AERO_FRACTION (~0.70) unladen.
  */
-export function speedCorrectionFactor(travelMph, testMph) {
+export function speedCorrectionFactor(travelMph, testMph, aeroFraction = AERO_FRACTION) {
     if (!testMph || testMph <= 0) return 1;
-    const travelTerm = AERO_FRACTION * (travelMph / REFERENCE_SPEED) ** 2 + (1 - AERO_FRACTION);
-    const testTerm   = AERO_FRACTION * (testMph   / REFERENCE_SPEED) ** 2 + (1 - AERO_FRACTION);
+    const travelTerm = aeroFraction * (travelMph / REFERENCE_SPEED) ** 2 + (1 - aeroFraction);
+    const testTerm   = aeroFraction * (testMph   / REFERENCE_SPEED) ** 2 + (1 - aeroFraction);
     return travelTerm / testTerm;
 }
 
@@ -38,7 +44,8 @@ export function speedCorrectionFactor(travelMph, testMph) {
  * @param {number}  params.speedMph         Travel speed
  * @param {number}  params.chargeTimeMinutes Fixed charge duration per stop (mode B)
  * @param {'distance'|'time'} params.mode   Simulation mode
- * @param {number} [params.overheadMinutes] Per-stop overhead (default 5)
+ * @param {number}  [params.overheadMinutes] Per-stop overhead (default 5)
+ * @param {boolean} [params.towingMode]      When true, use higher aero fraction for speed correction
  *
  * @returns {{ segments, totalTimeMin, chargeStops, warnings, speedFactor }}
  */
@@ -46,13 +53,14 @@ export function simulateRoadTrip({
     batteryKwh, miPerKwh, testSpeedMph, chargingData,
     startSoc, minSoc, legDistanceMi, totalDistanceMi,
     speedMph, chargeTimeMinutes = 30, mode = 'distance',
-    overheadMinutes = 5,
+    overheadMinutes = 5, towingMode = false,
 }) {
     const warnings = [];
     const segments = [];
 
-    // Speed correction
-    const factor = speedCorrectionFactor(speedMph, testSpeedMph);
+    // Speed correction — use higher aero fraction when towing (trailer raises Cd×A of system)
+    const aeroFrac = towingMode ? TOWING_AERO_FRACTION : AERO_FRACTION;
+    const factor = speedCorrectionFactor(speedMph, testSpeedMph, aeroFrac);
     const correctedMiPerKwh = miPerKwh / factor;
 
     // Prepare charging curve sorted by SoC and by time

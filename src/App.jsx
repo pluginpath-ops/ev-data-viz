@@ -85,9 +85,9 @@ export default function App() {
         totalDistance: 500, speed: 70,
         overhead: 5,              // per-stop overhead minutes (applies to EV and ICE)
         yAxis: 'chargeTime',      // 'distance' | 'chargeTime'  — default to charge time
-        towingMode: false,
-        towingEfficiency: 1.5,
-        towingRefSpeedMph: 70,
+        towingMode: false,        // override all vehicle efficiencies with a fixed trailer-system value
+        towingEfficiency: 1.5,    // mi/kWh for the whole vehicle+trailer system
+        towingRefSpeedMph: 70,    // speed at which towingEfficiency was measured
     });
     const [chartConfig, setChartConfig] = useState({
         xAxis: 'soc',

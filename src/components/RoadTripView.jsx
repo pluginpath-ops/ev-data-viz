@@ -355,7 +355,10 @@ export default function RoadTripView({
 
     // ── Run simulation for each entry ─────────────────────────────────────────
     const simResults = useMemo(() => {
-        const { startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, overhead } = roadTripConfig;
+        const {
+            startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, overhead,
+            towingMode, towingEfficiency, towingRefSpeedMph,
+        } = roadTripConfig;
 
         return validEntries.map(entry => {
             const chargingData = runDataCache[entry.run.id];
@@ -363,9 +366,9 @@ export default function RoadTripView({
 
             const result = simulateRoadTrip({
                 batteryKwh:        entry.batteryKwh,
-                miPerKwh:          entry.miPerKwh,
-                // Use the run's test speed if known; otherwise assume 70 mph per spec
-                testSpeedMph:      entry.testSpeedMph || 70,
+                // Towing: all vehicles share the same system efficiency; battery still varies per vehicle
+                miPerKwh:          towingMode ? towingEfficiency : entry.miPerKwh,
+                testSpeedMph:      towingMode ? towingRefSpeedMph : (entry.testSpeedMph || 70),
                 chargingData,
                 startSoc,
                 minSoc,
@@ -375,6 +378,7 @@ export default function RoadTripView({
                 chargeTimeMinutes: chargeTime,
                 overheadMinutes:   overhead,
                 mode,
+                towingMode,
             });
 
             // Attach helper fields for the plugin
@@ -615,7 +619,10 @@ export default function RoadTripView({
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
 
     // ── Render ───────────────────────────────────────────────────────────────
-    const { startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, yAxis, overhead } = roadTripConfig;
+    const {
+        startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, yAxis, overhead,
+        towingMode, towingEfficiency, towingRefSpeedMph,
+    } = roadTripConfig;
 
     // ICE reference total time (for "vs ICE" column)
     const iceRefTimeMin = useMemo(() => {
@@ -634,9 +641,12 @@ export default function RoadTripView({
     }, [totalDistance, speed, overhead]);
 
     // Display values in current units
-    const dispLeg   = units === 'metric' ? Math.round(legDistance * MI_TO_KM) : legDistance;
-    const dispTotal = units === 'metric' ? Math.round(totalDistance * MI_TO_KM) : totalDistance;
-    const dispSpeed = units === 'metric' ? Math.round(speed * MI_TO_KM) : speed;
+    const dispLeg          = units === 'metric' ? Math.round(legDistance * MI_TO_KM) : legDistance;
+    const dispTotal        = units === 'metric' ? Math.round(totalDistance * MI_TO_KM) : totalDistance;
+    const dispSpeed        = units === 'metric' ? Math.round(speed * MI_TO_KM) : speed;
+    const dispTowingEff    = units === 'metric' ? (towingEfficiency * MI_TO_KM).toFixed(2) : towingEfficiency;
+    const dispTowingRef    = units === 'metric' ? Math.round(towingRefSpeedMph * MI_TO_KM) : towingRefSpeedMph;
+    const towingEffLabel   = units === 'metric' ? 'km/kWh' : 'mi/kWh';
 
     return (
         <div>
@@ -681,7 +691,47 @@ export default function RoadTripView({
                                 </button>
                             </div>
                         </div>
+                        <div>
+                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Mode</span>
+                            <button
+                                className={`btn btn-sm ${towingMode ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setField('towingMode', !towingMode)}
+                                title="Override all vehicle efficiencies with a fixed trailer-system value. Battery capacity and charging curve still vary per vehicle."
+                            >
+                                🚐 Towing
+                            </button>
+                        </div>
                     </div>
+
+                    {/* Towing inputs — only visible when towing mode is on */}
+                    {towingMode && (
+                        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <p className="text-xs font-semibold text-amber-700 mb-2 uppercase tracking-wide">Towing System Efficiency</p>
+                            <div className="flex flex-wrap items-end gap-4">
+                                <label className="text-sm">
+                                    <span className="font-medium block mb-1">Efficiency ({towingEffLabel})</span>
+                                    <input type="number" className="w-28 border rounded px-2 py-1" step="0.1" min="0.3" max="5"
+                                        value={dispTowingEff}
+                                        onChange={e => {
+                                            const val = parseFloat(e.target.value);
+                                            setField('towingEfficiency', units === 'metric' ? val / MI_TO_KM : val);
+                                        }} />
+                                </label>
+                                <label className="text-sm">
+                                    <span className="font-medium block mb-1">Measured at ({sl})</span>
+                                    <input type="number" className="w-24 border rounded px-2 py-1" min="20"
+                                        value={dispTowingRef}
+                                        onChange={e => {
+                                            const val = Number(e.target.value);
+                                            setField('towingRefSpeedMph', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
+                                        }} />
+                                </label>
+                                <p className="text-xs text-amber-600 max-w-xs">
+                                    Enter full system efficiency (vehicle + trailer). Battery capacity and charging speed still vary per vehicle.
+                                </p>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-4">
                         <label className="text-sm">
@@ -827,7 +877,7 @@ export default function RoadTripView({
                 <div className="card mb-6">
                     <div className="flex items-center justify-between mb-2">
                         <h3 className="text-lg font-bold">
-                            Road Trip — {Math.round(convDistance(totalDistance, units))} {dl} at {Math.round(convDistance(speed, units))} {sl}
+                            Road Trip{towingMode ? ' (Towing)' : ''} — {Math.round(convDistance(totalDistance, units))} {dl} at {Math.round(convDistance(speed, units))} {sl}
                         </h3>
                         <div className="flex items-center gap-2">
                             <button
@@ -920,14 +970,23 @@ export default function RoadTripView({
                                             <td className="px-3 py-2">{sim.chargeStops}</td>
                                             <td className="px-3 py-2">{sim.chargeStops > 0 ? formatTime(avgChargeTime) : '—'}</td>
                                             <td className="px-3 py-2">
-                                                {entry.miPerKwh.toFixed(1)} {effLabel}
-                                                {entry.testSpeedMph ? (
-                                                    <span className="text-gray-400 ml-1">@ {fmtSpeed(entry.testSpeedMph, units)}</span>
+                                                {towingMode ? (
+                                                    <>
+                                                        <span className="text-amber-700 font-medium">{dispTowingEff} {effLabel}</span>
+                                                        <span className="block text-xs text-amber-500">towing @ {dispTowingRef} {sl}</span>
+                                                    </>
                                                 ) : (
-                                                    <span className="text-amber-500 ml-1" title="Set Speed (mph) on the run in Tests &amp; Data for accurate speed correction">@ 70 mph (assumed)</span>
-                                                )}
-                                                {entry.efficiencyNote && (
-                                                    <span className="block text-xs text-gray-400">{entry.efficiencyNote}</span>
+                                                    <>
+                                                        {entry.miPerKwh.toFixed(1)} {effLabel}
+                                                        {entry.testSpeedMph ? (
+                                                            <span className="text-gray-400 ml-1">@ {fmtSpeed(entry.testSpeedMph, units)}</span>
+                                                        ) : (
+                                                            <span className="text-amber-500 ml-1" title="Set Speed (mph) on the run in Tests &amp; Data for accurate speed correction">@ 70 mph (assumed)</span>
+                                                        )}
+                                                        {entry.efficiencyNote && (
+                                                            <span className="block text-xs text-gray-400">{entry.efficiencyNote}</span>
+                                                        )}
+                                                    </>
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">
