@@ -53,7 +53,7 @@ const PALETTE = [
 ];
 
 // ── Chart.js plugin: charging badges + finish labels ─────────────────────────
-function makeRoadTripPlugin(simResults, units, yAxis) {
+function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin) {
     return {
         id: 'roadTripLabels',
 
@@ -85,7 +85,7 @@ function makeRoadTripPlugin(simResults, units, yAxis) {
         afterDatasetsDraw(chart) {
             const ctx = chart.ctx;
 
-            // ── byTest mode: draw elapsed-time callout at end of each run ──
+            // ── byTest mode: draw elapsed-time + vs-ICE callout at end of each run ──
             if (yAxis === 'byTest') {
                 let simIdx = 0;
                 chart.data.datasets.forEach((ds, di) => {
@@ -95,13 +95,29 @@ function makeRoadTripPlugin(simResults, units, yAxis) {
                     const meta   = chart.getDatasetMeta(di);
                     const lastPt = meta.data[meta.data.length - 1];
                     if (!lastPt) return;
-                    const label = formatTime(sim.totalTimeMin);
+
+                    const timeLabel = formatTime(sim.totalTimeMin);
+                    const deltaMin  = iceTimeMin != null ? sim.totalTimeMin - iceTimeMin : null;
+                    const absDelta  = deltaMin != null ? Math.abs(deltaMin) : null;
+                    const vsIce     = absDelta != null
+                        ? (deltaMin > 0 ? `+${formatTime(absDelta)} vs ICE` : `−${formatTime(absDelta)} vs ICE`)
+                        : null;
+
                     ctx.save();
-                    ctx.font          = 'bold 11px system-ui, sans-serif';
-                    ctx.fillStyle     = ds.borderColor;
-                    ctx.textAlign     = 'left';
-                    ctx.textBaseline  = 'middle';
-                    ctx.fillText(label, lastPt.x + 6, lastPt.y);
+                    ctx.font         = 'bold 11px system-ui, sans-serif';
+                    ctx.textAlign    = 'left';
+                    ctx.textBaseline = 'middle';
+
+                    // Main elapsed time in vehicle color
+                    ctx.fillStyle = ds.borderColor;
+                    ctx.fillText(timeLabel, lastPt.x + 6, lastPt.y);
+
+                    // vs ICE delta below, in amber (slower) or green (faster)
+                    if (vsIce) {
+                        ctx.font      = '10px system-ui, sans-serif';
+                        ctx.fillStyle = deltaMin > 0 ? '#d97706' : '#16a34a'; // amber-600 / green-600
+                        ctx.fillText(vsIce, lastPt.x + 6, lastPt.y + 13);
+                    }
                     ctx.restore();
                 });
                 return;
@@ -701,7 +717,7 @@ export default function RoadTripView({
             },
             plugins: [makeRoadTripPlugin(simResults.map((s, i) => {
                 return datasets.find(d => d._simIndex === i) ? s : null;
-            }).filter(Boolean), units, yAxis)],
+            }).filter(Boolean), units, yAxis, iceTime)],
         });
 
         return () => {
