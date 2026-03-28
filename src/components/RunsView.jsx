@@ -135,25 +135,26 @@ const EstimateTimePanel = ({
                                     {preview.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
                                 </div>
                             )}
-                            <table className="text-xs w-full border rounded overflow-hidden">
-                                <thead className="bg-gray-100">
-                                    <tr>
-                                        <th className="px-2 py-1 text-left font-medium">SoC %</th>
-                                        <th className="px-2 py-1 text-left font-medium">Est. time (min)</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {preview.points.slice(0, 6).map((p, i) => (
-                                        <tr key={i}>
-                                            <td className="px-2 py-0.5">{p.soc}%</td>
-                                            <td className="px-2 py-0.5">{p.time}</td>
+                            <div className="max-h-64 overflow-y-auto border rounded">
+                                <table className="text-xs w-full">
+                                    <thead className="bg-gray-100 sticky top-0">
+                                        <tr>
+                                            <th className="px-2 py-1 text-left font-medium">SoC %</th>
+                                            <th className="px-2 py-1 text-left font-medium">kW</th>
+                                            <th className="px-2 py-1 text-left font-medium">Est. time (min)</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                            {preview.points.length > 6 && (
-                                <p className="text-xs text-gray-400">…{preview.points.length - 6} more rows</p>
-                            )}
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {preview.points.map((p, i) => (
+                                            <tr key={i}>
+                                                <td className="px-2 py-0.5">{p.soc}%</td>
+                                                <td className="px-2 py-0.5">{p.chargeRate}</td>
+                                                <td className="px-2 py-0.5">{p.time}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                             <p className="text-xs text-gray-500 font-medium">
                                 Apply will write {preview.points.length} time values to this run.
                             </p>
@@ -698,7 +699,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         if (!estimatePreview) return;
         setEstimateApplying(true);
         try {
-            await onMergeRunData(run.id, estimatePreview.points, 'soc');
+            // Strip chargeRate — only write the time column (chargeRate is display-only in preview)
+            const timePoints = estimatePreview.points.map(({ soc, time }) => ({ soc, time }));
+            await onMergeRunData(run.id, timePoints, 'soc');
             // Mark time as a calculated (estimated) field
             const updated = editCalculatedFields.includes('time')
                 ? editCalculatedFields

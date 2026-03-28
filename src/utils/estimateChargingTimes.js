@@ -115,7 +115,7 @@ export function estimateChargingTimes({ dataPoints, batteryKwh, anchors, shiftTo
         : calibrated;
 
     return {
-        points: sorted.map((p, i) => ({ soc: p.soc, time: times[i] })),
+        points: sorted.map((p, i) => ({ soc: p.soc, chargeRate: p.chargeRate, time: times[i] })),
         warnings,
     };
 }
