@@ -10,6 +10,7 @@ import EditVehicleForm from './EditVehicleForm';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 import { RunVoteButtons } from './VoteButtons';
+import { estimateChargingTimes } from '../utils/estimateChargingTimes';
 
 // ── Data-type flag definitions ────────────────────────────────────────────────
 // Each flag represents a data domain that can independently be present in a run.
@@ -25,6 +26,143 @@ const inferRunFlags = (run) => {
     if (run?.has_charging ?? true)  flags.push('charging');
     if (run?.has_range    ?? false) flags.push('range');
     return flags;
+};
+
+// ── Estimate Time from Power panel ────────────────────────────────────────────
+const EstimateTimePanel = ({
+    vehicle, editData, editDataLoading,
+    anchors, onChangeAnchors,
+    shiftToZero, onShiftToZeroChange,
+    preview, applying, error,
+    onPreview, onApply,
+}) => {
+    const batteryMissing = !vehicle?.battery;
+    const validAnchors   = anchors.filter(
+        a => a.soc !== '' && a.timeMin !== '' && !isNaN(Number(a.soc)) && !isNaN(Number(a.timeMin))
+    );
+    const canPreview = !batteryMissing && validAnchors.length >= 2 && editData !== null && !editDataLoading;
+
+    return (
+        <div className="mt-2 border rounded bg-gray-50 p-3 space-y-3">
+            {batteryMissing && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    ⚠ Set the battery capacity (kWh) on this vehicle to use time estimation.
+                </p>
+            )}
+            {editDataLoading && <p className="text-xs text-gray-400">Loading data…</p>}
+            {!editDataLoading && (
+                <>
+                    <div>
+                        <div className="grid grid-cols-[76px_96px_24px] gap-1 text-xs text-gray-500 px-1 mb-1">
+                            <span>SoC (%)</span><span>Elapsed (min)</span>
+                        </div>
+                        <div className="space-y-1">
+                            {anchors.map((a, i) => (
+                                <div key={i} className="grid grid-cols-[76px_96px_24px] gap-1 items-center">
+                                    <input
+                                        type="number" min="0" max="100"
+                                        placeholder="SoC%"
+                                        value={a.soc}
+                                        onChange={e => {
+                                            const next = [...anchors];
+                                            next[i] = { ...next[i], soc: e.target.value };
+                                            onChangeAnchors(next);
+                                        }}
+                                        className="form-input text-xs py-1"
+                                    />
+                                    <input
+                                        type="number" step="0.1"
+                                        placeholder="minutes"
+                                        value={a.timeMin}
+                                        onChange={e => {
+                                            const next = [...anchors];
+                                            next[i] = { ...next[i], timeMin: e.target.value };
+                                            onChangeAnchors(next);
+                                        }}
+                                        className="form-input text-xs py-1"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => onChangeAnchors(anchors.filter((_, j) => j !== i))}
+                                        className="text-gray-400 hover:text-red-500 font-bold leading-none"
+                                        title="Remove anchor"
+                                    >✕</button>
+                                </div>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => onChangeAnchors([...anchors, { soc: '', timeMin: '' }])}
+                            className="mt-1 text-xs text-blue-600 hover:text-blue-800"
+                        >+ Add anchor</button>
+                    </div>
+
+                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={shiftToZero}
+                            onChange={e => onShiftToZeroChange(e.target.checked)}
+                        />
+                        Shift times so t=0 is at the first data point
+                    </label>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                            type="button"
+                            onClick={onPreview}
+                            disabled={!canPreview}
+                            className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+                        >Preview</button>
+                        <button
+                            type="button"
+                            onClick={onApply}
+                            disabled={!preview || applying}
+                            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+                        >{applying ? 'Applying…' : 'Apply'}</button>
+                        {!batteryMissing && validAnchors.length < 2 && anchors.length >= 1 && (
+                            <span className="text-xs text-gray-400">Need ≥2 anchors to preview</span>
+                        )}
+                    </div>
+
+                    {error && (
+                        <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{error}</p>
+                    )}
+
+                    {preview && !error && (
+                        <div className="space-y-1">
+                            {preview.warnings.length > 0 && (
+                                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 space-y-0.5">
+                                    {preview.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
+                                </div>
+                            )}
+                            <table className="text-xs w-full border rounded overflow-hidden">
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th className="px-2 py-1 text-left font-medium">SoC %</th>
+                                        <th className="px-2 py-1 text-left font-medium">Est. time (min)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {preview.points.slice(0, 6).map((p, i) => (
+                                        <tr key={i}>
+                                            <td className="px-2 py-0.5">{p.soc}%</td>
+                                            <td className="px-2 py-0.5">{p.time}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {preview.points.length > 6 && (
+                                <p className="text-xs text-gray-400">…{preview.points.length - 6} more rows</p>
+                            )}
+                            <p className="text-xs text-gray-500 font-medium">
+                                Apply will write {preview.points.length} time values to this run.
+                            </p>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    );
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, onAddTrim, onDeleteTrim, vehicles, onCopyRunToVehicle }) {
@@ -130,6 +268,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [editCalcKwh, setEditCalcKwh]         = useState(null);   // kWh derived from data_points in edit mode
     const [sortField, setSortField]             = useState(null);   // active sort column key
     const [sortDir, setSortDir]                 = useState('asc');  // 'asc' | 'desc'
+
+    // ── Estimate-time-from-power panel state ──────────────────────────────────
+    const [showEstimatePanel, setShowEstimatePanel] = useState(false);
+    const [estimateAnchors, setEstimateAnchors]     = useState([]);   // [{soc:'', timeMin:''}]
+    const [estimateShift, setEstimateShift]         = useState(false);
+    const [estimatePreview, setEstimatePreview]     = useState(null); // null | {points, warnings}
+    const [estimateApplying, setEstimateApplying]   = useState(false);
+    const [estimateError, setEstimateError]         = useState('');
 
     // ── Per-card lazy kWh check (card view, not edit mode) ───────────────────
     // { [runId]: { kwh: number|null, loading: bool } }
@@ -395,6 +541,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             setEditDataDirty(false);
             setShowDataTable(false);
             setEditCalcKwh(null);
+            setShowEstimatePanel(false);
+            setEstimateAnchors([]);
+            setEstimatePreview(null);
+            setEstimateError('');
         }
     };
 
@@ -406,6 +556,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setEditDataDirty(false);
         setShowDataTable(false);
         setEditCalcKwh(null);
+        setShowEstimatePanel(false);
+        setEstimateAnchors([]);
+        setEstimatePreview(null);
+        setEstimateError('');
     };
 
     // ── Update data (merge mode entry) ────────────────────────────────────────
@@ -479,6 +633,94 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         })));
         setEditCalculatedFields(prev => prev.includes('range') ? prev : [...prev, 'range']);
         setEditDataDirty(true);
+    };
+
+    // ── Estimate time from power ──────────────────────────────────────────────
+
+    const handleToggleEstimatePanel = async (runId) => {
+        if (showEstimatePanel) {
+            setShowEstimatePanel(false);
+            return;
+        }
+        // Seed anchors from whatever time values are already in the data
+        const seedAnchors = (data) => {
+            const fromData = (data || [])
+                .filter(p => p.soc != null && p.time != null)
+                .sort((a, b) => a.soc - b.soc)
+                .map(p => ({ soc: String(p.soc), timeMin: String(p.time) }));
+            setEstimateAnchors(
+                fromData.length >= 2 ? fromData : [{ soc: '', timeMin: '' }, { soc: '', timeMin: '' }]
+            );
+        };
+
+        if (editData !== null) {
+            seedAnchors(editData);
+        } else {
+            // Load data (shared with data-table state)
+            setEditDataLoading(true);
+            try {
+                const data = await dataService.getRunData(runId);
+                setEditData(data);
+                setSortField(null);
+                setSortDir('asc');
+                setEditCalcKwh(calcKwhFromPoints(data));
+                seedAnchors(data);
+            } catch (err) {
+                console.error('Error loading run data for time estimation:', err);
+                setEditData([]);
+                seedAnchors([]);
+            } finally {
+                setEditDataLoading(false);
+            }
+        }
+        setEstimatePreview(null);
+        setEstimateError('');
+        setShowEstimatePanel(true);
+    };
+
+    const handleEstimatePreview = () => {
+        setEstimateError('');
+        setEstimatePreview(null);
+        try {
+            const result = estimateChargingTimes({
+                dataPoints:  editData,
+                batteryKwh:  vehicle.battery,
+                anchors:     estimateAnchors,
+                shiftToZero: estimateShift,
+            });
+            setEstimatePreview(result);
+        } catch (err) {
+            setEstimateError(err.message);
+        }
+    };
+
+    const handleEstimateApply = async (run) => {
+        if (!estimatePreview) return;
+        setEstimateApplying(true);
+        try {
+            await onMergeRunData(run.id, estimatePreview.points, 'soc');
+            // Mark time as a calculated (estimated) field
+            const updated = editCalculatedFields.includes('time')
+                ? editCalculatedFields
+                : [...editCalculatedFields, 'time'];
+            setEditCalculatedFields(updated);
+            onUpdateRun(run.id, { calculated_fields: updated });
+            // Patch local editData so the data table reflects the new values
+            if (editData) {
+                const socToTime = Object.fromEntries(estimatePreview.points.map(p => [p.soc, p.time]));
+                setEditData(prev => prev.map(row =>
+                    row.soc != null && socToTime[row.soc] !== undefined
+                        ? { ...row, time: socToTime[row.soc] }
+                        : row
+                ));
+            }
+            setEstimatePreview(null);
+            setEstimateError('');
+        } catch (err) {
+            setEstimateError('Failed to apply: ' + err.message);
+        } finally {
+            setEstimateApplying(false);
+        }
     };
 
     // ── Join key logic (merge mode only) ─────────────────────────────────────
@@ -1242,6 +1484,37 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 onChange={(e) => setEditFormData({...editFormData, chargingUrl: e.target.value})}
                                                 className="form-input w-full mt-2"
                                             />
+                                        </div>
+                                    )}
+
+                                    {/* Estimate Time from Power — charging runs with SoC+kW data */}
+                                    {canEdit(vehicle) && (editFormData.dataFlags || ['charging']).includes('charging') && (
+                                        <div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleToggleEstimatePanel(run.id)}
+                                                className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 mt-1"
+                                            >
+                                                <span className="font-semibold">
+                                                    {showEstimatePanel ? '▴ Estimate time from power' : '▾ Estimate time from power'}
+                                                </span>
+                                            </button>
+                                            {showEstimatePanel && (
+                                                <EstimateTimePanel
+                                                    vehicle={vehicle}
+                                                    editData={editData}
+                                                    editDataLoading={editDataLoading}
+                                                    anchors={estimateAnchors}
+                                                    onChangeAnchors={setEstimateAnchors}
+                                                    shiftToZero={estimateShift}
+                                                    onShiftToZeroChange={setEstimateShift}
+                                                    preview={estimatePreview}
+                                                    applying={estimateApplying}
+                                                    error={estimateError}
+                                                    onPreview={handleEstimatePreview}
+                                                    onApply={() => handleEstimateApply(run)}
+                                                />
+                                            )}
                                         </div>
                                     )}
 
