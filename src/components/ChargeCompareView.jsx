@@ -268,6 +268,7 @@ export default function ChargeCompareView({
     xMinutes = 15, setXMinutes,
     mMiles   = 150, setMMiles,
     startSoc = 10,  setStartSoc,
+    onUpdateRunColor = null,
     presentationMode = false,
 }) {
     const { units } = useAppContext();
@@ -292,8 +293,9 @@ export default function ChargeCompareView({
         });
     };
 
+    // Preserve the user's pill order
     const selectedVehicles = useMemo(
-        () => vehicles.filter(v => selectedVehicleIds.includes(v.id)),
+        () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
         [vehicles, selectedVehicleIds]
     );
 
@@ -620,7 +622,7 @@ export default function ChargeCompareView({
                         onToggleRun={runId => setSelectedRuns(prev =>
                             prev.includes(runId) ? prev.filter(id => id !== runId) : [...prev, runId]
                         )}
-                        onUpdateRunColor={null}
+                        onUpdateRunColor={onUpdateRunColor}
                         runFilter={r => r.has_range}
                         emptyMessage="No range test records"
                         renderRunMeta={run => (

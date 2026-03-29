@@ -19,7 +19,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const [chartImage, setChartImage] = useState(null);
     const [imageCopied, setImageCopied] = useState(false);
 
-    const selectedVehicles = vehicles.filter(v => selectedVehicleIds.includes(v.id));
+    // Preserve the user's pill order
+    const selectedVehicles = selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean);
 
     const handleColorChange = (vehicleId, runId, color) => {
         onUpdateRunColor(vehicleId, runId, color);

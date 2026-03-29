@@ -77,6 +77,7 @@ export default function App() {
 
     const [activeVehicle, setActiveVehicle] = useState(null);
     const [view, setView] = useState('vehicles');
+    const [dragOverIdx, setDragOverIdx] = useState(null); // pill drop-indicator position
     const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare'
     const [compareConfig, setCompareConfig] = useState({ xMinutes: 15, mMiles: 150, startSoc: 10 });
     const [roadTripConfig, setRoadTripConfig] = useState({
@@ -555,23 +556,54 @@ export default function App() {
                                 </div>
                             ) : (
                                 <>
-                                    {selectedVehicles.map(vehicleId => {
+                                    {selectedVehicles.map((vehicleId, idx) => {
                                         const vehicle = vehicles.find(v => v.id === vehicleId);
                                         if (!vehicle) return null;
+                                        // dropIdx is computed from cursor position on each pill:
+                                        // left half → insert before (idx), right half → insert after (idx+1)
+                                        const getDropIdx = (e) => {
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            return e.clientX > rect.left + rect.width / 2 ? idx + 1 : idx;
+                                        };
                                         return (
-                                            <div
-                                                key={vehicleId}
-                                                className="selected-vehicle-chip"
-                                                style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}
-                                            >
-                                                <span>{vehicle.name}</span>
-                                                <button
-                                                    onClick={() => removeVehicleSelection(vehicleId)}
-                                                    className="ml-1 hover:opacity-70 rounded-full w-4 h-4 flex items-center justify-center"
-                                                    style={{fontSize: '12px'}}
+                                            <div key={vehicleId} className="flex items-center">
+                                                {/* Drop indicator before this pill */}
+                                                {dragOverIdx === idx && (
+                                                    <div className="w-0.5 h-6 bg-blue-500 rounded mr-1 shrink-0" />
+                                                )}
+                                                <div
+                                                    draggable
+                                                    onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(idx)); }}
+                                                    onDragOver={e => { e.preventDefault(); setDragOverIdx(getDropIdx(e)); }}
+                                                    onDragEnd={() => setDragOverIdx(null)}
+                                                    onDrop={e => {
+                                                        e.preventDefault();
+                                                        setDragOverIdx(null);
+                                                        const fromIdx = Number(e.dataTransfer.getData('text/plain'));
+                                                        const dropIdx = getDropIdx(e);
+                                                        const next = [...selectedVehicles];
+                                                        const [moved] = next.splice(fromIdx, 1);
+                                                        const insertAt = dropIdx > fromIdx ? dropIdx - 1 : dropIdx;
+                                                        next.splice(insertAt, 0, moved);
+                                                        setVehicleSelection(next);
+                                                    }}
+                                                    className="selected-vehicle-chip cursor-grab active:cursor-grabbing"
+                                                    style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}
+                                                    title="Drag to reorder"
                                                 >
-                                                    &times;
-                                                </button>
+                                                    <span>{vehicle.name}</span>
+                                                    <button
+                                                        onClick={() => removeVehicleSelection(vehicleId)}
+                                                        className="ml-1 hover:opacity-70 rounded-full w-4 h-4 flex items-center justify-center"
+                                                        style={{fontSize: '12px'}}
+                                                    >
+                                                        &times;
+                                                    </button>
+                                                </div>
+                                                {/* Drop indicator after the last pill */}
+                                                {idx === selectedVehicles.length - 1 && dragOverIdx === selectedVehicles.length && (
+                                                    <div className="w-0.5 h-6 bg-blue-500 rounded ml-1 shrink-0" />
+                                                )}
                                             </div>
                                         );
                                     })}
@@ -676,6 +708,7 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                             roadTripConfig={roadTripConfig}
                             setRoadTripConfig={setRoadTripConfig}
+                            onUpdateRunColor={updateRunColor}
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'compare' && (
@@ -688,11 +721,12 @@ export default function App() {
                             setXMinutes={v => setCompareConfig(p => ({ ...p, xMinutes: v }))}
                             setMMiles={v => setCompareConfig(p => ({ ...p, mMiles: v }))}
                             setStartSoc={v => setCompareConfig(p => ({ ...p, startSoc: v }))}
+                            onUpdateRunColor={updateRunColor}
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'specs' && (
                         <SpecsChartView
-                            vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
+                            vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
                             selectedField={chartConfig.specsField}
                             onFieldChange={field => setChartConfig(p => ({ ...p, specsField: field }))}
                         />
