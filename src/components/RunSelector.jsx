@@ -1,10 +1,11 @@
 import { useState } from 'react';
 
 /**
- * Shared collapsible run selector used by ChargingView, RangeChartView, and ChargeCompareView.
+ * Shared collapsible run selector used by ChargingView, RangeChartView,
+ * ChargeCompareView, and RoadTripView.
  *
  * Props:
- *   vehicles        — array of vehicle objects with .runs
+ *   vehicles        — array of vehicle objects with .runs, in display order
  *   selectedRunIds  — array of selected run IDs
  *   onToggleRun     — (runId) => void
  *   onUpdateRunColor — (vehicleId, runId, color) => void, or null to hide color inputs
@@ -22,15 +23,11 @@ export default function RunSelector({
     renderRunMeta = null,
 }) {
     const [expanded, setExpanded] = useState(false);
-    const [expandedVehicles, setExpandedVehicles] = useState({});
 
-    const toggleVehicle = (vehicleId) =>
-        setExpandedVehicles(prev => ({ ...prev, [vehicleId]: !prev[vehicleId] }));
+    const isSelected = (run) => selectedRunIds.some(id => String(id) === String(run.id));
 
-    const selectedCount = vehicles.reduce((n, v) => {
-        const filtered = (v.runs || []).filter(runFilter);
-        return n + filtered.filter(r => selectedRunIds.some(id => String(id) === String(r.id))).length;
-    }, 0);
+    const selectedCount = vehicles.reduce((n, v) =>
+        n + (v.runs || []).filter(runFilter).filter(isSelected).length, 0);
 
     return (
         <div>
@@ -41,63 +38,38 @@ export default function RunSelector({
                 <span style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
                 Select Vehicle Tests to Display
                 <span className="text-sm font-normal text-gray-500">({selectedCount} selected)</span>
+                {expanded && (
+                    <span className="text-xs font-normal text-gray-400 ml-2">· Drag the pills above to reorder</span>
+                )}
             </button>
 
             {expanded && (
                 <div className="mt-3">
                     <div className="runs-list">
                         {vehicles.map(vehicle => {
-                            const filteredRuns  = (vehicle.runs || []).filter(runFilter);
-                            const activeRuns    = filteredRuns.filter(r =>  selectedRunIds.some(id => String(id) === String(r.id)));
-                            const inactiveRuns  = filteredRuns.filter(r => !selectedRunIds.some(id => String(id) === String(r.id)));
-                            const isVehicleExpanded = expandedVehicles[vehicle.id];
+                            const filteredRuns = (vehicle.runs || []).filter(runFilter);
 
                             return (
                                 <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
                                     <div className="flex items-center gap-2 mb-2">
                                         <h4 className="text-sm font-semibold text-gray-700">{vehicle.name}</h4>
-                                        {inactiveRuns.length > 0 && (
-                                            <button
-                                                onClick={() => toggleVehicle(vehicle.id)}
-                                                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
-                                            >
-                                                <span style={{ display: 'inline-block', transform: isVehicleExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                                                <span>{isVehicleExpanded ? 'Hide' : 'Show all'} ({filteredRuns.length})</span>
-                                            </button>
-                                        )}
                                     </div>
 
                                     {filteredRuns.length === 0 ? (
                                         <p className="text-sm text-gray-400 italic">{emptyMessage}</p>
                                     ) : (
                                         <div className="run-items">
-                                            {activeRuns.map(run => (
+                                            {filteredRuns.map(run => (
                                                 <RunRow
                                                     key={run.id}
                                                     run={run}
                                                     vehicle={vehicle}
-                                                    isChecked={true}
-                                                    dimmed={false}
+                                                    isChecked={isSelected(run)}
                                                     onToggle={() => onToggleRun(run.id)}
                                                     onUpdateRunColor={onUpdateRunColor}
                                                     renderRunMeta={renderRunMeta}
                                                 />
                                             ))}
-                                            {isVehicleExpanded && inactiveRuns.map(run => (
-                                                <RunRow
-                                                    key={run.id}
-                                                    run={run}
-                                                    vehicle={vehicle}
-                                                    isChecked={false}
-                                                    dimmed={true}
-                                                    onToggle={() => onToggleRun(run.id)}
-                                                    onUpdateRunColor={onUpdateRunColor}
-                                                    renderRunMeta={renderRunMeta}
-                                                />
-                                            ))}
-                                            {activeRuns.length === 0 && !isVehicleExpanded && (
-                                                <p className="text-xs text-gray-400 italic">No runs selected — click Show all to re-add</p>
-                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -110,9 +82,9 @@ export default function RunSelector({
     );
 }
 
-function RunRow({ run, vehicle, isChecked, dimmed, onToggle, onUpdateRunColor, renderRunMeta }) {
+function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunMeta }) {
     return (
-        <label className={`flex items-center gap-2 cursor-pointer ${dimmed ? 'opacity-60 hover:opacity-100' : ''}`}>
+        <label className={`flex items-center gap-2 cursor-pointer ${!isChecked ? 'opacity-60 hover:opacity-100' : ''}`}>
             <input
                 type="checkbox"
                 checked={isChecked}

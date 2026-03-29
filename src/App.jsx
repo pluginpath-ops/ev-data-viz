@@ -555,14 +555,27 @@ export default function App() {
                                 </div>
                             ) : (
                                 <>
-                                    {selectedVehicles.map(vehicleId => {
+                                    {selectedVehicles.map((vehicleId, idx) => {
                                         const vehicle = vehicles.find(v => v.id === vehicleId);
                                         if (!vehicle) return null;
                                         return (
                                             <div
                                                 key={vehicleId}
-                                                className="selected-vehicle-chip"
+                                                draggable
+                                                onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(idx)); }}
+                                                onDragOver={e => e.preventDefault()}
+                                                onDrop={e => {
+                                                    e.preventDefault();
+                                                    const fromIdx = Number(e.dataTransfer.getData('text/plain'));
+                                                    if (fromIdx === idx) return;
+                                                    const next = [...selectedVehicles];
+                                                    const [moved] = next.splice(fromIdx, 1);
+                                                    next.splice(idx, 0, moved);
+                                                    setVehicleSelection(next);
+                                                }}
+                                                className="selected-vehicle-chip cursor-grab active:cursor-grabbing"
                                                 style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}
+                                                title="Drag to reorder"
                                             >
                                                 <span>{vehicle.name}</span>
                                                 <button
@@ -676,6 +689,7 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                             roadTripConfig={roadTripConfig}
                             setRoadTripConfig={setRoadTripConfig}
+                            onUpdateRunColor={updateRunColor}
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'compare' && (
@@ -688,11 +702,12 @@ export default function App() {
                             setXMinutes={v => setCompareConfig(p => ({ ...p, xMinutes: v }))}
                             setMMiles={v => setCompareConfig(p => ({ ...p, mMiles: v }))}
                             setStartSoc={v => setCompareConfig(p => ({ ...p, startSoc: v }))}
+                            onUpdateRunColor={updateRunColor}
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'specs' && (
                         <SpecsChartView
-                            vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
+                            vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
                             selectedField={chartConfig.specsField}
                             onFieldChange={field => setChartConfig(p => ({ ...p, specsField: field }))}
                         />

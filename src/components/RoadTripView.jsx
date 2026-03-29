@@ -316,6 +316,7 @@ export default function RoadTripView({
     selectedVehicleIds,
     roadTripConfig,
     setRoadTripConfig,
+    onUpdateRunColor = null,
     presentationMode = false,
 }) {
     const { units } = useAppContext();
@@ -338,9 +339,9 @@ export default function RoadTripView({
     const dl = distanceLabel(units);
     const sl = speedLabel(units);
 
-    // ── Resolve selected vehicles ────────────────────────────────────────────
+    // ── Resolve selected vehicles (preserve pill order) ──────────────────────
     const selectedVehicles = useMemo(
-        () => vehicles.filter(v => selectedVehicleIds.includes(v.id)),
+        () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
         [vehicles, selectedVehicleIds]
     );
 
@@ -1006,7 +1007,7 @@ export default function RoadTripView({
                                     ? prev.filter(x => x !== runId)
                                     : [...prev, runId]
                             )}
-                            onUpdateRunColor={null}
+                            onUpdateRunColor={onUpdateRunColor}
                             runFilter={r => r.has_charging !== false}
                             emptyMessage="No charging test data"
                             renderRunMeta={run => {
