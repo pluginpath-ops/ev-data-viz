@@ -266,24 +266,33 @@ class DataService {
       localStorage.setItem('evData', JSON.stringify(data));
       return newRun;
     }
+    // Accept both camelCase (from form/context) and snake_case (from raw DB rows,
+    // e.g. when duplicating a run that came directly out of getVehicles()).
+    const coalesce = (camel, snake) => camel !== undefined ? camel : snake;
+    const numField = (camel, snake) => {
+      const v = coalesce(camel, snake);
+      return v != null && v !== '' ? Number(v) : null;
+    };
     const { data: newRun, error } = await getSupabase().from('runs').insert({
       vehicle_id: vehicleId, name: run.name, date: run.date,
-      software_version: run.softwareVersion, conditions: run.conditions,
-      color: run.color || '#3b82f6', is_default: run.isDefault || false,
-      synthetic: run.synthetic || false,
-      has_charging: run.hasCharging ?? true,
-      has_range:    run.hasRange    ?? false,
+      software_version: coalesce(run.softwareVersion,   run.software_version)  || null,
+      conditions: run.conditions || null,
+      color: run.color || '#3b82f6',
+      is_default: coalesce(run.isDefault,  run.is_default)  || false,
+      synthetic:  coalesce(run.synthetic,  run.synthetic)   || false,
+      has_charging: coalesce(run.hasCharging, run.has_charging) ?? true,
+      has_range:    coalesce(run.hasRange,    run.has_range)    ?? false,
       source: run.source || null,
-      start_soc: run.startSoc != null && run.startSoc !== '' ? Number(run.startSoc) : null,
-      end_soc: run.endSoc != null && run.endSoc !== '' ? Number(run.endSoc) : null,
-      speed_mph: run.speedMph != null && run.speedMph !== '' ? Number(run.speedMph) : null,
-      distance_miles: run.distanceMiles != null && run.distanceMiles !== '' ? Number(run.distanceMiles) : null,
-      energy_kwh: run.energyKwh != null && run.energyKwh !== '' ? Number(run.energyKwh) : null,
-      temperature_f: run.temperatureF != null && run.temperatureF !== '' ? Number(run.temperatureF) : null,
-      elevation_gain_ft: run.elevationGainFt != null && run.elevationGainFt !== '' ? Number(run.elevationGainFt) : null,
+      start_soc:         numField(run.startSoc,        run.start_soc),
+      end_soc:           numField(run.endSoc,          run.end_soc),
+      speed_mph:         numField(run.speedMph,        run.speed_mph),
+      distance_miles:    numField(run.distanceMiles,   run.distance_miles),
+      energy_kwh:        numField(run.energyKwh,       run.energy_kwh),
+      temperature_f:     numField(run.temperatureF,    run.temperature_f),
+      elevation_gain_ft: numField(run.elevationGainFt, run.elevation_gain_ft),
       url: run.url || null,
-      charging_url: run.chargingUrl || null,
-      trim_id: run.trimId ? Number(run.trimId) : null,
+      charging_url: coalesce(run.chargingUrl, run.charging_url) || null,
+      trim_id: numField(run.trimId, run.trim_id),
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
