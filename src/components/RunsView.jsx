@@ -524,18 +524,17 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         try {
             // Convert dataFlags → boolean columns and drop the flags field
             const { dataFlags, ...formRest } = editFormData;
-            onUpdateRun(runId, {
+            await onUpdateRun(runId, {
                 ...formRest,
                 hasCharging: dataFlags.includes('charging'),
                 hasRange:    dataFlags.includes('range'),
                 calculated_fields: editCalculatedFields,
             });
-            // Save table data only if the owner made changes
+            // Save table data only if the editor made changes
             if (editDataDirty && canEdit(vehicle) && editData !== null) {
                 await onReplaceRunData(runId, editData.map((row, i) => ({ ...row, frame: i })));
             }
-        } finally {
-            setSavingData(false);
+            // Close the form only on success
             setEditingRunId(null);
             setEditFormData({});
             setEditData(null);
@@ -546,6 +545,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             setEstimateAnchors([]);
             setEstimatePreview(null);
             setEstimateError('');
+        } catch (err) {
+            alert(`Save failed: ${err?.message ?? err}`);
+        } finally {
+            setSavingData(false);
         }
     };
 
