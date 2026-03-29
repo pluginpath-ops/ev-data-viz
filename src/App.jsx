@@ -575,10 +575,11 @@ export default function App() {
                                                         e.preventDefault();
                                                         setDragOverIdx(null);
                                                         const fromIdx = Number(e.dataTransfer.getData('text/plain'));
-                                                        if (fromIdx === idx) return;
                                                         const next = [...selectedVehicles];
                                                         const [moved] = next.splice(fromIdx, 1);
-                                                        next.splice(idx, 0, moved);
+                                                        // After removal, indices above fromIdx shift down by 1
+                                                        const insertAt = idx > fromIdx ? idx - 1 : idx;
+                                                        next.splice(insertAt, 0, moved);
                                                         setVehicleSelection(next);
                                                     }}
                                                     className="selected-vehicle-chip cursor-grab active:cursor-grabbing"
