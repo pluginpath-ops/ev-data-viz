@@ -77,6 +77,7 @@ export default function App() {
 
     const [activeVehicle, setActiveVehicle] = useState(null);
     const [view, setView] = useState('vehicles');
+    const [dragOverIdx, setDragOverIdx] = useState(null); // pill drop-indicator position
     const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare'
     const [compareConfig, setCompareConfig] = useState({ xMinutes: 15, mMiles: 150, startSoc: 10 });
     const [roadTripConfig, setRoadTripConfig] = useState({
@@ -559,35 +560,62 @@ export default function App() {
                                         const vehicle = vehicles.find(v => v.id === vehicleId);
                                         if (!vehicle) return null;
                                         return (
-                                            <div
-                                                key={vehicleId}
-                                                draggable
-                                                onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(idx)); }}
-                                                onDragOver={e => e.preventDefault()}
-                                                onDrop={e => {
-                                                    e.preventDefault();
-                                                    const fromIdx = Number(e.dataTransfer.getData('text/plain'));
-                                                    if (fromIdx === idx) return;
-                                                    const next = [...selectedVehicles];
-                                                    const [moved] = next.splice(fromIdx, 1);
-                                                    next.splice(idx, 0, moved);
-                                                    setVehicleSelection(next);
-                                                }}
-                                                className="selected-vehicle-chip cursor-grab active:cursor-grabbing"
-                                                style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}
-                                                title="Drag to reorder"
-                                            >
-                                                <span>{vehicle.name}</span>
-                                                <button
-                                                    onClick={() => removeVehicleSelection(vehicleId)}
-                                                    className="ml-1 hover:opacity-70 rounded-full w-4 h-4 flex items-center justify-center"
-                                                    style={{fontSize: '12px'}}
+                                            <div key={vehicleId} className="flex items-center">
+                                                {/* Drop indicator before this pill */}
+                                                {dragOverIdx === idx && (
+                                                    <div className="w-0.5 h-6 bg-blue-500 rounded mr-1 shrink-0" />
+                                                )}
+                                                <div
+                                                    draggable
+                                                    onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(idx)); }}
+                                                    onDragEnter={e => { e.preventDefault(); setDragOverIdx(idx); }}
+                                                    onDragOver={e => e.preventDefault()}
+                                                    onDragEnd={() => setDragOverIdx(null)}
+                                                    onDrop={e => {
+                                                        e.preventDefault();
+                                                        setDragOverIdx(null);
+                                                        const fromIdx = Number(e.dataTransfer.getData('text/plain'));
+                                                        if (fromIdx === idx) return;
+                                                        const next = [...selectedVehicles];
+                                                        const [moved] = next.splice(fromIdx, 1);
+                                                        next.splice(idx, 0, moved);
+                                                        setVehicleSelection(next);
+                                                    }}
+                                                    className="selected-vehicle-chip cursor-grab active:cursor-grabbing"
+                                                    style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}
+                                                    title="Drag to reorder"
                                                 >
-                                                    &times;
-                                                </button>
+                                                    <span>{vehicle.name}</span>
+                                                    <button
+                                                        onClick={() => removeVehicleSelection(vehicleId)}
+                                                        className="ml-1 hover:opacity-70 rounded-full w-4 h-4 flex items-center justify-center"
+                                                        style={{fontSize: '12px'}}
+                                                    >
+                                                        &times;
+                                                    </button>
+                                                </div>
                                             </div>
                                         );
                                     })}
+                                    {/* Drop indicator at the end */}
+                                    {dragOverIdx === selectedVehicles.length && (
+                                        <div className="w-0.5 h-6 bg-blue-500 rounded mx-1 shrink-0" />
+                                    )}
+                                    {/* Trailing drop zone so you can drag to the end */}
+                                    <div
+                                        className="h-8 w-4 shrink-0"
+                                        onDragEnter={e => { e.preventDefault(); setDragOverIdx(selectedVehicles.length); }}
+                                        onDragOver={e => e.preventDefault()}
+                                        onDrop={e => {
+                                            e.preventDefault();
+                                            setDragOverIdx(null);
+                                            const fromIdx = Number(e.dataTransfer.getData('text/plain'));
+                                            const next = [...selectedVehicles];
+                                            const [moved] = next.splice(fromIdx, 1);
+                                            next.push(moved);
+                                            setVehicleSelection(next);
+                                        }}
+                                    />
                                     <button
                                         onClick={clearAllSelections}
                                         className="btn btn-warning btn-sm"

@@ -23,6 +23,11 @@ export default function RunSelector({
     renderRunMeta = null,
 }) {
     const [expanded, setExpanded] = useState(false);
+    // Default all vehicles to expanded; track explicit collapses
+    const [collapsedVehicles, setCollapsedVehicles] = useState({});
+    const isVehicleExpanded = (vehicleId) => !collapsedVehicles[vehicleId];
+    const toggleVehicle = (vehicleId) =>
+        setCollapsedVehicles(prev => ({ ...prev, [vehicleId]: !prev[vehicleId] }));
 
     const isSelected = (run) => selectedRunIds.some(id => String(id) === String(run.id));
 
@@ -52,25 +57,34 @@ export default function RunSelector({
                             return (
                                 <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
                                     <div className="flex items-center gap-2 mb-2">
-                                        <h4 className="text-sm font-semibold text-gray-700">{vehicle.name}</h4>
+                                        <button
+                                            onClick={() => toggleVehicle(vehicle.id)}
+                                            className="flex items-center gap-1.5 text-left group"
+                                            title={isVehicleExpanded(vehicle.id) ? 'Collapse' : 'Expand'}
+                                        >
+                                            <span style={{ display: 'inline-block', transform: isVehicleExpanded(vehicle.id) ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} className="text-gray-400 group-hover:text-gray-600">&#9660;</span>
+                                            <h4 className="text-sm font-semibold text-gray-700">{vehicle.name}</h4>
+                                        </button>
                                     </div>
 
-                                    {filteredRuns.length === 0 ? (
-                                        <p className="text-sm text-gray-400 italic">{emptyMessage}</p>
-                                    ) : (
-                                        <div className="run-items">
-                                            {filteredRuns.map(run => (
-                                                <RunRow
-                                                    key={run.id}
-                                                    run={run}
-                                                    vehicle={vehicle}
-                                                    isChecked={isSelected(run)}
-                                                    onToggle={() => onToggleRun(run.id)}
-                                                    onUpdateRunColor={onUpdateRunColor}
-                                                    renderRunMeta={renderRunMeta}
-                                                />
-                                            ))}
-                                        </div>
+                                    {isVehicleExpanded(vehicle.id) && (
+                                        filteredRuns.length === 0 ? (
+                                            <p className="text-sm text-gray-400 italic">{emptyMessage}</p>
+                                        ) : (
+                                            <div className="run-items">
+                                                {filteredRuns.map(run => (
+                                                    <RunRow
+                                                        key={run.id}
+                                                        run={run}
+                                                        vehicle={vehicle}
+                                                        isChecked={isSelected(run)}
+                                                        onToggle={() => onToggleRun(run.id)}
+                                                        onUpdateRunColor={onUpdateRunColor}
+                                                        renderRunMeta={renderRunMeta}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )
                                     )}
                                 </div>
                             );

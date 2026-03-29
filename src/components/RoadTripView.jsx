@@ -413,11 +413,14 @@ export default function RoadTripView({
         return map;
     }, [selectedVehicles]);
 
-    // ── Active run entries (in selectedRunIds order) ──────────────────────────
-    const runEntries = useMemo(() =>
-        selectedRunIds.map(id => allChargingRunsInfo[id]).filter(Boolean),
-        [selectedRunIds, allChargingRunsInfo]
-    );
+    // ── Active run entries — ordered by vehicle pill position ─────────────────
+    const runEntries = useMemo(() => {
+        const vehicleOrder = new Map(selectedVehicles.map((v, i) => [v.id, i]));
+        return selectedRunIds
+            .map(id => allChargingRunsInfo[id])
+            .filter(Boolean)
+            .sort((a, b) => (vehicleOrder.get(a.vehicle.id) ?? 999) - (vehicleOrder.get(b.vehicle.id) ?? 999));
+    }, [selectedRunIds, allChargingRunsInfo, selectedVehicles]);
 
     const validEntries  = runEntries.filter(e => e.miPerKwh && e.batteryKwh);
     const skippedEntries = runEntries.filter(e => !e.miPerKwh || !e.batteryKwh);
