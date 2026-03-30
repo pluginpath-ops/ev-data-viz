@@ -23,14 +23,14 @@ const SPEED_SWEEP_MPH  = Array.from(
     (_, i) => SPEED_SWEEP_MIN + i * SPEED_SWEEP_STEP,
 ); // [45, 50, 55, ..., 100]
 
-// ── Distance sweep constants ─────────────────────────────────────────────────
-const DIST_SWEEP_MIN  = 100;  // miles
-const DIST_SWEEP_MAX  = 1000; // miles
-const DIST_SWEEP_STEP = 50;   // miles
-const DIST_SWEEP_MI   = Array.from(
-    { length: Math.floor((DIST_SWEEP_MAX - DIST_SWEEP_MIN) / DIST_SWEEP_STEP) + 1 },
-    (_, i) => DIST_SWEEP_MIN + i * DIST_SWEEP_STEP,
-); // [100, 150, 200, ..., 1000]
+// ── Leg-distance sweep constants (mi between charging stops) ─────────────────
+const LEG_SWEEP_MIN  = 60;   // miles between charges
+const LEG_SWEEP_MAX  = 200;  // miles between charges
+const LEG_SWEEP_STEP = 20;   // miles
+const LEG_SWEEP_MI   = Array.from(
+    { length: Math.floor((LEG_SWEEP_MAX - LEG_SWEEP_MIN) / LEG_SWEEP_STEP) + 1 },
+    (_, i) => LEG_SWEEP_MIN + i * LEG_SWEEP_STEP,
+); // [60, 80, 100, ..., 200]
 
 // ── Unrealistic simulation check ─────────────────────────────────────────────
 const CHARGE_CEIL_SOC = 95; // % — charging above this marks a sim as unrealistic
@@ -581,23 +581,23 @@ export default function RoadTripView({
         });
     }, [validEntries, runDataCache, roadTripConfig]);
 
-    // ── Distance sweep: run simulation at every distance in DIST_SWEEP_MI ─────
+    // ── Leg-distance sweep: run simulation at every leg distance in LEG_SWEEP_MI ─
     const distSweepResults = useMemo(() => {
         if (roadTripConfig.xAxis !== 'tripDist') return null;
         const {
-            startSoc, minSoc, legDistance, chargeTime, speed, mode, overhead,
+            startSoc, minSoc, chargeTime, totalDistance, speed, mode, overhead,
             towingMode, towingEfficiency, towingRefSpeedMph,
         } = roadTripConfig;
         return validEntries.map(entry => {
             const chargingData = runDataCache[entry.run.id] ?? [];
-            return DIST_SWEEP_MI.map(distMi => simulateRoadTrip({
+            return LEG_SWEEP_MI.map(legMi => simulateRoadTrip({
                 batteryKwh:        entry.batteryKwh,
                 miPerKwh:          towingMode ? towingEfficiency : entry.miPerKwh,
                 testSpeedMph:      towingMode ? towingRefSpeedMph : (entry.testSpeedMph || 70),
                 chargingData,
                 startSoc, minSoc,
-                legDistanceMi:     legDistance,
-                totalDistanceMi:   distMi,
+                legDistanceMi:     legMi,
+                totalDistanceMi:   totalDistance,
                 speedMph:          speed,
                 chargeTimeMinutes: chargeTime,
                 overheadMinutes:   overhead,
@@ -739,16 +739,16 @@ export default function RoadTripView({
         // ── Trip distance sweep chart ────────────────────────────────────────
         if (isTripDistMode) {
             const sweepLabel = { totalTime: 'Total Trip Time', driveTime: 'Driving Time', chargeTime: 'Charge + Stop Time' }[sweepYAxis] ?? 'Total Trip Time';
-            const distMinDisplay = units === 'metric' ? Math.round(DIST_SWEEP_MIN * MI_TO_KM) : DIST_SWEEP_MIN;
-            const distMaxDisplay = units === 'metric' ? Math.round(DIST_SWEEP_MAX * MI_TO_KM) : DIST_SWEEP_MAX;
-            const distStepDisplay = units === 'metric' ? Math.round(DIST_SWEEP_STEP * MI_TO_KM) : DIST_SWEEP_STEP;
+            const legMinDisplay  = units === 'metric' ? Math.round(LEG_SWEEP_MIN  * MI_TO_KM) : LEG_SWEEP_MIN;
+            const legMaxDisplay  = units === 'metric' ? Math.round(LEG_SWEEP_MAX  * MI_TO_KM) : LEG_SWEEP_MAX;
+            const legStepDisplay = units === 'metric' ? Math.round(LEG_SWEEP_STEP * MI_TO_KM) : LEG_SWEEP_STEP;
 
             const distDatasets = validEntries.map((entry, i) => {
                 const sweepSims = distSweepResults[i];
                 if (!sweepSims) return null;
-                const data = DIST_SWEEP_MI.map((distMi, di) => ({
-                    x: units === 'metric' ? Math.round(distMi * MI_TO_KM) : distMi,
-                    y: isSimUnrealistic(sweepSims[di]) ? null : Math.round(getSweepY(sweepSims[di], speed, distMi, sweepYAxis)),
+                const data = LEG_SWEEP_MI.map((legMi, di) => ({
+                    x: units === 'metric' ? Math.round(legMi * MI_TO_KM) : legMi,
+                    y: isSimUnrealistic(sweepSims[di]) ? null : Math.round(getSweepY(sweepSims[di], speed, totalDistance, sweepYAxis)),
                 }));
                 return {
                     label: entryLabel(entry),
@@ -762,14 +762,14 @@ export default function RoadTripView({
                 };
             }).filter(Boolean);
 
-            // ICE reference line for distance sweep
-            const iceDistData = DIST_SWEEP_MI.map(distMi => {
-                const iceTotalMin = calcIceTotalTimeAtSpeed(speed, distMi, overhead);
-                const driveMin    = (distMi / speed) * 60;
+            // ICE reference line — ICE stops every 3 hrs regardless of leg distance setting
+            const iceDistData = LEG_SWEEP_MI.map(legMi => {
+                const iceTotalMin = calcIceTotalTimeAtSpeed(speed, totalDistance, overhead);
+                const driveMin    = (totalDistance / speed) * 60;
                 const yVal = sweepYAxis === 'driveTime'  ? driveMin
                            : sweepYAxis === 'chargeTime' ? iceTotalMin - driveMin
                            : iceTotalMin;
-                return { x: units === 'metric' ? Math.round(distMi * MI_TO_KM) : distMi, y: Math.round(yVal) };
+                return { x: units === 'metric' ? Math.round(legMi * MI_TO_KM) : legMi, y: Math.round(yVal) };
             });
             distDatasets.unshift({
                 label: 'ICE Reference',
@@ -795,10 +795,10 @@ export default function RoadTripView({
                     scales: {
                         x: {
                             type: 'linear',
-                            min: axisScale.xMin ?? distMinDisplay,
-                            max: axisScale.xMax ?? distMaxDisplay,
-                            title: { display: true, text: `Trip Distance (${dl})`, font: { size: 13 } },
-                            ticks: { stepSize: distStepDisplay },
+                            min: axisScale.xMin ?? legMinDisplay,
+                            max: axisScale.xMax ?? legMaxDisplay,
+                            title: { display: true, text: `${dl} Between Charges`, font: { size: 13 } },
+                            ticks: { stepSize: legStepDisplay },
                         },
                         y: {
                             min: axisScale.yMin ?? 0,
@@ -812,7 +812,7 @@ export default function RoadTripView({
                             callbacks: {
                                 title: items => items[0]?.dataset.label ?? '',
                                 label: ctx => [
-                                    `Distance: ${ctx.parsed.x} ${dl}`,
+                                    `${dl} between charges: ${ctx.parsed.x} ${dl}`,
                                     `${sweepLabel}: ${formatTime(ctx.parsed.y)}`,
                                 ],
                             },
@@ -1285,7 +1285,7 @@ export default function RoadTripView({
                                 min={5} max={30} value={minSoc}
                                 onChange={e => setField('minSoc', Number(e.target.value))} />
                         </label>
-                        {mode === 'distance' && (
+                        {mode === 'distance' && !isTripDistMode && (
                             <label className="text-sm">
                                 <span className="font-medium block mb-1 whitespace-nowrap">{dl} between charges</span>
                                 <input type="number" className="w-full border rounded px-2 py-1"
@@ -1304,17 +1304,15 @@ export default function RoadTripView({
                                     onChange={e => setField('chargeTime', Number(e.target.value))} />
                             </label>
                         )}
-                        {!isTripDistMode && (
-                            <label className="text-sm">
-                                <span className="font-medium block mb-1 whitespace-nowrap">Total Dist. ({dl})</span>
-                                <input type="number" className="w-full border rounded px-2 py-1"
-                                    min={10} value={dispTotal}
-                                    onChange={e => {
-                                        const val = Number(e.target.value);
-                                        setField('totalDistance', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
-                                    }} />
-                            </label>
-                        )}
+                        <label className="text-sm">
+                            <span className="font-medium block mb-1 whitespace-nowrap">Total Dist. ({dl})</span>
+                            <input type="number" className="w-full border rounded px-2 py-1"
+                                min={10} value={dispTotal}
+                                onChange={e => {
+                                    const val = Number(e.target.value);
+                                    setField('totalDistance', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
+                                }} />
+                        </label>
                         {!isSpeedMode && (
                             <label className="text-sm">
                                 <span className="font-medium block mb-1 whitespace-nowrap">Speed ({sl})</span>
@@ -1422,7 +1420,7 @@ export default function RoadTripView({
                         <h3 className="text-lg font-bold">
                             Road Trip{towingMode ? ' (Towing)' : ''}
                             {isSpeedMode   ? ` · Speed vs. Time`
-                             : isTripDistMode ? ` · Distance vs. Time at ${Math.round(convDistance(speed, units))} ${sl}`
+                             : isTripDistMode ? ` — ${Math.round(convDistance(totalDistance, units))} ${dl} · Leg Distance vs. Time at ${Math.round(convDistance(speed, units))} ${sl}`
                              : ` — ${Math.round(convDistance(totalDistance, units))} ${dl} at ${Math.round(convDistance(speed, units))} ${sl}`}
                         </h3>
                         <button
@@ -1439,7 +1437,7 @@ export default function RoadTripView({
                     <p className="text-xs text-gray-400 mt-1 text-center">Drag to zoom · Reset Zoom to restore</p>
                     {isSweepMode && hasUnrealisticPoints && (
                         <p className="text-xs text-amber-600 mt-1 text-center">
-                            Lines end where a charge stop would exceed {CHARGE_CEIL_SOC}% SoC — unrealistic at that {isSpeedMode ? 'speed' : 'distance'}.
+                            Lines end where a charge stop would exceed {CHARGE_CEIL_SOC}% SoC — unrealistic at that {isSpeedMode ? 'speed' : 'leg distance'}.
                         </p>
                     )}
                     <div className="mt-3 flex gap-2">
