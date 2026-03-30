@@ -678,7 +678,7 @@ export default function RoadTripView({
                            : iceTotalMin;
                 return { x: units === 'metric' ? Math.round(mph * MI_TO_KM) : mph, y: Math.round(yVal) };
             });
-            const iceSpeedYMin = Math.floor(Math.min(...iceSpeedData.map(d => d.y)) / 60) * 60;
+            const iceSpeedYMin = Math.floor((Math.min(...iceSpeedData.map(d => d.y)) - 30) / 60) * 60;
             speedDatasets.unshift({
                 label: 'ICE Reference',
                 data: iceSpeedData,
@@ -773,7 +773,7 @@ export default function RoadTripView({
                            : iceTotalMin;
                 return { x: units === 'metric' ? Math.round(legMi * MI_TO_KM) : legMi, y: Math.round(yVal) };
             });
-            const iceDistYMin = Math.floor(Math.min(...iceDistData.map(d => d.y)) / 60) * 60;
+            const iceDistYMin = Math.floor((Math.min(...iceDistData.map(d => d.y)) - 30) / 60) * 60;
             distDatasets.unshift({
                 label: 'ICE Reference',
                 data: iceDistData,
