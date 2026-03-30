@@ -678,6 +678,7 @@ export default function RoadTripView({
                            : iceTotalMin;
                 return { x: units === 'metric' ? Math.round(mph * MI_TO_KM) : mph, y: Math.round(yVal) };
             });
+            const iceSpeedYMin = Math.floor(Math.min(...iceSpeedData.map(d => d.y)) / 60) * 60;
             speedDatasets.unshift({
                 label: 'ICE Reference',
                 data: iceSpeedData,
@@ -708,7 +709,7 @@ export default function RoadTripView({
                             ticks: { stepSize: sweepStepDisplay },
                         },
                         y: {
-                            min: axisScale.yMin != null ? axisScale.yMin * 60 : 0,
+                            min: axisScale.yMin != null ? axisScale.yMin * 60 : iceSpeedYMin,
                             max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
                             title: { display: true, text: speedYLabel, font: { size: 13 } },
                             ticks: { stepSize: 30, callback: val => formatTime(val) },
@@ -772,6 +773,7 @@ export default function RoadTripView({
                            : iceTotalMin;
                 return { x: units === 'metric' ? Math.round(legMi * MI_TO_KM) : legMi, y: Math.round(yVal) };
             });
+            const iceDistYMin = Math.floor(Math.min(...iceDistData.map(d => d.y)) / 60) * 60;
             distDatasets.unshift({
                 label: 'ICE Reference',
                 data: iceDistData,
@@ -802,7 +804,7 @@ export default function RoadTripView({
                             ticks: { stepSize: legStepDisplay },
                         },
                         y: {
-                            min: axisScale.yMin != null ? axisScale.yMin * 60 : 0,
+                            min: axisScale.yMin != null ? axisScale.yMin * 60 : iceDistYMin,
                             max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
                             title: { display: true, text: sweepLabel, font: { size: 13 } },
                             ticks: { stepSize: 30, callback: val => formatTime(val) },
