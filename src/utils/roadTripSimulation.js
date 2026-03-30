@@ -199,12 +199,17 @@ export function simulateRoadTrip({
 /**
  * Convert simulation segments to Chart.js data points (distance mode).
  * Each segment emits its start and end point.
+ * @param {boolean} [driveTimeX] When true, X = cumulative driving time (stops don't advance X).
  */
-export function segmentsToChartPoints(segments, units) {
+export function segmentsToChartPoints(segments, units, driveTimeX = false) {
     const points = [];
+    let cumDrive = 0;
     for (const seg of segments) {
-        points.push({ x: round1(seg.startTime), y: convDistance(seg.startDist, units) });
-        points.push({ x: round1(seg.endTime),   y: convDistance(seg.endDist, units)   });
+        const x1 = driveTimeX ? round1(cumDrive) : round1(seg.startTime);
+        points.push({ x: x1, y: convDistance(seg.startDist, units) });
+        if (seg.type === 'drive') cumDrive += seg.endTime - seg.startTime;
+        const x2 = driveTimeX ? round1(cumDrive) : round1(seg.endTime);
+        points.push({ x: x2, y: convDistance(seg.endDist, units) });
     }
     return points;
 }
@@ -214,16 +219,18 @@ export function segmentsToChartPoints(segments, units) {
  * Y-axis = cumulative minutes spent charging.
  * Drive segments: Y stays flat.
  * Charge segments: Y increases by the segment duration.
+ * @param {boolean} [driveTimeX] When true, X = cumulative driving time (stops don't advance X).
  */
-export function segmentsToChartPointsChargeTime(segments) {
+export function segmentsToChartPointsChargeTime(segments, driveTimeX = false) {
     const points = [];
-    let cumCharge = 0;
+    let cumCharge = 0, cumDrive = 0;
     for (const seg of segments) {
-        points.push({ x: round1(seg.startTime), y: round1(cumCharge) });
-        if (seg.type === 'charge') {
-            cumCharge += seg.endTime - seg.startTime;
-        }
-        points.push({ x: round1(seg.endTime), y: round1(cumCharge) });
+        const x1 = driveTimeX ? round1(cumDrive) : round1(seg.startTime);
+        points.push({ x: x1, y: round1(cumCharge) });
+        if (seg.type === 'charge') cumCharge += seg.endTime - seg.startTime;
+        if (seg.type === 'drive')  cumDrive  += seg.endTime - seg.startTime;
+        const x2 = driveTimeX ? round1(cumDrive) : round1(seg.endTime);
+        points.push({ x: x2, y: round1(cumCharge) });
     }
     return points;
 }

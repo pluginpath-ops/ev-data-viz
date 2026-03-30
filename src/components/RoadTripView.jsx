@@ -14,6 +14,39 @@ import {
 
 Chart.register(ZoomPlugin);
 
+// ── Speed sweep constants ────────────────────────────────────────────────────
+const SPEED_SWEEP_MIN  = 45;   // mph
+const SPEED_SWEEP_MAX  = 100;  // mph
+const SPEED_SWEEP_STEP = 5;    // mph
+const SPEED_SWEEP_MPH  = Array.from(
+    { length: Math.floor((SPEED_SWEEP_MAX - SPEED_SWEEP_MIN) / SPEED_SWEEP_STEP) + 1 },
+    (_, i) => SPEED_SWEEP_MIN + i * SPEED_SWEEP_STEP,
+); // [45, 50, 55, ..., 100]
+
+/** Y-value for one speed-sweep sim result. */
+function getSpeedModeY(sim, mph, totalDistanceMi, speedYAxis) {
+    const driveMin = (totalDistanceMi / mph) * 60;
+    if (speedYAxis === 'driveTime')  return driveMin;
+    if (speedYAxis === 'chargeTime') return sim.totalTimeMin - driveMin;
+    return sim.totalTimeMin; // 'totalTime'
+}
+
+/** Compute ICE total trip time at a given travel speed (used for speed-sweep ICE line). */
+function calcIceTotalTimeAtSpeed(speedMph, totalDistanceMi, overheadMin) {
+    const ICE_DRIVE_INTERVAL_MIN = 180;
+    let t = 0, d = 0, iter = 0;
+    while (d < totalDistanceMi && iter < 100) {
+        iter++;
+        const rem = totalDistanceMi - d;
+        const driveMi = Math.min((speedMph * ICE_DRIVE_INTERVAL_MIN) / 60, rem);
+        t += (driveMi / speedMph) * 60;
+        d += driveMi;
+        if (d >= totalDistanceMi - 0.01) break;
+        t += overheadMin;
+    }
+    return t;
+}
+
 // ── Efficiency helpers ───────────────────────────────────────────────────────
 
 /**
@@ -498,18 +531,52 @@ export default function RoadTripView({
         });
     }, [validEntries, runDataCache, roadTripConfig]);
 
+    // ── Speed sweep: run simulation at every speed in SPEED_SWEEP_MPH ─────────
+    const speedSweepResults = useMemo(() => {
+        if (roadTripConfig.xAxis !== 'speed') return null;
+        const {
+            startSoc, minSoc, legDistance, chargeTime, totalDistance, mode, overhead,
+            towingMode, towingEfficiency, towingRefSpeedMph,
+        } = roadTripConfig;
+        return validEntries.map(entry => {
+            const chargingData = runDataCache[entry.run.id] ?? [];
+            return SPEED_SWEEP_MPH.map(speedMph => simulateRoadTrip({
+                batteryKwh:        entry.batteryKwh,
+                miPerKwh:          towingMode ? towingEfficiency : entry.miPerKwh,
+                testSpeedMph:      towingMode ? towingRefSpeedMph : (entry.testSpeedMph || 70),
+                chargingData,
+                startSoc, minSoc,
+                legDistanceMi:     legDistance,
+                totalDistanceMi:   totalDistance,
+                speedMph,
+                chargeTimeMinutes: chargeTime,
+                overheadMinutes:   overhead,
+                mode,
+                towingMode,
+            }));
+        });
+    }, [validEntries, runDataCache, roadTripConfig]);
+
     // ── Build & render chart ──────────────────────────────────────────────────
     useEffect(() => {
-        if (!canvasRef.current || !simResults.some(Boolean)) return;
+        if (!canvasRef.current) return;
+        const { totalDistance, yAxis, xAxis, speedYAxis, overhead, speed } = roadTripConfig;
+        const isSpeedMode      = xAxis === 'speed';
+        const isDriveTimeXAxis = xAxis === 'driveTime';
+        const isChargeTimeMode = yAxis === 'chargeTime';
+        const isByTestMode     = yAxis === 'byTest';
+
+        if (isSpeedMode) {
+            if (!speedSweepResults || speedSweepResults.length === 0) return;
+        } else {
+            if (!simResults.some(Boolean)) return;
+        }
 
         if (chartRef.current) {
             chartRef.current.destroy();
             chartRef.current = null;
         }
 
-        const { totalDistance, yAxis, overhead } = roadTripConfig;
-        const isChargeTimeMode = yAxis === 'chargeTime';
-        const isByTestMode     = yAxis === 'byTest';
         const totalDistDisplay = convDistance(totalDistance, units);
 
         // Label logic: include run name when multiple runs from same vehicle
@@ -522,6 +589,100 @@ export default function RoadTripView({
                 ? `${e.vehicle.name} (${e.run.name})`
                 : e.vehicle.name;
 
+        // ── Speed sweep chart ────────────────────────────────────────────────
+        if (isSpeedMode) {
+            const sweepMinDisplay = units === 'metric' ? Math.round(SPEED_SWEEP_MIN * MI_TO_KM) : SPEED_SWEEP_MIN;
+            const sweepMaxDisplay = units === 'metric' ? Math.round(SPEED_SWEEP_MAX * MI_TO_KM) : SPEED_SWEEP_MAX;
+            const sweepStepDisplay = units === 'metric' ? Math.round(SPEED_SWEEP_STEP * MI_TO_KM) : SPEED_SWEEP_STEP;
+            const speedYLabel = { totalTime: 'Total Trip Time', driveTime: 'Driving Time', chargeTime: 'Charge + Stop Time' }[speedYAxis] ?? 'Total Trip Time';
+
+            const speedDatasets = validEntries.map((entry, i) => {
+                const sweepSims = speedSweepResults[i];
+                if (!sweepSims) return null;
+                const data = SPEED_SWEEP_MPH.map((mph, si) => ({
+                    x: units === 'metric' ? Math.round(mph * MI_TO_KM) : mph,
+                    y: Math.round(getSpeedModeY(sweepSims[si], mph, totalDistance, speedYAxis)),
+                }));
+                return {
+                    label: entryLabel(entry),
+                    data,
+                    borderColor: entry.color,
+                    backgroundColor: entry.color + '33',
+                    borderWidth: 2.5,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    fill: false,
+                };
+            }).filter(Boolean);
+
+            // ICE reference line
+            const iceSpeedData = SPEED_SWEEP_MPH.map(mph => {
+                const iceTotalMin = calcIceTotalTimeAtSpeed(mph, totalDistance, overhead);
+                const driveMin    = (totalDistance / mph) * 60;
+                const yVal = speedYAxis === 'driveTime'  ? driveMin
+                           : speedYAxis === 'chargeTime' ? iceTotalMin - driveMin
+                           : iceTotalMin;
+                return { x: units === 'metric' ? Math.round(mph * MI_TO_KM) : mph, y: Math.round(yVal) };
+            });
+            speedDatasets.unshift({
+                label: 'ICE Reference',
+                data: iceSpeedData,
+                borderColor: '#9ca3af',
+                backgroundColor: 'transparent',
+                borderWidth: 1.5,
+                borderDash: [6, 4],
+                tension: 0.3,
+                pointRadius: 2,
+                fill: false,
+                _isIce: true,
+            });
+
+            chartRef.current = new Chart(canvasRef.current, {
+                type: 'line',
+                data: { datasets: speedDatasets },
+                options: {
+                    animation: false,
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', axis: 'xy', intersect: false },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            min: axisScale.xMin ?? sweepMinDisplay,
+                            max: axisScale.xMax ?? sweepMaxDisplay,
+                            title: { display: true, text: `Travel Speed (${sl})`, font: { size: 13 } },
+                            ticks: { stepSize: sweepStepDisplay },
+                        },
+                        y: {
+                            min: axisScale.yMin ?? 0,
+                            title: { display: true, text: speedYLabel, font: { size: 13 } },
+                            ticks: { callback: val => formatTime(val) },
+                        },
+                    },
+                    plugins: {
+                        legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40 } },
+                        tooltip: {
+                            callbacks: {
+                                title: items => items[0]?.dataset.label ?? '',
+                                label: ctx => [
+                                    `Speed: ${ctx.parsed.x} ${sl}`,
+                                    `${speedYLabel}: ${formatTime(ctx.parsed.y)}`,
+                                ],
+                            },
+                        },
+                        zoom: {
+                            zoom: {
+                                drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
+                                mode: 'xy',
+                            },
+                        },
+                    },
+                },
+            });
+            return () => { chartRef.current?.destroy(); chartRef.current = null; };
+        }
+
+        // ── Timeline chart (total time or drive-time X) ──────────────────────
         const datasets = validEntries.map((entry, i) => {
             const sim = simResults[i];
             if (!sim) return null;
@@ -529,8 +690,8 @@ export default function RoadTripView({
             const points = isByTestMode
                 ? segmentsToChartPointsByTest(sim.segments, i)
                 : isChargeTimeMode
-                    ? segmentsToChartPointsChargeTime(sim.segments)
-                    : segmentsToChartPoints(sim.segments, units);
+                    ? segmentsToChartPointsChargeTime(sim.segments, isDriveTimeXAxis)
+                    : segmentsToChartPoints(sim.segments, units, isDriveTimeXAxis);
 
             // Mark charge-start points with larger radius
             const pointRadii = [];
@@ -563,7 +724,7 @@ export default function RoadTripView({
         const icePoints       = [];  // distance / chargeTime mode
         const iceByTestPoints = [];  // byTest mode (SoC lane)
         const iceGasStopSegs  = [];  // gas stop intervals for byTest green boxes
-        let iceTime = 0, iceDist = 0, iceCumStop = 0, iceIter = 0;
+        let iceTime = 0, iceDist = 0, iceCumStop = 0, iceCumDrive = 0, iceIter = 0;
 
         while (iceDist < roadTripConfig.totalDistance && iceIter < 100) {
             iceIter++;
@@ -572,35 +733,43 @@ export default function RoadTripView({
             const driveMi     = Math.min(maxDriveMi, remainingMi);
             const driveMin    = (driveMi / roadTripConfig.speed) * 60;
 
+            // X values: drive time or total time
+            const xDS = isDriveTimeXAxis ? Math.round(iceCumDrive)            : Math.round(iceTime);
+            const xDE = isDriveTimeXAxis ? Math.round(iceCumDrive + driveMin) : Math.round(iceTime + driveMin);
             if (isChargeTimeMode) {
-                icePoints.push({ x: Math.round(iceTime),            y: Math.round(iceCumStop) });
-                icePoints.push({ x: Math.round(iceTime + driveMin), y: Math.round(iceCumStop) });
+                icePoints.push({ x: xDS, y: Math.round(iceCumStop) });
+                icePoints.push({ x: xDE, y: Math.round(iceCumStop) });
             } else {
-                icePoints.push({ x: Math.round(iceTime),            y: convDistance(iceDist,           units) });
-                icePoints.push({ x: Math.round(iceTime + driveMin), y: convDistance(iceDist + driveMi, units) });
+                icePoints.push({ x: xDS, y: convDistance(iceDist,           units) });
+                icePoints.push({ x: xDE, y: convDistance(iceDist + driveMi, units) });
             }
-            // byTest: drive depletes "fuel" from 100% → ICE_MIN_SOC%
+            // byTest always uses total time on X
             iceByTestPoints.push({ x: Math.round(iceTime),            y: iceLane + 1.0            });
             iceByTestPoints.push({ x: Math.round(iceTime + driveMin), y: iceLane + ICE_MIN_SOC / 100 });
 
-            iceTime += driveMin;
-            iceDist += driveMi;
+            iceTime      += driveMin;
+            iceCumDrive  += driveMin;
+            iceDist      += driveMi;
             if (iceDist >= roadTripConfig.totalDistance - 0.01) break;
 
+            // X values for stop: drive time stays flat; only total time advances
+            const xSS = isDriveTimeXAxis ? Math.round(iceCumDrive) : Math.round(iceTime);
+            const xSE = isDriveTimeXAxis ? Math.round(iceCumDrive) : Math.round(iceTime + ICE_STOP_MIN);
             if (isChargeTimeMode) {
-                icePoints.push({ x: Math.round(iceTime),                y: Math.round(iceCumStop) });
-                icePoints.push({ x: Math.round(iceTime + ICE_STOP_MIN), y: Math.round(iceCumStop + ICE_STOP_MIN) });
+                icePoints.push({ x: xSS, y: Math.round(iceCumStop) });
+                icePoints.push({ x: xSE, y: Math.round(iceCumStop + ICE_STOP_MIN) });
             } else {
-                icePoints.push({ x: Math.round(iceTime),                y: convDistance(iceDist, units) });
-                icePoints.push({ x: Math.round(iceTime + ICE_STOP_MIN), y: convDistance(iceDist, units) });
+                icePoints.push({ x: xSS, y: convDistance(iceDist, units) });
+                icePoints.push({ x: xSE, y: convDistance(iceDist, units) });
             }
-            // byTest: gas stop refuels from ICE_MIN_SOC% → 100%
+            // byTest always uses total time on X
             iceGasStopSegs.push({ startTime: iceTime, endTime: iceTime + ICE_STOP_MIN });
             iceByTestPoints.push({ x: Math.round(iceTime),                y: iceLane + ICE_MIN_SOC / 100 });
             iceByTestPoints.push({ x: Math.round(iceTime + ICE_STOP_MIN), y: iceLane + 1.0              });
 
             iceTime    += ICE_STOP_MIN;
             iceCumStop += ICE_STOP_MIN;
+            // iceCumDrive does NOT advance during ICE stops
         }
 
         if (isByTestMode) {
@@ -641,13 +810,29 @@ export default function RoadTripView({
               ), iceCumStop, 30)
             : 0;
 
-        const autoXMax = maxTime * 1.15;
+        // In drive-time X mode, the max X is the total pure driving time
+        const maxDriveTime = isDriveTimeXAxis
+            ? Math.max(...validSims.map(s =>
+                s.segments.filter(seg => seg.type === 'drive')
+                          .reduce((sum, seg) => sum + (seg.endTime - seg.startTime), 0)
+              ), iceCumDrive, 60)
+            : 0;
+
+        const autoXMax = isDriveTimeXAxis ? maxDriveTime * 1.15 : maxTime * 1.15;
         const autoYMax = isChargeTimeMode ? Math.ceil(maxChargeTime * 1.2 / 10) * 10 : totalDistDisplay;
-        // Default X minimum: time of the earliest first charge stop across all vehicles.
-        // This focuses the chart on charging behaviour rather than the initial drive.
-        const firstChargeStart = Math.min(
-            ...validSims.map(s => s.segments.find(seg => seg.type === 'charge')?.startTime ?? Infinity)
-        );
+
+        // Default X minimum: time of the earliest first charge stop.
+        // In drive-time X mode, compute cumulative drive time up to first stop.
+        const firstChargeStart = isDriveTimeXAxis
+            ? Math.min(...validSims.map(s => {
+                let cum = 0;
+                for (const seg of s.segments) {
+                    if (seg.type === 'charge') return cum;
+                    cum += seg.endTime - seg.startTime;
+                }
+                return Infinity;
+            }))
+            : Math.min(...validSims.map(s => s.segments.find(seg => seg.type === 'charge')?.startTime ?? Infinity));
         const autoXMin = isFinite(firstChargeStart) && firstChargeStart > 0 ? firstChargeStart : 0;
 
         chartRef.current = new Chart(canvasRef.current, {
@@ -665,7 +850,7 @@ export default function RoadTripView({
                 scales: {
                     x: {
                         type: 'linear',
-                        title: { display: true, text: 'Elapsed Time', font: { size: 13 } },
+                        title: { display: true, text: isDriveTimeXAxis ? 'Drive Time' : 'Elapsed Time', font: { size: 13 } },
                         min: axisScale.xMin != null ? axisScale.xMin * 60 : autoXMin,
                         max: axisScale.xMax != null ? axisScale.xMax * 60 : autoXMax,
                         ticks: {
@@ -798,16 +983,17 @@ export default function RoadTripView({
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [simResults, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.speed, roadTripConfig.overhead, axisScale]);
+    }, [simResults, speedSweepResults, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.speedYAxis, roadTripConfig.speed, roadTripConfig.overhead, axisScale]);
 
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
 
     // ── Render ───────────────────────────────────────────────────────────────
     const {
-        startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, yAxis, overhead,
+        startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, yAxis, xAxis, speedYAxis, overhead,
         towingMode, towingEfficiency, towingRefSpeedMph,
     } = roadTripConfig;
+    const isSpeedMode = xAxis === 'speed';
 
     // ICE reference total time (for "vs ICE" column)
     const iceRefTimeMin = useMemo(() => {
@@ -860,27 +1046,33 @@ export default function RoadTripView({
                             </div>
                         </div>
                         <div>
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Y Axis</span>
+                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">X Axis</span>
                             <div className="flex gap-1">
-                                <button
-                                    className={`btn btn-sm ${yAxis === 'distance' ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={() => setField('yAxis', 'distance')}
-                                >
-                                    Distance
-                                </button>
-                                <button
-                                    className={`btn btn-sm ${yAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={() => setField('yAxis', 'chargeTime')}
-                                >
-                                    Charge Time
-                                </button>
-                                <button
-                                    className={`btn btn-sm ${yAxis === 'byTest' ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={() => setField('yAxis', 'byTest')}
-                                >
-                                    By Test
-                                </button>
+                                <button className={`btn btn-sm ${xAxis === 'totalTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'totalTime')}>Total Time</button>
+                                <button className={`btn btn-sm ${xAxis === 'driveTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'driveTime')}>Drive Time</button>
+                                <button className={`btn btn-sm ${xAxis === 'speed'     ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'speed')}>Travel Speed</button>
                             </div>
+                        </div>
+                        <div>
+                            {isSpeedMode ? (
+                                <>
+                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Y Axis</span>
+                                    <div className="flex gap-1">
+                                        <button className={`btn btn-sm ${speedYAxis === 'totalTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('speedYAxis', 'totalTime')}>Total Time</button>
+                                        <button className={`btn btn-sm ${speedYAxis === 'driveTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('speedYAxis', 'driveTime')}>Drive Time</button>
+                                        <button className={`btn btn-sm ${speedYAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('speedYAxis', 'chargeTime')}>Charge + Stop</button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Y Axis</span>
+                                    <div className="flex gap-1">
+                                        <button className={`btn btn-sm ${yAxis === 'distance'   ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'distance')}>Distance</button>
+                                        <button className={`btn btn-sm ${yAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'chargeTime')}>Charge Time</button>
+                                        <button className={`btn btn-sm ${yAxis === 'byTest'     ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'byTest')}>By Test</button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                         <div>
                             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Mode</span>
@@ -965,15 +1157,17 @@ export default function RoadTripView({
                                     setField('totalDistance', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
                                 }} />
                         </label>
-                        <label className="text-sm">
-                            <span className="font-medium block mb-1 whitespace-nowrap">Speed ({sl})</span>
-                            <input type="number" className="w-full border rounded px-2 py-1"
-                                min={20} value={dispSpeed}
-                                onChange={e => {
-                                    const val = Number(e.target.value);
-                                    setField('speed', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
-                                }} />
-                        </label>
+                        {!isSpeedMode && (
+                            <label className="text-sm">
+                                <span className="font-medium block mb-1 whitespace-nowrap">Speed ({sl})</span>
+                                <input type="number" className="w-full border rounded px-2 py-1"
+                                    min={20} value={dispSpeed}
+                                    onChange={e => {
+                                        const val = Number(e.target.value);
+                                        setField('speed', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
+                                    }} />
+                            </label>
+                        )}
                         <label className="text-sm">
                             <span className="font-medium block mb-1 whitespace-nowrap">Stop Overhead (min)</span>
                             <input type="number" className="w-full border rounded px-2 py-1"
@@ -1068,7 +1262,8 @@ export default function RoadTripView({
                 <div className="card mb-6">
                     <div className="flex items-center justify-between mb-2">
                         <h3 className="text-lg font-bold">
-                            Road Trip{towingMode ? ' (Towing)' : ''} — {Math.round(convDistance(totalDistance, units))} {dl} at {Math.round(convDistance(speed, units))} {sl}
+                            Road Trip{towingMode ? ' (Towing)' : ''} — {Math.round(convDistance(totalDistance, units))} {dl}
+                            {isSpeedMode ? ` · Speed vs. Time` : ` at ${Math.round(convDistance(speed, units))} ${sl}`}
                         </h3>
                         <button
                             onClick={() => chartRef.current?.resetZoom()}
@@ -1078,7 +1273,7 @@ export default function RoadTripView({
                             Reset Zoom
                         </button>
                     </div>
-                    <div style={{ height: `${yAxis === 'byTest' ? Math.max(300, validEntries.length * 120) : Math.max(400, validEntries.length * 40 + 200)}px`, position: 'relative' }}>
+                    <div style={{ height: `${isSpeedMode ? 400 : yAxis === 'byTest' ? Math.max(300, validEntries.length * 120) : Math.max(400, validEntries.length * 40 + 200)}px`, position: 'relative' }}>
                         <canvas ref={canvasRef} />
                     </div>
                     <p className="text-xs text-gray-400 mt-1 text-center">Drag to zoom · Reset Zoom to restore</p>
@@ -1104,7 +1299,7 @@ export default function RoadTripView({
             )}
 
             {/* ── Axis Scale Controls ────────────────────────────────────── */}
-            {!loading && simResults.some(Boolean) && !presentationMode && (
+            {!loading && (simResults.some(Boolean) || speedSweepResults?.length > 0) && !presentationMode && (
                 <div className="card mb-6">
                     <AxisScaleControls
                         xMin={axisScale.xMin} xMax={axisScale.xMax}
@@ -1112,13 +1307,13 @@ export default function RoadTripView({
                         onChange={onAxisChange}
                         showX={true}
                         showY2={false}
-                        xAxisLabel="X-Axis Scale (hrs)"
+                        xAxisLabel={isSpeedMode ? `X-Axis Scale (${sl})` : 'X-Axis Scale (hrs)'}
                     />
                 </div>
             )}
 
             {/* ── Summary Table ─────────────────────────────────────────── */}
-            {!loading && simResults.some(Boolean) && !presentationMode && (
+            {!loading && simResults.some(Boolean) && !presentationMode && !isSpeedMode && (
                 <div className="card">
                     <h3 className="text-lg font-bold mb-3">Results Summary</h3>
                     <div className="overflow-x-auto">
