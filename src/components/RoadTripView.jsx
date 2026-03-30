@@ -708,9 +708,10 @@ export default function RoadTripView({
                             ticks: { stepSize: sweepStepDisplay },
                         },
                         y: {
-                            min: axisScale.yMin ?? 0,
+                            min: axisScale.yMin != null ? axisScale.yMin * 60 : 0,
+                            max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
                             title: { display: true, text: speedYLabel, font: { size: 13 } },
-                            ticks: { callback: val => formatTime(val) },
+                            ticks: { stepSize: 30, callback: val => formatTime(val) },
                         },
                     },
                     plugins: {
@@ -801,9 +802,10 @@ export default function RoadTripView({
                             ticks: { stepSize: legStepDisplay },
                         },
                         y: {
-                            min: axisScale.yMin ?? 0,
+                            min: axisScale.yMin != null ? axisScale.yMin * 60 : 0,
+                            max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
                             title: { display: true, text: sweepLabel, font: { size: 13 } },
-                            ticks: { callback: val => formatTime(val) },
+                            ticks: { stepSize: 30, callback: val => formatTime(val) },
                         },
                     },
                     plugins: {
@@ -1471,6 +1473,7 @@ export default function RoadTripView({
                         showX={true}
                         showY2={false}
                         xAxisLabel={isSpeedMode ? `X-Axis Scale (${sl})` : isTripDistMode ? `X-Axis Scale (${dl})` : 'X-Axis Scale (hrs)'}
+                        yAxisLabel={isSweepMode ? 'Y-Axis Scale (hrs)' : 'Left Axis Scale'}
                     />
                 </div>
             )}
