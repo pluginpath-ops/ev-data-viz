@@ -25,7 +25,7 @@ const SPEED_SWEEP_MPH  = Array.from(
 
 // ── Leg-distance sweep constants (mi between charging stops) ─────────────────
 const LEG_SWEEP_MIN  = 60;   // miles between charges
-const LEG_SWEEP_MAX  = 200;  // miles between charges
+const LEG_SWEEP_MAX  = 260;  // miles between charges
 const LEG_SWEEP_STEP = 20;   // miles
 const LEG_SWEEP_MI   = Array.from(
     { length: Math.floor((LEG_SWEEP_MAX - LEG_SWEEP_MIN) / LEG_SWEEP_STEP) + 1 },
@@ -1284,7 +1284,7 @@ export default function RoadTripView({
                         <label className="text-sm">
                             <span className="font-medium block mb-1 whitespace-nowrap">Min SoC (%)</span>
                             <input type="number" className="w-full border rounded px-2 py-1"
-                                min={5} max={30} value={minSoc}
+                                min={0} max={30} value={minSoc}
                                 onChange={e => setField('minSoc', Number(e.target.value))} />
                         </label>
                         {mode === 'distance' && !isTripDistMode && (
