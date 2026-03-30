@@ -86,8 +86,8 @@ export default function App() {
         totalDistance: 500, speed: 70,
         overhead: 5,              // per-stop overhead minutes (applies to EV and ICE)
         yAxis: 'chargeTime',      // 'distance' | 'chargeTime' | 'byTest'
-        xAxis: 'totalTime',       // 'totalTime' | 'driveTime' | 'speed'
-        speedYAxis: 'totalTime',  // 'totalTime' | 'driveTime' | 'chargeTime' (speed mode only)
+        xAxis: 'totalTime',       // 'totalTime' | 'driveTime' | 'speed' | 'tripDist'
+        sweepYAxis: 'totalTime',  // 'totalTime' | 'driveTime' | 'chargeTime' (sweep modes only)
         towingMode: false,        // override all vehicle efficiencies with a fixed trailer-system value
         towingEfficiency: 1.5,    // mi/kWh for the whole vehicle+trailer system
         towingRefSpeedMph: 70,    // speed at which towingEfficiency was measured
@@ -192,7 +192,7 @@ export default function App() {
             ...(n('rt_oh') != null && { overhead:      n('rt_oh')               }),
             ...(p.get('rt_ya') && { yAxis:              p.get('rt_ya')          }),
             ...(p.get('rt_xa') && { xAxis:              p.get('rt_xa')          }),
-            ...(p.get('rt_sya') && { speedYAxis:        p.get('rt_sya')         }),
+            ...(p.get('rt_sya') && { sweepYAxis:         p.get('rt_sya')         }),
             ...(p.get('rt_tw') === '1' && { towingMode: true                    }),
             ...(n('rt_te') != null && { towingEfficiency:   n('rt_te')          }),
             ...(n('rt_tr') != null && { towingRefSpeedMph:  n('rt_tr')          }),
@@ -302,7 +302,7 @@ export default function App() {
             p.set('rt_oh', rt.overhead);
             p.set('rt_ya',  rt.yAxis);
             p.set('rt_xa',  rt.xAxis);
-            if (rt.speedYAxis !== 'totalTime')    p.set('rt_sya', rt.speedYAxis);
+            if (rt.sweepYAxis !== 'totalTime')     p.set('rt_sya', rt.sweepYAxis);
             if (rt.towingMode)                    p.set('rt_tw', '1');
             if (rt.towingMode) {
                 p.set('rt_te', rt.towingEfficiency);
