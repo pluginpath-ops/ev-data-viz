@@ -1422,10 +1422,13 @@ export default function RoadTripView({
                 <div className="card mb-6">
                     <div className="flex items-center justify-between mb-2">
                         <h3 className="text-lg font-bold">
-                            Road Trip{towingMode ? ' (Towing)' : ''}
-                            {isSpeedMode   ? ` · Speed vs. Time`
-                             : isTripDistMode ? ` — ${Math.round(convDistance(totalDistance, units))} ${dl} · Leg Distance vs. Time at ${Math.round(convDistance(speed, units))} ${sl}`
-                             : ` — ${Math.round(convDistance(totalDistance, units))} ${dl} at ${Math.round(convDistance(speed, units))} ${sl}`}
+                            {(() => {
+                                const yLabel = { totalTime: 'Total Time', driveTime: 'Drive Time', chargeTime: 'Charge + Stop Time' }[sweepYAxis] ?? 'Total Time';
+                                const tow = towingMode ? ' (Towing)' : '';
+                                if (isSpeedMode)    return `Road Trip${tow} — Travel Speed vs. ${yLabel} — ${Math.round(convDistance(totalDistance, units))} ${dl}`;
+                                if (isTripDistMode) return `Road Trip${tow} — Leg Distance vs. ${yLabel} — ${Math.round(convDistance(speed, units))} ${sl}`;
+                                return `Road Trip${tow} — ${Math.round(convDistance(totalDistance, units))} ${dl} at ${Math.round(convDistance(speed, units))} ${sl}`;
+                            })()}
                         </h3>
                         <button
                             onClick={() => chartRef.current?.resetZoom()}
