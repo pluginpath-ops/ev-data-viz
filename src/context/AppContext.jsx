@@ -591,9 +591,9 @@ export function AppProvider({ children }) {
         }
     };
 
-    const updateSpecLink = async (linkId, { scalingFactor }) => {
+    const updateSpecLink = async (linkId, changes) => {
         try {
-            await dataService.updateSpecLink(linkId, { scalingFactor });
+            await dataService.updateSpecLink(linkId, changes);
             await softRefreshVehicles();
         } catch (error) {
             showError('Error updating spec link: ' + error.message);
