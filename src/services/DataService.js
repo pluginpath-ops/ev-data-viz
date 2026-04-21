@@ -68,6 +68,8 @@ function buildInheritedRuns(vehicle, allVehicles) {
         _specLinkId:           link.id,
         _sourceVehicleId:      src.id,
         _sourceVehicleName:    src.name,
+        // Distinct default so inherited runs are visually differentiated.
+        color:          run.color ?? '#9ca3af',
         // Scale the run-level range metric immediately so bar charts are correct
         // without needing to fetch data points.
         distance_miles: run.distance_miles != null ? run.distance_miles * sf : null,
@@ -190,17 +192,23 @@ class DataService {
   // ── Spec links ────────────────────────────────────────────────────────────
 
   async addSpecLink({ targetVehicleId, sourceVehicleId, specType, scalingFactor, notes }) {
-    // Upsert: if a link already exists for (target, spec_type), replace it.
+    // Delete any existing link for (target, spec_type) first — avoids needing
+    // an UPDATE RLS policy; only INSERT + DELETE policies are required.
+    await getSupabase()
+      .from('spec_links')
+      .delete()
+      .eq('target_vehicle_id', targetVehicleId)
+      .eq('spec_type', specType);
     const { data, error } = await getSupabase()
       .from('spec_links')
-      .upsert({
+      .insert({
         target_vehicle_id: targetVehicleId,
         source_vehicle_id: sourceVehicleId,
         spec_type:         specType,
         scaling_factor:    scalingFactor != null && scalingFactor !== '' ? Number(scalingFactor) : null,
         notes:             notes || null,
         created_by:        this.user?.id ?? null,
-      }, { onConflict: 'target_vehicle_id,spec_type' })
+      })
       .select()
       .single();
     if (error) throw error;
