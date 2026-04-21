@@ -260,6 +260,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [noHeaders, setNoHeaders]                   = useState(false);
     const [selectedRangeTestRunId, setSelectedRangeTestRunId] = useState(null);
 
+    // ── Inherited test link form state ────────────────────────────────────────
+    const [showAddLink, setShowAddLink]     = useState(false);
+    const [newLinkSpecType, setNewLinkSpecType] = useState('range_test');
+    const [newLinkSourceId, setNewLinkSourceId] = useState('');
+    const [newLinkScaling, setNewLinkScaling]   = useState('');
+    const [newLinkNotes, setNewLinkNotes]       = useState('');
+    const [linkSaving, setLinkSaving]           = useState(false);
+
     // ── Inline data-table state (edit mode) ──────────────────────────────────
     const [editData, setEditData]               = useState(null);   // null=not fetched, []=loaded
     const [editDataLoading, setEditDataLoading] = useState(false);
@@ -2031,48 +2039,177 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             )}
 
             {/* ── Inherited Tests ───────────────────────────────────────────── */}
-            {inheritedRuns.length > 0 && (
+            {(inheritedRuns.length > 0 || (isContributor && canEdit(vehicle))) && (
                 <div className="mt-6">
-                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                        Inherited Tests
-                    </h3>
-                    <div className="space-y-2">
-                        {inheritedRuns.map(run => {
-                            const srcName = run._sourceVehicleName || `Vehicle #${run._sourceVehicleId}`;
-                            const sf = run._scalingFactor;
-                            const specLabel = run.has_range ? 'Range Test' : 'Charging Curve';
-                            return (
-                                <div key={run.id} className="card border border-dashed border-gray-300 bg-gray-50 flex items-center gap-3 px-4 py-3">
-                                    <span className="spec-link-type-badge flex-shrink-0">{specLabel}</span>
-                                    <span className="text-sm text-gray-700 flex-1 min-w-0 truncate">
-                                        Inherited from: <span className="font-medium">{srcName}</span>
-                                    </span>
-                                    {sf !== 1 && sf != null && (
-                                        <span className="text-xs font-mono text-gray-500 flex-shrink-0">×{sf}</span>
-                                    )}
-                                    <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 flex-shrink-0">
-                                        Estimated
-                                    </span>
-                                    <button
-                                        onClick={() => onViewChart && onViewChart()}
-                                        className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition flex-shrink-0"
-                                        title="View this run in the chart"
-                                    >
-                                        View Chart →
-                                    </button>
-                                    {isContributor && (
-                                        <button
-                                            onClick={() => deleteSpecLink(run._specLinkId)}
-                                            className="text-xs text-gray-400 hover:text-red-500 transition flex-shrink-0"
-                                            title="Remove this inherited link"
-                                        >
-                                            Remove Link
-                                        </button>
-                                    )}
-                                </div>
-                            );
-                        })}
+                    <div className="flex items-center gap-3 mb-3">
+                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                            Inherited Tests
+                        </h3>
+                        {isContributor && canEdit(vehicle) && !showAddLink && (
+                            <button
+                                onClick={() => setShowAddLink(true)}
+                                className="text-xs px-2 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition"
+                            >
+                                + Add Inherited Link
+                            </button>
+                        )}
                     </div>
+
+                    {/* Existing inherited runs */}
+                    {inheritedRuns.length > 0 && (
+                        <div className="space-y-2 mb-3">
+                            {inheritedRuns.map(run => {
+                                const srcName = run._sourceVehicleName || `Vehicle #${run._sourceVehicleId}`;
+                                const sf = run._scalingFactor;
+                                const specLabel = run.has_range ? 'Range Test' : 'Charging Curve';
+                                return (
+                                    <div key={run.id} className="card border border-dashed border-gray-300 bg-gray-50 flex items-center gap-3 px-4 py-3">
+                                        <span className="spec-link-type-badge flex-shrink-0">{specLabel}</span>
+                                        <span className="text-sm text-gray-700 flex-1 min-w-0 truncate">
+                                            Inherited from: <span className="font-medium">{srcName}</span>
+                                        </span>
+                                        {sf !== 1 && sf != null && (
+                                            <span className="text-xs font-mono text-gray-500 flex-shrink-0">×{sf}</span>
+                                        )}
+                                        <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 flex-shrink-0">
+                                            Estimated
+                                        </span>
+                                        <button
+                                            onClick={() => onViewChart && onViewChart()}
+                                            className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition flex-shrink-0"
+                                        >
+                                            View Chart →
+                                        </button>
+                                        {isContributor && canEdit(vehicle) && (
+                                            <button
+                                                onClick={() => deleteSpecLink(run._specLinkId)}
+                                                className="text-xs text-gray-400 hover:text-red-500 transition flex-shrink-0"
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Add link form */}
+                    {showAddLink && (() => {
+                        // Only show vehicles that have runs of the selected spec type
+                        const hasRelevantRuns = (v) => newLinkSpecType === 'range_test'
+                            ? v.runs?.some(r => !r._inherited && (r.has_range ?? false))
+                            : v.runs?.some(r => !r._inherited && (r.has_charging ?? true));
+                        // Exclude current vehicle and any already-linked source for this type
+                        const alreadyLinkedIds = new Set(
+                            (vehicle.spec_links || [])
+                                .filter(l => l.spec_type === newLinkSpecType)
+                                .map(l => Number(l.source_vehicle_id))
+                        );
+                        const sourceVehicles = (vehicles || [])
+                            .filter(v => Number(v.id) !== Number(vehicle.id) && hasRelevantRuns(v) && !alreadyLinkedIds.has(Number(v.id)))
+                            .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+                        const suggestEpaRatio = () => {
+                            const src = (vehicles || []).find(v => Number(v.id) === parseInt(newLinkSourceId, 10));
+                            if (!src) return;
+                            const srcRange = parseFloat(src.range);
+                            const tgtRange = parseFloat(vehicle.range);
+                            if (srcRange && tgtRange) setNewLinkScaling((tgtRange / srcRange).toFixed(3));
+                        };
+
+                        const handleAdd = async () => {
+                            if (!newLinkSourceId) return;
+                            setLinkSaving(true);
+                            try {
+                                await addSpecLink({
+                                    targetVehicleId: vehicle.id,
+                                    sourceVehicleId: parseInt(newLinkSourceId, 10),
+                                    specType: newLinkSpecType,
+                                    scalingFactor: newLinkScaling ? parseFloat(newLinkScaling) : null,
+                                    notes: newLinkNotes.trim() || null,
+                                });
+                                setNewLinkSourceId('');
+                                setNewLinkScaling('');
+                                setNewLinkNotes('');
+                                setShowAddLink(false);
+                            } finally {
+                                setLinkSaving(false);
+                            }
+                        };
+
+                        return (
+                            <div className="spec-link-add-form">
+                                <div className="flex gap-2 flex-wrap">
+                                    <select
+                                        value={newLinkSpecType}
+                                        onChange={e => { setNewLinkSpecType(e.target.value); setNewLinkSourceId(''); }}
+                                        className="form-input text-sm"
+                                    >
+                                        <option value="range_test">Range Test</option>
+                                        <option value="charging_curve">Charging Curve</option>
+                                    </select>
+                                    <select
+                                        value={newLinkSourceId}
+                                        onChange={e => setNewLinkSourceId(e.target.value)}
+                                        className="form-input text-sm flex-1 min-w-48"
+                                    >
+                                        <option value="">Source vehicle…</option>
+                                        {sourceVehicles.map(v => (
+                                            <option key={v.id} value={v.id}>{v.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {sourceVehicles.length === 0 && (
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        No other vehicles have {newLinkSpecType === 'range_test' ? 'range test' : 'charging curve'} data.
+                                    </p>
+                                )}
+                                <div className="flex gap-2 mt-2 flex-wrap items-center">
+                                    <input
+                                        type="number"
+                                        placeholder="Scaling factor (blank = 1.0)"
+                                        value={newLinkScaling}
+                                        onChange={e => setNewLinkScaling(e.target.value)}
+                                        step="0.001"
+                                        min="0.001"
+                                        className="form-input text-sm w-52"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={suggestEpaRatio}
+                                        disabled={!newLinkSourceId}
+                                        className="btn btn-secondary text-xs whitespace-nowrap disabled:opacity-40"
+                                        title="Auto-fill from EPA range ratio (target ÷ source)"
+                                    >
+                                        Suggest from EPA
+                                    </button>
+                                    <input
+                                        type="text"
+                                        placeholder="Notes (optional)"
+                                        value={newLinkNotes}
+                                        onChange={e => setNewLinkNotes(e.target.value)}
+                                        className="form-input text-sm flex-1 min-w-40"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleAdd}
+                                        disabled={!newLinkSourceId || linkSaving}
+                                        className="btn btn-primary text-sm disabled:opacity-40"
+                                    >
+                                        {linkSaving ? 'Adding…' : 'Add Link'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddLink(false)}
+                                        className="btn btn-secondary text-sm"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
 
@@ -2137,10 +2274,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             onCancel={closeEditVehicle}
                             manufacturers={manufacturers}
                             onAddManufacturer={addManufacturer}
-                            allVehicles={vehicles || []}
-                            onAddSpecLink={addSpecLink}
-                            onDeleteSpecLink={deleteSpecLink}
-                            isContributor={isContributor}
                         />
                     </div>
                 </div>

@@ -49,7 +49,7 @@ function splitPerformance(performance = {}) {
 function buildInheritedRuns(vehicle, allVehicles) {
   const inherited = [];
   for (const link of (vehicle.spec_links || [])) {
-    const src = allVehicles.find(v => v.id === link.source_vehicle_id);
+    const src = allVehicles.find(v => Number(v.id) === Number(link.source_vehicle_id));
     if (!src) continue;
     const relevantRuns = src.runs.filter(r =>
       link.spec_type === 'range_test'     ? r.has_range    :
@@ -190,16 +190,17 @@ class DataService {
   // ── Spec links ────────────────────────────────────────────────────────────
 
   async addSpecLink({ targetVehicleId, sourceVehicleId, specType, scalingFactor, notes }) {
+    // Upsert: if a link already exists for (target, spec_type), replace it.
     const { data, error } = await getSupabase()
       .from('spec_links')
-      .insert({
+      .upsert({
         target_vehicle_id: targetVehicleId,
         source_vehicle_id: sourceVehicleId,
         spec_type:         specType,
         scaling_factor:    scalingFactor != null && scalingFactor !== '' ? Number(scalingFactor) : null,
         notes:             notes || null,
         created_by:        this.user?.id ?? null,
-      })
+      }, { onConflict: 'target_vehicle_id,spec_type' })
       .select()
       .single();
     if (error) throw error;

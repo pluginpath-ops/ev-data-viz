@@ -185,9 +185,18 @@ export default function VehiclesView({
 
     // Stage 3: text filter
     const textLower = textFilter.trim().toLowerCase();
-    const textFiltered = !textLower ? mfgFiltered : mfgFiltered.filter(v =>
-        [v.name, v.make, v.model, String(v.year || '')].some(f => (f || '').toLowerCase().includes(textLower))
-    );
+    const textFiltered = !textLower ? mfgFiltered : mfgFiltered.filter(v => {
+        if ([v.name, v.make, v.model].some(f => (f || '').toLowerCase().includes(textLower))) return true;
+        const year = String(v.year || '');
+        if (year.toLowerCase().includes(textLower)) return true;
+        // Range match: "2022-2024" should match a search for "2023"
+        const queryNum = parseInt(textLower, 10);
+        if (!isNaN(queryNum) && /^\d{4}\s*[-–]\s*\d{4}$/.test(year)) {
+            const parts = year.split(/[-–]/).map(s => parseInt(s.trim(), 10));
+            if (parts.length === 2) return queryNum >= parts[0] && queryNum <= parts[1];
+        }
+        return false;
+    });
 
     // Stage 3: sort
     const sortedFilteredVehicles = [...textFiltered].sort((a, b) => {
@@ -336,11 +345,6 @@ export default function VehiclesView({
         // Manufacturer
         manufacturers,
         onAddManufacturer: addManufacturer,
-        // Spec links
-        allVehicles: vehicles,
-        onAddSpecLink: addSpecLink,
-        onDeleteSpecLink: deleteSpecLink,
-        isContributor,
     };
 
     const handleMoveVehicle = (vehicleId, direction) => {

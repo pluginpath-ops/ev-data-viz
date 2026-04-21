@@ -105,7 +105,7 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRun
                 onChange={onToggle}
                 className="w-4 h-4 shrink-0"
             />
-            {onUpdateRunColor && (
+            {onUpdateRunColor && !run._inherited && (
                 <>
                     <input
                         type="color"

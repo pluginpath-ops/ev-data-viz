@@ -32,6 +32,13 @@ export function AppProvider({ children }) {
         initializeApp();
     }, []);
 
+    // Refresh only the vehicles list (no loading spinner, no full re-init).
+    // Used after spec-link add/delete so inherited runs rebuild without a page flash.
+    async function softRefreshVehicles() {
+        const vehiclesData = await dataService.getVehicles();
+        setVehicles(vehiclesData);
+    }
+
     async function initializeApp() {
         setLoading(true);
         await dataService.initialize();
@@ -285,6 +292,15 @@ export function AppProvider({ children }) {
 
     const updateRunColor = async (vehicleId, runId, color) => {
         try {
+            // Inherited runs have synthetic string ids — skip the DB write, just update local state
+            if (typeof runId === 'string' && runId.startsWith('inherited_')) {
+                setVehicles(prev => prev.map(v =>
+                    v.id === vehicleId
+                        ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, color } : r) }
+                        : v
+                ));
+                return;
+            }
             await dataService.updateRunColor(vehicleId, runId, color);
             setVehicles(prev => prev.map(v =>
                 v.id === vehicleId
@@ -568,7 +584,7 @@ export function AppProvider({ children }) {
     const addSpecLink = async ({ targetVehicleId, sourceVehicleId, specType, scalingFactor, notes }) => {
         try {
             await dataService.addSpecLink({ targetVehicleId, sourceVehicleId, specType, scalingFactor, notes });
-            await initializeApp();
+            await softRefreshVehicles();
         } catch (error) {
             showError('Error adding spec link: ' + error.message);
             throw error;
@@ -578,7 +594,7 @@ export function AppProvider({ children }) {
     const deleteSpecLink = async (linkId) => {
         try {
             await dataService.deleteSpecLink(linkId);
-            await initializeApp();
+            await softRefreshVehicles();
         } catch (error) {
             showError('Error removing spec link: ' + error.message);
         }
