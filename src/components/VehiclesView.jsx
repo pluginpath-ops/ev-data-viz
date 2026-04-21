@@ -39,8 +39,9 @@ export default function VehiclesView({
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
         name: '', make: '', model: '', year: '',
-        battery: '', range: ''
+        battery: '', range: '', manufacturer_id: null,
     });
+    const [mfgFilter, setMfgFilter] = useState(new Set());
     const [formTags, setFormTags] = useState([]);
     const [newTagName, setNewTagName] = useState('');
     const [tagFilterStates, setTagFilterStates] = useState({}); // { [tagId]: 'or' | 'and' | 'not' }
@@ -57,7 +58,7 @@ export default function VehiclesView({
     const [specsViewingVehicle, setSpecsViewingVehicle] = useState(null);
     const VEHICLES_PER_PAGE = 24;
 
-    const { units } = useAppContext();
+    const { units, manufacturers, addManufacturer, isContributor, addSpecLink, deleteSpecLink } = useAppContext();
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -81,7 +82,7 @@ export default function VehiclesView({
             onAdd(formData);
         }
         setFormTags([]);
-        setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '' });
+        setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '', manufacturer_id: null });
         setShowForm(false);
     };
 
@@ -94,6 +95,7 @@ export default function VehiclesView({
             year: vehicle.year || '',
             battery: vehicle.battery || '',
             range: vehicle.range || '',
+            manufacturer_id: vehicle.manufacturer?.id ?? null,
         });
         setFormTags(vehicle.tags || []);
         setEditingId(vehicle.id);
@@ -105,7 +107,7 @@ export default function VehiclesView({
         setEditingId(null);
         setFormTags([]);
         setNewTagName('');
-        setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '' });
+        setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '', manufacturer_id: null });
     };
 
     const handleDuplicateVehicle = async (vehicle, e) => {
@@ -176,11 +178,25 @@ export default function VehiclesView({
         return true;
     }).filter(v => !committedDeletes.has(v.id));
 
-    // Stage 2: text filter
-    const textLower = textFilter.trim().toLowerCase();
-    const textFiltered = !textLower ? tagFiltered : tagFiltered.filter(v =>
-        [v.name, v.make, v.model, String(v.year || '')].some(f => (f || '').toLowerCase().includes(textLower))
+    // Stage 2: manufacturer filter
+    const mfgFiltered = mfgFilter.size === 0 ? tagFiltered : tagFiltered.filter(v =>
+        v.manufacturer?.id != null ? mfgFilter.has(v.manufacturer.id) : false
     );
+
+    // Stage 3: text filter
+    const textLower = textFilter.trim().toLowerCase();
+    const textFiltered = !textLower ? mfgFiltered : mfgFiltered.filter(v => {
+        if ([v.name, v.make, v.model].some(f => (f || '').toLowerCase().includes(textLower))) return true;
+        const year = String(v.year || '');
+        if (year.toLowerCase().includes(textLower)) return true;
+        // Range match: "2022-2024" should match a search for "2023"
+        const queryNum = parseInt(textLower, 10);
+        if (!isNaN(queryNum) && /^\d{4}\s*[-–]\s*\d{4}$/.test(year)) {
+            const parts = year.split(/[-–]/).map(s => parseInt(s.trim(), 10));
+            if (parts.length === 2) return queryNum >= parts[0] && queryNum <= parts[1];
+        }
+        return false;
+    });
 
     // Stage 3: sort
     const sortedFilteredVehicles = [...textFiltered].sort((a, b) => {
@@ -202,6 +218,12 @@ export default function VehiclesView({
             case 'model_za':    return (b.model || '').localeCompare(a.model || '');
             case 'year_newest': return Number(b.year || 0) - Number(a.year || 0);
             case 'year_oldest': return Number(a.year || 0) - Number(b.year || 0);
+            case 'mfg_az': {
+                const aMfg = a.manufacturer?.name || a.make || '';
+                const bMfg = b.manufacturer?.name || b.make || '';
+                const mfgCmp = aMfg.localeCompare(bMfg);
+                return mfgCmp !== 0 ? mfgCmp : (a.name || '').localeCompare(b.name || '');
+            }
             default: return 0;
         }
     });
@@ -320,6 +342,9 @@ export default function VehiclesView({
         onRemoveTrim: (trimId) => onDeleteTrim(editingId, trimId),
         imageUploading, onImageReady: handleImageReady,
         onSubmit: handleSubmit, onCancel: handleCancel,
+        // Manufacturer
+        manufacturers,
+        onAddManufacturer: addManufacturer,
     };
 
     const handleMoveVehicle = (vehicleId, direction) => {
@@ -389,7 +414,7 @@ export default function VehiclesView({
     };
 
     // Reset to page 1 when filter/sort changes
-    useEffect(() => { setVehiclePage(1); }, [textFilter, tagFilterStates, sortBy]);
+    useEffect(() => { setVehiclePage(1); }, [textFilter, tagFilterStates, sortBy, mfgFilter]);
 
     const showReorderButtons = canEdit({}) && sortBy === 'default'
         && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0
@@ -456,6 +481,7 @@ export default function VehiclesView({
                     <option value="model_za">Model Z→A</option>
                     <option value="year_newest">Year (Newest)</option>
                     <option value="year_oldest">Year (Oldest)</option>
+                    <option value="mfg_az">Group by Manufacturer</option>
                 </select>
                 {canEdit({}) && sortBy === 'default' && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0 && (
                     <button
@@ -512,6 +538,38 @@ export default function VehiclesView({
                     </span>
                 </div>
             )}
+            {/* Manufacturer filter bar */}
+            {manufacturers.length > 0 && (
+                <div className="tag-filter-bar">
+                    <span className="text-sm font-medium text-gray-500 flex-shrink-0">Brand:</span>
+                    {manufacturers.map(mfg => {
+                        const active = mfgFilter.has(mfg.id);
+                        return (
+                            <button
+                                key={mfg.id}
+                                onClick={() => setMfgFilter(prev => {
+                                    const next = new Set(prev);
+                                    next.has(mfg.id) ? next.delete(mfg.id) : next.add(mfg.id);
+                                    return next;
+                                })}
+                                className={`tag-filter-btn ${active ? 'tag-filter-or' : 'tag-filter-na'}`}
+                                title={active ? `Remove "${mfg.name}" filter` : `Show only "${mfg.name}" vehicles`}
+                            >
+                                {mfg.name}
+                            </button>
+                        );
+                    })}
+                    {mfgFilter.size > 0 && (
+                        <button
+                            onClick={() => setMfgFilter(new Set())}
+                            className="text-xs text-gray-400 hover:text-gray-600 underline ml-1 flex-shrink-0"
+                        >
+                            Clear
+                        </button>
+                    )}
+                </div>
+            )}
+
             {/* Select All / Clear All Visible */}
             {textFiltered.length > 0 && (
                 <div className="flex justify-end gap-2 mb-4 -mt-3">
@@ -536,13 +594,23 @@ export default function VehiclesView({
             {/* ── CARD VIEW ── */}
             {viewMode === 'card' && (
                 <div className="vehicle-grid">
-                    {pagedVehicles.map(vehicle => {
+                    {pagedVehicles.map((vehicle, pageIdx) => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
                         const isPending  = pendingDeletes.has(vehicle.id);
                         const globalPos  = sortedFilteredVehicles.findIndex(v => v.id === vehicle.id);
                         const totalCount = sortedFilteredVehicles.length;
+                        // Insert a manufacturer group header when group changes
+                        const mfgName = vehicle.manufacturer?.name || vehicle.make || 'Unknown';
+                        const prevVehicle = pagedVehicles[pageIdx - 1];
+                        const prevMfgName = prevVehicle ? (prevVehicle.manufacturer?.name || prevVehicle.make || 'Unknown') : null;
+                        const showMfgHeader = sortBy === 'mfg_az' && mfgName !== prevMfgName;
                         return (
                             <div key={vehicle.id} className="contents">
+                                {showMfgHeader && (
+                                    <div className="col-span-full pt-2 pb-1 border-b border-gray-200 mb-1">
+                                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{mfgName}</h3>
+                                    </div>
+                                )}
                                 <div
                                     onClick={() => handleCardClick(vehicle)}
                                     className={`card hover:shadow-lg transition cursor-pointer relative overflow-hidden flex flex-col${isPending ? ' opacity-60' : ''}`}
@@ -643,13 +711,22 @@ export default function VehiclesView({
             {/* ── LIST VIEW ── */}
             {viewMode === 'list' && (
                 <div className="vehicle-list">
-                    {pagedVehicles.map(vehicle => {
+                    {pagedVehicles.map((vehicle, pageIdx) => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
                         const isPending  = pendingDeletes.has(vehicle.id);
                         const globalPos  = sortedFilteredVehicles.findIndex(v => v.id === vehicle.id);
                         const totalCount = sortedFilteredVehicles.length;
+                        const mfgName = vehicle.manufacturer?.name || vehicle.make || 'Unknown';
+                        const prevVehicle = pagedVehicles[pageIdx - 1];
+                        const prevMfgName = prevVehicle ? (prevVehicle.manufacturer?.name || prevVehicle.make || 'Unknown') : null;
+                        const showMfgHeader = sortBy === 'mfg_az' && mfgName !== prevMfgName;
                         return (
                             <div key={vehicle.id}>
+                                {showMfgHeader && (
+                                    <div className="pt-2 pb-1 border-b border-gray-200 mb-1">
+                                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{mfgName}</h3>
+                                    </div>
+                                )}
                                 <div
                                     onClick={() => handleCardClick(vehicle)}
                                     className={`card hover:shadow-lg transition cursor-pointer flex items-center gap-4 py-3 px-4 relative overflow-hidden${isPending ? ' opacity-60' : ''}`}

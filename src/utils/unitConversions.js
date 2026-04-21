@@ -4,6 +4,7 @@ export const IN_TO_MM   = 25.4;
 export const LBS_TO_KG  = 0.453592;
 export const CUFT_TO_L  = 28.3168;
 export const LBFT_TO_NM = 1.35582;
+export const FT_TO_M    = 0.3048;
 
 // ── Formatted strings (value + unit label) ────────────────────────────────
 
@@ -66,6 +67,7 @@ export function convValue(value, unitGroup, sys) {
         case 'dimension': return Math.round(value * IN_TO_MM);
         case 'torque':    return r1(value * LBFT_TO_NM);
         case 'power':     return r1(value * 0.7457);
+        case 'feet':      return r1(value * FT_TO_M);
         default:          return value;
     }
 }
@@ -82,6 +84,7 @@ export function formatSpecValue(value, unitGroup, sys) {
         case 'dimension': return fmtDimension(value, sys);
         case 'torque':    return fmtTorque(value, sys);
         case 'power':     return fmtPower(value, sys);
+        case 'feet':      return sys === 'metric' ? `${r1(value * FT_TO_M)} m` : `${value} ft`;
         default:          return String(value);
     }
 }

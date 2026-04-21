@@ -16,6 +16,7 @@ export function AppProvider({ children }) {
     const [specVouches, setSpecVouches] = useState({});   // { [vehicleId]: { count, myVouch } }
     const [runVotes, setRunVotes] = useState({});          // { [runId]: { vouch, flag, myVote } }
     const [units, setUnits] = useState(() => localStorage.getItem('evbench_units') || 'imperial');
+    const [manufacturers, setManufacturers] = useState([]);
 
     const toggleUnits = () => setUnits(u => {
         const next = u === 'imperial' ? 'metric' : 'imperial';
@@ -31,6 +32,13 @@ export function AppProvider({ children }) {
         initializeApp();
     }, []);
 
+    // Refresh only the vehicles list (no loading spinner, no full re-init).
+    // Used after spec-link add/delete so inherited runs rebuild without a page flash.
+    async function softRefreshVehicles() {
+        const vehiclesData = await dataService.getVehicles();
+        setVehicles(vehiclesData);
+    }
+
     async function initializeApp() {
         setLoading(true);
         await dataService.initialize();
@@ -41,6 +49,7 @@ export function AppProvider({ children }) {
         const selectedIds = await dataService.getSelectedVehicles();
         const tagsData = dataService.useSupabase ? await dataService.getTags() : [];
         const siteSettings = await dataService.getSiteSettings();
+        const manufacturersData = dataService.useSupabase ? await dataService.getManufacturers() : [];
 
         // Derive custom field name suggestions from all vehicles' specs._custom objects
         const suggestions = {};
@@ -59,6 +68,7 @@ export function AppProvider({ children }) {
         setVehicles(vehiclesData);
         setSelectedVehicles(selectedIds);
         setTags(tagsData);
+        setManufacturers(manufacturersData);
         setHeaderImageUrl(siteSettings.header_image_url || '');
         setLoading(false);
     }
@@ -282,6 +292,15 @@ export function AppProvider({ children }) {
 
     const updateRunColor = async (vehicleId, runId, color) => {
         try {
+            // Inherited runs have synthetic string ids — skip the DB write, just update local state
+            if (typeof runId === 'string' && runId.startsWith('inherited_')) {
+                setVehicles(prev => prev.map(v =>
+                    v.id === vehicleId
+                        ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, color } : r) }
+                        : v
+                ));
+                return;
+            }
             await dataService.updateRunColor(vehicleId, runId, color);
             setVehicles(prev => prev.map(v =>
                 v.id === vehicleId
@@ -519,6 +538,78 @@ export function AppProvider({ children }) {
         }
     };
 
+    // ── Manufacturer CRUD ─────────────────────────────────────────────────────
+
+    const addManufacturer = async (name, country = null) => {
+        try {
+            const mfg = await dataService.addManufacturer(name, country);
+            setManufacturers(prev => [...prev, mfg].sort((a, b) => a.name.localeCompare(b.name)));
+            return mfg;
+        } catch (error) {
+            showError('Error adding manufacturer: ' + error.message);
+        }
+    };
+
+    const updateManufacturer = async (id, updates) => {
+        try {
+            await dataService.updateManufacturer(id, updates);
+            setManufacturers(prev =>
+                prev.map(m => m.id === id ? { ...m, ...updates } : m)
+                    .sort((a, b) => a.name.localeCompare(b.name))
+            );
+            // If name changed, keep vehicles' make field in sync
+            if (updates.name) {
+                setVehicles(prev => prev.map(v =>
+                    v.manufacturer?.id === id ? { ...v, manufacturer: { ...v.manufacturer, ...updates }, make: updates.name } : v
+                ));
+            }
+        } catch (error) {
+            showError('Error updating manufacturer: ' + error.message);
+        }
+    };
+
+    const deleteManufacturer = async (id) => {
+        try {
+            await dataService.deleteManufacturer(id);
+            setManufacturers(prev => prev.filter(m => m.id !== id));
+        } catch (error) {
+            showError('Error deleting manufacturer: ' + error.message);
+        }
+    };
+
+    // ── Spec link CRUD ────────────────────────────────────────────────────────
+
+    // Spec links require a full reload because buildInheritedRuns() is a two-pass
+    // operation inside DataService — optimistic state cannot replicate it cheaply.
+    const addSpecLink = async ({ targetVehicleId, sourceVehicleId, specType, scalingFactor, notes }) => {
+        try {
+            await dataService.addSpecLink({ targetVehicleId, sourceVehicleId, specType, scalingFactor, notes });
+            await softRefreshVehicles();
+        } catch (error) {
+            showError('Error adding spec link: ' + error.message);
+            throw error;
+        }
+    };
+
+    const updateSpecLink = async (linkId, { scalingFactor }) => {
+        try {
+            await dataService.updateSpecLink(linkId, { scalingFactor });
+            await softRefreshVehicles();
+        } catch (error) {
+            showError('Error updating spec link: ' + error.message);
+            throw error;
+        }
+    };
+
+    const deleteSpecLink = async (linkId) => {
+        try {
+            await dataService.deleteSpecLink(linkId);
+            await softRefreshVehicles();
+        } catch (error) {
+            showError('Error removing spec link: ' + error.message);
+        }
+    };
+
     // ── RBAC helpers ──────────────────────────────────────────────────────────
     const isAdmin       = userRole === 'admin';
     const isContributor = userRole === 'admin' || userRole === 'contributor';
@@ -722,6 +813,13 @@ export function AppProvider({ children }) {
         initializeApp,
         units,
         toggleUnits,
+        manufacturers,
+        addManufacturer,
+        updateManufacturer,
+        deleteManufacturer,
+        addSpecLink,
+        updateSpecLink,
+        deleteSpecLink,
     };
 
     return (

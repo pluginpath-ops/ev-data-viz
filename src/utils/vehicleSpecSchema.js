@@ -41,9 +41,17 @@ export const SPEC_CATEGORIES = [
         key: 'performance',
         label: 'Performance',
         fields: [
-            { key: 'zero_to_60_mph_sec', label: '0–60 mph (sec)',       type: 'number' },
-            { key: 'top_speed_mph',      label: 'Top Speed (mph)',       type: 'number', unitGroup: 'speed' },
-            { key: 'quarter_mile',       label: 'Quarter Mile',          type: 'text' },
+            { key: 'zero_to_60_mph_sec', label: '0–60 mph (sec)',              type: 'number' },
+            { key: 'quarter_mile_sec',   label: '¼ Mile (sec)',                type: 'number' },
+            { key: 'quarter_mile_mph',   label: '¼ Mile Trap Speed',           type: 'number', unitGroup: 'speed' },
+            { key: 'top_speed_mph',      label: 'Top Speed',                   type: 'number', unitGroup: 'speed' },
+            { key: 'weight_lbs',         label: 'Curb Weight',                 type: 'number', unitGroup: 'weight' },
+            { key: 'braking_60_0_ft',    label: 'Braking 60–0',               type: 'number', unitGroup: 'feet' },
+            { key: 'braking_70_0_ft',    label: 'Braking 70–0',               type: 'number', unitGroup: 'feet' },
+            { key: 'lateral_g',          label: 'Lateral Grip (g)',            type: 'number' },
+            { key: 'figure_8_sec',       label: 'Figure 8 (sec)',              type: 'number' },
+            { key: 'slalom_mph',         label: 'Slalom Speed',                type: 'number', unitGroup: 'speed' },
+            { key: 'elk_test_mph',       label: 'Elk Test Speed (Moose Test)', type: 'number', unitGroup: 'speed' },
         ],
     },
     {
@@ -71,7 +79,6 @@ export const SPEC_CATEGORIES = [
         key: 'dimensions',
         label: 'Exterior Dimensions',
         fields: [
-            { key: 'weight_lbs',          label: 'Weight (lbs)',            type: 'number', unitGroup: 'weight' },
             { key: 'length_in',           label: 'Length (in)',             type: 'number', unitGroup: 'dimension' },
             { key: 'width_in',            label: 'Width (in)',              type: 'number', unitGroup: 'dimension' },
             { key: 'height_in',           label: 'Height (in)',             type: 'number', unitGroup: 'dimension' },

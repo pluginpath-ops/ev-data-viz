@@ -337,10 +337,16 @@ export default function ChargeCompareView({
             if (missing.length === 0) return;
             setLoading(true);
             const updates = {};
+            const allRuns = vehicles.flatMap(v => v.runs || []);
             for (const runId of missing) {
                 try {
                     if (dataService.useSupabase) {
-                        updates[runId] = await dataService.getRunData(runId);
+                        const run = allRuns.find(r => String(r.id) === String(runId));
+                        if (run?._inherited) {
+                            updates[runId] = await dataService.getRunData(run._realRunId, run._scalingFactor ?? 1);
+                        } else {
+                            updates[runId] = await dataService.getRunData(runId);
+                        }
                     } else {
                         for (const v of vehicles) {
                             const run = v.runs?.find(r => r.id === runId);

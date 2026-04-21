@@ -25,6 +25,60 @@ function normalisePoint(point, runId, frame) {
   };
 }
 
+// Fields stored in vehicle_performance table instead of specs JSONB.
+// Add a key here when a new column is promoted to the table.
+const PROMOTED_PERF_FIELDS = ['zero_to_60_mph_sec', 'quarter_mile_sec', 'quarter_mile_mph', 'weight_lbs'];
+
+function splitPerformance(performance = {}) {
+  const promoted = {}, remaining = {};
+  for (const [k, v] of Object.entries(performance)) {
+    if (v !== '' && v != null) {
+      (PROMOTED_PERF_FIELDS.includes(k) ? promoted : remaining)[k] = v;
+    }
+  }
+  return { promoted, remaining: Object.keys(remaining).length ? remaining : null };
+}
+
+// ── Spec-link helpers (module-level so they're available before class) ────────
+
+/**
+ * Given a processed vehicle and the full array of already-processed vehicles,
+ * returns synthetic run objects for all runs inherited via spec_links.
+ * Each inherited run gets a synthetic string id to prevent runDataCache collisions.
+ */
+function buildInheritedRuns(vehicle, allVehicles) {
+  const inherited = [];
+  for (const link of (vehicle.spec_links || [])) {
+    const src = allVehicles.find(v => Number(v.id) === Number(link.source_vehicle_id));
+    if (!src) continue;
+    const relevantRuns = src.runs.filter(r =>
+      link.spec_type === 'range_test'     ? r.has_range    :
+      link.spec_type === 'charging_curve' ? r.has_charging : false
+    );
+    const sf = link.scaling_factor != null ? Number(link.scaling_factor) : 1;
+    for (const run of relevantRuns) {
+      inherited.push({
+        ...run,
+        // Synthetic id prevents runDataCache collision when both source and
+        // target vehicles are selected simultaneously in charts.
+        id:                   `inherited_${link.id}_${run.id}`,
+        _inherited:            true,
+        _realRunId:            run.id,
+        _scalingFactor:        sf,
+        _specLinkId:           link.id,
+        _sourceVehicleId:      src.id,
+        _sourceVehicleName:    src.name,
+        // Distinct default so inherited runs are visually differentiated.
+        color:          run.color ?? '#9ca3af',
+        // Scale the run-level range metric immediately so bar charts are correct
+        // without needing to fetch data points.
+        distance_miles: run.distance_miles != null ? run.distance_miles * sf : null,
+      });
+    }
+  }
+  return inherited;
+}
+
 class DataService {
   constructor() {
     this.user = null;
@@ -59,21 +113,122 @@ class DataService {
     }
     const { data } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), trims(*)`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), trims(*), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_vehicle_id, spec_type, scaling_factor, notes)`)
       .order('created_at', { ascending: false });
-    return (data || []).map(v => ({
+
+    // Pass 1: process each vehicle's own data
+    const processed = (data || []).map(v => {
+      // Merge promoted performance fields into specs.performance transparently
+      const perf = v.vehicle_performance;
+      if (perf) {
+        const { vehicle_id, updated_at, ...perfFields } = perf;
+        v.specs = {
+          ...(v.specs || {}),
+          performance: { ...(v.specs?.performance || {}), ...perfFields },
+        };
+      }
+      delete v.vehicle_performance;
+
+      // Flatten manufacturer object
+      const manufacturer = v.manufacturers ?? null;
+      delete v.manufacturers;
+
+      return {
+        ...v,
+        manufacturer,                    // { id, name, country } or null
+        spec_links: v.spec_links || [],  // raw link rows (kept for admin UI)
+        tags:  (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
+        trims: (v.trims || []).sort((a, b) => a.id - b.id),
+        runs:  (v.runs || []).map(r => ({
+          ...r,
+          // data_points(count) returns [{ count: N }]; normalise to a plain number
+          dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
+          // Resolve the trim FK so chart components can access trim details directly
+          _trim: (v.trims || []).find(t => t.id === r.trim_id) ?? null,
+        })),
+      };
+    });
+
+    // Pass 2: attach inherited runs (needs all vehicles already processed so
+    // source vehicle runs are available)
+    return processed.map(v => ({
       ...v,
-      tags: (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
-      trims: (v.trims || []).sort((a, b) => a.id - b.id),
-      runs: (v.runs || []).map(r => ({
-        ...r,
-        // data_points(count) returns [{ count: N }]; normalise to a plain number
-        dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
-        // Resolve the trim FK so chart components can access trim details directly
-        _trim: (v.trims || []).find(t => t.id === r.trim_id) ?? null,
-      })),
+      runs: [...v.runs, ...buildInheritedRuns(v, processed)],
     }));
   }
+
+  // ── Manufacturers ─────────────────────────────────────────────────────────
+
+  async getManufacturers() {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase().from('manufacturers').select('*').order('name');
+    if (error) throw error;
+    return data || [];
+  }
+
+  async addManufacturer(name, country = null) {
+    const { data, error } = await getSupabase()
+      .from('manufacturers')
+      .insert({ name, country: country || null })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async updateManufacturer(id, { name, country }) {
+    const { error } = await getSupabase()
+      .from('manufacturers')
+      .update({ name, country: country || null })
+      .eq('id', id);
+    if (error) throw error;
+  }
+
+  async deleteManufacturer(id) {
+    const { error } = await getSupabase().from('manufacturers').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  // ── Spec links ────────────────────────────────────────────────────────────
+
+  async addSpecLink({ targetVehicleId, sourceVehicleId, specType, scalingFactor, notes }) {
+    // Delete any existing link for (target, spec_type) first — avoids needing
+    // an UPDATE RLS policy; only INSERT + DELETE policies are required.
+    await getSupabase()
+      .from('spec_links')
+      .delete()
+      .eq('target_vehicle_id', targetVehicleId)
+      .eq('spec_type', specType);
+    const { data, error } = await getSupabase()
+      .from('spec_links')
+      .insert({
+        target_vehicle_id: targetVehicleId,
+        source_vehicle_id: sourceVehicleId,
+        spec_type:         specType,
+        scaling_factor:    scalingFactor != null && scalingFactor !== '' ? Number(scalingFactor) : null,
+        notes:             notes || null,
+        created_by:        this.user?.id ?? null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async updateSpecLink(id, { scalingFactor }) {
+    const { error } = await getSupabase()
+      .from('spec_links')
+      .update({ scaling_factor: scalingFactor != null && scalingFactor !== '' ? Number(scalingFactor) : null })
+      .eq('id', id);
+    if (error) throw error;
+  }
+
+  async deleteSpecLink(id) {
+    const { error } = await getSupabase().from('spec_links').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  // ── Tags ──────────────────────────────────────────────────────────────────
 
   async getTags() {
     if (!this.useSupabase) return [];
@@ -126,6 +281,7 @@ class DataService {
       battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
       range: vehicle.range ? parseFloat(vehicle.range) : null,
       power: vehicle.power ? parseFloat(vehicle.power) : null,
+      manufacturer_id: vehicle.manufacturer_id ? Number(vehicle.manufacturer_id) : null,
       visibility: 'private'
     }).select().single();
     if (error) throw error;
@@ -144,16 +300,32 @@ class DataService {
       name: updates.name, make: updates.make, model: updates.model, year: updates.year,
       battery: updates.battery ? parseFloat(updates.battery) : null,
       range: updates.range ? parseFloat(updates.range) : null,
-      power: updates.power ? parseFloat(updates.power) : null
+      power: updates.power ? parseFloat(updates.power) : null,
+      ...(updates.manufacturer_id !== undefined
+        ? { manufacturer_id: updates.manufacturer_id ? Number(updates.manufacturer_id) : null }
+        : {}),
     }).eq('id', vehicleId);
     if (error) throw error;
   }
 
   async updateVehicleSpecs(vehicleId, specs) {
     if (!this.useSupabase || !this.user) return;
+    const { performance, ...otherSpecs } = specs;
+    const { promoted, remaining } = splitPerformance(performance);
+
+    // Upsert promoted fields to dedicated vehicle_performance table
+    if (Object.keys(promoted).length > 0) {
+      const { error: perfError } = await getSupabase()
+        .from('vehicle_performance')
+        .upsert({ vehicle_id: vehicleId, ...promoted }, { onConflict: 'vehicle_id' });
+      if (perfError) throw perfError;
+    }
+
+    // Save remaining performance fields + all other spec categories to JSONB
+    const finalSpecs = remaining ? { ...otherSpecs, performance: remaining } : otherSpecs;
     const { error } = await getSupabase()
       .from('vehicles')
-      .update({ specs })
+      .update({ specs: finalSpecs })
       .eq('id', vehicleId);
     if (error) throw error;
   }
@@ -417,20 +589,28 @@ class DataService {
     localStorage.setItem('selectedVehicles', JSON.stringify(vehicleIds));
   }
 
-  async getRunData(runId) {
+  async getRunData(runId, scalingFactor = 1) {
+    // Inherited runs carry synthetic string ids like "inherited_<linkId>_<realRunId>".
+    // Strip the prefix to get the real DB run id.
+    const actualId = typeof runId === 'string' && runId.startsWith('inherited_')
+      ? parseInt(runId.split('_').pop(), 10)
+      : runId;
     const { data, error } = await getSupabase()
       .from('data_points')
       .select('*')
-      .eq('run_id', runId)
+      .eq('run_id', actualId)
       .order('frame', { ascending: true });
     if (error) throw error;
     return (data || []).map(p => ({
-      frame: p.frame,
-      timestamp: p.timestamp,
-      soc: p.soc,
-      chargeRate: p.charge_rate,
-      time: p.time_value,
-      range: p.range_value,
+      frame:       p.frame,
+      timestamp:   p.timestamp,
+      soc:         p.soc,
+      chargeRate:  p.charge_rate,
+      time:        p.time_value,
+      // Scale range_value for inherited runs so charts reflect the target vehicle
+      range:       p.range_value != null && scalingFactor !== 1
+        ? p.range_value * scalingFactor
+        : p.range_value,
       temperature: p.temperature,
     }));
   }

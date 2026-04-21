@@ -53,6 +53,9 @@ export default function EditVehicleForm({
     trims, onAddTrim, onRemoveTrim,
     imageUploading, onImageReady,
     onSubmit, onCancel,
+    // Manufacturer
+    manufacturers = [],
+    onAddManufacturer,
 }) {
     const [imgSrc, setImgSrc] = useState('');
     const [crop, setCrop] = useState();
@@ -65,6 +68,12 @@ export default function EditVehicleForm({
     const [newTrimWheel, setNewTrimWheel] = useState('');
     const [newTrimTire, setNewTrimTire] = useState('');
     const [newTrimEpa, setNewTrimEpa] = useState('');
+
+    // New manufacturer inline creation
+    const [showNewMfg, setShowNewMfg] = useState(false);
+    const [newMfgName, setNewMfgName] = useState('');
+    const [newMfgCountry, setNewMfgCountry] = useState('');
+    const [mfgSaving, setMfgSaving] = useState(false);
 
     const handleAddTrim = () => {
         if (!newTrimName.trim()) return;
@@ -116,6 +125,35 @@ export default function EditVehicleForm({
         setCompletedCrop(null);
     };
 
+    // ── Manufacturer handlers ─────────────────────────────────────────────────
+
+    const handleManufacturerChange = (e) => {
+        const id = e.target.value ? parseInt(e.target.value, 10) : null;
+        const mfg = manufacturers.find(m => m.id === id);
+        onFormChange({
+            ...formData,
+            manufacturer_id: id || null,
+            make: mfg ? mfg.name : formData.make,
+        });
+    };
+
+    const handleCreateManufacturer = async () => {
+        if (!newMfgName.trim() || !onAddManufacturer) return;
+        setMfgSaving(true);
+        try {
+            const mfg = await onAddManufacturer(newMfgName.trim(), newMfgCountry.trim() || null);
+            if (mfg) {
+                onFormChange({ ...formData, manufacturer_id: mfg.id, make: mfg.name });
+            }
+            setNewMfgName('');
+            setNewMfgCountry('');
+            setShowNewMfg(false);
+        } finally {
+            setMfgSaving(false);
+        }
+    };
+
+
     return (
         <>
             <form onSubmit={onSubmit} className="card">
@@ -128,7 +166,66 @@ export default function EditVehicleForm({
                         className="form-input col-span-2"
                         required
                     />
-                    <input placeholder="Make"           value={formData.make}    onChange={(e) => onFormChange({ ...formData, make: e.target.value })}    className="form-input" />
+
+                    {/* Manufacturer select — replaces free-text make input */}
+                    <div className="col-span-2">
+                        {!showNewMfg ? (
+                            <div className="flex gap-2 items-center">
+                                <select
+                                    value={formData.manufacturer_id || ''}
+                                    onChange={handleManufacturerChange}
+                                    className="form-input flex-1"
+                                >
+                                    <option value="">— Manufacturer —</option>
+                                    {manufacturers.map(m => (
+                                        <option key={m.id} value={m.id}>{m.name}</option>
+                                    ))}
+                                </select>
+                                {onAddManufacturer && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowNewMfg(true)}
+                                        className="btn btn-secondary text-sm whitespace-nowrap"
+                                    >
+                                        + New
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex gap-2 items-center">
+                                <input
+                                    autoFocus
+                                    placeholder="Manufacturer name"
+                                    value={newMfgName}
+                                    onChange={e => setNewMfgName(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreateManufacturer(); } if (e.key === 'Escape') setShowNewMfg(false); }}
+                                    className="form-input flex-1"
+                                />
+                                <input
+                                    placeholder="Country (optional)"
+                                    value={newMfgCountry}
+                                    onChange={e => setNewMfgCountry(e.target.value)}
+                                    className="form-input w-32"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleCreateManufacturer}
+                                    disabled={!newMfgName.trim() || mfgSaving}
+                                    className="btn btn-primary text-sm disabled:opacity-40"
+                                >
+                                    {mfgSaving ? 'Saving…' : 'Create'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowNewMfg(false)}
+                                    className="btn btn-secondary text-sm"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
                     <input placeholder="Model"          value={formData.model}   onChange={(e) => onFormChange({ ...formData, model: e.target.value })}   className="form-input" />
                     <input placeholder="Year"           value={formData.year}    onChange={(e) => onFormChange({ ...formData, year: e.target.value })}    className="form-input" />
                     <input placeholder="Battery (kWh)"  value={formData.battery} onChange={(e) => onFormChange({ ...formData, battery: e.target.value })} className="form-input" />
