@@ -2105,18 +2105,17 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 flex-shrink-0">
                                             Estimated
                                         </span>
-                                        {isContributor && canEdit(vehicle) ? (
-                                            <label className="flex items-center gap-1 text-xs text-gray-500 flex-shrink-0 cursor-pointer select-none" title="Treat this inherited run as the vehicle's default for ChargeCompare and auto-selection">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={run.isDefault ?? false}
-                                                    onChange={() => updateSpecLink(linkId, { useAsDefault: !run.isDefault })}
-                                                    className="w-3 h-3"
-                                                />
+                                        {run.isDefault ? (
+                                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-semibold flex-shrink-0" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
                                                 Default
-                                            </label>
-                                        ) : run.isDefault ? (
-                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>Default</span>
+                                            </span>
+                                        ) : isContributor && canEdit(vehicle) ? (
+                                            <button
+                                                onClick={() => updateSpecLink(linkId, { useAsDefault: true })}
+                                                className="btn btn-secondary text-sm flex-shrink-0"
+                                            >
+                                                Set as Default
+                                            </button>
                                         ) : null}
                                         <button
                                             onClick={() => onViewChart && onViewChart()}
