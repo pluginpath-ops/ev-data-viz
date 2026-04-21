@@ -167,7 +167,7 @@ const EstimateTimePanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, onAddTrim, onDeleteTrim, vehicles, onCopyRunToVehicle }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, deleteSpecLink } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
@@ -267,6 +267,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [newLinkScaling, setNewLinkScaling]   = useState('');
     const [newLinkNotes, setNewLinkNotes]       = useState('');
     const [linkSaving, setLinkSaving]           = useState(false);
+    // linkId -> string (local edit value for scaling factor)
+    const [scalingEdits, setScalingEdits]       = useState({});
 
     // ── Inline data-table state (edit mode) ──────────────────────────────────
     const [editData, setEditData]               = useState(null);   // null=not fetched, []=loaded
@@ -2062,14 +2064,43 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 const srcName = run._sourceVehicleName || `Vehicle #${run._sourceVehicleId}`;
                                 const sf = run._scalingFactor;
                                 const specLabel = run.has_range ? 'Range Test' : 'Charging Curve';
+                                const linkId = run._specLinkId;
+                                const editVal = scalingEdits[linkId] ?? (sf != null ? String(sf) : '');
+                                const saveScaling = async () => {
+                                    const newSf = editVal === '' ? null : parseFloat(editVal);
+                                    const unchanged = newSf === (sf ?? null);
+                                    if (unchanged) return;
+                                    try {
+                                        await updateSpecLink(linkId, { scalingFactor: newSf });
+                                        setScalingEdits(prev => { const n = { ...prev }; delete n[linkId]; return n; });
+                                    } catch (_) { /* error shown by context */ }
+                                };
                                 return (
                                     <div key={run.id} className="card border border-dashed border-gray-300 bg-gray-50 flex items-center gap-3 px-4 py-3">
                                         <span className="spec-link-type-badge flex-shrink-0">{specLabel}</span>
                                         <span className="text-sm text-gray-700 flex-1 min-w-0 truncate">
                                             Inherited from: <span className="font-medium">{srcName}</span>
                                         </span>
-                                        {sf !== 1 && sf != null && (
-                                            <span className="text-xs font-mono text-gray-500 flex-shrink-0">×{sf}</span>
+                                        {isContributor && canEdit(vehicle) ? (
+                                            <label className="flex items-center gap-1 text-xs text-gray-500 flex-shrink-0">
+                                                <span>×</span>
+                                                <input
+                                                    type="number"
+                                                    value={editVal}
+                                                    onChange={e => setScalingEdits(prev => ({ ...prev, [linkId]: e.target.value }))}
+                                                    onBlur={saveScaling}
+                                                    onKeyDown={e => { if (e.key === 'Enter') { e.target.blur(); } }}
+                                                    step="0.001"
+                                                    min="0.001"
+                                                    placeholder="1.0"
+                                                    className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
+                                                    title="Scaling factor (blank = 1.0)"
+                                                />
+                                            </label>
+                                        ) : (
+                                            sf !== 1 && sf != null && (
+                                                <span className="text-xs font-mono text-gray-500 flex-shrink-0">×{sf}</span>
+                                            )
                                         )}
                                         <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 flex-shrink-0">
                                             Estimated
@@ -2082,7 +2113,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         </button>
                                         {isContributor && canEdit(vehicle) && (
                                             <button
-                                                onClick={() => deleteSpecLink(run._specLinkId)}
+                                                onClick={() => deleteSpecLink(linkId)}
                                                 className="text-xs text-gray-400 hover:text-red-500 transition flex-shrink-0"
                                             >
                                                 Remove

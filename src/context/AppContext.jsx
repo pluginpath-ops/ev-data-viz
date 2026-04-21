@@ -591,6 +591,16 @@ export function AppProvider({ children }) {
         }
     };
 
+    const updateSpecLink = async (linkId, { scalingFactor }) => {
+        try {
+            await dataService.updateSpecLink(linkId, { scalingFactor });
+            await softRefreshVehicles();
+        } catch (error) {
+            showError('Error updating spec link: ' + error.message);
+            throw error;
+        }
+    };
+
     const deleteSpecLink = async (linkId) => {
         try {
             await dataService.deleteSpecLink(linkId);
@@ -808,6 +818,7 @@ export function AppProvider({ children }) {
         updateManufacturer,
         deleteManufacturer,
         addSpecLink,
+        updateSpecLink,
         deleteSpecLink,
     };
 

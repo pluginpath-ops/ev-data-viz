@@ -215,6 +215,14 @@ class DataService {
     return data;
   }
 
+  async updateSpecLink(id, { scalingFactor }) {
+    const { error } = await getSupabase()
+      .from('spec_links')
+      .update({ scaling_factor: scalingFactor != null && scalingFactor !== '' ? Number(scalingFactor) : null })
+      .eq('id', id);
+    if (error) throw error;
+  }
+
   async deleteSpecLink(id) {
     const { error } = await getSupabase().from('spec_links').delete().eq('id', id);
     if (error) throw error;
