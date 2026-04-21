@@ -127,10 +127,17 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             if (missingIds.length === 0) return;
             setLoadingData(true);
             const updates = {};
+            // Build a flat lookup of all runs across all selected vehicles
+            const allRuns = vehicles.flatMap(v => v.runs || []);
             for (const runId of missingIds) {
                 try {
                     if (dataService.useSupabase) {
-                        updates[runId] = await dataService.getRunData(runId);
+                        const run = allRuns.find(r => String(r.id) === String(runId));
+                        if (run?._inherited) {
+                            updates[runId] = await dataService.getRunData(run._realRunId, run._scalingFactor ?? 1);
+                        } else {
+                            updates[runId] = await dataService.getRunData(runId);
+                        }
                     } else {
                         // localStorage: find run.data inline
                         for (const v of vehicles) {

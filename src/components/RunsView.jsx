@@ -167,14 +167,14 @@ const EstimateTimePanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, onAddTrim, onDeleteTrim, vehicles, onCopyRunToVehicle }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, deleteSpecLink } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
     const [showEditSpecs, setShowEditSpecs] = useState(false);
     const [showViewSpecs, setShowViewSpecs] = useState(false);
     const [vehicleFormData, setVehicleFormData] = useState({
-        name: '', make: '', model: '', year: '', battery: '', range: ''
+        name: '', make: '', model: '', year: '', battery: '', range: '', manufacturer_id: null,
     });
     const [vehicleFormTags, setVehicleFormTags] = useState([]);
     const [vehicleNewTagName, setVehicleNewTagName] = useState('');
@@ -188,6 +188,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             year: vehicle.year || '',
             battery: vehicle.battery || '',
             range: vehicle.range || '',
+            manufacturer_id: vehicle.manufacturer?.id ?? null,
         });
         setVehicleFormTags(vehicle.tags || []);
         setVehicleNewTagName('');
@@ -842,9 +843,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
     // ── Derived state ─────────────────────────────────────────────────────────
 
-    const availableFields = csvData?.meta.fields || [];
-    const displayRuns     = (vehicle.runs || []).filter(r => !committedDeletes.has(r.id));
-    const barVisible      = pendingDeletes.size > 0 || !!undoState;
+    const availableFields  = csvData?.meta.fields || [];
+    const allDisplayRuns   = (vehicle.runs || []).filter(r => !committedDeletes.has(r.id));
+    const displayRuns      = allDisplayRuns.filter(r => !r._inherited);
+    const inheritedRuns    = allDisplayRuns.filter(r => r._inherited);
+    const barVisible       = pendingDeletes.size > 0 || !!undoState;
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -940,7 +943,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                     >
                         {showUpload && uploadMode === 'create' ? 'Cancel' : '+ Add new record'}
                     </button>
-                    {vehicle.runs?.length > 0 && (
+                    {allDisplayRuns.length > 0 && (
                         <button
                             onClick={onViewChart}
                             className="btn btn-primary"
@@ -2021,9 +2024,55 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 })}
             </div>
 
-            {vehicle.runs?.length === 0 && !showUpload && (
+            {displayRuns.length === 0 && !showUpload && inheritedRuns.length === 0 && (
                 <div className="empty-state">
                     <p className="text-lg">No tests yet. Add a record to get started!</p>
+                </div>
+            )}
+
+            {/* ── Inherited Tests ───────────────────────────────────────────── */}
+            {inheritedRuns.length > 0 && (
+                <div className="mt-6">
+                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                        Inherited Tests
+                    </h3>
+                    <div className="space-y-2">
+                        {inheritedRuns.map(run => {
+                            const srcName = run._sourceVehicleName || `Vehicle #${run._sourceVehicleId}`;
+                            const sf = run._scalingFactor;
+                            const specLabel = run.has_range ? 'Range Test' : 'Charging Curve';
+                            return (
+                                <div key={run.id} className="card border border-dashed border-gray-300 bg-gray-50 flex items-center gap-3 px-4 py-3">
+                                    <span className="spec-link-type-badge flex-shrink-0">{specLabel}</span>
+                                    <span className="text-sm text-gray-700 flex-1 min-w-0 truncate">
+                                        Inherited from: <span className="font-medium">{srcName}</span>
+                                    </span>
+                                    {sf !== 1 && sf != null && (
+                                        <span className="text-xs font-mono text-gray-500 flex-shrink-0">×{sf}</span>
+                                    )}
+                                    <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 flex-shrink-0">
+                                        Estimated
+                                    </span>
+                                    <button
+                                        onClick={() => onViewChart && onViewChart()}
+                                        className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition flex-shrink-0"
+                                        title="View this run in the chart"
+                                    >
+                                        View Chart →
+                                    </button>
+                                    {isContributor && (
+                                        <button
+                                            onClick={() => deleteSpecLink(run._specLinkId)}
+                                            className="text-xs text-gray-400 hover:text-red-500 transition flex-shrink-0"
+                                            title="Remove this inherited link"
+                                        >
+                                            Remove Link
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 
@@ -2086,6 +2135,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             onImageReady={handleVehicleImageReady}
                             onSubmit={handleVehicleSubmit}
                             onCancel={closeEditVehicle}
+                            manufacturers={manufacturers}
+                            onAddManufacturer={addManufacturer}
+                            allVehicles={vehicles || []}
+                            onAddSpecLink={addSpecLink}
+                            onDeleteSpecLink={deleteSpecLink}
+                            isContributor={isContributor}
                         />
                     </div>
                 </div>

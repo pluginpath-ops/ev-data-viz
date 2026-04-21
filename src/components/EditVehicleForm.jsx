@@ -53,6 +53,14 @@ export default function EditVehicleForm({
     trims, onAddTrim, onRemoveTrim,
     imageUploading, onImageReady,
     onSubmit, onCancel,
+    // Manufacturer
+    manufacturers = [],
+    onAddManufacturer,
+    // Spec links
+    allVehicles = [],
+    onAddSpecLink,
+    onDeleteSpecLink,
+    isContributor = false,
 }) {
     const [imgSrc, setImgSrc] = useState('');
     const [crop, setCrop] = useState();
@@ -65,6 +73,19 @@ export default function EditVehicleForm({
     const [newTrimWheel, setNewTrimWheel] = useState('');
     const [newTrimTire, setNewTrimTire] = useState('');
     const [newTrimEpa, setNewTrimEpa] = useState('');
+
+    // New manufacturer inline creation
+    const [showNewMfg, setShowNewMfg] = useState(false);
+    const [newMfgName, setNewMfgName] = useState('');
+    const [newMfgCountry, setNewMfgCountry] = useState('');
+    const [mfgSaving, setMfgSaving] = useState(false);
+
+    // Spec link "add" form local state
+    const [newLinkSourceId, setNewLinkSourceId] = useState('');
+    const [newLinkSpecType, setNewLinkSpecType] = useState('range_test');
+    const [newLinkScaling, setNewLinkScaling] = useState('');
+    const [newLinkNotes, setNewLinkNotes] = useState('');
+    const [linkSaving, setLinkSaving] = useState(false);
 
     const handleAddTrim = () => {
         if (!newTrimName.trim()) return;
@@ -116,6 +137,71 @@ export default function EditVehicleForm({
         setCompletedCrop(null);
     };
 
+    // ── Manufacturer handlers ─────────────────────────────────────────────────
+
+    const handleManufacturerChange = (e) => {
+        const id = e.target.value ? parseInt(e.target.value, 10) : null;
+        const mfg = manufacturers.find(m => m.id === id);
+        onFormChange({
+            ...formData,
+            manufacturer_id: id || null,
+            make: mfg ? mfg.name : formData.make,
+        });
+    };
+
+    const handleCreateManufacturer = async () => {
+        if (!newMfgName.trim() || !onAddManufacturer) return;
+        setMfgSaving(true);
+        try {
+            const mfg = await onAddManufacturer(newMfgName.trim(), newMfgCountry.trim() || null);
+            if (mfg) {
+                onFormChange({ ...formData, manufacturer_id: mfg.id, make: mfg.name });
+            }
+            setNewMfgName('');
+            setNewMfgCountry('');
+            setShowNewMfg(false);
+        } finally {
+            setMfgSaving(false);
+        }
+    };
+
+    // ── Spec link handlers ────────────────────────────────────────────────────
+
+    const suggestEpaRatio = () => {
+        const src = allVehicles.find(v => v.id === parseInt(newLinkSourceId, 10));
+        const tgt = editingVehicle;
+        if (!src || !tgt) return;
+        const srcRange = parseFloat(src.range);
+        const tgtRange = parseFloat(tgt.range);
+        if (!srcRange || !tgtRange) return;
+        setNewLinkScaling((tgtRange / srcRange).toFixed(3));
+    };
+
+    const handleAddSpecLink = async () => {
+        if (!newLinkSourceId || !onAddSpecLink) return;
+        setLinkSaving(true);
+        try {
+            await onAddSpecLink({
+                targetVehicleId: editingVehicle.id,
+                sourceVehicleId: parseInt(newLinkSourceId, 10),
+                specType: newLinkSpecType,
+                scalingFactor: newLinkScaling ? parseFloat(newLinkScaling) : null,
+                notes: newLinkNotes.trim() || null,
+            });
+            setNewLinkSourceId('');
+            setNewLinkScaling('');
+            setNewLinkNotes('');
+        } finally {
+            setLinkSaving(false);
+        }
+    };
+
+    // Vehicles available as spec link sources (exclude current vehicle and inherited runs)
+    const linkableVehicles = allVehicles.filter(v => v.id !== editingVehicle?.id);
+
+    // Existing spec links on the editing vehicle
+    const existingLinks = editingVehicle?.spec_links || [];
+
     return (
         <>
             <form onSubmit={onSubmit} className="card">
@@ -128,7 +214,66 @@ export default function EditVehicleForm({
                         className="form-input col-span-2"
                         required
                     />
-                    <input placeholder="Make"           value={formData.make}    onChange={(e) => onFormChange({ ...formData, make: e.target.value })}    className="form-input" />
+
+                    {/* Manufacturer select — replaces free-text make input */}
+                    <div className="col-span-2">
+                        {!showNewMfg ? (
+                            <div className="flex gap-2 items-center">
+                                <select
+                                    value={formData.manufacturer_id || ''}
+                                    onChange={handleManufacturerChange}
+                                    className="form-input flex-1"
+                                >
+                                    <option value="">— Manufacturer —</option>
+                                    {manufacturers.map(m => (
+                                        <option key={m.id} value={m.id}>{m.name}</option>
+                                    ))}
+                                </select>
+                                {onAddManufacturer && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowNewMfg(true)}
+                                        className="btn btn-secondary text-sm whitespace-nowrap"
+                                    >
+                                        + New
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex gap-2 items-center">
+                                <input
+                                    autoFocus
+                                    placeholder="Manufacturer name"
+                                    value={newMfgName}
+                                    onChange={e => setNewMfgName(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreateManufacturer(); } if (e.key === 'Escape') setShowNewMfg(false); }}
+                                    className="form-input flex-1"
+                                />
+                                <input
+                                    placeholder="Country (optional)"
+                                    value={newMfgCountry}
+                                    onChange={e => setNewMfgCountry(e.target.value)}
+                                    className="form-input w-32"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleCreateManufacturer}
+                                    disabled={!newMfgName.trim() || mfgSaving}
+                                    className="btn btn-primary text-sm disabled:opacity-40"
+                                >
+                                    {mfgSaving ? 'Saving…' : 'Create'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowNewMfg(false)}
+                                    className="btn btn-secondary text-sm"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
                     <input placeholder="Model"          value={formData.model}   onChange={(e) => onFormChange({ ...formData, model: e.target.value })}   className="form-input" />
                     <input placeholder="Year"           value={formData.year}    onChange={(e) => onFormChange({ ...formData, year: e.target.value })}    className="form-input" />
                     <input placeholder="Battery (kWh)"  value={formData.battery} onChange={(e) => onFormChange({ ...formData, battery: e.target.value })} className="form-input" />
@@ -267,6 +412,115 @@ export default function EditVehicleForm({
                             >
                                 Add
                             </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Inherited Test Data — edit mode + contributors/admins only */}
+                {editingId && isContributor && onAddSpecLink && (
+                    <div className="form-section mt-5">
+                        <label className="block font-medium mb-2">Inherited Test Data</label>
+                        <p className="text-xs text-gray-500 mb-3">
+                            Let this vehicle inherit range tests or charging curves from another vehicle,
+                            with an optional scaling factor applied to range data.
+                        </p>
+
+                        {/* Existing links */}
+                        {existingLinks.length > 0 && (
+                            <div className="spec-link-list mb-3">
+                                {existingLinks.map(link => {
+                                    const src = allVehicles.find(v => v.id === link.source_vehicle_id);
+                                    return (
+                                        <div key={link.id} className="spec-link-row">
+                                            <span className="spec-link-type-badge">
+                                                {link.spec_type === 'range_test' ? 'Range Test' : 'Charging Curve'}
+                                            </span>
+                                            <span className="text-sm text-gray-700 flex-1">
+                                                ← {src?.name || `Vehicle #${link.source_vehicle_id}`}
+                                            </span>
+                                            {link.scaling_factor != null && (
+                                                <span className="text-xs text-gray-500 font-mono">
+                                                    ×{link.scaling_factor}
+                                                </span>
+                                            )}
+                                            {link.notes && (
+                                                <span className="text-xs text-gray-400 italic truncate max-w-32" title={link.notes}>
+                                                    {link.notes}
+                                                </span>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => onDeleteSpecLink(link.id)}
+                                                className="text-gray-400 hover:text-red-500 transition text-xs ml-1"
+                                                title="Remove this link"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Add new link */}
+                        <div className="spec-link-add-form">
+                            <div className="flex gap-2 flex-wrap">
+                                <select
+                                    value={newLinkSourceId}
+                                    onChange={e => setNewLinkSourceId(e.target.value)}
+                                    className="form-input text-sm flex-1 min-w-40"
+                                >
+                                    <option value="">Source vehicle…</option>
+                                    {linkableVehicles
+                                        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                                        .map(v => (
+                                            <option key={v.id} value={v.id}>{v.name}</option>
+                                        ))}
+                                </select>
+                                <select
+                                    value={newLinkSpecType}
+                                    onChange={e => setNewLinkSpecType(e.target.value)}
+                                    className="form-input text-sm"
+                                >
+                                    <option value="range_test">Range Test</option>
+                                    <option value="charging_curve">Charging Curve</option>
+                                </select>
+                            </div>
+                            <div className="flex gap-2 mt-2 flex-wrap items-center">
+                                <input
+                                    type="number"
+                                    placeholder="Scaling factor (blank = 1.0)"
+                                    value={newLinkScaling}
+                                    onChange={e => setNewLinkScaling(e.target.value)}
+                                    step="0.001"
+                                    min="0.001"
+                                    className="form-input text-sm flex-1 min-w-40"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={suggestEpaRatio}
+                                    disabled={!newLinkSourceId}
+                                    className="btn btn-secondary text-xs whitespace-nowrap disabled:opacity-40"
+                                    title="Auto-fill scaling from EPA range ratio (target ÷ source)"
+                                >
+                                    Suggest from EPA ratio
+                                </button>
+                                <input
+                                    type="text"
+                                    placeholder="Notes (optional)"
+                                    value={newLinkNotes}
+                                    onChange={e => setNewLinkNotes(e.target.value)}
+                                    className="form-input text-sm flex-1 min-w-40"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleAddSpecLink}
+                                    disabled={!newLinkSourceId || linkSaving}
+                                    className="btn btn-primary text-sm disabled:opacity-40"
+                                >
+                                    {linkSaving ? 'Adding…' : 'Add Link'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

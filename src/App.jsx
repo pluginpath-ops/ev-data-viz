@@ -11,6 +11,7 @@ import RoadTripView from './components/RoadTripView';
 import PopoutView from './components/PopoutView';
 import SpecsView from './components/SpecsView';
 import SpecsChartView from './components/SpecsChartView';
+import SpecsScatterView from './components/SpecsScatterView';
 import AdminView from './components/AdminView';
 
 export default function App() {
@@ -107,7 +108,9 @@ export default function App() {
         y2Max: null,
         showLine:   true,
         showPoints: false,
-        specsField: null,   // selected field key for Spec Chart mode
+        specsField:     null,   // selected field key for Spec Chart mode
+        scatterXField:  null,   // selected X field key for Spec Scatter mode
+        scatterYField:  null,   // selected Y field key for Spec Scatter mode
     });
     const handleChartModeChange = (newMode) => {
         // Push a history entry so "back" can return to the previous chart mode.
@@ -163,7 +166,9 @@ export default function App() {
             y2Max: p.get('y2x') !== null && p.get('y2x') !== '' ? Number(p.get('y2x')) : null,
             showLine:   p.get('line') !== '0', // default to true if not present, false if explicitly set to 0
             showPoints: p.get('pts') === '1', // default to false if not present, true if explicitly set to 1
-            chartMode: p.get('m') || 'charging',
+            chartMode:     p.get('m') || 'charging',
+            scatterXField: p.get('scx') || null,
+            scatterYField: p.get('scy') || null,
         };
 
         // Charge Compare config
@@ -246,8 +251,10 @@ export default function App() {
             yMax:          s.yMax,
             y2Min:         s.y2Min ?? null,
             y2Max:         s.y2Max ?? null,
-            showLine:   s.showLine ?? true, // default to true if not present, false if explicitly set to 0
-            showPoints: s.showPoints ?? false, // default to false if not present, true if explicitly set to 1
+            showLine:      s.showLine ?? true, // default to true if not present, false if explicitly set to 0
+            showPoints:    s.showPoints ?? false, // default to false if not present, true if explicitly set to 1
+            ...(s.scatterXField && { scatterXField: s.scatterXField }),
+            ...(s.scatterYField && { scatterYField: s.scatterYField }),
         }));
         setView('chart');
     }, [loading]);
@@ -308,6 +315,12 @@ export default function App() {
                 p.set('rt_te', rt.towingEfficiency);
                 p.set('rt_tr', rt.towingRefSpeedMph);
             }
+        }
+
+        // Spec Scatter options
+        if (chartMode === 'specscatter') {
+            if (chartConfig.scatterXField) p.set('scx', chartConfig.scatterXField);
+            if (chartConfig.scatterYField) p.set('scy', chartConfig.scatterYField);
         }
 
         history.replaceState({ view: 'chart', chartMode }, '', '?' + p.toString());
@@ -525,7 +538,8 @@ export default function App() {
                                         { key: 'range',     label: 'Range & Efficiency' },
                                         { key: 'compare',   label: 'Charge Compare' },
                                         { key: 'roadtrip',  label: 'Road Trip' },
-                                        { key: 'specs',     label: 'Spec Chart' },
+                                        { key: 'specs',       label: 'Spec Chart' },
+                                        { key: 'specscatter', label: 'Spec Scatter' },
                                     ].map(({ key, label }) => (
                                         <button
                                             key={key}
@@ -698,7 +712,7 @@ export default function App() {
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                         />
                     )}
-                    {view === 'chart' && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'roadtrip' && (
+                    {view === 'chart' && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && (
                         <ChargingView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -735,6 +749,14 @@ export default function App() {
                             vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
                             selectedField={chartConfig.specsField}
                             onFieldChange={field => setChartConfig(p => ({ ...p, specsField: field }))}
+                        />
+                    )}
+                    {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'specscatter' && (
+                        <SpecsScatterView
+                            vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
+                            xField={chartConfig.scatterXField}
+                            yField={chartConfig.scatterYField}
+                            onFieldChange={(x, y) => setChartConfig(p => ({ ...p, scatterXField: x, scatterYField: y }))}
                         />
                     )}
                     {view === 'specs' && (

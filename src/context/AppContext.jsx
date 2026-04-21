@@ -16,6 +16,7 @@ export function AppProvider({ children }) {
     const [specVouches, setSpecVouches] = useState({});   // { [vehicleId]: { count, myVouch } }
     const [runVotes, setRunVotes] = useState({});          // { [runId]: { vouch, flag, myVote } }
     const [units, setUnits] = useState(() => localStorage.getItem('evbench_units') || 'imperial');
+    const [manufacturers, setManufacturers] = useState([]);
 
     const toggleUnits = () => setUnits(u => {
         const next = u === 'imperial' ? 'metric' : 'imperial';
@@ -41,6 +42,7 @@ export function AppProvider({ children }) {
         const selectedIds = await dataService.getSelectedVehicles();
         const tagsData = dataService.useSupabase ? await dataService.getTags() : [];
         const siteSettings = await dataService.getSiteSettings();
+        const manufacturersData = dataService.useSupabase ? await dataService.getManufacturers() : [];
 
         // Derive custom field name suggestions from all vehicles' specs._custom objects
         const suggestions = {};
@@ -59,6 +61,7 @@ export function AppProvider({ children }) {
         setVehicles(vehiclesData);
         setSelectedVehicles(selectedIds);
         setTags(tagsData);
+        setManufacturers(manufacturersData);
         setHeaderImageUrl(siteSettings.header_image_url || '');
         setLoading(false);
     }
@@ -519,6 +522,68 @@ export function AppProvider({ children }) {
         }
     };
 
+    // ── Manufacturer CRUD ─────────────────────────────────────────────────────
+
+    const addManufacturer = async (name, country = null) => {
+        try {
+            const mfg = await dataService.addManufacturer(name, country);
+            setManufacturers(prev => [...prev, mfg].sort((a, b) => a.name.localeCompare(b.name)));
+            return mfg;
+        } catch (error) {
+            showError('Error adding manufacturer: ' + error.message);
+        }
+    };
+
+    const updateManufacturer = async (id, updates) => {
+        try {
+            await dataService.updateManufacturer(id, updates);
+            setManufacturers(prev =>
+                prev.map(m => m.id === id ? { ...m, ...updates } : m)
+                    .sort((a, b) => a.name.localeCompare(b.name))
+            );
+            // If name changed, keep vehicles' make field in sync
+            if (updates.name) {
+                setVehicles(prev => prev.map(v =>
+                    v.manufacturer?.id === id ? { ...v, manufacturer: { ...v.manufacturer, ...updates }, make: updates.name } : v
+                ));
+            }
+        } catch (error) {
+            showError('Error updating manufacturer: ' + error.message);
+        }
+    };
+
+    const deleteManufacturer = async (id) => {
+        try {
+            await dataService.deleteManufacturer(id);
+            setManufacturers(prev => prev.filter(m => m.id !== id));
+        } catch (error) {
+            showError('Error deleting manufacturer: ' + error.message);
+        }
+    };
+
+    // ── Spec link CRUD ────────────────────────────────────────────────────────
+
+    // Spec links require a full reload because buildInheritedRuns() is a two-pass
+    // operation inside DataService — optimistic state cannot replicate it cheaply.
+    const addSpecLink = async ({ targetVehicleId, sourceVehicleId, specType, scalingFactor, notes }) => {
+        try {
+            await dataService.addSpecLink({ targetVehicleId, sourceVehicleId, specType, scalingFactor, notes });
+            await initializeApp();
+        } catch (error) {
+            showError('Error adding spec link: ' + error.message);
+            throw error;
+        }
+    };
+
+    const deleteSpecLink = async (linkId) => {
+        try {
+            await dataService.deleteSpecLink(linkId);
+            await initializeApp();
+        } catch (error) {
+            showError('Error removing spec link: ' + error.message);
+        }
+    };
+
     // ── RBAC helpers ──────────────────────────────────────────────────────────
     const isAdmin       = userRole === 'admin';
     const isContributor = userRole === 'admin' || userRole === 'contributor';
@@ -722,6 +787,12 @@ export function AppProvider({ children }) {
         initializeApp,
         units,
         toggleUnits,
+        manufacturers,
+        addManufacturer,
+        updateManufacturer,
+        deleteManufacturer,
+        addSpecLink,
+        deleteSpecLink,
     };
 
     return (
