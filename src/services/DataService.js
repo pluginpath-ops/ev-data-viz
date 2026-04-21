@@ -220,7 +220,13 @@ class DataService {
     return data;
   }
 
-  async updateSpecLink(id, changes) {
+  async updateSpecLink(id, changes, targetVehicleId = null) {
+    // When promoting an inherited run to default, first clear all existing
+    // defaults for this vehicle so exactly one is ever marked at a time.
+    if (changes.useAsDefault && targetVehicleId) {
+      await getSupabase().from('runs').update({ is_default: false }).eq('vehicle_id', targetVehicleId);
+      await getSupabase().from('spec_links').update({ use_as_default: false }).eq('target_vehicle_id', targetVehicleId);
+    }
     const payload = {};
     if ('scalingFactor' in changes) {
       payload.scaling_factor = changes.scalingFactor != null && changes.scalingFactor !== ''
@@ -571,6 +577,10 @@ class DataService {
       localStorage.setItem('evData', JSON.stringify(data));
       return;
     }
+    // Clear all defaults for this vehicle first (runs + inherited links) so
+    // exactly one run is ever marked as default at a time.
+    await getSupabase().from('runs').update({ is_default: false }).eq('vehicle_id', vehicleId);
+    await getSupabase().from('spec_links').update({ use_as_default: false }).eq('target_vehicle_id', vehicleId);
     const { error } = await getSupabase().from('runs').update({ is_default: true }).eq('id', runId);
     if (error) throw error;
   }
