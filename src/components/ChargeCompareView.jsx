@@ -3,6 +3,7 @@ import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
 import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
+import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 
@@ -316,7 +317,7 @@ export default function ChargeCompareView({
                 const selfHasCharging = rangeRun.has_charging !== false;
                 const chargingRun     = selfHasCharging ? rangeRun : defaultCharging;
                 result.push({
-                    rangeRun:        { ...rangeRun, vehicleName: vehicle.name, vehicleId: vehicle.id },
+                    rangeRun:        { ...rangeRun, vehicleName: vehicleLabel(vehicle), vehicleId: vehicle.id },
                     chargingRunId:   chargingRun?.id   ?? null,
                     chargingRunName: chargingRun?.name ?? null,
                 });

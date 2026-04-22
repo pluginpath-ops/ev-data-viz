@@ -1,6 +1,12 @@
 import { SPEC_CATEGORIES, formatCustomKey } from './vehicleSpecSchema';
 import { distanceLabel } from './unitConversions';
 
+// ── Vehicle display label ─────────────────────────────────────────────────────
+
+export function vehicleLabel(v) {
+    return v?.year ? `${v.year} ${v.name}` : (v?.name ?? '');
+}
+
 // ── Built-in vehicle-level fields ─────────────────────────────────────────────
 
 export function makeVehicleFields(units) {

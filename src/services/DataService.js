@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { vehicleLabel } from '../utils/specHelpers';
 
 /**
  * Round a numeric field to a given number of decimal places.
@@ -155,7 +156,7 @@ class DataService {
     for (const v of processed) {
       for (const r of v.runs) {
         runById.set(Number(r.id), r);
-        runToVehicle.set(Number(r.id), { vehicleId: v.id, vehicleName: v.name });
+        runToVehicle.set(Number(r.id), { vehicleId: v.id, vehicleName: vehicleLabel(v) });
       }
     }
 

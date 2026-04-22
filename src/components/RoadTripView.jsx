@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import ZoomPlugin from 'chartjs-plugin-zoom';
+import { vehicleLabel } from '../utils/specHelpers';
 import { dataService } from '../services/DataService';
 import { useAppContext } from '../context/AppContext';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
@@ -646,8 +647,8 @@ export default function RoadTripView({
         }
         const entryLabel = e =>
             vehicleRunCount[e.vehicle.id] > 1
-                ? `${e.vehicle.name} (${e.run.name})`
-                : e.vehicle.name;
+                ? `${vehicleLabel(e.vehicle)} (${e.run.name})`
+                : vehicleLabel(e.vehicle);
 
         // ── Speed sweep chart ────────────────────────────────────────────────
         if (isSpeedMode) {
@@ -1035,8 +1036,8 @@ export default function RoadTripView({
                                     if (idx >= 0 && idx < validEntries.length) {
                                         const e = validEntries[idx];
                                         return vehicleRunCount[e.vehicle.id] > 1
-                                            ? `${e.vehicle.name} · ${e.run.name}`
-                                            : e.vehicle.name;
+                                            ? `${vehicleLabel(e.vehicle)} · ${e.run.name}`
+                                            : vehicleLabel(e.vehicle);
                                     }
                                     if (idx === validEntries.length) return 'ICE Reference';
                                 }
@@ -1351,7 +1352,7 @@ export default function RoadTripView({
                                 if (!sim?.warnings?.length) return null;
                                 return sim.warnings.map((w, wi) => (
                                     <p key={`${entry.run.id}-${wi}`} className="roadtrip-warning">
-                                        ⚠ {entry.vehicle.name} – {entry.run.name}: {w}
+                                        ⚠ {vehicleLabel(entry.vehicle)} – {entry.run.name}: {w}
                                     </p>
                                 ));
                             })}
@@ -1401,7 +1402,7 @@ export default function RoadTripView({
                             ))}
                             {skippedEntries.map(e => (
                                 <p key={e.run.id}>
-                                    ⚠ {e.vehicle.name} – {e.run.name}: {!e.miPerKwh ? 'No range data for efficiency' : 'No battery capacity'}
+                                    ⚠ {vehicleLabel(e.vehicle)} – {e.run.name}: {!e.miPerKwh ? 'No range data for efficiency' : 'No battery capacity'}
                                 </p>
                             ))}
                         </div>
@@ -1577,7 +1578,7 @@ export default function RoadTripView({
                                                     <span className="inline-block w-3 h-3 rounded-full mt-1 shrink-0"
                                                           style={{ backgroundColor: entry.color }} />
                                                     <div>
-                                                        <div className="font-medium">{entry.vehicle.name}</div>
+                                                        <div className="font-medium">{vehicleLabel(entry.vehicle)}</div>
                                                         <div className="text-xs text-gray-400">{entry.run.name}</div>
                                                     </div>
                                                 </div>
