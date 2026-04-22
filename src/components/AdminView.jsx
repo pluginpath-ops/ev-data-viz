@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useAppContext } from '../context/AppContext';
+import ImportTableauModal from './ImportTableauModal';
 
 const ROLES = ['user', 'contributor', 'admin'];
 
@@ -9,10 +11,14 @@ const roleBadgeStyle = {
 };
 
 export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId }) {
-    const [users, setUsers]       = useState([]);
-    const [loading, setLoading]   = useState(true);
-    const [saving, setSaving]     = useState(null); // userId being saved
-    const [error, setError]       = useState(null);
+    const { exportData, importData, importTableauSessions, vehicles } = useAppContext();
+    const [users, setUsers]           = useState([]);
+    const [loading, setLoading]       = useState(true);
+    const [saving, setSaving]         = useState(null);
+    const [error, setError]           = useState(null);
+    const [showImportMenu, setShowImportMenu] = useState(false);
+    const [showTableauModal, setShowTableauModal] = useState(false);
+    const jsonImportRef = useRef();
 
     useEffect(() => {
         load();
@@ -45,14 +51,47 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
 
     return (
         <div>
+            {showTableauModal && (
+                <ImportTableauModal
+                    vehicles={vehicles}
+                    onImport={importTableauSessions}
+                    onClose={() => setShowTableauModal(false)}
+                />
+            )}
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="page-title">Admin Panel</h2>
                     <p className="text-gray-500 mt-1">Manage registered users and their roles.</p>
                 </div>
-                <button onClick={load} className="btn btn-secondary text-sm" disabled={loading}>
-                    {loading ? 'Loading…' : '↻ Refresh'}
-                </button>
+                <div className="flex items-center gap-2">
+                    <button onClick={exportData} className="btn btn-secondary text-sm">
+                        ↓ Export Data
+                    </button>
+                    <div className="relative">
+                        <button className="btn btn-primary text-sm" onClick={() => setShowImportMenu(m => !m)}>
+                            Import ▾
+                        </button>
+                        {showImportMenu && (
+                            <>
+                                <div className="fixed inset-0 z-10" onClick={() => setShowImportMenu(false)} />
+                                <div className="dropdown-menu w-44">
+                                    <label className="dropdown-item cursor-pointer" onClick={() => setShowImportMenu(false)}>
+                                        📄 App JSON
+                                        <input ref={jsonImportRef} type="file" accept=".json" className="hidden"
+                                            onChange={e => { e.target.files[0] && importData(e.target.files[0]); e.target.value = ''; }} />
+                                    </label>
+                                    <button className="dropdown-item w-full text-left"
+                                        onClick={() => { setShowImportMenu(false); setShowTableauModal(true); }}>
+                                        📊 Tableau CSV
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    <button onClick={load} className="btn btn-secondary text-sm" disabled={loading}>
+                        {loading ? 'Loading…' : '↻ Refresh'}
+                    </button>
+                </div>
             </div>
 
             {error && (

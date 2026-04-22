@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
 import AuthModal from './components/AuthModal';
-import ImportTableauModal from './components/ImportTableauModal';
 import VehiclesView from './components/VehiclesView';
 import RunsView from './components/RunsView';
 import ChargingView from './components/ChargingView';
@@ -51,9 +50,6 @@ export default function App() {
         toggleVehicleVisibility,
         replaceRunData,
         mergeRunData,
-        exportData,
-        importData,
-        importTableauSessions,
         getUsersForAdmin,
         setUserRole,
         signOut,
@@ -140,9 +136,6 @@ export default function App() {
 
     const [pendingEditVehicle, setPendingEditVehicle] = useState(null);
     const [showAuthModal, setShowAuthModal] = useState(false);
-    const [showImportMenu, setShowImportMenu] = useState(false);
-    const [showTableauModal, setShowTableauModal] = useState(false);
-    const jsonImportRef = useRef();
     const pendingUrlState = useRef(null);
     const urlApplied = useRef(false);
 
@@ -373,13 +366,6 @@ export default function App() {
                     }}
                 />
             )}
-            {showTableauModal && (
-                <ImportTableauModal
-                    vehicles={vehicles}
-                    onImport={importTableauSessions}
-                    onClose={() => setShowTableauModal(false)}
-                />
-            )}
             <div className="min-h-screen">
                 {/* ── Header ── */}
                 <header className="relative text-white shadow-lg overflow-hidden">
@@ -488,44 +474,6 @@ export default function App() {
                                         Sign In
                                     </button>
                                 )}
-                                <button onClick={exportData} className="btn btn-secondary">
-                                    Export Data
-                                </button>
-                                {/* Import ▾ dropdown — blue (primary action) */}
-                                <div className="relative">
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={() => setShowImportMenu(m => !m)}
-                                    >
-                                        Import ▾
-                                    </button>
-                                    {showImportMenu && (
-                                        <>
-                                            <div className="fixed inset-0 z-10" onClick={() => setShowImportMenu(false)} />
-                                            <div className="dropdown-menu w-44">
-                                                <label
-                                                    className="dropdown-item cursor-pointer"
-                                                    onClick={() => setShowImportMenu(false)}
-                                                >
-                                                    📄 App JSON
-                                                    <input
-                                                        ref={jsonImportRef}
-                                                        type="file"
-                                                        accept=".json"
-                                                        className="hidden"
-                                                        onChange={(e) => { e.target.files[0] && importData(e.target.files[0]); e.target.value = ''; }}
-                                                    />
-                                                </label>
-                                                <button
-                                                    className="dropdown-item w-full text-left"
-                                                    onClick={() => { setShowImportMenu(false); setShowTableauModal(true); }}
-                                                >
-                                                    📊 Tableau CSV
-                                                </button>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
                             </div>
                         </div>
 

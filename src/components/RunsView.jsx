@@ -1952,49 +1952,50 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         >
                                             {isPending ? '↩ Restore' : 'Delete'}
                                         </button>
-                                        {/* ··· overflow menu */}
-                                        <div className="relative"
-                                            onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpenMenuRunId(null); }}>
+                                        {/* More ▾ overflow menu */}
+                                        <div className="relative">
                                             <button
                                                 onClick={() => setOpenMenuRunId(openMenuRunId === run.id ? null : run.id)}
-                                                className="text-sm px-2 py-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                                                title="More actions"
-                                            >···</button>
+                                                className="btn btn-primary text-sm"
+                                            >More ▾</button>
                                             {openMenuRunId === run.id && (
-                                                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-30 py-1">
-                                                    <button
-                                                        onClick={() => { handleExportCsv(run); setOpenMenuRunId(null); }}
-                                                        disabled={exportingRunId === run.id}
-                                                        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                                                    >
-                                                        {exportingRunId === run.id ? 'Exporting…' : '↓ Download CSV'}
-                                                    </button>
-                                                    {canEdit(vehicle) && (
+                                                <>
+                                                    <div className="fixed inset-0 z-10" onClick={() => setOpenMenuRunId(null)} />
+                                                    <div className="dropdown-menu w-52 z-20">
                                                         <button
-                                                            onClick={() => { handleDuplicateRun(run); setOpenMenuRunId(null); }}
-                                                            disabled={duplicatingRunId !== null}
-                                                            className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                                            onClick={() => { handleExportCsv(run); setOpenMenuRunId(null); }}
+                                                            disabled={exportingRunId === run.id}
+                                                            className="dropdown-item w-full text-left disabled:opacity-50"
                                                         >
-                                                            {duplicatingRunId === run.id ? 'Copying…' : 'Copy'}
+                                                            {exportingRunId === run.id ? '↓ Exporting…' : '↓ Download CSV'}
                                                         </button>
-                                                    )}
-                                                    {canEdit(vehicle) && copyTargetVehicles.length > 0 && (
-                                                        <button
-                                                            onClick={() => { setCopyToRun(run); setCopyingToVehicleId(''); setOpenMenuRunId(null); }}
-                                                            className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-                                                        >
-                                                            Copy to…
-                                                        </button>
-                                                    )}
-                                                    {canEdit(vehicle) && (
-                                                        <button
-                                                            onClick={() => { handleUpdateData(run); setOpenMenuRunId(null); }}
-                                                            className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-                                                        >
-                                                            Upload additional data
-                                                        </button>
-                                                    )}
-                                                </div>
+                                                        {canEdit(vehicle) && (
+                                                            <button
+                                                                onClick={() => { handleDuplicateRun(run); setOpenMenuRunId(null); }}
+                                                                disabled={duplicatingRunId !== null}
+                                                                className="dropdown-item w-full text-left disabled:opacity-50"
+                                                            >
+                                                                {duplicatingRunId === run.id ? '⧉ Copying…' : '⧉ Copy'}
+                                                            </button>
+                                                        )}
+                                                        {canEdit(vehicle) && copyTargetVehicles.length > 0 && (
+                                                            <button
+                                                                onClick={() => { setCopyToRun(run); setCopyingToVehicleId(''); setOpenMenuRunId(null); }}
+                                                                className="dropdown-item w-full text-left"
+                                                            >
+                                                                ↪ Copy to…
+                                                            </button>
+                                                        )}
+                                                        {canEdit(vehicle) && (
+                                                            <button
+                                                                onClick={() => { handleUpdateData(run); setOpenMenuRunId(null); }}
+                                                                className="dropdown-item w-full text-left"
+                                                            >
+                                                                ↑ Upload additional data
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </>
                                             )}
                                         </div>
                                     </div>
