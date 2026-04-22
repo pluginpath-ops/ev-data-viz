@@ -2137,13 +2137,15 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         </div>
                                                     )}
                                                 </div>
-                                                <div className="inline-row mt-3">
-                                                    <span className="text-sm text-gray-600">Plot Color:</span>
+                                            </div>
+                                            <div className="run-actions">
+                                                <label className="flex items-center gap-1 text-xs text-gray-500">
+                                                    <span>Color</span>
                                                     <input
                                                         type="color"
                                                         value={runColor}
                                                         onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
-                                                        className="w-10 h-7 border-0 rounded cursor-pointer"
+                                                        className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
                                                         title="Change color"
                                                     />
                                                     <input
@@ -2151,13 +2153,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         value={runColor}
                                                         onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
                                                         onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) updateRunColor(vehicle.id, run.id, runColor); }}
-                                                        className="w-24 px-2 py-1 border rounded text-sm font-mono"
+                                                        className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
                                                         placeholder="#9ca3af"
                                                         maxLength={7}
                                                     />
-                                                </div>
-                                            </div>
-                                            <div className="run-actions">
+                                                </label>
                                                 {isContributor && canEdit(vehicle) ? (
                                                     <label className="flex items-center gap-1 text-xs text-gray-500">
                                                         <span>Scale ×</span>
