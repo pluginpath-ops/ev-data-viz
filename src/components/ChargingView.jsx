@@ -131,20 +131,44 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             const allRuns = vehicles.flatMap(v => v.runs || []);
             for (const runId of missingIds) {
                 try {
+                    let runData;
                     if (dataService.useSupabase) {
                         const run = allRuns.find(r => String(r.id) === String(runId));
                         if (run?._inherited) {
-                            updates[runId] = await dataService.getRunData(run._realRunId, run._scalingFactor ?? 1);
+                            runData = await dataService.getRunData(run._realRunId, run._scalingFactor ?? 1);
                         } else {
-                            updates[runId] = await dataService.getRunData(runId);
+                            runData = await dataService.getRunData(runId);
+                        }
+
+                        // If this charging run has no range values at all, derive them
+                        // on the fly from the vehicle's range test via SoC interpolation.
+                        if (runData.length > 0 && !runData.some(p => p.range != null)) {
+                            const parentVehicle = vehicles.find(v =>
+                                v.runs?.some(r => String(r.id) === String(runId))
+                            );
+                            const rangeRun =
+                                parentVehicle?.runs?.find(r => !r._inherited && r.has_range && r.isDefault) ??
+                                parentVehicle?.runs?.find(r => !r._inherited && r.has_range);
+                            if (rangeRun) {
+                                try {
+                                    const lookup = await dataService.buildRangePerSocLookup(rangeRun.id);
+                                    if (lookup) {
+                                        runData = runData.map(p => ({
+                                            ...p,
+                                            range: p.soc != null ? lookup(p.soc) : null,
+                                        }));
+                                    }
+                                } catch (_) { /* non-fatal — chart will just lack range axis */ }
+                            }
                         }
                     } else {
                         // localStorage: find run.data inline
                         for (const v of vehicles) {
                             const run = v.runs?.find(r => r.id === runId);
-                            if (run) { updates[runId] = run.data || []; break; }
+                            if (run) { runData = run.data || []; break; }
                         }
                     }
+                    updates[runId] = runData ?? [];
                 } catch (err) {
                     console.error(`Failed to load data for run ${runId}:`, err);
                     updates[runId] = [];

@@ -70,6 +70,9 @@ function buildInheritedRuns(vehicle, allVehicles) {
         _sourceVehicleName:    src.name,
         // Distinct default so inherited runs are visually differentiated.
         color:          run.color ?? '#9ca3af',
+        // Honour the link's use_as_default flag so inherited runs participate
+        // in ChargeCompare and ChargingView auto-selection like real default runs.
+        isDefault:      !!link.use_as_default,
         // Scale the run-level range metric immediately so bar charts are correct
         // without needing to fetch data points.
         distance_miles: run.distance_miles != null ? run.distance_miles * sf : null,
@@ -113,7 +116,7 @@ class DataService {
     }
     const { data } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), trims(*), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_vehicle_id, spec_type, scaling_factor, notes)`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), trims(*), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_vehicle_id, spec_type, scaling_factor, notes, use_as_default)`)
       .order('created_at', { ascending: false });
 
     // Pass 1: process each vehicle's own data
@@ -141,6 +144,8 @@ class DataService {
         trims: (v.trims || []).sort((a, b) => a.id - b.id),
         runs:  (v.runs || []).map(r => ({
           ...r,
+          // Normalise DB snake_case to the camelCase used throughout the app.
+          isDefault: !!r.is_default,
           // data_points(count) returns [{ count: N }]; normalise to a plain number
           dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
           // Resolve the trim FK so chart components can access trim details directly
@@ -215,12 +220,47 @@ class DataService {
     return data;
   }
 
-  async updateSpecLink(id, { scalingFactor }) {
+  async updateSpecLink(id, changes, targetVehicleId = null) {
+    // When promoting an inherited run to default, first clear all existing
+    // defaults for this vehicle so exactly one is ever marked at a time.
+    if (changes.useAsDefault && targetVehicleId) {
+      await getSupabase().from('runs').update({ is_default: false }).eq('vehicle_id', targetVehicleId);
+      await getSupabase().from('spec_links').update({ use_as_default: false }).eq('target_vehicle_id', targetVehicleId);
+    }
+    const payload = {};
+    if ('scalingFactor' in changes) {
+      payload.scaling_factor = changes.scalingFactor != null && changes.scalingFactor !== ''
+        ? Number(changes.scalingFactor) : null;
+    }
+    if ('useAsDefault' in changes) {
+      payload.use_as_default = !!changes.useAsDefault;
+    }
     const { error } = await getSupabase()
       .from('spec_links')
-      .update({ scaling_factor: scalingFactor != null && scalingFactor !== '' ? Number(scalingFactor) : null })
+      .update(payload)
       .eq('id', id);
     if (error) throw error;
+  }
+
+  /**
+   * Fetches data points for a range-test run and returns a linear interpolation
+   * function (soc → range in display miles/km).  Returns null when there are
+   * fewer than two usable SoC+range point pairs.
+   */
+  async buildRangePerSocLookup(rangeTestRunId) {
+    const data = await this.getRunData(rangeTestRunId);
+    const pts = data
+      .filter(p => p.soc != null && p.range != null)
+      .sort((a, b) => a.soc - b.soc);
+    if (pts.length < 2) return null;
+    return (soc) => {
+      if (soc <= pts[0].soc)              return pts[0].range;
+      if (soc >= pts[pts.length - 1].soc) return pts[pts.length - 1].range;
+      const hi = pts.findIndex(p => p.soc >= soc);
+      const lo = hi - 1;
+      const t = (soc - pts[lo].soc) / (pts[hi].soc - pts[lo].soc);
+      return Math.round((pts[lo].range + t * (pts[hi].range - pts[lo].range)) * 10) / 10;
+    };
   }
 
   async deleteSpecLink(id) {
@@ -537,6 +577,10 @@ class DataService {
       localStorage.setItem('evData', JSON.stringify(data));
       return;
     }
+    // Clear all defaults for this vehicle first (runs + inherited links) so
+    // exactly one run is ever marked as default at a time.
+    await getSupabase().from('runs').update({ is_default: false }).eq('vehicle_id', vehicleId);
+    await getSupabase().from('spec_links').update({ use_as_default: false }).eq('target_vehicle_id', vehicleId);
     const { error } = await getSupabase().from('runs').update({ is_default: true }).eq('id', runId);
     if (error) throw error;
   }

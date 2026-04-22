@@ -1971,7 +1971,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         myVote={votes.myVote}
                                         onVote={(voteType) => toggleRunVote(run.id, voteType)}
                                     />
-                                    {!run.isDefault && (
+                                    {run.isDefault ? (
+                                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
+                                            Default
+                                        </span>
+                                    ) : (
                                         <button
                                             onClick={() => onSetDefaultRun(run.id)}
                                             className="btn btn-secondary text-sm"
@@ -2105,6 +2109,18 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 flex-shrink-0">
                                             Estimated
                                         </span>
+                                        {run.isDefault ? (
+                                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-semibold flex-shrink-0" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
+                                                Default
+                                            </span>
+                                        ) : isContributor && canEdit(vehicle) ? (
+                                            <button
+                                                onClick={() => updateSpecLink(linkId, { useAsDefault: true }, vehicle.id)}
+                                                className="btn btn-secondary text-sm flex-shrink-0"
+                                            >
+                                                Set as Default
+                                            </button>
+                                        ) : null}
                                         <button
                                             onClick={() => onViewChart && onViewChart()}
                                             className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition flex-shrink-0"
