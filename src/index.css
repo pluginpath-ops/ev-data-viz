@@ -591,7 +591,7 @@ body {
     @apply flex flex-wrap gap-1.5 mt-1;
 }
 
-/* Run card action column — each child .run-actions-row is a flex row of buttons */
+/* Run card actions — own runs: single horizontal row; inherited: column of rows */
 .run-actions {
     @apply flex flex-col gap-1.5 items-end shrink-0;
 }
