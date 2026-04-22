@@ -167,7 +167,7 @@ const EstimateTimePanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, onAddTrim, onDeleteTrim, vehicles, onCopyRunToVehicle }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, clearDefaultRun } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
@@ -1933,35 +1933,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             </div>
                                         );
                                     })()}
-                                    <div className="inline-row mt-3">
-                                        <span className="text-sm text-gray-600">Plot Color:</span>
-                                        <input
-                                            type="color"
-                                            value={run.color || '#3b82f6'}
-                                            onChange={(e) => {
-                                                onUpdateRun(run.id, { color: e.target.value });
-                                            }}
-                                            className="w-10 h-7 border-0 rounded cursor-pointer"
-                                            title="Change color"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={run.color || '#3b82f6'}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                onUpdateRun(run.id, { color: value });
-                                            }}
-                                            onBlur={(e) => {
-                                                const value = e.target.value;
-                                                if (!/^#[0-9A-Fa-f]{6}$/.test(value)) {
-                                                    onUpdateRun(run.id, { color: run.color || '#3b82f6' });
-                                                }
-                                            }}
-                                            className="w-24 px-2 py-1 border rounded text-sm font-mono"
-                                            placeholder="#3b82f6"
-                                            maxLength={7}
-                                        />
-                                    </div>
                                 </div>
                                 <div className="run-actions">
                                     <RunVoteButtons
@@ -1970,65 +1941,87 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         myVote={votes.myVote}
                                         onVote={(voteType) => toggleRunVote(run.id, voteType)}
                                     />
-                                    {run.isDefault ? (
-                                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
-                                            Default
-                                        </span>
-                                    ) : (
+                                    {/* Row 1: Default | CSV | Delete */}
+                                    <div className="run-actions-row">
                                         <button
-                                            onClick={() => onSetDefaultRun(run.id)}
-                                            className="btn btn-secondary text-sm"
+                                            onClick={() => run.isDefault ? clearDefaultRun(vehicle.id) : onSetDefaultRun(run.id)}
+                                            title={run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
+                                            className={`btn text-sm ${run.isDefault ? 'bg-blue-100 text-blue-700 hover:bg-red-50 hover:text-red-600 border border-blue-200 hover:border-red-200' : 'btn-secondary'}`}
                                         >
-                                            Set as Default
+                                            {run.isDefault ? <>Default <span className="text-red-500 font-bold">×</span></> : 'Set as Default'}
                                         </button>
-                                    )}
-                                    {canEdit(vehicle) && (
                                         <button
-                                            onClick={() => handleUpdateData(run)}
-                                            className="btn btn-secondary text-sm"
-                                        >
-                                            Upload additional data
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleExportCsv(run)}
-                                        disabled={exportingRunId === run.id}
-                                        title="Download test data as CSV"
-                                        className="btn btn-secondary text-sm disabled:opacity-50"
-                                    >
-                                        {exportingRunId === run.id ? '…' : '↓ CSV'}
-                                    </button>
-                                    {canEdit(vehicle) && (
-                                        <button
-                                            onClick={() => handleDuplicateRun(run)}
-                                            disabled={duplicatingRunId !== null}
-                                            title="Duplicate this test and its data"
+                                            onClick={() => handleExportCsv(run)}
+                                            disabled={exportingRunId === run.id}
+                                            title="Download test data as CSV"
                                             className="btn btn-secondary text-sm disabled:opacity-50"
                                         >
-                                            {duplicatingRunId === run.id ? '…' : '⧉ Copy'}
+                                            {exportingRunId === run.id ? '…' : '↓ CSV'}
                                         </button>
-                                    )}
-                                    {canEdit(vehicle) && copyTargetVehicles.length > 0 && (
                                         <button
-                                            onClick={() => { setCopyToRun(run); setCopyingToVehicleId(''); }}
-                                            title="Copy this test to another vehicle"
-                                            className="btn btn-secondary text-sm"
+                                            onClick={() => isPending ? restoreItem(run.id) : queueDelete(run.id)}
+                                            className={`btn text-sm ${isPending ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-0 rounded-md px-3 py-1 font-medium' : 'btn-danger'}`}
                                         >
-                                            Copy to…
+                                            {isPending ? '↩ Restore' : 'Delete'}
                                         </button>
+                                    </div>
+                                    {/* Row 2: Copy | Copy to… | Edit */}
+                                    {canEdit(vehicle) && (
+                                        <div className="run-actions-row">
+                                            <button
+                                                onClick={() => handleDuplicateRun(run)}
+                                                disabled={duplicatingRunId !== null}
+                                                title="Duplicate this test and its data"
+                                                className="btn btn-primary text-sm disabled:opacity-50"
+                                            >
+                                                {duplicatingRunId === run.id ? '…' : 'Copy'}
+                                            </button>
+                                            {copyTargetVehicles.length > 0 && (
+                                                <button
+                                                    onClick={() => { setCopyToRun(run); setCopyingToVehicleId(''); }}
+                                                    title="Copy this test to another vehicle"
+                                                    className="btn btn-primary text-sm"
+                                                >
+                                                    Copy to…
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handleEditRun(run)}
+                                                className="btn btn-edit text-sm"
+                                            >
+                                                Edit
+                                            </button>
+                                        </div>
                                     )}
-                                    <button
-                                        onClick={() => handleEditRun(run)}
-                                        className="btn btn-edit"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        onClick={() => isPending ? restoreItem(run.id) : queueDelete(run.id)}
-                                        className={`btn text-sm ${isPending ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-0 rounded-md px-3 py-1 font-medium' : 'btn-danger'}`}
-                                    >
-                                        {isPending ? '↩ Restore' : 'Delete'}
-                                    </button>
+                                    {/* Row 3: Color | Upload */}
+                                    <div className="run-actions-row">
+                                        <label className="flex items-center gap-1 text-xs text-gray-500">
+                                            <input
+                                                type="color"
+                                                value={run.color || '#3b82f6'}
+                                                onChange={e => onUpdateRun(run.id, { color: e.target.value })}
+                                                className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
+                                                title="Change plot color"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={run.color || '#3b82f6'}
+                                                onChange={e => onUpdateRun(run.id, { color: e.target.value })}
+                                                onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRun(run.id, { color: run.color || '#3b82f6' }); }}
+                                                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
+                                                placeholder="#3b82f6"
+                                                maxLength={7}
+                                            />
+                                        </label>
+                                        {canEdit(vehicle) && (
+                                            <button
+                                                onClick={() => handleUpdateData(run)}
+                                                className="btn btn-edit text-sm"
+                                            >
+                                                Upload additional data
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -2138,77 +2131,73 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 </div>
                                             </div>
                                             <div className="run-actions">
-                                                <label className="flex items-center gap-1 text-xs text-gray-500">
-                                                    <span>Color</span>
-                                                    <input
-                                                        type="color"
-                                                        value={runColor}
-                                                        onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
-                                                        className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
-                                                        title="Change color"
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        value={runColor}
-                                                        onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
-                                                        onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) updateRunColor(vehicle.id, run.id, runColor); }}
-                                                        className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
-                                                        placeholder="#9ca3af"
-                                                        maxLength={7}
-                                                    />
-                                                </label>
-                                                {isContributor && canEdit(vehicle) ? (
+                                                {/* Row 1: Default | Remove */}
+                                                <div className="run-actions-row">
+                                                    {isContributor && canEdit(vehicle) ? (
+                                                        <button
+                                                            onClick={() => run.isDefault
+                                                                ? updateSpecLink(linkId, { useAsDefault: false })
+                                                                : updateSpecLink(linkId, { useAsDefault: true }, vehicle.id)
+                                                            }
+                                                            title={run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
+                                                            className={`btn text-sm ${run.isDefault ? 'bg-blue-100 text-blue-700 hover:bg-red-50 hover:text-red-600 border border-blue-200 hover:border-red-200' : 'btn-secondary'}`}
+                                                        >
+                                                            {run.isDefault ? <>Default <span className="text-red-500 font-bold">×</span></> : 'Set as Default'}
+                                                        </button>
+                                                    ) : run.isDefault ? (
+                                                        <span className="btn text-sm bg-blue-100 text-blue-700 border border-blue-200">Default</span>
+                                                    ) : null}
+                                                    {isContributor && canEdit(vehicle) && (
+                                                        <button
+                                                            onClick={() => deleteSpecLink(linkId)}
+                                                            className="btn btn-danger text-sm"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {/* Row 2: Color Picker | Scale × */}
+                                                <div className="run-actions-row flex-wrap">
                                                     <label className="flex items-center gap-1 text-xs text-gray-500">
-                                                        <span>Scale ×</span>
                                                         <input
-                                                            type="number"
-                                                            value={editVal}
-                                                            onChange={e => setScalingEdits(prev => ({ ...prev, [linkId]: e.target.value }))}
-                                                            onBlur={saveScaling}
-                                                            onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-                                                            step="0.001"
-                                                            min="0.001"
-                                                            placeholder="1.0"
+                                                            type="color"
+                                                            value={runColor}
+                                                            onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
+                                                            className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
+                                                            title="Change color"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={runColor}
+                                                            onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
+                                                            onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) updateRunColor(vehicle.id, run.id, runColor); }}
                                                             className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
-                                                            title="Scaling factor (blank = 1.0)"
+                                                            placeholder="#9ca3af"
+                                                            maxLength={7}
                                                         />
                                                     </label>
-                                                ) : (
-                                                    sf !== 1 && sf != null && (
-                                                        <span className="text-xs font-mono text-gray-500">×{sf}</span>
-                                                    )
-                                                )}
-                                                {run.isDefault ? (
-                                                    isContributor && canEdit(vehicle) ? (
-                                                        <button
-                                                            onClick={() => updateSpecLink(linkId, { useAsDefault: false })}
-                                                            className="text-xs px-2 py-1 rounded font-semibold"
-                                                            style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
-                                                            title="Click to clear default"
-                                                        >
-                                                            Default ×
-                                                        </button>
+                                                    {isContributor && canEdit(vehicle) ? (
+                                                        <label className="flex items-center gap-1 text-xs text-gray-500">
+                                                            <span>Scale ×</span>
+                                                            <input
+                                                                type="number"
+                                                                value={editVal}
+                                                                onChange={e => setScalingEdits(prev => ({ ...prev, [linkId]: e.target.value }))}
+                                                                onBlur={saveScaling}
+                                                                onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                                                                step="0.001"
+                                                                min="0.001"
+                                                                placeholder="1.0"
+                                                                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
+                                                                title="Scaling factor (blank = 1.0)"
+                                                            />
+                                                        </label>
                                                     ) : (
-                                                        <span className="text-xs px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
-                                                            Default
-                                                        </span>
-                                                    )
-                                                ) : isContributor && canEdit(vehicle) ? (
-                                                    <button
-                                                        onClick={() => updateSpecLink(linkId, { useAsDefault: true }, vehicle.id)}
-                                                        className="btn btn-secondary text-sm"
-                                                    >
-                                                        Set as Default
-                                                    </button>
-                                                ) : null}
-                                                {isContributor && canEdit(vehicle) && (
-                                                    <button
-                                                        onClick={() => deleteSpecLink(linkId)}
-                                                        className="btn btn-danger text-sm"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                )}
+                                                        sf !== 1 && sf != null && (
+                                                            <span className="text-xs font-mono text-gray-500">×{sf}</span>
+                                                        )
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

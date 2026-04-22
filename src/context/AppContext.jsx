@@ -271,6 +271,19 @@ export function AppProvider({ children }) {
         }
     };
 
+    const clearDefaultRun = async (vehicleId) => {
+        try {
+            await dataService.clearDefaultRun(vehicleId);
+            setVehicles(prev => prev.map(v =>
+                v.id === vehicleId
+                    ? { ...v, runs: v.runs.map(r => ({ ...r, isDefault: false })) }
+                    : v
+            ));
+        } catch (error) {
+            showError('Error clearing default run: ' + error.message);
+        }
+    };
+
     const setDefaultRun = async (vehicleId, runId) => {
         try {
             await dataService.setDefaultRun(vehicleId, runId);
@@ -825,6 +838,7 @@ export function AppProvider({ children }) {
         addSpecLink,
         updateSpecLink,
         deleteSpecLink,
+        clearDefaultRun,
     };
 
     return (

@@ -565,6 +565,12 @@ class DataService {
     if (error) throw error;
   }
 
+  async clearDefaultRun(vehicleId) {
+    if (!this.useSupabase || !this.user) return;
+    await getSupabase().from('runs').update({ is_default: false }).eq('vehicle_id', vehicleId);
+    await getSupabase().from('spec_links').update({ is_default: false }).eq('target_vehicle_id', vehicleId);
+  }
+
   async setDefaultRun(vehicleId, runId) {
     if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
