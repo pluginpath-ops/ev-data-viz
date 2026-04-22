@@ -167,7 +167,7 @@ const EstimateTimePanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, onAddTrim, onDeleteTrim, vehicles, onCopyRunToVehicle }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
@@ -2067,7 +2067,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             {inheritedRuns.map(run => {
                                 const srcName = run._sourceVehicleName || `Vehicle #${run._sourceVehicleId}`;
                                 const sf = run._scalingFactor;
-                                const specLabel = run.has_range ? 'Range Test' : 'Charging Curve';
                                 const linkId = run._specLinkId;
                                 const editVal = scalingEdits[linkId] ?? (sf != null ? String(sf) : '');
                                 const saveScaling = async () => {
@@ -2079,62 +2078,129 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         setScalingEdits(prev => { const n = { ...prev }; delete n[linkId]; return n; });
                                     } catch (_) { /* error shown by context */ }
                                 };
+                                const runColor = run.color || '#9ca3af';
                                 return (
-                                    <div key={run.id} className="card border border-dashed border-gray-300 bg-gray-50 flex items-center gap-3 px-4 py-3">
-                                        <span className="spec-link-type-badge flex-shrink-0">{specLabel}</span>
-                                        <span className="text-sm text-gray-700 flex-1 min-w-0 truncate">
-                                            Inherited from: <span className="font-medium">{srcName}</span>
-                                        </span>
-                                        {isContributor && canEdit(vehicle) ? (
-                                            <label className="flex items-center gap-1 text-xs text-gray-500 flex-shrink-0">
-                                                <span>×</span>
-                                                <input
-                                                    type="number"
-                                                    value={editVal}
-                                                    onChange={e => setScalingEdits(prev => ({ ...prev, [linkId]: e.target.value }))}
-                                                    onBlur={saveScaling}
-                                                    onKeyDown={e => { if (e.key === 'Enter') { e.target.blur(); } }}
-                                                    step="0.001"
-                                                    min="0.001"
-                                                    placeholder="1.0"
-                                                    className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
-                                                    title="Scaling factor (blank = 1.0)"
-                                                />
-                                            </label>
-                                        ) : (
-                                            sf !== 1 && sf != null && (
-                                                <span className="text-xs font-mono text-gray-500 flex-shrink-0">×{sf}</span>
-                                            )
-                                        )}
-                                        <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 flex-shrink-0">
-                                            Estimated
-                                        </span>
-                                        {run.isDefault ? (
-                                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-semibold flex-shrink-0" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
-                                                Default
-                                            </span>
-                                        ) : isContributor && canEdit(vehicle) ? (
-                                            <button
-                                                onClick={() => updateSpecLink(linkId, { useAsDefault: true }, vehicle.id)}
-                                                className="btn btn-secondary text-sm flex-shrink-0"
-                                            >
-                                                Set as Default
-                                            </button>
-                                        ) : null}
-                                        <button
-                                            onClick={() => onViewChart && onViewChart()}
-                                            className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition flex-shrink-0"
-                                        >
-                                            View Chart →
-                                        </button>
-                                        {isContributor && canEdit(vehicle) && (
-                                            <button
-                                                onClick={() => deleteSpecLink(linkId)}
-                                                className="text-xs text-gray-400 hover:text-red-500 transition flex-shrink-0"
-                                            >
-                                                Remove
-                                            </button>
-                                        )}
+                                    <div key={run.id} className="card border border-dashed border-gray-300 bg-gray-50">
+                                        <div className="run-card-header">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h3 className="section-title">
+                                                        {run.name}
+                                                        {run.url && (
+                                                            <a href={run.url} target="_blank" rel="noopener noreferrer"
+                                                                title="Range test source"
+                                                                onClick={e => e.stopPropagation()}
+                                                                className="text-blue-400 hover:text-blue-600 transition-colors ml-1 text-sm font-normal">↗</a>
+                                                        )}
+                                                        {run.charging_url && (
+                                                            <a href={run.charging_url} target="_blank" rel="noopener noreferrer"
+                                                                title="Charging test source"
+                                                                onClick={e => e.stopPropagation()}
+                                                                className="text-blue-400 hover:text-blue-600 transition-colors ml-1 text-sm font-normal">↗</a>
+                                                        )}
+                                                    </h3>
+                                                    {inferRunFlags(run).map(key => {
+                                                        const flag = DATA_FLAGS.find(f => f.key === key);
+                                                        if (!flag) return null;
+                                                        return (
+                                                            <span key={key} title={flag.desc}
+                                                                className={`text-xs px-2 py-0.5 rounded-full font-medium border ${flag.pillStyle}`}>
+                                                                {flag.label}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                    {run.isDefault && (
+                                                        <span className="text-xs px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>Default</span>
+                                                    )}
+                                                    <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5">Estimated</span>
+                                                </div>
+                                                <div className="run-meta">
+                                                    <p className="text-gray-500">Inherited from: <span className="font-medium text-gray-700">{srcName}</span></p>
+                                                    <p>Date: {run.date}</p>
+                                                    {run.conditions && <p>Notes: {run.conditions}</p>}
+                                                    {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (
+                                                        <div className="run-stat-badges">
+                                                            {run.source && <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{run.source}</span>}
+                                                            {run.speed_mph != null
+                                                                ? <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
+                                                                : <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-200">70 mph (assumed)</span>
+                                                            }
+                                                            {run.distance_miles != null && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-200">{fmtDistance(run.distance_miles, units)}</span>}
+                                                            {run.temperature_f != null && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>}
+                                                            {run.start_soc != null && run.end_soc != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">SoC {run.start_soc}→{run.end_soc}%</span>}
+                                                        </div>
+                                                    )}
+                                                    {inferRunFlags(run).includes('charging') && (
+                                                        <div className="run-stat-badges items-center">
+                                                            <span className="text-sm">Data Points: {run.dataPointCount ?? 0}</span>
+                                                            {run.charging_url && <a href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline px-2 py-0.5 rounded">Source ↗</a>}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="inline-row mt-3">
+                                                    <span className="text-sm text-gray-600">Plot Color:</span>
+                                                    <input
+                                                        type="color"
+                                                        value={runColor}
+                                                        onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
+                                                        className="w-10 h-7 border-0 rounded cursor-pointer"
+                                                        title="Change color"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={runColor}
+                                                        onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
+                                                        onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) updateRunColor(vehicle.id, run.id, runColor); }}
+                                                        className="w-24 px-2 py-1 border rounded text-sm font-mono"
+                                                        placeholder="#9ca3af"
+                                                        maxLength={7}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="run-actions">
+                                                {isContributor && canEdit(vehicle) ? (
+                                                    <label className="flex items-center gap-1 text-xs text-gray-500">
+                                                        <span>Scale ×</span>
+                                                        <input
+                                                            type="number"
+                                                            value={editVal}
+                                                            onChange={e => setScalingEdits(prev => ({ ...prev, [linkId]: e.target.value }))}
+                                                            onBlur={saveScaling}
+                                                            onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                                                            step="0.001"
+                                                            min="0.001"
+                                                            placeholder="1.0"
+                                                            className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
+                                                            title="Scaling factor (blank = 1.0)"
+                                                        />
+                                                    </label>
+                                                ) : (
+                                                    sf !== 1 && sf != null && (
+                                                        <span className="text-xs font-mono text-gray-500">×{sf}</span>
+                                                    )
+                                                )}
+                                                {run.isDefault ? (
+                                                    <span className="text-xs px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
+                                                        Default
+                                                    </span>
+                                                ) : isContributor && canEdit(vehicle) ? (
+                                                    <button
+                                                        onClick={() => updateSpecLink(linkId, { useAsDefault: true }, vehicle.id)}
+                                                        className="btn btn-secondary text-sm"
+                                                    >
+                                                        Set as Default
+                                                    </button>
+                                                ) : null}
+                                                {isContributor && canEdit(vehicle) && (
+                                                    <button
+                                                        onClick={() => deleteSpecLink(linkId)}
+                                                        className="btn btn-danger text-sm"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 );
                             })}
