@@ -1994,30 +1994,30 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             Upload additional data
                                                         </button>
                                                     )}
-                                                    <div className="border-t border-gray-100 mt-1 pt-1 px-3 py-1.5">
-                                                        <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
-                                                            <input
-                                                                type="color"
-                                                                value={run.color || '#3b82f6'}
-                                                                onChange={e => onUpdateRun(run.id, { color: e.target.value })}
-                                                                className="w-6 h-5 border-0 rounded cursor-pointer shrink-0"
-                                                                title="Change plot color"
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                value={run.color || '#3b82f6'}
-                                                                onChange={e => onUpdateRun(run.id, { color: e.target.value })}
-                                                                onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRun(run.id, { color: run.color || '#3b82f6' }); }}
-                                                                className="w-20 px-1 py-0.5 border rounded text-xs font-mono text-gray-700"
-                                                                placeholder="#3b82f6"
-                                                                maxLength={7}
-                                                            />
-                                                            <span>Plot color</span>
-                                                        </label>
-                                                    </div>
                                                 </div>
                                             )}
                                         </div>
+                                    </div>
+                                    {/* Color picker — lower right */}
+                                    <div className="run-actions-row">
+                                        <label className="flex items-center gap-1 text-xs text-gray-400 cursor-pointer">
+                                            <input
+                                                type="color"
+                                                value={run.color || '#3b82f6'}
+                                                onChange={e => onUpdateRun(run.id, { color: e.target.value })}
+                                                className="w-7 h-5 border-0 rounded cursor-pointer shrink-0"
+                                                title="Change plot color"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={run.color || '#3b82f6'}
+                                                onChange={e => onUpdateRun(run.id, { color: e.target.value })}
+                                                onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRun(run.id, { color: run.color || '#3b82f6' }); }}
+                                                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-600"
+                                                placeholder="#3b82f6"
+                                                maxLength={7}
+                                            />
+                                        </label>
                                     </div>
                                 </div>
                             </div>
