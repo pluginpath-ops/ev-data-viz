@@ -2180,9 +2180,20 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     )
                                                 )}
                                                 {run.isDefault ? (
-                                                    <span className="text-xs px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
-                                                        Default
-                                                    </span>
+                                                    isContributor && canEdit(vehicle) ? (
+                                                        <button
+                                                            onClick={() => updateSpecLink(linkId, { useAsDefault: false })}
+                                                            className="text-xs px-2 py-1 rounded font-semibold"
+                                                            style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
+                                                            title="Click to clear default"
+                                                        >
+                                                            Default ×
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-xs px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
+                                                            Default
+                                                        </span>
+                                                    )
                                                 ) : isContributor && canEdit(vehicle) ? (
                                                     <button
                                                         onClick={() => updateSpecLink(linkId, { useAsDefault: true }, vehicle.id)}
