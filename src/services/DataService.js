@@ -68,8 +68,8 @@ function buildInheritedRuns(vehicle, allVehicles) {
         _specLinkId:           link.id,
         _sourceVehicleId:      src.id,
         _sourceVehicleName:    src.name,
-        // Distinct default so inherited runs are visually differentiated.
-        color:          run.color ?? '#9ca3af',
+        // Link color overrides the source run's color; fall back to gray.
+        color:          link.color ?? run.color ?? '#9ca3af',
         // Honour the link's use_as_default flag so inherited runs participate
         // in ChargeCompare and ChargingView auto-selection like real default runs.
         isDefault:      !!link.use_as_default,
@@ -116,7 +116,7 @@ class DataService {
     }
     const { data } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), trims(*), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_vehicle_id, spec_type, scaling_factor, notes, use_as_default)`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), trims(*), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_vehicle_id, spec_type, scaling_factor, notes, use_as_default, color)`)
       .order('created_at', { ascending: false });
 
     // Pass 1: process each vehicle's own data
@@ -234,6 +234,9 @@ class DataService {
     }
     if ('useAsDefault' in changes) {
       payload.use_as_default = !!changes.useAsDefault;
+    }
+    if ('color' in changes) {
+      payload.color = changes.color || null;
     }
     const { error } = await getSupabase()
       .from('spec_links')
