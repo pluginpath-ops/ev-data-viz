@@ -42,42 +42,36 @@ function splitPerformance(performance = {}) {
 // ── Spec-link helpers (module-level so they're available before class) ────────
 
 /**
- * Given a processed vehicle and the full array of already-processed vehicles,
+ * Given a processed vehicle, a Map of runId→run, and a Map of runId→{vehicleId,vehicleName},
  * returns synthetic run objects for all runs inherited via spec_links.
  * Each inherited run gets a synthetic string id to prevent runDataCache collisions.
  */
-function buildInheritedRuns(vehicle, allVehicles) {
+function buildInheritedRuns(vehicle, runById, runToVehicle) {
   const inherited = [];
   for (const link of (vehicle.spec_links || [])) {
-    const src = allVehicles.find(v => Number(v.id) === Number(link.source_vehicle_id));
-    if (!src) continue;
-    const relevantRuns = src.runs.filter(r =>
-      link.spec_type === 'range_test'     ? r.has_range    :
-      link.spec_type === 'charging_curve' ? r.has_charging : false
-    );
+    const run = runById.get(Number(link.source_run_id));
+    if (!run) continue;
+    const vInfo = runToVehicle.get(Number(link.source_run_id));
     const sf = link.scaling_factor != null ? Number(link.scaling_factor) : 1;
-    for (const run of relevantRuns) {
-      inherited.push({
-        ...run,
-        // Synthetic id prevents runDataCache collision when both source and
-        // target vehicles are selected simultaneously in charts.
-        id:                   `inherited_${link.id}_${run.id}`,
-        _inherited:            true,
-        _realRunId:            run.id,
-        _scalingFactor:        sf,
-        _specLinkId:           link.id,
-        _sourceVehicleId:      src.id,
-        _sourceVehicleName:    src.name,
-        // Link color overrides the source run's color; fall back to gray.
-        color:          link.color ?? run.color ?? '#9ca3af',
-        // Honour the link's use_as_default flag so inherited runs participate
-        // in ChargeCompare and ChargingView auto-selection like real default runs.
-        isDefault:      !!link.use_as_default,
-        // Scale the run-level range metric immediately so bar charts are correct
-        // without needing to fetch data points.
-        distance_miles: run.distance_miles != null ? run.distance_miles * sf : null,
-      });
-    }
+    inherited.push({
+      ...run,
+      // Synthetic id prevents runDataCache collision when both source and
+      // target vehicles are selected simultaneously in charts.
+      id:                `inherited_${link.id}_${run.id}`,
+      _inherited:         true,
+      _realRunId:         run.id,
+      _scalingFactor:     sf,
+      _specLinkId:        link.id,
+      _sourceVehicleId:   vInfo?.vehicleId,
+      _sourceVehicleName: vInfo?.vehicleName,
+      // Link color overrides the source run's color; fall back to gray.
+      color:          link.color ?? run.color ?? '#9ca3af',
+      // is_default on the link row gives per-run default precision.
+      isDefault:      !!link.is_default,
+      // Scale the run-level range metric immediately so bar charts are correct
+      // without needing to fetch data points.
+      distance_miles: run.distance_miles != null ? run.distance_miles * sf : null,
+    });
   }
   return inherited;
 }
@@ -116,7 +110,7 @@ class DataService {
     }
     const { data } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), trims(*), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_vehicle_id, spec_type, scaling_factor, notes, use_as_default, color)`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), trims(*), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color)`)
       .order('created_at', { ascending: false });
 
     // Pass 1: process each vehicle's own data
@@ -154,11 +148,20 @@ class DataService {
       };
     });
 
-    // Pass 2: attach inherited runs (needs all vehicles already processed so
-    // source vehicle runs are available)
+    // Pass 2: build flat run lookup maps, then attach inherited runs.
+    // buildInheritedRuns needs to locate source runs across all vehicles.
+    const runById      = new Map(); // runId → run object
+    const runToVehicle = new Map(); // runId → { vehicleId, vehicleName }
+    for (const v of processed) {
+      for (const r of v.runs) {
+        runById.set(Number(r.id), r);
+        runToVehicle.set(Number(r.id), { vehicleId: v.id, vehicleName: v.name });
+      }
+    }
+
     return processed.map(v => ({
       ...v,
-      runs: [...v.runs, ...buildInheritedRuns(v, processed)],
+      runs: [...v.runs, ...buildInheritedRuns(v, runById, runToVehicle)],
     }));
   }
 
@@ -196,20 +199,12 @@ class DataService {
 
   // ── Spec links ────────────────────────────────────────────────────────────
 
-  async addSpecLink({ targetVehicleId, sourceVehicleId, specType, scalingFactor, notes }) {
-    // Delete any existing link for (target, spec_type) first — avoids needing
-    // an UPDATE RLS policy; only INSERT + DELETE policies are required.
-    await getSupabase()
-      .from('spec_links')
-      .delete()
-      .eq('target_vehicle_id', targetVehicleId)
-      .eq('spec_type', specType);
+  async addSpecLink({ targetVehicleId, sourceRunId, scalingFactor, notes }) {
     const { data, error } = await getSupabase()
       .from('spec_links')
       .insert({
         target_vehicle_id: targetVehicleId,
-        source_vehicle_id: sourceVehicleId,
-        spec_type:         specType,
+        source_run_id:     sourceRunId,
         scaling_factor:    scalingFactor != null && scalingFactor !== '' ? Number(scalingFactor) : null,
         notes:             notes || null,
         created_by:        this.user?.id ?? null,
@@ -225,7 +220,7 @@ class DataService {
     // defaults for this vehicle so exactly one is ever marked at a time.
     if (changes.useAsDefault && targetVehicleId) {
       await getSupabase().from('runs').update({ is_default: false }).eq('vehicle_id', targetVehicleId);
-      await getSupabase().from('spec_links').update({ use_as_default: false }).eq('target_vehicle_id', targetVehicleId);
+      await getSupabase().from('spec_links').update({ is_default: false }).eq('target_vehicle_id', targetVehicleId);
     }
     const payload = {};
     if ('scalingFactor' in changes) {
@@ -233,7 +228,7 @@ class DataService {
         ? Number(changes.scalingFactor) : null;
     }
     if ('useAsDefault' in changes) {
-      payload.use_as_default = !!changes.useAsDefault;
+      payload.is_default = !!changes.useAsDefault;
     }
     if ('color' in changes) {
       payload.color = changes.color || null;
@@ -583,7 +578,7 @@ class DataService {
     // Clear all defaults for this vehicle first (runs + inherited links) so
     // exactly one run is ever marked as default at a time.
     await getSupabase().from('runs').update({ is_default: false }).eq('vehicle_id', vehicleId);
-    await getSupabase().from('spec_links').update({ use_as_default: false }).eq('target_vehicle_id', vehicleId);
+    await getSupabase().from('spec_links').update({ is_default: false }).eq('target_vehicle_id', vehicleId);
     const { error } = await getSupabase().from('runs').update({ is_default: true }).eq('id', runId);
     if (error) throw error;
   }

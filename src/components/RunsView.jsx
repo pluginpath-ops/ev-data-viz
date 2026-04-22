@@ -262,8 +262,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
     // ── Inherited test link form state ────────────────────────────────────────
     const [showAddLink, setShowAddLink]     = useState(false);
-    const [newLinkSpecType, setNewLinkSpecType] = useState('range_test');
-    const [newLinkSourceId, setNewLinkSourceId] = useState('');
+    const [newLinkSourceId, setNewLinkSourceId] = useState(''); // source vehicle id
     const [newLinkScaling, setNewLinkScaling]   = useState('');
     const [newLinkNotes, setNewLinkNotes]       = useState('');
     const [linkSaving, setLinkSaving]           = useState(false);
@@ -2220,39 +2219,44 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
                     {/* Add link form */}
                     {showAddLink && (() => {
-                        // Only show vehicles that have runs of the selected spec type
-                        const hasRelevantRuns = (v) => newLinkSpecType === 'range_test'
-                            ? v.runs?.some(r => !r._inherited && (r.has_range ?? false))
-                            : v.runs?.some(r => !r._inherited && (r.has_charging ?? true));
-                        // Exclude current vehicle and any already-linked source for this type
-                        const alreadyLinkedIds = new Set(
-                            (vehicle.spec_links || [])
-                                .filter(l => l.spec_type === newLinkSpecType)
-                                .map(l => Number(l.source_vehicle_id))
+                        // Run IDs already linked to this vehicle
+                        const alreadyLinkedRunIds = new Set(
+                            (vehicle.spec_links || []).map(l => Number(l.source_run_id))
                         );
+                        // Source vehicles: any vehicle with at least one non-inherited, not-yet-linked run
                         const sourceVehicles = (vehicles || [])
-                            .filter(v => Number(v.id) !== Number(vehicle.id) && hasRelevantRuns(v) && !alreadyLinkedIds.has(Number(v.id)))
+                            .filter(v =>
+                                Number(v.id) !== Number(vehicle.id) &&
+                                (v.runs || []).some(r => !r._inherited && !alreadyLinkedRunIds.has(Number(r.id)))
+                            )
                             .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
+                        const selectedSrc = newLinkSourceId
+                            ? (vehicles || []).find(v => Number(v.id) === parseInt(newLinkSourceId, 10))
+                            : null;
+                        const runsToLink = selectedSrc
+                            ? (selectedSrc.runs || []).filter(r => !r._inherited && !alreadyLinkedRunIds.has(Number(r.id)))
+                            : [];
+
                         const suggestEpaRatio = () => {
-                            const src = (vehicles || []).find(v => Number(v.id) === parseInt(newLinkSourceId, 10));
-                            if (!src) return;
-                            const srcRange = parseFloat(src.range);
+                            if (!selectedSrc) return;
+                            const srcRange = parseFloat(selectedSrc.range);
                             const tgtRange = parseFloat(vehicle.range);
                             if (srcRange && tgtRange) setNewLinkScaling((tgtRange / srcRange).toFixed(3));
                         };
 
                         const handleAdd = async () => {
-                            if (!newLinkSourceId) return;
+                            if (!newLinkSourceId || runsToLink.length === 0) return;
                             setLinkSaving(true);
                             try {
-                                await addSpecLink({
-                                    targetVehicleId: vehicle.id,
-                                    sourceVehicleId: parseInt(newLinkSourceId, 10),
-                                    specType: newLinkSpecType,
-                                    scalingFactor: newLinkScaling ? parseFloat(newLinkScaling) : null,
-                                    notes: newLinkNotes.trim() || null,
-                                });
+                                for (const run of runsToLink) {
+                                    await addSpecLink({
+                                        targetVehicleId: vehicle.id,
+                                        sourceRunId: run.id,
+                                        scalingFactor: newLinkScaling ? parseFloat(newLinkScaling) : null,
+                                        notes: newLinkNotes.trim() || null,
+                                    });
+                                }
                                 setNewLinkSourceId('');
                                 setNewLinkScaling('');
                                 setNewLinkNotes('');
@@ -2266,16 +2270,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             <div className="spec-link-add-form">
                                 <div className="flex gap-2 flex-wrap">
                                     <select
-                                        value={newLinkSpecType}
-                                        onChange={e => { setNewLinkSpecType(e.target.value); setNewLinkSourceId(''); }}
-                                        className="form-input text-sm"
-                                    >
-                                        <option value="range_test">Range Test</option>
-                                        <option value="charging_curve">Charging Curve</option>
-                                    </select>
-                                    <select
                                         value={newLinkSourceId}
-                                        onChange={e => setNewLinkSourceId(e.target.value)}
+                                        onChange={e => { setNewLinkSourceId(e.target.value); setNewLinkScaling(''); }}
                                         className="form-input text-sm flex-1 min-w-48"
                                     >
                                         <option value="">Source vehicle…</option>
@@ -2286,7 +2282,17 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 </div>
                                 {sourceVehicles.length === 0 && (
                                     <p className="text-xs text-gray-400 mt-1">
-                                        No other vehicles have {newLinkSpecType === 'range_test' ? 'range test' : 'charging curve'} data.
+                                        No other vehicles have unlinked tests.
+                                    </p>
+                                )}
+                                {selectedSrc && runsToLink.length === 0 && (
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        All tests from {selectedSrc.name} are already linked.
+                                    </p>
+                                )}
+                                {selectedSrc && runsToLink.length > 0 && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Will link {runsToLink.length} test{runsToLink.length !== 1 ? 's' : ''}: {runsToLink.map(r => r.name).join(', ')}
                                     </p>
                                 )}
                                 <div className="flex gap-2 mt-2 flex-wrap items-center">
@@ -2302,7 +2308,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <button
                                         type="button"
                                         onClick={suggestEpaRatio}
-                                        disabled={!newLinkSourceId}
+                                        disabled={!selectedSrc}
                                         className="btn btn-secondary text-xs whitespace-nowrap disabled:opacity-40"
                                         title="Auto-fill from EPA range ratio (target ÷ source)"
                                     >
@@ -2318,14 +2324,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <button
                                         type="button"
                                         onClick={handleAdd}
-                                        disabled={!newLinkSourceId || linkSaving}
+                                        disabled={!newLinkSourceId || runsToLink.length === 0 || linkSaving}
                                         className="btn btn-primary text-sm disabled:opacity-40"
                                     >
-                                        {linkSaving ? 'Adding…' : 'Add Link'}
+                                        {linkSaving ? 'Linking…' : `Link ${runsToLink.length > 0 ? runsToLink.length + ' ' : ''}Test${runsToLink.length !== 1 ? 's' : ''}`}
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setShowAddLink(false)}
+                                        onClick={() => { setShowAddLink(false); setNewLinkSourceId(''); setNewLinkScaling(''); setNewLinkNotes(''); }}
                                         className="btn btn-secondary text-sm"
                                     >
                                         Cancel
