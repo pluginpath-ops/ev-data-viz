@@ -712,7 +712,7 @@ export default function VehiclesView({
                                             {/* Left: vehicle info */}
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="text-xl font-bold mb-1">{vehicle.name}</h3>
-                                                <p className="text-gray-600 mb-2">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                                                <p className="text-gray-600 mb-2">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                                                 <div className="text-sm text-gray-700 space-y-1">
                                                     {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                                     {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
@@ -818,7 +818,7 @@ export default function VehiclesView({
                                     {/* Name + make + tags */}
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-bold text-lg leading-tight truncate">{vehicle.name}</h3>
-                                        <p className="text-gray-500 text-sm mb-1">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                                        <p className="text-gray-500 text-sm mb-1">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                                         <TagPills vehicle={vehicle} />
                                     </div>
 

@@ -206,6 +206,10 @@ export default function SpecsView({ selectedVehicleIds }) {
                                 {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.model || '—'}</td>)}
                             </tr>
                             <tr>
+                                <td className="specs-table-cell font-medium">Trim</td>
+                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.trim || '—'}</td>)}
+                            </tr>
+                            <tr>
                                 <td className="specs-table-cell font-medium">Year</td>
                                 {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.year || '—'}</td>)}
                             </tr>

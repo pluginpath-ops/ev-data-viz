@@ -873,7 +873,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 </div>
                 <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-lg leading-tight">{vehicle.name}</h3>
-                    <p className="text-gray-500 text-sm">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                    <p className="text-gray-500 text-sm">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                     <div className="text-sm text-gray-600 mt-0.5 flex flex-wrap gap-x-3">
                         {vehicle.battery && <span>Battery: {vehicle.battery} kWh</span>}
                         {vehicle.range && <span>Range: {vehicle.range} mi</span>}

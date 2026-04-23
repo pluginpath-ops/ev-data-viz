@@ -4,7 +4,8 @@ import { distanceLabel } from './unitConversions';
 // ── Vehicle display label ─────────────────────────────────────────────────────
 
 export function vehicleLabel(v) {
-    return v?.year ? `${v.year} ${v.name}` : (v?.name ?? '');
+    const base = v?.year ? `${v.year} ${v.name}` : (v?.name ?? '');
+    return v?.trim ? `${base} · ${v.trim}` : base;
 }
 
 // ── Spec inheritance merge ────────────────────────────────────────────────────
