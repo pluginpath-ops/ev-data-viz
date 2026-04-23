@@ -1785,9 +1785,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         {run.conditions && <p>Notes: {run.conditions}</p>}
                                         {/* Range metadata line */}
                                         {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (() => {
+                                            const rangeFlag = DATA_FLAGS.find(f => f.key === 'range');
                                             const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
                                             const items = [];
-                                            if (run.source) items.push(<span key="src" className="text-gray-700">{run.source}</span>);
                                             if (run.speed_mph != null) {
                                                 items.push(<span key="spd" className="text-gray-600">{fmtSpeed(run.speed_mph, units)}</span>);
                                             } else {
@@ -1798,19 +1798,35 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             if (run.energy_kwh != null && run.distance_miles != null) items.push(<span key="eff" className="text-blue-700">{calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}</span>);
                                             if (run.temperature_f != null) items.push(<span key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</span>);
                                             if (run.start_soc != null && run.end_soc != null) items.push(<span key="soc" className="text-gray-600">SoC {run.start_soc}→{run.end_soc}%</span>);
-                                            if (run.url) items.push(<a key="url" href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
+                                            if (run.url) items.push(<a key="url" href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{run.name} ↗</a>);
                                             return (
-                                                <p className="text-sm mt-1 flex flex-wrap items-baseline">
-                                                    {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
-                                                </p>
+                                                <div className="flex items-center gap-2 text-sm mt-1 flex-wrap">
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${rangeFlag.pillStyle} shrink-0`}>{rangeFlag.label}</span>
+                                                    <span className="flex flex-wrap items-baseline">
+                                                        {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
+                                                    </span>
+                                                </div>
                                             );
                                         })()}
-                                        {/* Charging metadata line */}
+                                        {/* Charging metadata line — pill label + data points + field tags + source */}
                                         {inferRunFlags(run).includes('charging') && (() => {
+                                            const chargingFlag = DATA_FLAGS.find(f => f.key === 'charging');
                                             const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
+                                            const fields = run.populated_fields || [];
+                                            const calcFields = run.calculated_fields || [];
                                             const items = [];
                                             items.push(<span key="pts" className="text-gray-600">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>);
                                             if (run.energy_kwh != null && !inferRunFlags(run).includes('range')) items.push(<span key="kwh" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.energy_kwh} kWh in</span>);
+                                            FIELD_META.filter(f => fields.includes(f.key)).forEach(f => {
+                                                const isCalc = calcFields.includes(f.key);
+                                                items.push(
+                                                    <span key={`field-${f.key}`}
+                                                        title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
+                                                        className={`px-2 py-0.5 text-xs rounded-full font-medium border ${isCalc ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                                        {isCalc ? `~${f.label}` : f.label}
+                                                    </span>
+                                                );
+                                            });
                                             if (run.charging_url) items.push(<a key="curl" href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
                                             if (run.energy_kwh != null && (run.dataPointCount ?? 0) > 1) {
                                                 const check = calcKwhByRun[run.id];
@@ -1833,38 +1849,15 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 }
                                             }
                                             return (
-                                                <p className="text-sm mt-1 flex flex-wrap items-baseline gap-y-1">
-                                                    {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
-                                                </p>
+                                                <div className="flex items-center gap-2 text-sm mt-1 flex-wrap gap-y-1">
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${chargingFlag.pillStyle} shrink-0`}>{chargingFlag.label}</span>
+                                                    <span className="flex flex-wrap items-baseline gap-y-1">
+                                                        {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
+                                                    </span>
+                                                </div>
                                             );
                                         })()}
                                     </div>
-                                    {/* Field tags — populated fields; amber = estimated, blue = measured */}
-                                    {(() => {
-                                        const fields = run.populated_fields || [];
-                                        const calcFields = run.calculated_fields || [];
-                                        if (fields.length === 0) return null;
-                                        return (
-                                            <div className="flex flex-wrap gap-1 mt-2">
-                                                {FIELD_META.filter(f => fields.includes(f.key)).map(f => {
-                                                    const isCalc = calcFields.includes(f.key);
-                                                    return (
-                                                        <span
-                                                            key={f.key}
-                                                            title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
-                                                            className={`px-2 py-0.5 text-xs rounded-full font-medium border ${
-                                                                isCalc
-                                                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                                                    : 'bg-blue-50 text-blue-700 border-blue-200'
-                                                            }`}
-                                                        >
-                                                            {isCalc ? `~${f.label}` : f.label}
-                                                        </span>
-                                                    );
-                                                })}
-                                            </div>
-                                        );
-                                    })()}
                                 </div>
                                 <div className="run-actions">
                                     <RunVoteButtons
@@ -2054,11 +2047,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     <p>Date: {run.date}</p>
                                                     {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
                                                     {run.conditions && <p>Notes: {run.conditions}</p>}
-                                                    {/* Range metadata line — same style as regular run cards */}
+                                                    {/* Range metadata line */}
                                                     {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (() => {
+                                                        const rangeFlag = DATA_FLAGS.find(f => f.key === 'range');
                                                         const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
                                                         const items = [];
-                                                        if (run.source) items.push(<span key="src" className="text-gray-700">{run.source}</span>);
                                                         if (run.speed_mph != null) {
                                                             items.push(<span key="spd" className="text-gray-600">{fmtSpeed(run.speed_mph, units)}</span>);
                                                         } else {
@@ -2069,53 +2062,46 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         if (run.energy_kwh != null && run.distance_miles != null) items.push(<span key="eff" className="text-blue-700">{calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}</span>);
                                                         if (run.temperature_f != null) items.push(<span key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</span>);
                                                         if (run.start_soc != null && run.end_soc != null) items.push(<span key="soc" className="text-gray-600">SoC {run.start_soc}→{run.end_soc}%</span>);
-                                                        if (run.url) items.push(<a key="url" href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
+                                                        if (run.url) items.push(<a key="url" href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{run.name} ↗</a>);
                                                         return (
-                                                            <p className="text-sm mt-1 flex flex-wrap items-baseline">
-                                                                {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
-                                                            </p>
+                                                            <div className="flex items-center gap-2 text-sm mt-1 flex-wrap">
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${rangeFlag.pillStyle} shrink-0`}>{rangeFlag.label}</span>
+                                                                <span className="flex flex-wrap items-baseline">
+                                                                    {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
+                                                                </span>
+                                                            </div>
                                                         );
                                                     })()}
-                                                    {/* Charging metadata line — same style as regular run cards */}
+                                                    {/* Charging metadata line — pill label + data points + field tags + source */}
                                                     {inferRunFlags(run).includes('charging') && (() => {
+                                                        const chargingFlag = DATA_FLAGS.find(f => f.key === 'charging');
                                                         const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
+                                                        const fields = run.populated_fields || [];
+                                                        const calcFields = run.calculated_fields || [];
                                                         const items = [];
                                                         items.push(<span key="pts" className="text-gray-600">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>);
                                                         if (run.energy_kwh != null && !inferRunFlags(run).includes('range')) items.push(<span key="kwh" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.energy_kwh} kWh in</span>);
+                                                        FIELD_META.filter(f => fields.includes(f.key)).forEach(f => {
+                                                            const isCalc = calcFields.includes(f.key);
+                                                            items.push(
+                                                                <span key={`field-${f.key}`}
+                                                                    title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
+                                                                    className={`px-2 py-0.5 text-xs rounded-full font-medium border ${isCalc ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                                                    {isCalc ? `~${f.label}` : f.label}
+                                                                </span>
+                                                            );
+                                                        });
                                                         if (run.charging_url) items.push(<a key="curl" href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
                                                         return (
-                                                            <p className="text-sm mt-1 flex flex-wrap items-baseline gap-y-1">
-                                                                {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
-                                                            </p>
+                                                            <div className="flex items-center gap-2 text-sm mt-1 flex-wrap gap-y-1">
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${chargingFlag.pillStyle} shrink-0`}>{chargingFlag.label}</span>
+                                                                <span className="flex flex-wrap items-baseline gap-y-1">
+                                                                    {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
+                                                                </span>
+                                                            </div>
                                                         );
                                                     })()}
                                                 </div>
-                                                {/* Field tags — same as regular run cards */}
-                                                {(() => {
-                                                    const fields = run.populated_fields || [];
-                                                    const calcFields = run.calculated_fields || [];
-                                                    if (fields.length === 0) return null;
-                                                    return (
-                                                        <div className="flex flex-wrap gap-1 mt-2">
-                                                            {FIELD_META.filter(f => fields.includes(f.key)).map(f => {
-                                                                const isCalc = calcFields.includes(f.key);
-                                                                return (
-                                                                    <span
-                                                                        key={f.key}
-                                                                        title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
-                                                                        className={`px-2 py-0.5 text-xs rounded-full font-medium border ${
-                                                                            isCalc
-                                                                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                                                                : 'bg-blue-50 text-blue-700 border-blue-200'
-                                                                        }`}
-                                                                    >
-                                                                        {isCalc ? `~${f.label}` : f.label}
-                                                                    </span>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    );
-                                                })()}
                                             </div>
                                             <div className="run-actions">
                                                 {/* Row 1: Default | Remove */}
