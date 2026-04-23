@@ -32,16 +32,16 @@ export default function VehiclesView({
     tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
     onReorderVehicles, onDuplicateVehicle,
     onUpdateVehicleSpecs, specCustomFieldSuggestions,
-    onAddTrim, onDeleteTrim,
     pendingEditVehicle, onClearPendingEdit,
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
-        name: '', make: '', model: '', year: '',
+        name: '', make: '', model: '', trim: '', year: '',
         battery: '', range: '', manufacturer_id: null,
     });
     const [mfgFilter, setMfgFilter] = useState(new Set());
+    const [modelFilter, setModelFilter] = useState(new Set());
     const [formTags, setFormTags] = useState([]);
     const [newTagName, setNewTagName] = useState('');
     const [tagFilterStates, setTagFilterStates] = useState({}); // { [tagId]: 'or' | 'and' | 'not' }
@@ -82,7 +82,7 @@ export default function VehiclesView({
             onAdd(formData);
         }
         setFormTags([]);
-        setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '', manufacturer_id: null });
+        setFormData({ name: '', make: '', model: '', trim: '', year: '', battery: '', range: '', manufacturer_id: null });
         setShowForm(false);
     };
 
@@ -92,6 +92,7 @@ export default function VehiclesView({
             name: vehicle.name,
             make: vehicle.make || '',
             model: vehicle.model || '',
+            trim: vehicle.trim || '',
             year: vehicle.year || '',
             battery: vehicle.battery || '',
             range: vehicle.range || '',
@@ -107,7 +108,7 @@ export default function VehiclesView({
         setEditingId(null);
         setFormTags([]);
         setNewTagName('');
-        setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '', manufacturer_id: null });
+        setFormData({ name: '', make: '', model: '', trim: '', year: '', battery: '', range: '', manufacturer_id: null });
     };
 
     const handleDuplicateVehicle = async (vehicle, e) => {
@@ -183,9 +184,17 @@ export default function VehiclesView({
         v.manufacturer?.id != null ? mfgFilter.has(v.manufacturer.id) : false
     );
 
+    // Stage 2b: model filter — only active when at least one manufacturer is selected
+    const availableModels = mfgFilter.size > 0
+        ? [...new Set(mfgFiltered.map(v => v.model).filter(Boolean))].sort()
+        : [];
+    const modelFiltered = modelFilter.size === 0 ? mfgFiltered : mfgFiltered.filter(v =>
+        v.model && modelFilter.has(v.model)
+    );
+
     // Stage 3: text filter
     const textLower = textFilter.trim().toLowerCase();
-    const textFiltered = !textLower ? mfgFiltered : mfgFiltered.filter(v => {
+    const textFiltered = !textLower ? modelFiltered : modelFiltered.filter(v => {
         if ([v.name, v.make, v.model].some(f => (f || '').toLowerCase().includes(textLower))) return true;
         const year = String(v.year || '');
         if (year.toLowerCase().includes(textLower)) return true;
@@ -337,9 +346,6 @@ export default function VehiclesView({
         newTagName, onNewTagNameChange: setNewTagName, onCreateTag: handleCreateTag,
         tags, availableTagsForForm,
         editingVehicle,
-        trims: editingVehicle?.trims || [],
-        onAddTrim: (trimData) => onAddTrim(editingId, trimData),
-        onRemoveTrim: (trimId) => onDeleteTrim(editingId, trimId),
         imageUploading, onImageReady: handleImageReady,
         onSubmit: handleSubmit, onCancel: handleCancel,
         // Manufacturer
@@ -547,11 +553,14 @@ export default function VehiclesView({
                         return (
                             <button
                                 key={mfg.id}
-                                onClick={() => setMfgFilter(prev => {
-                                    const next = new Set(prev);
-                                    next.has(mfg.id) ? next.delete(mfg.id) : next.add(mfg.id);
-                                    return next;
-                                })}
+                                onClick={() => {
+                                    setMfgFilter(prev => {
+                                        const next = new Set(prev);
+                                        next.has(mfg.id) ? next.delete(mfg.id) : next.add(mfg.id);
+                                        return next;
+                                    });
+                                    setModelFilter(new Set()); // reset model on brand change
+                                }}
                                 className={`tag-filter-btn ${active ? 'tag-filter-or' : 'tag-filter-na'}`}
                                 title={active ? `Remove "${mfg.name}" filter` : `Show only "${mfg.name}" vehicles`}
                             >
@@ -561,7 +570,39 @@ export default function VehiclesView({
                     })}
                     {mfgFilter.size > 0 && (
                         <button
-                            onClick={() => setMfgFilter(new Set())}
+                            onClick={() => { setMfgFilter(new Set()); setModelFilter(new Set()); }}
+                            className="text-xs text-gray-400 hover:text-gray-600 underline ml-1 flex-shrink-0"
+                        >
+                            Clear
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* Model filter bar — visible when a brand is selected and multiple models exist */}
+            {availableModels.length > 1 && (
+                <div className="tag-filter-bar">
+                    <span className="text-sm font-medium text-gray-500 flex-shrink-0">Model:</span>
+                    {availableModels.map(model => {
+                        const active = modelFilter.has(model);
+                        return (
+                            <button
+                                key={model}
+                                onClick={() => setModelFilter(prev => {
+                                    const next = new Set(prev);
+                                    next.has(model) ? next.delete(model) : next.add(model);
+                                    return next;
+                                })}
+                                className={`tag-filter-btn ${active ? 'tag-filter-or' : 'tag-filter-na'}`}
+                                title={active ? `Remove "${model}" filter` : `Show only ${model} variants`}
+                            >
+                                {model}
+                            </button>
+                        );
+                    })}
+                    {modelFilter.size > 0 && (
+                        <button
+                            onClick={() => setModelFilter(new Set())}
                             className="text-xs text-gray-400 hover:text-gray-600 underline ml-1 flex-shrink-0"
                         >
                             Clear
@@ -671,7 +712,7 @@ export default function VehiclesView({
                                             {/* Left: vehicle info */}
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="text-xl font-bold mb-1">{vehicle.name}</h3>
-                                                <p className="text-gray-600 mb-2">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                                                <p className="text-gray-600 mb-2">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                                                 <div className="text-sm text-gray-700 space-y-1">
                                                     {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                                     {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
@@ -777,7 +818,7 @@ export default function VehiclesView({
                                     {/* Name + make + tags */}
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-bold text-lg leading-tight truncate">{vehicle.name}</h3>
-                                        <p className="text-gray-500 text-sm mb-1">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                                        <p className="text-gray-500 text-sm mb-1">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                                         <TagPills vehicle={vehicle} />
                                     </div>
 

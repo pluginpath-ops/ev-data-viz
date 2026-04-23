@@ -6,6 +6,7 @@ import RunSelector from './RunSelector';
 import RangeChartView from './RangeChartView';
 import AxisScaleControls from './AxisScaleControls';
 import { runTooltipLines } from '../utils/tooltipHelpers';
+import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
 
@@ -318,7 +319,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     if (chartConfig.selectedRuns.includes(run.id)) {
                         allSelectedRuns.push({
                             ...run,
-                            vehicleName: vehicle.name,
+                            vehicleName: vehicleLabel(vehicle),
                             vehicleBattery: vehicle.battery ?? null,
                             vehicleRange: vehicle.range ?? null,
                         });

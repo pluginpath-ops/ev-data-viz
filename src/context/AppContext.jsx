@@ -151,47 +151,6 @@ export function AppProvider({ children }) {
         }
     };
 
-    // ── Trim CRUD ─────────────────────────────────────────────────────────────
-
-    const addTrim = async (vehicleId, trimData) => {
-        try {
-            const newTrim = await dataService.addTrim(vehicleId, trimData);
-            setVehicles(prev => prev.map(v =>
-                v.id === vehicleId
-                    ? { ...v, trims: [...(v.trims || []), newTrim] }
-                    : v
-            ));
-        } catch (error) {
-            showError('Error adding trim: ' + error.message);
-        }
-    };
-
-    const updateTrim = async (vehicleId, trimId, updates) => {
-        try {
-            await dataService.updateTrim(trimId, updates);
-            setVehicles(prev => prev.map(v =>
-                v.id === vehicleId
-                    ? { ...v, trims: (v.trims || []).map(t => t.id === trimId ? { ...t, ...updates } : t) }
-                    : v
-            ));
-        } catch (error) {
-            showError('Error updating trim: ' + error.message);
-        }
-    };
-
-    const deleteTrim = async (vehicleId, trimId) => {
-        try {
-            await dataService.deleteTrim(trimId);
-            setVehicles(prev => prev.map(v =>
-                v.id === vehicleId
-                    ? { ...v, trims: (v.trims || []).filter(t => t.id !== trimId) }
-                    : v
-            ));
-        } catch (error) {
-            showError('Error deleting trim: ' + error.message);
-        }
-    };
-
     // ── Copy run to a different vehicle ───────────────────────────────────────
 
     const copyRunToVehicle = async (sourceVehicleId, run, targetVehicleId) => {
@@ -268,6 +227,19 @@ export function AppProvider({ children }) {
             ));
         } catch (error) {
             showError('Error updating run: ' + error.message);
+        }
+    };
+
+    const clearDefaultRun = async (vehicleId) => {
+        try {
+            await dataService.clearDefaultRun(vehicleId);
+            setVehicles(prev => prev.map(v =>
+                v.id === vehicleId
+                    ? { ...v, runs: v.runs.map(r => ({ ...r, isDefault: false })) }
+                    : v
+            ));
+        } catch (error) {
+            showError('Error clearing default run: ' + error.message);
         }
     };
 
@@ -481,10 +453,17 @@ export function AppProvider({ children }) {
         }
     };
 
-    const updateVehicleSpecs = async (vehicleId, specs) => {
+    const updateVehicleSpecs = async (vehicleId, specs, specSourceVehicleId = undefined) => {
         try {
-            await dataService.updateVehicleSpecs(vehicleId, specs);
-            setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, specs } : v));
+            await dataService.updateVehicleSpecs(vehicleId, specs, specSourceVehicleId);
+            setVehicles(prev => prev.map(v => {
+                if (v.id !== vehicleId) return v;
+                const update = { ...v, specs };
+                if (specSourceVehicleId !== undefined) {
+                    update.spec_source_vehicle_id = specSourceVehicleId ? Number(specSourceVehicleId) : null;
+                }
+                return update;
+            }));
             // Update custom field suggestions with any new keys from the saved specs
             setSpecCustomFieldSuggestions(prev => {
                 const next = { ...prev };
@@ -586,9 +565,9 @@ export function AppProvider({ children }) {
 
     // Spec links require a full reload because buildInheritedRuns() is a two-pass
     // operation inside DataService — optimistic state cannot replicate it cheaply.
-    const addSpecLink = async ({ targetVehicleId, sourceVehicleId, specType, scalingFactor, notes }) => {
+    const addSpecLink = async ({ targetVehicleId, sourceRunId, scalingFactor, notes }) => {
         try {
-            await dataService.addSpecLink({ targetVehicleId, sourceVehicleId, specType, scalingFactor, notes });
+            await dataService.addSpecLink({ targetVehicleId, sourceRunId, scalingFactor, notes });
             await softRefreshVehicles();
         } catch (error) {
             showError('Error adding spec link: ' + error.message);
@@ -782,9 +761,6 @@ export function AppProvider({ children }) {
         reorderVehicles,
         duplicateVehicle,
         deleteVehicle,
-        addTrim,
-        updateTrim,
-        deleteTrim,
         copyRunToVehicle,
         duplicateRun,
         addRun,
@@ -825,6 +801,7 @@ export function AppProvider({ children }) {
         addSpecLink,
         updateSpecLink,
         deleteSpecLink,
+        clearDefaultRun,
     };
 
     return (

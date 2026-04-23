@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, normalizeCustomKey, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { SpecVouchButton, SpecFieldFlagButton } from './VoteButtons';
+import { vehicleLabel } from '../utils/specHelpers';
 
 /**
  * Modal form for editing all spec categories of a vehicle.
@@ -10,7 +11,7 @@ import { SpecVouchButton, SpecFieldFlagButton } from './VoteButtons';
  * Props:
  *   vehicle                   — the vehicle object (id + current specs)
  *   specCustomFieldSuggestions — { [category]: Set<normalizedKey> } for autocomplete
- *   onSave                    — async (vehicleId, specs) => void
+ *   onSave                    — async (vehicleId, specs, specSourceVehicleId?) => void
  *   onClose                   — () => void
  */
 
@@ -101,36 +102,53 @@ function mergeImportedSpecs(raw, setLocalSpecs, setImportError) {
     }
 }
 
-function SpecField({ field, value, onChange }) {
+/** Format an inherited value for display in a hint line. */
+function fmtInheritedHint(value, field) {
+    if (value === null || value === undefined) return null;
+    if (field.type === 'boolean') return value === true ? 'Yes' : value === false ? 'No' : null;
+    return String(value);
+}
+
+function SpecField({ field, value, onChange, inheritedValue }) {
+    const hasInherited = inheritedValue !== null && inheritedValue !== undefined;
+    const isEmpty      = value === null || value === undefined || value === '';
+    const hint         = hasInherited && isEmpty ? fmtInheritedHint(inheritedValue, field) : null;
+
     if (field.type === 'boolean') {
         const selectValue = value === true ? 'yes' : value === false ? 'no' : '';
         return (
-            <select
-                className="form-input text-sm w-full"
-                value={selectValue}
-                onChange={e => {
-                    const v = e.target.value;
-                    onChange(v === 'yes' ? true : v === 'no' ? false : null);
-                }}
-            >
-                <option value="">—</option>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-            </select>
+            <div>
+                <select
+                    className="form-input text-sm w-full"
+                    value={selectValue}
+                    onChange={e => {
+                        const v = e.target.value;
+                        onChange(v === 'yes' ? true : v === 'no' ? false : null);
+                    }}
+                >
+                    <option value="">—</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+                {hint && <p className="text-xs text-indigo-400 mt-0.5 pl-0.5">↑ {hint}</p>}
+            </div>
         );
     }
     if (field.type === 'enum') {
         return (
-            <select
-                className="form-input text-sm w-full"
-                value={value ?? ''}
-                onChange={e => onChange(e.target.value || null)}
-            >
-                <option value="">—</option>
-                {field.options.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                ))}
-            </select>
+            <div>
+                <select
+                    className="form-input text-sm w-full"
+                    value={value ?? ''}
+                    onChange={e => onChange(e.target.value || null)}
+                >
+                    <option value="">—</option>
+                    {field.options.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                </select>
+                {hint && <p className="text-xs text-indigo-400 mt-0.5 pl-0.5">↑ {hint}</p>}
+            </div>
         );
     }
     if (field.type === 'integer') {
@@ -140,6 +158,7 @@ function SpecField({ field, value, onChange }) {
                 step="1"
                 className="form-input text-sm w-full"
                 value={value ?? ''}
+                placeholder={hint ?? undefined}
                 onChange={e => onChange(e.target.value === '' ? null : parseInt(e.target.value, 10))}
             />
         );
@@ -151,6 +170,7 @@ function SpecField({ field, value, onChange }) {
                 step="any"
                 className="form-input text-sm w-full"
                 value={value ?? ''}
+                placeholder={hint ?? undefined}
                 onChange={e => onChange(e.target.value === '' ? null : parseFloat(e.target.value))}
             />
         );
@@ -161,6 +181,7 @@ function SpecField({ field, value, onChange }) {
             type="text"
             className="form-input text-sm w-full"
             value={value ?? ''}
+            placeholder={hint ?? undefined}
             onChange={e => onChange(e.target.value || null)}
         />
     );
@@ -177,6 +198,10 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     // Per-category "add custom field" input state
     const [newCustomKey, setNewCustomKey] = useState({});
     const [newCustomVal, setNewCustomVal] = useState({});
+    // Spec inheritance
+    const [inheritFromId, setInheritFromId] = useState(
+        vehicle.spec_source_vehicle_id ? String(vehicle.spec_source_vehicle_id) : ''
+    );
 
     // Load vouch count for display in footer
     useEffect(() => { loadSpecVouches(vehicle.id); }, [vehicle.id]);
@@ -185,6 +210,15 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     // Read flagged_specs from live context so admin unflag reflects immediately
     const liveVehicle = vehicles.find(v => v.id === vehicle.id) || vehicle;
     const flaggedSpecs = liveVehicle.flagged_specs || [];
+
+    // Source vehicle specs for inheritance hints
+    const sourceVehicle  = inheritFromId ? vehicles.find(v => String(v.id) === inheritFromId) : null;
+    const inheritedSpecs = sourceVehicle?.specs ?? {};
+
+    // Other vehicles available as inheritance sources (excluding self)
+    const otherVehicles = (vehicles || [])
+        .filter(v => v.id !== vehicle.id)
+        .sort((a, b) => vehicleLabel(a).localeCompare(vehicleLabel(b)));
 
     const toggleCategory = (key) => {
         setOpenCategories(prev => {
@@ -263,7 +297,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
         setSaving(true);
         try {
             const cleaned = cleanSpecs(localSpecs);
-            await onSave(vehicle.id, cleaned);
+            await onSave(vehicle.id, cleaned, inheritFromId || null);
             onClose();
         } finally {
             setSaving(false);
@@ -291,6 +325,27 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
 
                 {/* Scrollable body */}
                 <div className="modal-body flex-1 overflow-y-auto">
+
+                    {/* ── Inherit from selector ── */}
+                    <div className="flex items-center gap-3 mb-4 pb-4 border-b">
+                        <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Inherit from:</label>
+                        <select
+                            value={inheritFromId}
+                            onChange={e => setInheritFromId(e.target.value)}
+                            className="form-input text-sm flex-1"
+                        >
+                            <option value="">— None —</option>
+                            {otherVehicles.map(v => (
+                                <option key={v.id} value={String(v.id)}>{vehicleLabel(v)}</option>
+                            ))}
+                        </select>
+                        {sourceVehicle && (
+                            <p className="text-xs text-indigo-500 whitespace-nowrap">
+                                Fields you leave blank will show <span className="font-medium">↑ inherited</span> hints.
+                            </p>
+                        )}
+                    </div>
+
                     <div className="flex items-center justify-between mb-4">
                         <p className="text-sm text-gray-500">Fields left blank are not saved.</p>
                         <button
@@ -311,6 +366,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                         const customEntries = Object.entries(catData._custom || {});
                         const suggestions = [...(specCustomFieldSuggestions?.[cat.key] || new Set())];
                         const datalistId = `specs-custom-suggestions-${cat.key}`;
+                        const inheritedCat = inheritedSpecs?.[cat.key] ?? {};
 
                         return (
                             <div key={cat.key} className="specs-category">
@@ -335,6 +391,9 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                             {cat.fields.map(field => {
                                                 const fieldKey = `${cat.key}.${field.key}`;
                                                 const isFlagged = flaggedSpecs.includes(fieldKey);
+                                                const inheritedValue = sourceVehicle
+                                                    ? inheritedCat[field.key] ?? null
+                                                    : undefined;
                                                 return (
                                                     <div key={field.key}>
                                                         <label className="block text-xs text-gray-500 mb-0.5 flex items-center gap-1">
@@ -351,6 +410,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                                             field={field}
                                                             value={catData[field.key]}
                                                             onChange={v => setFieldValue(cat.key, field.key, v)}
+                                                            inheritedValue={inheritedValue}
                                                         />
                                                     </div>
                                                 );

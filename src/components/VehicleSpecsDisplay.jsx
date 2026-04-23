@@ -7,11 +7,15 @@ import { SpecFieldFlagButton } from './VoteButtons';
  * Read-only collapsible display of a vehicle's structured specs.
  *
  * Props:
- *   specs          — vehicle.specs JSONB object
- *   flaggedSpecs   — vehicle.flagged_specs string[] (e.g. ['powertrain.horsepower_hp'])
- *   vehicleId      — vehicle.id (needed for flag actions)
- *   defaultAllOpen — start with all categories expanded
- *   showFlagButtons — show 🚩 flag buttons on each field (default false)
+ *   specs            — vehicle.specs JSONB object (may be pre-merged with inherited values)
+ *   flaggedSpecs     — vehicle.flagged_specs string[] (e.g. ['powertrain.horsepower_hp'])
+ *   vehicleId        — vehicle.id (needed for flag actions)
+ *   defaultAllOpen   — start with all categories expanded
+ *   showFlagButtons  — show 🚩 flag buttons on each field (default false)
+ *   inheritedKeys    — optional Set<string> of field keys whose values came from a source vehicle
+ *   sourceVehicleName — optional display name of the source vehicle (for tooltip text)
+ *   pendingFlags     — optional Set<string> buffered locally (not yet in DB)
+ *   onFlagField      — optional override flag handler (used for deferred commit)
  *
  * Renders nothing if specs is null/undefined or all categories are empty.
  */
@@ -21,16 +25,14 @@ export default function VehicleSpecsDisplay({
     vehicleId,
     defaultAllOpen = false,
     showFlagButtons = false,
-    // Optional: Set of fieldKey strings buffered locally (not yet in DB).
-    // Clicking 🚩 on a pending field removes it from the buffer (undo).
+    inheritedKeys,
+    sourceVehicleName,
     pendingFlags,
-    // Optional: override the default flag handler (used for deferred commit).
     onFlagField,
 }) {
     const { vehicles, flagSpecField, unflagSpecField, isAdmin } = useAppContext();
 
     // Read flagged_specs directly from live context so updates reflect immediately
-    // without depending on the parent prop-chain re-rendering first.
     const liveVehicle = vehicleId ? vehicles.find(v => v.id === vehicleId) : null;
     const flaggedSpecs = liveVehicle?.flagged_specs ?? flaggedSpecsProp;
 
@@ -69,20 +71,39 @@ export default function VehicleSpecsDisplay({
 
     if (visibleCategories.length === 0) return null;
 
+    const InheritedTag = () => (
+        <span
+            className="text-[10px] text-indigo-400 ml-0.5 leading-none select-none"
+            title={sourceVehicleName ? `Inherited from ${sourceVehicleName}` : 'Inherited'}
+        >↑</span>
+    );
+
     return (
         <div className="mt-3">
+            {sourceVehicleName && (
+                <p className="text-xs text-indigo-500 mb-3 flex items-center gap-1">
+                    <span>↑</span>
+                    <span>Some fields are inherited from <span className="font-medium">{sourceVehicleName}</span></span>
+                </p>
+            )}
             {visibleCategories.map(cat => {
                 const catData = specs[cat.key] || {};
                 const isOpen = openCategories.has(cat.key);
 
                 const predefinedRows = cat.fields
-                    .map(f => ({ label: f.label, key: `${cat.key}.${f.key}`, value: formatValue(catData[f.key], f.type) }))
+                    .map(f => ({
+                        label:      f.label,
+                        key:        `${cat.key}.${f.key}`,
+                        value:      formatValue(catData[f.key], f.type),
+                        inherited:  inheritedKeys?.has(`${cat.key}.${f.key}`) ?? false,
+                    }))
                     .filter(row => row.value !== null);
 
                 const customRows = Object.entries(catData._custom || {}).map(([k, v]) => ({
-                    label: formatCustomKey(k),
-                    key: `${cat.key}._custom.${k}`,
-                    value: String(v),
+                    label:     formatCustomKey(k),
+                    key:       `${cat.key}._custom.${k}`,
+                    value:     String(v),
+                    inherited: inheritedKeys?.has(`${cat.key}._custom.${k}`) ?? false,
                 }));
 
                 return (
@@ -110,7 +131,10 @@ export default function VehicleSpecsDisplay({
                                         <div key={row.key} className="specs-field-row items-center">
                                             <span className="specs-field-label">{row.label}</span>
                                             <span className="specs-field-value flex items-center gap-1">
-                                                {row.value}
+                                                <span className={row.inherited ? 'text-indigo-400' : ''}>
+                                                    {row.value}
+                                                </span>
+                                                {row.inherited && <InheritedTag />}
                                                 {showFlagButtons && (
                                                     <SpecFieldFlagButton
                                                         isFlagged={committedIsFlagged || isPending}
@@ -133,7 +157,10 @@ export default function VehicleSpecsDisplay({
                                         <div key={row.key} className="specs-field-row items-center">
                                             <span className="specs-field-label">{row.label}</span>
                                             <span className="specs-field-value flex items-center gap-1">
-                                                {row.value}
+                                                <span className={row.inherited ? 'text-indigo-400' : ''}>
+                                                    {row.value}
+                                                </span>
+                                                {row.inherited && <InheritedTag />}
                                                 {showFlagButtons && (
                                                     <SpecFieldFlagButton
                                                         isFlagged={committedIsFlagged || isPending}

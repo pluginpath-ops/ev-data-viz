@@ -166,8 +166,8 @@ const EstimateTimePanel = ({
     );
 };
 
-export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, onAddTrim, onDeleteTrim, vehicles, onCopyRunToVehicle }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor } = useAppContext();
+export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle }) {
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, clearDefaultRun } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
@@ -227,7 +227,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         softwareVersion: '',
         conditions: '',
         dataFlags: ['charging'],
-        trimId: '',
         source: '',
         startSoc: '',
         endSoc: '',
@@ -260,10 +259,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [noHeaders, setNoHeaders]                   = useState(false);
     const [selectedRangeTestRunId, setSelectedRangeTestRunId] = useState(null);
 
+    // ── Overflow action menu state ────────────────────────────────────────────
+    const [openMenuRunId, setOpenMenuRunId] = useState(null);
+
     // ── Inherited test link form state ────────────────────────────────────────
     const [showAddLink, setShowAddLink]     = useState(false);
-    const [newLinkSpecType, setNewLinkSpecType] = useState('range_test');
-    const [newLinkSourceId, setNewLinkSourceId] = useState('');
+    const [newLinkSourceId, setNewLinkSourceId] = useState(''); // source vehicle id
     const [newLinkScaling, setNewLinkScaling]   = useState('');
     const [newLinkNotes, setNewLinkNotes]       = useState('');
     const [linkSaving, setLinkSaving]           = useState(false);
@@ -515,7 +516,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             softwareVersion: run.softwareVersion || run.software_version || '',
             conditions: run.conditions || '',
             dataFlags: inferRunFlags(run),
-            trimId: run.trim_id ?? '',
             source: run.source || '',
             startSoc: run.start_soc ?? '',
             endSoc: run.end_soc ?? '',
@@ -873,7 +873,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 </div>
                 <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-lg leading-tight">{vehicle.name}</h3>
-                    <p className="text-gray-500 text-sm">{vehicle.make} {vehicle.model} {vehicle.year}</p>
+                    <p className="text-gray-500 text-sm">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                     <div className="text-sm text-gray-600 mt-0.5 flex flex-wrap gap-x-3">
                         {vehicle.battery && <span>Battery: {vehicle.battery} kWh</span>}
                         {vehicle.range && <span>Range: {vehicle.range} mi</span>}
@@ -1040,33 +1040,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
                                             className="form-input w-full"
                                         />
-
-                                        {/* Trim selector */}
-                                        {vehicle?.trims?.length > 0 && (
-                                            <div>
-                                                <label className="text-sm font-medium text-gray-700">Trim / Configuration</label>
-                                                <select
-                                                    value={runMetadata.trimId}
-                                                    onChange={(e) => setRunMetadata({...runMetadata, trimId: e.target.value})}
-                                                    className="form-input w-full mt-1"
-                                                >
-                                                    <option value="">— Select trim (optional) —</option>
-                                                    {vehicle.trims.map(t => (
-                                                        <option key={t.id} value={t.id}>
-                                                            {t.name}{t.wheel_size ? ` · ${t.wheel_size}` : ''}{t.tire_size ? ` / ${t.tire_size}` : ''}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                {runMetadata.trimId && (() => {
-                                                    const t = vehicle.trims.find(x => String(x.id) === String(runMetadata.trimId));
-                                                    return t ? (
-                                                        <p className="text-xs text-gray-500 mt-1">
-                                                            {[t.wheel_size, t.tire_size, t.epa_range_miles != null && `EPA ${t.epa_range_miles} mi`].filter(Boolean).join(' · ')}
-                                                        </p>
-                                                    ) : null;
-                                                })()}
-                                            </div>
-                                        )}
 
                                         {/* Charging energy field (create mode) */}
                                         {runMetadata.dataFlags.includes('charging') && (
@@ -1456,32 +1429,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         onChange={(e) => setEditFormData({...editFormData, conditions: e.target.value})}
                                         className="form-input w-full"
                                     />
-                                    {/* Trim selector (edit mode) */}
-                                    {vehicle?.trims?.length > 0 && (
-                                        <div>
-                                            <label className="text-sm font-medium text-gray-700">Trim / Configuration</label>
-                                            <select
-                                                value={editFormData.trimId ?? ''}
-                                                onChange={(e) => setEditFormData({...editFormData, trimId: e.target.value})}
-                                                className="form-input w-full mt-1"
-                                            >
-                                                <option value="">— Select trim (optional) —</option>
-                                                {vehicle.trims.map(t => (
-                                                    <option key={t.id} value={t.id}>
-                                                        {t.name}{t.wheel_size ? ` · ${t.wheel_size}` : ''}{t.tire_size ? ` / ${t.tire_size}` : ''}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            {editFormData.trimId && (() => {
-                                                const t = vehicle.trims.find(x => String(x.id) === String(editFormData.trimId));
-                                                return t ? (
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        {[t.wheel_size, t.tire_size, t.epa_range_miles != null && `EPA ${t.epa_range_miles} mi`].filter(Boolean).join(' · ')}
-                                                    </p>
-                                                ) : null;
-                                            })()}
-                                        </div>
-                                    )}
                                     {/* Charging energy field — shows energy_kwh for charging runs */}
                                     {(editFormData.dataFlags || ['charging']).includes('charging') && (
                                         <div className="data-subpanel p-3">
@@ -1820,148 +1767,85 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 </a>
                                             )}
                                         </h3>
-                                        {/* Data-type flag pills — one per active data domain */}
-                                        {inferRunFlags(run).map(key => {
-                                            const flag = DATA_FLAGS.find(f => f.key === key);
-                                            if (!flag) return null;
-                                            return (
-                                                <span key={key} title={flag.desc}
-                                                    className={`text-xs px-2 py-0.5 rounded-full font-medium border ${flag.pillStyle}`}>
-                                                    {flag.label}
-                                                </span>
-                                            );
-                                        })}
-                                        {run.isDefault && (
-                                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-semibold" style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}>
-                                                Default
-                                            </span>
-                                        )}
                                     </div>
                                     <div className="run-meta">
                                         <p>Date: {run.date}</p>
                                         {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
                                         {run.conditions && <p>Notes: {run.conditions}</p>}
-                                        {/* Range data section — shown whenever the run has range data (with or without the range flag) */}
-                                        {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (
-                                            <div className="run-stat-badges">
-                                                {run.source && <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{run.source}</span>}
-                                                {run.speed_mph != null
-                                                    ? <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
-                                                    : <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-200" title="Set Speed (mph) in the run's metadata for accurate Road Trip efficiency">70 mph (assumed)</span>
-                                                }
-                                                {run.distance_miles != null && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-200">{fmtDistance(run.distance_miles, units)}</span>}
-                                                {run.energy_kwh != null && (
-                                                    <span
-                                                        title="Energy consumed on the drive — energy out (measured at vehicle)"
-                                                        className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200"
-                                                    >
-                                                        {run.energy_kwh} kWh <span className="opacity-60 text-[10px]">out</span>
+                                        {/* Range metadata line */}
+                                        {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (() => {
+                                            const rangeFlag = DATA_FLAGS.find(f => f.key === 'range');
+                                            const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
+                                            const items = [];
+                                            if (run.speed_mph != null) {
+                                                items.push(<span key="spd" className="text-gray-600">{fmtSpeed(run.speed_mph, units)}</span>);
+                                            } else {
+                                                items.push(<span key="spd" className="text-amber-600" title="Set Speed (mph) in run metadata for accurate efficiency">{fmtSpeed(70, units)} (est.)</span>);
+                                            }
+                                            if (run.distance_miles != null) items.push(<span key="dist" className="text-green-700">{fmtDistance(run.distance_miles, units)}</span>);
+                                            if (run.energy_kwh != null) items.push(<span key="kwh" className="text-blue-700" title="Energy out (measured at vehicle)">{run.energy_kwh} kWh out</span>);
+                                            if (run.energy_kwh != null && run.distance_miles != null) items.push(<span key="eff" className="text-blue-700">{calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}</span>);
+                                            if (run.temperature_f != null) items.push(<span key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</span>);
+                                            if (run.start_soc != null && run.end_soc != null) items.push(<span key="soc" className="text-gray-600">SoC {run.start_soc}→{run.end_soc}%</span>);
+                                            if (run.url) items.push(<a key="url" href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{run.name} ↗</a>);
+                                            return (
+                                                <div className="flex items-center gap-2 text-sm mt-1 flex-wrap">
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${rangeFlag.pillStyle} shrink-0`}>{rangeFlag.label}</span>
+                                                    <span className="flex flex-wrap items-baseline">
+                                                        {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
                                                     </span>
-                                                )}
-                                                {run.energy_kwh != null && run.distance_miles != null && (
-                                                    <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
-                                                        {calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}
+                                                </div>
+                                            );
+                                        })()}
+                                        {/* Charging metadata line — pill label + data points + field tags + source */}
+                                        {inferRunFlags(run).includes('charging') && (() => {
+                                            const chargingFlag = DATA_FLAGS.find(f => f.key === 'charging');
+                                            const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
+                                            const fields = run.populated_fields || [];
+                                            const calcFields = run.calculated_fields || [];
+                                            const items = [];
+                                            items.push(<span key="pts" className="text-gray-600">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>);
+                                            if (run.energy_kwh != null && !inferRunFlags(run).includes('range')) items.push(<span key="kwh" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.energy_kwh} kWh in</span>);
+                                            FIELD_META.filter(f => fields.includes(f.key)).forEach(f => {
+                                                const isCalc = calcFields.includes(f.key);
+                                                items.push(
+                                                    <span key={`field-${f.key}`}
+                                                        title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
+                                                        className={`px-2 py-0.5 text-xs rounded-full font-medium border ${isCalc ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                                        {isCalc ? `~${f.label}` : f.label}
                                                     </span>
-                                                )}
-                                                {run.temperature_f != null && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>}
-                                                {run.start_soc != null && run.end_soc != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">SoC {run.start_soc}→{run.end_soc}%</span>}
-                                                {run.url && <a href={run.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline px-2 py-0.5 rounded">Source ↗</a>}
-                                            </div>
-                                        )}
-                                        {/* Charging data section — shown whenever the run has time-series data */}
-                                        {inferRunFlags(run).includes('charging') && (
-                                            <div className="run-stat-badges items-center">
-                                                <span className="text-sm">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>
-                                                {/* energy_kwh for charging = energy in (measured at charger/vehicle) */}
-                                                {run.energy_kwh != null && !inferRunFlags(run).includes('range') && (
-                                                    <span
-                                                        title="Energy added during this charging session — energy in (measured at charger or vehicle)"
-                                                        className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200"
-                                                    >
-                                                        {run.energy_kwh} kWh <span className="opacity-60 text-[10px]">in</span>
-                                                    </span>
-                                                )}
-                                                {run.charging_url && <a href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline px-2 py-0.5 rounded">Source ↗</a>}
-                                                {/* Lazy kWh compare button — only when energy_kwh is set and data points exist */}
-                                                {run.energy_kwh != null && (run.dataPointCount ?? 0) > 1 && (() => {
-                                                    const check = calcKwhByRun[run.id];
-                                                    if (!check) return (
-                                                        <button
-                                                            onClick={() => handleCheckKwh(run)}
-                                                            className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 transition-colors"
-                                                            title="Calculate kWh from data points and compare to entered value"
-                                                        >
-                                                            Compare ↔
-                                                        </button>
+                                                );
+                                            });
+                                            if (run.charging_url) items.push(<a key="curl" href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
+                                            if (run.energy_kwh != null && (run.dataPointCount ?? 0) > 1) {
+                                                const check = calcKwhByRun[run.id];
+                                                if (!check) {
+                                                    items.push(
+                                                        <button key="cmp" onClick={() => handleCheckKwh(run)}
+                                                            className="text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 transition-colors text-xs"
+                                                            title="Calculate kWh from data points and compare">Compare ↔</button>
                                                     );
-                                                    if (check.loading) return <span className="text-xs text-gray-400">Calculating…</span>;
-                                                    if (check.error || check.kwh == null) return <span className="text-xs text-gray-400">—</span>;
+                                                } else if (check.loading) {
+                                                    items.push(<span key="cmp" className="text-gray-400 text-xs">Calculating…</span>);
+                                                } else if (check.kwh != null) {
                                                     const pct = Math.abs(run.energy_kwh - check.kwh) / Math.max(run.energy_kwh, check.kwh) * 100;
-                                                    return (
-                                                        <span className={`text-xs px-2 py-0.5 rounded border font-medium ${pct > 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-green-50 text-green-700 border-green-200'}`}
-                                                            title={`Calculated from data points: ${check.kwh} kWh`}
-                                                        >
+                                                    items.push(
+                                                        <span key="cmp" title={`Calculated from data points: ${check.kwh} kWh`}
+                                                            className={`text-xs px-1.5 py-0.5 rounded border font-medium ${pct > 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
                                                             {pct > 5 ? '⚠️ ' : '✓ '}data: {check.kwh} kWh ({pct.toFixed(1)}%)
                                                         </span>
                                                     );
-                                                })()}
-                                            </div>
-                                        )}
-                                    </div>
-                                    {/* Field tags — populated fields; amber = estimated, blue = measured */}
-                                    {(() => {
-                                        const fields = run.populated_fields || [];
-                                        const calcFields = run.calculated_fields || [];
-                                        if (fields.length === 0) return null;
-                                        return (
-                                            <div className="flex flex-wrap gap-1 mt-2">
-                                                {FIELD_META.filter(f => fields.includes(f.key)).map(f => {
-                                                    const isCalc = calcFields.includes(f.key);
-                                                    return (
-                                                        <span
-                                                            key={f.key}
-                                                            title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
-                                                            className={`px-2 py-0.5 text-xs rounded-full font-medium border ${
-                                                                isCalc
-                                                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                                                    : 'bg-blue-50 text-blue-700 border-blue-200'
-                                                            }`}
-                                                        >
-                                                            {isCalc ? `~${f.label}` : f.label}
-                                                        </span>
-                                                    );
-                                                })}
-                                            </div>
-                                        );
-                                    })()}
-                                    <div className="inline-row mt-3">
-                                        <span className="text-sm text-gray-600">Plot Color:</span>
-                                        <input
-                                            type="color"
-                                            value={run.color || '#3b82f6'}
-                                            onChange={(e) => {
-                                                onUpdateRun(run.id, { color: e.target.value });
-                                            }}
-                                            className="w-10 h-7 border-0 rounded cursor-pointer"
-                                            title="Change color"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={run.color || '#3b82f6'}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                onUpdateRun(run.id, { color: value });
-                                            }}
-                                            onBlur={(e) => {
-                                                const value = e.target.value;
-                                                if (!/^#[0-9A-Fa-f]{6}$/.test(value)) {
-                                                    onUpdateRun(run.id, { color: run.color || '#3b82f6' });
                                                 }
-                                            }}
-                                            className="w-24 px-2 py-1 border rounded text-sm font-mono"
-                                            placeholder="#3b82f6"
-                                            maxLength={7}
-                                        />
+                                            }
+                                            return (
+                                                <div className="flex items-center gap-2 text-sm mt-1 flex-wrap gap-y-1">
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${chargingFlag.pillStyle} shrink-0`}>{chargingFlag.label}</span>
+                                                    <span className="flex flex-wrap items-baseline gap-y-1">
+                                                        {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                                 <div className="run-actions">
@@ -1971,65 +1855,98 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         myVote={votes.myVote}
                                         onVote={(voteType) => toggleRunVote(run.id, voteType)}
                                     />
-                                    {run.isDefault ? (
-                                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
-                                            Default
-                                        </span>
-                                    ) : (
+                                    <div className="run-actions-row">
+                                        {/* Set Default — ghost text, green on hover, pale blue + × when active */}
                                         <button
-                                            onClick={() => onSetDefaultRun(run.id)}
-                                            className="btn btn-secondary text-sm"
+                                            onClick={() => run.isDefault ? clearDefaultRun(vehicle.id) : onSetDefaultRun(run.id)}
+                                            title={run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
+                                            className={`text-sm px-2 py-1 rounded transition-colors ${
+                                                run.isDefault
+                                                    ? 'bg-blue-100 text-blue-700 hover:bg-red-50 hover:text-red-600 border border-blue-200 hover:border-red-200'
+                                                    : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+                                            }`}
                                         >
-                                            Set as Default
+                                            {run.isDefault
+                                                ? <>Default <span className="text-red-500 font-bold">×</span></>
+                                                : 'Set Default'}
                                         </button>
-                                    )}
-                                    {canEdit(vehicle) && (
+                                        {canEdit(vehicle) && (
+                                            <button onClick={() => handleEditRun(run)} className="btn btn-edit text-sm">Edit</button>
+                                        )}
                                         <button
-                                            onClick={() => handleUpdateData(run)}
-                                            className="btn btn-secondary text-sm"
+                                            onClick={() => isPending ? restoreItem(run.id) : queueDelete(run.id)}
+                                            className={`btn text-sm ${isPending ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-0' : 'btn-danger'}`}
                                         >
-                                            Upload additional data
+                                            {isPending ? '↩ Restore' : 'Delete'}
                                         </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleExportCsv(run)}
-                                        disabled={exportingRunId === run.id}
-                                        title="Download test data as CSV"
-                                        className="btn btn-secondary text-sm disabled:opacity-50"
-                                    >
-                                        {exportingRunId === run.id ? '…' : '↓ CSV'}
-                                    </button>
-                                    {canEdit(vehicle) && (
-                                        <button
-                                            onClick={() => handleDuplicateRun(run)}
-                                            disabled={duplicatingRunId !== null}
-                                            title="Duplicate this test and its data"
-                                            className="btn btn-secondary text-sm disabled:opacity-50"
-                                        >
-                                            {duplicatingRunId === run.id ? '…' : '⧉ Copy'}
-                                        </button>
-                                    )}
-                                    {canEdit(vehicle) && copyTargetVehicles.length > 0 && (
-                                        <button
-                                            onClick={() => { setCopyToRun(run); setCopyingToVehicleId(''); }}
-                                            title="Copy this test to another vehicle"
-                                            className="btn btn-secondary text-sm"
-                                        >
-                                            Copy to…
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleEditRun(run)}
-                                        className="btn btn-edit"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        onClick={() => isPending ? restoreItem(run.id) : queueDelete(run.id)}
-                                        className={`btn text-sm ${isPending ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-0 rounded-md px-3 py-1 font-medium' : 'btn-danger'}`}
-                                    >
-                                        {isPending ? '↩ Restore' : 'Delete'}
-                                    </button>
+                                        {/* More ▾ overflow menu */}
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => setOpenMenuRunId(openMenuRunId === run.id ? null : run.id)}
+                                                className="btn btn-primary text-sm"
+                                            >More ▾</button>
+                                            {openMenuRunId === run.id && (
+                                                <>
+                                                    <div className="fixed inset-0 z-10" onClick={() => setOpenMenuRunId(null)} />
+                                                    <div className="dropdown-menu w-52 z-20">
+                                                        <button
+                                                            onClick={() => { handleExportCsv(run); setOpenMenuRunId(null); }}
+                                                            disabled={exportingRunId === run.id}
+                                                            className="dropdown-item w-full text-left disabled:opacity-50"
+                                                        >
+                                                            {exportingRunId === run.id ? '↓ Exporting…' : '↓ Download CSV'}
+                                                        </button>
+                                                        {canEdit(vehicle) && (
+                                                            <button
+                                                                onClick={() => { handleDuplicateRun(run); setOpenMenuRunId(null); }}
+                                                                disabled={duplicatingRunId !== null}
+                                                                className="dropdown-item w-full text-left disabled:opacity-50"
+                                                            >
+                                                                {duplicatingRunId === run.id ? '⧉ Copying…' : '⧉ Copy'}
+                                                            </button>
+                                                        )}
+                                                        {canEdit(vehicle) && copyTargetVehicles.length > 0 && (
+                                                            <button
+                                                                onClick={() => { setCopyToRun(run); setCopyingToVehicleId(''); setOpenMenuRunId(null); }}
+                                                                className="dropdown-item w-full text-left"
+                                                            >
+                                                                ↪ Copy to…
+                                                            </button>
+                                                        )}
+                                                        {canEdit(vehicle) && (
+                                                            <button
+                                                                onClick={() => { handleUpdateData(run); setOpenMenuRunId(null); }}
+                                                                className="dropdown-item w-full text-left"
+                                                            >
+                                                                ↑ Upload additional data
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {/* Color picker — lower right */}
+                                    <div className="run-actions-row">
+                                        <label className="flex items-center gap-1 text-xs text-gray-400 cursor-pointer">
+                                            <input
+                                                type="color"
+                                                value={run.color || '#3b82f6'}
+                                                onChange={e => onUpdateRun(run.id, { color: e.target.value })}
+                                                className="w-7 h-5 border-0 rounded cursor-pointer shrink-0"
+                                                title="Change plot color"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={run.color || '#3b82f6'}
+                                                onChange={e => onUpdateRun(run.id, { color: e.target.value })}
+                                                onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRun(run.id, { color: run.color || '#3b82f6' }); }}
+                                                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-600"
+                                                placeholder="#3b82f6"
+                                                maxLength={7}
+                                            />
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -2099,16 +2016,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 className="text-blue-400 hover:text-blue-600 transition-colors ml-1 text-sm font-normal">↗</a>
                                                         )}
                                                     </h3>
-                                                    {inferRunFlags(run).map(key => {
-                                                        const flag = DATA_FLAGS.find(f => f.key === key);
-                                                        if (!flag) return null;
-                                                        return (
-                                                            <span key={key} title={flag.desc}
-                                                                className={`text-xs px-2 py-0.5 rounded-full font-medium border ${flag.pillStyle}`}>
-                                                                {flag.label}
-                                                            </span>
-                                                        );
-                                                    })}
                                                     {run.isDefault && (
                                                         <span className="text-xs px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>Default</span>
                                                     )}
@@ -2117,99 +2024,132 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 <div className="run-meta">
                                                     <p className="text-gray-500">Inherited from: <span className="font-medium text-gray-700">{srcName}</span></p>
                                                     <p>Date: {run.date}</p>
+                                                    {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
                                                     {run.conditions && <p>Notes: {run.conditions}</p>}
-                                                    {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (
-                                                        <div className="run-stat-badges">
-                                                            {run.source && <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{run.source}</span>}
-                                                            {run.speed_mph != null
-                                                                ? <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
-                                                                : <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-200">70 mph (assumed)</span>
-                                                            }
-                                                            {run.distance_miles != null && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-200">{fmtDistance(run.distance_miles, units)}</span>}
-                                                            {run.temperature_f != null && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>}
-                                                            {run.start_soc != null && run.end_soc != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">SoC {run.start_soc}→{run.end_soc}%</span>}
-                                                        </div>
-                                                    )}
-                                                    {inferRunFlags(run).includes('charging') && (
-                                                        <div className="run-stat-badges items-center">
-                                                            <span className="text-sm">Data Points: {run.dataPointCount ?? 0}</span>
-                                                            {run.charging_url && <a href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline px-2 py-0.5 rounded">Source ↗</a>}
-                                                        </div>
-                                                    )}
+                                                    {/* Range metadata line */}
+                                                    {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (() => {
+                                                        const rangeFlag = DATA_FLAGS.find(f => f.key === 'range');
+                                                        const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
+                                                        const items = [];
+                                                        if (run.speed_mph != null) {
+                                                            items.push(<span key="spd" className="text-gray-600">{fmtSpeed(run.speed_mph, units)}</span>);
+                                                        } else {
+                                                            items.push(<span key="spd" className="text-amber-600" title="Set Speed (mph) in run metadata for accurate efficiency">{fmtSpeed(70, units)} (est.)</span>);
+                                                        }
+                                                        if (run.distance_miles != null) items.push(<span key="dist" className="text-green-700">{fmtDistance(run.distance_miles, units)}</span>);
+                                                        if (run.energy_kwh != null) items.push(<span key="kwh" className="text-blue-700" title="Energy out (measured at vehicle)">{run.energy_kwh} kWh out</span>);
+                                                        if (run.energy_kwh != null && run.distance_miles != null) items.push(<span key="eff" className="text-blue-700">{calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}</span>);
+                                                        if (run.temperature_f != null) items.push(<span key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</span>);
+                                                        if (run.start_soc != null && run.end_soc != null) items.push(<span key="soc" className="text-gray-600">SoC {run.start_soc}→{run.end_soc}%</span>);
+                                                        if (run.url) items.push(<a key="url" href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{run.name} ↗</a>);
+                                                        return (
+                                                            <div className="flex items-center gap-2 text-sm mt-1 flex-wrap">
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${rangeFlag.pillStyle} shrink-0`}>{rangeFlag.label}</span>
+                                                                <span className="flex flex-wrap items-baseline">
+                                                                    {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                    {/* Charging metadata line — pill label + data points + field tags + source */}
+                                                    {inferRunFlags(run).includes('charging') && (() => {
+                                                        const chargingFlag = DATA_FLAGS.find(f => f.key === 'charging');
+                                                        const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
+                                                        const fields = run.populated_fields || [];
+                                                        const calcFields = run.calculated_fields || [];
+                                                        const items = [];
+                                                        items.push(<span key="pts" className="text-gray-600">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>);
+                                                        if (run.energy_kwh != null && !inferRunFlags(run).includes('range')) items.push(<span key="kwh" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.energy_kwh} kWh in</span>);
+                                                        FIELD_META.filter(f => fields.includes(f.key)).forEach(f => {
+                                                            const isCalc = calcFields.includes(f.key);
+                                                            items.push(
+                                                                <span key={`field-${f.key}`}
+                                                                    title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
+                                                                    className={`px-2 py-0.5 text-xs rounded-full font-medium border ${isCalc ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                                                    {isCalc ? `~${f.label}` : f.label}
+                                                                </span>
+                                                            );
+                                                        });
+                                                        if (run.charging_url) items.push(<a key="curl" href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
+                                                        return (
+                                                            <div className="flex items-center gap-2 text-sm mt-1 flex-wrap gap-y-1">
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${chargingFlag.pillStyle} shrink-0`}>{chargingFlag.label}</span>
+                                                                <span className="flex flex-wrap items-baseline gap-y-1">
+                                                                    {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </div>
                                             <div className="run-actions">
-                                                <label className="flex items-center gap-1 text-xs text-gray-500">
-                                                    <span>Color</span>
-                                                    <input
-                                                        type="color"
-                                                        value={runColor}
-                                                        onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
-                                                        className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
-                                                        title="Change color"
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        value={runColor}
-                                                        onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
-                                                        onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) updateRunColor(vehicle.id, run.id, runColor); }}
-                                                        className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
-                                                        placeholder="#9ca3af"
-                                                        maxLength={7}
-                                                    />
-                                                </label>
-                                                {isContributor && canEdit(vehicle) ? (
+                                                {/* Row 1: Default | Remove */}
+                                                <div className="run-actions-row">
+                                                    {isContributor && canEdit(vehicle) ? (
+                                                        <button
+                                                            onClick={() => run.isDefault
+                                                                ? updateSpecLink(linkId, { useAsDefault: false })
+                                                                : updateSpecLink(linkId, { useAsDefault: true }, vehicle.id)
+                                                            }
+                                                            title={run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
+                                                            className={`btn text-sm ${run.isDefault ? 'bg-blue-100 text-blue-700 hover:bg-red-50 hover:text-red-600 border border-blue-200 hover:border-red-200' : 'btn-secondary'}`}
+                                                        >
+                                                            {run.isDefault ? <>Default <span className="text-red-500 font-bold">×</span></> : 'Set as Default'}
+                                                        </button>
+                                                    ) : run.isDefault ? (
+                                                        <span className="btn text-sm bg-blue-100 text-blue-700 border border-blue-200">Default</span>
+                                                    ) : null}
+                                                    {isContributor && canEdit(vehicle) && (
+                                                        <button
+                                                            onClick={() => deleteSpecLink(linkId)}
+                                                            className="btn btn-danger text-sm"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {/* Row 2: Color Picker | Scale × */}
+                                                <div className="run-actions-row flex-wrap">
                                                     <label className="flex items-center gap-1 text-xs text-gray-500">
-                                                        <span>Scale ×</span>
                                                         <input
-                                                            type="number"
-                                                            value={editVal}
-                                                            onChange={e => setScalingEdits(prev => ({ ...prev, [linkId]: e.target.value }))}
-                                                            onBlur={saveScaling}
-                                                            onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-                                                            step="0.001"
-                                                            min="0.001"
-                                                            placeholder="1.0"
+                                                            type="color"
+                                                            value={runColor}
+                                                            onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
+                                                            className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
+                                                            title="Change color"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={runColor}
+                                                            onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
+                                                            onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) updateRunColor(vehicle.id, run.id, runColor); }}
                                                             className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
-                                                            title="Scaling factor (blank = 1.0)"
+                                                            placeholder="#9ca3af"
+                                                            maxLength={7}
                                                         />
                                                     </label>
-                                                ) : (
-                                                    sf !== 1 && sf != null && (
-                                                        <span className="text-xs font-mono text-gray-500">×{sf}</span>
-                                                    )
-                                                )}
-                                                {run.isDefault ? (
-                                                    isContributor && canEdit(vehicle) ? (
-                                                        <button
-                                                            onClick={() => updateSpecLink(linkId, { useAsDefault: false })}
-                                                            className="text-xs px-2 py-1 rounded font-semibold"
-                                                            style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
-                                                            title="Click to clear default"
-                                                        >
-                                                            Default ×
-                                                        </button>
+                                                    {isContributor && canEdit(vehicle) ? (
+                                                        <label className="flex items-center gap-1 text-xs text-gray-500">
+                                                            <span>Scale ×</span>
+                                                            <input
+                                                                type="number"
+                                                                value={editVal}
+                                                                onChange={e => setScalingEdits(prev => ({ ...prev, [linkId]: e.target.value }))}
+                                                                onBlur={saveScaling}
+                                                                onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                                                                step="0.001"
+                                                                min="0.001"
+                                                                placeholder="1.0"
+                                                                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
+                                                                title="Scaling factor (blank = 1.0)"
+                                                            />
+                                                        </label>
                                                     ) : (
-                                                        <span className="text-xs px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
-                                                            Default
-                                                        </span>
-                                                    )
-                                                ) : isContributor && canEdit(vehicle) ? (
-                                                    <button
-                                                        onClick={() => updateSpecLink(linkId, { useAsDefault: true }, vehicle.id)}
-                                                        className="btn btn-secondary text-sm"
-                                                    >
-                                                        Set as Default
-                                                    </button>
-                                                ) : null}
-                                                {isContributor && canEdit(vehicle) && (
-                                                    <button
-                                                        onClick={() => deleteSpecLink(linkId)}
-                                                        className="btn btn-danger text-sm"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                )}
+                                                        sf !== 1 && sf != null && (
+                                                            <span className="text-xs font-mono text-gray-500">×{sf}</span>
+                                                        )
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -2220,39 +2160,44 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
                     {/* Add link form */}
                     {showAddLink && (() => {
-                        // Only show vehicles that have runs of the selected spec type
-                        const hasRelevantRuns = (v) => newLinkSpecType === 'range_test'
-                            ? v.runs?.some(r => !r._inherited && (r.has_range ?? false))
-                            : v.runs?.some(r => !r._inherited && (r.has_charging ?? true));
-                        // Exclude current vehicle and any already-linked source for this type
-                        const alreadyLinkedIds = new Set(
-                            (vehicle.spec_links || [])
-                                .filter(l => l.spec_type === newLinkSpecType)
-                                .map(l => Number(l.source_vehicle_id))
+                        // Run IDs already linked to this vehicle
+                        const alreadyLinkedRunIds = new Set(
+                            (vehicle.spec_links || []).map(l => Number(l.source_run_id))
                         );
+                        // Source vehicles: any vehicle with at least one non-inherited, not-yet-linked run
                         const sourceVehicles = (vehicles || [])
-                            .filter(v => Number(v.id) !== Number(vehicle.id) && hasRelevantRuns(v) && !alreadyLinkedIds.has(Number(v.id)))
+                            .filter(v =>
+                                Number(v.id) !== Number(vehicle.id) &&
+                                (v.runs || []).some(r => !r._inherited && !alreadyLinkedRunIds.has(Number(r.id)))
+                            )
                             .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
+                        const selectedSrc = newLinkSourceId
+                            ? (vehicles || []).find(v => Number(v.id) === parseInt(newLinkSourceId, 10))
+                            : null;
+                        const runsToLink = selectedSrc
+                            ? (selectedSrc.runs || []).filter(r => !r._inherited && !alreadyLinkedRunIds.has(Number(r.id)))
+                            : [];
+
                         const suggestEpaRatio = () => {
-                            const src = (vehicles || []).find(v => Number(v.id) === parseInt(newLinkSourceId, 10));
-                            if (!src) return;
-                            const srcRange = parseFloat(src.range);
+                            if (!selectedSrc) return;
+                            const srcRange = parseFloat(selectedSrc.range);
                             const tgtRange = parseFloat(vehicle.range);
                             if (srcRange && tgtRange) setNewLinkScaling((tgtRange / srcRange).toFixed(3));
                         };
 
                         const handleAdd = async () => {
-                            if (!newLinkSourceId) return;
+                            if (!newLinkSourceId || runsToLink.length === 0) return;
                             setLinkSaving(true);
                             try {
-                                await addSpecLink({
-                                    targetVehicleId: vehicle.id,
-                                    sourceVehicleId: parseInt(newLinkSourceId, 10),
-                                    specType: newLinkSpecType,
-                                    scalingFactor: newLinkScaling ? parseFloat(newLinkScaling) : null,
-                                    notes: newLinkNotes.trim() || null,
-                                });
+                                for (const run of runsToLink) {
+                                    await addSpecLink({
+                                        targetVehicleId: vehicle.id,
+                                        sourceRunId: run.id,
+                                        scalingFactor: newLinkScaling ? parseFloat(newLinkScaling) : null,
+                                        notes: newLinkNotes.trim() || null,
+                                    });
+                                }
                                 setNewLinkSourceId('');
                                 setNewLinkScaling('');
                                 setNewLinkNotes('');
@@ -2266,16 +2211,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             <div className="spec-link-add-form">
                                 <div className="flex gap-2 flex-wrap">
                                     <select
-                                        value={newLinkSpecType}
-                                        onChange={e => { setNewLinkSpecType(e.target.value); setNewLinkSourceId(''); }}
-                                        className="form-input text-sm"
-                                    >
-                                        <option value="range_test">Range Test</option>
-                                        <option value="charging_curve">Charging Curve</option>
-                                    </select>
-                                    <select
                                         value={newLinkSourceId}
-                                        onChange={e => setNewLinkSourceId(e.target.value)}
+                                        onChange={e => { setNewLinkSourceId(e.target.value); setNewLinkScaling(''); }}
                                         className="form-input text-sm flex-1 min-w-48"
                                     >
                                         <option value="">Source vehicle…</option>
@@ -2286,7 +2223,17 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 </div>
                                 {sourceVehicles.length === 0 && (
                                     <p className="text-xs text-gray-400 mt-1">
-                                        No other vehicles have {newLinkSpecType === 'range_test' ? 'range test' : 'charging curve'} data.
+                                        No other vehicles have unlinked tests.
+                                    </p>
+                                )}
+                                {selectedSrc && runsToLink.length === 0 && (
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        All tests from {selectedSrc.name} are already linked.
+                                    </p>
+                                )}
+                                {selectedSrc && runsToLink.length > 0 && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Will link {runsToLink.length} test{runsToLink.length !== 1 ? 's' : ''}: {runsToLink.map(r => r.name).join(', ')}
                                     </p>
                                 )}
                                 <div className="flex gap-2 mt-2 flex-wrap items-center">
@@ -2302,7 +2249,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <button
                                         type="button"
                                         onClick={suggestEpaRatio}
-                                        disabled={!newLinkSourceId}
+                                        disabled={!selectedSrc}
                                         className="btn btn-secondary text-xs whitespace-nowrap disabled:opacity-40"
                                         title="Auto-fill from EPA range ratio (target ÷ source)"
                                     >
@@ -2318,14 +2265,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <button
                                         type="button"
                                         onClick={handleAdd}
-                                        disabled={!newLinkSourceId || linkSaving}
+                                        disabled={!newLinkSourceId || runsToLink.length === 0 || linkSaving}
                                         className="btn btn-primary text-sm disabled:opacity-40"
                                     >
-                                        {linkSaving ? 'Adding…' : 'Add Link'}
+                                        {linkSaving ? 'Linking…' : `Link ${runsToLink.length > 0 ? runsToLink.length + ' ' : ''}Test${runsToLink.length !== 1 ? 's' : ''}`}
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setShowAddLink(false)}
+                                        onClick={() => { setShowAddLink(false); setNewLinkSourceId(''); setNewLinkScaling(''); setNewLinkNotes(''); }}
                                         className="btn btn-secondary text-sm"
                                     >
                                         Cancel
@@ -2389,9 +2336,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             tags={tags || []}
                             availableTagsForForm={vehicleAvailableTags}
                             editingVehicle={vehicle}
-                            trims={vehicle.trims || []}
-                            onAddTrim={(trimData) => onAddTrim(vehicle.id, trimData)}
-                            onRemoveTrim={(trimId) => onDeleteTrim(vehicle.id, trimId)}
                             imageUploading={vehicleImageUploading}
                             onImageReady={handleVehicleImageReady}
                             onSubmit={handleVehicleSubmit}

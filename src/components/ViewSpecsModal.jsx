@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import VehicleSpecsDisplay from './VehicleSpecsDisplay';
 import { SpecVouchButton } from './VoteButtons';
+import { mergeInheritedSpecs, vehicleLabel } from '../utils/specHelpers';
 
 /**
  * Read-only modal showing a vehicle's specs.
@@ -19,6 +20,16 @@ export default function ViewSpecsModal({ vehicle, onClose }) {
     // Use the live vehicle from context so flagged_specs updates are reflected immediately
     const liveVehicle = vehicles.find(v => v.id === vehicle.id) || vehicle;
     const vouches = specVouches[vehicle.id] ?? { count: 0, myVouch: false };
+
+    // Resolve inherited specs
+    const sourceVehicle = liveVehicle.spec_source_vehicle_id
+        ? vehicles.find(v => v.id === liveVehicle.spec_source_vehicle_id)
+        : null;
+    const { merged: effectiveSpecs, inheritedKeys } = mergeInheritedSpecs(
+        liveVehicle.specs,
+        sourceVehicle?.specs
+    );
+    const sourceVehicleName = sourceVehicle ? vehicleLabel(sourceVehicle) : null;
 
     // Pending flags — buffered locally, committed to DB only when the modal closes.
     // Clicking 🚩 again before closing cancels the flag (no DB call at all).
@@ -59,11 +70,13 @@ export default function ViewSpecsModal({ vehicle, onClose }) {
 
                 <div className="modal-body flex-1 overflow-y-auto">
                     <VehicleSpecsDisplay
-                        specs={liveVehicle.specs}
+                        specs={effectiveSpecs}
                         flaggedSpecs={liveVehicle.flagged_specs || []}
                         vehicleId={liveVehicle.id}
                         defaultAllOpen={true}
                         showFlagButtons={true}
+                        inheritedKeys={inheritedKeys}
+                        sourceVehicleName={sourceVehicleName}
                         pendingFlags={pendingFlags}
                         onFlagField={handleFlagField}
                     />

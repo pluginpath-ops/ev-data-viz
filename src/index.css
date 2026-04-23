@@ -591,9 +591,12 @@ body {
     @apply flex flex-wrap gap-1.5 mt-1;
 }
 
-/* Run card action button row */
+/* Run card actions — own runs: single horizontal row; inherited: column of rows */
 .run-actions {
-    @apply flex gap-2 flex-wrap justify-end;
+    @apply flex flex-col gap-1.5 items-end shrink-0;
+}
+.run-actions-row {
+    @apply flex gap-2 items-center;
 }
 
 

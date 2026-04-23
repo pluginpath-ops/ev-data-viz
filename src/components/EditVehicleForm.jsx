@@ -50,7 +50,6 @@ export default function EditVehicleForm({
     newTagName, onNewTagNameChange, onCreateTag,
     tags, availableTagsForForm,
     editingVehicle,
-    trims, onAddTrim, onRemoveTrim,
     imageUploading, onImageReady,
     onSubmit, onCancel,
     // Manufacturer
@@ -63,26 +62,11 @@ export default function EditVehicleForm({
     const imgRef = useRef(null);
     const fileInputRef = useRef(null);
 
-    // Trim "add" form local state
-    const [newTrimName, setNewTrimName] = useState('');
-    const [newTrimWheel, setNewTrimWheel] = useState('');
-    const [newTrimTire, setNewTrimTire] = useState('');
-    const [newTrimEpa, setNewTrimEpa] = useState('');
-
     // New manufacturer inline creation
     const [showNewMfg, setShowNewMfg] = useState(false);
     const [newMfgName, setNewMfgName] = useState('');
     const [newMfgCountry, setNewMfgCountry] = useState('');
     const [mfgSaving, setMfgSaving] = useState(false);
-
-    const handleAddTrim = () => {
-        if (!newTrimName.trim()) return;
-        onAddTrim({ name: newTrimName.trim(), wheel_size: newTrimWheel.trim(), tire_size: newTrimTire.trim(), epa_range_miles: newTrimEpa.trim() });
-        setNewTrimName('');
-        setNewTrimWheel('');
-        setNewTrimTire('');
-        setNewTrimEpa('');
-    };
 
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
@@ -227,6 +211,7 @@ export default function EditVehicleForm({
                     </div>
 
                     <input placeholder="Model"          value={formData.model}   onChange={(e) => onFormChange({ ...formData, model: e.target.value })}   className="form-input" />
+                    <input placeholder="Trim"           value={formData.trim ?? ''}  onChange={(e) => onFormChange({ ...formData, trim: e.target.value })}    className="form-input" />
                     <input placeholder="Year"           value={formData.year}    onChange={(e) => onFormChange({ ...formData, year: e.target.value })}    className="form-input" />
                     <input placeholder="Battery (kWh)"  value={formData.battery} onChange={(e) => onFormChange({ ...formData, battery: e.target.value })} className="form-input" />
                     <input placeholder="EPA Range (mi)" value={formData.range}   onChange={(e) => onFormChange({ ...formData, range: e.target.value })}   className="form-input" />
@@ -286,83 +271,6 @@ export default function EditVehicleForm({
                             />
                             <button type="button" onClick={onCreateTag} className="btn btn-primary text-sm">
                                 Create tag
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Trims — edit mode only */}
-                {editingId && (
-                    <div className="form-section mt-5">
-                        <label className="block font-medium mb-2">Trims</label>
-                        {(trims || []).length > 0 && (
-                            <div className="trim-list mb-3">
-                                <div className="trim-list-header">
-                                    <span>Name</span>
-                                    <span>Wheel</span>
-                                    <span>Tire Size</span>
-                                    <span>EPA Range</span>
-                                    <span />
-                                </div>
-                                {(trims || []).map(trim => (
-                                    <div key={trim.id} className="trim-list-row">
-                                        <span className="text-sm">{trim.name}</span>
-                                        <span className="text-sm text-gray-500">{trim.wheel_size || '—'}</span>
-                                        <span className="text-sm text-gray-500">{trim.tire_size || '—'}</span>
-                                        <span className="text-sm text-gray-500">{trim.epa_range_miles != null ? `${trim.epa_range_miles} mi` : '—'}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => onRemoveTrim(trim.id)}
-                                            className="text-gray-400 hover:text-red-500 transition text-xs"
-                                            title="Remove trim"
-                                        >
-                                            &times;
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        <div className="trim-add-row">
-                            <input
-                                type="text"
-                                placeholder="Name (e.g. Long Range AWD)"
-                                value={newTrimName}
-                                onChange={e => setNewTrimName(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTrim(); } }}
-                                className="form-input text-sm"
-                            />
-                            <input
-                                type="text"
-                                placeholder='Wheel (e.g. 19")'
-                                value={newTrimWheel}
-                                onChange={e => setNewTrimWheel(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTrim(); } }}
-                                className="form-input text-sm"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Tire (e.g. 255/45R19)"
-                                value={newTrimTire}
-                                onChange={e => setNewTrimTire(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTrim(); } }}
-                                className="form-input text-sm"
-                            />
-                            <input
-                                type="number"
-                                placeholder="EPA Range (mi)"
-                                value={newTrimEpa}
-                                onChange={e => setNewTrimEpa(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTrim(); } }}
-                                className="form-input text-sm w-24"
-                                min="0"
-                            />
-                            <button
-                                type="button"
-                                onClick={handleAddTrim}
-                                disabled={!newTrimName.trim()}
-                                className="btn btn-primary text-sm disabled:opacity-40"
-                            >
-                                Add
                             </button>
                         </div>
                     </div>

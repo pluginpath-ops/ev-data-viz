@@ -3,6 +3,7 @@ import Chart from 'chart.js/auto';
 import AxisScaleControls from './AxisScaleControls';
 import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
+import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import {
     convDistance, convSpeed, convTemp,
@@ -83,7 +84,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     const allRangeRuns = selectedVehicles.flatMap(v =>
         (v.runs || [])
             .filter(r => r.has_range)
-            .map(r => ({ ...r, vehicleName: v.name, vehicleId: v.id }))
+            .map(r => ({ ...r, vehicleName: vehicleLabel(v), vehicleId: v.id }))
     );
 
     const selectedRangeRuns = allRangeRuns.filter(r =>
