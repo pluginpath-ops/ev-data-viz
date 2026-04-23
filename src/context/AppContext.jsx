@@ -494,10 +494,17 @@ export function AppProvider({ children }) {
         }
     };
 
-    const updateVehicleSpecs = async (vehicleId, specs) => {
+    const updateVehicleSpecs = async (vehicleId, specs, specSourceVehicleId = undefined) => {
         try {
-            await dataService.updateVehicleSpecs(vehicleId, specs);
-            setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, specs } : v));
+            await dataService.updateVehicleSpecs(vehicleId, specs, specSourceVehicleId);
+            setVehicles(prev => prev.map(v => {
+                if (v.id !== vehicleId) return v;
+                const update = { ...v, specs };
+                if (specSourceVehicleId !== undefined) {
+                    update.spec_source_vehicle_id = specSourceVehicleId ? Number(specSourceVehicleId) : null;
+                }
+                return update;
+            }));
             // Update custom field suggestions with any new keys from the saved specs
             setSpecCustomFieldSuggestions(prev => {
                 const next = { ...prev };

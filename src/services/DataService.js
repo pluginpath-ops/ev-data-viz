@@ -347,7 +347,7 @@ class DataService {
     if (error) throw error;
   }
 
-  async updateVehicleSpecs(vehicleId, specs) {
+  async updateVehicleSpecs(vehicleId, specs, specSourceVehicleId = undefined) {
     if (!this.useSupabase || !this.user) return;
     const { performance, ...otherSpecs } = specs;
     const { promoted, remaining } = splitPerformance(performance);
@@ -360,11 +360,16 @@ class DataService {
       if (perfError) throw perfError;
     }
 
-    // Save remaining performance fields + all other spec categories to JSONB
+    // Save remaining performance fields + all other spec categories to JSONB.
+    // Optionally persist the inheritance source alongside the overrides.
     const finalSpecs = remaining ? { ...otherSpecs, performance: remaining } : otherSpecs;
+    const update = { specs: finalSpecs };
+    if (specSourceVehicleId !== undefined) {
+      update.spec_source_vehicle_id = specSourceVehicleId ? Number(specSourceVehicleId) : null;
+    }
     const { error } = await getSupabase()
       .from('vehicles')
-      .update({ specs: finalSpecs })
+      .update(update)
       .eq('id', vehicleId);
     if (error) throw error;
   }
