@@ -1767,17 +1767,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 </a>
                                             )}
                                         </h3>
-                                        {/* Data-type flag pills — one per active data domain */}
-                                        {inferRunFlags(run).map(key => {
-                                            const flag = DATA_FLAGS.find(f => f.key === key);
-                                            if (!flag) return null;
-                                            return (
-                                                <span key={key} title={flag.desc}
-                                                    className={`text-xs px-2 py-0.5 rounded-full font-medium border ${flag.pillStyle}`}>
-                                                    {flag.label}
-                                                </span>
-                                            );
-                                        })}
                                     </div>
                                     <div className="run-meta">
                                         <p>Date: {run.date}</p>
@@ -2027,16 +2016,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 className="text-blue-400 hover:text-blue-600 transition-colors ml-1 text-sm font-normal">↗</a>
                                                         )}
                                                     </h3>
-                                                    {inferRunFlags(run).map(key => {
-                                                        const flag = DATA_FLAGS.find(f => f.key === key);
-                                                        if (!flag) return null;
-                                                        return (
-                                                            <span key={key} title={flag.desc}
-                                                                className={`text-xs px-2 py-0.5 rounded-full font-medium border ${flag.pillStyle}`}>
-                                                                {flag.label}
-                                                            </span>
-                                                        );
-                                                    })}
                                                     {run.isDefault && (
                                                         <span className="text-xs px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>Default</span>
                                                     )}
