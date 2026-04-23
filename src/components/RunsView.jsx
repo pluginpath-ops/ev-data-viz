@@ -2052,26 +2052,70 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 <div className="run-meta">
                                                     <p className="text-gray-500">Inherited from: <span className="font-medium text-gray-700">{srcName}</span></p>
                                                     <p>Date: {run.date}</p>
+                                                    {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
                                                     {run.conditions && <p>Notes: {run.conditions}</p>}
-                                                    {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (
-                                                        <div className="run-stat-badges">
-                                                            {run.source && <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{run.source}</span>}
-                                                            {run.speed_mph != null
-                                                                ? <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
-                                                                : <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-200">70 mph (assumed)</span>
-                                                            }
-                                                            {run.distance_miles != null && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-200">{fmtDistance(run.distance_miles, units)}</span>}
-                                                            {run.temperature_f != null && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>}
-                                                            {run.start_soc != null && run.end_soc != null && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">SoC {run.start_soc}→{run.end_soc}%</span>}
-                                                        </div>
-                                                    )}
-                                                    {inferRunFlags(run).includes('charging') && (
-                                                        <div className="run-stat-badges items-center">
-                                                            <span className="text-sm">Data Points: {run.dataPointCount ?? 0}</span>
-                                                            {run.charging_url && <a href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline px-2 py-0.5 rounded">Source ↗</a>}
-                                                        </div>
-                                                    )}
+                                                    {/* Range metadata line — same style as regular run cards */}
+                                                    {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (() => {
+                                                        const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
+                                                        const items = [];
+                                                        if (run.source) items.push(<span key="src" className="text-gray-700">{run.source}</span>);
+                                                        if (run.speed_mph != null) {
+                                                            items.push(<span key="spd" className="text-gray-600">{fmtSpeed(run.speed_mph, units)}</span>);
+                                                        } else {
+                                                            items.push(<span key="spd" className="text-amber-600" title="Set Speed (mph) in run metadata for accurate efficiency">{fmtSpeed(70, units)} (est.)</span>);
+                                                        }
+                                                        if (run.distance_miles != null) items.push(<span key="dist" className="text-green-700">{fmtDistance(run.distance_miles, units)}</span>);
+                                                        if (run.energy_kwh != null) items.push(<span key="kwh" className="text-blue-700" title="Energy out (measured at vehicle)">{run.energy_kwh} kWh out</span>);
+                                                        if (run.energy_kwh != null && run.distance_miles != null) items.push(<span key="eff" className="text-blue-700">{calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}</span>);
+                                                        if (run.temperature_f != null) items.push(<span key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</span>);
+                                                        if (run.start_soc != null && run.end_soc != null) items.push(<span key="soc" className="text-gray-600">SoC {run.start_soc}→{run.end_soc}%</span>);
+                                                        if (run.url) items.push(<a key="url" href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
+                                                        return (
+                                                            <p className="text-sm mt-1 flex flex-wrap items-baseline">
+                                                                {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
+                                                            </p>
+                                                        );
+                                                    })()}
+                                                    {/* Charging metadata line — same style as regular run cards */}
+                                                    {inferRunFlags(run).includes('charging') && (() => {
+                                                        const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
+                                                        const items = [];
+                                                        items.push(<span key="pts" className="text-gray-600">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>);
+                                                        if (run.energy_kwh != null && !inferRunFlags(run).includes('range')) items.push(<span key="kwh" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.energy_kwh} kWh in</span>);
+                                                        if (run.charging_url) items.push(<a key="curl" href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
+                                                        return (
+                                                            <p className="text-sm mt-1 flex flex-wrap items-baseline gap-y-1">
+                                                                {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
+                                                            </p>
+                                                        );
+                                                    })()}
                                                 </div>
+                                                {/* Field tags — same as regular run cards */}
+                                                {(() => {
+                                                    const fields = run.populated_fields || [];
+                                                    const calcFields = run.calculated_fields || [];
+                                                    if (fields.length === 0) return null;
+                                                    return (
+                                                        <div className="flex flex-wrap gap-1 mt-2">
+                                                            {FIELD_META.filter(f => fields.includes(f.key)).map(f => {
+                                                                const isCalc = calcFields.includes(f.key);
+                                                                return (
+                                                                    <span
+                                                                        key={f.key}
+                                                                        title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
+                                                                        className={`px-2 py-0.5 text-xs rounded-full font-medium border ${
+                                                                            isCalc
+                                                                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                                                : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                                        }`}
+                                                                    >
+                                                                        {isCalc ? `~${f.label}` : f.label}
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                             <div className="run-actions">
                                                 {/* Row 1: Default | Remove */}
