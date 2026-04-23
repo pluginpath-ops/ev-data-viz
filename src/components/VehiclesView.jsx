@@ -58,7 +58,7 @@ export default function VehiclesView({
     const [specsViewingVehicle, setSpecsViewingVehicle] = useState(null);
     const VEHICLES_PER_PAGE = 24;
 
-    const { units, manufacturers, addManufacturer, isContributor, addSpecLink, deleteSpecLink } = useAppContext();
+    const { units, manufacturers, addManufacturer, isContributor, addSpecLink, deleteSpecLink, user } = useAppContext();
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -248,6 +248,7 @@ export default function VehiclesView({
     // ── Shared sub-components ────────────────────────────────────────────────
 
     const VisibilityPill = ({ vehicle, fullWidth }) => {
+        if (!user) return null;
         const base = `flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition${fullWidth ? ' w-full justify-center' : ''}`;
         const pubCls = 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200';
         const privCls = 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200';

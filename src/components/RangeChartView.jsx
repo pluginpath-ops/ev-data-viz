@@ -427,7 +427,15 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     // ── Copy chart PNG ────────────────────────────────────────────────────────
     const handleCopyImage = async () => {
         if (!chartInstance.current) return;
-        const dataUrl = chartInstance.current.toBase64Image('image/png', 1.0);
+        const src = chartInstance.current.canvas;
+        const offscreen = document.createElement('canvas');
+        offscreen.width = src.width;
+        offscreen.height = src.height;
+        const ctx2 = offscreen.getContext('2d');
+        ctx2.fillStyle = '#ffffff';
+        ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
+        ctx2.drawImage(src, 0, 0);
+        const dataUrl = offscreen.toDataURL('image/png');
         try {
             const blob = await (await fetch(dataUrl)).blob();
             await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
