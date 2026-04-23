@@ -111,7 +111,7 @@ class DataService {
     }
     const { data } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), trims(*), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color)`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color)`)
       .order('created_at', { ascending: false });
 
     // Pass 1: process each vehicle's own data
@@ -136,15 +136,12 @@ class DataService {
         manufacturer,                    // { id, name, country } or null
         spec_links: v.spec_links || [],  // raw link rows (kept for admin UI)
         tags:  (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
-        trims: (v.trims || []).sort((a, b) => a.id - b.id),
         runs:  (v.runs || []).map(r => ({
           ...r,
           // Normalise DB snake_case to the camelCase used throughout the app.
           isDefault: !!r.is_default,
           // data_points(count) returns [{ count: N }]; normalise to a plain number
           dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
-          // Resolve the trim FK so chart components can access trim details directly
-          _trim: (v.trims || []).find(t => t.id === r.trim_id) ?? null,
         })),
       };
     });
@@ -414,36 +411,6 @@ class DataService {
     });
   }
 
-  // ── Trims ─────────────────────────────────────────────────────────────────
-
-  async addTrim(vehicleId, { name, wheel_size, tire_size, epa_range_miles }) {
-    const { data, error } = await getSupabase()
-      .from('trims')
-      .insert({ vehicle_id: vehicleId, name, wheel_size: wheel_size || null, tire_size: tire_size || null, epa_range_miles: epa_range_miles != null && epa_range_miles !== '' ? Number(epa_range_miles) : null })
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  }
-
-  async updateTrim(trimId, updates) {
-    const { error } = await getSupabase()
-      .from('trims')
-      .update({
-        name: updates.name,
-        wheel_size: updates.wheel_size || null,
-        tire_size: updates.tire_size || null,
-        epa_range_miles: updates.epa_range_miles != null && updates.epa_range_miles !== '' ? Number(updates.epa_range_miles) : null,
-      })
-      .eq('id', trimId);
-    if (error) throw error;
-  }
-
-  async deleteTrim(trimId) {
-    const { error } = await getSupabase().from('trims').delete().eq('id', trimId);
-    if (error) throw error;
-  }
-
   // ── Copy run to a different vehicle ───────────────────────────────────────
 
   async copyRunToVehicle(run, targetVehicleId) {
@@ -508,7 +475,6 @@ class DataService {
       elevation_gain_ft: numField(run.elevationGainFt, run.elevation_gain_ft),
       url: run.url || null,
       charging_url: coalesce(run.chargingUrl, run.charging_url) || null,
-      trim_id: numField(run.trimId, run.trim_id),
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
@@ -566,7 +532,6 @@ class DataService {
       ...(updates.elevationGainFt !== undefined ? { elevation_gain_ft: updates.elevationGainFt !== '' ? Number(updates.elevationGainFt) : null } : {}),
       ...(updates.url !== undefined ? { url: updates.url || null } : {}),
       ...(updates.chargingUrl !== undefined ? { charging_url: updates.chargingUrl || null } : {}),
-      ...(updates.trimId !== undefined ? { trim_id: updates.trimId ? Number(updates.trimId) : null } : {}),
     }).eq('id', runId);
     if (error) throw error;
   }

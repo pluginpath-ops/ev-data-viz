@@ -151,47 +151,6 @@ export function AppProvider({ children }) {
         }
     };
 
-    // ── Trim CRUD ─────────────────────────────────────────────────────────────
-
-    const addTrim = async (vehicleId, trimData) => {
-        try {
-            const newTrim = await dataService.addTrim(vehicleId, trimData);
-            setVehicles(prev => prev.map(v =>
-                v.id === vehicleId
-                    ? { ...v, trims: [...(v.trims || []), newTrim] }
-                    : v
-            ));
-        } catch (error) {
-            showError('Error adding trim: ' + error.message);
-        }
-    };
-
-    const updateTrim = async (vehicleId, trimId, updates) => {
-        try {
-            await dataService.updateTrim(trimId, updates);
-            setVehicles(prev => prev.map(v =>
-                v.id === vehicleId
-                    ? { ...v, trims: (v.trims || []).map(t => t.id === trimId ? { ...t, ...updates } : t) }
-                    : v
-            ));
-        } catch (error) {
-            showError('Error updating trim: ' + error.message);
-        }
-    };
-
-    const deleteTrim = async (vehicleId, trimId) => {
-        try {
-            await dataService.deleteTrim(trimId);
-            setVehicles(prev => prev.map(v =>
-                v.id === vehicleId
-                    ? { ...v, trims: (v.trims || []).filter(t => t.id !== trimId) }
-                    : v
-            ));
-        } catch (error) {
-            showError('Error deleting trim: ' + error.message);
-        }
-    };
-
     // ── Copy run to a different vehicle ───────────────────────────────────────
 
     const copyRunToVehicle = async (sourceVehicleId, run, targetVehicleId) => {
@@ -802,9 +761,6 @@ export function AppProvider({ children }) {
         reorderVehicles,
         duplicateVehicle,
         deleteVehicle,
-        addTrim,
-        updateTrim,
-        deleteTrim,
         copyRunToVehicle,
         duplicateRun,
         addRun,

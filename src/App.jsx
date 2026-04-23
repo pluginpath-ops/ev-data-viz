@@ -58,8 +58,6 @@ export default function App() {
         clearNotification,
         updateVehicleSpecs,
         specCustomFieldSuggestions,
-        addTrim,
-        deleteTrim,
         copyRunToVehicle,
         units,
         toggleUnits,
@@ -620,8 +618,6 @@ export default function App() {
                             onDuplicateVehicle={duplicateVehicle}
                             onUpdateVehicleSpecs={updateVehicleSpecs}
                             specCustomFieldSuggestions={specCustomFieldSuggestions}
-                            onAddTrim={addTrim}
-                            onDeleteTrim={deleteTrim}
                             pendingEditVehicle={pendingEditVehicle}
                             onClearPendingEdit={() => setPendingEditVehicle(null)}
                         />
@@ -654,8 +650,6 @@ export default function App() {
                             onUploadVehicleImage={(file) => uploadVehicleImage(currentActiveVehicle.id, file)}
                             onUpdateVehicleSpecs={updateVehicleSpecs}
                             specCustomFieldSuggestions={specCustomFieldSuggestions}
-                            onAddTrim={addTrim}
-                            onDeleteTrim={deleteTrim}
                             vehicles={vehicles}
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                         />
