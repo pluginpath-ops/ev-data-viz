@@ -7,6 +7,51 @@ export function vehicleLabel(v) {
     return v?.year ? `${v.year} ${v.name}` : (v?.name ?? '');
 }
 
+// ── Spec inheritance merge ────────────────────────────────────────────────────
+
+/**
+ * Merge own (override) specs with source (inherited) specs.
+ * Returns:
+ *   merged       — the effective spec object to display
+ *   inheritedKeys — Set<string> of "cat.field" keys that came from the source
+ *                   (i.e., own value was blank, source value was used)
+ */
+export function mergeInheritedSpecs(ownSpecs, sourceSpecs) {
+    if (!sourceSpecs) return { merged: ownSpecs ?? {}, inheritedKeys: new Set() };
+
+    const merged = {};
+    const inheritedKeys = new Set();
+
+    for (const cat of SPEC_CATEGORIES) {
+        const own = ownSpecs?.[cat.key] ?? {};
+        const src = sourceSpecs?.[cat.key] ?? {};
+        merged[cat.key] = {};
+
+        for (const field of cat.fields) {
+            const ownVal = own[field.key];
+            const hasOwn = ownVal !== null && ownVal !== undefined && ownVal !== '';
+            if (hasOwn) {
+                merged[cat.key][field.key] = ownVal;
+            } else {
+                const srcVal = src[field.key];
+                const hasSrc = srcVal !== null && srcVal !== undefined && srcVal !== '';
+                merged[cat.key][field.key] = hasSrc ? srcVal : null;
+                if (hasSrc) inheritedKeys.add(`${cat.key}.${field.key}`);
+            }
+        }
+
+        // Custom fields: own overrides source; inherited if only in source
+        const ownCustom = own._custom ?? {};
+        const srcCustom = src._custom ?? {};
+        merged[cat.key]._custom = { ...srcCustom, ...ownCustom };
+        for (const k of Object.keys(srcCustom)) {
+            if (!ownCustom[k]) inheritedKeys.add(`${cat.key}._custom.${k}`);
+        }
+    }
+
+    return { merged, inheritedKeys };
+}
+
 // ── Built-in vehicle-level fields ─────────────────────────────────────────────
 
 export function makeVehicleFields(units) {
