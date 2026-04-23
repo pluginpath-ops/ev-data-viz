@@ -313,7 +313,7 @@ class DataService {
       return newVehicle;
     }
     const { data, error } = await getSupabase().from('vehicles').insert({
-      user_id: this.user.id, name: vehicle.name, make: vehicle.make, model: vehicle.model, year: vehicle.year,
+      user_id: this.user.id, name: vehicle.name, make: vehicle.make, model: vehicle.model, trim: vehicle.trim || null, year: vehicle.year,
       battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
       range: vehicle.range ? parseFloat(vehicle.range) : null,
       power: vehicle.power ? parseFloat(vehicle.power) : null,
@@ -333,7 +333,7 @@ class DataService {
       return;
     }
     const { error } = await getSupabase().from('vehicles').update({
-      name: updates.name, make: updates.make, model: updates.model, year: updates.year,
+      name: updates.name, make: updates.make, model: updates.model, trim: updates.trim || null, year: updates.year,
       battery: updates.battery ? parseFloat(updates.battery) : null,
       range: updates.range ? parseFloat(updates.range) : null,
       power: updates.power ? parseFloat(updates.power) : null,

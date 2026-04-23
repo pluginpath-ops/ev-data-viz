@@ -37,7 +37,7 @@ export default function VehiclesView({
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
-        name: '', make: '', model: '', year: '',
+        name: '', make: '', model: '', trim: '', year: '',
         battery: '', range: '', manufacturer_id: null,
     });
     const [mfgFilter, setMfgFilter] = useState(new Set());
@@ -82,7 +82,7 @@ export default function VehiclesView({
             onAdd(formData);
         }
         setFormTags([]);
-        setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '', manufacturer_id: null });
+        setFormData({ name: '', make: '', model: '', trim: '', year: '', battery: '', range: '', manufacturer_id: null });
         setShowForm(false);
     };
 
@@ -92,6 +92,7 @@ export default function VehiclesView({
             name: vehicle.name,
             make: vehicle.make || '',
             model: vehicle.model || '',
+            trim: vehicle.trim || '',
             year: vehicle.year || '',
             battery: vehicle.battery || '',
             range: vehicle.range || '',
@@ -107,7 +108,7 @@ export default function VehiclesView({
         setEditingId(null);
         setFormTags([]);
         setNewTagName('');
-        setFormData({ name: '', make: '', model: '', year: '', battery: '', range: '', manufacturer_id: null });
+        setFormData({ name: '', make: '', model: '', trim: '', year: '', battery: '', range: '', manufacturer_id: null });
     };
 
     const handleDuplicateVehicle = async (vehicle, e) => {
