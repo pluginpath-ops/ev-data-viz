@@ -1,5 +1,5 @@
 import { interpolate } from './interpolate';
-import { convDistance } from './unitConversions';
+import { convDistance, roundTo } from './unitConversions';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const AERO_FRACTION        = 0.70; // fraction of energy from aero drag at ref speed (unladen EV)
@@ -261,4 +261,4 @@ export function formatTime(minutes) {
 }
 
 // ── Internal ─────────────────────────────────────────────────────────────────
-function round1(v) { return Math.round(v * 10) / 10; }
+const round1 = v => roundTo(v, 1);

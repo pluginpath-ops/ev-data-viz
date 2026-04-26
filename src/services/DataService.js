@@ -1,16 +1,9 @@
 import { getSupabase } from './supabase';
 import { vehicleLabel } from '../utils/specHelpers';
+import { roundTo, } from '../utils/unitConversions';
+import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId } from '../utils/runUtils';
 
-/**
- * Round a numeric field to a given number of decimal places.
- * Returns null if the value is null/undefined/NaN.
- */
-function roundField(value, decimals) {
-  if (value == null) return null;
-  const n = Number(value);
-  if (isNaN(n)) return null;
-  return Math.round(n * 10 ** decimals) / 10 ** decimals;
-}
+const roundField = roundTo;
 
 /** Normalise a raw data-point object into a clean DB row shape. */
 function normalisePoint(point, runId, frame) {
@@ -58,7 +51,7 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
       ...run,
       // Synthetic id prevents runDataCache collision when both source and
       // target vehicles are selected simultaneously in charts.
-      id:                `inherited_${link.id}_${run.id}`,
+      id:                buildInheritedRunId(link.id, run.id),
       _inherited:         true,
       _realRunId:         run.id,
       _scalingFactor:     sf,
@@ -478,13 +471,7 @@ class DataService {
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
-      // Determine which fields have at least one non-null value
-      const populatedFields = [];
-      if (run.data.some(p => p.soc         != null)) populatedFields.push('soc');
-      if (run.data.some(p => p.chargeRate  != null)) populatedFields.push('chargeRate');
-      if (run.data.some(p => p.time        != null)) populatedFields.push('time');
-      if (run.data.some(p => p.range       != null)) populatedFields.push('range');
-      if (run.data.some(p => p.temperature != null)) populatedFields.push('temperature');
+      const populatedFields = detectPopulatedFields(run.data);
 
       const batchSize = 1000;
       for (let i = 0; i < run.data.length; i += batchSize) {
@@ -610,9 +597,8 @@ class DataService {
 
   async getRunData(runId, scalingFactor = 1) {
     // Inherited runs carry synthetic string ids like "inherited_<linkId>_<realRunId>".
-    // Strip the prefix to get the real DB run id.
-    const actualId = typeof runId === 'string' && runId.startsWith('inherited_')
-      ? parseInt(runId.split('_').pop(), 10)
+    const actualId = isInheritedRunId(runId)
+      ? parseInheritedRunId(runId).realRunId
       : runId;
     const { data, error } = await getSupabase()
       .from('data_points')
@@ -844,13 +830,7 @@ class DataService {
       .rpc('replace_run_data_points', { p_run_id: runId, p_rows: rows });
     if (error) throw error;
 
-    // Recompute populated_fields from the new data
-    const populatedFields = [];
-    if (points.some(p => p.soc         != null)) populatedFields.push('soc');
-    if (points.some(p => p.chargeRate  != null)) populatedFields.push('chargeRate');
-    if (points.some(p => p.time        != null)) populatedFields.push('time');
-    if (points.some(p => p.range       != null)) populatedFields.push('range');
-    if (points.some(p => p.temperature != null)) populatedFields.push('temperature');
+    const populatedFields = detectPopulatedFields(points);
     await getSupabase().from('runs').update({ populated_fields: populatedFields }).eq('id', runId);
 
     return { rowCount: points.length, populatedFields };

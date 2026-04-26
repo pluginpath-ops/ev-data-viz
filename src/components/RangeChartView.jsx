@@ -12,6 +12,8 @@ import {
     calcEff, effOptions, effLabel as getEffLabel,
     fmtSpeed, fmtTemp,
 } from '../utils/unitConversions';
+import { filterRangeRuns } from '../utils/runUtils';
+import { copyChartAsPng } from '../utils/chartUtils';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -84,9 +86,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
 
     // ── Derived: all range runs across selected vehicles ──────────────────────
     const allRangeRuns = selectedVehicles.flatMap(v =>
-        (v.runs || [])
-            .filter(r => r.has_range)
-            .map(r => ({ ...r, vehicleName: vehicleLabel(v), vehicleId: v.id }))
+        filterRangeRuns(v.runs).map(r => ({ ...r, vehicleName: vehicleLabel(v), vehicleId: v.id }))
     );
 
     const selectedRangeRuns = allRangeRuns.filter(r =>
@@ -436,18 +436,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     // ── Copy chart PNG ────────────────────────────────────────────────────────
     const handleCopyImage = async () => {
         if (!chartInstance.current) return;
-        const src = chartInstance.current.canvas;
-        const offscreen = document.createElement('canvas');
-        offscreen.width = src.width;
-        offscreen.height = src.height;
-        const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
-        ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
-        ctx2.drawImage(src, 0, 0);
-        const dataUrl = offscreen.toDataURL('image/png');
         try {
-            const blob = await (await fetch(dataUrl)).blob();
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            await copyChartAsPng(chartInstance.current, isDark ? 'rgb(8,12,28)' : '#ffffff');
             setCopied(true);
             setTimeout(() => setCopied(false), 2500);
         } catch { /* Clipboard API not supported — chart is still visible */ }

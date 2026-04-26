@@ -12,6 +12,8 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
+import { filterChargingRuns, filterRangeRuns } from '../utils/runUtils';
+import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, presentationMode = false }) {
     const { units } = useAppContext();
@@ -66,14 +68,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         });
 
         if (mode === 'charging') {
-            const chargingRuns = selectedVehicles.flatMap(v => (v.runs || []).filter(r => r.has_charging !== false));
+            const chargingRuns = selectedVehicles.flatMap(v => filterChargingRuns(v.runs));
             const validRunIds  = new Set(chargingRuns.map(r => String(r.id)));
             const kept         = currentRuns.filter(id => validRunIds.has(String(id)));
             const added        = [];
 
             selectedVehicles.forEach(vehicle => {
                 const vid           = String(vehicle.id);
-                const vChargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
+                const vChargingRuns = filterChargingRuns(vehicle.runs);
                 if (!vChargingRuns.length) { autoSelectedRef.current.add(vid); return; }
 
                 const hasRun = kept.some(id => vChargingRuns.some(r => String(r.id) === String(id)));
@@ -97,7 +99,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
         } else if (mode === 'range') {
             const allRangeIds = selectedVehicles.flatMap(v =>
-                (v.runs || []).filter(r => r.has_range).map(r => r.id)
+                filterRangeRuns(v.runs).map(r => r.id)
             );
             const validSet = new Set(allRangeIds.map(String));
             const kept     = currentRuns.filter(id => validSet.has(String(id)));
@@ -106,7 +108,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
             selectedVehicles.forEach(vehicle => {
                 const vid        = String(vehicle.id);
-                const vRangeRuns = (vehicle.runs || []).filter(r => r.has_range);
+                const vRangeRuns = filterRangeRuns(vehicle.runs);
                 if (!vRangeRuns.length) { autoSelectedRef.current.add(vid); return; }
 
                 const hasAny = vRangeRuns.some(r => keptSet.has(String(r.id)));
@@ -513,24 +515,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // ── PNG export ───────────────────────────────────────────────────────────
     const handleExportImage = async () => {
         if (!chartInstance.current) return;
-        const src = chartInstance.current.canvas;
-        const offscreen = document.createElement('canvas');
-        offscreen.width = src.width;
-        offscreen.height = src.height;
-        const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
-        ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
-        ctx2.drawImage(src, 0, 0);
-        const dataUrl = offscreen.toDataURL('image/png');
-        setChartImage(dataUrl);
-        // Try writing directly to clipboard (Chrome/Edge; Safari requires user gesture)
+        const bgColor = isDark ? 'rgb(8,12,28)' : '#ffffff';
         try {
-            const blob = await (await fetch(dataUrl)).blob();
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            const dataUrl = await copyChartAsPng(chartInstance.current, bgColor);
+            setChartImage(dataUrl);
             setImageCopied(true);
             setTimeout(() => setImageCopied(false), 2500);
         } catch {
-            // Clipboard image write not supported — image is shown inline for manual copy
+            // Clipboard API not supported — render inline for manual save
+            setChartImage(chartToPngDataUrl(chartInstance.current));
         }
     };
 
@@ -652,7 +645,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             : [...prev.selectedRuns, runId],
                     }))}
                     onUpdateRunColor={handleColorChange}
-                    runFilter={r => r.has_charging !== false}
+                    runFilter={filterChargingRuns}
                     emptyMessage="No charging test records"
                     renderRunMeta={run => {
                         const exclusionReason = getRaceExclusionReason(run.id);

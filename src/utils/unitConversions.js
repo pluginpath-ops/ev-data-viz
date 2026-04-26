@@ -89,7 +89,16 @@ export function formatSpecValue(value, unitGroup, sys) {
     }
 }
 
-// ── Internal helpers ──────────────────────────────────────────────────────
+// ── Rounding ──────────────────────────────────────────────────────────────────
 
+/** Round to a given number of decimal places. Returns null for null/NaN input. */
+export function roundTo(value, decimals) {
+    if (value == null) return null;
+    const n = Number(value);
+    if (isNaN(n)) return null;
+    return Math.round(n * 10 ** decimals) / 10 ** decimals;
+}
+
+// Internal shorthands used throughout this file
 function r1(v) { return Math.round(v * 10) / 10; }
 function r2(v) { return Math.round(v * 100) / 100; }

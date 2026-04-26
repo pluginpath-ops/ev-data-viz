@@ -1,4 +1,5 @@
 import { interpolate } from './interpolate';
+import { roundTo } from './unitConversions';
 
 /**
  * Estimate elapsed time values for charging data points using power integration
@@ -105,13 +106,13 @@ export function estimateChargingTimes({ dataPoints, batteryKwh, anchors, shiftTo
             baseAnchor = seg.A;
         }
         const t = baseAnchor.timeMin + (cumRawAtSoc(p.soc) - cumRawAtSoc(baseAnchor.soc)) * seg.scale;
-        return Math.round(t * 10) / 10; // 1 decimal place
+        return roundTo(t, 1);
     });
 
     // ── Optional: shift so minimum time = 0 ───────────────────────────────────
     const minT  = Math.min(...calibrated);
     const times = shiftToZero
-        ? calibrated.map(t => Math.round((t - minT) * 10) / 10)
+        ? calibrated.map(t => roundTo(t - minT, 1))
         : calibrated;
 
     return {

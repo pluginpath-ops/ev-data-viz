@@ -7,6 +7,7 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
+import { filterChargingRuns, filterRangeRuns } from '../utils/runUtils';
 
 // ── Interpolation helper ──────────────────────────────────────────────────────
 // Returns the interpolated yField value at targetX, given points sorted by xField.
@@ -308,8 +309,8 @@ export default function ChargeCompareView({
     const resolvedRuns = useMemo(() => {
         const result = [];
         for (const vehicle of selectedVehicles) {
-            const rangeRuns    = (vehicle.runs || []).filter(r => r.has_range);
-            const chargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
+            const rangeRuns    = filterRangeRuns(vehicle.runs);
+            const chargingRuns = filterChargingRuns(vehicle.runs);
             const defaultCharging =
                 chargingRuns.find(r => r.isDefault) ||
                 [...chargingRuns].sort((a, b) => new Date(b.date) - new Date(a.date))[0] ||
@@ -636,7 +637,7 @@ export default function ChargeCompareView({
                             prev.includes(runId) ? prev.filter(id => id !== runId) : [...prev, runId]
                         )}
                         onUpdateRunColor={onUpdateRunColor}
-                        runFilter={r => r.has_range}
+                        runFilter={filterRangeRuns}
                         emptyMessage="No range test records"
                         renderRunMeta={run => (
                             <>
