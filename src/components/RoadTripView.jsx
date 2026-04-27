@@ -1450,31 +1450,28 @@ export default function RoadTripView({
 
             {!loading && validEntries.length > 0 && (
                 <div className="card mb-6">
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-lg font-bold">
-                            Road Trip{towingMode ? ' (Towing)' : ''}
-                            {isSpeedMode   ? ` · Speed vs. Time`
-                             : isTripDistMode ? ` — ${Math.round(convDistance(totalDistance, units))} ${dl} · Leg Distance vs. Time at ${Math.round(convDistance(speed, units))} ${sl}`
-                             : ` — ${Math.round(convDistance(totalDistance, units))} ${dl} at ${Math.round(convDistance(speed, units))} ${sl}`}
-                        </h3>
-                        <button
-                            onClick={() => chartRef.current?.resetZoom()}
-                            className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded px-2 py-1 transition-colors"
-                            title="Reset zoom to full view"
-                        >
-                            Reset Zoom
-                        </button>
-                    </div>
+                    <h3 className="text-lg font-bold mb-2">
+                        Road Trip{towingMode ? ' (Towing)' : ''}
+                        {isSpeedMode   ? ` · Speed vs. Time`
+                         : isTripDistMode ? ` — ${Math.round(convDistance(totalDistance, units))} ${dl} · Leg Distance vs. Time at ${Math.round(convDistance(speed, units))} ${sl}`
+                         : ` — ${Math.round(convDistance(totalDistance, units))} ${dl} at ${Math.round(convDistance(speed, units))} ${sl}`}
+                    </h3>
                     <div style={{ height: `${isSweepMode ? 400 : yAxis === 'byTest' ? Math.max(300, validEntries.length * 120) : Math.max(400, validEntries.length * 40 + 200)}px`, position: 'relative' }}>
                         <canvas ref={canvasRef} />
                     </div>
-                    <p className="text-xs text-gray-400 mt-1 text-center">Drag to zoom · Reset Zoom to restore</p>
                     {isSweepMode && hasUnrealisticPoints && (
                         <p className="text-xs text-amber-600 mt-1 text-center">
                             Lines end where a charge stop would exceed {CHARGE_CEIL_SOC}% SoC — unrealistic at that {isSpeedMode ? 'speed' : 'leg distance'}.
                         </p>
                     )}
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-3 flex gap-2 flex-wrap items-center">
+                        <button
+                            onClick={() => chartRef.current?.resetZoom()}
+                            className="chart-copy-btn bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                            title="Reset zoom to full view"
+                        >
+                            🔍 Reset Zoom
+                        </button>
                         <button
                             onClick={() => {
                                 const p = new URLSearchParams(window.location.search);
@@ -1504,6 +1501,7 @@ export default function RoadTripView({
                             </button>
                         )}
                     </div>
+                    <p className="text-xs text-gray-400 mt-1">Drag to box-zoom · Reset Zoom to restore</p>
                     {chartImage && (
                         <div className="mt-3">
                             <p className="text-xs text-gray-400 mb-1.5">Right-click or long-press to copy / save</p>
