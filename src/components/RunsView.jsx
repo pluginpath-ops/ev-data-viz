@@ -28,6 +28,116 @@ const inferRunFlags = (run) => {
     return flags;
 };
 
+// ── Field tag metadata (ordered for display) ──────────────────────────────────
+const FIELD_META = [
+    { key: 'soc',         label: 'SoC',   title: 'State of Charge (%)' },
+    { key: 'chargeRate',  label: 'kW',    title: 'Charge Rate (kW)' },
+    { key: 'time',        label: 'Time',  title: 'Time' },
+    { key: 'range',       label: 'Range', title: 'Range' },
+    { key: 'temperature', label: 'Temp',  title: 'Temperature' },
+];
+
+// ── Shared run-card display components ───────────────────────────────────────
+
+/**
+ * Range metadata pill row — shown on both regular and inherited run cards.
+ * Renders the 📏 Range pill followed by speed, distance, energy, efficiency,
+ * temperature, SoC window, and source link.
+ */
+function RunRangeMetaLine({ run, units }) {
+    const rangeFlag = DATA_FLAGS.find(f => f.key === 'range');
+    const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
+    const items = [];
+    if (run.speed_mph != null) {
+        items.push(<span key="spd" className="text-gray-600">{fmtSpeed(run.speed_mph, units)}</span>);
+    } else {
+        items.push(<span key="spd" className="text-amber-600" title="Set Speed (mph) in run metadata for accurate efficiency">{fmtSpeed(70, units)} (est.)</span>);
+    }
+    if (run.distance_miles  != null) items.push(<span key="dist" className="text-green-700">{fmtDistance(run.distance_miles, units)}</span>);
+    if (run.energy_kwh      != null) items.push(<span key="kwh"  className="text-blue-700" title="Energy out (measured at vehicle)">{run.energy_kwh} kWh out</span>);
+    if (run.energy_kwh != null && run.distance_miles != null)
+        items.push(<span key="eff" className="text-blue-700">{calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}</span>);
+    if (run.temperature_f != null) items.push(<span key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</span>);
+    if (run.start_soc != null && run.end_soc != null)
+        items.push(<span key="soc" className="text-gray-600">SoC {run.start_soc}→{run.end_soc}%</span>);
+    if (run.url)
+        items.push(<a key="url" href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{run.name} ↗</a>);
+    return (
+        <div className="flex items-center gap-2 text-sm mt-1 flex-wrap">
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${rangeFlag.pillStyle} shrink-0`}>{rangeFlag.label}</span>
+            <span className="flex flex-wrap items-baseline">
+                {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
+            </span>
+        </div>
+    );
+}
+
+/**
+ * Charging metadata pill row — shown on both regular and inherited run cards.
+ * Renders the ⚡ Charging pill followed by data-point count, energy, field
+ * tags, charging source link, and (for editable cards) a kWh compare button.
+ *
+ * @param {Object}   props.run            Run record
+ * @param {Object}   [props.calcKwhByRun] Per-run kWh calculation cache (editable cards only)
+ * @param {Function} [props.onCheckKwh]   Callback to trigger kWh calculation (editable cards only)
+ */
+function RunChargingMetaLine({ run, calcKwhByRun, onCheckKwh }) {
+    const chargingFlag = DATA_FLAGS.find(f => f.key === 'charging');
+    const dot        = <span className="mx-1.5 text-gray-300 select-none">·</span>;
+    const fields     = run.populated_fields  || [];
+    const calcFields = run.calculated_fields || [];
+    const items = [];
+
+    items.push(<span key="pts" className="text-gray-600">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>);
+    if (run.energy_kwh != null && !inferRunFlags(run).includes('range'))
+        items.push(<span key="kwh" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.energy_kwh} kWh in</span>);
+
+    FIELD_META.filter(f => fields.includes(f.key)).forEach(f => {
+        const isCalc = calcFields.includes(f.key);
+        items.push(
+            <span key={`field-${f.key}`}
+                title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
+                className={`px-2 py-0.5 text-xs rounded-full font-medium border ${isCalc ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                {isCalc ? `~${f.label}` : f.label}
+            </span>
+        );
+    });
+
+    if (run.charging_url)
+        items.push(<a key="curl" href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
+
+    // kWh compare button — only on editable (non-inherited) cards
+    if (onCheckKwh && run.energy_kwh != null && (run.dataPointCount ?? 0) > 1) {
+        const check = calcKwhByRun?.[run.id];
+        if (!check) {
+            items.push(
+                <button key="cmp" onClick={() => onCheckKwh(run)}
+                    className="text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 transition-colors text-xs"
+                    title="Calculate kWh from data points and compare">Compare ↔</button>
+            );
+        } else if (check.loading) {
+            items.push(<span key="cmp" className="text-gray-400 text-xs">Calculating…</span>);
+        } else if (check.kwh != null) {
+            const pct = Math.abs(run.energy_kwh - check.kwh) / Math.max(run.energy_kwh, check.kwh) * 100;
+            items.push(
+                <span key="cmp" title={`Calculated from data points: ${check.kwh} kWh`}
+                    className={`text-xs px-1.5 py-0.5 rounded border font-medium ${pct > 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                    {pct > 5 ? '⚠️ ' : '✓ '}data: {check.kwh} kWh ({pct.toFixed(1)}%)
+                </span>
+            );
+        }
+    }
+
+    return (
+        <div className="flex items-center gap-2 text-sm mt-1 flex-wrap gap-y-1">
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${chargingFlag.pillStyle} shrink-0`}>{chargingFlag.label}</span>
+            <span className="flex flex-wrap items-baseline gap-y-1">
+                {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
+            </span>
+        </div>
+    );
+}
+
 // ── Estimate Time from Power panel ────────────────────────────────────────────
 const EstimateTimePanel = ({
     vehicle, editData, editDataLoading,
@@ -217,6 +327,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
     const vehicleAvailableTags = (tags || []).filter(t => !vehicleFormTags.some(ft => ft.id === t.id));
 
+    // ── Upload / CSV wizard state ────────────────────────────────────────────
     const [showUpload, setShowUpload] = useState(false);
     const [uploadStep, setUploadStep] = useState('file');
     const [csvData, setCsvData] = useState(null);
@@ -238,26 +349,21 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         url: '',
         chargingUrl: '',
     });
-    const [editingRunId, setEditingRunId] = useState(null);
-    const [editFormData, setEditFormData] = useState({});
-
-    // ── Merge-mode state ─────────────────────────────────────────────────────
     // uploadMode: 'create' (new run) | 'merge' (patch fields into existing rows)
     const [uploadMode, setUploadMode] = useState('create');
     const [mergeTargetRun, setMergeTargetRun] = useState(null);
     // joinKey: which column links incoming rows to existing ones
     const [joinKey, setJoinKey] = useState('soc');
     const [merging, setMerging] = useState(false);
-
-    // ── Estimation opts (import / merge step) ────────────────────────────────
-    // Tracks which derived-column offers the user has accepted
-    // range: null | 'epa' | 'measured'
+    // Tracks which derived-column offers the user has accepted (range: null | 'epa' | 'measured')
     const [estimations, setEstimations] = useState({ range: null });
-
-    // ── CSV paste / headerless state ──────────────────────────────────────────
     const [csvText, setCsvText]                       = useState('');
     const [noHeaders, setNoHeaders]                   = useState(false);
     const [selectedRangeTestRunId, setSelectedRangeTestRunId] = useState(null);
+
+    // ── Run inline edit state ────────────────────────────────────────────────
+    const [editingRunId, setEditingRunId] = useState(null);
+    const [editFormData, setEditFormData] = useState({});
 
     // ── Overflow action menu state ────────────────────────────────────────────
     const [openMenuRunId, setOpenMenuRunId] = useState(null);
@@ -841,15 +947,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             setExportingRunId(null);
         }
     };
-
-    // ── Field tag metadata (ordered for display) ─────────────────────────────
-    const FIELD_META = [
-        { key: 'soc',         label: 'SoC',   title: 'State of Charge (%)' },
-        { key: 'chargeRate',  label: 'kW',    title: 'Charge Rate (kW)' },
-        { key: 'time',        label: 'Time',  title: 'Time' },
-        { key: 'range',       label: 'Range', title: 'Range' },
-        { key: 'temperature', label: 'Temp',  title: 'Temperature' },
-    ];
 
     // ── Derived state ─────────────────────────────────────────────────────────
 
@@ -1778,80 +1875,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <p>Date: {run.date}</p>
                                         {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
                                         {run.conditions && <p>Notes: {run.conditions}</p>}
-                                        {/* Range metadata line */}
-                                        {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (() => {
-                                            const rangeFlag = DATA_FLAGS.find(f => f.key === 'range');
-                                            const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
-                                            const items = [];
-                                            if (run.speed_mph != null) {
-                                                items.push(<span key="spd" className="text-gray-600">{fmtSpeed(run.speed_mph, units)}</span>);
-                                            } else {
-                                                items.push(<span key="spd" className="text-amber-600" title="Set Speed (mph) in run metadata for accurate efficiency">{fmtSpeed(70, units)} (est.)</span>);
-                                            }
-                                            if (run.distance_miles != null) items.push(<span key="dist" className="text-green-700">{fmtDistance(run.distance_miles, units)}</span>);
-                                            if (run.energy_kwh != null) items.push(<span key="kwh" className="text-blue-700" title="Energy out (measured at vehicle)">{run.energy_kwh} kWh out</span>);
-                                            if (run.energy_kwh != null && run.distance_miles != null) items.push(<span key="eff" className="text-blue-700">{calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}</span>);
-                                            if (run.temperature_f != null) items.push(<span key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</span>);
-                                            if (run.start_soc != null && run.end_soc != null) items.push(<span key="soc" className="text-gray-600">SoC {run.start_soc}→{run.end_soc}%</span>);
-                                            if (run.url) items.push(<a key="url" href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{run.name} ↗</a>);
-                                            return (
-                                                <div className="flex items-center gap-2 text-sm mt-1 flex-wrap">
-                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${rangeFlag.pillStyle} shrink-0`}>{rangeFlag.label}</span>
-                                                    <span className="flex flex-wrap items-baseline">
-                                                        {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })()}
-                                        {/* Charging metadata line — pill label + data points + field tags + source */}
-                                        {inferRunFlags(run).includes('charging') && (() => {
-                                            const chargingFlag = DATA_FLAGS.find(f => f.key === 'charging');
-                                            const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
-                                            const fields = run.populated_fields || [];
-                                            const calcFields = run.calculated_fields || [];
-                                            const items = [];
-                                            items.push(<span key="pts" className="text-gray-600">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>);
-                                            if (run.energy_kwh != null && !inferRunFlags(run).includes('range')) items.push(<span key="kwh" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.energy_kwh} kWh in</span>);
-                                            FIELD_META.filter(f => fields.includes(f.key)).forEach(f => {
-                                                const isCalc = calcFields.includes(f.key);
-                                                items.push(
-                                                    <span key={`field-${f.key}`}
-                                                        title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
-                                                        className={`px-2 py-0.5 text-xs rounded-full font-medium border ${isCalc ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                                                        {isCalc ? `~${f.label}` : f.label}
-                                                    </span>
-                                                );
-                                            });
-                                            if (run.charging_url) items.push(<a key="curl" href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
-                                            if (run.energy_kwh != null && (run.dataPointCount ?? 0) > 1) {
-                                                const check = calcKwhByRun[run.id];
-                                                if (!check) {
-                                                    items.push(
-                                                        <button key="cmp" onClick={() => handleCheckKwh(run)}
-                                                            className="text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 transition-colors text-xs"
-                                                            title="Calculate kWh from data points and compare">Compare ↔</button>
-                                                    );
-                                                } else if (check.loading) {
-                                                    items.push(<span key="cmp" className="text-gray-400 text-xs">Calculating…</span>);
-                                                } else if (check.kwh != null) {
-                                                    const pct = Math.abs(run.energy_kwh - check.kwh) / Math.max(run.energy_kwh, check.kwh) * 100;
-                                                    items.push(
-                                                        <span key="cmp" title={`Calculated from data points: ${check.kwh} kWh`}
-                                                            className={`text-xs px-1.5 py-0.5 rounded border font-medium ${pct > 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                                                            {pct > 5 ? '⚠️ ' : '✓ '}data: {check.kwh} kWh ({pct.toFixed(1)}%)
-                                                        </span>
-                                                    );
-                                                }
-                                            }
-                                            return (
-                                                <div className="flex items-center gap-2 text-sm mt-1 flex-wrap gap-y-1">
-                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${chargingFlag.pillStyle} shrink-0`}>{chargingFlag.label}</span>
-                                                    <span className="flex flex-wrap items-baseline gap-y-1">
-                                                        {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })()}
+                                        {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (
+                                            <RunRangeMetaLine run={run} units={units} />
+                                        )}
+                                        {inferRunFlags(run).includes('charging') && (
+                                            <RunChargingMetaLine run={run} calcKwhByRun={calcKwhByRun} onCheckKwh={handleCheckKwh} />
+                                        )}
                                     </div>
                                 </div>
                                 <div className="run-actions">
@@ -2026,60 +2055,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     <p>Date: {run.date}</p>
                                                     {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
                                                     {run.conditions && <p>Notes: {run.conditions}</p>}
-                                                    {/* Range metadata line */}
-                                                    {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (() => {
-                                                        const rangeFlag = DATA_FLAGS.find(f => f.key === 'range');
-                                                        const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
-                                                        const items = [];
-                                                        if (run.speed_mph != null) {
-                                                            items.push(<span key="spd" className="text-gray-600">{fmtSpeed(run.speed_mph, units)}</span>);
-                                                        } else {
-                                                            items.push(<span key="spd" className="text-amber-600" title="Set Speed (mph) in run metadata for accurate efficiency">{fmtSpeed(70, units)} (est.)</span>);
-                                                        }
-                                                        if (run.distance_miles != null) items.push(<span key="dist" className="text-green-700">{fmtDistance(run.distance_miles, units)}</span>);
-                                                        if (run.energy_kwh != null) items.push(<span key="kwh" className="text-blue-700" title="Energy out (measured at vehicle)">{run.energy_kwh} kWh out</span>);
-                                                        if (run.energy_kwh != null && run.distance_miles != null) items.push(<span key="eff" className="text-blue-700">{calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}</span>);
-                                                        if (run.temperature_f != null) items.push(<span key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</span>);
-                                                        if (run.start_soc != null && run.end_soc != null) items.push(<span key="soc" className="text-gray-600">SoC {run.start_soc}→{run.end_soc}%</span>);
-                                                        if (run.url) items.push(<a key="url" href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{run.name} ↗</a>);
-                                                        return (
-                                                            <div className="flex items-center gap-2 text-sm mt-1 flex-wrap">
-                                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${rangeFlag.pillStyle} shrink-0`}>{rangeFlag.label}</span>
-                                                                <span className="flex flex-wrap items-baseline">
-                                                                    {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
-                                                                </span>
-                                                            </div>
-                                                        );
-                                                    })()}
-                                                    {/* Charging metadata line — pill label + data points + field tags + source */}
-                                                    {inferRunFlags(run).includes('charging') && (() => {
-                                                        const chargingFlag = DATA_FLAGS.find(f => f.key === 'charging');
-                                                        const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
-                                                        const fields = run.populated_fields || [];
-                                                        const calcFields = run.calculated_fields || [];
-                                                        const items = [];
-                                                        items.push(<span key="pts" className="text-gray-600">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>);
-                                                        if (run.energy_kwh != null && !inferRunFlags(run).includes('range')) items.push(<span key="kwh" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.energy_kwh} kWh in</span>);
-                                                        FIELD_META.filter(f => fields.includes(f.key)).forEach(f => {
-                                                            const isCalc = calcFields.includes(f.key);
-                                                            items.push(
-                                                                <span key={`field-${f.key}`}
-                                                                    title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
-                                                                    className={`px-2 py-0.5 text-xs rounded-full font-medium border ${isCalc ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                                                                    {isCalc ? `~${f.label}` : f.label}
-                                                                </span>
-                                                            );
-                                                        });
-                                                        if (run.charging_url) items.push(<a key="curl" href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
-                                                        return (
-                                                            <div className="flex items-center gap-2 text-sm mt-1 flex-wrap gap-y-1">
-                                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${chargingFlag.pillStyle} shrink-0`}>{chargingFlag.label}</span>
-                                                                <span className="flex flex-wrap items-baseline gap-y-1">
-                                                                    {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
-                                                                </span>
-                                                            </div>
-                                                        );
-                                                    })()}
+                                                    {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (
+                                                        <RunRangeMetaLine run={run} units={units} />
+                                                    )}
+                                                    {inferRunFlags(run).includes('charging') && (
+                                                        <RunChargingMetaLine run={run} />
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="run-actions">
