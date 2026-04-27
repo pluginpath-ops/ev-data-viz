@@ -1767,6 +1767,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 </a>
                                             )}
                                         </h3>
+                                        <RunVoteButtons
+                                            vouch={votes.vouch}
+                                            flag={votes.flag}
+                                            myVote={votes.myVote}
+                                            onVote={(voteType) => toggleRunVote(run.id, voteType)}
+                                        />
                                     </div>
                                     <div className="run-meta">
                                         <p>Date: {run.date}</p>
@@ -1849,12 +1855,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     </div>
                                 </div>
                                 <div className="run-actions">
-                                    <RunVoteButtons
-                                        vouch={votes.vouch}
-                                        flag={votes.flag}
-                                        myVote={votes.myVote}
-                                        onVote={(voteType) => toggleRunVote(run.id, voteType)}
-                                    />
                                     <div className="run-actions-row">
                                         {/* Set Default — ghost text, green on hover, pale blue + × when active */}
                                         <button

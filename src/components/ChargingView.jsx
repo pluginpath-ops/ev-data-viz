@@ -328,6 +328,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             }
         });
 
+        // Count active runs per vehicle to decide whether to include run name in label
+        const runsPerVehicle = {};
+        allSelectedRuns.forEach(r => {
+            runsPerVehicle[r.vehicleName] = (runsPerVehicle[r.vehicleName] || 0) + 1;
+        });
+        const runLabel = (run) => runsPerVehicle[run.vehicleName] > 1
+            ? `${run.vehicleName} - ${run.name}`
+            : run.vehicleName;
+
         const datasets = allSelectedRuns.flatMap((run) => {
             const rawData = runDataCache[run.id] ?? run.data ?? [];
             const { vehicleBattery, vehicleRange } = run;
@@ -362,7 +371,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             const showPts = chartConfig.showPoints || false;
 
             const result = [{
-                label:            `${run.vehicleName} - ${run.name}`,
+                label:            runLabel(run),
                 data:             y1Points,
                 backgroundColor:  color,
                 borderColor:      color,
@@ -381,7 +390,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     .filter(p => p.x != null && p.y != null);
                 if (y2Points.length > 0) {
                     result.push({
-                        label:            `${run.vehicleName} - ${run.name} (right)`,
+                        label:            `${runLabel(run)} (right)`,
                         data:             y2Points,
                         backgroundColor:  color,
                         borderColor:      color,
@@ -435,7 +444,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             title(ctx) {
                                 const run = ctx[0]?.dataset?.runMeta;
                                 if (!run) return undefined;
-                                return run.vehicleName ? `${run.vehicleName} — ${run.name}` : run.name;
+                                return runLabel(run);
                             },
                             label(ctx) {
                                 const xl = axisOptions.find(a => a.value === chartConfig.xAxis)?.label ?? 'X';
@@ -484,7 +493,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // ── PNG export ───────────────────────────────────────────────────────────
     const handleExportImage = async () => {
         if (!chartInstance.current) return;
-        const dataUrl = chartInstance.current.toBase64Image('image/png', 1.0);
+        const src = chartInstance.current.canvas;
+        const offscreen = document.createElement('canvas');
+        offscreen.width = src.width;
+        offscreen.height = src.height;
+        const ctx2 = offscreen.getContext('2d');
+        ctx2.fillStyle = '#ffffff';
+        ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
+        ctx2.drawImage(src, 0, 0);
+        const dataUrl = offscreen.toDataURL('image/png');
         setChartImage(dataUrl);
         // Try writing directly to clipboard (Chrome/Edge; Safari requires user gesture)
         try {

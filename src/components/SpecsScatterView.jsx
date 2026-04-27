@@ -139,9 +139,10 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
                 borderColor:     color,
                 pointRadius:     8,
                 pointHoverRadius: 11,
-                // Store raw values for tooltip
                 _rawX: rawX,
                 _rawY: rawY,
+                _manufacturer: v.manufacturer?.name ?? null,
+                _year: v.year ?? null,
             };
         });
 
@@ -198,7 +199,12 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
                     tooltip: {
                         filter: item => item.dataset.label !== 'Trend',
                         callbacks: {
-                            title: ctx => ctx[0]?.dataset.label || '',
+                            title: ctx => {
+                                const ds = ctx[0]?.dataset;
+                                if (!ds) return '';
+                                const parts = [ds._manufacturer, ds._year, ds.label].filter(Boolean);
+                                return parts.join(' · ');
+                            },
                             label: ctx => {
                                 const ds = ctx.dataset;
                                 return [
