@@ -50,8 +50,10 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
     const fieldGroups = useMemo(() => buildFieldGroups(vehicles, vehicleFields), [vehicles, vehicleFields]);
     const allFields   = useMemo(() => fieldGroups.flatMap(g => g.fields), [fieldGroups]);
 
-    const [localField,  setLocalField]  = useState('');
-    const [copiedUrl,   setCopiedUrl]   = useState(false);
+    const [localField,   setLocalField]   = useState('');
+    const [copiedUrl,    setCopiedUrl]    = useState(false);
+    const [imageCopied,  setImageCopied]  = useState(false);
+    const [chartImage,   setChartImage]   = useState(null);
     const selectedField = controlledField || localField;
 
     const setSelectedField = (field) => {
@@ -183,6 +185,26 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
         };
     }, [selectedField, vehicles, allFields, units]);
 
+    const handleCopyImage = async () => {
+        if (!chartRef.current) return;
+        const src = chartRef.current.canvas;
+        const offscreen = document.createElement('canvas');
+        offscreen.width  = src.width;
+        offscreen.height = src.height;
+        const ctx2 = offscreen.getContext('2d');
+        ctx2.fillStyle = '#ffffff';
+        ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
+        ctx2.drawImage(src, 0, 0);
+        const dataUrl = offscreen.toDataURL('image/png');
+        setChartImage(dataUrl);
+        try {
+            const blob = await (await fetch(dataUrl)).blob();
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            setImageCopied(true);
+            setTimeout(() => setImageCopied(false), 2500);
+        } catch { /* Clipboard API not supported — image shown inline */ }
+    };
+
     return (
         <div className="specs-chart-card">
             <div className="specs-chart-controls">
@@ -205,7 +227,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
             <div style={{ height: `${Math.max(220, vehicles.length * 52)}px`, position: 'relative' }}>
                 <canvas ref={canvasRef} />
             </div>
-            <div className="mt-3 flex gap-2">
+            <div className="mt-3 flex gap-2 flex-wrap">
                 <button
                     onClick={() => {
                         navigator.clipboard.writeText(window.location.href).then(() => {
@@ -218,7 +240,25 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                 >
                     {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
                 </button>
+                <button
+                    onClick={handleCopyImage}
+                    className={`chart-copy-btn ${imageCopied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                    title="Copy chart as PNG"
+                >
+                    {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
+                </button>
+                {chartImage && (
+                    <button onClick={() => setChartImage(null)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                        ✕ Dismiss preview
+                    </button>
+                )}
             </div>
+            {chartImage && (
+                <div className="mt-3">
+                    <p className="text-xs text-gray-400 mb-1.5">Right-click or long-press to copy / save</p>
+                    <img src={chartImage} alt="Chart export" className="w-full rounded border border-gray-200" />
+                </div>
+            )}
         </div>
     );
 }
