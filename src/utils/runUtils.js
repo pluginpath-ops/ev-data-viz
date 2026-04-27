@@ -1,7 +1,16 @@
 // ── Run filtering helpers ─────────────────────────────────────────────────────
+//
+// Two forms are provided for each data type:
+//   filterXxxRuns(runs)  — takes a run array, returns a filtered array.
+//                          Use when building derived arrays: filterChargingRuns(v.runs).map(...)
+//   isXxxRun(run)        — predicate, takes a single run, returns boolean.
+//                          Use as a runFilter prop: <RunSelector runFilter={isChargingRun} />
 
-export const filterChargingRuns = (runs) => (runs || []).filter(r => r.has_charging !== false);
-export const filterRangeRuns    = (runs) => (runs || []).filter(r => r.has_range);
+export const isChargingRun = (r) => r.has_charging !== false;
+export const isRangeRun    = (r) => !!r.has_range;
+
+export const filterChargingRuns = (runs) => (runs || []).filter(isChargingRun);
+export const filterRangeRuns    = (runs) => (runs || []).filter(isRangeRun);
 
 // ── Populated-field detection ─────────────────────────────────────────────────
 

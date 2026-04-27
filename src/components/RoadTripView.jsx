@@ -6,7 +6,7 @@ import { dataService } from '../services/DataService';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
-import { filterChargingRuns } from '../utils/runUtils';
+import { filterChargingRuns, isChargingRun } from '../utils/runUtils';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import {
@@ -1413,7 +1413,7 @@ export default function RoadTripView({
                                     : [...prev, runId]
                             )}
                             onUpdateRunColor={onUpdateRunColor}
-                            runFilter={filterChargingRuns}
+                            runFilter={isChargingRun}
                             emptyMessage="No charging test data"
                             renderRunMeta={run => {
                                 const info = allChargingRunsInfo[run.id];

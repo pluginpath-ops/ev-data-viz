@@ -12,7 +12,7 @@ import {
     calcEff, effOptions, effLabel as getEffLabel,
     fmtSpeed, fmtTemp,
 } from '../utils/unitConversions';
-import { filterRangeRuns } from '../utils/runUtils';
+import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { copyChartAsPng } from '../utils/chartUtils';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
@@ -506,7 +506,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}
                     onUpdateRunColor={onUpdateRunColor}
-                    runFilter={r => r.has_range}
+                    runFilter={isRangeRun}
                     emptyMessage="No range test records"
                     renderRunMeta={run => {
                         const eff         = calcEff(run.distance_miles, run.energy_kwh, effUnit, units);

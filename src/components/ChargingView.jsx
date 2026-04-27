@@ -12,7 +12,7 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
-import { filterChargingRuns, filterRangeRuns } from '../utils/runUtils';
+import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, presentationMode = false }) {
@@ -645,7 +645,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             : [...prev.selectedRuns, runId],
                     }))}
                     onUpdateRunColor={handleColorChange}
-                    runFilter={filterChargingRuns}
+                    runFilter={isChargingRun}
                     emptyMessage="No charging test records"
                     renderRunMeta={run => {
                         const exclusionReason = getRaceExclusionReason(run.id);

@@ -7,7 +7,7 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
-import { filterChargingRuns, filterRangeRuns } from '../utils/runUtils';
+import { filterChargingRuns, filterRangeRuns, isRangeRun } from '../utils/runUtils';
 
 // ── Interpolation helper ──────────────────────────────────────────────────────
 // Returns the interpolated yField value at targetX, given points sorted by xField.
@@ -637,7 +637,7 @@ export default function ChargeCompareView({
                             prev.includes(runId) ? prev.filter(id => id !== runId) : [...prev, runId]
                         )}
                         onUpdateRunColor={onUpdateRunColor}
-                        runFilter={filterRangeRuns}
+                        runFilter={isRangeRun}
                         emptyMessage="No range test records"
                         renderRunMeta={run => (
                             <>
