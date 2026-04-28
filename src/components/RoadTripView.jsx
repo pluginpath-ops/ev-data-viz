@@ -390,6 +390,8 @@ export default function RoadTripView({
     });
     const [axisScale, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
     const [copiedUrl, setCopiedUrl] = useState(false);
+    const [imageCopied, setImageCopied] = useState(false);
+    const [chartImage, setChartImage]   = useState(null);
     const [sortCol, setSortCol] = useState(null);   // column key or null
     const [sortDir, setSortDir] = useState('asc');  // 'asc' | 'desc'
     const onAxisChange = (key, val) => setAxisScale(prev => ({ ...prev, [key]: val }));
@@ -1146,6 +1148,27 @@ export default function RoadTripView({
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
 
+    // ── PNG export ────────────────────────────────────────────────────────────
+    const handleCopyImage = async () => {
+        if (!chartRef.current) return;
+        const src = chartRef.current.canvas;
+        const offscreen = document.createElement('canvas');
+        offscreen.width  = src.width;
+        offscreen.height = src.height;
+        const ctx2 = offscreen.getContext('2d');
+        ctx2.fillStyle = '#ffffff';
+        ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
+        ctx2.drawImage(src, 0, 0);
+        const dataUrl = offscreen.toDataURL('image/png');
+        setChartImage(dataUrl);
+        try {
+            const blob = await (await fetch(dataUrl)).blob();
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            setImageCopied(true);
+            setTimeout(() => setImageCopied(false), 2500);
+        } catch { /* Clipboard API not supported — image shown inline */ }
+    };
+
     // ── Render ───────────────────────────────────────────────────────────────
     const {
         startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, yAxis, xAxis, sweepYAxis, overhead,
@@ -1427,31 +1450,28 @@ export default function RoadTripView({
 
             {!loading && validEntries.length > 0 && (
                 <div className="card mb-6">
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-lg font-bold">
-                            Road Trip{towingMode ? ' (Towing)' : ''}
-                            {isSpeedMode   ? ` · Speed vs. Time`
-                             : isTripDistMode ? ` — ${Math.round(convDistance(totalDistance, units))} ${dl} · Leg Distance vs. Time at ${Math.round(convDistance(speed, units))} ${sl}`
-                             : ` — ${Math.round(convDistance(totalDistance, units))} ${dl} at ${Math.round(convDistance(speed, units))} ${sl}`}
-                        </h3>
-                        <button
-                            onClick={() => chartRef.current?.resetZoom()}
-                            className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded px-2 py-1 transition-colors"
-                            title="Reset zoom to full view"
-                        >
-                            Reset Zoom
-                        </button>
-                    </div>
+                    <h3 className="text-lg font-bold mb-2">
+                        Road Trip{towingMode ? ' (Towing)' : ''}
+                        {isSpeedMode   ? ` · Speed vs. Time`
+                         : isTripDistMode ? ` — ${Math.round(convDistance(totalDistance, units))} ${dl} · Leg Distance vs. Time at ${Math.round(convDistance(speed, units))} ${sl}`
+                         : ` — ${Math.round(convDistance(totalDistance, units))} ${dl} at ${Math.round(convDistance(speed, units))} ${sl}`}
+                    </h3>
                     <div style={{ height: `${isSweepMode ? 400 : yAxis === 'byTest' ? Math.max(300, validEntries.length * 120) : Math.max(400, validEntries.length * 40 + 200)}px`, position: 'relative' }}>
                         <canvas ref={canvasRef} />
                     </div>
-                    <p className="text-xs text-gray-400 mt-1 text-center">Drag to zoom · Reset Zoom to restore</p>
                     {isSweepMode && hasUnrealisticPoints && (
                         <p className="text-xs text-amber-600 mt-1 text-center">
                             Lines end where a charge stop would exceed {CHARGE_CEIL_SOC}% SoC — unrealistic at that {isSpeedMode ? 'speed' : 'leg distance'}.
                         </p>
                     )}
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-3 flex gap-2 flex-wrap items-center">
+                        <button
+                            onClick={() => chartRef.current?.resetZoom()}
+                            className="chart-copy-btn bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                            title="Reset zoom to full view"
+                        >
+                            🔍 Reset Zoom
+                        </button>
                         <button
                             onClick={() => {
                                 const p = new URLSearchParams(window.location.search);
@@ -1468,7 +1488,26 @@ export default function RoadTripView({
                         >
                             {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
                         </button>
+                        <button
+                            onClick={handleCopyImage}
+                            className={`chart-copy-btn ${imageCopied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                            title="Copy chart as PNG"
+                        >
+                            {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
+                        </button>
+                        {chartImage && (
+                            <button onClick={() => setChartImage(null)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                                ✕ Dismiss preview
+                            </button>
+                        )}
                     </div>
+                    <p className="text-xs text-gray-400 mt-1">Drag to box-zoom · Reset Zoom to restore</p>
+                    {chartImage && (
+                        <div className="mt-3">
+                            <p className="text-xs text-gray-400 mb-1.5">Right-click or long-press to copy / save</p>
+                            <img src={chartImage} alt="Chart export" className="w-full rounded border border-gray-200" />
+                        </div>
+                    )}
                 </div>
             )}
 

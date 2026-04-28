@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
+import ZoomPlugin from 'chartjs-plugin-zoom';
 Chart.defaults.font.size = 13;
+Chart.register(ZoomPlugin);
 import { dataService } from '../services/DataService';
 import RunSelector from './RunSelector';
 import RangeChartView from './RangeChartView';
@@ -455,7 +457,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                 return runTooltipLines(ctx.dataset?.runMeta, [], units);
                             },
                         },
-                    }
+                    },
+                    zoom: {
+                        zoom: {
+                            drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
+                            mode: 'xy',
+                        },
+                    },
                 },
                 scales: {
                     x: {
@@ -678,7 +686,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 </div>
 
                 {/* Export / share buttons */}
-                <div className="mt-3 flex items-center gap-3">
+                <div className="mt-3 flex items-center gap-3 flex-wrap">
+                    <button
+                        onClick={() => chartInstance.current?.resetZoom()}
+                        className="chart-copy-btn bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                        title="Reset zoom to full view"
+                    >
+                        🔍 Reset Zoom
+                    </button>
                     <button
                         onClick={() => {
                             navigator.clipboard.writeText(window.location.href).then(() => {
@@ -715,6 +730,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         </button>
                     )}
                 </div>
+
+                <p className="text-xs text-gray-400 mt-1">Drag to box-zoom · Reset Zoom to restore</p>
 
                 {/* Inline image preview — right-click/long-press to copy or save */}
                 {chartImage && (
