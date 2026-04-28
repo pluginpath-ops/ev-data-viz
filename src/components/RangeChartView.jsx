@@ -5,6 +5,7 @@ import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
+import { useTheme } from '../hooks/useTheme';
 import {
     convDistance, convSpeed, convTemp,
     distanceLabel, speedLabel, tempLabel,
@@ -50,6 +51,7 @@ const hasDataForType = (run, type) => {
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, onUpdateRunColor, presentationMode = false }) {
     const { units } = useAppContext();
+    const { isDark } = useTheme();
     const chartRef      = useRef(null);
     const chartInstance = useRef(null);
     const [chartType,    setChartType]    = useState('range-vehicle-bar');
@@ -196,6 +198,10 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
 
     // ── Render chart ──────────────────────────────────────────────────────────
     useEffect(() => {
+        const tickColor   = isDark ? 'rgb(148,163,184)' : 'rgb(107,114,128)';
+        const gridColor   = isDark ? 'rgba(51,65,85,0.6)' : 'rgba(229,231,235,0.8)';
+        const legendColor = isDark ? 'rgb(148,163,184)' : 'rgb(55,65,81)';
+
         if (chartInstance.current) {
             chartInstance.current.destroy();
             chartInstance.current = null;
@@ -357,7 +363,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                             : `${built.yLabel.replace(/\s*\(.*?\)$/, '')} vs ${built.xLabel.replace(/\s*\(.*?\)$/, '')}`,
                         font: { size: 14, weight: 'bold' },
                     },
-                    legend: { display: built.kind !== 'bar', position: 'top' },
+                    legend: { display: built.kind !== 'bar', position: 'top', labels: { color: legendColor } },
                     tooltip: {
                         displayColors: false,
                         callbacks: {
@@ -401,14 +407,17 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 scales: {
                     x: {
                         type:  built.kind === 'line' ? 'linear' : 'category',
-                        grid:  { display: built.kind !== 'bar' },
-                        title: { display: !!built.xLabel, text: built.xLabel },
+                        grid:  { display: built.kind !== 'bar', color: gridColor },
+                        title: { display: !!built.xLabel, text: built.xLabel, color: legendColor },
+                        ticks: { color: tickColor },
                         ...(built.kind === 'line' && xMin != null ? { min: xMin } : {}),
                         ...(built.kind === 'line' && xMax != null ? { max: xMax } : {}),
                     },
                     y: {
-                        title: { display: true, text: built.yLabel },
+                        title: { display: true, text: built.yLabel, color: legendColor },
                         beginAtZero: false,
+                        ticks: { color: tickColor },
+                        grid: { color: gridColor },
                         ...(yMin != null ? { min: yMin } : {}),
                         ...(yMax != null ? { max: yMax } : {}),
                     },
@@ -422,7 +431,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 chartInstance.current = null;
             }
         };
-    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units]);
+    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark]);
 
     // ── Copy chart PNG ────────────────────────────────────────────────────────
     const handleCopyImage = async () => {
@@ -432,7 +441,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         offscreen.width = src.width;
         offscreen.height = src.height;
         const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = '#ffffff';
+        ctx2.fillStyle = isDark ? 'rgb(30,41,59)' : '#ffffff';
         ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
         ctx2.drawImage(src, 0, 0);
         const dataUrl = offscreen.toDataURL('image/png');
@@ -580,11 +589,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                 setTimeout(() => setCopiedUrl(false), 2000);
                             });
                         }}
-                        className={`chart-copy-btn ${
-                            copiedUrl
-                                ? 'bg-green-50 border-green-200 text-green-700'
-                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                        }`}
+                        className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
                         title="Copy link to this chart view"
                     >
                         {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
@@ -592,11 +597,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     <button
                         onClick={handleCopyImage}
                         disabled={plottableRuns.length === 0}
-                        className={`chart-copy-btn disabled:opacity-40 disabled:cursor-not-allowed ${
-                            copied
-                                ? 'bg-green-50 border-green-200 text-green-700'
-                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                        }`}
+                        className={`chart-copy-btn disabled:opacity-40 disabled:cursor-not-allowed ${copied ? 'chart-copy-btn-active' : ''}`}
                         title="Export chart as PNG"
                     >
                         {copied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}

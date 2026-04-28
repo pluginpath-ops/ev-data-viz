@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
-/* Color Scheme Variables */
+/* Enable dark: Tailwind prefix via data-theme attribute */
+@variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ── Color Tokens ─────────────────────────────────────────────────────────── */
 :root {
     /* Primary color (main actions: Add, Save, View) */
     --color-primary: rgb(59, 130, 246);
@@ -27,13 +30,48 @@
     --color-warning: rgb(245, 158, 11);
     --color-warning-hover: rgb(217, 119, 6);
 
-    /* Background and layout colors */
-    --color-background: rgb(249, 250, 251);
-    --color-card: rgb(255, 255, 255);
-    --color-border: rgb(229, 231, 235);
+    /* ── Surface layers (light mode) ── */
+    --color-background: rgb(249, 250, 251);   /* gray-50  — page body */
+    --color-card:       rgb(255, 255, 255);   /* white    — cards, modals */
+    --color-surface-muted:  rgb(249, 250, 251); /* gray-50  — subtle panel bg */
+    --color-surface-sunken: rgb(243, 244, 246); /* gray-100 — inset areas, toggles, thumbnails */
+    --color-surface-input:  rgb(255, 255, 255); /* white    — text inputs, selects */
+
+    /* ── Text hierarchy (light mode) ── */
+    --color-text-primary:   rgb(17, 24, 39);    /* gray-900 */
+    --color-text-secondary: rgb(75, 85, 99);    /* gray-600 */
+    --color-text-muted:     rgb(107, 114, 128); /* gray-500 */
+    --color-text-faint:     rgb(156, 163, 175); /* gray-400 */
+
+    /* ── Borders (light mode) ── */
+    --color-border:       rgb(229, 231, 235); /* gray-200 */
+    --color-border-strong: rgb(209, 213, 219); /* gray-300 */
 }
 
-/* Base Button Styles - All buttons inherit these */
+/* ── Dark mode overrides ─────────────────────────────────────────────────── */
+[data-theme="dark"] {
+    --color-background:     rgb(15, 23, 42);    /* slate-950 */
+    --color-card:           rgb(30, 41, 59);    /* slate-800 */
+    --color-surface-muted:  rgb(23, 32, 51);    /* between page and card */
+    --color-surface-sunken: rgb(15, 23, 42);    /* same as page (deepest) */
+    --color-surface-input:  rgb(30, 41, 59);    /* same as card */
+
+    --color-text-primary:   rgb(241, 245, 249); /* slate-100 */
+    --color-text-secondary: rgb(148, 163, 184); /* slate-400 */
+    --color-text-muted:     rgb(100, 116, 139); /* slate-500 */
+    --color-text-faint:     rgb(71, 85, 105);   /* slate-600 */
+
+    --color-border:        rgb(51, 65, 85);     /* slate-700 */
+    --color-border-strong: rgb(71, 85, 105);    /* slate-600 */
+
+    /* Primary accent adjustments for dark backgrounds */
+    --color-primary-light: rgba(59, 130, 246, 0.2);
+    --color-primary-text:  rgb(147, 197, 253);   /* blue-300 */
+}
+
+
+/* ── Base Button Styles ───────────────────────────────────────────────────── */
+
 .btn {
     padding: 0.5rem 1rem;
     border-radius: 0.375rem;
@@ -128,11 +166,11 @@
     border-radius: 0.375rem;
     font-weight: 500;
     cursor: pointer;
-    color: rgb(75, 85, 99);
+    color: var(--color-text-secondary);
     background-color: transparent;
 }
 .btn-tab:hover {
-    background-color: rgb(243, 244, 246);
+    background-color: var(--color-surface-sunken);
 }
 .btn-tab.active {
     background-color: var(--color-primary-light);
@@ -150,11 +188,11 @@
     font-weight: 500;
     font-size: 0.8125rem;
     cursor: pointer;
-    color: rgb(75, 85, 99);
+    color: var(--color-text-secondary);
     background-color: transparent;
 }
 .btn-chart-mode:hover {
-    background-color: rgb(243, 244, 246);
+    background-color: var(--color-surface-sunken);
 }
 .btn-chart-mode.active {
     background-color: var(--color-primary-light);
@@ -169,6 +207,7 @@ html {
 /* Background and Card Styles */
 body {
     background-color: var(--color-background);
+    color: var(--color-text-primary);
 }
 
 .card {
@@ -184,7 +223,7 @@ body {
     height: 7rem;     /* 112px — h-28 equivalent */
     border-radius: 0.375rem;
     overflow: hidden;
-    background-color: rgb(243, 244, 246);
+    background-color: var(--color-surface-sunken);
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -231,7 +270,28 @@ body {
 
 /* Empty-state placeholder content */
 .empty-state {
-    @apply text-center py-12 text-gray-500;
+    @apply text-center py-12;
+    color: var(--color-text-muted);
+}
+
+
+/* ── App navigation bar ─────────────────────────────────────────────────────── */
+
+.app-nav {
+    background-color: var(--color-card);
+    border-bottom: 1px solid var(--color-border);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Theme toggle button in the nav-actions row */
+.theme-toggle {
+    @apply text-sm px-2.5 py-1 rounded border cursor-pointer transition-colors;
+    background-color: var(--color-surface-sunken);
+    border-color: var(--color-border);
+    color: var(--color-text-secondary);
+}
+.theme-toggle:hover {
+    background-color: var(--color-border);
 }
 
 
@@ -242,7 +302,7 @@ body {
     background-color: rgba(0, 0, 0, 0.5);
 }
 .modal-panel {
-    @apply bg-white w-full;
+    @apply w-full;
     background-color: var(--color-card);
 }
 .modal-header {
@@ -252,43 +312,56 @@ body {
     @apply overflow-y-auto flex-1 px-6 py-5;
 }
 .modal-footer {
-    @apply px-6 py-4 border-t flex-shrink-0 flex justify-end gap-2;
+    @apply px-6 py-4 flex-shrink-0 flex justify-end gap-2;
+    border-top: 1px solid var(--color-border);
 }
 
 
 /* ── Crop modal ─────────────────────────────────────────────────────────────── */
 .crop-modal-panel {
-    @apply bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden;
+    @apply rounded-xl shadow-2xl flex flex-col overflow-hidden;
+    background-color: var(--color-card);
     max-width: min(90vw, 900px);
     max-height: 90vh;
 }
 .crop-modal-header {
-    @apply px-5 py-4 border-b flex-shrink-0;
+    @apply px-5 py-4 flex-shrink-0;
+    border-bottom: 1px solid var(--color-border);
 }
 .crop-modal-body {
-    @apply overflow-auto flex-1 flex items-center justify-center bg-gray-100 p-4;
+    @apply overflow-auto flex-1 flex items-center justify-center p-4;
+    background-color: var(--color-surface-sunken);
 }
 .crop-modal-img {
     @apply block max-w-full max-h-full;
     max-height: calc(90vh - 11rem);
 }
 .crop-modal-footer {
-    @apply px-5 py-4 border-t flex-shrink-0 flex justify-end gap-2;
+    @apply px-5 py-4 flex-shrink-0 flex justify-end gap-2;
+    border-top: 1px solid var(--color-border);
 }
 
 /* ── Trims section (inside EditVehicleForm) ─────────────────────────────────── */
 .trim-list {
     @apply border rounded-lg overflow-hidden text-sm;
+    border-color: var(--color-border);
 }
 .trim-list-header {
-    @apply grid bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-500 border-b;
+    @apply grid px-3 py-1.5 text-xs font-medium;
     grid-template-columns: 1fr 1fr 1fr auto;
     gap: 0.5rem;
+    background-color: var(--color-surface-muted);
+    color: var(--color-text-muted);
+    border-bottom: 1px solid var(--color-border);
 }
 .trim-list-row {
-    @apply grid items-center px-3 py-2 border-b last:border-b-0;
+    @apply grid items-center px-3 py-2;
     grid-template-columns: 1fr 1fr 1fr auto;
     gap: 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+}
+.trim-list-row:last-child {
+    border-bottom: none;
 }
 .trim-add-row {
     @apply flex gap-2 mt-2 items-center;
@@ -300,20 +373,29 @@ body {
 /* ── Spec link section (inside EditVehicleForm) ─────────────────────────────── */
 .spec-link-list {
     @apply border rounded-lg overflow-hidden text-sm;
+    border-color: var(--color-border);
 }
 .spec-link-row {
-    @apply flex items-center gap-2 px-3 py-2 border-b last:border-b-0 bg-white;
+    @apply flex items-center gap-2 px-3 py-2;
+    background-color: var(--color-card);
+    border-bottom: 1px solid var(--color-border);
+}
+.spec-link-row:last-child {
+    border-bottom: none;
 }
 .spec-link-type-badge {
     @apply text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 whitespace-nowrap;
 }
 .spec-link-add-form {
-    @apply border rounded-lg p-3 bg-gray-50;
+    @apply border rounded-lg p-3;
+    background-color: var(--color-surface-muted);
+    border-color: var(--color-border);
 }
 
 /* ── Copy-to-vehicle modal ──────────────────────────────────────────────────── */
 .copy-to-modal-panel {
-    @apply bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden;
+    @apply rounded-xl shadow-2xl flex flex-col overflow-hidden;
+    background-color: var(--color-card);
     width: min(90vw, 420px);
 }
 
@@ -326,7 +408,8 @@ body {
 
 /* Divider between form sections; mt added inline (mt-4 or mt-5) */
 .form-section {
-    @apply border-t pt-4;
+    @apply pt-4;
+    border-top: 1px solid var(--color-border);
 }
 
 /* Action button row at the bottom of a form; mt added inline */
@@ -336,12 +419,22 @@ body {
 
 /* Standard text/select/number input field */
 .form-input {
-    @apply border p-2 rounded;
+    @apply p-2 rounded;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+}
+.form-input:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -1px;
+    border-color: var(--color-primary);
 }
 
 /* CSV file upload drag-drop target */
 .csv-drop-zone {
-    @apply border-2 border-dashed border-gray-300 rounded-lg p-6 text-center;
+    @apply border-2 border-dashed rounded-lg p-6 text-center;
+    border-color: var(--color-border-strong);
+    color: var(--color-text-muted);
 }
 
 /* Label wrapping a file input (image or CSV upload) */
@@ -360,6 +453,10 @@ body {
 /* Square-radius informational badge (blue by default) */
 .badge-default {
     @apply text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded;
+}
+[data-theme="dark"] .badge-default {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: rgb(147, 197, 253);
 }
 
 /* Border-style status badge (full-radius); color classes added inline */
@@ -404,12 +501,24 @@ body {
 
 /* Import ▾ dropdown panel */
 .dropdown-menu {
-    @apply absolute right-0 mt-1 bg-white border rounded-lg shadow-lg z-20 overflow-hidden;
+    @apply absolute right-0 mt-1 rounded-lg shadow-lg z-20 overflow-hidden;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
 }
 
 /* Single item inside a dropdown menu */
 .dropdown-item {
-    @apply flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50;
+    @apply flex items-center gap-2 px-4 py-2.5 text-sm;
+    color: var(--color-text-primary);
+}
+.dropdown-item:hover {
+    background-color: var(--color-surface-muted);
+}
+
+/* Selected vehicles strip (below the nav tabs) */
+.selected-strip {
+    background-color: var(--color-surface-muted);
+    border-top: 1px solid var(--color-border);
 }
 
 
@@ -432,7 +541,9 @@ body {
 
 /* Card / list view mode toggle widget */
 .view-toggle {
-    @apply flex border rounded-lg overflow-hidden text-gray-500;
+    @apply flex border rounded-lg overflow-hidden;
+    border-color: var(--color-border);
+    color: var(--color-text-muted);
 }
 
 /* Tag filter chip strip below the search bar */
@@ -442,13 +553,23 @@ body {
 
 /* Quad-state tag filter buttons (N/A → OR → AND → NOT) */
 .tag-filter-btn  { @apply px-3 py-1 rounded-full text-sm font-medium transition border cursor-pointer; }
-.tag-filter-na   { @apply bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200; }
+.tag-filter-na {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-secondary);
+    border-color: var(--color-border);
+}
+.tag-filter-na:hover {
+    background-color: var(--color-border);
+}
 .tag-filter-or   { @apply bg-green-500 text-white border-green-500 hover:bg-green-600; }
 .tag-filter-and  { @apply bg-blue-500 text-white border-blue-500 hover:bg-blue-600; }
 .tag-filter-not  { @apply bg-red-500 text-white border-red-500 hover:bg-red-600; }
 
 /* Small legend explaining OR/AND/NOT color states */
-.tag-filter-legend { @apply text-xs text-gray-400 ml-auto flex items-center gap-2 whitespace-nowrap select-none; }
+.tag-filter-legend {
+    @apply ml-auto flex items-center gap-2 whitespace-nowrap select-none text-xs;
+    color: var(--color-text-faint);
+}
 
 /* Vehicle tag chip cluster on a card or list row */
 .vehicle-tags {
@@ -462,7 +583,13 @@ body {
 
 /* Individual reorder direction button */
 .reorder-btn {
-    @apply w-6 h-6 flex items-center justify-center rounded text-[10px] bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-500;
+    @apply w-6 h-6 flex items-center justify-center rounded text-[10px];
+    background-color: var(--color-surface-sunken);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+}
+.reorder-btn:hover {
+    background-color: var(--color-border);
 }
 
 /* Pagination button strip below the vehicle grid */
@@ -472,7 +599,13 @@ body {
 
 /* Individual pagination navigation button */
 .pagination-btn {
-    @apply px-2 py-1 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-40;
+    @apply px-2 py-1 text-sm rounded disabled:opacity-40;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+}
+.pagination-btn:hover:not(:disabled) {
+    background-color: var(--color-surface-muted);
 }
 
 
@@ -500,7 +633,11 @@ body {
 
 /* Collapsible "Select Runs" section header button */
 .run-selector-header {
-    @apply flex items-center gap-2 w-full text-left font-medium hover:text-gray-600 transition-colors mb-1;
+    @apply flex items-center gap-2 w-full text-left font-medium transition-colors mb-1;
+    color: var(--color-text-primary);
+}
+.run-selector-header:hover {
+    color: var(--color-text-secondary);
 }
 
 /* Vehicle group list inside the run selector */
@@ -523,19 +660,39 @@ body {
     @apply flex-1 flex items-center gap-2 flex-wrap;
 }
 
-/* Copy chart as PNG button */
+/* Copy chart as PNG / Reset Zoom / action button strip below charts */
 .chart-copy-btn {
     @apply text-sm flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors;
+    background-color: var(--color-surface-muted);
+    border-color: var(--color-border);
+    color: var(--color-text-secondary);
+}
+.chart-copy-btn:hover {
+    background-color: var(--color-surface-sunken);
+}
+/* Active/success state — overrides default bg/border/color */
+.chart-copy-btn-active {
+    background-color: rgb(240, 253, 244);
+    border-color: rgb(187, 247, 208);
+    color: rgb(21, 128, 61);
+}
+[data-theme="dark"] .chart-copy-btn-active {
+    background-color: rgba(34, 197, 94, 0.15);
+    border-color: rgba(34, 197, 94, 0.4);
+    color: rgb(134, 239, 172);
 }
 
 /* Race mode configuration panel */
 .race-mode-panel {
-    @apply mt-4 p-3 rounded-lg border;
+    @apply mt-4 p-3 rounded-lg;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface-muted);
 }
 
 /* Efficiency unit toggle (mi/kWh ↔ Wh/mi) */
 .efficiency-unit-toggle {
-    @apply flex gap-1 p-1 bg-gray-100 rounded-lg;
+    @apply flex gap-1 p-1 rounded-lg;
+    background-color: var(--color-surface-sunken);
 }
 
 
@@ -550,6 +707,10 @@ body {
 .merge-target-banner {
     @apply mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between;
 }
+[data-theme="dark"] .merge-target-banner {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.3);
+}
 
 /* Data-type flag toggle chip strip */
 .data-type-flags {
@@ -558,7 +719,9 @@ body {
 
 /* Sub-section panel within a form (Charging Energy, Range Test Details) */
 .data-subpanel {
-    @apply border rounded-lg bg-gray-50;
+    @apply border rounded-lg;
+    background-color: var(--color-surface-muted);
+    border-color: var(--color-border);
 }
 
 /* CSV field mapping label + select row */
@@ -569,11 +732,13 @@ body {
 /* Range estimation option panel; color classes added inline */
 .estimation-panel {
     @apply p-4 rounded-lg border flex items-start justify-between gap-4;
+    border-color: var(--color-border);
 }
 
 /* Join key / merge-mode info panel; color classes added inline */
 .join-key-panel {
     @apply mt-5 p-4 rounded-lg border;
+    border-color: var(--color-border);
 }
 
 /* Run card top section (title + action buttons) */
@@ -583,7 +748,8 @@ body {
 
 /* Run metadata block (date, conditions, notes) */
 .run-meta {
-    @apply text-sm text-gray-600 mt-2 space-y-1;
+    @apply text-sm mt-2 space-y-1;
+    color: var(--color-text-secondary);
 }
 
 /* Inline badge cluster for run stats (speed, distance, energy, temp) */
@@ -613,11 +779,14 @@ body {
 /* Per-vehicle accordion panel */
 .import-vehicle-panel {
     @apply border rounded-lg overflow-hidden transition;
+    border-color: var(--color-border);
 }
 
 /* Vehicle panel header row */
 .import-vehicle-header {
-    @apply flex items-center gap-3 px-4 py-3 bg-gray-50 border-b;
+    @apply flex items-center gap-3 px-4 py-3;
+    background-color: var(--color-surface-muted);
+    border-bottom: 1px solid var(--color-border);
 }
 
 /* Individual session row within a vehicle panel */
@@ -635,7 +804,10 @@ body {
 
 /* Numeric axis-bound input — hides browser spin buttons */
 .axis-input {
-    @apply px-2 py-1 border rounded text-sm w-24;
+    @apply px-2 py-1 rounded text-sm w-24;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
     appearance: textfield;
 }
 .axis-input::-webkit-inner-spin-button,
@@ -661,18 +833,23 @@ body {
 
 /* One collapsible category block */
 .specs-category {
-    @apply border-t pt-2 mt-2;
+    @apply pt-2 mt-2;
+    border-top: 1px solid var(--color-border);
 }
 
 /* Category header toggle button (rotates chevron when expanded) */
 .specs-category-header {
-    @apply flex items-center gap-1.5 w-full text-left text-sm font-semibold
-           text-gray-600 hover:text-gray-800 transition-colors py-1;
+    @apply flex items-center gap-1.5 w-full text-left text-sm font-semibold transition-colors py-1;
+    color: var(--color-text-secondary);
+}
+.specs-category-header:hover {
+    color: var(--color-text-primary);
 }
 
 /* Chevron icon — rotate 90° when category is open */
 .specs-chevron {
-    @apply transition-transform duration-150 text-gray-400 text-xs;
+    @apply transition-transform duration-150 text-xs;
+    color: var(--color-text-faint);
 }
 
 /* Two-column label : value display row */
@@ -681,11 +858,13 @@ body {
 }
 
 .specs-field-label {
-    @apply text-gray-500 truncate;
+    @apply truncate;
+    color: var(--color-text-muted);
 }
 
 .specs-field-value {
-    @apply text-gray-800 font-medium;
+    @apply font-medium;
+    color: var(--color-text-primary);
 }
 
 /* Custom field rows in the edit form */
@@ -699,21 +878,33 @@ body {
 
 /* Category header row in the comparison table */
 .specs-table-category-header {
-    @apply bg-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide px-6 py-2;
+    @apply text-xs font-semibold uppercase tracking-wide px-6 py-2;
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-muted);
 }
 
 /* ── Vote buttons ──────────────────────────────────────────────────────────── */
 
 /* Base vote button — small, subtle, pill-shaped */
 .vote-btn {
-    @apply inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border
-           border-gray-200 text-gray-400 bg-white hover:border-gray-300
-           hover:text-gray-600 transition-colors cursor-pointer;
+    @apply inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-colors cursor-pointer;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-faint);
+}
+.vote-btn:hover {
+    border-color: var(--color-border-strong);
+    color: var(--color-text-secondary);
 }
 
 /* Vouch variant — active state turns green */
 .vote-btn-vouch.vote-btn-active {
     @apply border-green-400 text-green-600 bg-green-50 hover:border-green-500 hover:text-green-700;
+}
+[data-theme="dark"] .vote-btn-vouch.vote-btn-active {
+    background-color: rgba(34, 197, 94, 0.15);
+    border-color: rgba(34, 197, 94, 0.5);
+    color: rgb(134, 239, 172);
 }
 
 /* Flag variant — compact width, active state turns muted grey */
@@ -742,7 +933,9 @@ body {
 /* ── Specs comparison chart ──────────────────────────────────────────────────── */
 
 .specs-chart-card {
-    @apply bg-white rounded-xl border border-gray-200 p-6;
+    @apply rounded-xl p-6;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
 }
 
 .specs-chart-controls {
@@ -750,8 +943,10 @@ body {
 }
 
 .specs-chart-field-select {
-    @apply border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white
-           focus:outline-none focus:ring-2 focus:ring-blue-500;
+    @apply rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border-strong);
+    color: var(--color-text-primary);
 }
 
 /* ── Road trip simulation ────────────────────────────────────────────────────── */
@@ -763,16 +958,19 @@ body {
 /* ── Pop-out presentation mode ──────────────────────────────────────────────── */
 
 .popout-root {
-    @apply relative min-h-screen bg-white p-4;
+    @apply relative min-h-screen p-4;
+    background-color: var(--color-background);
 }
 
 /* Subtle fixed watermark in bottom-right corner */
 .popout-watermark {
-    @apply fixed bottom-3 right-4 z-50 text-xs text-gray-300 font-medium
+    @apply fixed bottom-3 right-4 z-50 text-xs font-medium
            bg-black/10 px-2 py-1 rounded select-none pointer-events-none;
+    color: var(--color-text-faint);
 }
 
 /* Shown when pop-out is open but no vehicles are selected in the main tab */
 .popout-waiting {
-    @apply flex items-center justify-center min-h-screen text-gray-400 text-lg;
+    @apply flex items-center justify-center min-h-screen text-lg;
+    color: var(--color-text-faint);
 }

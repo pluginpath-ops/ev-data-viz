@@ -5,6 +5,7 @@ import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
+import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 
 // ── Interpolation helper ──────────────────────────────────────────────────────
@@ -273,6 +274,7 @@ export default function ChargeCompareView({
     presentationMode = false,
 }) {
     const { units } = useAppContext();
+    const { isDark } = useTheme();
     const [runDataCache,    setRunDataCache]    = useState({});
     const [loading,         setLoading]         = useState(false);
     const [copied,          setCopied]          = useState(false);
@@ -487,6 +489,10 @@ export default function ChargeCompareView({
 
     // ── Build and render both charts ──────────────────────────────────────────
     useEffect(() => {
+        const tickColor   = isDark ? 'rgb(148,163,184)' : 'rgb(107,114,128)';
+        const gridColor   = isDark ? 'rgba(51,65,85,0.6)' : 'rgba(229,231,235,0.8)';
+        const legendColor = isDark ? 'rgb(148,163,184)' : 'rgb(55,65,81)';
+
         [chart1Instance, chart2Instance].forEach(inst => {
             if (inst.current) { inst.current.destroy(); inst.current = null; }
         });
@@ -536,11 +542,11 @@ export default function ChargeCompareView({
                         },
                     },
                     scales: isHorizontal ? {
-                        x: { title: { display: true, text: built.yLabel }, beginAtZero: true },
+                        x: { title: { display: true, text: built.yLabel, color: legendColor }, beginAtZero: true, ticks: { color: tickColor }, grid: { color: gridColor } },
                         y: { type: 'category', grid: { display: false }, title: { display: false }, ticks: { display: false } },
                     } : {
-                        x: { type: 'category', grid: { display: false }, title: { display: false } },
-                        y: { title: { display: true, text: built.yLabel }, beginAtZero: true },
+                        x: { type: 'category', grid: { display: false }, title: { display: false }, ticks: { color: tickColor } },
+                        y: { title: { display: true, text: built.yLabel, color: legendColor }, beginAtZero: true, ticks: { color: tickColor }, grid: { color: gridColor } },
                     },
                 },
             });
@@ -554,7 +560,7 @@ export default function ChargeCompareView({
                 if (inst.current) { inst.current.destroy(); inst.current = null; }
             });
         };
-    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns, units]);
+    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns, units, isDark]);
 
     const hasRangeRuns = resolvedRuns.length > 0;
 
@@ -674,7 +680,7 @@ export default function ChargeCompareView({
                         <div className="mt-3 flex gap-2">
                             <button
                                 onClick={handleCopyUrl}
-                                className={`chart-copy-btn ${copied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                                className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
                                 title="Copy link to this chart view"
                             >
                                 {copied ? '✓ Copied!' : '🔗 Copy URL'}
