@@ -73,6 +73,18 @@ export default function App() {
 
     const [activeVehicle, setActiveVehicle] = useState(null);
     const [view, setView] = useState('vehicles');
+
+    // Persist Vehicles tab UI state across tab switches so filters/sort/page
+    // are restored when the user returns.
+    const [vehiclesViewState, setVehiclesViewState] = useState(() => ({
+        textFilter: '',
+        tagFilterStates: {},
+        mfgFilterStates: {},
+        modelFilter: new Set(),
+        sortBy: 'default',
+        viewMode: 'card',
+        vehiclePage: 1,
+    }));
     const [dragOverIdx, setDragOverIdx] = useState(null); // pill drop-indicator position
     const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare'
     const [compareConfig, setCompareConfig] = useState({ xMinutes: 15, mMiles: 150, startSoc: 10 });
@@ -636,6 +648,8 @@ export default function App() {
                             specCustomFieldSuggestions={specCustomFieldSuggestions}
                             pendingEditVehicle={pendingEditVehicle}
                             onClearPendingEdit={() => setPendingEditVehicle(null)}
+                            savedState={vehiclesViewState}
+                            onSaveState={setVehiclesViewState}
                         />
                     )}
                     {view === 'runs' && currentActiveVehicle && (

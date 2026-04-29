@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { fmtDistance } from '../utils/unitConversions';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
@@ -33,6 +33,7 @@ export default function VehiclesView({
     onReorderVehicles, onDuplicateVehicle,
     onUpdateVehicleSpecs, specCustomFieldSuggestions,
     pendingEditVehicle, onClearPendingEdit,
+    savedState, onSaveState,
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -40,23 +41,38 @@ export default function VehiclesView({
         name: '', make: '', model: '', trim: '', year: '',
         battery: '', range: '', manufacturer_id: null,
     });
-    const [mfgFilterStates, setMfgFilterStates] = useState({}); // { [mfgId]: 'or' | 'not' }
-    const [modelFilter, setModelFilter] = useState(new Set());
+    const [mfgFilterStates, setMfgFilterStates] = useState(savedState?.mfgFilterStates ?? {}); // { [mfgId]: 'or' | 'not' }
+    const [modelFilter, setModelFilter] = useState(savedState?.modelFilter ?? new Set());
     const [formTags, setFormTags] = useState([]);
     const [newTagName, setNewTagName] = useState('');
-    const [tagFilterStates, setTagFilterStates] = useState({}); // { [tagId]: 'or' | 'and' | 'not' }
+    const [tagFilterStates, setTagFilterStates] = useState(savedState?.tagFilterStates ?? {}); // { [tagId]: 'or' | 'and' | 'not' }
     const [imageUploading, setImageUploading] = useState(false);
-    const [viewMode, setViewMode] = useState('card'); // 'card' | 'list'
-    const [sortBy, setSortBy] = useState('default');
-    const [textFilter, setTextFilter] = useState('');
+    const [viewMode, setViewMode] = useState(savedState?.viewMode ?? 'card'); // 'card' | 'list'
+    const [sortBy, setSortBy] = useState(savedState?.sortBy ?? 'default');
+    const [textFilter, setTextFilter] = useState(savedState?.textFilter ?? '');
     const [editingOrder, setEditingOrder] = useState(false);
     const [pendingOrder, setPendingOrder] = useState(null);   // [{id, sort_order}] or null
     const [savingOrder, setSavingOrder]   = useState(false);
     const [duplicatingId, setDuplicatingId] = useState(null);
-    const [vehiclePage, setVehiclePage] = useState(1);
+    const [vehiclePage, setVehiclePage] = useState(savedState?.vehiclePage ?? 1);
     const [specsEditingVehicle, setSpecsEditingVehicle] = useState(null);
     const [specsViewingVehicle, setSpecsViewingVehicle] = useState(null);
     const VEHICLES_PER_PAGE = 24;
+
+    // Keep a ref always pointing at latest filter/sort/page so the unmount
+    // cleanup can save it without stale-closure issues.
+    const persistableState = useRef({});
+    useEffect(() => {
+        persistableState.current = {
+            textFilter, tagFilterStates, mfgFilterStates, modelFilter,
+            sortBy, viewMode, vehiclePage,
+        };
+    }, [textFilter, tagFilterStates, mfgFilterStates, modelFilter, sortBy, viewMode, vehiclePage]);
+
+    // Save state back to App when this tab is left (unmount).
+    useEffect(() => {
+        return () => { onSaveState?.(persistableState.current); };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: fire only on unmount
 
     const { units, manufacturers, addManufacturer, isContributor, addSpecLink, deleteSpecLink, user } = useAppContext();
 
