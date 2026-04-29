@@ -662,18 +662,18 @@ export default function VehiclesView({
                                         borderColor: isPending ? 'rgb(252,165,165)' : isSelected ? 'var(--color-primary)' : 'transparent'
                                     }}
                                 >
-                                    {/* Background image + overlay */}
+                                    {/* Background image + overlay — purely decorative, must not intercept clicks */}
                                     {vehicle.image_url && (
                                         <>
                                             <div
-                                                className="absolute inset-0"
+                                                className="absolute inset-0 pointer-events-none"
                                                 style={{
                                                     backgroundImage: `url(${vehicle.image_url})`,
                                                     backgroundSize: 'cover',
                                                     backgroundPosition: 'center',
                                                 }}
                                             />
-                                            <div className="absolute inset-0 bg-white/80 dark:bg-black/65" />
+                                            <div className="absolute inset-0 bg-white/80 dark:bg-black/65 pointer-events-none" />
                                         </>
                                     )}
 

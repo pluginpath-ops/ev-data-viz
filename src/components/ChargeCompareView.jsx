@@ -45,7 +45,7 @@ function topAlertAmt(overshoot, total) {
 }
 
 // ── Bar label plugin (same style as RangeChartView barGroupPlugin) ────────────
-function makeBarPlugin(flatRuns, isHorizontal, units) {
+function makeBarPlugin(flatRuns, isHorizontal, units, isDark) {
     return {
         id: 'compareBarLabels',
         afterDatasetsDraw(chart) {
@@ -162,7 +162,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     if (!bar) return;
                     ctx2.save();
                     ctx2.font         = '12px sans-serif';
-                    ctx2.fillStyle    = '#6b7280';
+                    ctx2.fillStyle    = isDark ? 'rgb(203,213,225)' : '#6b7280';
                     ctx2.textAlign    = 'left';
                     ctx2.textBaseline = 'middle';
                     ctx2.fillText(run.name, bar.x + 8, bar.y);
@@ -180,7 +180,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     const cy = (y1 + y2) / 2;
 
                     ctx2.save();
-                    ctx2.strokeStyle = 'rgba(107,114,128,0.55)';
+                    ctx2.strokeStyle = isDark ? 'rgba(203,213,225,0.5)' : 'rgba(107,114,128,0.55)';
                     ctx2.lineWidth   = 1.5;
                     ctx2.beginPath();
                     ctx2.moveTo(area.left - 6, y1 + 3);
@@ -190,7 +190,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
 
                     ctx2.save();
                     ctx2.font         = 'bold 13px sans-serif';
-                    ctx2.fillStyle    = '#374151';
+                    ctx2.fillStyle    = isDark ? 'rgb(241,245,249)' : '#374151';
                     ctx2.textAlign    = 'right';
                     ctx2.textBaseline = 'middle';
                     ctx2.fillText(group.vehicleName, area.left - 10, cy);
@@ -201,7 +201,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                         if (nextStartBar) {
                             const sepY = (y2 + (nextStartBar.y - nextStartBar.height / 2)) / 2;
                             ctx2.save();
-                            ctx2.strokeStyle = 'rgba(107,114,128,0.35)';
+                            ctx2.strokeStyle = isDark ? 'rgba(100,116,139,0.45)' : 'rgba(107,114,128,0.35)';
                             ctx2.lineWidth   = 1;
                             ctx2.setLineDash([5, 4]);
                             ctx2.beginPath();
@@ -225,7 +225,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     const cx = (x1 + x2) / 2;
 
                     ctx2.save();
-                    ctx2.strokeStyle = 'rgba(107,114,128,0.55)';
+                    ctx2.strokeStyle = isDark ? 'rgba(203,213,225,0.5)' : 'rgba(107,114,128,0.55)';
                     ctx2.lineWidth   = 1.5;
                     ctx2.beginPath();
                     ctx2.moveTo(x1 + 3, groupLabelY);
@@ -235,7 +235,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
 
                     ctx2.save();
                     ctx2.font         = 'bold 13px sans-serif';
-                    ctx2.fillStyle    = '#374151';
+                    ctx2.fillStyle    = isDark ? 'rgb(241,245,249)' : '#374151';
                     ctx2.textAlign    = 'center';
                     ctx2.textBaseline = 'top';
                     ctx2.fillText(group.vehicleName, cx, groupLabelY + 4);
@@ -246,7 +246,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                         if (nextStartBar) {
                             const sepX = (x2 + (nextStartBar.x - nextStartBar.width / 2)) / 2;
                             ctx2.save();
-                            ctx2.strokeStyle = 'rgba(107,114,128,0.35)';
+                            ctx2.strokeStyle = isDark ? 'rgba(100,116,139,0.45)' : 'rgba(107,114,128,0.35)';
                             ctx2.lineWidth   = 1;
                             ctx2.setLineDash([5, 4]);
                             ctx2.beginPath();
@@ -505,7 +505,7 @@ export default function ChargeCompareView({
             instanceRef.current = new Chart(canvasRef.current.getContext('2d'), {
                 type:    'bar',
                 data:    built.data,
-                plugins: [makeBarPlugin(built.flatRuns, isHorizontal, units)],
+                plugins: [makeBarPlugin(built.flatRuns, isHorizontal, units, isDark)],
                 options: {
                     indexAxis: isHorizontal ? 'y' : undefined,
                     layout: { padding: isHorizontal ? { top: 0, left: 140, right: 10 } : { top: 0, bottom: 55 } },
