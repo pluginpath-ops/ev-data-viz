@@ -37,6 +37,20 @@ export function useTheme() {
         setIsDark(effective === 'dark');
     }, [stored]);
 
+    // Watch the data-theme attribute so ALL hook instances update when ANY
+    // component changes the theme — e.g. App.jsx's toggle re-renders chart
+    // components that have their own useTheme() instance.
+    useEffect(() => {
+        const observer = new MutationObserver(() => {
+            setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
+        });
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['data-theme'],
+        });
+        return () => observer.disconnect();
+    }, []);
+
     // Follow system changes when in 'system' mode
     useEffect(() => {
         if (stored !== 'system') return;
