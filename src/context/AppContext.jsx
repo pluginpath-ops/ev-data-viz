@@ -102,6 +102,12 @@ export function AppProvider({ children }) {
     const addVehicle = async (vehicle) => {
         try {
             const newVehicle = await dataService.addVehicle(vehicle);
+            // API response has manufacturer_id but not the joined manufacturer object —
+            // attach it from the already-loaded list so the card renders correctly.
+            if (newVehicle.manufacturer_id && !newVehicle.manufacturer) {
+                const mfg = manufacturers.find(m => m.id === newVehicle.manufacturer_id);
+                if (mfg) newVehicle.manufacturer = mfg;
+            }
             setVehicles(prev => [...prev, newVehicle]);
         } catch (error) {
             showError('Error adding vehicle: ' + error.message);
@@ -111,7 +117,16 @@ export function AppProvider({ children }) {
     const updateVehicle = async (vehicleId, updates) => {
         try {
             await dataService.updateVehicle(vehicleId, updates);
-            setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, ...updates } : v));
+            setVehicles(prev => prev.map(v => {
+                if (v.id !== vehicleId) return v;
+                const updated = { ...v, ...updates };
+                // Re-attach manufacturer object when manufacturer_id changes so the
+                // card and filters reflect the new brand without a full page refresh.
+                if ('manufacturer_id' in updates) {
+                    updated.manufacturer = manufacturers.find(m => m.id === updates.manufacturer_id) ?? null;
+                }
+                return updated;
+            }));
         } catch (error) {
             showError('Error updating vehicle: ' + error.message);
         }
