@@ -777,7 +777,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
                             {chartConfig.raceMode && (
                                 <>
-                                    <span className="text-sm text-gray-600">Start at:</span>
+                                    <span className="text-sm text-gray-600 dark:text-slate-300">Start at:</span>
                                     {/* Quick-select chips */}
                                     <div className="flex gap-1 flex-wrap">
                                         {[5, 10, 15, 20].map(pct => (
@@ -787,7 +787,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                 className={`px-2 py-0.5 text-xs rounded border transition-colors ${
                                                     chartConfig.raceThreshold === pct
                                                         ? 'bg-indigo-600 text-white border-indigo-600'
-                                                        : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'
+                                                        : 'bg-white dark:bg-slate-700 text-gray-600 dark:text-slate-200 border-gray-300 dark:border-slate-500 hover:border-indigo-400'
                                                 }`}
                                             >
                                                 {pct}%

@@ -591,10 +591,6 @@ export default function VehiclesView({
                             Clear
                         </button>
                     )}
-                    <span className="tag-filter-legend" title="Click a brand to cycle: OR (green) shows only that brand's vehicles · NOT (red) hides that brand's vehicles">
-                        <span className="text-green-500">●</span> OR
-                        <span className="text-red-500 ml-1">●</span> NOT
-                    </span>
                 </div>
             )}
 

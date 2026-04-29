@@ -468,7 +468,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                 key={key}
                                 type="button"
                                 onClick={() => setEffUnit(key)}
-                                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${effUnit === key ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${effUnit === key ? 'bg-white shadow text-gray-900' : 'text-gray-500 dark:text-slate-300 hover:text-gray-700 dark:hover:text-slate-100'}`}
                             >
                                 {label}
                             </button>

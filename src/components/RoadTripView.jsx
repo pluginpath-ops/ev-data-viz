@@ -1235,7 +1235,7 @@ export default function RoadTripView({
                     {/* Toggles row */}
                     <div className="flex flex-wrap gap-6 mb-4">
                         <div>
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Simulation</span>
+                            <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">Simulation</span>
                             <div className="flex gap-1">
                                 <button
                                     className={`btn btn-sm ${mode === 'distance' ? 'btn-primary' : 'btn-secondary'}`}
@@ -1252,7 +1252,7 @@ export default function RoadTripView({
                             </div>
                         </div>
                         <div>
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">X Axis</span>
+                            <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">X Axis</span>
                             <div className="flex gap-1">
                                 <button className={`btn btn-sm ${xAxis === 'totalTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'totalTime')}>Total Time</button>
                                 <button className={`btn btn-sm ${xAxis === 'driveTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'driveTime')}>Drive Time</button>
@@ -1263,7 +1263,7 @@ export default function RoadTripView({
                         <div>
                             {isSweepMode ? (
                                 <>
-                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Y Axis</span>
+                                    <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">Y Axis</span>
                                     <div className="flex gap-1">
                                         <button className={`btn btn-sm ${sweepYAxis === 'totalTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'totalTime')}>Total Time</button>
                                         <button className={`btn btn-sm ${sweepYAxis === 'driveTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'driveTime')}>Drive Time</button>
@@ -1272,7 +1272,7 @@ export default function RoadTripView({
                                 </>
                             ) : (
                                 <>
-                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Y Axis</span>
+                                    <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">Y Axis</span>
                                     <div className="flex gap-1">
                                         <button className={`btn btn-sm ${yAxis === 'distance'   ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'distance')}>Distance</button>
                                         <button className={`btn btn-sm ${yAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'chargeTime')}>Charge Time</button>
@@ -1282,7 +1282,7 @@ export default function RoadTripView({
                             )}
                         </div>
                         <div>
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Mode</span>
+                            <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">Mode</span>
                             <button
                                 className={`btn btn-sm ${towingMode ? 'btn-primary' : 'btn-secondary'}`}
                                 onClick={() => setField('towingMode', !towingMode)}

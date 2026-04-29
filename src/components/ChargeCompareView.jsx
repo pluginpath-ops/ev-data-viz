@@ -579,7 +579,7 @@ export default function ChargeCompareView({
                     )}
                 </div>
                 <div className="flex flex-wrap items-center gap-6">
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
                         Starting SoC (%):
                         <input
                             type="number"
@@ -590,7 +590,7 @@ export default function ChargeCompareView({
                             className="w-20 px-2 py-1 border rounded text-sm"
                         />
                     </label>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
                         Charging Time (minutes):
                         <input
                             type="number"
@@ -601,7 +601,7 @@ export default function ChargeCompareView({
                             className="w-20 px-2 py-1 border rounded text-sm"
                         />
                     </label>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
                         Range to add ({distanceLabel(units)}):
                         <input
                             type="number"
