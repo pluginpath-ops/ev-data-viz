@@ -180,7 +180,7 @@ export default function SpecsView({ selectedVehicleIds }) {
             ) : (
                 <div className="specs-table-container">
                     <table className="w-full">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-gray-50 dark:bg-blue-950 dark:text-slate-100">
                             <tr>
                                 <th className="px-6 py-3 text-left font-semibold">Specification</th>
                                 {resolvedVehicles.map(rv => (
@@ -195,7 +195,7 @@ export default function SpecsView({ selectedVehicleIds }) {
                                 ))}
                             </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y dark:divide-slate-700">
                             {/* ── Core vehicle fields ── */}
                             <tr>
                                 <td className="specs-table-cell font-medium">Make</td>

@@ -637,9 +637,9 @@ export default function RoadTripView({
             if (!simResults.some(Boolean)) return;
         }
 
-        const tickColor   = isDark ? 'rgb(148,163,184)' : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(51,65,85,0.6)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(148,163,184)' : 'rgb(55,65,81)';
+        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
+        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
+        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
 
         if (chartRef.current) {
             chartRef.current.destroy();
@@ -1173,7 +1173,7 @@ export default function RoadTripView({
         offscreen.width  = src.width;
         offscreen.height = src.height;
         const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = isDark ? 'rgb(30,41,59)' : '#ffffff';
+        ctx2.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
         ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
         ctx2.drawImage(src, 0, 0);
         const dataUrl = offscreen.toDataURL('image/png');
@@ -1612,7 +1612,7 @@ export default function RoadTripView({
 
                             return (
                         <table className="w-full text-sm">
-                            <thead className="bg-gray-50">
+                            <thead className="bg-gray-50 dark:bg-slate-700 dark:text-slate-100">
                                 <tr>
                                     <SortTh col="vehicle">Vehicle / Run</SortTh>
                                     <SortTh col="totalTime">Total Time</SortTh>
@@ -1624,7 +1624,7 @@ export default function RoadTripView({
                                     <SortTh col="vsIce">vs ICE</SortTh>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y">
+                            <tbody className="divide-y dark:divide-slate-700">
                                 {rows.map(({ entry, sim, avgChargeTime, speedDiff, adjPct, vsIce }) => {
 
                                     return (

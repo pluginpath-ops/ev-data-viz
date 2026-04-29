@@ -198,9 +198,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
 
     // ── Render chart ──────────────────────────────────────────────────────────
     useEffect(() => {
-        const tickColor   = isDark ? 'rgb(148,163,184)' : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(51,65,85,0.6)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(148,163,184)' : 'rgb(55,65,81)';
+        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
+        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
+        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
 
         if (chartInstance.current) {
             chartInstance.current.destroy();
@@ -304,7 +304,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
 
                     // Underline spanning the group
                     ctx2.save();
-                    ctx2.strokeStyle = 'rgba(107,114,128,0.55)';
+                    ctx2.strokeStyle = isDark ? 'rgba(203,213,225,0.5)' : 'rgba(107,114,128,0.55)';
                     ctx2.lineWidth   = 1.5;
                     ctx2.beginPath();
                     ctx2.moveTo(x1 + 3, groupLabelY);
@@ -315,7 +315,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     // Centered bold vehicle name
                     ctx2.save();
                     ctx2.font         = 'bold 13px sans-serif';
-                    ctx2.fillStyle    = '#374151';
+                    ctx2.fillStyle    = isDark ? 'rgb(241,245,249)' : '#374151';
                     ctx2.textAlign    = 'center';
                     ctx2.textBaseline = 'top';
                     ctx2.fillText(group.vehicleName, cx, groupLabelY + 4);
@@ -327,7 +327,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         if (nextStartBar) {
                             const sepX = (x2 + (nextStartBar.x - nextStartBar.width / 2)) / 2;
                             ctx2.save();
-                            ctx2.strokeStyle = 'rgba(107,114,128,0.35)';
+                            ctx2.strokeStyle = isDark ? 'rgba(100,116,139,0.45)' : 'rgba(107,114,128,0.35)';
                             ctx2.lineWidth   = 1;
                             ctx2.setLineDash([5, 4]);
                             ctx2.beginPath();
@@ -441,7 +441,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         offscreen.width = src.width;
         offscreen.height = src.height;
         const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = isDark ? 'rgb(30,41,59)' : '#ffffff';
+        ctx2.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
         ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
         ctx2.drawImage(src, 0, 0);
         const dataUrl = offscreen.toDataURL('image/png');

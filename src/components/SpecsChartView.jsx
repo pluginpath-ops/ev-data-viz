@@ -81,9 +81,9 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
     useEffect(() => {
         if (!selectedField || !canvasRef.current || !vehicles.length) return;
 
-        const tickColor   = isDark ? 'rgb(148,163,184)' : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(51,65,85,0.6)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(148,163,184)' : 'rgb(55,65,81)';
+        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
+        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
+        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
 
         const fieldDef  = allFields.find(f => f.key === selectedField) || getFieldDef(selectedField, vehicleFields);
         const mode      = detectMode(vehicles, selectedField, fieldDef);
@@ -198,7 +198,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
         offscreen.width  = src.width;
         offscreen.height = src.height;
         const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = isDark ? 'rgb(30,41,59)' : '#ffffff';
+        ctx2.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
         ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
         ctx2.drawImage(src, 0, 0);
         const dataUrl = offscreen.toDataURL('image/png');

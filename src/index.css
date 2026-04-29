@@ -49,24 +49,51 @@
 }
 
 /* ── Dark mode overrides ─────────────────────────────────────────────────── */
+/*
+ * Inverted-elevation model: cards sit DARKER than the page background.
+ * Page is medium-dark navy; cards/modals are near-black navy.
+ * Surfaces within cards are slightly lighter than the card, adding structure.
+ */
 [data-theme="dark"] {
-    --color-background:     rgb(15, 23, 42);    /* slate-950 */
-    --color-card:           rgb(30, 41, 59);    /* slate-800 */
-    --color-surface-muted:  rgb(23, 32, 51);    /* between page and card */
-    --color-surface-sunken: rgb(15, 23, 42);    /* same as page (deepest) */
-    --color-surface-input:  rgb(30, 41, 59);    /* same as card */
+    --color-background:     rgb(20, 28, 50);    /* medium dark navy — page body */
+    --color-card:           rgb(8, 12, 28);     /* near-black navy — cards/modals */
+    --color-surface-muted:  rgb(14, 20, 42);    /* slightly above card — sub-panels */
+    --color-surface-sunken: rgb(14, 20, 42);    /* same as muted */
+    --color-surface-input:  rgb(8, 12, 28);     /* same as card */
 
-    --color-text-primary:   rgb(241, 245, 249); /* slate-100 */
-    --color-text-secondary: rgb(148, 163, 184); /* slate-400 */
-    --color-text-muted:     rgb(100, 116, 139); /* slate-500 */
-    --color-text-faint:     rgb(71, 85, 105);   /* slate-600 */
+    --color-text-primary:   rgb(248, 250, 252); /* slate-50 — near white */
+    --color-text-secondary: rgb(203, 213, 225); /* slate-300 — light */
+    --color-text-muted:     rgb(148, 163, 184); /* slate-400 — medium */
+    --color-text-faint:     rgb(100, 116, 139); /* slate-500 */
 
-    --color-border:        rgb(51, 65, 85);     /* slate-700 */
-    --color-border-strong: rgb(71, 85, 105);    /* slate-600 */
+    --color-border:        rgb(38, 52, 82);     /* subtle separator */
+    --color-border-strong: rgb(58, 74, 108);    /* more prominent */
 
-    /* Primary accent adjustments for dark backgrounds */
-    --color-primary-light: rgba(59, 130, 246, 0.2);
-    --color-primary-text:  rgb(147, 197, 253);   /* blue-300 */
+    /* Primary accent: near-white tint for preset buttons & selected chips */
+    --color-primary-light: rgba(59, 130, 246, 0.25);
+    --color-primary-text:  rgb(226, 232, 240);   /* slate-200 — near white, cool tint */
+}
+
+/* Nav tabs and chart-mode tabs: near white in dark mode */
+[data-theme="dark"] .btn-tab {
+    color: rgb(241, 245, 249); /* slate-100 */
+}
+[data-theme="dark"] .btn-tab:hover {
+    color: rgb(255, 255, 255);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+[data-theme="dark"] .btn-tab.active {
+    color: var(--color-primary-text);
+}
+[data-theme="dark"] .btn-chart-mode {
+    color: rgb(226, 232, 240); /* slate-200 */
+}
+[data-theme="dark"] .btn-chart-mode:hover {
+    color: rgb(255, 255, 255);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+[data-theme="dark"] .btn-chart-mode.active {
+    color: var(--color-primary-text);
 }
 
 

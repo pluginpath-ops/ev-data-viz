@@ -426,9 +426,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             ? `${stripUnits(yLabel)} from ${raceThreshold}% SoC`
             : `${stripUnits(yLabel)} vs ${stripUnits(xLabel)}`;
 
-        const tickColor   = isDark ? 'rgb(148,163,184)' : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(51,65,85,0.6)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(148,163,184)' : 'rgb(55,65,81)';
+        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
+        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
+        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
 
         chartInstance.current = new Chart(ctx, {
             type: 'scatter',
@@ -518,7 +518,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         offscreen.width = src.width;
         offscreen.height = src.height;
         const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = isDark ? 'rgb(30,41,59)' : '#ffffff';
+        ctx2.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
         ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
         ctx2.drawImage(src, 0, 0);
         const dataUrl = offscreen.toDataURL('image/png');
@@ -691,7 +691,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             {/* ── Chart canvas ── */}
             <div className="card mb-4">
                 {loadingData && (
-                    <div className="text-center py-4 text-gray-500 text-sm">Loading run data...</div>
+                    <div className="text-center py-4 text-gray-500 dark:text-slate-300 text-sm">Loading run data...</div>
                 )}
                 <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px' }}>
                     <canvas ref={chartRef}></canvas>
@@ -807,7 +807,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                 className="w-14 px-1 py-0.5 border rounded text-xs text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                                 min="0" max="100"
                                             />
-                                            <span className="text-xs text-gray-500">%</span>
+                                            <span className="text-xs text-gray-500 dark:text-slate-400">%</span>
                                         </div>
                                     </div>
                                 </>
@@ -824,7 +824,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             </div>}
 
             {!presentationMode && chartConfig.selectedRuns.length === 0 && (
-                <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-12 text-gray-500 dark:text-slate-300">
                     <p className="text-lg">Select runs to display on the chart</p>
                 </div>
             )}
