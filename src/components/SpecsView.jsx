@@ -35,8 +35,9 @@ export default function SpecsView({ selectedVehicleIds }) {
         });
     };
 
+    // Map over selectedVehicleIds (not vehicles) to preserve pill order.
     const displayVehicles = selectedVehicleIds.length > 0
-        ? vehicles.filter(v => selectedVehicleIds.includes(v.id))
+        ? selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean)
         : vehicles;
 
     // Resolve effective specs (own overrides + inherited fallback) for each vehicle.
