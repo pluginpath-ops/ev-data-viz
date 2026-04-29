@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { fmtSpeed, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel } from '../utils/unitConversions';
+import { fmtSpeed, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
 import { dataService } from '../services/DataService';
@@ -750,7 +750,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setEditData(prev => prev.map(row => ({
             ...row,
             range: row.range != null ? row.range
-                : (row.soc != null ? Math.round((row.soc / 100) * ratedRange * 10) / 10 : null),
+                : (row.soc != null ? roundTo((row.soc / 100) * ratedRange, 1) : null),
         })));
         setEditCalculatedFields(prev => prev.includes('range') ? prev : [...prev, 'range']);
         setEditDataDirty(true);
@@ -866,8 +866,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         : null;
     const offerRangeEstimateTest = !!fieldMapping.soc && !fieldMapping.range && rangeTestRuns.length > 0;
 
-    // ── Tiny rounding helper (mirrors DataService.roundField, used for estimations) ──
-    const roundField = (v, dp) => (v == null || isNaN(Number(v))) ? null : Math.round(Number(v) * 10 ** dp) / 10 ** dp;
+    const roundField = roundTo;
 
     // ── kWh calculator from data_points ──────────────────────────────────────
     // Trapezoidal integration of chargeRate (kW) over time.
@@ -885,7 +884,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             const avgKw = (sorted[i].chargeRate + sorted[i - 1].chargeRate) / 2;
             if (dt > 0 && avgKw >= 0) kwh += avgKw * dt;
         }
-        return kwh < 0.1 ? null : Math.round(kwh * 10) / 10;
+        return kwh < 0.1 ? null : roundTo(kwh, 1);
     };
 
     // ── On-demand kWh comparison for card view (non-edit) ────────────────────

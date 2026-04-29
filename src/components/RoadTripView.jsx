@@ -6,6 +6,7 @@ import { dataService } from '../services/DataService';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
+import { filterChargingRuns, isChargingRun } from '../utils/runUtils';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import {
@@ -413,7 +414,7 @@ export default function RoadTripView({
         setSelectedRunIds(prev => {
             const allChargingRunIds = new Set(
                 selectedVehicles.flatMap(v =>
-                    (v.runs || []).filter(r => r.has_charging !== false).map(r => r.id)
+                    filterChargingRuns(v.runs).map(r => r.id)
                 )
             );
             // Drop runs whose vehicle is no longer selected
@@ -422,7 +423,7 @@ export default function RoadTripView({
 
             // For each vehicle with no selected runs, add its default/most-recent charging run
             for (const vehicle of selectedVehicles) {
-                const chargingRuns = (vehicle.runs || []).filter(r => r.has_charging !== false);
+                const chargingRuns = filterChargingRuns(vehicle.runs);
                 if (chargingRuns.some(r => keptSet.has(r.id))) continue;
                 const def = chargingRuns.find(r => r.isDefault) ||
                     [...chargingRuns].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
@@ -443,7 +444,7 @@ export default function RoadTripView({
                 .filter(r => hasRangeData(r, vehicle.battery))
                 .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null;
 
-            for (const run of (vehicle.runs || []).filter(r => r.has_charging !== false)) {
+            for (const run of filterChargingRuns(vehicle.runs)) {
                 const hasOwnRange = hasRangeData(run, vehicle.battery);
                 const rangeSource  = hasOwnRange ? run : bestRangeRun;
                 const miPerKwh     = rangeSource ? computeMiPerKwh(rangeSource, vehicle.battery) : null;
@@ -489,7 +490,7 @@ export default function RoadTripView({
 
     // Vehicles with no charging runs at all (need separate warning)
     const vehiclesWithNoChargingRuns = selectedVehicles.filter(
-        v => !(v.runs || []).some(r => r.has_charging !== false)
+        v => filterChargingRuns(v.runs).length === 0
     );
 
     // ── Lazy-load charging data ──────────────────────────────────────────────
@@ -1403,7 +1404,7 @@ export default function RoadTripView({
                     <div className="mt-4">
                         <RunSelector
                             vehicles={selectedVehicles.filter(v =>
-                                (v.runs || []).some(r => r.has_charging !== false)
+                                filterChargingRuns(v.runs).length > 0
                             )}
                             selectedRunIds={selectedRunIds}
                             onToggleRun={runId => setSelectedRunIds(prev =>
@@ -1412,7 +1413,7 @@ export default function RoadTripView({
                                     : [...prev, runId]
                             )}
                             onUpdateRunColor={onUpdateRunColor}
-                            runFilter={r => r.has_charging !== false}
+                            runFilter={isChargingRun}
                             emptyMessage="No charging test data"
                             renderRunMeta={run => {
                                 const info = allChargingRunsInfo[run.id];
