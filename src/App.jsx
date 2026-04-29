@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
+import { useTheme } from './hooks/useTheme';
 import AuthModal from './components/AuthModal';
 import VehiclesView from './components/VehiclesView';
 import RunsView from './components/RunsView';
@@ -116,6 +117,10 @@ export default function App() {
         setChartMode(newMode);
         setChartConfig(prev => ({ ...prev, selectedRuns: [] }));
     };
+
+    const { theme, cycleTheme, isDark } = useTheme();
+    const themeIcon  = theme === 'dark' ? '🌙' : theme === 'light' ? '☀️' : '💻';
+    const themeTitle = theme === 'dark' ? 'Dark mode (click for system)' : theme === 'light' ? 'Light mode (click for dark)' : 'System theme (click for light)';
 
     const { isPopout, sendState } = useChartSync({
         chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig,
@@ -329,10 +334,10 @@ export default function App() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-background)' }}>
                 <div className="text-center">
                     <div className="text-6xl mb-4">&#9889;</div>
-                    <div className="text-2xl font-semibold text-gray-700">Loading EV Data...</div>
+                    <div className="text-2xl font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Loading EV Data...</div>
                 </div>
             </div>
         );
@@ -367,8 +372,13 @@ export default function App() {
             <div className="min-h-screen">
                 {/* ── Header ── */}
                 <header className="relative text-white shadow-lg overflow-hidden">
-                    {/* Full-width base colour — always fills edge to edge */}
-                    <div className="absolute inset-0" style={{ backgroundColor: 'var(--color-primary)' }} />
+                    {/* Full-width base colour — always fills edge to edge.
+                        In dark mode use the page background so the header blends into
+                        the dark navy layout instead of showing a bright blue strip. */}
+                    <div
+                        className="absolute inset-0"
+                        style={{ backgroundColor: isDark ? 'var(--color-background)' : 'var(--color-primary)' }}
+                    />
                     {/* Image + overlay are both capped to page width (max-w-7xl) so on very
                         wide monitors the image stays aligned with the content column and more
                         of it is visible rather than being stretched thin across the viewport */}
@@ -379,7 +389,10 @@ export default function App() {
                                     className="absolute inset-0"
                                     style={{ backgroundImage: `url(${headerImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
                                 />
-                                <div className="absolute inset-0" style={{ backgroundColor: 'rgba(29,78,216,0.72)' }} />
+                                <div
+                                    className="absolute inset-0"
+                                    style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(29,78,216,0.72)' }}
+                                />
                             </div>
                         </div>
                     )}
@@ -408,7 +421,7 @@ export default function App() {
                     </div>
                 </header>
 
-                <nav className="bg-white shadow-sm border-b">
+                <nav className="app-nav">
                     <div className="page-container pt-3 pb-2">
                         {/*
                           * flex-col-reverse on mobile: DOM order is tabs first, actions second,
@@ -455,9 +468,12 @@ export default function App() {
                             </div>
                             {/* Action group — right-aligned on desktop, full-width right-justified on mobile */}
                             <div className="nav-actions sm:ml-auto">
+                                <button onClick={cycleTheme} className="theme-toggle" title={themeTitle}>
+                                    {themeIcon}
+                                </button>
                                 {user ? (
                                     <>
-                                        <div className="flex flex-col items-end leading-tight text-sm text-gray-600">
+                                        <div className="flex flex-col items-end leading-tight text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                                             <span>{user.email}</span>
                                             {userRole && userRole !== 'user' && (
                                                 <span className="owner-badge mt-0.5">{userRole.toUpperCase()}</span>
@@ -511,13 +527,13 @@ export default function App() {
                         )}
 
                     </div>
-                    <div className="border-t">
+                    <div className="selected-strip">
                         <div className="page-container py-2">
                         {/* Selected vehicles row */}
                         <div className="inline-row flex-wrap">
-                            <span className="text-sm text-gray-600 font-medium">Selected:</span>
+                            <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Selected:</span>
                             {selectedVehicles.length === 0 ? (
-                                <div className="px-3 py-1 bg-gray-100 text-gray-500 rounded-full text-sm">
+                                <div className="px-3 py-1 rounded-full text-sm" style={{ backgroundColor: 'var(--color-surface-sunken)', color: 'var(--color-text-muted)' }}>
                                     None
                                 </div>
                             ) : (

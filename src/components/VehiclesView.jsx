@@ -40,7 +40,7 @@ export default function VehiclesView({
         name: '', make: '', model: '', trim: '', year: '',
         battery: '', range: '', manufacturer_id: null,
     });
-    const [mfgFilter, setMfgFilter] = useState(new Set());
+    const [mfgFilterStates, setMfgFilterStates] = useState({}); // { [mfgId]: 'or' | 'not' }
     const [modelFilter, setModelFilter] = useState(new Set());
     const [formTags, setFormTags] = useState([]);
     const [newTagName, setNewTagName] = useState('');
@@ -156,6 +156,17 @@ export default function VehiclesView({
         setImageUploading(false);
     };
 
+    // Cycle brand filter state: N/A → OR (green) → NOT (red) → N/A  (no AND — doesn't make sense for brands)
+    const cycleMfgFilter = (mfgId) => {
+        setMfgFilterStates(prev => {
+            const cur = prev[mfgId];
+            if (!cur)         return { ...prev, [mfgId]: 'or' };
+            if (cur === 'or') return { ...prev, [mfgId]: 'not' };
+            const next = { ...prev }; delete next[mfgId]; return next; // not → N/A
+        });
+        setModelFilter(new Set()); // reset model filter when brand filter changes
+    };
+
     // Cycle tag filter state: N/A → OR (green) → AND (blue) → NOT (red) → N/A
     const cycleTagFilter = (tagId) => {
         setTagFilterStates(prev => {
@@ -179,13 +190,17 @@ export default function VehiclesView({
         return true;
     }).filter(v => !committedDeletes.has(v.id));
 
-    // Stage 2: manufacturer filter
-    const mfgFiltered = mfgFilter.size === 0 ? tagFiltered : tagFiltered.filter(v =>
-        v.manufacturer?.id != null ? mfgFilter.has(v.manufacturer.id) : false
-    );
+    // Stage 2: manufacturer filter (OR = show only these brands, NOT = hide these brands)
+    const orMfgs  = Object.entries(mfgFilterStates).filter(([, s]) => s === 'or' ).map(([id]) => Number(id));
+    const notMfgs = Object.entries(mfgFilterStates).filter(([, s]) => s === 'not').map(([id]) => Number(id));
+    const mfgFiltered = (orMfgs.length === 0 && notMfgs.length === 0) ? tagFiltered : tagFiltered.filter(v => {
+        if (notMfgs.length && notMfgs.includes(v.manufacturer?.id ?? null)) return false;
+        if (orMfgs.length  && !orMfgs.includes(v.manufacturer?.id ?? null)) return false;
+        return true;
+    });
 
-    // Stage 2b: model filter — only active when at least one manufacturer is selected
-    const availableModels = mfgFilter.size > 0
+    // Stage 2b: model filter — only active when at least one OR-brand is selected
+    const availableModels = orMfgs.length > 0
         ? [...new Set(mfgFiltered.map(v => v.model).filter(Boolean))].sort()
         : [];
     const modelFiltered = modelFilter.size === 0 ? mfgFiltered : mfgFiltered.filter(v =>
@@ -421,7 +436,7 @@ export default function VehiclesView({
     };
 
     // Reset to page 1 when filter/sort changes
-    useEffect(() => { setVehiclePage(1); }, [textFilter, tagFilterStates, sortBy, mfgFilter]);
+    useEffect(() => { setVehiclePage(1); }, [textFilter, tagFilterStates, sortBy, mfgFilterStates]);
 
     const showReorderButtons = canEdit({}) && sortBy === 'default'
         && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0
@@ -508,7 +523,7 @@ export default function VehiclesView({
             {/* Tag filter bar — quad-state: N/A → OR (green) → AND (blue) → NOT (red) */}
             {tags.length > 0 && (
                 <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-gray-500 flex-shrink-0">Filter:</span>
+                    <span className="text-sm font-medium text-gray-500 dark:text-slate-300 flex-shrink-0">Filter:</span>
                     {tags.map(tag => {
                         const state = tagFilterStates[tag.id]; // undefined = 'na'
                         const stateClass = state === 'or' ? 'tag-filter-or'
@@ -545,33 +560,32 @@ export default function VehiclesView({
                     </span>
                 </div>
             )}
-            {/* Manufacturer filter bar */}
+            {/* Manufacturer filter bar — tri-state: N/A → OR (green) → NOT (red) → N/A */}
             {manufacturers.length > 0 && (
                 <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-gray-500 flex-shrink-0">Brand:</span>
+                    <span className="text-sm font-medium text-gray-500 dark:text-slate-300 flex-shrink-0">Brand:</span>
                     {manufacturers.map(mfg => {
-                        const active = mfgFilter.has(mfg.id);
+                        const state = mfgFilterStates[mfg.id];
+                        const stateClass = state === 'or'  ? 'tag-filter-or'
+                            : state === 'not' ? 'tag-filter-not'
+                            : 'tag-filter-na';
+                        const tooltip = state === 'or'  ? `OR — showing only "${mfg.name}" vehicles. Click for NOT.`
+                            : state === 'not' ? `NOT — hiding "${mfg.name}" vehicles. Click to clear.`
+                            : `Click to filter: OR (show only "${mfg.name}" vehicles)`;
                         return (
                             <button
                                 key={mfg.id}
-                                onClick={() => {
-                                    setMfgFilter(prev => {
-                                        const next = new Set(prev);
-                                        next.has(mfg.id) ? next.delete(mfg.id) : next.add(mfg.id);
-                                        return next;
-                                    });
-                                    setModelFilter(new Set()); // reset model on brand change
-                                }}
-                                className={`tag-filter-btn ${active ? 'tag-filter-or' : 'tag-filter-na'}`}
-                                title={active ? `Remove "${mfg.name}" filter` : `Show only "${mfg.name}" vehicles`}
+                                onClick={() => cycleMfgFilter(mfg.id)}
+                                className={`tag-filter-btn ${stateClass}`}
+                                title={tooltip}
                             >
                                 {mfg.name}
                             </button>
                         );
                     })}
-                    {mfgFilter.size > 0 && (
+                    {Object.keys(mfgFilterStates).length > 0 && (
                         <button
-                            onClick={() => { setMfgFilter(new Set()); setModelFilter(new Set()); }}
+                            onClick={() => { setMfgFilterStates({}); setModelFilter(new Set()); }}
                             className="text-xs text-gray-400 hover:text-gray-600 underline ml-1 flex-shrink-0"
                         >
                             Clear
@@ -583,7 +597,7 @@ export default function VehiclesView({
             {/* Model filter bar — visible when a brand is selected and multiple models exist */}
             {availableModels.length > 1 && (
                 <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-gray-500 flex-shrink-0">Model:</span>
+                    <span className="text-sm font-medium text-gray-500 dark:text-slate-300 flex-shrink-0">Model:</span>
                     {availableModels.map(model => {
                         const active = modelFilter.has(model);
                         return (
@@ -649,8 +663,8 @@ export default function VehiclesView({
                         return (
                             <div key={vehicle.id} className="contents">
                                 {showMfgHeader && (
-                                    <div className="col-span-full pt-2 pb-1 border-b border-gray-200 mb-1">
-                                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{mfgName}</h3>
+                                    <div className="col-span-full pt-2 pb-1 border-b border-gray-200 dark:border-slate-700 mb-1">
+                                        <h3 className="text-sm font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wider">{mfgName}</h3>
                                     </div>
                                 )}
                                 <div
@@ -662,18 +676,18 @@ export default function VehiclesView({
                                         borderColor: isPending ? 'rgb(252,165,165)' : isSelected ? 'var(--color-primary)' : 'transparent'
                                     }}
                                 >
-                                    {/* Background image + overlay */}
+                                    {/* Background image + overlay — purely decorative, must not intercept clicks */}
                                     {vehicle.image_url && (
                                         <>
                                             <div
-                                                className="absolute inset-0"
+                                                className="absolute inset-0 pointer-events-none"
                                                 style={{
                                                     backgroundImage: `url(${vehicle.image_url})`,
                                                     backgroundSize: 'cover',
                                                     backgroundPosition: 'center',
                                                 }}
                                             />
-                                            <div className="absolute inset-0 bg-white/80" />
+                                            <div className="absolute inset-0 bg-white/80 dark:bg-black/65 pointer-events-none" />
                                         </>
                                     )}
 
@@ -713,8 +727,8 @@ export default function VehiclesView({
                                             {/* Left: vehicle info */}
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="text-xl font-bold mb-1">{vehicle.name}</h3>
-                                                <p className="text-gray-600 mb-2">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
-                                                <div className="text-sm text-gray-700 space-y-1">
+                                                <p className="text-gray-600 dark:text-slate-200 mb-2">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
+                                                <div className="text-sm text-gray-700 dark:text-slate-200 space-y-1">
                                                     {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                                     {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
                                                 </div>
@@ -736,7 +750,7 @@ export default function VehiclesView({
                                         <div className="mt-auto pt-3" onClick={e => e.stopPropagation()}>
                                             <button
                                                 onClick={() => onViewRuns(vehicle)}
-                                                className="w-full px-3 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
+                                                className="w-full px-3 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-900/50 transition"
                                             >
                                                 View Tests &amp; Data →
                                             </button>
@@ -765,8 +779,8 @@ export default function VehiclesView({
                         return (
                             <div key={vehicle.id}>
                                 {showMfgHeader && (
-                                    <div className="pt-2 pb-1 border-b border-gray-200 mb-1">
-                                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{mfgName}</h3>
+                                    <div className="pt-2 pb-1 border-b border-gray-200 dark:border-slate-700 mb-1">
+                                        <h3 className="text-sm font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wider">{mfgName}</h3>
                                     </div>
                                 )}
                                 <div
@@ -819,12 +833,12 @@ export default function VehiclesView({
                                     {/* Name + make + tags */}
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-bold text-lg leading-tight truncate">{vehicle.name}</h3>
-                                        <p className="text-gray-500 text-sm mb-1">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
+                                        <p className="text-gray-500 dark:text-slate-300 text-sm mb-1">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                                         <TagPills vehicle={vehicle} />
                                     </div>
 
                                     {/* Specs */}
-                                    <div className="text-sm text-gray-600 space-y-0.5 w-36 flex-shrink-0 hidden sm:block">
+                                    <div className="text-sm text-gray-600 dark:text-slate-200 space-y-0.5 w-36 flex-shrink-0 hidden sm:block">
                                         {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                         {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
                                         {vehicle.power && <p>Power: {vehicle.power} kW</p>}
@@ -857,7 +871,7 @@ export default function VehiclesView({
                 <div className="vehicle-pagination">
                     <button onClick={() => setVehiclePage(1)} disabled={vehiclePage === 1} className="pagination-btn">«</button>
                     <button onClick={() => setVehiclePage(p => p - 1)} disabled={vehiclePage === 1} className="pagination-btn">‹</button>
-                    <span className="text-sm text-gray-600">Page {vehiclePage} of {totalPages}</span>
+                    <span className="text-sm text-gray-600 dark:text-slate-300">Page {vehiclePage} of {totalPages}</span>
                     <button onClick={() => setVehiclePage(p => p + 1)} disabled={vehiclePage === totalPages} className="pagination-btn">›</button>
                     <button onClick={() => setVehiclePage(totalPages)} disabled={vehiclePage === totalPages} className="pagination-btn">»</button>
                 </div>
@@ -867,8 +881,8 @@ export default function VehiclesView({
                 <div className="empty-state">
                     {textFilter.trim()
                         ? <p className="text-lg">No vehicles match "{textFilter.trim()}".</p>
-                        : Object.keys(tagFilterStates).length > 0
-                            ? <p className="text-lg">No vehicles match the selected tag filters.</p>
+                        : Object.keys(tagFilterStates).length > 0 || Object.keys(mfgFilterStates).length > 0
+                            ? <p className="text-lg">No vehicles match the active filters.</p>
                             : <p className="text-lg">No vehicles yet. Click "Add Vehicle" to get started!</p>
                     }
                 </div>

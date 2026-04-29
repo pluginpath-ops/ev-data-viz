@@ -4,6 +4,7 @@ import ZoomPlugin from 'chartjs-plugin-zoom';
 import { vehicleLabel } from '../utils/specHelpers';
 import { dataService } from '../services/DataService';
 import { useAppContext } from '../context/AppContext';
+import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
@@ -378,6 +379,7 @@ export default function RoadTripView({
     presentationMode = false,
 }) {
     const { units } = useAppContext();
+    const { isDark } = useTheme();
     const canvasRef = useRef(null);
     const chartRef  = useRef(null);
 
@@ -635,6 +637,10 @@ export default function RoadTripView({
             if (!simResults.some(Boolean)) return;
         }
 
+        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
+        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
+        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
+
         if (chartRef.current) {
             chartRef.current.destroy();
             chartRef.current = null;
@@ -714,18 +720,20 @@ export default function RoadTripView({
                             type: 'linear',
                             min: axisScale.xMin ?? sweepMinDisplay,
                             max: axisScale.xMax ?? sweepMaxDisplay,
-                            title: { display: true, text: `Travel Speed (${sl})`, font: { size: 13 } },
-                            ticks: { stepSize: sweepStepDisplay },
+                            title: { display: true, text: `Travel Speed (${sl})`, font: { size: 13 }, color: legendColor },
+                            ticks: { stepSize: sweepStepDisplay, color: tickColor },
+                            grid: { color: gridColor },
                         },
                         y: {
                             min: axisScale.yMin != null ? axisScale.yMin * 60 : iceSpeedYMin,
                             max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
-                            title: { display: true, text: speedYLabel, font: { size: 13 } },
-                            ticks: { stepSize: 30, callback: val => formatTime(val) },
+                            title: { display: true, text: speedYLabel, font: { size: 13 }, color: legendColor },
+                            ticks: { stepSize: 30, callback: val => formatTime(val), color: tickColor },
+                            grid: { color: gridColor },
                         },
                     },
                     plugins: {
-                        legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40 } },
+                        legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor } },
                         tooltip: {
                             callbacks: {
                                 title: items => items[0]?.dataset.label ?? '',
@@ -809,18 +817,20 @@ export default function RoadTripView({
                             type: 'linear',
                             min: axisScale.xMin ?? legMinDisplay,
                             max: axisScale.xMax ?? legMaxDisplay,
-                            title: { display: true, text: `${dl} Between Charges`, font: { size: 13 } },
-                            ticks: { stepSize: legStepDisplay },
+                            title: { display: true, text: `${dl} Between Charges`, font: { size: 13 }, color: legendColor },
+                            ticks: { stepSize: legStepDisplay, color: tickColor },
+                            grid: { color: gridColor },
                         },
                         y: {
                             min: axisScale.yMin != null ? axisScale.yMin * 60 : iceDistYMin,
                             max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
-                            title: { display: true, text: sweepLabel, font: { size: 13 } },
-                            ticks: { stepSize: 30, callback: val => formatTime(val) },
+                            title: { display: true, text: sweepLabel, font: { size: 13 }, color: legendColor },
+                            ticks: { stepSize: 30, callback: val => formatTime(val), color: tickColor },
+                            grid: { color: gridColor },
                         },
                     },
                     plugins: {
-                        legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40 } },
+                        legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor } },
                         tooltip: {
                             callbacks: {
                                 title: items => items[0]?.dataset.label ?? '',
@@ -1010,11 +1020,12 @@ export default function RoadTripView({
                 scales: {
                     x: {
                         type: 'linear',
-                        title: { display: true, text: isDriveTimeXAxis ? 'Drive Time' : 'Elapsed Time', font: { size: 13 } },
+                        title: { display: true, text: isDriveTimeXAxis ? 'Drive Time' : 'Elapsed Time', font: { size: 13 }, color: legendColor },
                         min: axisScale.xMin != null ? axisScale.xMin * 60 : autoXMin,
                         max: axisScale.xMax != null ? axisScale.xMax * 60 : autoXMax,
                         ticks: {
                             stepSize: 30,
+                            color: tickColor,
                             callback: val => {
                                 const m = Math.round(val); // guard against FP imprecision (e.g. 59.9999…)
                                 if (m % 60 === 0) return m === 0 ? '0' : `${m / 60}h`;
@@ -1022,6 +1033,7 @@ export default function RoadTripView({
                                 return null;
                             },
                         },
+                        grid: { color: gridColor },
                     },
                     y: isByTestMode ? {
                         reverse: false,
@@ -1030,6 +1042,7 @@ export default function RoadTripView({
                         title: { display: false },
                         ticks: {
                             stepSize: 0.5,
+                            color: tickColor,
                             callback: (val) => {
                                 // Half-integer positions = lane centers → show label
                                 const frac = val - Math.floor(val);
@@ -1062,21 +1075,25 @@ export default function RoadTripView({
                         },
                     } : isChargeTimeMode ? {
                         reverse: true,
-                        title: { display: true, text: 'Cumulative Charge Time (min)', font: { size: 13 } },
+                        title: { display: true, text: 'Cumulative Charge Time (min)', font: { size: 13 }, color: legendColor },
                         min: axisScale.yMin ?? 0,
                         max: axisScale.yMax ?? autoYMax,
+                        ticks: { color: tickColor },
+                        grid: { color: gridColor },
                     } : {
                         reverse: true,
-                        title: { display: true, text: `Distance Traveled (${dl})`, font: { size: 13 } },
+                        title: { display: true, text: `Distance Traveled (${dl})`, font: { size: 13 }, color: legendColor },
                         min: axisScale.yMin ?? 0,
                         max: axisScale.yMax ?? autoYMax,
+                        ticks: { color: tickColor },
+                        grid: { color: gridColor },
                     },
                 },
                 plugins: {
                     legend: {
                         display: true,
                         position: 'top',
-                        labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40 },
+                        labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor },
                     },
                     tooltip: {
                         displayColors: true,
@@ -1143,7 +1160,7 @@ export default function RoadTripView({
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [simResults, speedSweepResults, distSweepResults, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.sweepYAxis, roadTripConfig.speed, roadTripConfig.overhead, axisScale]);
+    }, [simResults, speedSweepResults, distSweepResults, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.sweepYAxis, roadTripConfig.speed, roadTripConfig.overhead, axisScale, isDark]);
 
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
@@ -1156,7 +1173,7 @@ export default function RoadTripView({
         offscreen.width  = src.width;
         offscreen.height = src.height;
         const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = '#ffffff';
+        ctx2.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
         ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
         ctx2.drawImage(src, 0, 0);
         const dataUrl = offscreen.toDataURL('image/png');
@@ -1218,7 +1235,7 @@ export default function RoadTripView({
                     {/* Toggles row */}
                     <div className="flex flex-wrap gap-6 mb-4">
                         <div>
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Simulation</span>
+                            <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">Simulation</span>
                             <div className="flex gap-1">
                                 <button
                                     className={`btn btn-sm ${mode === 'distance' ? 'btn-primary' : 'btn-secondary'}`}
@@ -1235,7 +1252,7 @@ export default function RoadTripView({
                             </div>
                         </div>
                         <div>
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">X Axis</span>
+                            <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">X Axis</span>
                             <div className="flex gap-1">
                                 <button className={`btn btn-sm ${xAxis === 'totalTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'totalTime')}>Total Time</button>
                                 <button className={`btn btn-sm ${xAxis === 'driveTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'driveTime')}>Drive Time</button>
@@ -1246,7 +1263,7 @@ export default function RoadTripView({
                         <div>
                             {isSweepMode ? (
                                 <>
-                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Y Axis</span>
+                                    <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">Y Axis</span>
                                     <div className="flex gap-1">
                                         <button className={`btn btn-sm ${sweepYAxis === 'totalTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'totalTime')}>Total Time</button>
                                         <button className={`btn btn-sm ${sweepYAxis === 'driveTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'driveTime')}>Drive Time</button>
@@ -1255,7 +1272,7 @@ export default function RoadTripView({
                                 </>
                             ) : (
                                 <>
-                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Y Axis</span>
+                                    <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">Y Axis</span>
                                     <div className="flex gap-1">
                                         <button className={`btn btn-sm ${yAxis === 'distance'   ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'distance')}>Distance</button>
                                         <button className={`btn btn-sm ${yAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'chargeTime')}>Charge Time</button>
@@ -1265,7 +1282,7 @@ export default function RoadTripView({
                             )}
                         </div>
                         <div>
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Mode</span>
+                            <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">Mode</span>
                             <button
                                 className={`btn btn-sm ${towingMode ? 'btn-primary' : 'btn-secondary'}`}
                                 onClick={() => setField('towingMode', !towingMode)}
@@ -1467,7 +1484,7 @@ export default function RoadTripView({
                     <div className="mt-3 flex gap-2 flex-wrap items-center">
                         <button
                             onClick={() => chartRef.current?.resetZoom()}
-                            className="chart-copy-btn bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                            className="chart-copy-btn"
                             title="Reset zoom to full view"
                         >
                             🔍 Reset Zoom
@@ -1483,20 +1500,20 @@ export default function RoadTripView({
                                     setTimeout(() => setCopiedUrl(false), 2000);
                                 });
                             }}
-                            className={`chart-copy-btn ${copiedUrl ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                            className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
                             title="Copy link to this Road Trip chart"
                         >
                             {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
                         </button>
                         <button
                             onClick={handleCopyImage}
-                            className={`chart-copy-btn ${imageCopied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                            className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
                             title="Copy chart as PNG"
                         >
                             {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
                         </button>
                         {chartImage && (
-                            <button onClick={() => setChartImage(null)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                            <button onClick={() => setChartImage(null)} className="chart-copy-btn">
                                 ✕ Dismiss preview
                             </button>
                         )}
@@ -1595,7 +1612,7 @@ export default function RoadTripView({
 
                             return (
                         <table className="w-full text-sm">
-                            <thead className="bg-gray-50">
+                            <thead className="bg-gray-50 dark:bg-slate-700 dark:text-slate-100">
                                 <tr>
                                     <SortTh col="vehicle">Vehicle / Run</SortTh>
                                     <SortTh col="totalTime">Total Time</SortTh>
@@ -1607,7 +1624,7 @@ export default function RoadTripView({
                                     <SortTh col="vsIce">vs ICE</SortTh>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y">
+                            <tbody className="divide-y dark:divide-slate-700">
                                 {rows.map(({ entry, sim, avgChargeTime, speedDiff, adjPct, vsIce }) => {
 
                                     return (

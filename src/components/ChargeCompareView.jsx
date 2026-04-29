@@ -5,6 +5,7 @@ import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
+import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 
 // ── Interpolation helper ──────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ function topAlertAmt(overshoot, total) {
 }
 
 // ── Bar label plugin (same style as RangeChartView barGroupPlugin) ────────────
-function makeBarPlugin(flatRuns, isHorizontal, units) {
+function makeBarPlugin(flatRuns, isHorizontal, units, isDark) {
     return {
         id: 'compareBarLabels',
         afterDatasetsDraw(chart) {
@@ -161,7 +162,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     if (!bar) return;
                     ctx2.save();
                     ctx2.font         = '12px sans-serif';
-                    ctx2.fillStyle    = '#6b7280';
+                    ctx2.fillStyle    = isDark ? 'rgb(203,213,225)' : '#6b7280';
                     ctx2.textAlign    = 'left';
                     ctx2.textBaseline = 'middle';
                     ctx2.fillText(run.name, bar.x + 8, bar.y);
@@ -179,7 +180,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     const cy = (y1 + y2) / 2;
 
                     ctx2.save();
-                    ctx2.strokeStyle = 'rgba(107,114,128,0.55)';
+                    ctx2.strokeStyle = isDark ? 'rgba(203,213,225,0.5)' : 'rgba(107,114,128,0.55)';
                     ctx2.lineWidth   = 1.5;
                     ctx2.beginPath();
                     ctx2.moveTo(area.left - 6, y1 + 3);
@@ -189,7 +190,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
 
                     ctx2.save();
                     ctx2.font         = 'bold 13px sans-serif';
-                    ctx2.fillStyle    = '#374151';
+                    ctx2.fillStyle    = isDark ? 'rgb(241,245,249)' : '#374151';
                     ctx2.textAlign    = 'right';
                     ctx2.textBaseline = 'middle';
                     ctx2.fillText(group.vehicleName, area.left - 10, cy);
@@ -200,7 +201,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                         if (nextStartBar) {
                             const sepY = (y2 + (nextStartBar.y - nextStartBar.height / 2)) / 2;
                             ctx2.save();
-                            ctx2.strokeStyle = 'rgba(107,114,128,0.35)';
+                            ctx2.strokeStyle = isDark ? 'rgba(100,116,139,0.45)' : 'rgba(107,114,128,0.35)';
                             ctx2.lineWidth   = 1;
                             ctx2.setLineDash([5, 4]);
                             ctx2.beginPath();
@@ -224,7 +225,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     const cx = (x1 + x2) / 2;
 
                     ctx2.save();
-                    ctx2.strokeStyle = 'rgba(107,114,128,0.55)';
+                    ctx2.strokeStyle = isDark ? 'rgba(203,213,225,0.5)' : 'rgba(107,114,128,0.55)';
                     ctx2.lineWidth   = 1.5;
                     ctx2.beginPath();
                     ctx2.moveTo(x1 + 3, groupLabelY);
@@ -234,7 +235,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
 
                     ctx2.save();
                     ctx2.font         = 'bold 13px sans-serif';
-                    ctx2.fillStyle    = '#374151';
+                    ctx2.fillStyle    = isDark ? 'rgb(241,245,249)' : '#374151';
                     ctx2.textAlign    = 'center';
                     ctx2.textBaseline = 'top';
                     ctx2.fillText(group.vehicleName, cx, groupLabelY + 4);
@@ -245,7 +246,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                         if (nextStartBar) {
                             const sepX = (x2 + (nextStartBar.x - nextStartBar.width / 2)) / 2;
                             ctx2.save();
-                            ctx2.strokeStyle = 'rgba(107,114,128,0.35)';
+                            ctx2.strokeStyle = isDark ? 'rgba(100,116,139,0.45)' : 'rgba(107,114,128,0.35)';
                             ctx2.lineWidth   = 1;
                             ctx2.setLineDash([5, 4]);
                             ctx2.beginPath();
@@ -273,6 +274,7 @@ export default function ChargeCompareView({
     presentationMode = false,
 }) {
     const { units } = useAppContext();
+    const { isDark } = useTheme();
     const [runDataCache,    setRunDataCache]    = useState({});
     const [loading,         setLoading]         = useState(false);
     const [copied,          setCopied]          = useState(false);
@@ -487,6 +489,10 @@ export default function ChargeCompareView({
 
     // ── Build and render both charts ──────────────────────────────────────────
     useEffect(() => {
+        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
+        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
+        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
+
         [chart1Instance, chart2Instance].forEach(inst => {
             if (inst.current) { inst.current.destroy(); inst.current = null; }
         });
@@ -499,7 +505,7 @@ export default function ChargeCompareView({
             instanceRef.current = new Chart(canvasRef.current.getContext('2d'), {
                 type:    'bar',
                 data:    built.data,
-                plugins: [makeBarPlugin(built.flatRuns, isHorizontal, units)],
+                plugins: [makeBarPlugin(built.flatRuns, isHorizontal, units, isDark)],
                 options: {
                     indexAxis: isHorizontal ? 'y' : undefined,
                     layout: { padding: isHorizontal ? { top: 0, left: 140, right: 10 } : { top: 0, bottom: 55 } },
@@ -536,11 +542,11 @@ export default function ChargeCompareView({
                         },
                     },
                     scales: isHorizontal ? {
-                        x: { title: { display: true, text: built.yLabel }, beginAtZero: true },
+                        x: { title: { display: true, text: built.yLabel, color: legendColor }, beginAtZero: true, ticks: { color: tickColor }, grid: { color: gridColor } },
                         y: { type: 'category', grid: { display: false }, title: { display: false }, ticks: { display: false } },
                     } : {
-                        x: { type: 'category', grid: { display: false }, title: { display: false } },
-                        y: { title: { display: true, text: built.yLabel }, beginAtZero: true },
+                        x: { type: 'category', grid: { display: false }, title: { display: false }, ticks: { color: tickColor } },
+                        y: { title: { display: true, text: built.yLabel, color: legendColor }, beginAtZero: true, ticks: { color: tickColor }, grid: { color: gridColor } },
                     },
                 },
             });
@@ -554,7 +560,7 @@ export default function ChargeCompareView({
                 if (inst.current) { inst.current.destroy(); inst.current = null; }
             });
         };
-    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns, units]);
+    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns, units, isDark]);
 
     const hasRangeRuns = resolvedRuns.length > 0;
 
@@ -573,7 +579,7 @@ export default function ChargeCompareView({
                     )}
                 </div>
                 <div className="flex flex-wrap items-center gap-6">
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
                         Starting SoC (%):
                         <input
                             type="number"
@@ -584,7 +590,7 @@ export default function ChargeCompareView({
                             className="w-20 px-2 py-1 border rounded text-sm"
                         />
                     </label>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
                         Charging Time (minutes):
                         <input
                             type="number"
@@ -595,7 +601,7 @@ export default function ChargeCompareView({
                             className="w-20 px-2 py-1 border rounded text-sm"
                         />
                     </label>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
                         Range to add ({distanceLabel(units)}):
                         <input
                             type="number"
@@ -674,7 +680,7 @@ export default function ChargeCompareView({
                         <div className="mt-3 flex gap-2">
                             <button
                                 onClick={handleCopyUrl}
-                                className={`chart-copy-btn ${copied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                                className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
                                 title="Copy link to this chart view"
                             >
                                 {copied ? '✓ Copied!' : '🔗 Copy URL'}

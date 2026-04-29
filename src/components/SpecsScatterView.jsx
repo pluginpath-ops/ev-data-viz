@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import { useAppContext } from '../context/AppContext';
+import { useTheme } from '../hooks/useTheme';
 import { convValue, formatSpecValue } from '../utils/unitConversions';
 import {
     makeVehicleFields, buildFieldGroups, getFieldDef, extractValue,
@@ -59,6 +60,7 @@ const pointLabelPlugin = {
 
 export default function SpecsScatterView({ vehicles, xField: xProp, yField: yProp, onFieldChange }) {
     const { units } = useAppContext();
+    const { isDark } = useTheme();
 
     const vehicleFields = useMemo(() => makeVehicleFields(units), [units]);
     const fieldGroups   = useMemo(() => buildFieldGroups(vehicles, vehicleFields), [vehicles, vehicleFields]);
@@ -106,6 +108,10 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
 
     useEffect(() => {
         if (!xField || !yField || !canvasRef.current || !vehicles.length) return;
+
+        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
+        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
+        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
 
         const xDef = allNumericFields.find(f => f.key === xField) || getFieldDef(xField, vehicleFields);
         const yDef = allNumericFields.find(f => f.key === yField) || getFieldDef(yField, vehicleFields);
@@ -195,6 +201,7 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
                         labels: {
                             boxWidth: 10,
                             padding: 10,
+                            color: legendColor,
                             filter: item => item.text !== 'Trend',
                         },
                     },
@@ -218,8 +225,8 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
                     },
                 },
                 scales: {
-                    x: { title: { display: true, text: xLabel, font: { size: 12 } } },
-                    y: { title: { display: true, text: yLabel, font: { size: 12 } } },
+                    x: { title: { display: true, text: xLabel, font: { size: 12 }, color: legendColor }, ticks: { color: tickColor }, grid: { color: gridColor } },
+                    y: { title: { display: true, text: yLabel, font: { size: 12 }, color: legendColor }, ticks: { color: tickColor }, grid: { color: gridColor } },
                 },
             },
             plugins: [pointLabelPlugin],
@@ -229,7 +236,7 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [xField, yField, vehicles, allNumericFields, vehicleFields, units]);
+    }, [xField, yField, vehicles, allNumericFields, vehicleFields, units, isDark]);
 
     const handleCopyImage = async () => {
         if (!chartRef.current) return;
@@ -238,7 +245,7 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
         offscreen.width  = src.width;
         offscreen.height = src.height;
         const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = '#ffffff';
+        ctx2.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
         ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
         ctx2.drawImage(src, 0, 0);
         const dataUrl = offscreen.toDataURL('image/png');
@@ -297,20 +304,20 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
                             setTimeout(() => setCopiedUrl(false), 2000);
                         });
                     }}
-                    className={`chart-copy-btn ${copiedUrl ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                    className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
                     title="Copy link to this chart view"
                 >
                     {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
                 </button>
                 <button
                     onClick={handleCopyImage}
-                    className={`chart-copy-btn ${imageCopied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+                    className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
                     title="Copy chart as PNG"
                 >
                     {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
                 </button>
                 {chartImage && (
-                    <button onClick={() => setChartImage(null)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                    <button onClick={() => setChartImage(null)} className="chart-copy-btn">
                         ✕ Dismiss preview
                     </button>
                 )}

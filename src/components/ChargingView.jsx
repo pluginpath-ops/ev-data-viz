@@ -10,10 +10,12 @@ import AxisScaleControls from './AxisScaleControls';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
+import { useTheme } from '../hooks/useTheme';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, presentationMode = false }) {
     const { units } = useAppContext();
+    const { isDark } = useTheme();
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
     const [runDataCache, setRunDataCache] = useState({});
@@ -424,6 +426,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             ? `${stripUnits(yLabel)} from ${raceThreshold}% SoC`
             : `${stripUnits(yLabel)} vs ${stripUnits(xLabel)}`;
 
+        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
+        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
+        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
+
         chartInstance.current = new Chart(ctx, {
             type: 'scatter',
             data: { datasets },
@@ -432,10 +438,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    title: { display: true, text: chartTitle, font: { size: 14, weight: 'bold' } },
+                    title: { display: true, text: chartTitle, font: { size: 14, weight: 'bold' }, color: legendColor },
                     legend: {
                         position: 'top',
                         labels: {
+                            color: legendColor,
                             // Y2 datasets share color+style with their Y1 pair — hide duplicates
                             filter: (item, data) => data.datasets[item.datasetIndex].yAxisID !== 'y2',
                         },
@@ -467,12 +474,16 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 },
                 scales: {
                     x: {
-                        title: { display: true, text: xLabel },
+                        title: { display: true, text: xLabel, color: legendColor },
+                        ticks: { color: tickColor },
+                        grid:  { color: gridColor },
                         ...(chartConfig.xMin != null ? { min: chartConfig.xMin } : {}),
                         ...(chartConfig.xMax != null ? { max: chartConfig.xMax } : {}),
                     },
                     y: {
-                        title: { display: true, text: yLabel },
+                        title: { display: true, text: yLabel, color: legendColor },
+                        ticks: { color: tickColor },
+                        grid:  { color: gridColor },
                         ...(chartConfig.yMin != null ? { min: chartConfig.yMin } : {}),
                         ...(chartConfig.yMax != null ? { max: chartConfig.yMax } : {}),
                     },
@@ -481,8 +492,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             type:     'linear',
                             display:  true,
                             position: 'right',
-                            title:    { display: true, text: y2Label },
-                            grid:     { drawOnChartArea: false },
+                            title:    { display: true, text: y2Label, color: legendColor },
+                            ticks:    { color: tickColor },
+                            grid:     { drawOnChartArea: false, color: gridColor },
                             ...(chartConfig.y2Min != null ? { min: chartConfig.y2Min } : {}),
                             ...(chartConfig.y2Max != null ? { max: chartConfig.y2Max } : {}),
                         },
@@ -496,7 +508,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 chartInstance.current.destroy();
             }
         };
-    }, [chartConfig, selectedVehicles, runDataCache, units]);
+    }, [chartConfig, selectedVehicles, runDataCache, units, isDark]);
 
     // ── PNG export ───────────────────────────────────────────────────────────
     const handleExportImage = async () => {
@@ -506,7 +518,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         offscreen.width = src.width;
         offscreen.height = src.height;
         const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = '#ffffff';
+        ctx2.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
         ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
         ctx2.drawImage(src, 0, 0);
         const dataUrl = offscreen.toDataURL('image/png');
@@ -679,7 +691,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             {/* ── Chart canvas ── */}
             <div className="card mb-4">
                 {loadingData && (
-                    <div className="text-center py-4 text-gray-500 text-sm">Loading run data...</div>
+                    <div className="text-center py-4 text-gray-500 dark:text-slate-300 text-sm">Loading run data...</div>
                 )}
                 <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px' }}>
                     <canvas ref={chartRef}></canvas>
@@ -689,7 +701,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 <div className="mt-3 flex items-center gap-3 flex-wrap">
                     <button
                         onClick={() => chartInstance.current?.resetZoom()}
-                        className="chart-copy-btn bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                        className="chart-copy-btn"
                         title="Reset zoom to full view"
                     >
                         🔍 Reset Zoom
@@ -701,22 +713,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                 setTimeout(() => setCopied(false), 2000);
                             });
                         }}
-                        className={`chart-copy-btn ${
-                            copied
-                                ? 'bg-green-50 border-green-200 text-green-700'
-                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                        }`}
+                        className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
                         title="Copy link to this chart view"
                     >
                         {copied ? '✓ Copied!' : '🔗 Copy URL'}
                     </button>
                     <button
                         onClick={handleExportImage}
-                        className={`chart-copy-btn ${
-                            imageCopied
-                                ? 'bg-green-50 border-green-200 text-green-700'
-                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                        }`}
+                        className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
                         title="Export chart as PNG"
                     >
                         {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
@@ -724,7 +728,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     {chartImage && (
                         <button
                             onClick={() => setChartImage(null)}
-                            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                            className="chart-copy-btn"
                         >
                             ✕ Dismiss preview
                         </button>
@@ -773,7 +777,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
                             {chartConfig.raceMode && (
                                 <>
-                                    <span className="text-sm text-gray-600">Start at:</span>
+                                    <span className="text-sm text-gray-600 dark:text-slate-300">Start at:</span>
                                     {/* Quick-select chips */}
                                     <div className="flex gap-1 flex-wrap">
                                         {[5, 10, 15, 20].map(pct => (
@@ -783,7 +787,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                 className={`px-2 py-0.5 text-xs rounded border transition-colors ${
                                                     chartConfig.raceThreshold === pct
                                                         ? 'bg-indigo-600 text-white border-indigo-600'
-                                                        : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'
+                                                        : 'bg-white dark:bg-slate-700 text-gray-600 dark:text-slate-200 border-gray-300 dark:border-slate-500 hover:border-indigo-400'
                                                 }`}
                                             >
                                                 {pct}%
@@ -803,7 +807,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                 className="w-14 px-1 py-0.5 border rounded text-xs text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                                 min="0" max="100"
                                             />
-                                            <span className="text-xs text-gray-500">%</span>
+                                            <span className="text-xs text-gray-500 dark:text-slate-400">%</span>
                                         </div>
                                     </div>
                                 </>
@@ -820,7 +824,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             </div>}
 
             {!presentationMode && chartConfig.selectedRuns.length === 0 && (
-                <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-12 text-gray-500 dark:text-slate-300">
                     <p className="text-lg">Select runs to display on the chart</p>
                 </div>
             )}
