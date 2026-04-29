@@ -40,7 +40,7 @@ export default function VehiclesView({
         name: '', make: '', model: '', trim: '', year: '',
         battery: '', range: '', manufacturer_id: null,
     });
-    const [mfgFilter, setMfgFilter] = useState(new Set());
+    const [mfgFilterStates, setMfgFilterStates] = useState({}); // { [mfgId]: 'or' | 'not' }
     const [modelFilter, setModelFilter] = useState(new Set());
     const [formTags, setFormTags] = useState([]);
     const [newTagName, setNewTagName] = useState('');
@@ -156,6 +156,17 @@ export default function VehiclesView({
         setImageUploading(false);
     };
 
+    // Cycle brand filter state: N/A → OR (green) → NOT (red) → N/A  (no AND — doesn't make sense for brands)
+    const cycleMfgFilter = (mfgId) => {
+        setMfgFilterStates(prev => {
+            const cur = prev[mfgId];
+            if (!cur)         return { ...prev, [mfgId]: 'or' };
+            if (cur === 'or') return { ...prev, [mfgId]: 'not' };
+            const next = { ...prev }; delete next[mfgId]; return next; // not → N/A
+        });
+        setModelFilter(new Set()); // reset model filter when brand filter changes
+    };
+
     // Cycle tag filter state: N/A → OR (green) → AND (blue) → NOT (red) → N/A
     const cycleTagFilter = (tagId) => {
         setTagFilterStates(prev => {
@@ -179,13 +190,17 @@ export default function VehiclesView({
         return true;
     }).filter(v => !committedDeletes.has(v.id));
 
-    // Stage 2: manufacturer filter
-    const mfgFiltered = mfgFilter.size === 0 ? tagFiltered : tagFiltered.filter(v =>
-        v.manufacturer?.id != null ? mfgFilter.has(v.manufacturer.id) : false
-    );
+    // Stage 2: manufacturer filter (OR = show only these brands, NOT = hide these brands)
+    const orMfgs  = Object.entries(mfgFilterStates).filter(([, s]) => s === 'or' ).map(([id]) => Number(id));
+    const notMfgs = Object.entries(mfgFilterStates).filter(([, s]) => s === 'not').map(([id]) => Number(id));
+    const mfgFiltered = (orMfgs.length === 0 && notMfgs.length === 0) ? tagFiltered : tagFiltered.filter(v => {
+        if (notMfgs.length && notMfgs.includes(v.manufacturer?.id ?? null)) return false;
+        if (orMfgs.length  && !orMfgs.includes(v.manufacturer?.id ?? null)) return false;
+        return true;
+    });
 
-    // Stage 2b: model filter — only active when at least one manufacturer is selected
-    const availableModels = mfgFilter.size > 0
+    // Stage 2b: model filter — only active when at least one OR-brand is selected
+    const availableModels = orMfgs.length > 0
         ? [...new Set(mfgFiltered.map(v => v.model).filter(Boolean))].sort()
         : [];
     const modelFiltered = modelFilter.size === 0 ? mfgFiltered : mfgFiltered.filter(v =>
@@ -421,7 +436,7 @@ export default function VehiclesView({
     };
 
     // Reset to page 1 when filter/sort changes
-    useEffect(() => { setVehiclePage(1); }, [textFilter, tagFilterStates, sortBy, mfgFilter]);
+    useEffect(() => { setVehiclePage(1); }, [textFilter, tagFilterStates, sortBy, mfgFilterStates]);
 
     const showReorderButtons = canEdit({}) && sortBy === 'default'
         && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0
@@ -545,38 +560,41 @@ export default function VehiclesView({
                     </span>
                 </div>
             )}
-            {/* Manufacturer filter bar */}
+            {/* Manufacturer filter bar — tri-state: N/A → OR (green) → NOT (red) → N/A */}
             {manufacturers.length > 0 && (
                 <div className="tag-filter-bar">
                     <span className="text-sm font-medium text-gray-500 dark:text-slate-300 flex-shrink-0">Brand:</span>
                     {manufacturers.map(mfg => {
-                        const active = mfgFilter.has(mfg.id);
+                        const state = mfgFilterStates[mfg.id];
+                        const stateClass = state === 'or'  ? 'tag-filter-or'
+                            : state === 'not' ? 'tag-filter-not'
+                            : 'tag-filter-na';
+                        const tooltip = state === 'or'  ? `OR — showing only "${mfg.name}" vehicles. Click for NOT.`
+                            : state === 'not' ? `NOT — hiding "${mfg.name}" vehicles. Click to clear.`
+                            : `Click to filter: OR (show only "${mfg.name}" vehicles)`;
                         return (
                             <button
                                 key={mfg.id}
-                                onClick={() => {
-                                    setMfgFilter(prev => {
-                                        const next = new Set(prev);
-                                        next.has(mfg.id) ? next.delete(mfg.id) : next.add(mfg.id);
-                                        return next;
-                                    });
-                                    setModelFilter(new Set()); // reset model on brand change
-                                }}
-                                className={`tag-filter-btn ${active ? 'tag-filter-or' : 'tag-filter-na'}`}
-                                title={active ? `Remove "${mfg.name}" filter` : `Show only "${mfg.name}" vehicles`}
+                                onClick={() => cycleMfgFilter(mfg.id)}
+                                className={`tag-filter-btn ${stateClass}`}
+                                title={tooltip}
                             >
                                 {mfg.name}
                             </button>
                         );
                     })}
-                    {mfgFilter.size > 0 && (
+                    {Object.keys(mfgFilterStates).length > 0 && (
                         <button
-                            onClick={() => { setMfgFilter(new Set()); setModelFilter(new Set()); }}
+                            onClick={() => { setMfgFilterStates({}); setModelFilter(new Set()); }}
                             className="text-xs text-gray-400 hover:text-gray-600 underline ml-1 flex-shrink-0"
                         >
                             Clear
                         </button>
                     )}
+                    <span className="tag-filter-legend" title="Click a brand to cycle: OR (green) shows only that brand's vehicles · NOT (red) hides that brand's vehicles">
+                        <span className="text-green-500">●</span> OR
+                        <span className="text-red-500 ml-1">●</span> NOT
+                    </span>
                 </div>
             )}
 
@@ -867,8 +885,8 @@ export default function VehiclesView({
                 <div className="empty-state">
                     {textFilter.trim()
                         ? <p className="text-lg">No vehicles match "{textFilter.trim()}".</p>
-                        : Object.keys(tagFilterStates).length > 0
-                            ? <p className="text-lg">No vehicles match the selected tag filters.</p>
+                        : Object.keys(tagFilterStates).length > 0 || Object.keys(mfgFilterStates).length > 0
+                            ? <p className="text-lg">No vehicles match the active filters.</p>
                             : <p className="text-lg">No vehicles yet. Click "Add Vehicle" to get started!</p>
                     }
                 </div>
