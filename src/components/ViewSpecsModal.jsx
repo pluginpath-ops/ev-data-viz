@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import VehicleSpecsDisplay from './VehicleSpecsDisplay';
 import { SpecVouchButton } from './VoteButtons';
-import { mergeInheritedSpecs, vehicleLabel } from '../utils/specHelpers';
+import { mergeInheritedSpecs, resolveEffectiveSpecs, vehicleLabel } from '../utils/specHelpers';
 
 /**
  * Read-only modal showing a vehicle's specs.
@@ -25,9 +25,12 @@ export default function ViewSpecsModal({ vehicle, onClose }) {
     const sourceVehicle = liveVehicle.spec_source_vehicle_id
         ? vehicles.find(v => v.id === liveVehicle.spec_source_vehicle_id)
         : null;
+    const ancestorSpecs = sourceVehicle
+        ? resolveEffectiveSpecs(sourceVehicle, vehicles, new Set([liveVehicle.id]))
+        : null;
     const { merged: effectiveSpecs, inheritedKeys } = mergeInheritedSpecs(
         liveVehicle.specs,
-        sourceVehicle?.specs
+        ancestorSpecs
     );
     const sourceVehicleName = sourceVehicle ? vehicleLabel(sourceVehicle) : null;
 

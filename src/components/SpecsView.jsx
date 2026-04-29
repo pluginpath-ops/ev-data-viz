@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { formatSpecValue, fmtDistance, distanceLabel } from '../utils/unitConversions';
 import { SpecFieldFlagButton } from './VoteButtons';
-import { mergeInheritedSpecs, vehicleLabel } from '../utils/specHelpers';
+import { mergeInheritedSpecs, resolveEffectiveSpecs, vehicleLabel } from '../utils/specHelpers';
 
 export default function SpecsView({ selectedVehicleIds }) {
     // Read vehicles directly from context so optimistic updates (e.g. admin unflag)
@@ -40,12 +40,13 @@ export default function SpecsView({ selectedVehicleIds }) {
         ? selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean)
         : vehicles;
 
-    // Resolve effective specs (own overrides + inherited fallback) for each vehicle.
+    // Resolve effective specs (own overrides + full ancestor chain) for each vehicle.
     const resolvedVehicles = displayVehicles.map(v => {
         const source = v.spec_source_vehicle_id
             ? vehicles.find(sv => sv.id === v.spec_source_vehicle_id)
             : null;
-        const { merged, inheritedKeys } = mergeInheritedSpecs(v.specs, source?.specs);
+        const ancestorSpecs = source ? resolveEffectiveSpecs(source, vehicles, new Set([v.id])) : null;
+        const { merged, inheritedKeys } = mergeInheritedSpecs(v.specs, ancestorSpecs);
         return {
             ...v,
             effectiveSpecs: merged,

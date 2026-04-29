@@ -11,6 +11,34 @@ export function vehicleLabel(v) {
 // ── Spec inheritance merge ────────────────────────────────────────────────────
 
 /**
+ * Walk the full ancestor chain for a vehicle and return its fully-resolved
+ * effective specs — own fields merged over all ancestors — so that grandchild
+ * vehicles see values that were only set on a grandparent.
+ *
+ * _visited: Set of vehicle IDs already seen this walk; stops infinite loops
+ * caused by circular spec_source_vehicle_id references.
+ *
+ * Returns a plain specs object (same shape as vehicle.specs).
+ */
+export function resolveEffectiveSpecs(vehicle, vehicles, _visited = new Set()) {
+    if (!vehicle) return {};
+
+    const parent = vehicle.spec_source_vehicle_id
+        ? vehicles.find(v => v.id === vehicle.spec_source_vehicle_id)
+        : null;
+
+    if (!parent || _visited.has(parent.id)) {
+        // No parent, or cycle detected — own specs are the effective specs.
+        return vehicle.specs ?? {};
+    }
+
+    const visited = new Set([..._visited, vehicle.id]);
+    const parentEffective = resolveEffectiveSpecs(parent, vehicles, visited);
+    const { merged } = mergeInheritedSpecs(vehicle.specs, parentEffective);
+    return merged;
+}
+
+/**
  * Merge own (override) specs with source (inherited) specs.
  * Returns:
  *   merged       — the effective spec object to display
