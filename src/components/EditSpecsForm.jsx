@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, normalizeCustomKey, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { SpecVouchButton, SpecFieldFlagButton } from './VoteButtons';
-import { vehicleLabel } from '../utils/specHelpers';
+import { vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
 
 /**
  * Modal form for editing all spec categories of a vehicle.
@@ -211,9 +211,12 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     const liveVehicle = vehicles.find(v => v.id === vehicle.id) || vehicle;
     const flaggedSpecs = liveVehicle.flagged_specs || [];
 
-    // Source vehicle specs for inheritance hints
+    // Source vehicle specs for inheritance hints — resolve the full ancestor chain
+    // so hints show the value that would actually be inherited (not just direct parent's own fields).
     const sourceVehicle  = inheritFromId ? vehicles.find(v => String(v.id) === inheritFromId) : null;
-    const inheritedSpecs = sourceVehicle?.specs ?? {};
+    const inheritedSpecs = sourceVehicle
+        ? resolveEffectiveSpecs(sourceVehicle, vehicles, new Set([vehicle.id]))
+        : {};
 
     // Other vehicles available as inheritance sources (excluding self)
     const otherVehicles = (vehicles || [])
