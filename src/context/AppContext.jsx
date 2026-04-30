@@ -768,6 +768,34 @@ export function AppProvider({ children }) {
         }
     };
 
+    /**
+     * Bulk-import EPA test groups from the parsed testcar sheet, then create
+     * vehicle mappings for any test groups the user linked to a vehicle.
+     *
+     * @param {Array<Object>} testGroups  Rows for epa_test_groups upsert
+     * @param {Array<{vehicleId, testGroupId}>} mappings  Vehicle → test group links to create
+     */
+    const importEpaTestGroups = async (testGroups, mappings) => {
+        try {
+            await dataService.bulkUpsertEpaTestGroups(testGroups);
+            // Create mappings sequentially; skip if already linked (upsert would conflict)
+            for (const { vehicleId, testGroupId } of mappings) {
+                try {
+                    await dataService.linkEpaTestGroup(vehicleId, testGroupId, 'likely', null);
+                } catch {
+                    // Ignore duplicate-link errors (UNIQUE constraint) — mapping already exists
+                }
+            }
+            const updated = await dataService.getVehicles();
+            setVehicles(updated);
+            showSuccess(`Imported ${testGroups.length} EPA test group(s), linked ${mappings.length}.`);
+            return { testGroupsCount: testGroups.length, mappingsCount: mappings.length };
+        } catch (error) {
+            showError('EPA import failed: ' + error.message);
+            throw error;
+        }
+    };
+
     // ── Admin actions ─────────────────────────────────────────────────────────
     const getUsersForAdmin = async () => {
         // Let the error propagate to AdminView so it can show it inline.
@@ -859,6 +887,7 @@ export function AppProvider({ children }) {
         linkEpaTestGroup,
         updateEpaMapping,
         unlinkEpaTestGroup,
+        importEpaTestGroups,
     };
 
     return (

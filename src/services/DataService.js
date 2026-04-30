@@ -1103,6 +1103,19 @@ class DataService {
       .eq('id', mappingId);
     if (error) throw error;
   }
+
+  /**
+   * Bulk upsert EPA test group rows (keyed on test_group_id).
+   * Existing rows are updated; new rows are inserted.
+   * @param {Array<Object>} rows  Shaped like epa_test_groups columns
+   */
+  async bulkUpsertEpaTestGroups(rows) {
+    if (!this.useSupabase || !rows.length) return;
+    const { error } = await getSupabase()
+      .from('epa_test_groups')
+      .upsert(rows, { onConflict: 'test_group_id', ignoreDuplicates: false });
+    if (error) throw error;
+  }
 }
 
 export const dataService = new DataService();

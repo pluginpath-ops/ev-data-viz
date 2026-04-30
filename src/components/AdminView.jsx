@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import ImportTableauModal from './ImportTableauModal';
+import EpaImportModal from './EpaImportModal';
 
 const ROLES = ['user', 'contributor', 'admin'];
 
@@ -11,13 +12,14 @@ const roleBadgeStyle = {
 };
 
 export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId }) {
-    const { exportData, importData, importTableauSessions, vehicles } = useAppContext();
+    const { exportData, importData, importTableauSessions, importEpaTestGroups, vehicles } = useAppContext();
     const [users, setUsers]           = useState([]);
     const [loading, setLoading]       = useState(true);
     const [saving, setSaving]         = useState(null);
     const [error, setError]           = useState(null);
     const [showImportMenu, setShowImportMenu] = useState(false);
     const [showTableauModal, setShowTableauModal] = useState(false);
+    const [showEpaModal, setShowEpaModal]         = useState(false);
     const jsonImportRef = useRef();
 
     useEffect(() => {
@@ -58,6 +60,13 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                     onClose={() => setShowTableauModal(false)}
                 />
             )}
+            {showEpaModal && (
+                <EpaImportModal
+                    vehicles={vehicles}
+                    onImport={importEpaTestGroups}
+                    onClose={() => setShowEpaModal(false)}
+                />
+            )}
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="page-title">Admin Panel</h2>
@@ -83,6 +92,10 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                                     <button className="dropdown-item w-full text-left"
                                         onClick={() => { setShowImportMenu(false); setShowTableauModal(true); }}>
                                         📊 Tableau CSV
+                                    </button>
+                                    <button className="dropdown-item w-full text-left"
+                                        onClick={() => { setShowImportMenu(false); setShowEpaModal(true); }}>
+                                        ⚡ EPA Test Car Data
                                     </button>
                                 </div>
                             </>
