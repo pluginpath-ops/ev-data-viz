@@ -202,6 +202,8 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     const [inheritFromId, setInheritFromId] = useState(
         vehicle.spec_source_vehicle_id ? String(vehicle.spec_source_vehicle_id) : ''
     );
+    const [parentSearch, setParentSearch] = useState('');
+    const [showParentDropdown, setShowParentDropdown] = useState(false);
 
     // Load vouch count for display in footer
     useEffect(() => { loadSpecVouches(vehicle.id); }, [vehicle.id]);
@@ -218,10 +220,36 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
         ? resolveEffectiveSpecs(sourceVehicle, vehicles, new Set([vehicle.id]))
         : {};
 
-    // Other vehicles available as inheritance sources (excluding self)
+    // Build the set of descendant IDs so we can exclude them from the parent picker
+    // (selecting a descendant as parent would create a circular inheritance chain).
+    const getDescendantIds = (rootId, allVehicles, visited = new Set()) => {
+        const ids = new Set();
+        for (const v of allVehicles) {
+            if (v.spec_source_vehicle_id === rootId && !visited.has(v.id)) {
+                ids.add(v.id);
+                const childVisited = new Set([...visited, v.id]);
+                for (const d of getDescendantIds(v.id, allVehicles, childVisited)) ids.add(d);
+            }
+        }
+        return ids;
+    };
+    const descendantIds = getDescendantIds(vehicle.id, vehicles || []);
+
+    // Other vehicles available as inheritance sources (excluding self and descendants)
     const otherVehicles = (vehicles || [])
-        .filter(v => v.id !== vehicle.id)
+        .filter(v => v.id !== vehicle.id && !descendantIds.has(v.id))
         .sort((a, b) => vehicleLabel(a).localeCompare(vehicleLabel(b)));
+
+    // Filtered list for combobox
+    const parentSearchLower = parentSearch.toLowerCase();
+    const filteredParents = parentSearch
+        ? otherVehicles.filter(v => vehicleLabel(v).toLowerCase().includes(parentSearchLower))
+        : otherVehicles;
+
+    // Label for the currently-selected parent (shown in the closed combobox)
+    const selectedParentLabel = inheritFromId
+        ? vehicleLabel(otherVehicles.find(v => String(v.id) === inheritFromId) || {})
+        : '';
 
     const toggleCategory = (key) => {
         setOpenCategories(prev => {
@@ -329,21 +357,72 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                 {/* Scrollable body */}
                 <div className="modal-body flex-1 overflow-y-auto">
 
-                    {/* ── Inherit from selector ── */}
-                    <div className="flex items-center gap-3 mb-4 pb-4 border-b">
-                        <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Inherit from:</label>
-                        <select
-                            value={inheritFromId}
-                            onChange={e => setInheritFromId(e.target.value)}
-                            className="form-input text-sm flex-1"
-                        >
-                            <option value="">— None —</option>
-                            {otherVehicles.map(v => (
-                                <option key={v.id} value={String(v.id)}>{vehicleLabel(v)}</option>
-                            ))}
-                        </select>
+                    {/* ── Inherit from selector (combobox) ── */}
+                    <div className="mb-4 pb-4 border-b">
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Inherit from:</label>
+                            <div className="relative flex-1">
+                                {showParentDropdown ? (
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        value={parentSearch}
+                                        onChange={e => setParentSearch(e.target.value)}
+                                        onBlur={() => setTimeout(() => setShowParentDropdown(false), 150)}
+                                        placeholder="Type to filter vehicles…"
+                                        className="form-input text-sm w-full"
+                                    />
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setParentSearch(''); setShowParentDropdown(true); }}
+                                        className="form-input text-sm w-full text-left truncate"
+                                    >
+                                        {selectedParentLabel || <span className="text-gray-400">— None —</span>}
+                                    </button>
+                                )}
+                                {showParentDropdown && (
+                                    <ul className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border shadow-lg bg-white dark:bg-slate-800 dark:border-slate-600">
+                                        <li
+                                            className="px-3 py-2 text-sm cursor-pointer text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+                                            onMouseDown={() => {
+                                                setInheritFromId('');
+                                                setShowParentDropdown(false);
+                                                setParentSearch('');
+                                            }}
+                                        >
+                                            — None —
+                                        </li>
+                                        {filteredParents.map(v => (
+                                            <li
+                                                key={v.id}
+                                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900 ${String(v.id) === inheritFromId ? 'font-semibold text-indigo-600 dark:text-indigo-300' : ''}`}
+                                                onMouseDown={() => {
+                                                    setInheritFromId(String(v.id));
+                                                    setShowParentDropdown(false);
+                                                    setParentSearch('');
+                                                }}
+                                            >
+                                                {vehicleLabel(v)}
+                                            </li>
+                                        ))}
+                                        {filteredParents.length === 0 && (
+                                            <li className="px-3 py-2 text-sm text-gray-400 italic">No matches</li>
+                                        )}
+                                    </ul>
+                                )}
+                            </div>
+                            {inheritFromId && (
+                                <button
+                                    type="button"
+                                    onClick={() => setInheritFromId('')}
+                                    className="text-gray-400 hover:text-gray-600 text-lg leading-none flex-shrink-0"
+                                    title="Clear inheritance"
+                                >×</button>
+                            )}
+                        </div>
                         {sourceVehicle && (
-                            <p className="text-xs text-indigo-500 whitespace-nowrap">
+                            <p className="text-xs text-indigo-500 mt-1.5">
                                 Fields you leave blank will show <span className="font-medium">↑ inherited</span> hints.
                             </p>
                         )}
