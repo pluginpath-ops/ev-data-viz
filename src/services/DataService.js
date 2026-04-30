@@ -104,7 +104,7 @@ class DataService {
     }
     const { data } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color)`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, model_year, make, epa_carline_name, drive, transmission, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs, hwfet_unadj_kwh_100mi, hwfet_adj_kwh_100mi, udds_unadj_kwh_100mi, range_city_mi, range_hwy_mi, range_combined_mi, useable_kwh, label_combined_mpge, label_combined_mi, label_hwy_mpge, label_city_mpge, label_hwy_mi, label_city_mi, label_method))`)
       .order('created_at', { ascending: false });
 
     // Pass 1: process each vehicle's own data
@@ -128,6 +128,12 @@ class DataService {
         ...v,
         manufacturer,                    // { id, name, country } or null
         spec_links: v.spec_links || [],  // raw link rows (kept for admin UI)
+        epa_mappings: (v.epa_vehicle_mappings || []).map(m => ({
+          id:        m.id,
+          confidence: m.confidence,
+          notes:     m.notes,
+          epaGroup:  m.epa_test_groups,
+        })),
         tags:  (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
         runs:  (v.runs || []).map(r => ({
           ...r,
@@ -1027,6 +1033,74 @@ class DataService {
       p_vehicle_id: vehicleId,
       p_field_key: fieldKey,
     });
+    if (error) throw error;
+  }
+
+  // ── EPA Test Groups ───────────────────────────────────────────────────────
+
+  /**
+   * Search epa_test_groups for the vehicle-linking combobox.
+   * Filters by free-text (matched against make + epa_carline_name) and optional
+   * model year. Returns at most 50 results, ordered by make and carline name.
+   *
+   * @param {string} query — free text search string
+   * @param {number|null} year — exact model year filter (optional)
+   */
+  async searchEpaTestGroups(query, year = null) {
+    if (!this.useSupabase) return [];
+    let q = getSupabase()
+      .from('epa_test_groups')
+      .select('test_group_id, model_year, make, epa_carline_name, transmission, drive, fuel_type')
+      .order('make')
+      .order('epa_carline_name')
+      .limit(50);
+    if (year) q = q.eq('model_year', year);
+    if (query?.trim()) {
+      const escaped = query.trim().replace(/[%_]/g, '\\$&');
+      q = q.or(`make.ilike.%${escaped}%,epa_carline_name.ilike.%${escaped}%`);
+    }
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Link a vehicle to an EPA test group.
+   * Contributor-level permission enforced by RLS on epa_vehicle_mappings.
+   */
+  async linkEpaTestGroup(vehicleId, epaTestGroupId, confidence = 'inferred', notes = '') {
+    if (!this.useSupabase) return null;
+    const { data, error } = await getSupabase()
+      .from('epa_vehicle_mappings')
+      .insert({ vehicle_id: vehicleId, epa_test_group_id: epaTestGroupId, confidence, notes: notes || null })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Update the confidence or notes on an existing vehicle → EPA test group mapping.
+   */
+  async updateEpaMapping(mappingId, updates) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('epa_vehicle_mappings')
+      .update(updates)
+      .eq('id', mappingId);
+    if (error) throw error;
+  }
+
+  /**
+   * Remove a vehicle → EPA test group mapping.
+   * Admin permission enforced by RLS.
+   */
+  async unlinkEpaTestGroup(mappingId) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('epa_vehicle_mappings')
+      .delete()
+      .eq('id', mappingId);
     if (error) throw error;
   }
 }

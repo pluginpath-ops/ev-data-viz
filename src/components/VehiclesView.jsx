@@ -74,7 +74,10 @@ export default function VehiclesView({
         return () => { onSaveState?.(persistableState.current); };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: fire only on unmount
 
-    const { units, manufacturers, addManufacturer, isContributor, addSpecLink, deleteSpecLink, user } = useAppContext();
+    const {
+        units, manufacturers, addManufacturer, isContributor, addSpecLink, deleteSpecLink, user,
+        searchEpaTestGroups, linkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup,
+    } = useAppContext();
 
     const {
         pendingDeletes, committedDeletes, undoState, secondsLeft,
@@ -383,6 +386,13 @@ export default function VehiclesView({
         // Manufacturer
         manufacturers,
         onAddManufacturer: addManufacturer,
+        // EPA linking (contributor+)
+        ...(isContributor ? {
+            searchEpaTestGroups,
+            onLinkEpaTestGroup:   linkEpaTestGroup,
+            onUpdateEpaMapping:   updateEpaMapping,
+            onUnlinkEpaTestGroup: unlinkEpaTestGroup,
+        } : {}),
     };
 
     const handleMoveVehicle = (vehicleId, direction) => {

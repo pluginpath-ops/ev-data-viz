@@ -730,6 +730,44 @@ export function AppProvider({ children }) {
         }
     };
 
+    // ── EPA test group linking ────────────────────────────────────────────────
+
+    /** Pass-through: server-side search used by the linking combobox. */
+    const searchEpaTestGroups = (query, year) => dataService.searchEpaTestGroups(query, year);
+
+    const linkEpaTestGroup = async (vehicleId, groupId, confidence, notes) => {
+        try {
+            await dataService.linkEpaTestGroup(vehicleId, groupId, confidence, notes);
+            // Re-fetch vehicles so epa_mappings reflects the new link immediately.
+            const updated = await dataService.getVehicles();
+            setVehicles(updated);
+            showSuccess('EPA test group linked.');
+        } catch (error) {
+            showError('Error linking EPA test group: ' + error.message);
+        }
+    };
+
+    const updateEpaMapping = async (mappingId, updates) => {
+        try {
+            await dataService.updateEpaMapping(mappingId, updates);
+            const updated = await dataService.getVehicles();
+            setVehicles(updated);
+        } catch (error) {
+            showError('Error updating EPA mapping: ' + error.message);
+        }
+    };
+
+    const unlinkEpaTestGroup = async (mappingId) => {
+        try {
+            await dataService.unlinkEpaTestGroup(mappingId);
+            const updated = await dataService.getVehicles();
+            setVehicles(updated);
+            showSuccess('EPA test group unlinked.');
+        } catch (error) {
+            showError('Error unlinking EPA test group: ' + error.message);
+        }
+    };
+
     // ── Admin actions ─────────────────────────────────────────────────────────
     const getUsersForAdmin = async () => {
         // Let the error propagate to AdminView so it can show it inline.
@@ -817,6 +855,10 @@ export function AppProvider({ children }) {
         updateSpecLink,
         deleteSpecLink,
         clearDefaultRun,
+        searchEpaTestGroups,
+        linkEpaTestGroup,
+        updateEpaMapping,
+        unlinkEpaTestGroup,
     };
 
     return (
