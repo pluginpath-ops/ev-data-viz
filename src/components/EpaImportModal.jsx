@@ -121,7 +121,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                             >
                                 <div className="text-4xl mb-3">📂</div>
                                 <p className="font-medium text-gray-700 dark:text-slate-300">Drop the EPA testcar TSV here, or click to browse</p>
-                                <p className="text-sm text-gray-400 mt-1">Accepts .txt / .tsv / .csv · Tab-separated · Pre-filter to your vehicles of interest</p>
+                                <p className="text-sm text-gray-400 mt-1">Accepts .csv (Excel) or .txt / .tsv (tab-separated) · Pre-filter to your vehicles of interest</p>
                                 <input ref={fileRef} type="file" accept=".txt,.tsv,.csv" className="hidden" onChange={handleFilePick} />
                             </div>
                             {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
@@ -131,7 +131,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                 <ol className="list-decimal list-inside space-y-1 text-xs">
                                     <li>Download the EPA Test Car List (testcar_yymmdd.txt) from <span className="font-mono">epa.gov</span></li>
                                     <li>Open in Excel and filter to the manufacturers and models you care about</li>
-                                    <li>Save As → Tab-delimited text (.txt or .tsv)</li>
+                                    <li>Save As → CSV (.csv) or Tab-delimited text (.txt / .tsv)</li>
                                     <li>Upload here — the app will group rows by test group and show a pick list</li>
                                 </ol>
                             </div>

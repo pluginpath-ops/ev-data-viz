@@ -31,14 +31,55 @@ function mpgeToKwh100mi(mpge) {
  * @param {string} [sourceFileName]  Stored in source_file field
  * @returns {Array<Object>}
  */
+/**
+ * Split one line into fields, respecting RFC 4180 CSV quoting rules.
+ * For TSV (sep='\t') no quoting is expected so we just split.
+ * For CSV, fields may be wrapped in double-quotes, and "" inside a quoted
+ * field represents a literal double-quote.
+ */
+function splitLine(line, sep) {
+    if (sep === '\t') return line.split('\t');
+
+    const fields = [];
+    let cur = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+            if (ch === '"') {
+                if (i + 1 < line.length && line[i + 1] === '"') {
+                    cur += '"'; // escaped quote
+                    i++;
+                } else {
+                    inQuotes = false;
+                }
+            } else {
+                cur += ch;
+            }
+        } else {
+            if (ch === '"') {
+                inQuotes = true;
+            } else if (ch === sep) {
+                fields.push(cur);
+                cur = '';
+            } else {
+                cur += ch;
+            }
+        }
+    }
+    fields.push(cur);
+    return fields;
+}
+
 export function parseEpaTestCarSheet(text, sourceFileName = null) {
     // Normalise line endings
     const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
     if (lines.length < 2) return [];
 
-    // Detect separator
+    // Detect separator: prefer tab; fall back to comma (Excel CSV)
     const sep = lines[0].includes('\t') ? '\t' : ',';
-    const headers = lines[0].split(sep).map(h => h.trim());
+    const headers = splitLine(lines[0], sep).map(h => h.trim());
 
     // Build a lookup from header name → column index
     const colIdx = {};
@@ -56,7 +97,7 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
         if (!line.trim()) continue;
-        const row = line.split(sep);
+        const row = splitLine(line, sep);
 
         // ── Fuel type filter ────────────────────────────────────────────────
         const fuelCd = get(row, 'Test Fuel Type Cd');
