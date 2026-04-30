@@ -451,8 +451,13 @@ export default function VehiclesView({
         setPendingOrder(null);
     };
 
-    // Reset to page 1 when filter/sort changes
-    useEffect(() => { setVehiclePage(1); }, [textFilter, tagFilterStates, sortBy, mfgFilterStates]);
+    // Reset to page 1 when filter/sort changes — but NOT on the initial mount,
+    // otherwise the effect would immediately overwrite the restored vehiclePage.
+    const didMount = useRef(false);
+    useEffect(() => {
+        if (!didMount.current) { didMount.current = true; return; }
+        setVehiclePage(1);
+    }, [textFilter, tagFilterStates, sortBy, mfgFilterStates]);
 
     const showReorderButtons = canEdit({}) && sortBy === 'default'
         && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0
