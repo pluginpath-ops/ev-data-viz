@@ -288,10 +288,10 @@ export default function SpecsView({ selectedVehicleIds }) {
                 Uses negative margin-top to float over the table rather than push it down. */}
             <div
                 ref={mirrorRef}
-                className="sticky bottom-0 z-20 overflow-x-scroll overflow-y-hidden"
+                className="sticky bottom-2.5 z-20 overflow-x-scroll overflow-y-hidden"
                 style={{
-                    height: 16,
-                    marginTop: -16,
+                    height: 24,
+                    marginTop: -24,
                     visibility: isOverflowing ? 'visible' : 'hidden',
                     background: 'var(--color-card)',
                     boxShadow: '0 -2px 6px rgba(0,0,0,0.10)',
