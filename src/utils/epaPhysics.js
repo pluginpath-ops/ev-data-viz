@@ -55,26 +55,33 @@ export const CURVE_SPEED_RANGE = [5, 120];
  * Select which set of road-load coefficients to use.
  *
  * Preference order:
- *   1. set_a/b/c — values actually programmed on the dynamometer (what was tested)
- *   2. target_a/b/c — EPA-certified values (what the label is based on)
+ *   1. target_a/b/c — EPA-certified road load (what the vehicle experiences on the road)
+ *   2. set_a/b/c    — dyno-programmed load (fallback when target is absent)
  *
- * They usually match. When they differ, set values reflect actual test conditions;
- * target values reflect what was certified. For a curve calibrated to match the
- * measured HWFET result, set values are slightly more internally consistent.
+ * WHY target is preferred:
+ *   The "target" coefficients come from the vehicle's coast-down test and represent
+ *   the true aerodynamic and rolling-resistance forces the vehicle must overcome on
+ *   the road. The "set" (programmed) coefficients are what gets sent to the chassis
+ *   dynamometer controller. Because the dyno drums have their own tire-contact
+ *   friction, the programmed values are adjusted downward (often giving a negative A)
+ *   so that:
+ *       F_set(v)  +  F_drum_friction(v)  =  F_target(v)
+ *   Using set alone would dramatically understate road load at highway speeds
+ *   (30–55 % for heavy vehicles), producing falsely optimistic efficiency curves.
  *
  * @param {object} epaGroup — row from epa_test_groups
  * @returns {{ a: number, b: number, c: number }}
  */
 export function resolveCoeffs(epaGroup) {
-    const hasSet =
-        epaGroup.set_a != null &&
-        epaGroup.set_b != null &&
-        epaGroup.set_c != null;
+    const hasTarget =
+        epaGroup.target_a != null &&
+        epaGroup.target_b != null &&
+        epaGroup.target_c != null;
 
-    if (hasSet) {
-        return { a: epaGroup.set_a, b: epaGroup.set_b, c: epaGroup.set_c };
+    if (hasTarget) {
+        return { a: epaGroup.target_a, b: epaGroup.target_b, c: epaGroup.target_c };
     }
-    return { a: epaGroup.target_a, b: epaGroup.target_b, c: epaGroup.target_c };
+    return { a: epaGroup.set_a, b: epaGroup.set_b, c: epaGroup.set_c };
 }
 
 // ── Core physics ──────────────────────────────────────────────────────────────
