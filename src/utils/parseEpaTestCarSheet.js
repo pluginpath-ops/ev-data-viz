@@ -20,10 +20,19 @@ function numOrNull(str) {
     return isNaN(n) ? null : n;
 }
 
-/** Convert MPGe → kWh/100mi (rounded to 4 decimal places). */
-function mpgeToKwh100mi(mpge) {
-    if (!mpge || mpge <= 0) return null;
-    return Math.round((MPG_E_CONVERSION * 100 / mpge) * 10000) / 10000;
+/**
+ * Convert kWh/100mi → MPGe (rounded to 1 decimal place).
+ *
+ * Despite being named "FE" (fuel economy), the RND_ADJ_FE column in the EPA
+ * Test Car List stores energy *consumption* in kWh/100mi, not MPGe. This
+ * function applies the correct formula: MPGe = (33.705 × 100) / kWh/100mi.
+ *
+ * Values ≥ 500 kWh/100mi are EPA sentinel placeholders (e.g. 999 = "label
+ * not yet finalized") and are treated as null.
+ */
+function kwh100miToMpge(kwh100mi) {
+    if (kwh100mi == null || kwh100mi <= 0 || kwh100mi >= 500) return null;
+    return Math.round((MPG_E_CONVERSION * 100 / kwh100mi) * 10) / 10;
 }
 
 /**
@@ -175,13 +184,16 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         if (g.set_b === null && sb !== null) g.set_b = sb;
         if (g.set_c === null && sc !== null) g.set_c = sc;
 
-        // ── Per-cycle FE ─────────────────────────────────────────────────────
-        // Only RND_ADJ_FE is a reliable MPGe value. FE Bag 1/2/3 are NOT MPGe
-        // for BEVs — they appear to be internal EPA test-accounting corrections
-        // (evidenced by negative values in US06/SC03 rows). Do not use them.
-        const category     = get(row, 'Test Category').toUpperCase();
-        const testProcCd   = get(row, 'Test Procedure Cd');
-        const fe           = getNum(row, 'RND_ADJ_FE');
+        // ── Per-cycle energy consumption ──────────────────────────────────────
+        // RND_ADJ_FE is kWh/100mi (not MPGe — see kwh100miToMpge comment above).
+        // FE Bag 1/2/3 are internal EPA test-accounting corrections (can be
+        // negative for US06/SC03) and are not usable as consumption values.
+        const category   = get(row, 'Test Category').toUpperCase();
+        const testProcCd = get(row, 'Test Procedure Cd');
+        const feKwh      = getNum(row, 'RND_ADJ_FE'); // kWh/100mi; null if blank or sentinel
+
+        // Plausibility guard: values ≥ 500 are sentinel placeholders (e.g. 999)
+        const feKwh100mi = (feKwh != null && feKwh > 0 && feKwh < 500) ? feKwh : null;
 
         // Cold-FTP: Test Procedure Cd 86 shares Test Category "CD" with MCT.
         // Detect it by procedure code before falling through to the CD/MCT case.
@@ -189,25 +201,27 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
             category === 'COLD' || category === 'FTP COLD' || category === 'COLD FTP';
 
         if (isColdFtp) {
-            if (fe != null) g.cold_ftp_adj_kwh_100mi = mpgeToKwh100mi(fe);
+            if (feKwh100mi != null) g.cold_ftp_adj_kwh_100mi = feKwh100mi;
         } else {
             switch (category) {
                 case 'CD':   // charge-depleting combined — MCT summary row
                 case 'MCT':
-                    if (fe != null) g.label_combined_mpge = fe;
+                    // Convert kWh/100mi → MPGe for the label field
+                    if (feKwh100mi != null) g.label_combined_mpge = kwh100miToMpge(feKwh100mi);
                     break;
                 case 'FTP':
-                    if (fe != null) g.udds_adj_kwh_100mi = mpgeToKwh100mi(fe);
+                    // Already kWh/100mi — store directly, no conversion needed
+                    if (feKwh100mi != null) g.udds_adj_kwh_100mi = feKwh100mi;
                     break;
                 case 'HWY':
                 case 'HWFE':
-                    if (fe != null) g.hwfet_adj_kwh_100mi = mpgeToKwh100mi(fe);
+                    if (feKwh100mi != null) g.hwfet_adj_kwh_100mi = feKwh100mi;
                     break;
                 case 'US06':
-                    if (fe != null) g.us06_adj_kwh_100mi = mpgeToKwh100mi(fe);
+                    if (feKwh100mi != null) g.us06_adj_kwh_100mi = feKwh100mi;
                     break;
                 case 'SC03':
-                    if (fe != null) g.sc03_adj_kwh_100mi = mpgeToKwh100mi(fe);
+                    if (feKwh100mi != null) g.sc03_adj_kwh_100mi = feKwh100mi;
                     break;
                 default:
                     break;

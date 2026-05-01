@@ -464,10 +464,13 @@ export default function EpaCurvesView({
                             const { epaGroup, confidence } = mapping;
                             if (!epaGroup) return null;
                             const { a, b, c } = resolveCoeffs(epaGroup);
+                            const hwfetKwh = epaGroup.hwfet_unadj_kwh_100mi ?? epaGroup.hwfet_adj_kwh_100mi;
                             const eta = (a != null)
-                                ? calibrateEfficiency(a, b, c, epaGroup.hwfet_unadj_kwh_100mi)
+                                ? calibrateEfficiency(a, b, c, hwfetKwh)
                                 : null;
-                            const etaFromHwfet = eta != null && epaGroup.hwfet_unadj_kwh_100mi != null;
+                            const hwfetSource = epaGroup.hwfet_unadj_kwh_100mi != null ? 'unadj'
+                                              : epaGroup.hwfet_adj_kwh_100mi    != null ? 'adj'
+                                              : null;
                             const useableKwh = resolveUseableKwh(epaGroup, vehicle);
                             return (
                                 <div
@@ -487,10 +490,15 @@ export default function EpaCurvesView({
                                     {eta != null && (
                                         <span style={{ color: 'var(--color-text-muted)' }}>
                                             η<sub>eff</sub>: {(eta * 100).toFixed(1)}%
-                                            {etaFromHwfet
-                                                ? <> · calibrated from HWFET unadj ({epaGroup.hwfet_unadj_kwh_100mi?.toFixed(1)} kWh/100mi)<InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} /></>
-                                                : <> · default fallback (no HWFET data)<InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} /></>
-                                            }
+                                            {hwfetSource === 'unadj' && (
+                                                <> · calibrated from HWFET unadj ({epaGroup.hwfet_unadj_kwh_100mi?.toFixed(1)} kWh/100mi)<InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} /></>
+                                            )}
+                                            {hwfetSource === 'adj' && (
+                                                <> · calibrated from HWFET adj ({epaGroup.hwfet_adj_kwh_100mi?.toFixed(1)} kWh/100mi)<InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} /></>
+                                            )}
+                                            {hwfetSource === null && (
+                                                <> · default fallback (no HWFET data)<InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} /></>
+                                            )}
                                         </span>
                                     )}
                                     {useableKwh && (

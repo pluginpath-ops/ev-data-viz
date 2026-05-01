@@ -168,7 +168,12 @@ export function buildEpaCurve(epaGroup, useableKwh) {
     const { a, b, c } = resolveCoeffs(epaGroup);
     if (a == null || b == null || c == null) return [];
 
-    const eta = calibrateEfficiency(a, b, c, epaGroup.hwfet_unadj_kwh_100mi);
+    // Prefer unadjusted HWFET (raw dyno value) for calibration; fall back to
+    // adjusted (RND_ADJ_FE kWh/100mi from the test car sheet). Unadj is rarely
+    // present in the test car list; adj is populated for every HWFE/HWY row and
+    // is accurate enough for the steady-state comparative curve.
+    const hwfetKwh = epaGroup.hwfet_unadj_kwh_100mi ?? epaGroup.hwfet_adj_kwh_100mi;
+    const eta = calibrateEfficiency(a, b, c, hwfetKwh);
     const results = [];
     const [vMin, vMax] = CURVE_SPEED_RANGE;
 
