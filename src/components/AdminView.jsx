@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import ImportTableauModal from './ImportTableauModal';
 import EpaImportModal from './EpaImportModal';
+import EpaDataCard from './EpaDataCard';
 
 const ROLES = ['user', 'contributor', 'admin'];
 
@@ -12,7 +13,11 @@ const roleBadgeStyle = {
 };
 
 export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId }) {
-    const { exportData, importData, importTableauSessions, importEpaTestGroups, vehicles } = useAppContext();
+    const {
+        exportData, importData, importTableauSessions,
+        importEpaTestGroups, getEpaTestGroupsAdmin, deleteEpaTestGroup,
+        vehicles,
+    } = useAppContext();
     const [users, setUsers]           = useState([]);
     const [loading, setLoading]       = useState(true);
     const [saving, setSaving]         = useState(null);
@@ -181,6 +186,11 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                     <li><em>Unauthenticated</em> — read-only access to public content</li>
                 </ul>
             </div>
+
+            <EpaDataCard
+                getEpaTestGroupsAdmin={getEpaTestGroupsAdmin}
+                deleteEpaTestGroup={deleteEpaTestGroup}
+            />
         </div>
     );
 }

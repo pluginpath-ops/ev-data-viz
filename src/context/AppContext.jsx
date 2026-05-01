@@ -768,6 +768,22 @@ export function AppProvider({ children }) {
         }
     };
 
+    /** Pass-through: fetch all test groups with linked vehicles for admin panel. */
+    const getEpaTestGroupsAdmin = () => dataService.getEpaTestGroupsAdmin();
+
+    /** Delete an EPA test group and its vehicle mappings, then refresh vehicles. */
+    const deleteEpaTestGroup = async (testGroupId) => {
+        try {
+            await dataService.deleteEpaTestGroup(testGroupId);
+            const updated = await dataService.getVehicles();
+            setVehicles(updated);
+            showSuccess('EPA test group deleted.');
+        } catch (error) {
+            showError('Delete failed: ' + error.message);
+            throw error;
+        }
+    };
+
     /**
      * Bulk-import EPA test groups from the parsed testcar sheet, then create
      * vehicle mappings for any test groups the user linked to a vehicle.
@@ -888,6 +904,8 @@ export function AppProvider({ children }) {
         updateEpaMapping,
         unlinkEpaTestGroup,
         importEpaTestGroups,
+        getEpaTestGroupsAdmin,
+        deleteEpaTestGroup,
     };
 
     return (

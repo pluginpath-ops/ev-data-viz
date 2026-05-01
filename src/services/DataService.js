@@ -1121,6 +1121,50 @@ class DataService {
       .upsert(rows, { onConflict: 'test_group_id', ignoreDuplicates: false });
     if (error) throw error;
   }
+
+  /**
+   * Fetch all EPA test groups for the admin panel, including which vehicles
+   * each group is currently linked to via epa_vehicle_mappings.
+   */
+  async getEpaTestGroupsAdmin() {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase()
+      .from('epa_test_groups')
+      .select(`
+        test_group_id, epa_test_family_id,
+        model_year, make, epa_carline_name, drive, transmission,
+        equiv_test_weight_lbs, target_a, set_a,
+        label_combined_mpge, source_file, ingested_at,
+        epa_vehicle_mappings(
+          id, confidence,
+          vehicles(id, name, year)
+        )
+      `)
+      .order('make')
+      .order('epa_carline_name');
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Delete an EPA test group and all its vehicle mappings.
+   * The epa_vehicle_mappings FK has no CASCADE so mappings must be deleted first.
+   */
+  async deleteEpaTestGroup(testGroupId) {
+    if (!this.useSupabase) return;
+    // Step 1: remove all vehicle→group mappings
+    const { error: mapErr } = await getSupabase()
+      .from('epa_vehicle_mappings')
+      .delete()
+      .eq('epa_test_group_id', testGroupId);
+    if (mapErr) throw mapErr;
+    // Step 2: remove the group itself
+    const { error } = await getSupabase()
+      .from('epa_test_groups')
+      .delete()
+      .eq('test_group_id', testGroupId);
+    if (error) throw error;
+  }
 }
 
 export const dataService = new DataService();
