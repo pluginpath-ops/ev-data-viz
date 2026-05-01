@@ -197,6 +197,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
     const [query, setQuery]               = useState('');
     const [results, setResults]           = useState([]);
     const [searching, setSearching]       = useState(false);
+    const [searchError, setSearchError]   = useState(null);
     const [showDropdown, setShowDropdown] = useState(false);
     const [linking, setLinking]           = useState(false);
     const debounceRef = useRef(null);
@@ -207,14 +208,19 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
         const q = e.target.value;
         setQuery(q);
         setShowDropdown(true);
+        setSearchError(null);
         if (debounceRef.current) clearTimeout(debounceRef.current);
         if (!q.trim()) { setResults([]); return; }
         debounceRef.current = setTimeout(async () => {
             setSearching(true);
             try {
-                const year = vehicle?.year ? parseInt(vehicle.year, 10) : null;
-                const rows = await searchEpaTestGroups?.(q.trim(), year);
+                // No year filter — EPA model years often differ from the vehicle's model year
+                // by 1–2 years; the year is shown in dropdown results for manual verification.
+                const rows = await searchEpaTestGroups?.(q.trim());
                 setResults(rows || []);
+            } catch (err) {
+                setSearchError(err?.message || 'Search failed');
+                setResults([]);
             } finally {
                 setSearching(false);
             }
@@ -278,10 +284,13 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                         {linking && (
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">Linking…</span>
                         )}
-                        {showDropdown && (results.length > 0 || searching) && (
+                        {showDropdown && (results.length > 0 || searching || searchError) && (
                             <ul className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border shadow-lg bg-white dark:bg-slate-800 dark:border-slate-600">
                                 {searching && (
                                     <li className="px-3 py-2 text-sm text-gray-400 italic">Searching…</li>
+                                )}
+                                {!searching && searchError && (
+                                    <li className="px-3 py-2 text-sm text-red-500">Error: {searchError}</li>
                                 )}
                                 {!searching && results.map(g => (
                                     <li
@@ -295,7 +304,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                         </span>
                                     </li>
                                 ))}
-                                {!searching && results.length === 0 && query.trim() && (
+                                {!searching && !searchError && results.length === 0 && query.trim() && (
                                     <li className="px-3 py-2 text-sm text-gray-400 italic">No results</li>
                                 )}
                             </ul>

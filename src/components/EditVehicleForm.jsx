@@ -179,9 +179,12 @@ export default function EditVehicleForm({
         epaDebounceRef.current = setTimeout(async () => {
             setEpaSearching(true);
             try {
-                const year = formData.year ? parseInt(formData.year, 10) : null;
-                const rows = await searchEpaTestGroups?.(q.trim(), year);
+                // No year filter — EPA model years often differ from the vehicle's model year;
+                // the year is visible in dropdown results for manual verification.
+                const rows = await searchEpaTestGroups?.(q.trim());
                 setEpaResults(rows || []);
+            } catch {
+                setEpaResults([]);
             } finally {
                 setEpaSearching(false);
             }

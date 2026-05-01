@@ -6,9 +6,10 @@ import { convSpeed, speedLabel, distanceLabel } from '../utils/unitConversions';
 import { vehicleColor, vehicleLabel } from '../utils/specHelpers';
 import { PALETTE } from '../utils/specHelpers';
 import {
-    buildEpaCurve, resolveUseableKwh,
+    buildEpaCurve, resolveUseableKwh, resolveCoeffs, calibrateEfficiency,
     HWFET_AVG_MPH, US06_AVG_MPH, HIGHWAY_BAND_MPH,
 } from '../utils/epaPhysics';
+import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 
@@ -417,13 +418,23 @@ export default function EpaCurvesView({
                                 <span className="font-medium">Shaded band</span> — 65–75 mph typical highway
                             </span>
                             <span>
-                                <span className="font-medium" style={{ color: 'rgb(99,102,241)' }}>Purple dashes</span> — HWFET avg (48.3 mph) · the basis for EPA highway label
+                                <span className="font-medium" style={{ color: 'rgb(99,102,241)' }}>Purple dashes</span> — HWFET avg (48.3 mph) · basis for EPA highway label
                                 <InfoIcon text={EPA_EXPLAINERS.hwfetCycle} />
                             </span>
                             <span>
                                 <span className="font-medium" style={{ color: 'rgb(168,85,247)' }}>Violet dashes</span> — US06 avg (48.4 mph) · aggressive cycle with transients to 80+ mph
                                 <InfoIcon text={EPA_EXPLAINERS.us06Cycle} />
                             </span>
+                        </div>
+                    )}
+                    {!presentationMode && (
+                        <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                            <AxisScaleControls
+                                xMin={xMin} xMax={xMax} yMin={yMin} yMax={yMax}
+                                xAxisLabel={`Speed (${speedLabel(units)})`}
+                                yAxisLabel={yAxisLabel(yAxis, units)}
+                                onChange={(key, value) => setEpaConfig(p => ({ ...p, [key]: value }))}
+                            />
                         </div>
                     )}
                 </div>
@@ -452,6 +463,12 @@ export default function EpaCurvesView({
                         vehicle.epa_mappings.map(mapping => {
                             const { epaGroup, confidence } = mapping;
                             if (!epaGroup) return null;
+                            const { a, b, c } = resolveCoeffs(epaGroup);
+                            const eta = (a != null)
+                                ? calibrateEfficiency(a, b, c, epaGroup.hwfet_unadj_kwh_100mi)
+                                : null;
+                            const etaFromHwfet = eta != null && epaGroup.hwfet_unadj_kwh_100mi != null;
+                            const useableKwh = resolveUseableKwh(epaGroup, vehicle);
                             return (
                                 <div
                                     key={mapping.id}
@@ -467,10 +484,18 @@ export default function EpaCurvesView({
                                             {epaGroup.label_method && <InfoIcon text={EPA_EXPLAINERS.labelMethod} />}
                                         </span>
                                     )}
-                                    {epaGroup.hwfet_unadj_kwh_100mi && (
+                                    {eta != null && (
                                         <span style={{ color: 'var(--color-text-muted)' }}>
-                                            HWFET unadj: {epaGroup.hwfet_unadj_kwh_100mi} kWh/100mi
-                                            <InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} />
+                                            η<sub>eff</sub>: {(eta * 100).toFixed(1)}%
+                                            {etaFromHwfet
+                                                ? <> · calibrated from HWFET unadj ({epaGroup.hwfet_unadj_kwh_100mi?.toFixed(1)} kWh/100mi)<InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} /></>
+                                                : <> · default fallback (no HWFET data)<InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} /></>
+                                            }
+                                        </span>
+                                    )}
+                                    {useableKwh && (
+                                        <span style={{ color: 'var(--color-text-muted)' }}>
+                                            Useable: {Number(useableKwh).toFixed(1)} kWh
                                         </span>
                                     )}
                                 </div>
