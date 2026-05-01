@@ -169,14 +169,15 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence }) {
                             value={(g.cold_ftp_adj_kwh_100mi ?? g.cold_ftp_unadj_kwh_100mi)?.toFixed(1) + ' kWh/100mi'}
                         />
                     )}
-                    {/* Label values */}
-                    {g.label_combined_mpge != null && (
+                    {/* Label values — suppress 999/sentinel placeholders used by EPA
+                        for records where the label has not yet been finalized */}
+                    {g.label_combined_mpge != null && g.label_combined_mpge < 500 && (
                         <DataRow label="Label combined" value={g.label_combined_mpge.toFixed(1) + ' MPGe'} />
                     )}
-                    {g.label_hwy_mpge != null && (
+                    {g.label_hwy_mpge != null && g.label_hwy_mpge < 500 && (
                         <DataRow label="Label highway" value={g.label_hwy_mpge.toFixed(1) + ' MPGe'} />
                     )}
-                    {g.label_city_mpge != null && (
+                    {g.label_city_mpge != null && g.label_city_mpge < 500 && (
                         <DataRow label="Label city" value={g.label_city_mpge.toFixed(1) + ' MPGe'} />
                     )}
                     {g.label_combined_mi != null && (

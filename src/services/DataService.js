@@ -1133,7 +1133,9 @@ class DataService {
       .select(`
         test_group_id, epa_test_family_id,
         model_year, make, epa_carline_name, drive, transmission,
-        equiv_test_weight_lbs, target_a, set_a,
+        equiv_test_weight_lbs,
+        target_a, target_b, target_c,
+        set_a, set_b, set_c,
         label_combined_mpge, source_file, ingested_at,
         epa_vehicle_mappings(
           id, confidence,

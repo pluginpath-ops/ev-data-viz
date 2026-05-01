@@ -125,8 +125,8 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup 
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Vehicle Config ID</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Year · Make · Carline</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Drive / ETW</th>
-                                <th className="px-3 py-2 text-gray-500 font-semibold text-center whitespace-nowrap">A/B/C</th>
-                                <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Label</th>
+                                <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Road-Load A / B / C</th>
+                                <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Label MPGe</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold">Linked Vehicles</th>
                                 <th className="px-3 py-2" />
                             </tr>
@@ -173,17 +173,29 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup 
                                             </div>
                                         </td>
 
-                                        {/* Has road-load coefficients? */}
-                                        <td className="px-3 py-2 text-center">
-                                            {g.target_a != null || g.set_a != null
-                                                ? <span className="text-green-600 dark:text-green-400 font-medium">✓</span>
-                                                : <span className="text-gray-300 dark:text-slate-600">—</span>
-                                            }
+                                        {/* Road-load A / B / C — prefer target; fall back to set */}
+                                        <td className="px-3 py-2 font-mono whitespace-nowrap">
+                                            {(() => {
+                                                const a = g.target_a ?? g.set_a;
+                                                const b = g.target_b ?? g.set_b;
+                                                const c = g.target_c ?? g.set_c;
+                                                const isTarget = g.target_a != null;
+                                                if (a == null) return <span className="text-gray-300 dark:text-slate-600">—</span>;
+                                                return (
+                                                    <div className={`text-[11px] leading-tight ${isTarget ? 'text-gray-600 dark:text-slate-300' : 'text-gray-400 dark:text-slate-500'}`}
+                                                         title={isTarget ? 'Target coefficients (road load)' : 'Set coefficients (dyno-programmed)'}>
+                                                        <div>{Number(a).toFixed(2)}</div>
+                                                        <div>{Number(b).toFixed(4)}</div>
+                                                        <div>{Number(c).toFixed(5)}</div>
+                                                        {!isTarget && <div className="text-[9px] text-amber-500 mt-0.5">set only</div>}
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
 
-                                        {/* Label MPGe */}
+                                        {/* Label MPGe — 999 is an EPA sentinel meaning "label not yet assigned" */}
                                         <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-slate-400">
-                                            {g.label_combined_mpge != null
+                                            {g.label_combined_mpge != null && g.label_combined_mpge < 500
                                                 ? `${g.label_combined_mpge} MPGe`
                                                 : <span className="text-gray-300 dark:text-slate-600">—</span>
                                             }

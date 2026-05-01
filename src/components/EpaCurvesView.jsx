@@ -478,7 +478,7 @@ export default function EpaCurvesView({
                                     <span className="font-medium">{vehicleLabel(vehicle)}</span>
                                     <span style={{ color: 'var(--color-text-muted)' }}>{epaGroup.epa_carline_name} · {epaGroup.model_year} · {epaGroup.test_group_id}</span>
                                     <ConfidenceBadge confidence={confidence} />
-                                    {epaGroup.label_combined_mpge && (
+                                    {epaGroup.label_combined_mpge && epaGroup.label_combined_mpge < 500 && (
                                         <span style={{ color: 'var(--color-text-secondary)' }}>
                                             Label: {epaGroup.label_combined_mpge} MPGe combined
                                             {epaGroup.label_method && <InfoIcon text={EPA_EXPLAINERS.labelMethod} />}
