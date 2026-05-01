@@ -103,13 +103,21 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         const fuelCd = get(row, 'Test Fuel Type Cd');
         if (fuelCd !== '62') continue; // 62 = Electricity
 
-        const testGroupId = get(row, 'Actual Tested Testgroup');
+        // ── Unique key: Test Vehicle ID is specific per configuration (e.g.
+        //    R1S247XR20 = 20in wheels, R1S247XR22 = 22in wheels).
+        //    "Actual Tested Testgroup" is a test-family ID shared across
+        //    multiple configurations — using it would merge the 20in and 22in
+        //    variants into one record, discarding the different A/B/C values.
+        const testVehicleId  = get(row, 'Test Vehicle ID');
+        const testFamilyId   = get(row, 'Actual Tested Testgroup');
+        const testGroupId    = testVehicleId || testFamilyId;
         if (!testGroupId) continue;
 
         // ── Initialise group on first encounter ─────────────────────────────
         if (!groups.has(testGroupId)) {
             groups.set(testGroupId, {
-                test_group_id: testGroupId,
+                test_group_id:      testGroupId,      // Test Vehicle ID (preferred)
+                epa_test_family_id: testFamilyId || null, // Actual Tested Testgroup
                 model_year: getNum(row, 'Model Year'),
                 make: get(row, 'Represented Test Veh Make') || get(row, 'Vehicle Manufacturer Name') || null,
                 epa_carline_name: get(row, 'Represented Test Veh Model') || null,
@@ -124,6 +132,9 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
                 set_a:    null, set_b:    null, set_c:    null,
 
                 // Per-cycle kWh/100mi (adj = adjusted label values)
+                // Note: only RND_ADJ_FE is used; FE Bag columns are NOT MPGe
+                // for BEVs — their values can be negative (US06) which proves
+                // they are internal test-accounting deltas, not fuel economy.
                 udds_unadj_kwh_100mi:     null,
                 udds_adj_kwh_100mi:       null,
                 hwfet_unadj_kwh_100mi:    null,
@@ -164,45 +175,43 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         if (g.set_b === null && sb !== null) g.set_b = sb;
         if (g.set_c === null && sc !== null) g.set_c = sc;
 
-        // ── Per-cycle FE (RND_ADJ_FE = cycle-adjusted MPGe) ────────────────
-        const category = get(row, 'Test Category').toUpperCase();
-        const fe = getNum(row, 'RND_ADJ_FE');
-        // Bag 1 = phase 1, Bag 2 = phase 2 (for FTP: Bag1=cold, Bag2=transient, Bag3=hot)
-        const bag1 = getNum(row, 'FE Bag 1');
-        const bag2 = getNum(row, 'FE Bag 2');
-        const bag3 = getNum(row, 'FE Bag 3');
+        // ── Per-cycle FE ─────────────────────────────────────────────────────
+        // Only RND_ADJ_FE is a reliable MPGe value. FE Bag 1/2/3 are NOT MPGe
+        // for BEVs — they appear to be internal EPA test-accounting corrections
+        // (evidenced by negative values in US06/SC03 rows). Do not use them.
+        const category     = get(row, 'Test Category').toUpperCase();
+        const testProcCd   = get(row, 'Test Procedure Cd');
+        const fe           = getNum(row, 'RND_ADJ_FE');
 
-        switch (category) {
-            case 'CD':   // charge-depleting combined — MCT summary row
-            case 'MCT':
-                if (fe != null) g.label_combined_mpge = fe;
-                break;
-            case 'FTP':
-                // FTP = UDDS city cycle; bags = Bag1 cold + Bag2 transient + Bag3 hot
-                if (fe  != null) g.udds_adj_kwh_100mi  = mpgeToKwh100mi(fe);
-                // Unadjusted: bag values are raw dyno phases; combined unadj ≈ bag average
-                // (only assign if we can get a meaningful value — bags are often blank for BEVs)
-                if (bag1 != null && bag1 > 1) g.udds_unadj_kwh_100mi = mpgeToKwh100mi(bag1);
-                break;
-            case 'HWY':
-            case 'HWFE':
-                if (fe   != null) g.hwfet_adj_kwh_100mi  = mpgeToKwh100mi(fe);
-                if (bag1 != null && bag1 > 1) g.hwfet_unadj_kwh_100mi = mpgeToKwh100mi(bag1);
-                break;
-            case 'US06':
-                if (fe   != null) g.us06_adj_kwh_100mi   = mpgeToKwh100mi(fe);
-                if (bag1 != null && bag1 > 1) g.us06_unadj_kwh_100mi  = mpgeToKwh100mi(bag1);
-                break;
-            case 'SC03':
-                if (fe   != null) g.sc03_adj_kwh_100mi   = mpgeToKwh100mi(fe);
-                break;
-            case 'COLD':
-            case 'FTP COLD':
-            case 'COLD FTP':
-                if (fe   != null) g.cold_ftp_adj_kwh_100mi = mpgeToKwh100mi(fe);
-                break;
-            default:
-                break;
+        // Cold-FTP: Test Procedure Cd 86 shares Test Category "CD" with MCT.
+        // Detect it by procedure code before falling through to the CD/MCT case.
+        const isColdFtp = testProcCd === '86' ||
+            category === 'COLD' || category === 'FTP COLD' || category === 'COLD FTP';
+
+        if (isColdFtp) {
+            if (fe != null) g.cold_ftp_adj_kwh_100mi = mpgeToKwh100mi(fe);
+        } else {
+            switch (category) {
+                case 'CD':   // charge-depleting combined — MCT summary row
+                case 'MCT':
+                    if (fe != null) g.label_combined_mpge = fe;
+                    break;
+                case 'FTP':
+                    if (fe != null) g.udds_adj_kwh_100mi = mpgeToKwh100mi(fe);
+                    break;
+                case 'HWY':
+                case 'HWFE':
+                    if (fe != null) g.hwfet_adj_kwh_100mi = mpgeToKwh100mi(fe);
+                    break;
+                case 'US06':
+                    if (fe != null) g.us06_adj_kwh_100mi = mpgeToKwh100mi(fe);
+                    break;
+                case 'SC03':
+                    if (fe != null) g.sc03_adj_kwh_100mi = mpgeToKwh100mi(fe);
+                    break;
+                default:
+                    break;
+            }
         }
     }
 

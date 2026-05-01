@@ -65,7 +65,12 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence }) {
                         {g.model_year}{g.make ? ` · ${g.make}` : ''}{g.drive ? ` · ${g.drive}` : ''}
                         {g.transmission ? ` · ${g.transmission}` : ''}
                     </div>
-                    <div className="font-mono text-xs text-gray-400 mt-0.5">{g.test_group_id}</div>
+                    <div className="font-mono text-xs text-gray-400 mt-0.5">
+                        {g.test_group_id}
+                        {g.epa_test_family_id && g.epa_test_family_id !== g.test_group_id && (
+                            <span className="ml-1 text-gray-300 dark:text-slate-600">· family: {g.epa_test_family_id}</span>
+                        )}
+                    </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                     {canEdit ? (
