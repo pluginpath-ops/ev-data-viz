@@ -183,6 +183,9 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence }) {
                     {g.label_combined_mi != null && (
                         <DataRow label="Label range" value={g.label_combined_mi.toFixed(0) + ' mi'} />
                     )}
+                    {g.label_method && (
+                        <DataRow label="Label method" value={g.label_method} />
+                    )}
                     {/* No cycle data at all */}
                     {g.label_combined_mpge == null && g.hwfet_adj_kwh_100mi == null && g.hwfet_unadj_kwh_100mi == null && (
                         <p className="text-gray-400 text-[10px] italic">No cycle data in this record</p>

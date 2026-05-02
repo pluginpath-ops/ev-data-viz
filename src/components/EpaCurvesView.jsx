@@ -79,6 +79,88 @@ function makeReferencePlugin(hwfetMph, us06Mph, bandMph, units, isDark) {
     };
 }
 
+// ── Speed callout plugin ──────────────────────────────────────────────────────
+
+/**
+ * Draws filled dots + range labels on each curve at specified reference speeds.
+ *
+ * The label always shows range (mi or km) regardless of the current Y axis, so
+ * users see "what range does this speed translate to?" in any view mode.
+ * Labels only appear when useableKwh is available (rangeMi != null).
+ */
+function makeCalloutPlugin(calloutMphs, yAxis, units, isDark) {
+    return {
+        id: 'epaCallouts',
+        afterDatasetsDraw(chart) {
+            const { ctx, chartArea: area, scales, data } = chart;
+            if (!area || !scales.x || !scales.y) return;
+
+            data.datasets.forEach((ds) => {
+                const curve = ds._curve;
+                if (!curve?.length) return;
+
+                const color = ds.borderColor;
+
+                calloutMphs.forEach((targetMph) => {
+                    // Find nearest curve point to this reference speed
+                    const pt = curve.reduce((best, p) =>
+                        Math.abs(p.mph - targetMph) < Math.abs(best.mph - targetMph) ? p : best
+                    , curve[0]);
+                    if (!pt) return;
+
+                    const xVal = convSpeed(targetMph, units);
+                    const yVal = convertYValue(getYValue(pt, yAxis), yAxis, units);
+                    if (yVal == null) return;
+
+                    const px = scales.x.getPixelForValue(xVal);
+                    const py = scales.y.getPixelForValue(yVal);
+                    if (px < area.left || px > area.right || py < area.top || py > area.bottom) return;
+
+                    ctx.save();
+
+                    // Filled dot on the curve
+                    ctx.beginPath();
+                    ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    ctx.strokeStyle = isDark ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.9)';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    // Range label — only when rangeMi is available
+                    if (pt.rangeMi != null) {
+                        const rangeDisplay = units === 'metric'
+                            ? `${(pt.rangeMi * 1.60934).toFixed(0)} km`
+                            : `${pt.rangeMi.toFixed(0)} mi`;
+
+                        ctx.font = '10px system-ui, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'alphabetic';
+
+                        const textW = ctx.measureText(rangeDisplay).width;
+                        const labelY = py - 9;
+
+                        // Pill background for legibility over other curves
+                        const padX = 3, padY = 2;
+                        ctx.fillStyle = isDark ? 'rgba(15,23,42,0.82)' : 'rgba(255,255,255,0.88)';
+                        ctx.beginPath();
+                        ctx.roundRect(
+                            px - textW / 2 - padX, labelY - 10 - padY,
+                            textW + padX * 2, 11 + padY * 2, 3
+                        );
+                        ctx.fill();
+
+                        ctx.fillStyle = color;
+                        ctx.fillText(rangeDisplay, px, labelY);
+                    }
+
+                    ctx.restore();
+                });
+            });
+        },
+    };
+}
+
 // ── Y-axis mode config ────────────────────────────────────────────────────────
 
 const Y_MODES = [
@@ -234,13 +316,14 @@ export default function EpaCurvesView({
         const gridColor   = isDark ? 'rgba(100,116,139,0.35)'   : 'rgba(229,231,235,0.8)';
         const legendColor = isDark ? 'rgb(241,245,249)'         : 'rgb(55,65,81)';
 
-        const refPlugin = makeReferencePlugin(
+        const refPlugin      = makeReferencePlugin(
             HWFET_AVG_MPH, US06_AVG_MPH, HIGHWAY_BAND_MPH, units, isDark
         );
+        const calloutPlugin  = makeCalloutPlugin([70, 80], yAxis, units, isDark);
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
-            plugins: [refPlugin],
+            plugins: [refPlugin, calloutPlugin],
             data: { datasets },
             options: {
                 animation: false,
@@ -424,6 +507,9 @@ export default function EpaCurvesView({
                             <span>
                                 <span className="font-medium" style={{ color: 'rgb(168,85,247)' }}>Violet dashes</span> — US06 avg (48.4 mph) · aggressive cycle with transients to 80+ mph
                                 <InfoIcon text={EPA_EXPLAINERS.us06Cycle} />
+                            </span>
+                            <span>
+                                <span className="font-medium">● Dots</span> — range at 70 &amp; 80 mph
                             </span>
                         </div>
                     )}

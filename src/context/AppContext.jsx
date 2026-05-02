@@ -771,6 +771,11 @@ export function AppProvider({ children }) {
     /** Pass-through: fetch all test groups with linked vehicles for admin panel. */
     const getEpaTestGroupsAdmin = () => dataService.getEpaTestGroupsAdmin();
 
+    /** Update the label_method field on an EPA test group (admin only). */
+    const updateEpaLabelMethod = async (testGroupId, method) => {
+        await dataService.updateEpaLabelMethod(testGroupId, method);
+    };
+
     /** Delete an EPA test group and its vehicle mappings, then refresh vehicles. */
     const deleteEpaTestGroup = async (testGroupId) => {
         try {
@@ -906,6 +911,7 @@ export function AppProvider({ children }) {
         importEpaTestGroups,
         getEpaTestGroupsAdmin,
         deleteEpaTestGroup,
+        updateEpaLabelMethod,
     };
 
     return (

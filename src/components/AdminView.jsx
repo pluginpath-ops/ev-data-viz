@@ -15,7 +15,7 @@ const roleBadgeStyle = {
 export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId }) {
     const {
         exportData, importData, importTableauSessions,
-        importEpaTestGroups, getEpaTestGroupsAdmin, deleteEpaTestGroup,
+        importEpaTestGroups, getEpaTestGroupsAdmin, deleteEpaTestGroup, updateEpaLabelMethod,
         vehicles,
     } = useAppContext();
     const [users, setUsers]           = useState([]);
@@ -190,6 +190,7 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
             <EpaDataCard
                 getEpaTestGroupsAdmin={getEpaTestGroupsAdmin}
                 deleteEpaTestGroup={deleteEpaTestGroup}
+                updateEpaLabelMethod={updateEpaLabelMethod}
             />
         </div>
     );

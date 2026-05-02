@@ -16,12 +16,21 @@ const CONFIDENCE_COLORS = {
     inferred: 'text-gray-500 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-800/40 dark:border-gray-600',
 };
 
-export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup }) {
-    const [groups,   setGroups]   = useState([]);
-    const [loading,  setLoading]  = useState(true);
-    const [query,    setQuery]    = useState('');
-    const [deleting, setDeleting] = useState(new Set()); // set of test_group_ids in-flight
-    const [error,    setError]    = useState(null);
+const LABEL_METHOD_OPTIONS = [
+    { value: '',                  label: '— unknown —'       },
+    { value: '2-cycle',           label: '2-cycle'           },
+    { value: '5-cycle',           label: '5-cycle'           },
+    { value: 'vehicle-specific',  label: 'Vehicle-specific'  },
+    { value: 'mpg-based',         label: 'MPG-based'         },
+];
+
+export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup, updateEpaLabelMethod }) {
+    const [groups,          setGroups]          = useState([]);
+    const [loading,         setLoading]         = useState(true);
+    const [query,           setQuery]           = useState('');
+    const [deleting,        setDeleting]        = useState(new Set()); // set of test_group_ids in-flight
+    const [updatingMethod,  setUpdatingMethod]  = useState(new Set()); // set of test_group_ids updating label_method
+    const [error,           setError]           = useState(null);
 
     useEffect(() => { load(); }, []);
 
@@ -53,6 +62,22 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup 
             setError('Delete failed: ' + e.message);
         } finally {
             setDeleting(prev => { const s = new Set(prev); s.delete(group.test_group_id); return s; });
+        }
+    }
+
+    async function handleLabelMethodChange(group, method) {
+        setUpdatingMethod(prev => new Set(prev).add(group.test_group_id));
+        try {
+            await updateEpaLabelMethod?.(group.test_group_id, method);
+            setGroups(prev => prev.map(g =>
+                g.test_group_id === group.test_group_id
+                    ? { ...g, label_method: method || null }
+                    : g
+            ));
+        } catch (e) {
+            setError('Update failed: ' + e.message);
+        } finally {
+            setUpdatingMethod(prev => { const s = new Set(prev); s.delete(group.test_group_id); return s; });
         }
     }
 
@@ -127,6 +152,7 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup 
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Drive / ETW</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Road-Load A / B / C</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Label MPGe</th>
+                                <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Label Method</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold">Linked Vehicles</th>
                                 <th className="px-3 py-2" />
                             </tr>
@@ -210,6 +236,21 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup 
                                             ) : (
                                                 <span className="text-gray-300 dark:text-slate-600">—</span>
                                             )}
+                                        </td>
+
+                                        {/* Label method — admin-editable select */}
+                                        <td className="px-3 py-2">
+                                            <select
+                                                value={g.label_method ?? ''}
+                                                disabled={updatingMethod.has(g.test_group_id) || isDel}
+                                                onChange={e => handleLabelMethodChange(g, e.target.value)}
+                                                className="form-input text-xs py-0.5 w-36 disabled:opacity-50"
+                                                title="Range label derivation method — not in the Test Car List; look up on fueleconomy.gov"
+                                            >
+                                                {LABEL_METHOD_OPTIONS.map(o => (
+                                                    <option key={o.value} value={o.value}>{o.label}</option>
+                                                ))}
+                                            </select>
                                         </td>
 
                                         {/* Linked vehicles with confidence badges */}

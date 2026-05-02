@@ -1136,7 +1136,8 @@ class DataService {
         equiv_test_weight_lbs,
         target_a, target_b, target_c,
         set_a, set_b, set_c,
-        label_combined_mpge, source_file, ingested_at,
+        label_combined_mpge, label_method,
+        source_file, ingested_at,
         epa_vehicle_mappings(
           id, confidence,
           vehicles(id, name, year)
@@ -1146,6 +1147,16 @@ class DataService {
       .order('epa_carline_name');
     if (error) throw error;
     return data || [];
+  }
+
+  /** Update the label_method field on a single EPA test group. */
+  async updateEpaLabelMethod(testGroupId, method) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('epa_test_groups')
+      .update({ label_method: method || null })
+      .eq('test_group_id', testGroupId);
+    if (error) throw error;
   }
 
   /**
