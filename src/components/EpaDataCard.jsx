@@ -193,12 +193,23 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup 
                                             })()}
                                         </td>
 
-                                        {/* Label MPGe — 999 is an EPA sentinel meaning "label not yet assigned" */}
-                                        <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-slate-400">
-                                            {g.label_combined_mpge != null && g.label_combined_mpge < 500
-                                                ? `${g.label_combined_mpge} MPGe`
-                                                : <span className="text-gray-300 dark:text-slate-600">—</span>
-                                            }
+                                        {/* Label MPGe */}
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            {g.label_combined_mpge != null && g.label_combined_mpge < 500 ? (
+                                                <span
+                                                    className={g.label_combined_mpge < 60
+                                                        ? 'text-amber-600 dark:text-amber-400 font-medium'
+                                                        : 'text-gray-500 dark:text-slate-400'}
+                                                    title={g.label_combined_mpge < 60
+                                                        ? 'Label < 60 MPGe — the source column may have been in MPGe rather than kWh/100mi. Re-import with the unit flip toggle to correct.'
+                                                        : undefined}
+                                                >
+                                                    {g.label_combined_mpge < 60 && '⚠ '}
+                                                    {g.label_combined_mpge} MPGe
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-300 dark:text-slate-600">—</span>
+                                            )}
                                         </td>
 
                                         {/* Linked vehicles with confidence badges */}

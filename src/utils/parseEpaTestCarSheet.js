@@ -165,6 +165,12 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
 
                 source_file:  sourceFileName,
                 ingested_at:  new Date().toISOString(),
+
+                // Raw RND_ADJ_FE column values before our kWh/100mi interpretation.
+                // NOT sent to the database — used only by the import UI so the user
+                // can detect and flip records where the column is actually in MPGe.
+                // Stripped by applyUnitOverride() before the DB upsert.
+                _raw: { combined: null, hwfet: null, udds: null, us06: null, sc03: null, cold_ftp: null },
             });
         }
 
@@ -201,26 +207,32 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
             category === 'COLD' || category === 'FTP COLD' || category === 'COLD FTP';
 
         if (isColdFtp) {
+            g._raw.cold_ftp = feKwh;  // store raw (pre-sentinel-filter) for unit-flip UI
             if (feKwh100mi != null) g.cold_ftp_adj_kwh_100mi = feKwh100mi;
         } else {
             switch (category) {
                 case 'CD':   // charge-depleting combined — MCT summary row
                 case 'MCT':
+                    g._raw.combined = feKwh;
                     // Convert kWh/100mi → MPGe for the label field
                     if (feKwh100mi != null) g.label_combined_mpge = kwh100miToMpge(feKwh100mi);
                     break;
                 case 'FTP':
+                    g._raw.udds = feKwh;
                     // Already kWh/100mi — store directly, no conversion needed
                     if (feKwh100mi != null) g.udds_adj_kwh_100mi = feKwh100mi;
                     break;
                 case 'HWY':
                 case 'HWFE':
+                    g._raw.hwfet = feKwh;
                     if (feKwh100mi != null) g.hwfet_adj_kwh_100mi = feKwh100mi;
                     break;
                 case 'US06':
+                    g._raw.us06 = feKwh;
                     if (feKwh100mi != null) g.us06_adj_kwh_100mi = feKwh100mi;
                     break;
                 case 'SC03':
+                    g._raw.sc03 = feKwh;
                     if (feKwh100mi != null) g.sc03_adj_kwh_100mi = feKwh100mi;
                     break;
                 default:
