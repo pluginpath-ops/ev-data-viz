@@ -626,7 +626,7 @@ export default function EpaCurvesView({
                 </div>
             )}
 
-            {/* ── Axis scale controls (below chart, per convention) ──────────── */}
+            {/* ── Axis scale controls (card provided by AxisScaleControls) ──── */}
             {!presentationMode && datasets.length > 0 && (
                 <AxisScaleControls
                     xMin={xMin} xMax={xMax} yMin={yMin} yMax={yMax}

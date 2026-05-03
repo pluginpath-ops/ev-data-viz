@@ -1,6 +1,6 @@
 /**
  * Shared Y/X axis min-max scale controls.
- * Used by ChargingView (charging) and RangeChartView (range & efficiency).
+ * Used below charts in ChargingView, RangeChartView, RoadTripView, EpaCurvesView.
  *
  * Props:
  *   xMin, xMax, yMin, yMax        – current values (null = auto)
@@ -13,15 +13,28 @@
  *   xAxisLabel                     – label for the X-axis section (default "X-Axis Scale").
  *                                    Pass e.g. "X-Axis Scale (hrs)" to hint at expected units.
  *   yAxisLabel                     – label for the left Y-axis section (default "Left Axis Scale").
+ *
+ * Card wrapping (design pattern):
+ *   By default this component renders itself inside a `card mb-6` container so that
+ *   chart views don't need to remember to add one. Pass `card={false}` when the
+ *   parent already manages a shared card (e.g. ChargingView bundles axis controls
+ *   together with race-mode and line-toggle panels in one card).
  */
 
-export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max, onChange, showX = true, showY2 = false, xAxisLabel = 'X-Axis Scale', yAxisLabel = 'Left Axis Scale' }) {
+export default function AxisScaleControls({
+    xMin, xMax, yMin, yMax, y2Min, y2Max,
+    onChange,
+    showX = true, showY2 = false,
+    xAxisLabel = 'X-Axis Scale',
+    yAxisLabel = 'Left Axis Scale',
+    card = true,
+}) {
     const colCount = 1 + (showX ? 1 : 0) + (showY2 ? 1 : 0);
     const gridClass = colCount === 3 ? 'grid-cols-3'
                     : colCount === 2 ? 'grid-cols-2'
                     : 'grid-cols-1 max-w-xs';
 
-    return (
+    const content = (
         <div className={`grid gap-8 ${gridClass}`}>
 
             {/* ── Y-Axis Scale ─────────────────────────────────────────────── */}
@@ -138,4 +151,6 @@ export default function AxisScaleControls({ xMin, xMax, yMin, yMax, y2Min, y2Max
             )}
         </div>
     );
+
+    return card ? <div className="card mb-6">{content}</div> : content;
 }
