@@ -3,7 +3,7 @@ import Chart from 'chart.js/auto';
 import { useTheme } from '../hooks/useTheme';
 import { useAppContext } from '../context/AppContext';
 import { convSpeed, speedLabel, distanceLabel } from '../utils/unitConversions';
-import { vehicleColor, vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
+import { vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
 import { PALETTE } from '../utils/specHelpers';
 import {
     buildEpaCurve, resolveUseableKwh, resolveUseableKwhSource,
@@ -14,12 +14,11 @@ import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 
-// ── Reference line / highway band plugin ─────────────────────────────────────
+// ── Highway band plugin ───────────────────────────────────────────────────────
 
 /**
- * Draws the highway speed band and two reference speed lines after Chart.js
- * renders its datasets. Follows the same afterDraw pattern as barGroupPlugin
- * and makeBarPlugin in other chart views.
+ * Draws the 65–75 mph highway band after Chart.js renders its datasets.
+ * Follows the same afterDraw pattern as barGroupPlugin / makeBarPlugin.
  */
 function makeReferencePlugin(bandMph, units, isDark) {
     return {
@@ -34,13 +33,11 @@ function makeReferencePlugin(bandMph, units, isDark) {
 
             ctx.save();
 
-            // 65–75 mph highway band
             const xBand0 = x(bandMph[0]);
             const xBand1 = x(bandMph[1]);
             ctx.fillStyle = bandColor;
             ctx.fillRect(xBand0, area.top, xBand1 - xBand0, area.bottom - area.top);
 
-            // Band label
             ctx.font = '9px system-ui, sans-serif';
             ctx.fillStyle = textColor;
             ctx.textAlign = 'center';
@@ -55,15 +52,15 @@ function makeReferencePlugin(bandMph, units, isDark) {
 
 /**
  * Draws filled dots + range labels on each curve at specified reference speeds.
+ * Pass an empty array to disable without removing the code.
  *
- * The label always shows range (mi or km) regardless of the current Y axis, so
- * users see "what range does this speed translate to?" in any view mode.
- * Labels only appear when useableKwh is available (rangeMi != null).
+ * To re-enable: pass [70, 80] (or any mph values) at the call site.
  */
 function makeCalloutPlugin(calloutMphs, yAxis, units, isDark) {
     return {
         id: 'epaCallouts',
         afterDatasetsDraw(chart) {
+            if (!calloutMphs.length) return;
             const { ctx, chartArea: area, scales, data } = chart;
             if (!area || !scales.x || !scales.y) return;
 
@@ -74,7 +71,6 @@ function makeCalloutPlugin(calloutMphs, yAxis, units, isDark) {
                 const color = ds.borderColor;
 
                 calloutMphs.forEach((targetMph) => {
-                    // Find nearest curve point to this reference speed
                     const pt = curve.reduce((best, p) =>
                         Math.abs(p.mph - targetMph) < Math.abs(best.mph - targetMph) ? p : best
                     , curve[0]);
@@ -89,8 +85,6 @@ function makeCalloutPlugin(calloutMphs, yAxis, units, isDark) {
                     if (px < area.left || px > area.right || py < area.top || py > area.bottom) return;
 
                     ctx.save();
-
-                    // Filled dot on the curve
                     ctx.beginPath();
                     ctx.arc(px, py, 4.5, 0, Math.PI * 2);
                     ctx.fillStyle = color;
@@ -99,7 +93,6 @@ function makeCalloutPlugin(calloutMphs, yAxis, units, isDark) {
                     ctx.lineWidth = 1.5;
                     ctx.stroke();
 
-                    // Range label — only when rangeMi is available
                     if (pt.rangeMi != null) {
                         const rangeDisplay = units === 'metric'
                             ? `${(pt.rangeMi * 1.60934).toFixed(0)} km`
@@ -111,15 +104,10 @@ function makeCalloutPlugin(calloutMphs, yAxis, units, isDark) {
 
                         const textW = ctx.measureText(rangeDisplay).width;
                         const labelY = py - 9;
-
-                        // Pill background for legibility over other curves
                         const padX = 3, padY = 2;
                         ctx.fillStyle = isDark ? 'rgba(15,23,42,0.82)' : 'rgba(255,255,255,0.88)';
                         ctx.beginPath();
-                        ctx.roundRect(
-                            px - textW / 2 - padX, labelY - 10 - padY,
-                            textW + padX * 2, 11 + padY * 2, 3
-                        );
+                        ctx.roundRect(px - textW / 2 - padX, labelY - 10 - padY, textW + padX * 2, 11 + padY * 2, 3);
                         ctx.fill();
 
                         ctx.fillStyle = color;
@@ -164,14 +152,13 @@ function yAxisLabel(yAxis, units) {
     return '';
 }
 
-/** Convert a Y value from imperial to metric for display. */
 function convertYValue(val, yAxis, units) {
     if (val == null) return null;
     if (units !== 'metric') return val;
-    if (yAxis === 'kwh100mi') return val / 1.60934;  // kWh/100mi → kWh/100km
-    if (yAxis === 'mi_kwh')   return val * 1.60934;  // mi/kWh → km/kWh
-    if (yAxis === 'range_mi') return val * 1.60934;  // mi → km
-    return val; // MPGe stays as-is
+    if (yAxis === 'kwh100mi') return val / 1.60934;
+    if (yAxis === 'mi_kwh')   return val * 1.60934;
+    if (yAxis === 'range_mi') return val * 1.60934;
+    return val;
 }
 
 // ── Confidence badge ──────────────────────────────────────────────────────────
@@ -190,14 +177,23 @@ function ConfidenceBadge({ confidence }) {
     );
 }
 
+// ── Default color for a mapping ───────────────────────────────────────────────
+
+function defaultMappingColor(vehicle, vehicleIdx, mappingIdx) {
+    const base = vehicle.color || PALETTE[vehicleIdx % PALETTE.length];
+    return mappingIdx === 0 ? base : base + 'bb';
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 /**
  * EpaCurvesView — "EPA Curves" chart sub-tab.
  *
- * Renders theoretical steady-state efficiency vs speed curves derived from
- * EPA road-load coefficients for each selected vehicle that has an EPA test
- * group linked. Vehicles without a mapping are listed in an empty-state callout.
+ * Layout mirrors ChargingView:
+ *   1. Chart Options card  — Y-axis toggles, axis scale controls, collapsible
+ *      per-mapping selector with color pickers and metadata
+ *   2. Chart card          — canvas
+ *   3. Below chart         — legend note, Copy URL, Copy PNG
  *
  * Props:
  *   vehicles           {Array}    — full vehicles array from context (with epa_mappings)
@@ -217,25 +213,28 @@ export default function EpaCurvesView({
     const { isDark } = useTheme();
     const canvasRef = useRef(null);
     const chartRef  = useRef(null);
-    const [imageCopied, setImageCopied] = useState(false);
+
+    // ── UI state ──────────────────────────────────────────────────────────────
+    const [selectorExpanded, setSelectorExpanded] = useState(false);
+    const [hiddenMappings,   setHiddenMappings]   = useState(new Set()); // mapping.id
+    const [mappingColors,    setMappingColors]    = useState({});        // mapping.id → hex
+    const [urlCopied,        setUrlCopied]        = useState(false);
+    const [imageCopied,      setImageCopied]      = useState(false);
 
     const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
 
-    // Resolve selected vehicles that have EPA data vs those that don't
-    const selectedVehicles = useMemo(() => {
-        return selectedVehicleIds
-            .map(id => vehicles.find(v => v.id === id))
-            .filter(Boolean);
-    }, [vehicles, selectedVehicleIds]);
+    // ── Vehicle lists ─────────────────────────────────────────────────────────
+    const selectedVehicles = useMemo(() =>
+        selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
+    [vehicles, selectedVehicleIds]);
 
     const vehiclesWithEpa    = selectedVehicles.filter(v => v.epa_mappings?.length > 0);
     const vehiclesWithoutEpa = selectedVehicles.filter(v => !v.epa_mappings?.length);
 
-    // Build curve datasets: one per vehicle-mapping combination
+    // ── Datasets ──────────────────────────────────────────────────────────────
     const datasets = useMemo(() => {
         const result = [];
         vehiclesWithEpa.forEach((vehicle, vi) => {
-            // Resolve inherited specs so battery_usable_kwh from a parent vehicle is visible
             const effectiveVehicle = {
                 ...vehicle,
                 specs: resolveEffectiveSpecs(vehicle, vehicles),
@@ -243,15 +242,15 @@ export default function EpaCurvesView({
             vehicle.epa_mappings.forEach((mapping, mi) => {
                 const { epaGroup, confidence } = mapping;
                 if (!epaGroup) return;
+                if (hiddenMappings.has(mapping.id)) return;
+
                 const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
                 const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
                 const curve            = buildEpaCurve(epaGroup, useableKwh);
                 if (!curve.length) return;
 
-                const baseColor = vehicle.color || PALETTE[vi % PALETTE.length];
-                // Use a slightly lighter alpha for additional mappings on the same vehicle
-                const color = mi === 0 ? baseColor : baseColor + 'bb';
-                // Prefer display_name (friendly) over raw EPA carline name for labels
+                // Color: user override → vehicle color → palette (with alpha for 2nd+ mapping)
+                const color = mappingColors[mapping.id] ?? defaultMappingColor(vehicle, vi, mi);
                 const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name;
                 const label = vehiclesWithEpa.length > 1 || mi > 0
                     ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
@@ -263,44 +262,40 @@ export default function EpaCurvesView({
                         x: convSpeed(pt.mph, units),
                         y: convertYValue(getYValue(pt, yAxis), yAxis, units),
                     })).filter(pt => pt.y != null),
-                    borderColor: color,
+                    borderColor:     color,
                     backgroundColor: color + '22',
-                    borderWidth: 2,
-                    borderDash: [6, 4],            // dashed = theoretical (vs solid empirical runs)
-                    pointRadius: 0,
+                    borderWidth:     2,
+                    borderDash:      [6, 4],
+                    pointRadius:     0,
                     pointHoverRadius: 4,
-                    tension: 0.3,
-                    // Store metadata for tooltip
+                    tension:         0.3,
                     _vehicleId:        vehicle.id,
                     _mappingId:        mapping.id,
                     _confidence:       confidence,
                     _epaGroup:         epaGroup,
                     _useableKwh:       useableKwh,
                     _useableKwhSource: useableKwhSource,
-                    _curve:            curve,       // full curve for tooltip lookup
+                    _curve:            curve,
                 });
             });
         });
         return result;
-    }, [vehiclesWithEpa, vehicles, yAxis, units]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors]);
 
-    // Build / rebuild chart whenever deps change
+    // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
         if (!canvasRef.current) return;
-        if (chartRef.current) {
-            chartRef.current.destroy();
-            chartRef.current = null;
-        }
+        if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
         if (!datasets.length) return;
 
-        const tickColor   = isDark ? 'rgb(226,232,240)'         : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(100,116,139,0.35)'   : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(241,245,249)'         : 'rgb(55,65,81)';
+        const tickColor   = isDark ? 'rgb(226,232,240)'       : 'rgb(107,114,128)';
+        const gridColor   = isDark ? 'rgba(100,116,139,0.35)' : 'rgba(229,231,235,0.8)';
+        const legendColor = isDark ? 'rgb(241,245,249)'       : 'rgb(55,65,81)';
 
-        const refPlugin      = makeReferencePlugin(HIGHWAY_BAND_MPH, units, isDark);
+        const refPlugin     = makeReferencePlugin(HIGHWAY_BAND_MPH, units, isDark);
         // Speed callouts disabled — labels overlap with multiple curves.
         // Re-enable by restoring [70, 80] (or any mph values) here.
-        const calloutPlugin  = makeCalloutPlugin([], yAxis, units, isDark);
+        const calloutPlugin = makeCalloutPlugin([], yAxis, units, isDark);
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
@@ -330,7 +325,7 @@ export default function EpaCurvesView({
                 },
                 plugins: {
                     legend: {
-                        display:  datasets.length > 1,
+                        display: datasets.length > 1,
                         labels: { color: legendColor, usePointStyle: true, pointStyleWidth: 16 },
                     },
                     tooltip: {
@@ -350,7 +345,6 @@ export default function EpaCurvesView({
                                 , curve[0]);
                                 if (!pt) return ds.label;
 
-                                // Format the value for whichever Y axis is active
                                 let valStr = '';
                                 if (yAxis === 'kwh100mi') {
                                     valStr = pt.kwh100mi != null
@@ -367,7 +361,6 @@ export default function EpaCurvesView({
                                         ? `${(units === 'metric' ? pt.rangeMi * 1.60934 : pt.rangeMi).toFixed(0)} ${distanceLabel(units)}`
                                         : '—';
                                 }
-
                                 return `${ds.label}: ${valStr}`;
                             },
                         },
@@ -378,17 +371,14 @@ export default function EpaCurvesView({
             },
         });
 
-        return () => {
-            chartRef.current?.destroy();
-            chartRef.current = null;
-        };
+        return () => { chartRef.current?.destroy(); chartRef.current = null; };
     }, [datasets, yAxis, units, isDark, xMin, xMax, yMin, yMax]);
 
-    // ── PNG copy ──────────────────────────────────────────────────────────────
+    // ── Copy PNG ──────────────────────────────────────────────────────────────
     const handleCopyPng = async () => {
         if (!chartRef.current) return;
         const canvas = chartRef.current.canvas;
-        const bg = isDark ? 'rgb(8,12,28)' : '#ffffff';
+        const bg  = isDark ? 'rgb(8,12,28)' : '#ffffff';
         const tmp = document.createElement('canvas');
         tmp.width  = canvas.width;
         tmp.height = canvas.height;
@@ -402,14 +392,23 @@ export default function EpaCurvesView({
             setImageCopied(true);
             setTimeout(() => setImageCopied(false), 2000);
         } catch {
-            // Fallback: open in new tab
             window.open(tmp.toDataURL('image/png'));
         }
     };
 
-    // ── Render ────────────────────────────────────────────────────────────────
+    // ── Copy URL ──────────────────────────────────────────────────────────────
+    const handleCopyUrl = () => {
+        navigator.clipboard.writeText(window.location.href).then(() => {
+            setUrlCopied(true);
+            setTimeout(() => setUrlCopied(false), 2000);
+        });
+    };
 
-    // Empty state: no vehicles selected
+    // ── Total visible mapping count (for selector badge) ──────────────────────
+    const totalMappings = vehiclesWithEpa.reduce((n, v) => n + (v.epa_mappings?.length ?? 0), 0);
+    const visibleCount  = totalMappings - hiddenMappings.size;
+
+    // ── Empty state ───────────────────────────────────────────────────────────
     if (selectedVehicleIds.length === 0) {
         return (
             <div>
@@ -421,71 +420,209 @@ export default function EpaCurvesView({
         );
     }
 
+    // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div>
+            {/* ── Chart Options card ────────────────────────────────────────── */}
             {!presentationMode && (
-                <div className="flex items-center gap-3 mb-4">
-                    <h2 className="page-title mb-0">
-                        EPA Efficiency Curves
-                        <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="below" />
-                    </h2>
-                    <button
-                        type="button"
-                        onClick={handleCopyPng}
-                        disabled={!datasets.length}
-                        className={`chart-copy-btn ml-auto ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                    >
-                        {imageCopied ? '✓ Copied!' : '📋 Copy PNG'}
-                    </button>
-                </div>
-            )}
+                <div className="card mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="section-title">
+                            Chart Options — EPA Efficiency Curves
+                            <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" className="ml-1" />
+                        </h3>
+                    </div>
 
-            {/* Y-axis mode toggle */}
-            {!presentationMode && (
-                <div className="chart-toggles mb-4">
-                    <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Y axis:</span>
-                    <div className="chart-type-buttons">
-                        {Y_MODES.map(m => (
+                    {/* Y-axis toggle */}
+                    <div className="chart-toggles mb-4">
+                        <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Y axis:</span>
+                        <div className="chart-type-buttons">
+                            {Y_MODES.map(m => (
+                                <button
+                                    key={m.key}
+                                    type="button"
+                                    className={`btn btn-sm ${yAxis === m.key ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setEpaConfig(p => ({ ...p, yAxis: m.key }))}
+                                >
+                                    {m.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Axis scale controls */}
+                    <AxisScaleControls
+                        xMin={xMin} xMax={xMax} yMin={yMin} yMax={yMax}
+                        xAxisLabel={`Speed (${speedLabel(units)})`}
+                        yAxisLabel={yAxisLabel(yAxis, units)}
+                        onChange={(key, value) => setEpaConfig(p => ({ ...p, [key]: value }))}
+                    />
+
+                    {/* Collapsible EPA test selector */}
+                    {vehiclesWithEpa.length > 0 && (
+                        <div className="mt-4">
                             <button
-                                key={m.key}
-                                type="button"
-                                className={`btn btn-sm ${yAxis === m.key ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setEpaConfig(p => ({ ...p, yAxis: m.key }))}
+                                onClick={() => setSelectorExpanded(p => !p)}
+                                className="run-selector-header"
                             >
-                                {m.label}
+                                <span style={{ display: 'inline-block', transform: selectorExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
+                                Select Vehicle Tests to Display
+                                <span className="text-sm font-normal text-gray-500">({visibleCount} of {totalMappings} shown)</span>
                             </button>
-                        ))}
-                    </div>
-                    <div className="flex items-center gap-1.5 ml-4 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                        <span className="inline-block w-8 border-t-2 border-dashed border-indigo-400" />
-                        <span>Theoretical (EPA road load)</span>
-                        <InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} />
-                    </div>
-                </div>
-            )}
 
-            {/* Chart canvas */}
-            {datasets.length > 0 ? (
-                <div className="specs-chart-card">
-                    <div style={{ height: presentationMode ? 'calc(100vh - 120px)' : 480 }}>
-                        <canvas ref={canvasRef} />
-                    </div>
-                    {!presentationMode && (
-                        <div className="mt-3 flex flex-wrap gap-4 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                            <span>
-                                <span className="font-medium">Shaded band</span> — 65–75 mph typical highway
-                            </span>
+                            {selectorExpanded && (
+                                <div className="mt-3">
+                                    <div className="runs-list">
+                                        {vehiclesWithEpa.map((vehicle, vi) => {
+                                            const effectiveVehicle = {
+                                                ...vehicle,
+                                                specs: resolveEffectiveSpecs(vehicle, vehicles),
+                                            };
+                                            return (
+                                                <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
+                                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">
+                                                        {vehicleLabel(vehicle)}
+                                                    </h4>
+                                                    <div className="run-items">
+                                                        {vehicle.epa_mappings.map((mapping, mi) => {
+                                                            const { epaGroup, confidence } = mapping;
+                                                            if (!epaGroup) return null;
+                                                            const isVisible  = !hiddenMappings.has(mapping.id);
+                                                            const color      = mappingColors[mapping.id] ?? defaultMappingColor(vehicle, vi, mi).replace(/[0-9a-f]{2}$/i, '');
+                                                            // Strip any alpha suffix for the color input
+                                                            const pickerColor = (mappingColors[mapping.id] ?? (vehicle.color || PALETTE[vi % PALETTE.length])).slice(0, 7);
+
+                                                            const { a, b, c } = resolveCoeffs(epaGroup);
+                                                            const hwfetKwh = epaGroup.hwfet_unadj_kwh_100mi ?? epaGroup.hwfet_adj_kwh_100mi;
+                                                            const eta = a != null ? calibrateEfficiency(a, b, c, hwfetKwh) : null;
+                                                            const hwfetSource = epaGroup.hwfet_unadj_kwh_100mi != null ? 'unadj'
+                                                                              : epaGroup.hwfet_adj_kwh_100mi    != null ? 'adj'
+                                                                              : null;
+                                                            const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
+                                                            const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
+                                                            const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name;
+
+                                                            return (
+                                                                <div
+                                                                    key={mapping.id}
+                                                                    className={`flex items-start gap-2 ${!isVisible ? 'opacity-50' : ''}`}
+                                                                >
+                                                                    {/* Checkbox */}
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isVisible}
+                                                                        onChange={() => setHiddenMappings(prev => {
+                                                                            const s = new Set(prev);
+                                                                            s.has(mapping.id) ? s.delete(mapping.id) : s.add(mapping.id);
+                                                                            return s;
+                                                                        })}
+                                                                        className="w-4 h-4 mt-0.5 shrink-0"
+                                                                    />
+                                                                    {/* Color picker */}
+                                                                    <input
+                                                                        type="color"
+                                                                        value={pickerColor}
+                                                                        onChange={e => setMappingColors(prev => ({ ...prev, [mapping.id]: e.target.value }))}
+                                                                        onClick={e => e.stopPropagation()}
+                                                                        className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
+                                                                        title="Change curve color"
+                                                                    />
+                                                                    {/* Label + metadata */}
+                                                                    <div className="run-label min-w-0">
+                                                                        <span className="font-medium">{epaLabel}</span>
+                                                                        <span className="text-sm text-gray-500 dark:text-slate-400 ml-2">{epaGroup.model_year} · {epaGroup.test_group_id}</span>
+                                                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                                                                            <ConfidenceBadge confidence={confidence} />
+                                                                            {epaGroup.label_combined_mpge && epaGroup.label_combined_mpge < 500 && (
+                                                                                <span>
+                                                                                    EPA rated: {epaGroup.label_combined_mpge} MPGe
+                                                                                    {epaGroup.label_method && <> · {epaGroup.label_method}<InfoIcon text={EPA_EXPLAINERS.labelMethod} /></>}
+                                                                                </span>
+                                                                            )}
+                                                                            {eta != null && (
+                                                                                <span>
+                                                                                    η<sub>eff</sub>: {(eta * 100).toFixed(1)}%
+                                                                                    {hwfetSource === 'unadj' && <> · HWFET unadj<InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} /></>}
+                                                                                    {hwfetSource === 'adj'   && <> · HWFET adj<InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} /></>}
+                                                                                    {hwfetSource === null    && <> · default η<InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} /></>}
+                                                                                </span>
+                                                                            )}
+                                                                            {useableKwh && (
+                                                                                <span>
+                                                                                    {Number(useableKwh).toFixed(1)} kWh
+                                                                                    {useableKwhSource === 'EPA'   && ' (EPA)'}
+                                                                                    {useableKwhSource === 'spec'  && ' (spec)'}
+                                                                                    {useableKwhSource === 'gross' && ' (gross)'}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Vehicles without EPA data */}
+                                    {vehiclesWithoutEpa.length > 0 && (
+                                        <div className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                                            <span className="font-medium">No EPA data:</span>{' '}
+                                            {vehiclesWithoutEpa.map(v => vehicleLabel(v)).join(', ')}
+                                            {' '}— link a test group via Edit Vehicle.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
-                    {!presentationMode && (
-                        <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
-                            <AxisScaleControls
-                                xMin={xMin} xMax={xMax} yMin={yMin} yMax={yMax}
-                                xAxisLabel={`Speed (${speedLabel(units)})`}
-                                yAxisLabel={yAxisLabel(yAxis, units)}
-                                onChange={(key, value) => setEpaConfig(p => ({ ...p, [key]: value }))}
-                            />
+
+                    {/* All selected vehicles lack EPA data */}
+                    {vehiclesWithEpa.length === 0 && vehiclesWithoutEpa.length > 0 && (
+                        <div className="mt-4 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                            No EPA test group linked for the selected vehicles. Link one via Edit Vehicle.
                         </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── Chart card ────────────────────────────────────────────────── */}
+            {datasets.length > 0 ? (
+                <div className="card mb-4">
+                    <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 500 }}>
+                        <canvas ref={canvasRef} />
+                    </div>
+
+                    {!presentationMode && (
+                        <>
+                            {/* Legend note */}
+                            <div className="mt-3 flex flex-wrap gap-4 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                                <span>
+                                    <span className="font-medium">Shaded band</span> — 65–75 mph typical highway
+                                </span>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="mt-3 flex items-center gap-3 flex-wrap">
+                                <button
+                                    onClick={handleCopyUrl}
+                                    className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
+                                    title="Copy link to this chart view"
+                                >
+                                    {urlCopied ? '✓ Copied!' : '🔗 Copy URL'}
+                                </button>
+                                <button
+                                    onClick={handleCopyPng}
+                                    disabled={!datasets.length}
+                                    className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
+                                    title="Copy chart as PNG"
+                                >
+                                    {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
+                                </button>
+                            </div>
+                        </>
                     )}
                 </div>
             ) : (
@@ -494,88 +631,6 @@ export default function EpaCurvesView({
                     <p className="text-sm mt-2" style={{ color: 'var(--color-text-muted)' }}>
                         Link an EPA test group via Edit Vehicle to enable this chart.
                     </p>
-                </div>
-            )}
-
-            {/* Vehicles without EPA data */}
-            {vehiclesWithoutEpa.length > 0 && !presentationMode && (
-                <div className="mt-4 p-3 rounded-lg text-sm" style={{ background: 'var(--color-surface-muted)', color: 'var(--color-text-secondary)' }}>
-                    <span className="font-medium">No EPA data:</span>{' '}
-                    {vehiclesWithoutEpa.map(v => vehicleLabel(v)).join(', ')}
-                    {' '}— link an EPA test group via Edit Vehicle.
-                </div>
-            )}
-
-            {/* Per-vehicle metadata summary */}
-            {vehiclesWithEpa.length > 0 && !presentationMode && (
-                <div className="mt-4 space-y-2">
-                    {vehiclesWithEpa.map(vehicle =>
-                        vehicle.epa_mappings.map(mapping => {
-                            const { epaGroup, confidence } = mapping;
-                            if (!epaGroup) return null;
-                            const { a, b, c } = resolveCoeffs(epaGroup);
-                            const hwfetKwh = epaGroup.hwfet_unadj_kwh_100mi ?? epaGroup.hwfet_adj_kwh_100mi;
-                            const eta = (a != null)
-                                ? calibrateEfficiency(a, b, c, hwfetKwh)
-                                : null;
-                            const hwfetSource = epaGroup.hwfet_unadj_kwh_100mi != null ? 'unadj'
-                                              : epaGroup.hwfet_adj_kwh_100mi    != null ? 'adj'
-                                              : null;
-                            // Use effective (inherited) specs so battery_usable_kwh from
-                            // a parent vehicle is visible when the child hasn't set it.
-                            const effectiveVehicle = {
-                                ...vehicle,
-                                specs: resolveEffectiveSpecs(vehicle, vehicles),
-                            };
-                            const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
-                            const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
-                            return (
-                                <div
-                                    key={mapping.id}
-                                    className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 rounded-lg text-xs"
-                                    style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
-                                >
-                                    <span className="font-medium">{vehicleLabel(vehicle)}</span>
-                                    <span style={{ color: 'var(--color-text-muted)' }}>
-                                        {epaGroup.display_name
-                                            ? <><span className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>{epaGroup.display_name}</span> · <span className="italic">{epaGroup.epa_carline_name}</span></>
-                                            : epaGroup.epa_carline_name
-                                        }
-                                        {' '}· {epaGroup.model_year} · {epaGroup.test_group_id}
-                                    </span>
-                                    <ConfidenceBadge confidence={confidence} />
-                                    {epaGroup.label_combined_mpge && epaGroup.label_combined_mpge < 500 && (
-                                        <span style={{ color: 'var(--color-text-secondary)' }}>
-                                            EPA rated: {epaGroup.label_combined_mpge} MPGe
-                                            {epaGroup.label_method && <> · {epaGroup.label_method}<InfoIcon text={EPA_EXPLAINERS.labelMethod} /></>}
-                                        </span>
-                                    )}
-                                    {eta != null && (
-                                        <span style={{ color: 'var(--color-text-muted)' }}>
-                                            η<sub>eff</sub>: {(eta * 100).toFixed(1)}%
-                                            {hwfetSource === 'unadj' && (
-                                                <> · calibrated from HWFET unadj ({epaGroup.hwfet_unadj_kwh_100mi?.toFixed(1)} kWh/100mi)<InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} /></>
-                                            )}
-                                            {hwfetSource === 'adj' && (
-                                                <> · calibrated from HWFET adj ({epaGroup.hwfet_adj_kwh_100mi?.toFixed(1)} kWh/100mi)<InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} /></>
-                                            )}
-                                            {hwfetSource === null && (
-                                                <> · default fallback (no HWFET data)<InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} /></>
-                                            )}
-                                        </span>
-                                    )}
-                                    {useableKwh && (
-                                        <span style={{ color: 'var(--color-text-muted)' }}>
-                                            {Number(useableKwh).toFixed(1)} kWh
-                                            {useableKwhSource === 'EPA'   && ' (EPA useable)'}
-                                            {useableKwhSource === 'spec'  && ' (useable, from specs)'}
-                                            {useableKwhSource === 'gross' && ' (gross — useable not set)'}
-                                        </span>
-                                    )}
-                                </div>
-                            );
-                        })
-                    )}
                 </div>
             )}
         </div>
