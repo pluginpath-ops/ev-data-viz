@@ -847,7 +847,8 @@ body {
 
 /* Specs comparison table outer wrapper */
 .specs-table-container {
-    @apply rounded-lg shadow overflow-x-auto;
+    @apply rounded-lg shadow overflow-auto;
+    max-height: calc(100vh - 12rem); /* owns both scroll axes so sticky header/col work */
     background-color: var(--color-card);
 }
 

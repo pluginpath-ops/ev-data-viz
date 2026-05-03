@@ -284,22 +284,10 @@ export default function SpecsView({ selectedVehicleIds }) {
                 </div>
             )}
 
-            {/* Sticky mirror scrollbar — always reachable at the bottom of the viewport.
-                Uses negative margin-top to float over the table rather than push it down. */}
-            <div
-                ref={mirrorRef}
-                className="sticky bottom-2.5 z-20 overflow-x-scroll overflow-y-hidden"
-                style={{
-                    height: 24,
-                    marginTop: -24,
-                    visibility: isOverflowing ? 'visible' : 'hidden',
-                    background: 'var(--color-card)',
-                    boxShadow: '0 -2px 6px rgba(0,0,0,0.10)',
-                    borderRadius: '0 0 8px 8px',
-                }}
-            >
-                <div style={{ width: mirrorInnerWidth, height: 1 }} />
-            </div>
+            {/* Mirror scrollbar — no longer needed now that the container has a
+                fixed max-height and owns both scroll axes; native scrollbar is
+                always visible at the container bottom. Hidden but kept for reference. */}
+            <div ref={mirrorRef} style={{ display: 'none' }} />
         </div>
     );
 }
