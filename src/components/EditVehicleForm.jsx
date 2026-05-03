@@ -4,6 +4,8 @@
 import { useState, useRef, useCallback } from 'react';
 import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
+import InfoIcon from './InfoIcon';
+import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 
 const ASPECT = 16 / 9;
 const MAX_W = 1600;
@@ -43,6 +45,20 @@ function getCroppedBlob(imgEl, completedCrop) {
     });
 }
 
+// Confidence badge — same style as EpaCurvesView
+const CONFIDENCE_COLORS = {
+    verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
+    likely:   'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-700',
+    inferred: 'text-gray-500 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-800/40 dark:border-gray-600',
+};
+function ConfidenceBadge({ confidence }) {
+    return (
+        <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${CONFIDENCE_COLORS[confidence] ?? CONFIDENCE_COLORS.inferred}`}>
+            {confidence}
+        </span>
+    );
+}
+
 export default function EditVehicleForm({
     formData, onFormChange,
     editingId,
@@ -55,6 +71,11 @@ export default function EditVehicleForm({
     // Manufacturer
     manufacturers = [],
     onAddManufacturer,
+    // EPA linking (edit mode only, contributor+)
+    searchEpaTestGroups,
+    onLinkEpaTestGroup,
+    onUpdateEpaMapping,
+    onUnlinkEpaTestGroup,
 }) {
     const [imgSrc, setImgSrc] = useState('');
     const [crop, setCrop] = useState();
@@ -67,6 +88,15 @@ export default function EditVehicleForm({
     const [newMfgName, setNewMfgName] = useState('');
     const [newMfgCountry, setNewMfgCountry] = useState('');
     const [mfgSaving, setMfgSaving] = useState(false);
+
+    // ── EPA linking state ─────────────────────────────────────────────────────
+    const [epaQuery, setEpaQuery]           = useState('');
+    const [epaResults, setEpaResults]       = useState([]);
+    const [epaSearching, setEpaSearching]   = useState(false);
+    const [showEpaDropdown, setShowEpaDropdown] = useState(false);
+    const [epaLinking, setEpaLinking]       = useState(false);  // in-flight link
+    const [epaUnlinking, setEpaUnlinking]   = useState(null);   // mappingId being unlinked
+    const epaDebounceRef = useRef(null);
 
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
@@ -137,6 +167,59 @@ export default function EditVehicleForm({
         }
     };
 
+
+    // ── EPA linking handlers ──────────────────────────────────────────────────
+
+    const handleEpaQueryChange = (e) => {
+        const q = e.target.value;
+        setEpaQuery(q);
+        setShowEpaDropdown(true);
+        if (epaDebounceRef.current) clearTimeout(epaDebounceRef.current);
+        if (!q.trim()) { setEpaResults([]); return; }
+        epaDebounceRef.current = setTimeout(async () => {
+            setEpaSearching(true);
+            try {
+                // No year filter — EPA model years often differ from the vehicle's model year;
+                // the year is visible in dropdown results for manual verification.
+                const rows = await searchEpaTestGroups?.(q.trim());
+                setEpaResults(rows || []);
+            } catch {
+                setEpaResults([]);
+            } finally {
+                setEpaSearching(false);
+            }
+        }, 300);
+    };
+
+    const handleEpaSelect = async (group) => {
+        setShowEpaDropdown(false);
+        setEpaQuery('');
+        setEpaResults([]);
+        if (!editingId || !onLinkEpaTestGroup) return;
+        setEpaLinking(true);
+        try {
+            await onLinkEpaTestGroup(editingId, group.test_group_id, 'inferred', null);
+        } finally {
+            setEpaLinking(false);
+        }
+    };
+
+    const handleEpaUnlink = async (mappingId) => {
+        if (!onUnlinkEpaTestGroup) return;
+        setEpaUnlinking(mappingId);
+        try {
+            await onUnlinkEpaTestGroup(mappingId);
+        } finally {
+            setEpaUnlinking(null);
+        }
+    };
+
+    const handleConfidenceChange = async (mappingId, confidence) => {
+        await onUpdateEpaMapping?.(mappingId, { confidence });
+    };
+
+    // Current EPA mappings come from editingVehicle (refreshed by parent on success)
+    const currentEpaMappings = editingVehicle?.epa_mappings ?? [];
 
     return (
         <>
@@ -301,6 +384,103 @@ export default function EditVehicleForm({
                             />
                         </label>
                         <p className="text-xs text-gray-400 mt-1">16:9 crop · max 1600×900 · saved as JPEG</p>
+                    </div>
+                )}
+
+                {/* EPA Test Group linking — edit mode only */}
+                {editingId && searchEpaTestGroups && (
+                    <div className="form-section mt-5">
+                        <label className="block font-medium mb-2">
+                            EPA Test Group
+                            <InfoIcon
+                                text={EPA_EXPLAINERS.roadLoad}
+                                position="right"
+                                className="ml-1"
+                            />
+                        </label>
+
+                        {/* Current mappings list */}
+                        {currentEpaMappings.length === 0 ? (
+                            <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">No EPA test group linked yet.</p>
+                        ) : (
+                            <div className="flex flex-col gap-2 mb-3">
+                                {currentEpaMappings.map(m => {
+                                    const g = m.epaGroup;
+                                    if (!g) return null;
+                                    return (
+                                        <div key={m.id} className="flex items-center gap-2 flex-wrap rounded border border-gray-200 dark:border-slate-600 p-2 text-sm">
+                                            <span className="flex-1 min-w-0">
+                                                <span className="font-medium">{g.epa_carline_name}</span>
+                                                <span className="text-gray-500 dark:text-slate-400 ml-1">({g.model_year})</span>
+                                                {m.notes && (
+                                                    <span className="text-gray-500 dark:text-slate-400 ml-1">· {m.notes}</span>
+                                                )}
+                                            </span>
+                                            <select
+                                                value={m.confidence}
+                                                onChange={e => handleConfidenceChange(m.id, e.target.value)}
+                                                className="form-input text-xs py-0.5 w-28"
+                                            >
+                                                <option value="verified">Verified</option>
+                                                <option value="likely">Likely</option>
+                                                <option value="inferred">Inferred</option>
+                                            </select>
+                                            <ConfidenceBadge confidence={m.confidence} />
+                                            <button
+                                                type="button"
+                                                disabled={epaUnlinking === m.id}
+                                                onClick={() => handleEpaUnlink(m.id)}
+                                                className="btn btn-secondary text-xs py-0.5 px-2 disabled:opacity-40"
+                                            >
+                                                {epaUnlinking === m.id ? 'Unlinking…' : 'Unlink'}
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Search combobox for adding a new mapping */}
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Search EPA test groups by make or carline…"
+                                value={epaQuery}
+                                onChange={handleEpaQueryChange}
+                                onFocus={() => epaQuery && setShowEpaDropdown(true)}
+                                onBlur={() => setTimeout(() => setShowEpaDropdown(false), 150)}
+                                className="form-input text-sm w-full"
+                                disabled={epaLinking}
+                            />
+                            {epaLinking && (
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 dark:text-slate-400">Linking…</span>
+                            )}
+                            {showEpaDropdown && (epaResults.length > 0 || epaSearching) && (
+                                <ul className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border shadow-lg bg-white dark:bg-slate-800 dark:border-slate-600">
+                                    {epaSearching && (
+                                        <li className="px-3 py-2 text-sm text-gray-400 italic">Searching…</li>
+                                    )}
+                                    {!epaSearching && epaResults.map(g => (
+                                        <li
+                                            key={g.test_group_id}
+                                            className="px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900"
+                                            onMouseDown={e => { e.preventDefault(); handleEpaSelect(g); }}
+                                        >
+                                            <span className="font-medium">{g.make} · {g.epa_carline_name}</span>
+                                            <span className="text-gray-400 ml-2">
+                                                {g.model_year}{g.drive ? ` · ${g.drive}` : ''} · {g.test_group_id}
+                                            </span>
+                                        </li>
+                                    ))}
+                                    {!epaSearching && epaResults.length === 0 && epaQuery.trim() && (
+                                        <li className="px-3 py-2 text-sm text-gray-400 italic">No results</li>
+                                    )}
+                                </ul>
+                            )}
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                            Results are pre-filtered by vehicle year when available.
+                        </p>
                     </div>
                 )}
 

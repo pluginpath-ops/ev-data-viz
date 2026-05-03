@@ -12,6 +12,7 @@ import PopoutView from './components/PopoutView';
 import SpecsView from './components/SpecsView';
 import SpecsChartView from './components/SpecsChartView';
 import SpecsScatterView from './components/SpecsScatterView';
+import EpaCurvesView from './components/EpaCurvesView';
 import AdminView from './components/AdminView';
 
 export default function App() {
@@ -86,8 +87,9 @@ export default function App() {
         vehiclePage: 1,
     }));
     const [dragOverIdx, setDragOverIdx] = useState(null); // pill drop-indicator position
-    const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare'
+    const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare' | 'epacurves' | …
     const [compareConfig, setCompareConfig] = useState({ xMinutes: 15, mMiles: 150, startSoc: 10 });
+    const [epaConfig, setEpaConfig] = useState({ yAxis: 'kwh100mi', xMin: null, xMax: null, yMin: null, yMax: null });
     const [roadTripConfig, setRoadTripConfig] = useState({
         mode: 'distance', startSoc: 90, minSoc: 10,
         legDistance: 150, chargeTime: 30,
@@ -135,8 +137,8 @@ export default function App() {
     const themeTitle = theme === 'dark' ? 'Dark mode (click for system)' : theme === 'light' ? 'Light mode (click for dark)' : 'System theme (click for light)';
 
     const { isPopout, sendState } = useChartSync({
-        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig,
-        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig,
+        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig,
+        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig,
     });
 
     // Navigate to a new top-level view and push a browser history entry so the
@@ -211,6 +213,10 @@ export default function App() {
             ...(n('rt_tr') != null && { towingRefSpeedMph:  n('rt_tr')          }),
         };
         if (Object.keys(rtOverride).length > 0) setRoadTripConfig(prev => ({ ...prev, ...rtOverride }));
+
+        // EPA Curves config
+        const epaYa = p.get('epa_ya');
+        if (epaYa) setEpaConfig(prev => ({ ...prev, yAxis: epaYa }));
     }, []);
 
     // ── Handle browser back/forward ─────────────────────────────────────────
@@ -331,13 +337,18 @@ export default function App() {
             if (chartConfig.scatterYField) p.set('scy', chartConfig.scatterYField);
         }
 
+        // EPA Curves options
+        if (chartMode === 'epacurves') {
+            if (epaConfig.yAxis && epaConfig.yAxis !== 'kwh100mi') p.set('epa_ya', epaConfig.yAxis);
+        }
+
         history.replaceState({ view: 'chart', chartMode }, '', '?' + p.toString());
-    }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig]);
+    }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig]);
 
     // ── Broadcast chart state to any open pop-out windows ───────────────────
     useEffect(() => {
         sendState();
-    }, [chartMode, chartConfig, selectedVehicles, compareConfig, sendState]);
+    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, sendState]);
 
     // Keep activeVehicle in sync with vehicles state
     const currentActiveVehicle = activeVehicle
@@ -365,6 +376,7 @@ export default function App() {
                 setChartConfig={setChartConfig}
                 compareConfig={compareConfig}
                 roadTripConfig={roadTripConfig}
+                epaConfig={epaConfig}
                 onUpdateRunColor={updateRunColor}
             />
         );
@@ -514,6 +526,7 @@ export default function App() {
                                         { key: 'roadtrip',  label: 'Road Trip' },
                                         { key: 'specs',       label: 'Spec Chart' },
                                         { key: 'specscatter', label: 'Spec Scatter' },
+                                        { key: 'epacurves',   label: 'EPA Curves' },
                                     ].map(({ key, label }) => (
                                         <button
                                             key={key}
@@ -684,7 +697,7 @@ export default function App() {
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                         />
                     )}
-                    {view === 'chart' && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && (
+                    {view === 'chart' && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'epacurves' && (
                         <ChargingView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -729,6 +742,14 @@ export default function App() {
                             xField={chartConfig.scatterXField}
                             yField={chartConfig.scatterYField}
                             onFieldChange={(x, y) => setChartConfig(p => ({ ...p, scatterXField: x, scatterYField: y }))}
+                        />
+                    )}
+                    {view === 'chart' && chartMode === 'epacurves' && (
+                        <EpaCurvesView
+                            vehicles={vehicles}
+                            selectedVehicleIds={selectedVehicles}
+                            epaConfig={epaConfig}
+                            setEpaConfig={setEpaConfig}
                         />
                     )}
                     {view === 'specs' && (

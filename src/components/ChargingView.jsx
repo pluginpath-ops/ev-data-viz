@@ -752,6 +752,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     y2Min={chartConfig.y2Min} y2Max={chartConfig.y2Max}
                     onChange={(key, val) => setChartConfig(prev => ({ ...prev, [key]: val }))}
                     showY2={!!chartConfig.y2Axis}
+                    card={false}
                 />
 
                 {/* ── Race mode panel — only visible when X = Time ── */}

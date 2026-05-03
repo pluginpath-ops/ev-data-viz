@@ -1529,19 +1529,17 @@ export default function RoadTripView({
                 </div>
             )}
 
-            {/* ── Axis Scale Controls ────────────────────────────────────── */}
+            {/* ── Axis Scale Controls (card provided by AxisScaleControls) ─ */}
             {!loading && (simResults.some(Boolean) || speedSweepResults?.length > 0 || distSweepResults?.length > 0) && !presentationMode && (
-                <div className="card mb-6">
-                    <AxisScaleControls
-                        xMin={axisScale.xMin} xMax={axisScale.xMax}
-                        yMin={axisScale.yMin} yMax={axisScale.yMax}
-                        onChange={onAxisChange}
-                        showX={true}
-                        showY2={false}
-                        xAxisLabel={isSpeedMode ? `X-Axis Scale (${sl})` : isTripDistMode ? `X-Axis Scale (${dl})` : 'X-Axis Scale (hrs)'}
-                        yAxisLabel={isSweepMode ? 'Y-Axis Scale (hrs)' : 'Left Axis Scale'}
-                    />
-                </div>
+                <AxisScaleControls
+                    xMin={axisScale.xMin} xMax={axisScale.xMax}
+                    yMin={axisScale.yMin} yMax={axisScale.yMax}
+                    onChange={onAxisChange}
+                    showX={true}
+                    showY2={false}
+                    xAxisLabel={isSpeedMode ? `X-Axis Scale (${sl})` : isTripDistMode ? `X-Axis Scale (${dl})` : 'X-Axis Scale (hrs)'}
+                    yAxisLabel={isSweepMode ? 'Y-Axis Scale (hrs)' : 'Left Axis Scale'}
+                />
             )}
 
             {/* ── Summary Table ─────────────────────────────────────────── */}

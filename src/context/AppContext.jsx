@@ -730,6 +730,103 @@ export function AppProvider({ children }) {
         }
     };
 
+    // ── EPA test group linking ────────────────────────────────────────────────
+
+    /** Pass-through: server-side search used by the linking combobox. */
+    const searchEpaTestGroups = (query, year) => dataService.searchEpaTestGroups(query, year);
+
+    const linkEpaTestGroup = async (vehicleId, groupId, confidence, notes) => {
+        try {
+            await dataService.linkEpaTestGroup(vehicleId, groupId, confidence, notes);
+            // Re-fetch vehicles so epa_mappings reflects the new link immediately.
+            const updated = await dataService.getVehicles();
+            setVehicles(updated);
+            showSuccess('EPA test group linked.');
+        } catch (error) {
+            showError('Error linking EPA test group: ' + error.message);
+        }
+    };
+
+    const updateEpaMapping = async (mappingId, updates) => {
+        try {
+            await dataService.updateEpaMapping(mappingId, updates);
+            const updated = await dataService.getVehicles();
+            setVehicles(updated);
+        } catch (error) {
+            showError('Error updating EPA mapping: ' + error.message);
+        }
+    };
+
+    const unlinkEpaTestGroup = async (mappingId) => {
+        try {
+            await dataService.unlinkEpaTestGroup(mappingId);
+            const updated = await dataService.getVehicles();
+            setVehicles(updated);
+            showSuccess('EPA test group unlinked.');
+        } catch (error) {
+            showError('Error unlinking EPA test group: ' + error.message);
+        }
+    };
+
+    /** Pass-through: fetch all test groups with linked vehicles for admin panel. */
+    const getEpaTestGroupsAdmin = () => dataService.getEpaTestGroupsAdmin();
+
+    /**
+     * Update editable fields on an EPA test group.
+     * Accepts any subset of: { label_method, display_name }.
+     * Soft-refreshes vehicles so chart labels and vehicle cards reflect the change.
+     */
+    const updateEpaTestGroup = async (testGroupId, updates) => {
+        await dataService.updateEpaTestGroup(testGroupId, updates);
+        softRefreshVehicles();
+    };
+
+    /** Convenience alias: update only label_method. */
+    const updateEpaLabelMethod = async (testGroupId, method) => {
+        await dataService.updateEpaLabelMethod(testGroupId, method);
+    };
+
+    /** Delete an EPA test group and its vehicle mappings, then refresh vehicles. */
+    const deleteEpaTestGroup = async (testGroupId) => {
+        try {
+            await dataService.deleteEpaTestGroup(testGroupId);
+            const updated = await dataService.getVehicles();
+            setVehicles(updated);
+            showSuccess('EPA test group deleted.');
+        } catch (error) {
+            showError('Delete failed: ' + error.message);
+            throw error;
+        }
+    };
+
+    /**
+     * Bulk-import EPA test groups from the parsed testcar sheet, then create
+     * vehicle mappings for any test groups the user linked to a vehicle.
+     *
+     * @param {Array<Object>} testGroups  Rows for epa_test_groups upsert
+     * @param {Array<{vehicleId, testGroupId}>} mappings  Vehicle → test group links to create
+     */
+    const importEpaTestGroups = async (testGroups, mappings) => {
+        try {
+            await dataService.bulkUpsertEpaTestGroups(testGroups);
+            // Create mappings sequentially; skip if already linked (upsert would conflict)
+            for (const { vehicleId, testGroupId } of mappings) {
+                try {
+                    await dataService.linkEpaTestGroup(vehicleId, testGroupId, 'likely', null);
+                } catch {
+                    // Ignore duplicate-link errors (UNIQUE constraint) — mapping already exists
+                }
+            }
+            const updated = await dataService.getVehicles();
+            setVehicles(updated);
+            showSuccess(`Imported ${testGroups.length} EPA test group(s), linked ${mappings.length}.`);
+            return { testGroupsCount: testGroups.length, mappingsCount: mappings.length };
+        } catch (error) {
+            showError('EPA import failed: ' + error.message);
+            throw error;
+        }
+    };
+
     // ── Admin actions ─────────────────────────────────────────────────────────
     const getUsersForAdmin = async () => {
         // Let the error propagate to AdminView so it can show it inline.
@@ -817,6 +914,15 @@ export function AppProvider({ children }) {
         updateSpecLink,
         deleteSpecLink,
         clearDefaultRun,
+        searchEpaTestGroups,
+        linkEpaTestGroup,
+        updateEpaMapping,
+        unlinkEpaTestGroup,
+        importEpaTestGroups,
+        getEpaTestGroupsAdmin,
+        deleteEpaTestGroup,
+        updateEpaLabelMethod,
+        updateEpaTestGroup,
     };
 
     return (

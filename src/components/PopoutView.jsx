@@ -2,6 +2,7 @@ import ChargingView from './ChargingView';
 import ChargeCompareView from './ChargeCompareView';
 import RoadTripView from './RoadTripView';
 import SpecsChartView from './SpecsChartView';
+import EpaCurvesView from './EpaCurvesView';
 
 /**
  * Minimal fullscreen chart-only view rendered in the pop-out tab.
@@ -10,7 +11,7 @@ import SpecsChartView from './SpecsChartView';
  */
 export default function PopoutView({
     vehicles, selectedVehicles, chartMode, chartConfig,
-    setChartConfig, compareConfig, roadTripConfig, onUpdateRunColor,
+    setChartConfig, compareConfig, roadTripConfig, epaConfig, onUpdateRunColor,
 }) {
     return (
         <div className="popout-root">
@@ -58,6 +59,16 @@ export default function PopoutView({
                     xMinutes={compareConfig.xMinutes}
                     mMiles={compareConfig.mMiles}
                     startSoc={compareConfig.startSoc}
+                    presentationMode
+                />
+            )}
+
+            {chartMode === 'epacurves' && (
+                <EpaCurvesView
+                    vehicles={vehicles}
+                    selectedVehicleIds={selectedVehicles}
+                    epaConfig={epaConfig || { yAxis: 'kwh100mi' }}
+                    setEpaConfig={() => {}}
                     presentationMode
                 />
             )}

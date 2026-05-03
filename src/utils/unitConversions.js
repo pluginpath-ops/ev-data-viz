@@ -89,6 +89,22 @@ export function formatSpecValue(value, unitGroup, sys) {
     }
 }
 
+// ── MPGe (Miles Per Gallon equivalent) ───────────────────────────────────────
+
+/** EPA's kWh per gallon of gasoline equivalent (used to compute MPGe). */
+export const MPG_E_CONVERSION = 33.705;
+
+/**
+ * Convert mi/kWh to MPGe (Miles Per Gallon equivalent).
+ * MPGe = (mi/kWh) × 33.705 kWh/gal
+ * @param {number|null} miPerKwh
+ * @returns {number|null}
+ */
+export function miKwhToMpge(miPerKwh) {
+    if (miPerKwh == null) return null;
+    return Math.round(miPerKwh * MPG_E_CONVERSION * 10) / 10;
+}
+
 // ── Rounding ──────────────────────────────────────────────────────────────────
 
 /** Round to a given number of decimal places. Returns null for null/NaN input. */

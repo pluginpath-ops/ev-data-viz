@@ -10,6 +10,7 @@ import EditVehicleForm from './EditVehicleForm';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 import { RunVoteButtons } from './VoteButtons';
+import EpaVehicleSection from './EpaVehicleSection';
 import { estimateChargingTimes } from '../utils/estimateChargingTimes';
 
 // ── Data-type flag definitions ────────────────────────────────────────────────
@@ -277,7 +278,7 @@ const EstimateTimePanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, clearDefaultRun } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, clearDefaultRun, searchEpaTestGroups, linkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
@@ -2368,6 +2369,19 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                     </div>
                 </div>
             )}
+
+            {/* ── EPA Testing Data ──────────────────────────────────────────── */}
+            <EpaVehicleSection
+                vehicle={vehicle}
+                canEdit={isContributor && canEdit(vehicle)}
+                searchEpaTestGroups={searchEpaTestGroups}
+                onLink={linkEpaTestGroup}
+                onUnlink={unlinkEpaTestGroup}
+                onUpdateConfidence={updateEpaMapping}
+                onUpdateDisplayName={(testGroupId, name) =>
+                    updateEpaTestGroup(testGroupId, { display_name: name || null })
+                }
+            />
         </div>
     );
 }

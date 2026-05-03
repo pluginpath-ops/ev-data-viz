@@ -594,15 +594,13 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     </button>
                 </div>
             </div>
-            {/* ── Axis scale controls card ── */}
-            <div className="card mb-4">
-                <AxisScaleControls
-                    xMin={xMin} xMax={xMax}
-                    yMin={yMin} yMax={yMax}
-                    onChange={handleScaleChange}
-                    showX={CHART_TYPES.find(t => t.key === chartType)?.kind === 'line'}
-                />
-            </div>
+            {/* ── Axis scale controls (card provided by AxisScaleControls) ── */}
+            <AxisScaleControls
+                xMin={xMin} xMax={xMax}
+                yMin={yMin} yMax={yMax}
+                onChange={handleScaleChange}
+                showX={CHART_TYPES.find(t => t.key === chartType)?.kind === 'line'}
+            />
         </div>
     );
 }
