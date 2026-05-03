@@ -298,7 +298,9 @@ export default function EpaCurvesView({
         const legendColor = isDark ? 'rgb(241,245,249)'         : 'rgb(55,65,81)';
 
         const refPlugin      = makeReferencePlugin(HIGHWAY_BAND_MPH, units, isDark);
-        const calloutPlugin  = makeCalloutPlugin([70, 80], yAxis, units, isDark);
+        // Speed callouts disabled — labels overlap with multiple curves.
+        // Re-enable by restoring [70, 80] (or any mph values) here.
+        const calloutPlugin  = makeCalloutPlugin([], yAxis, units, isDark);
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
@@ -472,9 +474,6 @@ export default function EpaCurvesView({
                         <div className="mt-3 flex flex-wrap gap-4 text-xs" style={{ color: 'var(--color-text-muted)' }}>
                             <span>
                                 <span className="font-medium">Shaded band</span> — 65–75 mph typical highway
-                            </span>
-                            <span>
-                                <span className="font-medium">● Dots</span> — range at 70 &amp; 80 mph
                             </span>
                         </div>
                     )}
