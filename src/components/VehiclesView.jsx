@@ -7,11 +7,12 @@ import EditVehicleForm from './EditVehicleForm';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 
-// ── Test-count pills ──────────────────────────────────────────────────────────
+// ── Test-count row ────────────────────────────────────────────────────────────
 
 /**
- * Renders coloured pills showing how many charging runs, range runs, and EPA
- * test groups a vehicle has. Omits any category whose count is zero.
+ * Renders a "Tests: Charging (n) Range (n) EPA (n)" line that matches the
+ * styling of Battery/Range rows. "Tests:" inherits the parent's text-sm color;
+ * the type names are 1pt smaller and colored. Zero-count categories omitted.
  */
 function TestCountPills({ vehicle }) {
     const chargingCount = vehicle.runs?.filter(r => r.has_charging).length ?? 0;
@@ -21,12 +22,12 @@ function TestCountPills({ vehicle }) {
     if (!chargingCount && !rangeCount && !epaCount) return null;
 
     return (
-        <div className="flex flex-wrap items-center gap-1 mt-2">
-            <span className="text-xs text-gray-500 dark:text-slate-400 mr-0.5">Tests:</span>
-            {chargingCount > 0 && <span className="pill-test-charging">Charging ({chargingCount})</span>}
-            {rangeCount    > 0 && <span className="pill-test-range">Range ({rangeCount})</span>}
-            {epaCount      > 0 && <span className="pill-test-epa">EPA ({epaCount})</span>}
-        </div>
+        <p className="flex flex-wrap items-baseline gap-x-1.5">
+            <span>Tests:</span>
+            {chargingCount > 0 && <span className="text-[13px] font-medium text-green-600 dark:text-green-400">Charging ({chargingCount})</span>}
+            {rangeCount    > 0 && <span className="text-[13px] font-medium text-amber-600 dark:text-amber-400">Range ({rangeCount})</span>}
+            {epaCount      > 0 && <span className="text-[13px] font-medium text-blue-600 dark:text-blue-400">EPA ({epaCount})</span>}
+        </p>
     );
 }
 
@@ -785,8 +786,8 @@ export default function VehiclesView({
                                                 <div className="text-sm text-gray-700 dark:text-slate-200 space-y-1">
                                                     {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                                     {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
+                                                    <TestCountPills vehicle={vehicle} />
                                                 </div>
-                                                <TestCountPills vehicle={vehicle} />
                                                 {vehicle.tags?.length > 0 && (
                                                     <div className="mt-2">
                                                         <TagPills vehicle={vehicle} />
