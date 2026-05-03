@@ -450,14 +450,6 @@ export default function EpaCurvesView({
                         </div>
                     </div>
 
-                    {/* Axis scale controls */}
-                    <AxisScaleControls
-                        xMin={xMin} xMax={xMax} yMin={yMin} yMax={yMax}
-                        xAxisLabel={`Speed (${speedLabel(units)})`}
-                        yAxisLabel={yAxisLabel(yAxis, units)}
-                        onChange={(key, value) => setEpaConfig(p => ({ ...p, [key]: value }))}
-                    />
-
                     {/* Collapsible EPA test selector */}
                     {vehiclesWithEpa.length > 0 && (
                         <div className="mt-4">
@@ -632,6 +624,16 @@ export default function EpaCurvesView({
                         Link an EPA test group via Edit Vehicle to enable this chart.
                     </p>
                 </div>
+            )}
+
+            {/* ── Axis scale controls (below chart, per convention) ──────────── */}
+            {!presentationMode && datasets.length > 0 && (
+                <AxisScaleControls
+                    xMin={xMin} xMax={xMax} yMin={yMin} yMax={yMax}
+                    xAxisLabel={`Speed (${speedLabel(units)})`}
+                    yAxisLabel={yAxisLabel(yAxis, units)}
+                    onChange={(key, value) => setEpaConfig(p => ({ ...p, [key]: value }))}
+                />
             )}
         </div>
     );
