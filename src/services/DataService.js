@@ -104,7 +104,7 @@ class DataService {
     }
     const { data } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs, hwfet_unadj_kwh_100mi, hwfet_adj_kwh_100mi, udds_unadj_kwh_100mi, us06_adj_kwh_100mi, sc03_adj_kwh_100mi, cold_ftp_adj_kwh_100mi, range_city_mi, range_hwy_mi, range_combined_mi, useable_kwh, label_combined_mpge, label_combined_mi, label_hwy_mpge, label_city_mpge, label_hwy_mi, label_city_mi, label_method))`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs, hwfet_unadj_kwh_100mi, hwfet_adj_kwh_100mi, udds_unadj_kwh_100mi, us06_adj_kwh_100mi, sc03_adj_kwh_100mi, cold_ftp_adj_kwh_100mi, range_city_mi, range_hwy_mi, range_combined_mi, useable_kwh, label_combined_mpge, label_combined_mi, label_hwy_mpge, label_city_mpge, label_hwy_mi, label_city_mi, label_method, display_name))`)
       .order('created_at', { ascending: false });
 
     // Pass 1: process each vehicle's own data
@@ -1136,7 +1136,7 @@ class DataService {
         equiv_test_weight_lbs,
         target_a, target_b, target_c,
         set_a, set_b, set_c,
-        label_combined_mpge, label_method,
+        label_combined_mpge, label_method, display_name,
         source_file, ingested_at,
         epa_vehicle_mappings(
           id, confidence,
@@ -1149,14 +1149,22 @@ class DataService {
     return data || [];
   }
 
-  /** Update the label_method field on a single EPA test group. */
-  async updateEpaLabelMethod(testGroupId, method) {
+  /**
+   * Update one or more fields on an EPA test group.
+   * Accepts any subset of: { label_method, display_name }.
+   */
+  async updateEpaTestGroup(testGroupId, updates) {
     if (!this.useSupabase) return;
     const { error } = await getSupabase()
       .from('epa_test_groups')
-      .update({ label_method: method || null })
+      .update(updates)
       .eq('test_group_id', testGroupId);
     if (error) throw error;
+  }
+
+  /** Convenience alias kept for back-compat. */
+  async updateEpaLabelMethod(testGroupId, method) {
+    return this.updateEpaTestGroup(testGroupId, { label_method: method || null });
   }
 
   /**

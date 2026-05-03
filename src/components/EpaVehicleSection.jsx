@@ -60,7 +60,12 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence }) {
             {/* Card header */}
             <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="min-w-0">
-                    <div className="font-semibold text-sm truncate">{g.epa_carline_name}</div>
+                    <div className="font-semibold text-sm truncate">
+                        {g.display_name || g.epa_carline_name}
+                    </div>
+                    {g.display_name && (
+                        <div className="text-xs text-gray-400 dark:text-slate-500 italic truncate mt-0.5">{g.epa_carline_name}</div>
+                    )}
                     <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
                         {g.model_year}{g.make ? ` · ${g.make}` : ''}{g.drive ? ` · ${g.drive}` : ''}
                         {g.transmission ? ` · ${g.transmission}` : ''}

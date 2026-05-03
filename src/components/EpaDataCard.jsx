@@ -8,7 +8,7 @@
  * Delete removes the vehicle mapping(s) first (no CASCADE on the FK) then the
  * test group row, and shows a confirmation that names any linked vehicles.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const CONFIDENCE_COLORS = {
     verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
@@ -24,15 +24,25 @@ const LABEL_METHOD_OPTIONS = [
     { value: 'mpg-based',         label: 'MPG-based'         },
 ];
 
-export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup, updateEpaLabelMethod }) {
+export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup, updateEpaLabelMethod, updateEpaTestGroup }) {
     const [groups,          setGroups]          = useState([]);
     const [loading,         setLoading]         = useState(true);
     const [query,           setQuery]           = useState('');
     const [deleting,        setDeleting]        = useState(new Set()); // set of test_group_ids in-flight
     const [updatingMethod,  setUpdatingMethod]  = useState(new Set()); // set of test_group_ids updating label_method
+    // display_name: local draft edits keyed by test_group_id (string); saved on blur/Enter
+    const [draftNames,      setDraftNames]      = useState({});
+    const [savingName,      setSavingName]      = useState(new Set());
     const [error,           setError]           = useState(null);
 
     useEffect(() => { load(); }, []);
+
+    // Seed draft names whenever groups load / reload
+    useEffect(() => {
+        const seed = {};
+        groups.forEach(g => { seed[g.test_group_id] = g.display_name ?? ''; });
+        setDraftNames(seed);
+    }, [groups]);
 
     async function load() {
         setLoading(true);
@@ -62,6 +72,27 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
             setError('Delete failed: ' + e.message);
         } finally {
             setDeleting(prev => { const s = new Set(prev); s.delete(group.test_group_id); return s; });
+        }
+    }
+
+    async function handleDisplayNameSave(group) {
+        const draft = (draftNames[group.test_group_id] ?? '').trim();
+        const current = group.display_name ?? '';
+        if (draft === current) return; // no change
+        setSavingName(prev => new Set(prev).add(group.test_group_id));
+        try {
+            await updateEpaTestGroup?.(group.test_group_id, { display_name: draft || null });
+            setGroups(prev => prev.map(g =>
+                g.test_group_id === group.test_group_id
+                    ? { ...g, display_name: draft || null }
+                    : g
+            ));
+        } catch (e) {
+            setError('Save failed: ' + e.message);
+            // Revert draft
+            setDraftNames(prev => ({ ...prev, [group.test_group_id]: current }));
+        } finally {
+            setSavingName(prev => { const s = new Set(prev); s.delete(group.test_group_id); return s; });
         }
     }
 
@@ -147,6 +178,7 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                     <table className="w-full text-xs">
                         <thead>
                             <tr className="border-b bg-gray-50 dark:bg-slate-800/50 text-left">
+                                <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Display Name</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Vehicle Config ID</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Year · Make · Carline</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Drive / ETW</th>
@@ -166,6 +198,27 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                         key={g.test_group_id}
                                         className={`transition hover:bg-gray-50/50 dark:hover:bg-slate-800/30 ${isDel ? 'opacity-40 pointer-events-none' : ''}`}
                                     >
+                                        {/* Display name — inline editable, save on blur or Enter */}
+                                        <td className="px-3 py-2 min-w-[160px]">
+                                            <input
+                                                type="text"
+                                                value={draftNames[g.test_group_id] ?? g.display_name ?? ''}
+                                                placeholder={g.epa_carline_name}
+                                                disabled={isDel || savingName.has(g.test_group_id)}
+                                                onChange={e => setDraftNames(prev => ({ ...prev, [g.test_group_id]: e.target.value }))}
+                                                onBlur={() => handleDisplayNameSave(g)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter') { e.target.blur(); }
+                                                    if (e.key === 'Escape') {
+                                                        setDraftNames(prev => ({ ...prev, [g.test_group_id]: g.display_name ?? '' }));
+                                                        e.target.blur();
+                                                    }
+                                                }}
+                                                className="form-input text-xs py-0.5 w-full disabled:opacity-50 placeholder:text-gray-300 dark:placeholder:text-slate-600 placeholder:italic"
+                                                title="Friendly name used in charts. Leave blank to use the EPA carline name."
+                                            />
+                                        </td>
+
                                         {/* Vehicle config ID + family ID */}
                                         <td className="px-3 py-2 font-mono">
                                             <div className="text-gray-700 dark:text-slate-300">{g.test_group_id}</div>

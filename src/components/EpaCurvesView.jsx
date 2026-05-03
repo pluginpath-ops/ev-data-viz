@@ -273,8 +273,10 @@ export default function EpaCurvesView({
                 const baseColor = vehicle.color || PALETTE[vi % PALETTE.length];
                 // Use a slightly lighter alpha for additional mappings on the same vehicle
                 const color = mi === 0 ? baseColor : baseColor + 'bb';
+                // Prefer display_name (friendly) over raw EPA carline name for labels
+                const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name;
                 const label = vehiclesWithEpa.length > 1 || mi > 0
-                    ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaGroup.epa_carline_name})` : ''}`
+                    ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
                     : vehicleLabel(vehicle);
 
                 result.push({
@@ -386,14 +388,18 @@ export default function EpaCurvesView({
                                 const ds = items[0]?.dataset;
                                 const eg = ds?._epaGroup;
                                 if (!eg) return [];
-                                return [
-                                    '',
-                                    `EPA carline: ${eg.epa_carline_name} (${eg.model_year})`,
-                                    `Test group:  ${eg.test_group_id}`,
+                                const lines = [''];
+                                if (eg.display_name) {
+                                    lines.push(`Display name: ${eg.display_name}`);
+                                }
+                                lines.push(
+                                    `EPA carline:  ${eg.epa_carline_name} (${eg.model_year})`,
+                                    `Test group:   ${eg.test_group_id}`,
                                     ds._useableKwh
-                                        ? `Useable kWh: ${Number(ds._useableKwh).toFixed(1)}`
-                                        : 'Useable kWh: N/A',
-                                ];
+                                        ? `Useable kWh:  ${Number(ds._useableKwh).toFixed(1)}`
+                                        : 'Useable kWh:  N/A',
+                                );
+                                return lines;
                             },
                         },
                         mode: 'index',
@@ -565,7 +571,13 @@ export default function EpaCurvesView({
                                     style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
                                 >
                                     <span className="font-medium">{vehicleLabel(vehicle)}</span>
-                                    <span style={{ color: 'var(--color-text-muted)' }}>{epaGroup.epa_carline_name} · {epaGroup.model_year} · {epaGroup.test_group_id}</span>
+                                    <span style={{ color: 'var(--color-text-muted)' }}>
+                                        {epaGroup.display_name
+                                            ? <><span className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>{epaGroup.display_name}</span> · <span className="italic">{epaGroup.epa_carline_name}</span></>
+                                            : epaGroup.epa_carline_name
+                                        }
+                                        {' '}· {epaGroup.model_year} · {epaGroup.test_group_id}
+                                    </span>
                                     <ConfidenceBadge confidence={confidence} />
                                     {epaGroup.label_combined_mpge && epaGroup.label_combined_mpge < 500 && (
                                         <span style={{ color: 'var(--color-text-secondary)' }}>

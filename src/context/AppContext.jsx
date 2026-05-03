@@ -771,7 +771,15 @@ export function AppProvider({ children }) {
     /** Pass-through: fetch all test groups with linked vehicles for admin panel. */
     const getEpaTestGroupsAdmin = () => dataService.getEpaTestGroupsAdmin();
 
-    /** Update the label_method field on an EPA test group (admin only). */
+    /**
+     * Update editable fields on an EPA test group (admin only).
+     * Accepts any subset of: { label_method, display_name }.
+     */
+    const updateEpaTestGroup = async (testGroupId, updates) => {
+        await dataService.updateEpaTestGroup(testGroupId, updates);
+    };
+
+    /** Convenience alias: update only label_method. */
     const updateEpaLabelMethod = async (testGroupId, method) => {
         await dataService.updateEpaLabelMethod(testGroupId, method);
     };
@@ -912,6 +920,7 @@ export function AppProvider({ children }) {
         getEpaTestGroupsAdmin,
         deleteEpaTestGroup,
         updateEpaLabelMethod,
+        updateEpaTestGroup,
     };
 
     return (
