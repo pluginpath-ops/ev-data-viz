@@ -8,7 +8,7 @@ import { PALETTE } from '../utils/specHelpers';
 import {
     buildEpaCurve, resolveUseableKwh, resolveUseableKwhSource,
     resolveCoeffs, calibrateEfficiency,
-    HWFET_AVG_MPH, US06_AVG_MPH, HIGHWAY_BAND_MPH,
+    HWFET_AVG_MPH, HIGHWAY_BAND_MPH,
 } from '../utils/epaPhysics';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
@@ -21,7 +21,7 @@ import { EPA_EXPLAINERS } from '../utils/epaExplainers';
  * renders its datasets. Follows the same afterDraw pattern as barGroupPlugin
  * and makeBarPlugin in other chart views.
  */
-function makeReferencePlugin(hwfetMph, us06Mph, bandMph, units, isDark) {
+function makeReferencePlugin(bandMph, units, isDark) {
     return {
         id: 'epaReferenceLines',
         afterDraw(chart) {
@@ -29,10 +29,8 @@ function makeReferencePlugin(hwfetMph, us06Mph, bandMph, units, isDark) {
             if (!area || !scales.x) return;
 
             const x = v => scales.x.getPixelForValue(convSpeed(v, units));
-            const textColor  = isDark ? 'rgba(226,232,240,0.6)' : 'rgba(107,114,128,0.8)';
-            const bandColor  = isDark ? 'rgba(59,130,246,0.07)' : 'rgba(59,130,246,0.06)';
-            const lineHwfet  = isDark ? 'rgba(99,102,241,0.45)'  : 'rgba(99,102,241,0.55)';
-            const lineUs06   = isDark ? 'rgba(168,85,247,0.40)'  : 'rgba(168,85,247,0.50)';
+            const textColor = isDark ? 'rgba(226,232,240,0.6)' : 'rgba(107,114,128,0.8)';
+            const bandColor = isDark ? 'rgba(59,130,246,0.07)' : 'rgba(59,130,246,0.06)';
 
             ctx.save();
 
@@ -42,38 +40,11 @@ function makeReferencePlugin(hwfetMph, us06Mph, bandMph, units, isDark) {
             ctx.fillStyle = bandColor;
             ctx.fillRect(xBand0, area.top, xBand1 - xBand0, area.bottom - area.top);
 
-            // Helper: draw one dashed vertical line with a rotated label at the top
-            const drawLine = (mph, color, label) => {
-                const px = x(mph);
-                if (px < area.left || px > area.right) return;
-                ctx.beginPath();
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 1;
-                ctx.setLineDash([4, 4]);
-                ctx.moveTo(px, area.top);
-                ctx.lineTo(px, area.bottom);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                // Rotated label
-                ctx.save();
-                ctx.translate(px - 3, area.top + 4);
-                ctx.rotate(-Math.PI / 2);
-                ctx.font = '10px system-ui, sans-serif';
-                ctx.fillStyle = textColor;
-                ctx.textAlign = 'left';
-                ctx.fillText(label, 0, 0);
-                ctx.restore();
-            };
-
-            drawLine(hwfetMph, lineHwfet, `HWFET avg (${convSpeed(hwfetMph, units)} ${speedLabel(units)})`);
-            drawLine(us06Mph,  lineUs06,  `US06 avg (${convSpeed(us06Mph, units)} ${speedLabel(units)})`);
-
             // Band label
             ctx.font = '9px system-ui, sans-serif';
             ctx.fillStyle = textColor;
             ctx.textAlign = 'center';
-            const bandMid = (xBand0 + xBand1) / 2;
-            ctx.fillText('Hwy', bandMid, area.top + 10);
+            ctx.fillText('Hwy', (xBand0 + xBand1) / 2, area.top + 10);
 
             ctx.restore();
         },
@@ -326,9 +297,7 @@ export default function EpaCurvesView({
         const gridColor   = isDark ? 'rgba(100,116,139,0.35)'   : 'rgba(229,231,235,0.8)';
         const legendColor = isDark ? 'rgb(241,245,249)'         : 'rgb(55,65,81)';
 
-        const refPlugin      = makeReferencePlugin(
-            HWFET_AVG_MPH, US06_AVG_MPH, HIGHWAY_BAND_MPH, units, isDark
-        );
+        const refPlugin      = makeReferencePlugin(HIGHWAY_BAND_MPH, units, isDark);
         const calloutPlugin  = makeCalloutPlugin([70, 80], yAxis, units, isDark);
 
         chartRef.current = new Chart(canvasRef.current, {
@@ -365,49 +334,39 @@ export default function EpaCurvesView({
                     tooltip: {
                         callbacks: {
                             title(items) {
-                                const item = items[0];
-                                const spd = item.parsed.x;
-                                return `${spd.toFixed(1)} ${speedLabel(units)}`;
+                                const spd = items[0]?.parsed.x;
+                                return `${spd?.toFixed(1)} ${speedLabel(units)}`;
                             },
                             label(item) {
                                 const ds = item.dataset;
-                                const curve   = ds._curve;
+                                const curve = ds._curve;
                                 const speedMph = units === 'metric'
                                     ? item.parsed.x / 1.60934
                                     : item.parsed.x;
-                                // Find nearest curve point
-                                const pt = curve.reduce((best, p) =>
+                                const pt = curve?.reduce((best, p) =>
                                     Math.abs(p.mph - speedMph) < Math.abs(best.mph - speedMph) ? p : best
                                 , curve[0]);
                                 if (!pt) return ds.label;
-                                const lines = [
-                                    `${ds.label}`,
-                                    `  kWh/100mi:  ${pt.kwh100mi?.toFixed(1)}`,
-                                    `  mi/kWh:     ${pt.miPerKwh?.toFixed(2)}`,
-                                    `  MPGe:       ${pt.mpge?.toFixed(1)}`,
-                                ];
-                                if (pt.rangeMi != null) {
-                                    lines.push(`  Range:      ${units === 'metric' ? (pt.rangeMi * 1.60934).toFixed(0) : pt.rangeMi.toFixed(0)} ${distanceLabel(units)}`);
+
+                                // Format the value for whichever Y axis is active
+                                let valStr = '';
+                                if (yAxis === 'kwh100mi') {
+                                    valStr = pt.kwh100mi != null
+                                        ? `${(units === 'metric' ? pt.kwh100mi / 1.60934 : pt.kwh100mi).toFixed(1)} ${units === 'metric' ? 'kWh/100km' : 'kWh/100mi'}`
+                                        : '—';
+                                } else if (yAxis === 'mi_kwh') {
+                                    valStr = pt.miPerKwh != null
+                                        ? `${(units === 'metric' ? pt.miPerKwh * 1.60934 : pt.miPerKwh).toFixed(2)} ${units === 'metric' ? 'km/kWh' : 'mi/kWh'}`
+                                        : '—';
+                                } else if (yAxis === 'mpge') {
+                                    valStr = pt.mpge != null ? `${pt.mpge.toFixed(1)} MPGe` : '—';
+                                } else if (yAxis === 'range_mi') {
+                                    valStr = pt.rangeMi != null
+                                        ? `${(units === 'metric' ? pt.rangeMi * 1.60934 : pt.rangeMi).toFixed(0)} ${distanceLabel(units)}`
+                                        : '—';
                                 }
-                                lines.push(`  Confidence: ${ds._confidence}`);
-                                return lines;
-                            },
-                            afterBody(items) {
-                                const ds = items[0]?.dataset;
-                                const eg = ds?._epaGroup;
-                                if (!eg) return [];
-                                const lines = [''];
-                                if (eg.display_name) {
-                                    lines.push(`Display name: ${eg.display_name}`);
-                                }
-                                lines.push(
-                                    `EPA carline:  ${eg.epa_carline_name} (${eg.model_year})`,
-                                    `Test group:   ${eg.test_group_id}`,
-                                    ds._useableKwh
-                                        ? `Useable kWh:  ${Number(ds._useableKwh).toFixed(1)} (${ds._useableKwhSource === 'EPA' ? 'EPA' : ds._useableKwhSource === 'spec' ? 'from specs' : 'gross'})`
-                                        : 'Useable kWh:  N/A',
-                                );
-                                return lines;
+
+                                return `${ds.label}: ${valStr}`;
                             },
                         },
                         mode: 'index',
@@ -515,14 +474,6 @@ export default function EpaCurvesView({
                                 <span className="font-medium">Shaded band</span> — 65–75 mph typical highway
                             </span>
                             <span>
-                                <span className="font-medium" style={{ color: 'rgb(99,102,241)' }}>Purple dashes</span> — HWFET avg (48.3 mph) · basis for EPA highway label
-                                <InfoIcon text={EPA_EXPLAINERS.hwfetCycle} />
-                            </span>
-                            <span>
-                                <span className="font-medium" style={{ color: 'rgb(168,85,247)' }}>Violet dashes</span> — US06 avg (48.4 mph) · aggressive cycle with transients to 80+ mph
-                                <InfoIcon text={EPA_EXPLAINERS.us06Cycle} />
-                            </span>
-                            <span>
                                 <span className="font-medium">● Dots</span> — range at 70 &amp; 80 mph
                             </span>
                         </div>
@@ -596,8 +547,8 @@ export default function EpaCurvesView({
                                     <ConfidenceBadge confidence={confidence} />
                                     {epaGroup.label_combined_mpge && epaGroup.label_combined_mpge < 500 && (
                                         <span style={{ color: 'var(--color-text-secondary)' }}>
-                                            Label: {epaGroup.label_combined_mpge} MPGe combined
-                                            {epaGroup.label_method && <InfoIcon text={EPA_EXPLAINERS.labelMethod} />}
+                                            EPA rated: {epaGroup.label_combined_mpge} MPGe
+                                            {epaGroup.label_method && <> · {epaGroup.label_method}<InfoIcon text={EPA_EXPLAINERS.labelMethod} /></>}
                                         </span>
                                     )}
                                     {eta != null && (
