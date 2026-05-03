@@ -6,7 +6,8 @@ import { convSpeed, speedLabel, distanceLabel } from '../utils/unitConversions';
 import { vehicleColor, vehicleLabel } from '../utils/specHelpers';
 import { PALETTE } from '../utils/specHelpers';
 import {
-    buildEpaCurve, resolveUseableKwh, resolveCoeffs, calibrateEfficiency,
+    buildEpaCurve, resolveUseableKwh, resolveUseableKwhSource,
+    resolveCoeffs, calibrateEfficiency,
     HWFET_AVG_MPH, US06_AVG_MPH, HIGHWAY_BAND_MPH,
 } from '../utils/epaPhysics';
 import AxisScaleControls from './AxisScaleControls';
@@ -266,8 +267,9 @@ export default function EpaCurvesView({
             vehicle.epa_mappings.forEach((mapping, mi) => {
                 const { epaGroup, confidence } = mapping;
                 if (!epaGroup) return;
-                const useableKwh = resolveUseableKwh(epaGroup, vehicle);
-                const curve      = buildEpaCurve(epaGroup, useableKwh);
+                const useableKwh       = resolveUseableKwh(epaGroup, vehicle);
+                const useableKwhSource = resolveUseableKwhSource(epaGroup, vehicle);
+                const curve            = buildEpaCurve(epaGroup, useableKwh);
                 if (!curve.length) return;
 
                 const baseColor = vehicle.color || PALETTE[vi % PALETTE.length];
@@ -293,12 +295,13 @@ export default function EpaCurvesView({
                     pointHoverRadius: 4,
                     tension: 0.3,
                     // Store metadata for tooltip
-                    _vehicleId:   vehicle.id,
-                    _mappingId:   mapping.id,
-                    _confidence:  confidence,
-                    _epaGroup:    epaGroup,
-                    _useableKwh:  useableKwh,
-                    _curve:       curve,            // full curve for tooltip lookup
+                    _vehicleId:        vehicle.id,
+                    _mappingId:        mapping.id,
+                    _confidence:       confidence,
+                    _epaGroup:         epaGroup,
+                    _useableKwh:       useableKwh,
+                    _useableKwhSource: useableKwhSource,
+                    _curve:            curve,       // full curve for tooltip lookup
                 });
             });
         });
@@ -396,7 +399,7 @@ export default function EpaCurvesView({
                                     `EPA carline:  ${eg.epa_carline_name} (${eg.model_year})`,
                                     `Test group:   ${eg.test_group_id}`,
                                     ds._useableKwh
-                                        ? `Useable kWh:  ${Number(ds._useableKwh).toFixed(1)}`
+                                        ? `Useable kWh:  ${Number(ds._useableKwh).toFixed(1)} (${ds._useableKwhSource === 'EPA' ? 'EPA' : ds._useableKwhSource === 'spec' ? 'from specs' : 'gross'})`
                                         : 'Useable kWh:  N/A',
                                 );
                                 return lines;
@@ -563,7 +566,8 @@ export default function EpaCurvesView({
                             const hwfetSource = epaGroup.hwfet_unadj_kwh_100mi != null ? 'unadj'
                                               : epaGroup.hwfet_adj_kwh_100mi    != null ? 'adj'
                                               : null;
-                            const useableKwh = resolveUseableKwh(epaGroup, vehicle);
+                            const useableKwh       = resolveUseableKwh(epaGroup, vehicle);
+                            const useableKwhSource = resolveUseableKwhSource(epaGroup, vehicle);
                             return (
                                 <div
                                     key={mapping.id}
@@ -601,7 +605,10 @@ export default function EpaCurvesView({
                                     )}
                                     {useableKwh && (
                                         <span style={{ color: 'var(--color-text-muted)' }}>
-                                            Useable: {Number(useableKwh).toFixed(1)} kWh
+                                            {Number(useableKwh).toFixed(1)} kWh
+                                            {useableKwhSource === 'EPA'   && ' (EPA useable)'}
+                                            {useableKwhSource === 'spec'  && ' (useable, from specs)'}
+                                            {useableKwhSource === 'gross' && ' (gross — useable not set)'}
                                         </span>
                                     )}
                                 </div>

@@ -194,12 +194,12 @@ export function buildEpaCurve(epaGroup, useableKwh) {
 // ── Useable kWh resolution ────────────────────────────────────────────────────
 
 /**
- * Resolve the best available useable battery capacity estimate (kWh).
+ * Resolve the best available useable battery capacity (kWh).
  *
  * Priority:
- *   1. epa_test_groups.useable_kwh  — EPA's own reported value (often absent)
+ *   1. epa_test_groups.useable_kwh          — EPA's own reported value (often absent)
  *   2. vehicle.specs.charging.battery_usable_kwh — contributor-entered spec
- *   3. vehicle.battery × 0.93  — gross battery × typical usable fraction (estimate)
+ *   3. vehicle.battery                       — gross capacity as-is
  *
  * Returns null when none of the above yield a positive number.
  *
@@ -211,6 +211,20 @@ export function resolveUseableKwh(epaGroup, vehicle) {
     if (epaGroup?.useable_kwh > 0) return epaGroup.useable_kwh;
     const specUsable = vehicle?.specs?.charging?.battery_usable_kwh;
     if (specUsable > 0) return specUsable;
-    if (vehicle?.battery > 0) return vehicle.battery * 0.93;
+    if (vehicle?.battery > 0) return vehicle.battery;
+    return null;
+}
+
+/**
+ * Return a short label describing which source resolveUseableKwh() used.
+ * Matches the priority order exactly.
+ *
+ * @returns {'EPA'|'spec'|'gross'|null}
+ */
+export function resolveUseableKwhSource(epaGroup, vehicle) {
+    if (epaGroup?.useable_kwh > 0) return 'EPA';
+    const specUsable = vehicle?.specs?.charging?.battery_usable_kwh;
+    if (specUsable > 0) return 'spec';
+    if (vehicle?.battery > 0) return 'gross';
     return null;
 }
