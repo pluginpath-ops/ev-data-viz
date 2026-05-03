@@ -231,7 +231,7 @@ export default function SpecsView({ selectedVehicleIds }) {
             ) : (
                 <div className="specs-table-container" ref={tableContainerRef}>
                     <table className="w-full">
-                        <thead className="bg-gray-50 dark:bg-blue-950 dark:text-slate-100">
+                        <thead>
                             <tr>
                                 <th className="px-6 py-3 text-left font-semibold">Specification</th>
                                 {resolvedVehicles.map(rv => (
