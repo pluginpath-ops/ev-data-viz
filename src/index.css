@@ -491,6 +491,38 @@ body {
     @apply text-xs px-1.5 py-0.5 rounded-full border;
 }
 
+/* ── Test-count pills (vehicle cards) ──────────────────────────────────────── */
+
+/* Charging: green */
+.pill-test-charging {
+    @apply px-2 py-0.5 rounded-full text-xs font-medium border bg-green-100 text-green-700 border-green-200;
+}
+[data-theme="dark"] .pill-test-charging {
+    background-color: rgba(34, 197, 94, 0.15);
+    color: rgb(134, 239, 172);
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+/* Range: amber/yellow */
+.pill-test-range {
+    @apply px-2 py-0.5 rounded-full text-xs font-medium border bg-yellow-100 text-yellow-700 border-yellow-200;
+}
+[data-theme="dark"] .pill-test-range {
+    background-color: rgba(234, 179, 8, 0.15);
+    color: rgb(253, 224, 71);
+    border-color: rgba(234, 179, 8, 0.3);
+}
+
+/* EPA curves: blue */
+.pill-test-epa {
+    @apply px-2 py-0.5 rounded-full text-xs font-medium border bg-blue-100 text-blue-700 border-blue-200;
+}
+[data-theme="dark"] .pill-test-epa {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: rgb(147, 197, 253);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
 
 /* ── Navigation (App.jsx) ───────────────────────────────────────────────────── */
 

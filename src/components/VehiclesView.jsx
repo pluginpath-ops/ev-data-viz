@@ -7,6 +7,29 @@ import EditVehicleForm from './EditVehicleForm';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 
+// ── Test-count pills ──────────────────────────────────────────────────────────
+
+/**
+ * Renders coloured pills showing how many charging runs, range runs, and EPA
+ * test groups a vehicle has. Omits any category whose count is zero.
+ */
+function TestCountPills({ vehicle }) {
+    const chargingCount = vehicle.runs?.filter(r => r.has_charging).length ?? 0;
+    const rangeCount    = vehicle.runs?.filter(r => r.has_range).length    ?? 0;
+    const epaCount      = vehicle.epa_mappings?.length                     ?? 0;
+
+    if (!chargingCount && !rangeCount && !epaCount) return null;
+
+    return (
+        <div className="flex flex-wrap items-center gap-1 mt-2">
+            <span className="text-xs text-gray-500 dark:text-slate-400 mr-0.5">Tests:</span>
+            {chargingCount > 0 && <span className="pill-test-charging">Charging ({chargingCount})</span>}
+            {rangeCount    > 0 && <span className="pill-test-range">Range ({rangeCount})</span>}
+            {epaCount      > 0 && <span className="pill-test-epa">EPA ({epaCount})</span>}
+        </div>
+    );
+}
+
 // Icons for view toggle
 const CardViewIcon = () => (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -763,7 +786,7 @@ export default function VehiclesView({
                                                     {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                                     {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
                                                 </div>
-                                                <p className="text-sm font-semibold mt-2">Tests: {vehicle.runs?.length || 0}</p>
+                                                <TestCountPills vehicle={vehicle} />
                                                 {vehicle.tags?.length > 0 && (
                                                     <div className="mt-2">
                                                         <TagPills vehicle={vehicle} />
@@ -873,7 +896,7 @@ export default function VehiclesView({
                                         {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                         {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
                                         {vehicle.power && <p>Power: {vehicle.power} kW</p>}
-                                        <p className="font-medium">Tests: {vehicle.runs?.length || 0}</p>
+                                        <TestCountPills vehicle={vehicle} />
                                     </div>
 
                                     {/* View Tests & Data — dedicated column */}
