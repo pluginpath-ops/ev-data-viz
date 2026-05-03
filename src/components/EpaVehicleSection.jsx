@@ -36,14 +36,15 @@ function DataRow({ label, value, muted }) {
 }
 
 /** Card displaying the data for one EPA test group mapping. */
-function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence }) {
-    const [unlinking, setUnlinking] = useState(false);
+function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence, onUpdateDisplayName }) {
+    const [unlinking,    setUnlinking]    = useState(false);
     const [updatingConf, setUpdatingConf] = useState(false);
+    const [draftName,    setDraftName]    = useState(null); // null = not editing
+    const [savingName,   setSavingName]   = useState(false);
     const g = mapping.epaGroup;
     if (!g) return null;
 
     const fmt = (n, dp = 4) => n != null ? n.toFixed(dp) : null;
-    const mpge = (kwh) => kwh != null ? (33705 / kwh).toFixed(1) : null; // kWh/100mi → MPGe
 
     const handleUnlink = async () => {
         setUnlinking(true);
@@ -55,15 +56,56 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence }) {
         try { await onUpdateConfidence(mapping.id, e.target.value); } finally { setUpdatingConf(false); }
     };
 
+    const handleNameFocus = () => {
+        if (!canEdit) return;
+        setDraftName(g.display_name ?? '');
+    };
+
+    const handleNameSave = async () => {
+        if (draftName === null) return;
+        const trimmed = draftName.trim();
+        const current = g.display_name ?? '';
+        setDraftName(null);
+        if (trimmed === current) return;
+        setSavingName(true);
+        try {
+            await onUpdateDisplayName?.(g.test_group_id, trimmed || null);
+        } finally {
+            setSavingName(false);
+        }
+    };
+
+    const handleNameKeyDown = (e) => {
+        if (e.key === 'Enter')  { e.target.blur(); }
+        if (e.key === 'Escape') { setDraftName(null); }
+    };
+
     return (
         <div className="card p-4 mb-3">
             {/* Card header */}
             <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="min-w-0">
-                    <div className="font-semibold text-sm truncate">
-                        {g.display_name || g.epa_carline_name}
-                    </div>
-                    {g.display_name && (
+                <div className="min-w-0 flex-1">
+                    {/* Display name — editable when canEdit */}
+                    {canEdit ? (
+                        <input
+                            type="text"
+                            value={draftName !== null ? draftName : (g.display_name ?? '')}
+                            placeholder={g.epa_carline_name}
+                            disabled={savingName}
+                            onFocus={handleNameFocus}
+                            onChange={e => setDraftName(e.target.value)}
+                            onBlur={handleNameSave}
+                            onKeyDown={handleNameKeyDown}
+                            className="form-input text-sm font-semibold py-0.5 w-full disabled:opacity-50 placeholder:text-gray-400 dark:placeholder:text-slate-500 placeholder:font-normal placeholder:italic"
+                            title="Friendly display name used in charts. Leave blank to use the EPA carline name."
+                        />
+                    ) : (
+                        <div className="font-semibold text-sm truncate">
+                            {g.display_name || g.epa_carline_name}
+                        </div>
+                    )}
+                    {/* Show raw EPA name as subtitle when a display name is set or being edited */}
+                    {(g.display_name || draftName !== null) && (
                         <div className="text-xs text-gray-400 dark:text-slate-500 italic truncate mt-0.5">{g.epa_carline_name}</div>
                     )}
                     <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
@@ -207,7 +249,7 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroups, onLink, onUnlink, onUpdateConfidence }) {
+export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroups, onLink, onUnlink, onUpdateConfidence, onUpdateDisplayName }) {
     const [query, setQuery]               = useState('');
     const [results, setResults]           = useState([]);
     const [searching, setSearching]       = useState(false);
@@ -277,6 +319,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                         canEdit={canEdit}
                         onUnlink={onUnlink}
                         onUpdateConfidence={onUpdateConfidence}
+                        onUpdateDisplayName={onUpdateDisplayName}
                     />
                 ))
             )}

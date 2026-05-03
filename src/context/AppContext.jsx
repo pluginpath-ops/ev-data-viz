@@ -772,11 +772,13 @@ export function AppProvider({ children }) {
     const getEpaTestGroupsAdmin = () => dataService.getEpaTestGroupsAdmin();
 
     /**
-     * Update editable fields on an EPA test group (admin only).
+     * Update editable fields on an EPA test group.
      * Accepts any subset of: { label_method, display_name }.
+     * Soft-refreshes vehicles so chart labels and vehicle cards reflect the change.
      */
     const updateEpaTestGroup = async (testGroupId, updates) => {
         await dataService.updateEpaTestGroup(testGroupId, updates);
+        softRefreshVehicles();
     };
 
     /** Convenience alias: update only label_method. */
