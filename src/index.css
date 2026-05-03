@@ -847,13 +847,49 @@ body {
 
 /* Specs comparison table outer wrapper */
 .specs-table-container {
-    @apply rounded-lg shadow overflow-x-auto;
+    @apply rounded-lg shadow overflow-auto;
+    max-height: calc(100vh - 12rem); /* owns both scroll axes so sticky header/col work */
     background-color: var(--color-card);
 }
 
 /* Specs table cell — both <th> and <td> */
 .specs-table-cell {
     @apply px-6 py-4;
+}
+
+/* ── Sticky header row + first column ────────────────────────────────────── */
+
+/* All header <th> cells stick to the top of the viewport */
+.specs-table-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background-color: rgb(249, 250, 251); /* gray-50 — matches old bg-gray-50 */
+}
+[data-theme="dark"] .specs-table-container thead th {
+    background-color: rgb(23, 37, 84);  /* blue-950 — matches old dark:bg-blue-950 */
+    color: rgb(226, 232, 240);          /* slate-200 — matches old dark:text-slate-100 */
+}
+
+/* First-column label cells in the body stick to the left */
+.specs-table-container tbody td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background-color: var(--color-card);
+    border-right: 1px solid var(--color-border);
+}
+
+/* Top-left corner: sticky in both directions — needs the highest z-index */
+.specs-table-container thead th:first-child {
+    z-index: 4;
+    border-right: 1px solid var(--color-border);
+}
+
+/* Category-section divider rows span all columns — restore their background */
+.specs-table-container td.specs-table-category-header {
+    background-color: var(--color-surface-sunken);
+    border-right: none;
 }
 
 /* ── Vehicle Specs — card display & edit form ─────────────────────────────── */
