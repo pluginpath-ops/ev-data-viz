@@ -21,8 +21,7 @@ function TestCountPills({ vehicle }) {
     if (!chargingCount && !rangeCount && !epaCount) return null;
 
     return (
-        <div className="flex flex-wrap items-center gap-1 mt-2">
-            <span className="text-xs text-gray-500 dark:text-slate-400 mr-0.5">Tests:</span>
+        <div className="flex flex-wrap items-center gap-1">
             {chargingCount > 0 && <span className="pill-test-charging">Charging ({chargingCount})</span>}
             {rangeCount    > 0 && <span className="pill-test-range">Range ({rangeCount})</span>}
             {epaCount      > 0 && <span className="pill-test-epa">EPA ({epaCount})</span>}
@@ -786,7 +785,6 @@ export default function VehiclesView({
                                                     {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                                     {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
                                                 </div>
-                                                <TestCountPills vehicle={vehicle} />
                                                 {vehicle.tags?.length > 0 && (
                                                     <div className="mt-2">
                                                         <TagPills vehicle={vehicle} />
@@ -804,9 +802,10 @@ export default function VehiclesView({
                                         <div className="mt-auto pt-3" onClick={e => e.stopPropagation()}>
                                             <button
                                                 onClick={() => onViewRuns(vehicle)}
-                                                className="w-full px-3 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-900/50 transition"
+                                                className="w-full px-3 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-900/50 transition flex flex-col items-start gap-1.5"
                                             >
-                                                View Tests &amp; Data →
+                                                <span>View Tests &amp; Data →</span>
+                                                <TestCountPills vehicle={vehicle} />
                                             </button>
                                         </div>
                                     </div>
@@ -896,15 +895,15 @@ export default function VehiclesView({
                                         {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                         {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
                                         {vehicle.power && <p>Power: {vehicle.power} kW</p>}
-                                        <TestCountPills vehicle={vehicle} />
                                     </div>
 
                                     {/* View Tests & Data — dedicated column */}
                                     <button
                                         onClick={(e) => { e.stopPropagation(); onViewRuns(vehicle); }}
-                                        className="px-4 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition flex-shrink-0"
+                                        className="px-4 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-900/50 transition flex-shrink-0 flex flex-col items-start gap-1.5"
                                     >
-                                        View Tests &amp; Data →
+                                        <span>View Tests &amp; Data →</span>
+                                        <TestCountPills vehicle={vehicle} />
                                     </button>
 
                                     {/* Action column: Visibility → Edit → Copy → Delete */}
