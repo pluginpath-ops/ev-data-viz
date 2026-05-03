@@ -3,7 +3,7 @@ import Chart from 'chart.js/auto';
 import { useTheme } from '../hooks/useTheme';
 import { useAppContext } from '../context/AppContext';
 import { convSpeed, speedLabel, distanceLabel } from '../utils/unitConversions';
-import { vehicleColor, vehicleLabel } from '../utils/specHelpers';
+import { vehicleColor, vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
 import { PALETTE } from '../utils/specHelpers';
 import {
     buildEpaCurve, resolveUseableKwh, resolveUseableKwhSource,
@@ -264,11 +264,16 @@ export default function EpaCurvesView({
     const datasets = useMemo(() => {
         const result = [];
         vehiclesWithEpa.forEach((vehicle, vi) => {
+            // Resolve inherited specs so battery_usable_kwh from a parent vehicle is visible
+            const effectiveVehicle = {
+                ...vehicle,
+                specs: resolveEffectiveSpecs(vehicle, vehicles),
+            };
             vehicle.epa_mappings.forEach((mapping, mi) => {
                 const { epaGroup, confidence } = mapping;
                 if (!epaGroup) return;
-                const useableKwh       = resolveUseableKwh(epaGroup, vehicle);
-                const useableKwhSource = resolveUseableKwhSource(epaGroup, vehicle);
+                const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
+                const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
                 const curve            = buildEpaCurve(epaGroup, useableKwh);
                 if (!curve.length) return;
 
@@ -306,7 +311,7 @@ export default function EpaCurvesView({
             });
         });
         return result;
-    }, [vehiclesWithEpa, yAxis, units]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units]);
 
     // Build / rebuild chart whenever deps change
     useEffect(() => {
@@ -566,8 +571,14 @@ export default function EpaCurvesView({
                             const hwfetSource = epaGroup.hwfet_unadj_kwh_100mi != null ? 'unadj'
                                               : epaGroup.hwfet_adj_kwh_100mi    != null ? 'adj'
                                               : null;
-                            const useableKwh       = resolveUseableKwh(epaGroup, vehicle);
-                            const useableKwhSource = resolveUseableKwhSource(epaGroup, vehicle);
+                            // Use effective (inherited) specs so battery_usable_kwh from
+                            // a parent vehicle is visible when the child hasn't set it.
+                            const effectiveVehicle = {
+                                ...vehicle,
+                                specs: resolveEffectiveSpecs(vehicle, vehicles),
+                            };
+                            const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
+                            const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
                             return (
                                 <div
                                     key={mapping.id}
