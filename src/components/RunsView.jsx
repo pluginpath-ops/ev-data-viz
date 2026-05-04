@@ -285,7 +285,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [showEditSpecs, setShowEditSpecs] = useState(false);
     const [showViewSpecs, setShowViewSpecs] = useState(false);
     const [vehicleFormData, setVehicleFormData] = useState({
-        name: '', make: '', model: '', year: '', battery: '', range: '', manufacturer_id: null,
+        name: '', make: '', model: '', trim: '', year: '', battery: '', range: '', manufacturer_id: null,
     });
     const [vehicleFormTags, setVehicleFormTags] = useState([]);
     const [vehicleNewTagName, setVehicleNewTagName] = useState('');
@@ -296,6 +296,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             name: vehicle.name,
             make: vehicle.make || '',
             model: vehicle.model || '',
+            trim: vehicle.trim || '',
             year: vehicle.year || '',
             battery: vehicle.battery || '',
             range: vehicle.range || '',
