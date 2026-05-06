@@ -28,6 +28,24 @@ export function AppProvider({ children }) {
     const showSuccess = (message) => setAppNotification({ message, type: 'success' });
     const clearNotification = () => setAppNotification(null);
 
+    // ── Access logging helpers ────────────────────────────────────────────────
+    const isRlsViolation = (err) =>
+        err?.message?.includes('row-level security') ||
+        err?.code === 'PGRST301' ||
+        err?.code === '42501';
+
+    const logIfUnauthorized = (operation, resourceType, resourceId, err) => {
+        if (isRlsViolation(err)) {
+            dataService.logAccessAttempt({
+                operation,
+                resourceType,
+                resourceId: String(resourceId ?? ''),
+                errorCode:    err.code,
+                errorMessage: err.message,
+            });
+        }
+    };
+
     useEffect(() => {
         initializeApp();
     }, []);
@@ -110,6 +128,7 @@ export function AppProvider({ children }) {
             }
             setVehicles(prev => [...prev, newVehicle]);
         } catch (error) {
+            logIfUnauthorized('add_vehicle', 'vehicle', null, error);
             showError('Error adding vehicle: ' + error.message);
         }
     };
@@ -128,6 +147,7 @@ export function AppProvider({ children }) {
                 return updated;
             }));
         } catch (error) {
+            logIfUnauthorized('update_vehicle', 'vehicle', vehicleId, error);
             showError('Error updating vehicle: ' + error.message);
         }
     };
@@ -140,6 +160,7 @@ export function AppProvider({ children }) {
                 return u ? { ...v, sort_order: u.sort_order } : v;
             }));
         } catch (error) {
+            logIfUnauthorized('reorder_vehicles', 'vehicle', null, error);
             showError('Error reordering vehicles: ' + error.message);
         }
     };
@@ -162,6 +183,7 @@ export function AppProvider({ children }) {
             setVehicles(prev => prev.filter(v => v.id !== vehicleId));
             setSelectedVehicles(prev => prev.filter(id => id !== vehicleId));
         } catch (error) {
+            logIfUnauthorized('delete_vehicle', 'vehicle', vehicleId, error);
             showError('Error deleting vehicle: ' + error.message);
         }
     };
@@ -178,6 +200,7 @@ export function AppProvider({ children }) {
             ));
             showSuccess(`Test copied to ${vehicles.find(v => v.id === targetVehicleId)?.name || 'vehicle'}`);
         } catch (error) {
+            logIfUnauthorized('copy_run', 'run', null, error);
             showError('Error copying test: ' + error.message);
         }
     };
@@ -194,6 +217,7 @@ export function AppProvider({ children }) {
                     : v
             ));
         } catch (error) {
+            logIfUnauthorized('duplicate_run', 'run', runId, error);
             showError('Error duplicating run: ' + error.message);
         }
     };
@@ -208,6 +232,7 @@ export function AppProvider({ children }) {
             ));
             return vehicleId;
         } catch (error) {
+            logIfUnauthorized('add_run', 'run', null, error);
             showError('Error adding run: ' + error.message);
         }
     };
@@ -241,6 +266,7 @@ export function AppProvider({ children }) {
                     : v
             ));
         } catch (error) {
+            logIfUnauthorized('update_run', 'run', runId, error);
             showError('Error updating run: ' + error.message);
         }
     };
@@ -254,6 +280,7 @@ export function AppProvider({ children }) {
                     : v
             ));
         } catch (error) {
+            logIfUnauthorized('clear_default_run', 'run', null, error);
             showError('Error clearing default run: ' + error.message);
         }
     };
@@ -273,6 +300,7 @@ export function AppProvider({ children }) {
                     : v
             ));
         } catch (error) {
+            logIfUnauthorized('set_default_run', 'run', runId, error);
             showError('Error setting default run: ' + error.message);
         }
     };
@@ -300,6 +328,7 @@ export function AppProvider({ children }) {
                     : v
             ));
         } catch (error) {
+            logIfUnauthorized('update_run_color', 'run', runId, error);
             showError('Error updating run color: ' + error.message);
         }
     };
@@ -313,6 +342,7 @@ export function AppProvider({ children }) {
                     : v
             ));
         } catch (error) {
+            logIfUnauthorized('delete_run', 'run', runId, error);
             showError('Error deleting run: ' + error.message);
         }
     };
@@ -330,6 +360,7 @@ export function AppProvider({ children }) {
             ));
             return result;
         } catch (error) {
+            logIfUnauthorized('save_run_data', 'run', runId, error);
             showError('Error saving data: ' + error.message);
             throw error;
         }
@@ -350,6 +381,7 @@ export function AppProvider({ children }) {
             }
             return result;
         } catch (error) {
+            logIfUnauthorized('merge_run_data', 'run', runId, error);
             showError('Error updating run data: ' + error.message);
             throw error; // re-throw so the caller knows it failed
         }
@@ -451,6 +483,7 @@ export function AppProvider({ children }) {
             setTags(prev => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)));
             return tag;
         } catch (error) {
+            logIfUnauthorized('create_tag', 'tag', null, error);
             const message = error.message?.includes('row-level security')
                 ? 'Only vehicle owners can create tags.'
                 : 'Error creating tag: ' + error.message;
@@ -464,6 +497,7 @@ export function AppProvider({ children }) {
             const vehicleTags = tags.filter(t => tagIds.includes(t.id));
             setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, tags: vehicleTags } : v));
         } catch (error) {
+            logIfUnauthorized('sync_tags', 'vehicle', vehicleId, error);
             showError('Error updating tags: ' + error.message);
         }
     };
@@ -491,6 +525,7 @@ export function AppProvider({ children }) {
                 return next;
             });
         } catch (error) {
+            logIfUnauthorized('update_specs', 'vehicle', vehicleId, error);
             showError('Error updating specs: ' + error.message);
         }
     };
@@ -511,6 +546,7 @@ export function AppProvider({ children }) {
             // Only update UI after confirmed DB write
             setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, visibility: newVisibility } : v));
         } catch (error) {
+            logIfUnauthorized('update_visibility', 'vehicle', vehicleId, error);
             showError('Error updating visibility: ' + error.message);
             // Re-sync from DB so the UI doesn't show stale state
             await initializeApp();
@@ -545,6 +581,7 @@ export function AppProvider({ children }) {
             setManufacturers(prev => [...prev, mfg].sort((a, b) => a.name.localeCompare(b.name)));
             return mfg;
         } catch (error) {
+            logIfUnauthorized('add_manufacturer', 'manufacturer', null, error);
             showError('Error adding manufacturer: ' + error.message);
         }
     };
@@ -563,6 +600,7 @@ export function AppProvider({ children }) {
                 ));
             }
         } catch (error) {
+            logIfUnauthorized('update_manufacturer', 'manufacturer', id, error);
             showError('Error updating manufacturer: ' + error.message);
         }
     };
@@ -572,6 +610,7 @@ export function AppProvider({ children }) {
             await dataService.deleteManufacturer(id);
             setManufacturers(prev => prev.filter(m => m.id !== id));
         } catch (error) {
+            logIfUnauthorized('delete_manufacturer', 'manufacturer', id, error);
             showError('Error deleting manufacturer: ' + error.message);
         }
     };
@@ -585,6 +624,7 @@ export function AppProvider({ children }) {
             await dataService.addSpecLink({ targetVehicleId, sourceRunId, scalingFactor, notes });
             await softRefreshVehicles();
         } catch (error) {
+            logIfUnauthorized('add_spec_link', 'spec_link', null, error);
             showError('Error adding spec link: ' + error.message);
             throw error;
         }
@@ -595,6 +635,7 @@ export function AppProvider({ children }) {
             await dataService.updateSpecLink(linkId, changes, targetVehicleId);
             await softRefreshVehicles();
         } catch (error) {
+            logIfUnauthorized('update_spec_link', 'spec_link', linkId, error);
             showError('Error updating spec link: ' + error.message);
             throw error;
         }
@@ -605,6 +646,7 @@ export function AppProvider({ children }) {
             await dataService.deleteSpecLink(linkId);
             await softRefreshVehicles();
         } catch (error) {
+            logIfUnauthorized('delete_spec_link', 'spec_link', linkId, error);
             showError('Error removing spec link: ' + error.message);
         }
     };
