@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import AxisScaleControls from './AxisScaleControls';
 import RunSelector from './RunSelector';
@@ -14,6 +14,7 @@ import {
 } from '../utils/unitConversions';
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { copyChartAsPng } from '../utils/chartUtils';
+import { resolveChartColors } from '../utils/colorUtils';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -51,7 +52,7 @@ const hasDataForType = (run, type) => {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, onUpdateRunColor, presentationMode = false }) {
+export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, onUpdateRunColor, presentationMode = false, autoColor = false }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
@@ -95,6 +96,14 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
 
     const plottableRuns = selectedRangeRuns.filter(r => hasDataForType(r, chartType));
 
+    // Perceptual color resolution.  In auto mode every run gets an Okabe-Ito
+    // slot (with hue-family bias toward the stored color); in manual mode only
+    // default-blue runs are nudged.
+    const colorMap = useMemo(
+        () => resolveChartColors(plottableRuns, {}, autoColor ? 'auto' : 'manual'),
+        [plottableRuns, autoColor]
+    );
+
     // ── Run toggle ────────────────────────────────────────────────────────────
     const toggleRun = (runId) => {
         const strId = String(runId);
@@ -129,8 +138,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
             const datasets = [{
                 label:           yLabel,
                 data:            plottableRuns.map(r => getY(r)),
-                backgroundColor: plottableRuns.map(r => r.color || '#3b82f6'),
-                borderColor:     plottableRuns.map(r => r.color || '#3b82f6'),
+                backgroundColor: plottableRuns.map(r => colorMap[r.id] || r.color || '#3b82f6'),
+                borderColor:     plottableRuns.map(r => colorMap[r.id] || r.color || '#3b82f6'),
                 borderRadius:    4,
                 borderSkipped:   false,
             }];
@@ -160,7 +169,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         run:      r,
                         x:        isSpeed ? convSpeed(r.speed_mph, units) : convTemp(r.temperature_f, units),
                         y:        getY(r),
-                        _color:   r.color   || '#3b82f6',
+                        _color:   colorMap[r.id] || r.color || '#3b82f6',
                         _runName: r.name,
                     }))
                     .filter(p => p.x != null && p.y != null)
@@ -169,7 +178,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
 
                 // Line stroke = first run's color; individual points use their
                 // own run color so multiple runs per vehicle are distinguishable.
-                const lineColor   = runs[0].color || '#3b82f6';
+                const lineColor   = colorMap[runs[0].id] || runs[0].color || '#3b82f6';
                 const pointColors = runPoints.map(p => p._color);
                 // Keep run objects parallel to points for tooltip access
                 const runMetas    = runPoints.map(p => p.run);
@@ -482,9 +491,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     ))}
                 </div>
 
-                {/* Show points toggle — only relevant for line charts */}
-                {CHART_TYPES.find(t => t.key === chartType)?.kind === 'line' && (
-                    <div className="mb-6">
+                {/* Show points + Auto Color toggles */}
+                <div className={`chart-toggles mb-6`}>
+                    {CHART_TYPES.find(t => t.key === chartType)?.kind === 'line' && (
                         <label className="toggle-label">
                             <input
                                 type="checkbox"
@@ -494,8 +503,17 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                             />
                             <span className="text-sm font-medium">Show points</span>
                         </label>
-                    </div>
-                )}
+                    )}
+                    <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
+                        <input
+                            type="checkbox"
+                            checked={autoColor}
+                            onChange={e => setChartConfig(prev => ({ ...prev, autoColor: e.target.checked }))}
+                            className="w-4 h-4"
+                        />
+                        <span className="text-sm font-medium">Auto Color</span>
+                    </label>
+                </div>
 
                 {/* ── Run selector ── */}
                 <RunSelector
@@ -504,6 +522,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     onToggleRun={toggleRun}
                     onUpdateRunColor={onUpdateRunColor}
                     runFilter={isRangeRun}
+                    colorMap={colorMap}
                     emptyMessage="No range test records"
                     renderRunMeta={run => {
                         const eff         = calcEff(run.distance_miles, run.energy_kwh, effUnit, units);

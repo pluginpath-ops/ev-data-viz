@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 /**
  * Shared collapsible run selector used by ChargingView, RangeChartView,
@@ -21,6 +21,7 @@ export default function RunSelector({
     runFilter,
     emptyMessage = 'No runs',
     renderRunMeta = null,
+    colorMap = {},
 }) {
     const [expanded, setExpanded] = useState(false);
     // Default all vehicles to expanded; track explicit collapses
@@ -81,6 +82,7 @@ export default function RunSelector({
                                                         onToggle={() => onToggleRun(run.id)}
                                                         onUpdateRunColor={onUpdateRunColor}
                                                         renderRunMeta={renderRunMeta}
+                                                        colorMap={colorMap}
                                                     />
                                                 ))}
                                             </div>
@@ -96,7 +98,34 @@ export default function RunSelector({
     );
 }
 
-function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunMeta }) {
+function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunMeta, colorMap = {} }) {
+    // Local in-flight color so rapid picker drags don't fire a DB write on every
+    // pixel.  We only commit to the parent after a short debounce or on blur.
+    const storedColor  = run.color || '#3b82f6';
+    const [localColor, setLocalColor] = useState(storedColor);
+    const commitTimer  = useRef(null);
+
+    // Sync if run.color changes from outside (e.g. another run update propagates)
+    useEffect(() => { setLocalColor(run.color || '#3b82f6'); }, [run.color]);
+
+    const handleColorChange = (e) => {
+        e.stopPropagation();
+        const val = e.target.value;
+        setLocalColor(val);
+        clearTimeout(commitTimer.current);
+        commitTimer.current = setTimeout(() => onUpdateRunColor(vehicle.id, run.id, val), 400);
+    };
+
+    const handleColorCommit = () => {
+        clearTimeout(commitTimer.current);
+        if (/^#[0-9A-Fa-f]{6}$/.test(localColor)) {
+            onUpdateRunColor(vehicle.id, run.id, localColor);
+        }
+    };
+
+    // Resolved chart display color (Okabe-Ito in auto mode, stored color otherwise)
+    const resolvedColor = colorMap[run.id] || localColor;
+
     return (
         <label className={`flex items-center gap-2 cursor-pointer ${!isChecked ? 'opacity-60 hover:opacity-100' : ''}`}>
             <input
@@ -107,19 +136,36 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRun
             />
             {onUpdateRunColor && (
                 <>
+                    {/* Swatch: shows the resolved chart color (may differ from stored in auto mode) */}
+                    <span
+                        className="w-3 h-5 rounded-sm shrink-0 border border-black/10"
+                        style={{ backgroundColor: resolvedColor }}
+                        title={resolvedColor !== localColor
+                            ? `Chart color: ${resolvedColor} (stored: ${localColor})`
+                            : `Color: ${resolvedColor}`}
+                    />
+                    {/* Picker: edits the stored preference color, debounced */}
                     <input
                         type="color"
-                        value={run.color || '#3b82f6'}
-                        onChange={e => { e.stopPropagation(); onUpdateRunColor(vehicle.id, run.id, e.target.value); }}
+                        value={localColor}
+                        onChange={handleColorChange}
+                        onBlur={handleColorCommit}
                         onClick={e => e.stopPropagation()}
                         className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
-                        title="Change color"
+                        title="Set color preference (influences auto-color hue family when Auto Color is on)"
                     />
                     <input
                         type="text"
-                        value={run.color || '#3b82f6'}
-                        onChange={e => { e.stopPropagation(); onUpdateRunColor(vehicle.id, run.id, e.target.value); }}
-                        onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRunColor(vehicle.id, run.id, run.color || '#3b82f6'); }}
+                        value={localColor}
+                        onChange={e => { e.stopPropagation(); setLocalColor(e.target.value); }}
+                        onBlur={e => {
+                            e.stopPropagation();
+                            if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
+                                onUpdateRunColor(vehicle.id, run.id, e.target.value);
+                            } else {
+                                setLocalColor(run.color || '#3b82f6');
+                            }
+                        }}
                         onClick={e => e.stopPropagation()}
                         className="hidden w-20 px-2 py-0.5 border rounded text-xs font-mono shrink-0"
                         placeholder="#3b82f6"

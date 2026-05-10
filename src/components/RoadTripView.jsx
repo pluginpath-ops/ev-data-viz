@@ -15,6 +15,7 @@ import {
     formatTime, speedCorrectionFactor,
 } from '../utils/roadTripSimulation';
 import LoadingSpinner from './LoadingSpinner';
+import { resolveChartColors } from '../utils/colorUtils';
 
 Chart.register(ZoomPlugin);
 
@@ -379,6 +380,8 @@ export default function RoadTripView({
     setRoadTripConfig,
     onUpdateRunColor = null,
     presentationMode = false,
+    autoColor = true,
+    setChartConfig = null,
 }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
@@ -434,6 +437,12 @@ export default function RoadTripView({
         });
     }, [selectedVehicleIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // ── Resolve chart colors for all charging runs ────────────────────────────
+    const colorMap = useMemo(() => {
+        const allRuns = selectedVehicles.flatMap(v => filterChargingRuns(v.runs));
+        return resolveChartColors(allRuns, {}, autoColor ? 'auto' : 'manual');
+    }, [selectedVehicles, autoColor]);
+
     // ── Build efficiency info for every charging run in the selection ─────────
     // Keyed by run.id. Derives mi/kWh from the run itself (if it has range data)
     // or falls back to the vehicle's best range run.
@@ -468,14 +477,14 @@ export default function RoadTripView({
                     // Assume 70 mph if not specified on the run or its range source
                     testSpeedMph:   run.speed_mph ?? bestRangeRun?.speed_mph ?? null,
                     batteryKwh:     vehicle.battery,
-                    color:          run.color || PALETTE[colorIdx % PALETTE.length],
+                    color:          colorMap[run.id] || run.color || PALETTE[colorIdx % PALETTE.length],
                     efficiencyNote,
                 };
                 colorIdx++;
             }
         }
         return map;
-    }, [selectedVehicles]);
+    }, [selectedVehicles, colorMap]);
 
     // ── Active run entries — ordered by vehicle pill position ─────────────────
     const runEntries = useMemo(() => {
@@ -1292,6 +1301,19 @@ export default function RoadTripView({
                                 🚐 Towing
                             </button>
                         </div>
+                        {setChartConfig && (
+                            <div className="flex items-end">
+                                <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoColor}
+                                        onChange={e => setChartConfig(prev => ({ ...prev, autoColor: e.target.checked }))}
+                                        className="w-4 h-4"
+                                    />
+                                    <span className="text-sm font-medium">Auto Color</span>
+                                </label>
+                            </div>
+                        )}
                     </div>
 
                     {/* Towing inputs — only visible when towing mode is on */}
@@ -1413,6 +1435,7 @@ export default function RoadTripView({
                                     : [...prev, runId]
                             )}
                             onUpdateRunColor={onUpdateRunColor}
+                            colorMap={colorMap}
                             runFilter={isChargingRun}
                             emptyMessage="No charging test data"
                             renderRunMeta={run => {

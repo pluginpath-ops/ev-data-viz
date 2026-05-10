@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import ZoomPlugin from 'chartjs-plugin-zoom';
 Chart.defaults.font.size = 13;
@@ -15,6 +15,7 @@ import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitC
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 import LoadingSpinner from './LoadingSpinner';
+import { resolveChartColors } from '../utils/colorUtils';
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, presentationMode = false }) {
     const { units } = useAppContext();
@@ -33,6 +34,16 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const handleColorChange = (vehicleId, runId, color) => {
         onUpdateRunColor(vehicleId, runId, color);
     };
+
+    // Resolve display colors for all selected runs.
+    // In 'manual' mode only default-blue runs get nudged; in 'auto' mode all
+    // runs get Okabe-Ito assignment with hue-family bias toward their stored color.
+    const colorMap = useMemo(() => {
+        const runs = selectedVehicles.flatMap(v =>
+            (v.runs || []).filter(r => chartConfig.selectedRuns.includes(r.id))
+        );
+        return resolveChartColors(runs, {}, chartConfig.autoColor ? 'auto' : 'manual');
+    }, [selectedVehicles, chartConfig.selectedRuns, chartConfig.autoColor]);
 
     // Ref so the auto-select effect can read chartMode without it being a dep
     // (avoids changing the deps array size, which React disallows mid-session).
@@ -347,7 +358,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         const datasets = allSelectedRuns.flatMap((run) => {
             const rawData = runDataCache[run.id] ?? run.data ?? [];
             const { vehicleBattery, vehicleRange } = run;
-            const color = run.color || '#3b82f6';
+            const color = colorMap[run.id] || run.color || '#3b82f6';
 
             // 1. Apply race-mode trim (slice from anchor; exclude if ineligible)
             let workingData = rawData;
@@ -511,7 +522,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 chartInstance.current.destroy();
             }
         };
-    }, [chartConfig, selectedVehicles, runDataCache, units, isDark]);
+    }, [chartConfig, selectedVehicles, runDataCache, units, isDark, colorMap]);
 
     // ── PNG export ───────────────────────────────────────────────────────────
     const handleExportImage = async () => {
@@ -538,6 +549,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 setChartConfig={setChartConfig}
                 onUpdateRunColor={onUpdateRunColor}
                 presentationMode={presentationMode}
+                autoColor={chartConfig.autoColor ?? false}
             />
         );
     }
@@ -630,6 +642,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         />
                         <span className="text-sm font-medium">Show points</span>
                     </label>
+                    <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
+                        <input
+                            type="checkbox"
+                            checked={chartConfig.autoColor ?? false}
+                            onChange={e => setChartConfig({ ...chartConfig, autoColor: e.target.checked })}
+                            className="w-4 h-4"
+                        />
+                        <span className="text-sm font-medium">Auto Color</span>
+                    </label>
                 </div>
 
                 {/* ── Collapsible run selector ── */}
@@ -644,6 +665,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     }))}
                     onUpdateRunColor={handleColorChange}
                     runFilter={isChargingRun}
+                    colorMap={colorMap}
                     emptyMessage="No charging test records"
                     renderRunMeta={run => {
                         const exclusionReason = getRaceExclusionReason(run.id);
