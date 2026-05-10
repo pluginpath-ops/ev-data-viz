@@ -746,8 +746,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     };
 
     // Fill null range values from SoC × effective range from the selected test run.
-    const handleEstimateRangeInEdit = () => {
-        const ratedRange = effectiveRangeFromTest;
+    const handleEstimateRangeInEdit = (ratedRange = effectiveRangeFromTest) => {
         if (!editData || !ratedRange) return;
         setEditData(prev => prev.map(row => ({
             ...row,
@@ -1691,24 +1690,39 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     {showDataTable && (
                                         <div className="mt-3">
                                             {/* Range estimation offer — shown when range is absent but SoC exists */}
-                                            {canEdit(vehicle) && !editDataLoading && editData !== null &&
-                                             editData.some(r => r.soc != null) &&
-                                             editData.every(r => r.range == null) && (
-                                                <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200">
-                                                    <p className="text-xs text-blue-800 font-semibold mb-2">ℹ No range data — estimate from SoC%:</p>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {effectiveRangeFromTest && (
-                                                            <button
-                                                                onClick={() => handleEstimateRangeInEdit()}
-                                                                className="text-xs px-3 py-1 rounded border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
-                                                                title={`From: ${selectedRangeTestRun?.name}`}
-                                                            >
-                                                                Measured ({effectiveRangeFromTest} mi effective)
-                                                            </button>
-                                                        )}
+                                            {(() => {
+                                                const epaRange = vehicle?.range ? parseFloat(vehicle.range) : null;
+                                                const hasAnyOption = effectiveRangeFromTest || epaRange;
+                                                if (!canEdit(vehicle) || editDataLoading || editData === null) return null;
+                                                if (!editData.some(r => r.soc != null)) return null;
+                                                if (!editData.every(r => r.range == null)) return null;
+                                                if (!hasAnyOption) return null;
+                                                return (
+                                                    <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200">
+                                                        <p className="text-xs text-blue-800 font-semibold mb-2">ℹ No range data — estimate from SoC%:</p>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {effectiveRangeFromTest && (
+                                                                <button
+                                                                    onClick={() => handleEstimateRangeInEdit(effectiveRangeFromTest)}
+                                                                    className="text-xs px-3 py-1 rounded border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
+                                                                    title={`Measured range test: ${selectedRangeTestRun?.name} (${selectedRangeTestRun?.distance_miles} mi @ ${selectedRangeTestRun?.start_soc}→${selectedRangeTestRun?.end_soc}% SoC)`}
+                                                                >
+                                                                    Measured ({effectiveRangeFromTest} mi / 100%)
+                                                                </button>
+                                                            )}
+                                                            {epaRange && (
+                                                                <button
+                                                                    onClick={() => handleEstimateRangeInEdit(epaRange)}
+                                                                    className="text-xs px-3 py-1 rounded border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
+                                                                    title={`Use vehicle's EPA-rated range (${epaRange} mi) as the 100% SoC baseline`}
+                                                                >
+                                                                    EPA ({epaRange} mi)
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            )}
+                                                );
+                                            })()}
                                             {/* kWh comparison — charging runs only, once data is loaded */}
                                             {!editDataLoading && editCalcKwh != null && (editFormData.dataFlags || ['charging']).includes('charging') && (() => {
                                                 const manual = editFormData.energyKwh !== '' ? parseFloat(editFormData.energyKwh) : NaN;
