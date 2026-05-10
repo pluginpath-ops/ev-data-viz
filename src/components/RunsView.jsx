@@ -861,13 +861,13 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     // if absent we treat the test as a full 0→100% run (a safe approximation).
     const rangeTestRuns = (vehicle?.runs ?? [])
         .filter(r => r.has_range && r.distance_miles > 0
-            && (r.start_soc == null || r.end_soc == null || (r.start_soc - r.end_soc) > 0))
+            && (r.start_soc == null || r.end_soc == null || r.start_soc !== r.end_soc))
         .sort((a, b) => new Date(b.date) - new Date(a.date));
     const selectedRangeTestRun = rangeTestRuns.find(r => r.id === selectedRangeTestRunId) ?? rangeTestRuns[0] ?? null;
     const effectiveRangeFromTest = selectedRangeTestRun
         ? (() => {
             const hasSoc = selectedRangeTestRun.start_soc != null && selectedRangeTestRun.end_soc != null;
-            const socDelta = hasSoc ? (selectedRangeTestRun.start_soc - selectedRangeTestRun.end_soc) : 100;
+            const socDelta = hasSoc ? Math.abs(selectedRangeTestRun.start_soc - selectedRangeTestRun.end_soc) : 100;
             return Math.round(selectedRangeTestRun.distance_miles * 100 / socDelta);
         })()
         : null;
@@ -1196,6 +1196,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         className="form-input"
                                                         min="0" max="100"
                                                     />
+                                                    {runMetadata.startSoc !== '' && runMetadata.endSoc !== '' &&
+                                                     parseFloat(runMetadata.startSoc) < parseFloat(runMetadata.endSoc) && (
+                                                        <p className="col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                            ⚠ Start SoC is lower than End SoC — for a range test the vehicle depletes, so Start should be higher (e.g. 95% → 5%). Did you swap them?
+                                                        </p>
+                                                    )}
                                                     <input
                                                         type="number"
                                                         placeholder="Speed (mph)"
@@ -1379,8 +1385,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         className="mt-1 border p-1 rounded text-xs w-full max-w-xs"
                                                     >
                                                         {rangeTestRuns.map(r => {
-                                                            const eff = Math.round(r.distance_miles * 100 / (r.start_soc - r.end_soc));
-                                                            return <option key={r.id} value={r.id}>{r.name} — {eff} mi effective</option>;
+                                                            const hasSoc = r.start_soc != null && r.end_soc != null;
+                                                            const socDelta = hasSoc ? Math.abs(r.start_soc - r.end_soc) : 100;
+                                                            const eff = Math.round(r.distance_miles * 100 / socDelta);
+                                                            return <option key={r.id} value={r.id}>{r.name} — {eff} mi effective{!hasSoc ? ' (est.)' : ''}</option>;
                                                         })}
                                                     </select>
                                                 )}
@@ -1614,6 +1622,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     className="form-input"
                                                     min="0" max="100"
                                                 />
+                                                {editFormData.startSoc !== '' && editFormData.endSoc !== '' &&
+                                                 parseFloat(editFormData.startSoc) < parseFloat(editFormData.endSoc) && (
+                                                    <p className="col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                        ⚠ Start SoC is lower than End SoC — for a range test the vehicle depletes, so Start should be higher (e.g. 95% → 5%). Did you swap them?
+                                                    </p>
+                                                )}
                                                 <input
                                                     type="number"
                                                     placeholder="Speed (mph)"
