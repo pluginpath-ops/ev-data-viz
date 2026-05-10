@@ -302,6 +302,22 @@ body {
 }
 
 
+/* ── Compact header (non-Vehicles tabs) ─────────────────────────────────────── */
+
+.app-header-compact {
+    height: 48px;
+    background-color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .app-header-compact {
+    background-color: var(--color-background);
+    border-bottom: 1px solid var(--color-border);
+    box-shadow: none;
+}
+
 /* ── App navigation bar ─────────────────────────────────────────────────────── */
 
 .app-nav {

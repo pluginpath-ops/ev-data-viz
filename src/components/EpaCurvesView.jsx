@@ -426,16 +426,11 @@ export default function EpaCurvesView({
             {/* ── Chart Options card ────────────────────────────────────────── */}
             {!presentationMode && (
                 <div className="card mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="section-title">
-                            Chart Options — EPA Efficiency Curves
-                            <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" className="ml-1" />
-                        </h3>
-                    </div>
-
                     {/* Y-axis toggle */}
                     <div className="chart-toggles mb-4">
-                        <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Y axis:</span>
+                        <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                            Y axis: <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" className="ml-1" />
+                        </span>
                         <div className="chart-type-buttons">
                             {Y_MODES.map(m => (
                                 <button

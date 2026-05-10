@@ -395,55 +395,70 @@ export default function App() {
             )}
             <div className="min-h-screen">
                 {/* ── Header ── */}
-                <header className="relative text-white shadow-lg overflow-hidden">
-                    {/* Full-width base colour — always fills edge to edge.
-                        In dark mode use the page background so the header blends into
-                        the dark navy layout instead of showing a bright blue strip. */}
-                    <div
-                        className="absolute inset-0"
-                        style={{ backgroundColor: isDark ? 'var(--color-background)' : 'var(--color-primary)' }}
-                    />
-                    {/* Image + overlay are both capped to page width (max-w-7xl) so on very
-                        wide monitors the image stays aligned with the content column and more
-                        of it is visible rather than being stretched thin across the viewport */}
-                    {headerImageUrl && (
-                        <div className="absolute inset-0 flex justify-center">
-                            <div className="relative w-full max-w-7xl h-full flex-shrink-0">
-                                <div
-                                    className="absolute inset-0"
-                                    style={{ backgroundImage: `url(${headerImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-                                />
-                                <div
-                                    className="absolute inset-0"
-                                    style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(29,78,216,0.72)' }}
-                                />
+                {view === 'vehicles' ? (
+                    /* Full hero — only on the Vehicles tab */
+                    <header className="relative text-white shadow-lg overflow-hidden">
+                        {/* Full-width base colour — always fills edge to edge.
+                            In dark mode use the page background so the header blends into
+                            the dark navy layout instead of showing a bright blue strip. */}
+                        <div
+                            className="absolute inset-0"
+                            style={{ backgroundColor: isDark ? 'var(--color-background)' : 'var(--color-primary)' }}
+                        />
+                        {/* Image + overlay are both capped to page width (max-w-7xl) so on very
+                            wide monitors the image stays aligned with the content column and more
+                            of it is visible rather than being stretched thin across the viewport */}
+                        {headerImageUrl && (
+                            <div className="absolute inset-0 flex justify-center">
+                                <div className="relative w-full max-w-7xl h-full flex-shrink-0">
+                                    <div
+                                        className="absolute inset-0"
+                                        style={{ backgroundImage: `url(${headerImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                                    />
+                                    <div
+                                        className="absolute inset-0"
+                                        style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(29,78,216,0.72)' }}
+                                    />
+                                </div>
                             </div>
-                        </div>
-                    )}
-                    <div className="relative page-container py-6">
-                        {/* Clickable title → home */}
-                        <button
-                            onClick={() => navigateTo('vehicles')}
-                            className="text-left group"
-                        >
-                            <h1 className="text-3xl font-bold group-hover:underline decoration-white/60">EVBench</h1>
-                        </button>
-                        <p className="mt-1" style={{color: 'rgba(255,255,255,0.8)'}}>Compare and benchmark electric vehicle performance data</p>
-
-                        {/* Admin-only: change header image */}
-                        {isAdmin && (
-                            <label className="absolute top-3 right-6 cursor-pointer flex items-center gap-1 text-xs text-white/60 hover:text-white/90 transition">
-                                📷 Change header image
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={(e) => { e.target.files[0] && uploadHeaderImage(e.target.files[0]); e.target.value = ''; }}
-                                />
-                            </label>
                         )}
-                    </div>
-                </header>
+                        <div className="relative page-container py-6">
+                            {/* Clickable title → home */}
+                            <button
+                                onClick={() => navigateTo('vehicles')}
+                                className="text-left group"
+                            >
+                                <h1 className="text-3xl font-bold group-hover:underline decoration-white/60">EVBench</h1>
+                            </button>
+                            <p className="mt-1" style={{color: 'rgba(255,255,255,0.8)'}}>Compare and benchmark electric vehicle performance data</p>
+
+                            {/* Admin-only: change header image */}
+                            {isAdmin && (
+                                <label className="absolute top-3 right-6 cursor-pointer flex items-center gap-1 text-xs text-white/60 hover:text-white/90 transition">
+                                    📷 Change header image
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => { e.target.files[0] && uploadHeaderImage(e.target.files[0]); e.target.value = ''; }}
+                                    />
+                                </label>
+                            )}
+                        </div>
+                    </header>
+                ) : (
+                    /* Compact bar — all other tabs */
+                    <header className="app-header-compact">
+                        <div className="page-container flex items-center h-full">
+                            <button
+                                onClick={() => navigateTo('vehicles')}
+                                className="text-lg font-bold text-white hover:underline decoration-white/60"
+                            >
+                                EVBench
+                            </button>
+                        </div>
+                    </header>
+                )}
 
                 <nav className="app-nav">
                     <div className="page-container pt-3 pb-2">

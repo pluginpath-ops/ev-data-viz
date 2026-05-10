@@ -449,21 +449,18 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         <div>
             {/* ── Config card — hidden in presentation mode ── */}
             {!presentationMode && <div className="card mb-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold">Chart Options — Range &amp; Efficiency</h3>
-                    {/* Efficiency unit toggle — relevant for efficiency charts */}
-                    <div className="efficiency-unit-toggle">
-                        {effOptions(units).map(({ value: key, label }) => (
-                            <button
-                                key={key}
-                                type="button"
-                                onClick={() => setEffUnit(key)}
-                                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${effUnit === key ? 'bg-white shadow text-gray-900' : 'text-gray-500 dark:text-slate-300 hover:text-gray-700 dark:hover:text-slate-100'}`}
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
+                {/* Efficiency unit toggle */}
+                <div className="efficiency-unit-toggle mb-4">
+                    {effOptions(units).map(({ value: key, label }) => (
+                        <button
+                            key={key}
+                            type="button"
+                            onClick={() => setEffUnit(key)}
+                            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${effUnit === key ? 'bg-white shadow text-gray-900' : 'text-gray-500 dark:text-slate-300 hover:text-gray-700 dark:hover:text-slate-100'}`}
+                        >
+                            {label}
+                        </button>
+                    ))}
                 </div>
 
                 {/* Chart type buttons */}

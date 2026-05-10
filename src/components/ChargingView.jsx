@@ -545,10 +545,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         <div>
             {/* ── Top card: presets, axis selectors, run selector — hidden in presentation mode ── */}
             {!presentationMode && <div className="card mb-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="section-title">Chart Options — Charging Performance</h3>
-                </div>
-
                 {/* Presets */}
                 <div className="flex flex-wrap gap-2 mb-6">
                     {chartPresets.map(preset => (

@@ -1231,8 +1231,6 @@ export default function RoadTripView({
             {/* ── Controls ─────────────────────────────────────────────── */}
             {!presentationMode && (
                 <div className="card mb-6">
-                    <h3 className="text-lg font-bold mb-4">Road Trip Settings</h3>
-
                     {/* Toggles row */}
                     <div className="flex flex-wrap gap-6 mb-4">
                         <div>
