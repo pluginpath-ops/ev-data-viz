@@ -1186,6 +1186,33 @@ class DataService {
       .eq('test_group_id', testGroupId);
     if (error) throw error;
   }
+
+  // ── Access logging ──────────────────────────────────────────────────────────
+
+  /**
+   * Record an unauthorised access attempt (RLS violation or permission error).
+   * Writes via a SECURITY DEFINER RPC so anonymous callers can always insert.
+   * Errors are silently swallowed — logging must never surface to the user.
+   *
+   * @param {{ operation, resourceType, resourceId, errorCode, errorMessage }} opts
+   */
+  async logAccessAttempt({ operation, resourceType, resourceId, errorCode, errorMessage }) {
+    if (!this.useSupabase) return;
+    try {
+      await getSupabase().rpc('log_access_attempt', {
+        p_user_id:       this.user?.id        ?? null,
+        p_user_email:    this.user?.email      ?? null,
+        p_operation:     operation,
+        p_resource_type: resourceType          ?? null,
+        p_resource_id:   String(resourceId ?? ''),
+        p_error_code:    errorCode             ?? null,
+        p_error_message: errorMessage          ?? null,
+        p_user_agent:    navigator.userAgent,
+      });
+    } catch {
+      // Intentionally swallowed — logging failures are invisible to the user.
+    }
+  }
 }
 
 export const dataService = new DataService();
