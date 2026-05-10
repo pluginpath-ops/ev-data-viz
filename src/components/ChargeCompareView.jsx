@@ -8,6 +8,7 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun } from '../utils/runUtils';
+import LoadingSpinner from './LoadingSpinner';
 
 // ── Interpolation helper ──────────────────────────────────────────────────────
 // Returns the interpolated yField value at targetX, given points sorted by xField.
@@ -570,15 +571,7 @@ export default function ChargeCompareView({
         <div>
             {/* ── Controls card — hidden in presentation/pop-out mode ── */}
             {!presentationMode && <div className="card mb-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold">Chart Options — Charge Compare</h3>
-                    {loading && (
-                        <span className="flex items-center gap-2 text-sm text-gray-500">
-                            <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-                            Loading charging data…
-                        </span>
-                    )}
-                </div>
+                {loading && <LoadingSpinner message="Loading charging data…" />}
                 <div className="flex flex-wrap items-center gap-6">
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
                         Starting SoC (%):

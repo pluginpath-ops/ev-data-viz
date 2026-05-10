@@ -1889,12 +1889,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         {/* Set Default — ghost text, green on hover, pale blue + × when active */}
                                         <button
                                             onClick={() => run.isDefault ? clearDefaultRun(vehicle.id) : onSetDefaultRun(run.id)}
-                                            title={run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
+                                            title={!canCreate ? 'Sign in to save changes' : run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
                                             className={`text-sm px-2 py-1 rounded transition-colors ${
                                                 run.isDefault
                                                     ? 'bg-blue-100 text-blue-700 hover:bg-red-50 hover:text-red-600 border border-blue-200 hover:border-red-200'
                                                     : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
-                                            }`}
+                                            }${!canCreate ? ' opacity-50 cursor-not-allowed' : ''}`}
                                         >
                                             {run.isDefault
                                                 ? <>Default <span className="text-red-500 font-bold">×</span></>
@@ -1905,7 +1905,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         )}
                                         <button
                                             onClick={() => isPending ? restoreItem(run.id) : queueDelete(run.id)}
-                                            className={`btn text-sm ${isPending ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-0' : 'btn-danger'}`}
+                                            title={!canCreate && !isPending ? 'Sign in to save changes' : undefined}
+                                            className={`btn text-sm ${isPending ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-0' : 'btn-danger'}${!canCreate && !isPending ? ' opacity-50 cursor-not-allowed' : ''}`}
                                         >
                                             {isPending ? '↩ Restore' : 'Delete'}
                                         </button>
