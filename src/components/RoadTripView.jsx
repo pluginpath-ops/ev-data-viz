@@ -14,6 +14,7 @@ import {
     segmentsToChartPointsByTest,
     formatTime, speedCorrectionFactor,
 } from '../utils/roadTripSimulation';
+import LoadingSpinner from './LoadingSpinner';
 
 Chart.register(ZoomPlugin);
 
@@ -1231,6 +1232,7 @@ export default function RoadTripView({
             {/* ── Controls ─────────────────────────────────────────────── */}
             {!presentationMode && (
                 <div className="card mb-6">
+                    {loading && <LoadingSpinner message="Loading charging data…" />}
                     {/* Toggles row */}
                     <div className="flex flex-wrap gap-6 mb-4">
                         <div>

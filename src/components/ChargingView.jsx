@@ -14,6 +14,7 @@ import { useTheme } from '../hooks/useTheme';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
+import LoadingSpinner from './LoadingSpinner';
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, presentationMode = false }) {
     const { units } = useAppContext();
@@ -545,6 +546,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         <div>
             {/* ── Top card: presets, axis selectors, run selector — hidden in presentation mode ── */}
             {!presentationMode && <div className="card mb-6">
+                {loadingData && <LoadingSpinner message="Loading run data…" />}
                 {/* Presets */}
                 <div className="flex flex-wrap gap-2 mb-6">
                     {chartPresets.map(preset => (
