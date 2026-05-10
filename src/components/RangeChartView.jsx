@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import AxisScaleControls from './AxisScaleControls';
 import RunSelector from './RunSelector';
@@ -14,6 +14,7 @@ import {
 } from '../utils/unitConversions';
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { copyChartAsPng } from '../utils/chartUtils';
+import { resolveChartColors } from '../utils/colorUtils';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -95,6 +96,13 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
 
     const plottableRuns = selectedRangeRuns.filter(r => hasDataForType(r, chartType));
 
+    // Perceptual color resolution — nudges default colors to distinct Okabe-Ito
+    // slots; contributor-set colors always win.
+    const colorMap = useMemo(
+        () => resolveChartColors(plottableRuns),
+        [plottableRuns]
+    );
+
     // ── Run toggle ────────────────────────────────────────────────────────────
     const toggleRun = (runId) => {
         const strId = String(runId);
@@ -129,8 +137,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
             const datasets = [{
                 label:           yLabel,
                 data:            plottableRuns.map(r => getY(r)),
-                backgroundColor: plottableRuns.map(r => r.color || '#3b82f6'),
-                borderColor:     plottableRuns.map(r => r.color || '#3b82f6'),
+                backgroundColor: plottableRuns.map(r => colorMap[r.id] || r.color || '#3b82f6'),
+                borderColor:     plottableRuns.map(r => colorMap[r.id] || r.color || '#3b82f6'),
                 borderRadius:    4,
                 borderSkipped:   false,
             }];
@@ -160,7 +168,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         run:      r,
                         x:        isSpeed ? convSpeed(r.speed_mph, units) : convTemp(r.temperature_f, units),
                         y:        getY(r),
-                        _color:   r.color   || '#3b82f6',
+                        _color:   colorMap[r.id] || r.color || '#3b82f6',
                         _runName: r.name,
                     }))
                     .filter(p => p.x != null && p.y != null)
@@ -169,7 +177,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
 
                 // Line stroke = first run's color; individual points use their
                 // own run color so multiple runs per vehicle are distinguishable.
-                const lineColor   = runs[0].color || '#3b82f6';
+                const lineColor   = colorMap[runs[0].id] || runs[0].color || '#3b82f6';
                 const pointColors = runPoints.map(p => p._color);
                 // Keep run objects parallel to points for tooltip access
                 const runMetas    = runPoints.map(p => p.run);
@@ -504,6 +512,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     onToggleRun={toggleRun}
                     onUpdateRunColor={onUpdateRunColor}
                     runFilter={isRangeRun}
+                    colorMap={colorMap}
                     emptyMessage="No range test records"
                     renderRunMeta={run => {
                         const eff         = calcEff(run.distance_miles, run.energy_kwh, effUnit, units);

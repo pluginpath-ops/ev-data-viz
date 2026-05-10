@@ -21,6 +21,7 @@ export default function RunSelector({
     runFilter,
     emptyMessage = 'No runs',
     renderRunMeta = null,
+    colorMap = {},
 }) {
     const [expanded, setExpanded] = useState(false);
     // Default all vehicles to expanded; track explicit collapses
@@ -109,7 +110,7 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRun
                 <>
                     <input
                         type="color"
-                        value={run.color || '#3b82f6'}
+                        value={colorMap[run.id] || run.color || '#3b82f6'}
                         onChange={e => { e.stopPropagation(); onUpdateRunColor(vehicle.id, run.id, e.target.value); }}
                         onClick={e => e.stopPropagation()}
                         className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
@@ -117,9 +118,9 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRun
                     />
                     <input
                         type="text"
-                        value={run.color || '#3b82f6'}
+                        value={colorMap[run.id] || run.color || '#3b82f6'}
                         onChange={e => { e.stopPropagation(); onUpdateRunColor(vehicle.id, run.id, e.target.value); }}
-                        onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRunColor(vehicle.id, run.id, run.color || '#3b82f6'); }}
+                        onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRunColor(vehicle.id, run.id, colorMap[run.id] || run.color || '#3b82f6'); }}
                         onClick={e => e.stopPropagation()}
                         className="hidden w-20 px-2 py-0.5 border rounded text-xs font-mono shrink-0"
                         placeholder="#3b82f6"
