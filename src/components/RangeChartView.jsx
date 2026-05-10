@@ -52,7 +52,7 @@ const hasDataForType = (run, type) => {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, onUpdateRunColor, presentationMode = false }) {
+export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, onUpdateRunColor, presentationMode = false, autoColor = false }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
@@ -96,11 +96,12 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
 
     const plottableRuns = selectedRangeRuns.filter(r => hasDataForType(r, chartType));
 
-    // Perceptual color resolution — nudges default colors to distinct Okabe-Ito
-    // slots; contributor-set colors always win.
+    // Perceptual color resolution.  In auto mode every run gets an Okabe-Ito
+    // slot (with hue-family bias toward the stored color); in manual mode only
+    // default-blue runs are nudged.
     const colorMap = useMemo(
-        () => resolveChartColors(plottableRuns),
-        [plottableRuns]
+        () => resolveChartColors(plottableRuns, {}, autoColor ? 'auto' : 'manual'),
+        [plottableRuns, autoColor]
     );
 
     // ── Run toggle ────────────────────────────────────────────────────────────
@@ -490,9 +491,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     ))}
                 </div>
 
-                {/* Show points toggle — only relevant for line charts */}
-                {CHART_TYPES.find(t => t.key === chartType)?.kind === 'line' && (
-                    <div className="mb-6">
+                {/* Show points + Auto Color toggles */}
+                <div className={`chart-toggles mb-6`}>
+                    {CHART_TYPES.find(t => t.key === chartType)?.kind === 'line' && (
                         <label className="toggle-label">
                             <input
                                 type="checkbox"
@@ -502,8 +503,17 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                             />
                             <span className="text-sm font-medium">Show points</span>
                         </label>
-                    </div>
-                )}
+                    )}
+                    <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
+                        <input
+                            type="checkbox"
+                            checked={autoColor}
+                            onChange={e => setChartConfig(prev => ({ ...prev, autoColor: e.target.checked }))}
+                            className="w-4 h-4"
+                        />
+                        <span className="text-sm font-medium">Auto Color</span>
+                    </label>
+                </div>
 
                 {/* ── Run selector ── */}
                 <RunSelector

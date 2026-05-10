@@ -117,6 +117,7 @@ export default function App() {
         y2Max: null,
         showLine:   true,
         showPoints: false,
+        autoColor:  false,      // when true, all runs get Okabe-Ito palette assignment
         specsField:     null,   // selected field key for Spec Chart mode
         scatterXField:  null,   // selected X field key for Spec Scatter mode
         scatterYField:  null,   // selected Y field key for Spec Scatter mode

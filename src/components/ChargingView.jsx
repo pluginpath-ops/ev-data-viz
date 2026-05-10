@@ -35,15 +35,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         onUpdateRunColor(vehicleId, runId, color);
     };
 
-    // Resolve display colors for all selected runs — nudges runs with the default
-    // color to perceptually distinct Okabe-Ito slots so overlapping defaults are
-    // automatically separated. Contributor-set colors always win.
+    // Resolve display colors for all selected runs.
+    // In 'manual' mode only default-blue runs get nudged; in 'auto' mode all
+    // runs get Okabe-Ito assignment with hue-family bias toward their stored color.
     const colorMap = useMemo(() => {
         const runs = selectedVehicles.flatMap(v =>
             (v.runs || []).filter(r => chartConfig.selectedRuns.includes(r.id))
         );
-        return resolveChartColors(runs);
-    }, [selectedVehicles, chartConfig.selectedRuns]);
+        return resolveChartColors(runs, {}, chartConfig.autoColor ? 'auto' : 'manual');
+    }, [selectedVehicles, chartConfig.selectedRuns, chartConfig.autoColor]);
 
     // Ref so the auto-select effect can read chartMode without it being a dep
     // (avoids changing the deps array size, which React disallows mid-session).
@@ -549,6 +549,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 setChartConfig={setChartConfig}
                 onUpdateRunColor={onUpdateRunColor}
                 presentationMode={presentationMode}
+                autoColor={chartConfig.autoColor ?? false}
             />
         );
     }
@@ -640,6 +641,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             className="w-4 h-4"
                         />
                         <span className="text-sm font-medium">Show points</span>
+                    </label>
+                    <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
+                        <input
+                            type="checkbox"
+                            checked={chartConfig.autoColor ?? false}
+                            onChange={e => setChartConfig({ ...chartConfig, autoColor: e.target.checked })}
+                            className="w-4 h-4"
+                        />
+                        <span className="text-sm font-medium">Auto Color</span>
                     </label>
                 </div>
 
