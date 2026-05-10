@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { convSpeed, speedLabel, distanceLabel } from '../utils/unitConversions';
 import { vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
 import { PALETTE } from '../utils/specHelpers';
+import { resolveChartColors } from '../utils/colorUtils';
 import {
     buildEpaCurve, resolveUseableKwh, resolveUseableKwhSource,
     resolveCoeffs, calibrateEfficiency,
@@ -208,6 +209,8 @@ export default function EpaCurvesView({
     epaConfig,
     setEpaConfig,
     presentationMode = false,
+    autoColor = true,
+    setChartConfig = null,
 }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
@@ -231,6 +234,15 @@ export default function EpaCurvesView({
     const vehiclesWithEpa    = selectedVehicles.filter(v => v.epa_mappings?.length > 0);
     const vehiclesWithoutEpa = selectedVehicles.filter(v => !v.epa_mappings?.length);
 
+    // ── Vehicle color map (Okabe-Ito when autoColor) ──────────────────────────
+    // EPA curves are per-vehicle (not per-run), so we resolve colors at the
+    // vehicle level.  We treat each vehicle as a "run" with .id and .color so
+    // resolveChartColors can do its ΔE work.
+    const vehicleColorMap = useMemo(
+        () => resolveChartColors(vehiclesWithEpa, {}, autoColor ? 'auto' : 'manual'),
+        [vehiclesWithEpa, autoColor]
+    );
+
     // ── Datasets ──────────────────────────────────────────────────────────────
     const datasets = useMemo(() => {
         const result = [];
@@ -249,8 +261,10 @@ export default function EpaCurvesView({
                 const curve            = buildEpaCurve(epaGroup, useableKwh);
                 if (!curve.length) return;
 
-                // Color: user override → vehicle color → palette (with alpha for 2nd+ mapping)
-                const color = mappingColors[mapping.id] ?? defaultMappingColor(vehicle, vi, mi);
+                // Color: user override → vehicleColorMap/vehicle color → palette (with alpha for 2nd+ mapping)
+                const baseColor = vehicleColorMap[vehicle.id] || vehicle.color || PALETTE[vi % PALETTE.length];
+                const autoBase  = mi === 0 ? baseColor : baseColor + 'bb';
+                const color = mappingColors[mapping.id] ?? autoBase;
                 const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name;
                 const label = vehiclesWithEpa.length > 1 || mi > 0
                     ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
@@ -280,7 +294,7 @@ export default function EpaCurvesView({
             });
         });
         return result;
-    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -426,7 +440,7 @@ export default function EpaCurvesView({
             {/* ── Chart Options card ────────────────────────────────────────── */}
             {!presentationMode && (
                 <div className="card mb-6">
-                    {/* Y-axis toggle */}
+                    {/* Y-axis toggle + Auto Color */}
                     <div className="chart-toggles mb-4">
                         <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                             Y axis: <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" className="ml-1" />
@@ -443,6 +457,17 @@ export default function EpaCurvesView({
                                 </button>
                             ))}
                         </div>
+                        {setChartConfig && (
+                            <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
+                                <input
+                                    type="checkbox"
+                                    checked={autoColor}
+                                    onChange={e => setChartConfig(prev => ({ ...prev, autoColor: e.target.checked }))}
+                                    className="w-4 h-4"
+                                />
+                                <span className="text-sm font-medium">Auto Color</span>
+                            </label>
+                        )}
                     </div>
 
                     {/* Collapsible EPA test selector */}
@@ -475,9 +500,10 @@ export default function EpaCurvesView({
                                                             const { epaGroup, confidence } = mapping;
                                                             if (!epaGroup) return null;
                                                             const isVisible  = !hiddenMappings.has(mapping.id);
-                                                            const color      = mappingColors[mapping.id] ?? defaultMappingColor(vehicle, vi, mi).replace(/[0-9a-f]{2}$/i, '');
+                                                            const baseVehicleColor = vehicleColorMap[vehicle.id] || vehicle.color || PALETTE[vi % PALETTE.length];
+                                                            const color      = mappingColors[mapping.id] ?? (mi === 0 ? baseVehicleColor : baseVehicleColor + 'bb').replace(/[0-9a-f]{2}$/i, '');
                                                             // Strip any alpha suffix for the color input
-                                                            const pickerColor = (mappingColors[mapping.id] ?? (vehicle.color || PALETTE[vi % PALETTE.length])).slice(0, 7);
+                                                            const pickerColor = (mappingColors[mapping.id] ?? baseVehicleColor).slice(0, 7);
 
                                                             const { a, b, c } = resolveCoeffs(epaGroup);
                                                             const hwfetKwh = epaGroup.hwfet_unadj_kwh_100mi ?? epaGroup.hwfet_adj_kwh_100mi;

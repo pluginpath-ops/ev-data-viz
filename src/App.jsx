@@ -117,7 +117,7 @@ export default function App() {
         y2Max: null,
         showLine:   true,
         showPoints: false,
-        autoColor:  false,      // when true, all runs get Okabe-Ito palette assignment
+        autoColor:  true,       // when true, all runs get Okabe-Ito palette assignment
         specsField:     null,   // selected field key for Spec Chart mode
         scatterXField:  null,   // selected X field key for Spec Scatter mode
         scatterYField:  null,   // selected Y field key for Spec Scatter mode
@@ -730,6 +730,8 @@ export default function App() {
                             roadTripConfig={roadTripConfig}
                             setRoadTripConfig={setRoadTripConfig}
                             onUpdateRunColor={updateRunColor}
+                            autoColor={chartConfig.autoColor ?? true}
+                            setChartConfig={setChartConfig}
                         />
                     )}
                     {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'compare' && (
@@ -766,6 +768,8 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                             epaConfig={epaConfig}
                             setEpaConfig={setEpaConfig}
+                            autoColor={chartConfig.autoColor ?? true}
+                            setChartConfig={setChartConfig}
                         />
                     )}
                     {view === 'specs' && (
