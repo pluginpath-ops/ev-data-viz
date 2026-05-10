@@ -856,14 +856,20 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const missingJoinKey    = uploadMode === 'merge' && !canJoinBySoc && !canJoinByTime;
 
     // ── Derived-column offer logic ────────────────────────────────────────────
-    // Range test runs available for measured-range estimation
+    // Range test runs available for measured-range estimation.
+    // Requires has_range + distance_miles; start_soc/end_soc are optional —
+    // if absent we treat the test as a full 0→100% run (a safe approximation).
     const rangeTestRuns = (vehicle?.runs ?? [])
-        .filter(r => r.has_range && r.start_soc != null && r.end_soc != null
-            && r.distance_miles > 0 && (r.start_soc - r.end_soc) > 0)
+        .filter(r => r.has_range && r.distance_miles > 0
+            && (r.start_soc == null || r.end_soc == null || (r.start_soc - r.end_soc) > 0))
         .sort((a, b) => new Date(b.date) - new Date(a.date));
     const selectedRangeTestRun = rangeTestRuns.find(r => r.id === selectedRangeTestRunId) ?? rangeTestRuns[0] ?? null;
     const effectiveRangeFromTest = selectedRangeTestRun
-        ? Math.round(selectedRangeTestRun.distance_miles * 100 / (selectedRangeTestRun.start_soc - selectedRangeTestRun.end_soc))
+        ? (() => {
+            const hasSoc = selectedRangeTestRun.start_soc != null && selectedRangeTestRun.end_soc != null;
+            const socDelta = hasSoc ? (selectedRangeTestRun.start_soc - selectedRangeTestRun.end_soc) : 100;
+            return Math.round(selectedRangeTestRun.distance_miles * 100 / socDelta);
+        })()
         : null;
     const offerRangeEstimateTest = !!fieldMapping.soc && !fieldMapping.range && rangeTestRuns.length > 0;
 
@@ -1701,15 +1707,21 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200">
                                                         <p className="text-xs text-blue-800 font-semibold mb-2">ℹ No range data — estimate from SoC%:</p>
                                                         <div className="flex flex-wrap gap-2">
-                                                            {effectiveRangeFromTest && (
-                                                                <button
-                                                                    onClick={() => handleEstimateRangeInEdit(effectiveRangeFromTest)}
-                                                                    className="text-xs px-3 py-1 rounded border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
-                                                                    title={`Measured range test: ${selectedRangeTestRun?.name} (${selectedRangeTestRun?.distance_miles} mi @ ${selectedRangeTestRun?.start_soc}→${selectedRangeTestRun?.end_soc}% SoC)`}
-                                                                >
-                                                                    Measured ({effectiveRangeFromTest} mi / 100%)
-                                                                </button>
-                                                            )}
+                                                            {effectiveRangeFromTest && (() => {
+                                                                const hasSocMeta = selectedRangeTestRun?.start_soc != null && selectedRangeTestRun?.end_soc != null;
+                                                                const tip = hasSocMeta
+                                                                    ? `From: ${selectedRangeTestRun?.name} — ${selectedRangeTestRun?.distance_miles} mi @ ${selectedRangeTestRun?.start_soc}→${selectedRangeTestRun?.end_soc}% SoC`
+                                                                    : `From: ${selectedRangeTestRun?.name} — ${selectedRangeTestRun?.distance_miles} mi (no SoC metadata; assuming 0→100%)`;
+                                                                return (
+                                                                    <button
+                                                                        onClick={() => handleEstimateRangeInEdit(effectiveRangeFromTest)}
+                                                                        className="text-xs px-3 py-1 rounded border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
+                                                                        title={tip}
+                                                                    >
+                                                                        Measured ({effectiveRangeFromTest} mi / 100%){!hasSocMeta && ' *'}
+                                                                    </button>
+                                                                );
+                                                            })()}
                                                             {epaRange && (
                                                                 <button
                                                                     onClick={() => handleEstimateRangeInEdit(epaRange)}
