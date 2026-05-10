@@ -82,6 +82,7 @@ export default function RunSelector({
                                                         onToggle={() => onToggleRun(run.id)}
                                                         onUpdateRunColor={onUpdateRunColor}
                                                         renderRunMeta={renderRunMeta}
+                                                        colorMap={colorMap}
                                                     />
                                                 ))}
                                             </div>
@@ -97,7 +98,7 @@ export default function RunSelector({
     );
 }
 
-function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunMeta }) {
+function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunMeta, colorMap = {} }) {
     return (
         <label className={`flex items-center gap-2 cursor-pointer ${!isChecked ? 'opacity-60 hover:opacity-100' : ''}`}>
             <input
