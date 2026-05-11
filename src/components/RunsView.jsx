@@ -1929,13 +1929,24 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                         </th>
                                                                         );
                                                                     })}
-                                                                    {canEdit(vehicle) && <th className="w-6"></th>}
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
                                                                 {(editData || []).map((row, i) => (
                                                                     <tr key={i} className={`border-t ${i % 2 !== 0 ? 'bg-gray-50/50' : ''}`}>
-                                                                        <td className="px-2 py-0.5 text-gray-400 select-none">{i + 1}</td>
+                                                                        {/* Row # + delete button share the first cell */}
+                                                                        <td className="px-1 py-0.5 text-gray-400 select-none whitespace-nowrap">
+                                                                            <div className="flex items-center gap-1">
+                                                                                {canEdit(vehicle) && (
+                                                                                    <button
+                                                                                        onClick={() => handleDeleteDataRow(i)}
+                                                                                        className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors leading-none flex-shrink-0"
+                                                                                        title="Remove row"
+                                                                                    >×</button>
+                                                                                )}
+                                                                                <span className="text-[11px]">{i + 1}</span>
+                                                                            </div>
+                                                                        </td>
                                                                         {/* Timestamp cell — read-only, only rendered when column is visible */}
                                                                         {editData?.some(r => r.timestamp != null) && (
                                                                             <td className="px-2 py-0.5 text-gray-500 whitespace-nowrap text-[11px] font-mono select-all">
@@ -1960,15 +1971,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                                 />
                                                                             </td>
                                                                         ))}
-                                                                        {canEdit(vehicle) && (
-                                                                            <td className="px-1 text-center">
-                                                                                <button
-                                                                                    onClick={() => handleDeleteDataRow(i)}
-                                                                                    className="text-gray-300 hover:text-red-500 leading-none"
-                                                                                    title="Remove row"
-                                                                                >×</button>
-                                                                            </td>
-                                                                        )}
                                                                     </tr>
                                                                 ))}
                                                             </tbody>
