@@ -826,6 +826,7 @@ class DataService {
     }
     const rows = points.map((p, i) => ({
       frame:       p.frame ?? i,
+      timestamp:   p.timestamp ?? null,
       soc:         roundField(p.soc,         1),
       charge_rate: roundField(p.chargeRate,  2),
       time_value:  roundField(p.time,        1),

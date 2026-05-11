@@ -1879,6 +1879,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             <thead className="bg-gray-50 sticky top-0 z-10 border-b">
                                                                 <tr>
                                                                     <th className="px-2 py-1.5 text-left text-gray-500 font-medium w-8">#</th>
+                                                                    {/* Read-only timestamp column — only rendered when data has timestamps */}
+                                                                    {editData?.some(r => r.timestamp != null) && (
+                                                                        <th className="px-2 py-1.5 text-left text-gray-500 font-medium whitespace-nowrap">
+                                                                            Timestamp
+                                                                        </th>
+                                                                    )}
                                                                     {[['soc','SoC (%)'],['chargeRate','kW'],['time','Time'],['range','Range'],['temperature','Temp']].map(([field, label]) => {
                                                                         const isEst      = editCalculatedFields.includes(field);
                                                                         const isActive   = sortField === field;
@@ -1930,6 +1936,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 {(editData || []).map((row, i) => (
                                                                     <tr key={i} className={`border-t ${i % 2 !== 0 ? 'bg-gray-50/50' : ''}`}>
                                                                         <td className="px-2 py-0.5 text-gray-400 select-none">{i + 1}</td>
+                                                                        {/* Timestamp cell — read-only, only rendered when column is visible */}
+                                                                        {editData?.some(r => r.timestamp != null) && (
+                                                                            <td className="px-2 py-0.5 text-gray-500 whitespace-nowrap text-[11px] font-mono select-all">
+                                                                                {row.timestamp
+                                                                                    ? new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                                                                    : <span className="text-gray-300">—</span>}
+                                                                            </td>
+                                                                        )}
                                                                         {['soc','chargeRate','time','range','temperature'].map(field => (
                                                                             <td key={field} className="px-1 py-0.5">
                                                                                 <input
