@@ -437,12 +437,73 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             const lower = String(header).toLowerCase();
             if (lower.includes('soc') || lower.includes('state of charge')) autoMapping.soc = header;
             if (lower.includes('charge') && lower.includes('rate')) autoMapping.chargeRate = header;
-            if (lower.includes('time')) autoMapping.time = header;
+            // 'timestamp' is more specific — check it before the generic 'time' test
+            if (lower.includes('timestamp')) autoMapping.timestamp = header;
+            else if (lower.includes('time')) autoMapping.time = header;
             if (lower.includes('range')) autoMapping.range = header;
             if (lower.includes('temp')) autoMapping.temperature = header;
             if (lower.includes('frame')) autoMapping.frame = header;
         });
         return autoMapping;
+    };
+
+    /**
+     * Return true when a single CSV cell value looks like a wall-clock timestamp
+     * rather than a plain number (seconds / minutes).
+     */
+    const isTimestampValue = (val) =>
+        val != null && typeof val === 'string' && val.trim() !== '' &&
+        isNaN(Number(val)) && !isNaN(Date.parse(val));
+
+    /**
+     * After field mapping, detect timestamp columns and convert them to elapsed
+     * minutes from the first data point.
+     *
+     * Two cases handled:
+     *   A. `timestamp` field is mapped (explicit wall-clock column).
+     *      → compute `time` from it if `time` is not already mapped.
+     *   B. `time` field is mapped but the first non-null value is a timestamp
+     *      string, not a number.
+     *      → convert `time` in-place; preserve original string as `timestamp`.
+     *
+     * Returns { rows, converted: boolean }.
+     */
+    const applyTimestampConversion = (rows) => {
+        const firstWithTs   = rows.find(r => r.timestamp != null);
+        const firstWithTime = rows.find(r => r.time != null);
+
+        // Case A: explicit timestamp column mapped
+        if (firstWithTs && isTimestampValue(firstWithTs.timestamp)) {
+            const t0 = new Date(firstWithTs.timestamp).getTime();
+            return {
+                rows: rows.map(row => ({
+                    ...row,
+                    // Only fill `time` when it wasn't already supplied
+                    time: row.time != null ? row.time
+                        : row.timestamp != null
+                            ? roundTo((new Date(row.timestamp).getTime() - t0) / 60000, 3)
+                            : null,
+                })),
+                converted: true,
+            };
+        }
+
+        // Case B: `time` column contains timestamp strings
+        if (firstWithTime && isTimestampValue(firstWithTime.time)) {
+            const t0 = new Date(firstWithTime.time).getTime();
+            return {
+                rows: rows.map(row => ({
+                    ...row,
+                    timestamp: row.timestamp ?? row.time,   // save original
+                    time: row.time != null
+                        ? roundTo((new Date(row.time).getTime() - t0) / 60000, 3)
+                        : null,
+                })),
+                converted: true,
+            };
+        }
+
+        return { rows, converted: false };
     };
 
     const handleFileUpload = async (e) => {
@@ -533,6 +594,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             return newRow;
         });
 
+        // Convert wall-clock timestamps → elapsed minutes if needed
+        ({ rows: transformedData } = applyTimestampConversion(transformedData));
+
         // Sort by time → soc so out-of-order CSV files don't create jumbled charts
         transformedData = sortPointsByTime(transformedData);
 
@@ -579,6 +643,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             });
             return newRow;
         });
+
+        // Convert wall-clock timestamps → elapsed minutes if needed
+        ({ rows: transformedData } = applyTimestampConversion(transformedData));
 
         // Apply opted-in estimations
         if (estimations.range) {
@@ -1348,9 +1415,17 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
                             <h4 className="font-semibold mb-3">Field Mapping</h4>
                             <div className="space-y-3">
-                                {['soc', 'chargeRate', 'time', 'range', 'temperature', 'frame'].map(field => (
+                                {[
+                                    ['soc',         'SoC (%)'],
+                                    ['chargeRate',  'Charge Rate (kW)'],
+                                    ['timestamp',   'Timestamp (wall clock)'],
+                                    ['time',        'Elapsed Time (min/s)'],
+                                    ['range',       'Range (mi/km)'],
+                                    ['temperature', 'Temperature'],
+                                    ['frame',       'Frame #'],
+                                ].map(([field, label]) => (
                                     <div key={field} className="field-mapping-row">
-                                        <label className="w-40 font-medium capitalize">{field.replace(/([A-Z])/g, ' $1')}:</label>
+                                        <label className="w-44 font-medium">{label}:</label>
                                         <select
                                             value={fieldMapping[field] || ''}
                                             onChange={(e) => setFieldMapping({...fieldMapping, [field]: e.target.value})}
@@ -1366,6 +1441,23 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     </div>
                                 ))}
                             </div>
+
+                            {/* Timestamp conversion notice */}
+                            {(() => {
+                                const tsMapped  = !!fieldMapping.timestamp;
+                                const timeMapped = !!fieldMapping.time;
+                                // Peek at first row to detect timestamp strings in the time column
+                                const firstRow  = csvData?.data?.[0];
+                                const timeColTs = timeMapped && firstRow &&
+                                    isTimestampValue(firstRow[fieldMapping.time]);
+                                if (!tsMapped && !timeColTs) return null;
+                                return (
+                                    <p className="mt-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                                        📅 Timestamps detected — will be converted to elapsed minutes from the first data point
+                                        {tsMapped && !timeMapped && ' (Elapsed Time will be derived automatically)'}
+                                    </p>
+                                );
+                            })()}
 
                             {/* ── Derived-column offers ── */}
                             {offerRangeEstimateTest && (
@@ -1787,6 +1879,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             <thead className="bg-gray-50 sticky top-0 z-10 border-b">
                                                                 <tr>
                                                                     <th className="px-2 py-1.5 text-left text-gray-500 font-medium w-8">#</th>
+                                                                    {/* Read-only timestamp column — only rendered when data has timestamps */}
+                                                                    {editData?.some(r => r.timestamp != null) && (
+                                                                        <th className="px-2 py-1.5 text-left text-gray-500 font-medium whitespace-nowrap">
+                                                                            Timestamp
+                                                                        </th>
+                                                                    )}
                                                                     {[['soc','SoC (%)'],['chargeRate','kW'],['time','Time'],['range','Range'],['temperature','Temp']].map(([field, label]) => {
                                                                         const isEst      = editCalculatedFields.includes(field);
                                                                         const isActive   = sortField === field;
@@ -1831,13 +1929,32 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                         </th>
                                                                         );
                                                                     })}
-                                                                    {canEdit(vehicle) && <th className="w-6"></th>}
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
                                                                 {(editData || []).map((row, i) => (
                                                                     <tr key={i} className={`border-t ${i % 2 !== 0 ? 'bg-gray-50/50' : ''}`}>
-                                                                        <td className="px-2 py-0.5 text-gray-400 select-none">{i + 1}</td>
+                                                                        {/* Row # + delete button share the first cell */}
+                                                                        <td className="px-1 py-0.5 text-gray-400 select-none whitespace-nowrap">
+                                                                            <div className="flex items-center gap-1">
+                                                                                {canEdit(vehicle) && (
+                                                                                    <button
+                                                                                        onClick={() => handleDeleteDataRow(i)}
+                                                                                        className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors leading-none flex-shrink-0"
+                                                                                        title="Remove row"
+                                                                                    >×</button>
+                                                                                )}
+                                                                                <span className="text-[11px]">{i + 1}</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        {/* Timestamp cell — read-only, only rendered when column is visible */}
+                                                                        {editData?.some(r => r.timestamp != null) && (
+                                                                            <td className="px-2 py-0.5 text-gray-500 whitespace-nowrap text-[11px] font-mono select-all">
+                                                                                {row.timestamp
+                                                                                    ? new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                                                                    : <span className="text-gray-300">—</span>}
+                                                                            </td>
+                                                                        )}
                                                                         {['soc','chargeRate','time','range','temperature'].map(field => (
                                                                             <td key={field} className="px-1 py-0.5">
                                                                                 <input
@@ -1854,15 +1971,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                                 />
                                                                             </td>
                                                                         ))}
-                                                                        {canEdit(vehicle) && (
-                                                                            <td className="px-1 text-center">
-                                                                                <button
-                                                                                    onClick={() => handleDeleteDataRow(i)}
-                                                                                    className="text-gray-300 hover:text-red-500 leading-none"
-                                                                                    title="Remove row"
-                                                                                >×</button>
-                                                                            </td>
-                                                                        )}
                                                                     </tr>
                                                                 ))}
                                                             </tbody>
