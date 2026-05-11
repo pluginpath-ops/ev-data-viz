@@ -126,6 +126,7 @@ function makeCalloutPlugin(calloutMphs, yAxis, units, isDark) {
 
 const Y_MODES = [
     { key: 'kwh100mi', label: 'kWh/100mi' },
+    { key: 'wh_mi',    label: 'Wh/mi'     },
     { key: 'mi_kwh',   label: 'mi/kWh'    },
     { key: 'mpge',     label: 'MPGe'       },
     { key: 'range_mi', label: 'Range (mi)' },
@@ -134,6 +135,7 @@ const Y_MODES = [
 function getYValue(point, yAxis) {
     switch (yAxis) {
         case 'kwh100mi': return point.kwh100mi;
+        case 'wh_mi':    return point.kwh100mi != null ? point.kwh100mi * 10 : null;
         case 'mi_kwh':   return point.miPerKwh;
         case 'mpge':     return point.mpge;
         case 'range_mi': return point.rangeMi;
@@ -145,9 +147,11 @@ function yAxisLabel(yAxis, units) {
     if (yAxis === 'range_mi') return `Range (${distanceLabel(units)})`;
     if (units === 'metric') {
         if (yAxis === 'kwh100mi') return 'kWh/100km';
+        if (yAxis === 'wh_mi')    return 'Wh/km';
         if (yAxis === 'mi_kwh')   return 'km/kWh';
     }
     if (yAxis === 'kwh100mi') return 'kWh/100mi';
+    if (yAxis === 'wh_mi')    return 'Wh/mi';
     if (yAxis === 'mi_kwh')   return 'mi/kWh';
     if (yAxis === 'mpge')     return 'MPGe';
     return '';
@@ -157,6 +161,7 @@ function convertYValue(val, yAxis, units) {
     if (val == null) return null;
     if (units !== 'metric') return val;
     if (yAxis === 'kwh100mi') return val / 1.60934;
+    if (yAxis === 'wh_mi')    return val / 1.60934; // Wh/mi → Wh/km
     if (yAxis === 'mi_kwh')   return val * 1.60934;
     if (yAxis === 'range_mi') return val * 1.60934;
     return val;
@@ -340,7 +345,26 @@ export default function EpaCurvesView({
                 plugins: {
                     legend: {
                         display: datasets.length > 1,
-                        labels: { color: legendColor, usePointStyle: true, pointStyleWidth: 16 },
+                        labels: {
+                            color: legendColor,
+                            // Draw a short dashed line matching each dataset's line style
+                            // rather than the default filled circle.
+                            generateLabels(chart) {
+                                return chart.data.datasets.map((ds, i) => ({
+                                    text:        ds.label,
+                                    fontColor:   legendColor,
+                                    fillStyle:   'transparent',
+                                    strokeStyle: ds.borderColor,
+                                    lineWidth:   ds.borderWidth ?? 2,
+                                    lineDash:    ds.borderDash  ?? [],
+                                    hidden:      !chart.isDatasetVisible(i),
+                                    datasetIndex: i,
+                                }));
+                            },
+                            usePointStyle: false,
+                            boxWidth: 24,
+                            boxHeight: 2,
+                        },
                     },
                     tooltip: {
                         callbacks: {
@@ -364,6 +388,11 @@ export default function EpaCurvesView({
                                     valStr = pt.kwh100mi != null
                                         ? `${(units === 'metric' ? pt.kwh100mi / 1.60934 : pt.kwh100mi).toFixed(1)} ${units === 'metric' ? 'kWh/100km' : 'kWh/100mi'}`
                                         : '—';
+                                } else if (yAxis === 'wh_mi') {
+                                    const wh = pt.kwh100mi != null ? pt.kwh100mi * 10 : null;
+                                    valStr = wh != null
+                                        ? `${(units === 'metric' ? wh / 1.60934 : wh).toFixed(1)} ${units === 'metric' ? 'Wh/km' : 'Wh/mi'}`
+                                        : '—';
                                 } else if (yAxis === 'mi_kwh') {
                                     valStr = pt.miPerKwh != null
                                         ? `${(units === 'metric' ? pt.miPerKwh * 1.60934 : pt.miPerKwh).toFixed(2)} ${units === 'metric' ? 'km/kWh' : 'mi/kWh'}`
@@ -378,7 +407,7 @@ export default function EpaCurvesView({
                                 return `${ds.label}: ${valStr}`;
                             },
                         },
-                        mode: 'index',
+                        mode: 'nearest',
                         intersect: false,
                     },
                 },
