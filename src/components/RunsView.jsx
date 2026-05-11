@@ -746,8 +746,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     };
 
     // Fill null range values from SoC × effective range from the selected test run.
-    const handleEstimateRangeInEdit = () => {
-        const ratedRange = effectiveRangeFromTest;
+    const handleEstimateRangeInEdit = (ratedRange = effectiveRangeFromTest) => {
         if (!editData || !ratedRange) return;
         setEditData(prev => prev.map(row => ({
             ...row,
@@ -857,14 +856,20 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const missingJoinKey    = uploadMode === 'merge' && !canJoinBySoc && !canJoinByTime;
 
     // ── Derived-column offer logic ────────────────────────────────────────────
-    // Range test runs available for measured-range estimation
+    // Range test runs available for measured-range estimation.
+    // Requires has_range + distance_miles; start_soc/end_soc are optional —
+    // if absent we treat the test as a full 0→100% run (a safe approximation).
     const rangeTestRuns = (vehicle?.runs ?? [])
-        .filter(r => r.has_range && r.start_soc != null && r.end_soc != null
-            && r.distance_miles > 0 && (r.start_soc - r.end_soc) > 0)
+        .filter(r => r.has_range && r.distance_miles > 0
+            && (r.start_soc == null || r.end_soc == null || r.start_soc !== r.end_soc))
         .sort((a, b) => new Date(b.date) - new Date(a.date));
     const selectedRangeTestRun = rangeTestRuns.find(r => r.id === selectedRangeTestRunId) ?? rangeTestRuns[0] ?? null;
     const effectiveRangeFromTest = selectedRangeTestRun
-        ? Math.round(selectedRangeTestRun.distance_miles * 100 / (selectedRangeTestRun.start_soc - selectedRangeTestRun.end_soc))
+        ? (() => {
+            const hasSoc = selectedRangeTestRun.start_soc != null && selectedRangeTestRun.end_soc != null;
+            const socDelta = hasSoc ? Math.abs(selectedRangeTestRun.start_soc - selectedRangeTestRun.end_soc) : 100;
+            return Math.round(selectedRangeTestRun.distance_miles * 100 / socDelta);
+        })()
         : null;
     const offerRangeEstimateTest = !!fieldMapping.soc && !fieldMapping.range && rangeTestRuns.length > 0;
 
@@ -1191,6 +1196,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         className="form-input"
                                                         min="0" max="100"
                                                     />
+                                                    {runMetadata.startSoc !== '' && runMetadata.endSoc !== '' &&
+                                                     parseFloat(runMetadata.startSoc) < parseFloat(runMetadata.endSoc) && (
+                                                        <p className="col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                            ⚠ Start SoC is lower than End SoC — for a range test the vehicle depletes, so Start should be higher (e.g. 95% → 5%). Did you swap them?
+                                                        </p>
+                                                    )}
                                                     <input
                                                         type="number"
                                                         placeholder="Speed (mph)"
@@ -1374,8 +1385,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         className="mt-1 border p-1 rounded text-xs w-full max-w-xs"
                                                     >
                                                         {rangeTestRuns.map(r => {
-                                                            const eff = Math.round(r.distance_miles * 100 / (r.start_soc - r.end_soc));
-                                                            return <option key={r.id} value={r.id}>{r.name} — {eff} mi effective</option>;
+                                                            const hasSoc = r.start_soc != null && r.end_soc != null;
+                                                            const socDelta = hasSoc ? Math.abs(r.start_soc - r.end_soc) : 100;
+                                                            const eff = Math.round(r.distance_miles * 100 / socDelta);
+                                                            return <option key={r.id} value={r.id}>{r.name} — {eff} mi effective{!hasSoc ? ' (est.)' : ''}</option>;
                                                         })}
                                                     </select>
                                                 )}
@@ -1609,6 +1622,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     className="form-input"
                                                     min="0" max="100"
                                                 />
+                                                {editFormData.startSoc !== '' && editFormData.endSoc !== '' &&
+                                                 parseFloat(editFormData.startSoc) < parseFloat(editFormData.endSoc) && (
+                                                    <p className="col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                        ⚠ Start SoC is lower than End SoC — for a range test the vehicle depletes, so Start should be higher (e.g. 95% → 5%). Did you swap them?
+                                                    </p>
+                                                )}
                                                 <input
                                                     type="number"
                                                     placeholder="Speed (mph)"
@@ -1691,24 +1710,45 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     {showDataTable && (
                                         <div className="mt-3">
                                             {/* Range estimation offer — shown when range is absent but SoC exists */}
-                                            {canEdit(vehicle) && !editDataLoading && editData !== null &&
-                                             editData.some(r => r.soc != null) &&
-                                             editData.every(r => r.range == null) && (
-                                                <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200">
-                                                    <p className="text-xs text-blue-800 font-semibold mb-2">ℹ No range data — estimate from SoC%:</p>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {effectiveRangeFromTest && (
-                                                            <button
-                                                                onClick={() => handleEstimateRangeInEdit()}
-                                                                className="text-xs px-3 py-1 rounded border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
-                                                                title={`From: ${selectedRangeTestRun?.name}`}
-                                                            >
-                                                                Measured ({effectiveRangeFromTest} mi effective)
-                                                            </button>
-                                                        )}
+                                            {(() => {
+                                                const epaRange = vehicle?.range ? parseFloat(vehicle.range) : null;
+                                                const hasAnyOption = effectiveRangeFromTest || epaRange;
+                                                if (!canEdit(vehicle) || editDataLoading || editData === null) return null;
+                                                if (!editData.some(r => r.soc != null)) return null;
+                                                if (!editData.every(r => r.range == null)) return null;
+                                                if (!hasAnyOption) return null;
+                                                return (
+                                                    <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200">
+                                                        <p className="text-xs text-blue-800 font-semibold mb-2">ℹ No range data — estimate from SoC%:</p>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {effectiveRangeFromTest && (() => {
+                                                                const hasSocMeta = selectedRangeTestRun?.start_soc != null && selectedRangeTestRun?.end_soc != null;
+                                                                const tip = hasSocMeta
+                                                                    ? `From: ${selectedRangeTestRun?.name} — ${selectedRangeTestRun?.distance_miles} mi @ ${selectedRangeTestRun?.start_soc}→${selectedRangeTestRun?.end_soc}% SoC`
+                                                                    : `From: ${selectedRangeTestRun?.name} — ${selectedRangeTestRun?.distance_miles} mi (no SoC metadata; assuming 0→100%)`;
+                                                                return (
+                                                                    <button
+                                                                        onClick={() => handleEstimateRangeInEdit(effectiveRangeFromTest)}
+                                                                        className="text-xs px-3 py-1 rounded border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
+                                                                        title={tip}
+                                                                    >
+                                                                        Measured ({effectiveRangeFromTest} mi / 100%){!hasSocMeta && ' *'}
+                                                                    </button>
+                                                                );
+                                                            })()}
+                                                            {epaRange && (
+                                                                <button
+                                                                    onClick={() => handleEstimateRangeInEdit(epaRange)}
+                                                                    className="text-xs px-3 py-1 rounded border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
+                                                                    title={`Use vehicle's EPA-rated range (${epaRange} mi) as the 100% SoC baseline`}
+                                                                >
+                                                                    EPA ({epaRange} mi)
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            )}
+                                                );
+                                            })()}
                                             {/* kWh comparison — charging runs only, once data is loaded */}
                                             {!editDataLoading && editCalcKwh != null && (editFormData.dataFlags || ['charging']).includes('charging') && (() => {
                                                 const manual = editFormData.energyKwh !== '' ? parseFloat(editFormData.energyKwh) : NaN;

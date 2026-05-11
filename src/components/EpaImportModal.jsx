@@ -85,7 +85,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
      * In 'mpge' mode: raw values are MPGe → re-derive kWh/100mi for per-cycle fields.
      */
     const applyUnitOverride = (g) => {
-        const { _raw, ...rest } = g;
+        const { _raw, _hasCycleEnergy, ...rest } = g;
         if (unitOverrides[g.test_group_id] !== 'mpge' || !_raw) return rest;
         const toKwh = (mpge) => (mpge != null && mpge > 0 && mpge < 999)
             ? parseFloat((MPG_E_CONV * 100 / mpge).toFixed(4))
@@ -202,6 +202,11 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                 <span>{summary.withMpge} with combined MPGe</span>
                                 <span className="text-gray-400">·</span>
                                 <span>File: <span className="font-mono text-xs">{fileName}</span></span>
+                                {summary.isMasterList && (
+                                    <span className="text-amber-700 dark:text-amber-400 font-medium">
+                                        ⚠ Master Emissions List — per-cycle kWh/100mi not available; coefficients only
+                                    </span>
+                                )}
                             </div>
 
                             {error && (
