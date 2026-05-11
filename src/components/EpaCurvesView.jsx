@@ -352,6 +352,7 @@ export default function EpaCurvesView({
                             generateLabels(chart) {
                                 return chart.data.datasets.map((ds, i) => ({
                                     text:        ds.label,
+                                    fontColor:   legendColor,
                                     fillStyle:   'transparent',
                                     strokeStyle: ds.borderColor,
                                     lineWidth:   ds.borderWidth ?? 2,
