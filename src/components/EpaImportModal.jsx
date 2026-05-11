@@ -202,6 +202,11 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                 <span>{summary.withMpge} with combined MPGe</span>
                                 <span className="text-gray-400">·</span>
                                 <span>File: <span className="font-mono text-xs">{fileName}</span></span>
+                                {summary.isMasterList && (
+                                    <span className="text-amber-700 dark:text-amber-400 font-medium">
+                                        ⚠ Master Emissions List — per-cycle kWh/100mi not available; coefficients only
+                                    </span>
+                                )}
                             </div>
 
                             {error && (

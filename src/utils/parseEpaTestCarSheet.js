@@ -1,14 +1,24 @@
 /**
- * Parse an EPA Test Car List TSV (tab-separated) or CSV file.
+ * Parse an EPA Test Car List TSV/CSV **or** an EPA Master Emissions List CSV.
  *
- * The EPA file has one row per *test run* — a single vehicle configuration
- * (test group) produces multiple rows: MCT/CD (combined label), FTP (city),
- * HWY (highway), US06, SC03, and optionally Cold-FTP. This parser groups
- * those rows back into one record per test group and extracts per-cycle
- * fuel economy values where available.
+ * The EPA publishes two distinct file formats for BEV test data:
  *
- * Filter: only rows with Test Fuel Type Cd = 62 (Electricity) are kept.
+ *  Test Car List (TCL)
+ *    – One row per test cycle per vehicle configuration.
+ *    – Columns: `Test Category` (MCT/FTP/HWY/…), `RND_ADJ_FE` (kWh/100mi),
+ *      `Test Vehicle ID`, `Test Fuel Type Cd`, `Set Coef A`, etc.
+ *    – Both coefficients AND per-cycle energy data available.
  *
+ *  Master Emissions List (MEL) — the "master" file
+ *    – One row per emission type per test per certification region.
+ *    – Columns renamed (e.g. `Vehicle ID`, `Test Fuel`, `Set Coefficient A`).
+ *    – `Test Category` is gone; cycle derived from `Test Procedure` code.
+ *    – `RND_ADJ_FE` is absent — only emissions data, no energy consumption.
+ *    – Same test appears multiple times (CA + Federal regions) → deduplicated
+ *      by `Test Number`.
+ *    – File begins with a UTF-8 BOM.
+ *
+ * Both formats are detected automatically from the header row.
  * Returns: Array of objects shaped like the epa_test_groups table row.
  */
 
@@ -35,11 +45,6 @@ function kwh100miToMpge(kwh100mi) {
     return Math.round((MPG_E_CONVERSION * 100 / kwh100mi) * 10) / 10;
 }
 
-/**
- * @param {string} text  Raw file text (UTF-8)
- * @param {string} [sourceFileName]  Stored in source_file field
- * @returns {Array<Object>}
- */
 /**
  * Split one line into fields, respecting RFC 4180 CSV quoting rules.
  * For TSV (sep='\t') no quoting is expected so we just split.
@@ -81,9 +86,56 @@ function splitLine(line, sep) {
     return fields;
 }
 
+// ── Master Emissions List: Test Procedure code → cycle category ───────────────
+// Based on EPA test procedure codes for charge-depleting BEV tests.
+const PROC_CODE_TO_CATEGORY = {
+    '77': 'MCT',      // Multi-Cycle Test (combined label summary)
+    '78': 'MCT',      // MCT variant
+    '81': 'FTP',      // Charge-Depleting UDDS (city)
+    '82': 'HWY',      // Charge-Depleting HWFET (highway)
+    '83': 'US06',     // Charge-Depleting US06
+    '84': 'SC03',     // Charge-Depleting SC03
+    '85': 'COLD FTP', // Cold-temperature FTP variant
+    '86': 'COLD FTP', // Cold-temperature FTP
+};
+
+/**
+ * Derive a normalised cycle category string from a row, trying the explicit
+ * Test Category column first (TCL format), then the procedure code (MEL),
+ * then the procedure description as a last resort.
+ */
+function deriveCycleCategory(row, get) {
+    // TCL: explicit column
+    const cat = get(row, 'Test Category');
+    if (cat) return cat.toUpperCase();
+
+    // MEL: numeric procedure code
+    const procCode = get(row, 'Test Procedure');
+    if (PROC_CODE_TO_CATEGORY[procCode]) return PROC_CODE_TO_CATEGORY[procCode];
+
+    // MEL fallback: parse description text
+    const desc = (get(row, 'Test Procedure Description') || '').toUpperCase();
+    if (desc.includes('UDDS'))                        return 'FTP';
+    if (desc.includes('HWFET') || desc.includes('HIGHWAY')) return 'HWY';
+    if (desc.includes('US06'))                        return 'US06';
+    if (desc.includes('SC03'))                        return 'SC03';
+    if (desc.includes('COLD'))                        return 'COLD FTP';
+    if (desc.includes('MCT') || desc.includes('MULTI')) return 'MCT';
+
+    return '';
+}
+
+/**
+ * @param {string} text  Raw file text (UTF-8, may include BOM)
+ * @param {string} [sourceFileName]  Stored in source_file field
+ * @returns {Array<Object>}
+ */
 export function parseEpaTestCarSheet(text, sourceFileName = null) {
+    // Strip UTF-8 BOM (present in Master Emissions List files)
+    const cleanText = text.replace(/^﻿/, '');
+
     // Normalise line endings
-    const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    const lines = cleanText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
     if (lines.length < 2) return [];
 
     // Detect separator: prefer tab; fall back to comma (Excel CSV)
@@ -94,14 +146,34 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
     const colIdx = {};
     headers.forEach((h, i) => { colIdx[h] = i; });
 
-    // Helper: get a cell by column name (returns '' if not found)
+    // ── Format detection ─────────────────────────────────────────────────────
+    // TCL has `Test Category` and `RND_ADJ_FE`.
+    // MEL has `Test Procedure Description` and `Certification Region`.
+    const isMasterList = !('Test Category' in colIdx) && ('Certification Region' in colIdx);
+
+    // ── Column accessor helpers ───────────────────────────────────────────────
+    // get()     — single column name → trimmed string
+    // getAny()  — tries column names in order, returns first non-empty value
     const get = (row, col) => {
         const i = colIdx[col];
         return i !== undefined ? (row[i] ?? '').trim() : '';
     };
+    const getAny = (row, ...cols) => {
+        for (const col of cols) {
+            const v = get(row, col);
+            if (v) return v;
+        }
+        return '';
+    };
     const getNum = (row, col) => numOrNull(get(row, col));
+    const getNumAny = (row, ...cols) => numOrNull(getAny(row, ...cols));
 
     const groups = new Map();
+
+    // MEL: deduplicate rows — the same Test Number appears once per cert region
+    // (e.g. once for California, once for Federal). We only want to process
+    // each actual test once.
+    const seenTestNumbers = new Set();
 
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
@@ -109,30 +181,66 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         const row = splitLine(line, sep);
 
         // ── Fuel type filter ────────────────────────────────────────────────
-        const fuelCd = get(row, 'Test Fuel Type Cd');
+        // TCL: "Test Fuel Type Cd" = '62'   MEL: "Test Fuel" = '62'
+        const fuelCd = getAny(row, 'Test Fuel Type Cd', 'Test Fuel');
         if (fuelCd !== '62') continue; // 62 = Electricity
 
-        // ── Unique key: Test Vehicle ID is specific per configuration (e.g.
-        //    R1S247XR20 = 20in wheels, R1S247XR22 = 22in wheels).
-        //    "Actual Tested Testgroup" is a test-family ID shared across
-        //    multiple configurations — using it would merge the 20in and 22in
-        //    variants into one record, discarding the different A/B/C values.
-        const testVehicleId  = get(row, 'Test Vehicle ID');
-        const testFamilyId   = get(row, 'Actual Tested Testgroup');
-        const testGroupId    = testVehicleId || testFamilyId;
+        // ── MEL deduplication by Test Number ───────────────────────────────
+        if (isMasterList) {
+            const testNumber = get(row, 'Test Number');
+            if (testNumber) {
+                if (seenTestNumbers.has(testNumber)) continue;
+                seenTestNumbers.add(testNumber);
+            }
+        }
+
+        // ── Unique key per vehicle configuration ────────────────────────────
+        // TCL: "Test Vehicle ID"      MEL: "Vehicle ID"
+        // Fallback: "Actual Tested Testgroup" / "Certified Test Group"
+        const testVehicleId = getAny(row, 'Test Vehicle ID', 'Vehicle ID');
+        const testFamilyId  = getAny(row, 'Actual Tested Testgroup', 'Certified Test Group');
+        const testGroupId   = testVehicleId || testFamilyId;
         if (!testGroupId) continue;
 
         // ── Initialise group on first encounter ─────────────────────────────
         if (!groups.has(testGroupId)) {
+            const make = getAny(row,
+                'Represented Test Veh Make',
+                'Represented Test Vehicle Make',
+                'Vehicle Manufacturer Name',
+                'Certificate Manufacturer Name',
+            ) || null;
+
+            const model = getAny(row,
+                'Represented Test Veh Model',
+                'Represented Test Vehicle Model',
+            ) || null;
+
+            const transmission = getAny(row,
+                'Tested Transmission Type',
+                'Transmission Type Description', // prefer description for readability
+                'Transmission Type',
+            ) || null;
+
+            const drive = getAny(row,
+                'Drive System Description',
+                'Test Drive Description',
+            ) || null;
+
+            const fuelDesc = getAny(row,
+                'Test Fuel Type Description',
+                'Test Fuel Description',
+            ) || 'BEV';
+
             groups.set(testGroupId, {
-                test_group_id:      testGroupId,      // Test Vehicle ID (preferred)
-                epa_test_family_id: testFamilyId || null, // Actual Tested Testgroup
+                test_group_id:      testGroupId,
+                epa_test_family_id: testFamilyId || null,
                 model_year: getNum(row, 'Model Year'),
-                make: get(row, 'Represented Test Veh Make') || get(row, 'Vehicle Manufacturer Name') || null,
-                epa_carline_name: get(row, 'Represented Test Veh Model') || null,
-                transmission: get(row, 'Tested Transmission Type') || null,
-                drive: get(row, 'Drive System Description') || null,
-                fuel_type: get(row, 'Test Fuel Type Description') || 'BEV',
+                make,
+                epa_carline_name: model,
+                transmission,
+                drive,
+                fuel_type: fuelDesc,
 
                 equiv_test_weight_lbs: getNum(row, 'Equivalent Test Weight (lbs.)'),
 
@@ -140,10 +248,7 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
                 target_a: null, target_b: null, target_c: null,
                 set_a:    null, set_b:    null, set_c:    null,
 
-                // Per-cycle kWh/100mi (adj = adjusted label values)
-                // Note: only RND_ADJ_FE is used; FE Bag columns are NOT MPGe
-                // for BEVs — their values can be negative (US06) which proves
-                // they are internal test-accounting deltas, not fuel economy.
+                // Per-cycle kWh/100mi — only available in TCL format
                 udds_unadj_kwh_100mi:     null,
                 udds_adj_kwh_100mi:       null,
                 hwfet_unadj_kwh_100mi:    null,
@@ -166,23 +271,29 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
                 source_file:  sourceFileName,
                 ingested_at:  new Date().toISOString(),
 
-                // Raw RND_ADJ_FE column values before our kWh/100mi interpretation.
-                // NOT sent to the database — used only by the import UI so the user
-                // can detect and flip records where the column is actually in MPGe.
+                // Raw RND_ADJ_FE values (TCL only; null for MEL).
+                // NOT sent to the database — used only by the import UI so the
+                // user can detect and flip records where the column is in MPGe.
                 // Stripped by applyUnitOverride() before the DB upsert.
                 _raw: { combined: null, hwfet: null, udds: null, us06: null, sc03: null, cold_ftp: null },
+
+                // Indicates whether per-cycle energy data is available.
+                // False for MEL imports (coefficients only).
+                _hasCycleEnergy: false,
             });
         }
 
         const g = groups.get(testGroupId);
 
-        // ── Road-load coefficients (same for all rows; take first non-null) ──
-        const ta = getNum(row, 'Target Coef A (lbf)');
-        const tb = getNum(row, 'Target Coef B (lbf/mph)');
-        const tc = getNum(row, 'Target Coef C (lbf/mph**2)');
-        const sa = getNum(row, 'Set Coef A (lbf)');
-        const sb = getNum(row, 'Set Coef B (lbf/mph)');
-        const sc = getNum(row, 'Set Coef C (lbf/mph**2)');
+        // ── Road-load coefficients ────────────────────────────────────────────
+        // TCL: "Set Coef A (lbf)"          MEL: "Set Coefficient A (lbf)"
+        // TCL: "Target Coef A (lbf)"       MEL: "Target Coefficient A (lbf)"
+        const ta = getNumAny(row, 'Target Coef A (lbf)', 'Target Coefficient A (lbf)');
+        const tb = getNumAny(row, 'Target Coef B (lbf/mph)', 'Target Coefficient B (lbf/mph)');
+        const tc = getNumAny(row, 'Target Coef C (lbf/mph**2)', 'Target Coefficient C (lbf/mph**2)');
+        const sa = getNumAny(row, 'Set Coef A (lbf)', 'Set Coefficient A (lbf)');
+        const sb = getNumAny(row, 'Set Coef B (lbf/mph)', 'Set Coefficient B (lbf/mph)');
+        const sc = getNumAny(row, 'Set Coef C (lbf/mph**2)', 'Set Coefficient C (lbf/mph**2)');
         if (g.target_a === null && ta !== null) g.target_a = ta;
         if (g.target_b === null && tb !== null) g.target_b = tb;
         if (g.target_c === null && tc !== null) g.target_c = tc;
@@ -190,36 +301,38 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         if (g.set_b === null && sb !== null) g.set_b = sb;
         if (g.set_c === null && sc !== null) g.set_c = sc;
 
-        // ── Per-cycle energy consumption ──────────────────────────────────────
+        // ── Per-cycle energy consumption (TCL only) ───────────────────────────
         // RND_ADJ_FE is kWh/100mi (not MPGe — see kwh100miToMpge comment above).
-        // FE Bag 1/2/3 are internal EPA test-accounting corrections (can be
-        // negative for US06/SC03) and are not usable as consumption values.
-        const category   = get(row, 'Test Category').toUpperCase();
-        const testProcCd = get(row, 'Test Procedure Cd');
-        const feKwh      = getNum(row, 'RND_ADJ_FE'); // kWh/100mi; null if blank or sentinel
-
-        // Plausibility guard: values ≥ 500 are sentinel placeholders (e.g. 999)
+        // MEL files do not include this column; energy fields remain null.
+        const feKwh     = getNum(row, 'RND_ADJ_FE');
         const feKwh100mi = (feKwh != null && feKwh > 0 && feKwh < 500) ? feKwh : null;
 
-        // Cold-FTP: Test Procedure Cd 86 shares Test Category "CD" with MCT.
-        // Detect it by procedure code before falling through to the CD/MCT case.
+        if (feKwh100mi != null) g._hasCycleEnergy = true;
+
+        // ── Cycle category ───────────────────────────────────────────────────
+        // TCL: explicit "Test Category" column (MCT, FTP, HWY, US06, SC03, COLD)
+        // MEL: derived from "Test Procedure" code via PROC_CODE_TO_CATEGORY
+        const category = deriveCycleCategory(row, get);
+
+        // TCL: "Test Procedure Cd"   MEL: "Test Procedure" (same values)
+        const testProcCd = getAny(row, 'Test Procedure Cd', 'Test Procedure');
+
         const isColdFtp = testProcCd === '86' ||
-            category === 'COLD' || category === 'FTP COLD' || category === 'COLD FTP';
+            category === 'COLD' || category === 'COLD FTP' ||
+            category === 'FTP COLD' || category === 'COLD-FTP';
 
         if (isColdFtp) {
-            g._raw.cold_ftp = feKwh;  // store raw (pre-sentinel-filter) for unit-flip UI
+            g._raw.cold_ftp = feKwh;
             if (feKwh100mi != null) g.cold_ftp_adj_kwh_100mi = feKwh100mi;
         } else {
             switch (category) {
-                case 'CD':   // charge-depleting combined — MCT summary row
+                case 'CD':
                 case 'MCT':
                     g._raw.combined = feKwh;
-                    // Convert kWh/100mi → MPGe for the label field
                     if (feKwh100mi != null) g.label_combined_mpge = kwh100miToMpge(feKwh100mi);
                     break;
                 case 'FTP':
                     g._raw.udds = feKwh;
-                    // Already kWh/100mi — store directly, no conversion needed
                     if (feKwh100mi != null) g.udds_adj_kwh_100mi = feKwh100mi;
                     break;
                 case 'HWY':
@@ -257,6 +370,8 @@ export function summariseEpaGroups(groups) {
         yearMin: years.length ? Math.min(...years) : null,
         yearMax: years.length ? Math.max(...years) : null,
         withCoeffs: groups.filter(g => g.set_a !== null || g.target_a !== null).length,
-        withMpge: groups.filter(g => g.label_combined_mpge !== null).length,
+        withMpge:   groups.filter(g => g.label_combined_mpge !== null).length,
+        withCycleEnergy: groups.filter(g => g._hasCycleEnergy).length,
+        isMasterList: groups.length > 0 && !groups[0]._hasCycleEnergy,
     };
 }
