@@ -48,6 +48,50 @@ function kwh100miToMpge(kwh100mi) {
 }
 
 /**
+ * Energy/100mi at or above which a bare RND_ADJ_FE value is assumed to be
+ * MPGe rather than kWh/100mi, when FE_UNIT doesn't say.
+ *
+ * The two scales don't overlap for normal EVs: real consumption is ≈15–50
+ * kWh/100mi, while MPGe is ≈65–250. The mathematical crossover (where a value
+ * equals its own reciprocal conversion, x = 3370.5/x) is ~58, so 60 is a safe
+ * divider. Only the very thirstiest vehicles (e.g. Hummer EV, ~47 MPGe /
+ * ~72 kWh/100mi) fall in the ambiguous band — those rely on FE_UNIT.
+ */
+const MPGE_MAGNITUDE_THRESHOLD = 60;
+
+/**
+ * Normalise a RND_ADJ_FE reading to kWh/100mi.
+ *
+ * RND_ADJ_FE's unit varies by file and is *supposed* to be declared in the
+ * FE_UNIT column ('MPG' = MPGe for electric vehicles). That column has proven
+ * unreliable (blank or wrong in some exports), so FE_UNIT is only trusted when
+ * it is explicit; otherwise we fall back to a magnitude test, which is
+ * unambiguous for all but the thirstiest EVs (see MPGE_MAGNITUDE_THRESHOLD).
+ *
+ * @param {number|null} feRaw   raw RND_ADJ_FE value
+ * @param {string} feUnitRaw    raw FE_UNIT string
+ * @returns {number|null} kWh/100mi, or null when absent/sentinel
+ */
+function normalizeFeToKwh100mi(feRaw, feUnitRaw) {
+    if (feRaw == null || feRaw <= 0) return null;
+
+    const unit = (feUnitRaw || '').toUpperCase();
+    const saysMpge = unit.includes('MPG');
+    const saysKwh  = unit.includes('KWH') || unit.includes('WH');
+
+    let isMpge;
+    if      (saysMpge) isMpge = true;
+    else if (saysKwh)  isMpge = false;
+    else               isMpge = feRaw >= MPGE_MAGNITUDE_THRESHOLD; // magnitude backstop
+
+    if (isMpge) {
+        if (feRaw >= 999) return null;            // EPA sentinel (e.g. 999)
+        return (MPG_E_CONVERSION * 100) / feRaw;  // MPGe → kWh/100mi
+    }
+    return feRaw < 500 ? feRaw : null;            // already kWh/100mi
+}
+
+/**
  * Split one line into fields, respecting RFC 4180 CSV quoting rules.
  * For TSV (sep='\t') no quoting is expected so we just split.
  * For CSV, fields may be wrapped in double-quotes, and "" inside a quoted
@@ -328,19 +372,9 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         //   otherwise        → already kWh/100mi (legacy / some exports)
         // Normalise everything to kWh/100mi. MEL files lack this column, so
         // energy fields remain null for them.
-        const feRaw  = getNum(row, 'RND_ADJ_FE');
-        const feUnit = (get(row, 'FE_UNIT') || '').toUpperCase();
-        let feKwh100mi = null;
-        if (feRaw != null && feRaw > 0) {
-            if (feUnit.includes('MPG')) {
-                // MPGe → kWh/100mi  (kWh/100mi = 33.705 × 100 / MPGe)
-                feKwh100mi = (MPG_E_CONVERSION * 100) / feRaw;
-            } else if (feRaw < 500) {
-                feKwh100mi = feRaw; // already kWh/100mi
-            }
-        }
-        // Keep the raw value (in its source unit) for the import UI toggle.
-        const feKwh = feRaw;
+        const feRaw      = getNum(row, 'RND_ADJ_FE');
+        const feKwh100mi = normalizeFeToKwh100mi(feRaw, get(row, 'FE_UNIT'));
+        const feKwh      = feRaw; // raw source value, retained for diagnostics
 
         if (feKwh100mi != null) g._hasCycleEnergy = true;
 
