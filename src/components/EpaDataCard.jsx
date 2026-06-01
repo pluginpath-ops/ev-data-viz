@@ -12,6 +12,7 @@
  * into the carline column to avoid horizontal scroll.
  */
 import { useState, useEffect } from 'react';
+import { resolveEfficiency } from '../utils/epaPhysics';
 
 const CONFIDENCE_COLORS = {
     verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
@@ -28,7 +29,7 @@ const LABEL_METHOD_OPTIONS = [
     { value: 'mpg-based',        label: 'MPG',      title: 'MPG-based (PHEV)'     },
 ];
 
-export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup, updateEpaLabelMethod, updateEpaTestGroup }) {
+export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup, updateEpaLabelMethod, updateEpaDrivetrainEta, updateEpaTestGroup }) {
     const [groups,         setGroups]         = useState([]);
     const [loading,        setLoading]        = useState(true);
     const [query,          setQuery]          = useState('');
@@ -36,6 +37,8 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
     const [updatingMethod, setUpdatingMethod] = useState(new Set());
     const [draftNames,     setDraftNames]     = useState({});   // keyed by test_group_id
     const [savingName,     setSavingName]     = useState(new Set());
+    const [draftEtas,      setDraftEtas]      = useState({});   // efficiency %, keyed by test_group_id
+    const [savingEta,      setSavingEta]      = useState(new Set());
     const [error,          setError]          = useState(null);
 
     useEffect(() => { load(); }, []);
@@ -43,8 +46,15 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
     // Seed drafts whenever the group list changes
     useEffect(() => {
         const seed = {};
-        groups.forEach(g => { seed[g.test_group_id] = g.display_name ?? ''; });
+        const seedEta = {};
+        groups.forEach(g => {
+            seed[g.test_group_id] = g.display_name ?? '';
+            seedEta[g.test_group_id] = g.drivetrain_eta_override != null
+                ? Math.round(g.drivetrain_eta_override * 100)
+                : '';
+        });
         setDraftNames(seed);
+        setDraftEtas(seedEta);
     }, [groups]);
 
     async function load() {
@@ -102,15 +112,73 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
         setUpdatingMethod(prev => new Set(prev).add(group.test_group_id));
         try {
             await updateEpaLabelMethod?.(group.test_group_id, method);
+            // Manually setting the method clears the "inferred" uncertainty flag.
             setGroups(prev => prev.map(g =>
                 g.test_group_id === group.test_group_id
-                    ? { ...g, label_method: method || null }
+                    ? { ...g, label_method: method || null, label_method_inferred: false }
                     : g
             ));
         } catch (e) {
             setError('Update failed: ' + e.message);
         } finally {
             setUpdatingMethod(prev => { const s = new Set(prev); s.delete(group.test_group_id); return s; });
+        }
+    }
+
+    async function handleEtaSave(group) {
+        const raw     = (draftEtas[group.test_group_id] ?? '').toString().trim();
+        const current = group.drivetrain_eta_override ?? null;
+
+        let newVal = null;
+        if (raw !== '') {
+            const pct = parseFloat(raw);
+            if (isNaN(pct) || pct < 50 || pct > 100) {
+                setError('Drivetrain efficiency must be between 50 and 100%.');
+                setDraftEtas(prev => ({
+                    ...prev,
+                    [group.test_group_id]: current != null ? Math.round(current * 100) : '',
+                }));
+                return;
+            }
+            newVal = Math.round(pct) / 100;
+        }
+
+        if (newVal === current || (newVal == null && current == null)) return;
+
+        setSavingEta(prev => new Set(prev).add(group.test_group_id));
+        try {
+            await updateEpaDrivetrainEta?.(group.test_group_id, newVal);
+            setGroups(prev => prev.map(g =>
+                g.test_group_id === group.test_group_id
+                    ? { ...g, drivetrain_eta_override: newVal }
+                    : g
+            ));
+        } catch (e) {
+            setError('Save failed: ' + e.message);
+            setDraftEtas(prev => ({
+                ...prev,
+                [group.test_group_id]: current != null ? Math.round(current * 100) : '',
+            }));
+        } finally {
+            setSavingEta(prev => { const s = new Set(prev); s.delete(group.test_group_id); return s; });
+        }
+    }
+
+    async function handleEtaClear(group) {
+        if (group.drivetrain_eta_override == null) return;
+        setSavingEta(prev => new Set(prev).add(group.test_group_id));
+        try {
+            await updateEpaDrivetrainEta?.(group.test_group_id, null);
+            setGroups(prev => prev.map(g =>
+                g.test_group_id === group.test_group_id
+                    ? { ...g, drivetrain_eta_override: null }
+                    : g
+            ));
+            setDraftEtas(prev => ({ ...prev, [group.test_group_id]: '' }));
+        } catch (e) {
+            setError('Save failed: ' + e.message);
+        } finally {
+            setSavingEta(prev => { const s = new Set(prev); s.delete(group.test_group_id); return s; });
         }
     }
 
@@ -187,6 +255,7 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">A · B · C</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">MPGe</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Method</th>
+                                <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap" title="Effective drivetrain efficiency used for the steady-state curve. HWFET-calibrated when highway energy data exists; otherwise estimated. Admin override stays flagged uncertain.">Drivetrain η</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold">Linked Vehicles</th>
                                 <th className="px-3 py-2" />
                             </tr>
@@ -291,7 +360,7 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                             )}
                                         </td>
 
-                                        {/* Label method — compact select */}
+                                        {/* Label method — compact select; flag inferred values */}
                                         <td className="px-3 py-2">
                                             <select
                                                 value={g.label_method ?? ''}
@@ -305,6 +374,77 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                                     <option key={o.value} value={o.value} title={o.title}>{o.label}</option>
                                                 ))}
                                             </select>
+                                            {g.label_method_inferred && g.label_method && (
+                                                <div
+                                                    className="text-[9px] text-amber-500 mt-0.5"
+                                                    title="Inferred from available test cycles on import — verify and set to clear this flag."
+                                                >
+                                                    ~inferred
+                                                </div>
+                                            )}
+                                        </td>
+
+                                        {/* Drivetrain η — editable override + provenance badge */}
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            {(() => {
+                                                const { eta, source, certain } = resolveEfficiency(g);
+                                                const isSavingEta = savingEta.has(g.test_group_id);
+                                                const badge = source === 'measured'
+                                                    ? { text: 'HWFET', cls: 'text-green-600 dark:text-green-400', title: 'Calibrated from the vehicle’s own HWFET highway energy — certain.' }
+                                                    : source === 'manual'
+                                                    ? { text: 'manual', cls: 'text-blue-600 dark:text-blue-400', title: 'Admin override — authoritative for the curve but still uncertain (not a direct measurement).' }
+                                                    : { text: 'est', cls: 'text-amber-600 dark:text-amber-400', title: 'Generic estimate — no highway energy data available. Uncertain.' };
+                                                return (
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="font-mono text-gray-700 dark:text-slate-300" title={badge.title}>
+                                                                {!certain && '~'}{Math.round(eta * 100)}%
+                                                            </span>
+                                                            <span className={`text-[9px] font-medium ${badge.cls}`} title={badge.title}>
+                                                                {badge.text}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <input
+                                                                type="number"
+                                                                min={50}
+                                                                max={100}
+                                                                step={1}
+                                                                value={draftEtas[g.test_group_id] ?? ''}
+                                                                placeholder="override"
+                                                                disabled={isDel || isSavingEta}
+                                                                onChange={e => setDraftEtas(prev => ({ ...prev, [g.test_group_id]: e.target.value }))}
+                                                                onBlur={() => handleEtaSave(g)}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter')  { e.target.blur(); }
+                                                                    if (e.key === 'Escape') {
+                                                                        setDraftEtas(prev => ({
+                                                                            ...prev,
+                                                                            [g.test_group_id]: g.drivetrain_eta_override != null
+                                                                                ? Math.round(g.drivetrain_eta_override * 100)
+                                                                                : '',
+                                                                        }));
+                                                                        e.target.blur();
+                                                                    }
+                                                                }}
+                                                                className="form-input text-xs py-0.5 w-16 disabled:opacity-50 placeholder:text-gray-300 dark:placeholder:text-slate-600 placeholder:italic"
+                                                                title="Override drivetrain efficiency (50–100%). Leave blank to use the HWFET-calibrated or estimated value."
+                                                            />
+                                                            {g.drivetrain_eta_override != null && (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={isDel || isSavingEta}
+                                                                    onClick={() => handleEtaClear(g)}
+                                                                    className="text-[10px] text-gray-400 hover:text-red-500 disabled:opacity-40"
+                                                                    title="Clear override"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
 
                                         {/* Linked vehicles with confidence badges */}

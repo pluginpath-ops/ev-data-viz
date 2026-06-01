@@ -828,6 +828,13 @@ export function AppProvider({ children }) {
         await dataService.updateEpaLabelMethod(testGroupId, method);
     };
 
+    /** Set/clear the admin drivetrain-efficiency override, then soft-refresh
+     *  so the curves and surfaced η value update. */
+    const updateEpaDrivetrainEta = async (testGroupId, eta) => {
+        await dataService.updateEpaDrivetrainEta(testGroupId, eta);
+        softRefreshVehicles();
+    };
+
     /** Delete an EPA test group and its vehicle mappings, then refresh vehicles. */
     const deleteEpaTestGroup = async (testGroupId) => {
         try {
@@ -964,6 +971,7 @@ export function AppProvider({ children }) {
         getEpaTestGroupsAdmin,
         deleteEpaTestGroup,
         updateEpaLabelMethod,
+        updateEpaDrivetrainEta,
         updateEpaTestGroup,
     };
 

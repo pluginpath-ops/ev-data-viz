@@ -8,7 +8,7 @@ import { PALETTE } from '../utils/specHelpers';
 import { resolveChartColors } from '../utils/colorUtils';
 import {
     buildEpaCurve, resolveUseableKwh, resolveUseableKwhSource,
-    resolveCoeffs, calibrateEfficiency,
+    resolveCoeffs, resolveEfficiency,
     HWFET_AVG_MPH, HIGHWAY_BAND_MPH,
 } from '../utils/epaPhysics';
 import AxisScaleControls from './AxisScaleControls';
@@ -534,12 +534,11 @@ export default function EpaCurvesView({
                                                             // Strip any alpha suffix for the color input
                                                             const pickerColor = (mappingColors[mapping.id] ?? baseVehicleColor).slice(0, 7);
 
-                                                            const { a, b, c } = resolveCoeffs(epaGroup);
-                                                            const hwfetKwh = epaGroup.hwfet_unadj_kwh_100mi ?? epaGroup.hwfet_adj_kwh_100mi;
-                                                            const eta = a != null ? calibrateEfficiency(a, b, c, hwfetKwh) : null;
-                                                            const hwfetSource = epaGroup.hwfet_unadj_kwh_100mi != null ? 'unadj'
-                                                                              : epaGroup.hwfet_adj_kwh_100mi    != null ? 'adj'
-                                                                              : null;
+                                                            const { a } = resolveCoeffs(epaGroup);
+                                                            // Resolve η with provenance: admin override → HWFET-calibrated → estimate.
+                                                            const { eta: etaResolved, source: etaSource, certain: etaCertain } =
+                                                                a != null ? resolveEfficiency(epaGroup) : { eta: null, source: null, certain: false };
+                                                            const eta = etaResolved;
                                                             const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
                                                             const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
                                                             const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name;
@@ -582,11 +581,11 @@ export default function EpaCurvesView({
                                                                                 </span>
                                                                             )}
                                                                             {eta != null && (
-                                                                                <span>
-                                                                                    η<sub>eff</sub>: {(eta * 100).toFixed(1)}%
-                                                                                    {hwfetSource === 'unadj' && <> · HWFET unadj<InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} /></>}
-                                                                                    {hwfetSource === 'adj'   && <> · HWFET adj<InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} /></>}
-                                                                                    {hwfetSource === null    && <> · default η<InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} /></>}
+                                                                                <span title={!etaCertain ? 'Drivetrain efficiency is uncertain — not a direct HWFET measurement.' : undefined}>
+                                                                                    η<sub>eff</sub>: {!etaCertain && '~'}{(eta * 100).toFixed(1)}%
+                                                                                    {etaSource === 'measured' && <> · HWFET<InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} /></>}
+                                                                                    {etaSource === 'manual'   && <> · manual<InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} /></>}
+                                                                                    {etaSource === 'estimated' && <> · est<InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} /></>}
                                                                                 </span>
                                                                             )}
                                                                             {useableKwh && (

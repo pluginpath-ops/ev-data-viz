@@ -268,6 +268,13 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
                 label_city_mi:       null,
                 label_hwy_mi:        null,
 
+                // Window-sticker label method. Neither EPA file format carries
+                // this explicitly; it is inferred from cycle availability after
+                // the parse loop (see inferLabelMethod below). label_method_inferred
+                // flags that the value was inferred, not admin-confirmed.
+                label_method:          null,
+                label_method_inferred: false,
+
                 source_file:  sourceFileName,
                 ingested_at:  new Date().toISOString(),
 
@@ -354,7 +361,44 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         }
     }
 
+    // ── Infer label method from cycle availability ────────────────────────────
+    // No EPA source column states the window-sticker method, but the set of
+    // cycles that were run is a reliable proxy:
+    //   5-cycle  → US06, SC03 and Cold-FTP energy all present
+    //   2-cycle  → only the UDDS/combined + HWFET pair present
+    // Anything with no cycle energy at all (e.g. Master Emissions List) stays
+    // null. All inferred values are flagged so the UI can mark them uncertain.
+    for (const g of groups.values()) {
+        inferLabelMethod(g);
+    }
+
     return Array.from(groups.values());
+}
+
+/**
+ * Set g.label_method / g.label_method_inferred based on which cycles carry
+ * energy data. Mutates the group in place.
+ */
+function inferLabelMethod(g) {
+    const has5cycle =
+        g.us06_adj_kwh_100mi     != null &&
+        g.sc03_adj_kwh_100mi     != null &&
+        g.cold_ftp_adj_kwh_100mi != null;
+
+    const has2cycle =
+        g.hwfet_adj_kwh_100mi != null &&
+        (g.udds_adj_kwh_100mi != null || g.label_combined_mpge != null);
+
+    if (has5cycle) {
+        g.label_method = '5-cycle';
+        g.label_method_inferred = true;
+    } else if (has2cycle) {
+        g.label_method = '2-cycle';
+        g.label_method_inferred = true;
+    } else {
+        g.label_method = null;
+        g.label_method_inferred = false;
+    }
 }
 
 /**
@@ -372,6 +416,7 @@ export function summariseEpaGroups(groups) {
         withCoeffs: groups.filter(g => g.set_a !== null || g.target_a !== null).length,
         withMpge:   groups.filter(g => g.label_combined_mpge !== null).length,
         withCycleEnergy: groups.filter(g => g._hasCycleEnergy).length,
+        withInferredMethod: groups.filter(g => g.label_method_inferred).length,
         isMasterList: groups.length > 0 && !groups[0]._hasCycleEnergy,
     };
 }

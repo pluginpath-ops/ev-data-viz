@@ -44,7 +44,7 @@ export const MPG_E_CONVERSION = 33.705;
 const LBF_MILE_TO_KWH = 0.001989;
 
 /** Fallback drivetrain efficiency when HWFET data is absent. */
-const DEFAULT_ETA = 0.88;
+export const DEFAULT_ETA = 0.88;
 
 /** Speed range for the curve, mph, inclusive. */
 export const CURVE_SPEED_RANGE = [5, 120];
@@ -136,6 +136,40 @@ export function calibrateEfficiency(a, b, c, hwfetUnadjKwh100mi) {
 }
 
 /**
+ * Resolve the drivetrain efficiency to use for a test group, along with its
+ * provenance so the UI can flag uncertainty.
+ *
+ * Priority:
+ *   1. drivetrain_eta_override — admin-pinned value. Treated as 'manual':
+ *      authoritative for the curve, but still *uncertain* (not a direct
+ *      HWFET measurement).
+ *   2. HWFET-calibrated η — back-solved from the cars's own highway energy
+ *      measurement. This is the only 'measured' (certain) source.
+ *   3. DEFAULT_ETA — generic estimate used when no HWFET energy exists
+ *      (e.g. Master Emissions List imports). 'estimated' / uncertain.
+ *
+ * @param {object} epaGroup — row from epa_test_groups
+ * @returns {{ eta: number, source: 'manual'|'measured'|'estimated', certain: boolean }}
+ */
+export function resolveEfficiency(epaGroup) {
+    // 1. Admin override
+    const override = epaGroup?.drivetrain_eta_override;
+    if (override != null && override > 0 && override <= 1) {
+        return { eta: override, source: 'manual', certain: false };
+    }
+
+    // 2. HWFET-calibrated
+    const { a, b, c } = resolveCoeffs(epaGroup);
+    const hwfetKwh = epaGroup?.hwfet_unadj_kwh_100mi ?? epaGroup?.hwfet_adj_kwh_100mi;
+    if (a != null && b != null && c != null && hwfetKwh > 0) {
+        return { eta: calibrateEfficiency(a, b, c, hwfetKwh), source: 'measured', certain: true };
+    }
+
+    // 3. Generic estimate
+    return { eta: DEFAULT_ETA, source: 'estimated', certain: false };
+}
+
+/**
  * Battery-side energy consumption at a single steady-state speed.
  *
  * @param {number} speedMph
@@ -168,12 +202,9 @@ export function buildEpaCurve(epaGroup, useableKwh) {
     const { a, b, c } = resolveCoeffs(epaGroup);
     if (a == null || b == null || c == null) return [];
 
-    // Prefer unadjusted HWFET (raw dyno value) for calibration; fall back to
-    // adjusted (RND_ADJ_FE kWh/100mi from the test car sheet). Unadj is rarely
-    // present in the test car list; adj is populated for every HWFE/HWY row and
-    // is accurate enough for the steady-state comparative curve.
-    const hwfetKwh = epaGroup.hwfet_unadj_kwh_100mi ?? epaGroup.hwfet_adj_kwh_100mi;
-    const eta = calibrateEfficiency(a, b, c, hwfetKwh);
+    // Drivetrain efficiency, resolved with provenance: admin override →
+    // HWFET-calibrated → generic estimate. (See resolveEfficiency.)
+    const { eta } = resolveEfficiency(epaGroup);
     const results = [];
     const [vMin, vMax] = CURVE_SPEED_RANGE;
 
