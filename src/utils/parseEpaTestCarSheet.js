@@ -60,6 +60,16 @@ function kwh100miToMpge(kwh100mi) {
 const MPGE_MAGNITUDE_THRESHOLD = 60;
 
 /**
+ * MPGe at or above which a value is treated as an EPA "no data" placeholder
+ * rather than a real reading. EPA fills unreported efficiency with high
+ * sentinels — classically 999, but manufacturers also use near-999 values
+ * (e.g. Lucid's 982.1 / 984.9 / 987.5). No production vehicle exceeds ~350
+ * MPGe even on an unadjusted single cycle, so 400 cleanly separates real
+ * data from placeholders.
+ */
+const MPGE_PLACEHOLDER_MIN = 400;
+
+/**
  * Normalise a RND_ADJ_FE reading to kWh/100mi.
  *
  * RND_ADJ_FE's unit varies by file and is *supposed* to be declared in the
@@ -85,10 +95,10 @@ function normalizeFeToKwh100mi(feRaw, feUnitRaw) {
     else               isMpge = feRaw >= MPGE_MAGNITUDE_THRESHOLD; // magnitude backstop
 
     if (isMpge) {
-        if (feRaw >= 999) return null;            // EPA sentinel (e.g. 999)
-        return (MPG_E_CONVERSION * 100) / feRaw;  // MPGe → kWh/100mi
+        if (feRaw >= MPGE_PLACEHOLDER_MIN) return null; // EPA "no data" placeholder
+        return (MPG_E_CONVERSION * 100) / feRaw;        // MPGe → kWh/100mi
     }
-    return feRaw < 500 ? feRaw : null;            // already kWh/100mi
+    return feRaw < 500 ? feRaw : null;                  // already kWh/100mi
 }
 
 /**
@@ -262,12 +272,26 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
 
         // ── Initialise group on first encounter ─────────────────────────────
         if (!groups.has(testGroupId)) {
-            const make = getAny(row,
+            // Make: some files (e.g. Lucid's) mis-file the model year into the
+            // "Represented Test Veh Make" column, so skip purely-numeric values
+            // and fall back to the manufacturer name. Trim verbose legal
+            // suffixes ("Lucid USA, Inc" → "Lucid").
+            let make = null;
+            for (const col of [
                 'Represented Test Veh Make',
                 'Represented Test Vehicle Make',
                 'Vehicle Manufacturer Name',
                 'Certificate Manufacturer Name',
-            ) || null;
+            ]) {
+                const v = get(row, col);
+                if (v && !/^\d+$/.test(v)) { make = v; break; }
+            }
+            if (make) {
+                make = make
+                    .replace(/,?\s*\b(USA|Inc|LLC|Ltd|GmbH|AG|Corp|Corporation|Co|Company)\b\.?/gi, '')
+                    .replace(/,\s*$/, '')
+                    .trim() || make;
+            }
 
             const model = getAny(row,
                 'Represented Test Veh Model',
