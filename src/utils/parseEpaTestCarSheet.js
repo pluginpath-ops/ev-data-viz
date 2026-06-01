@@ -33,9 +33,11 @@ function numOrNull(str) {
 /**
  * Convert kWh/100mi → MPGe (rounded to 1 decimal place).
  *
- * Despite being named "FE" (fuel economy), the RND_ADJ_FE column in the EPA
- * Test Car List stores energy *consumption* in kWh/100mi, not MPGe. This
- * function applies the correct formula: MPGe = (33.705 × 100) / kWh/100mi.
+ * MPGe = (33.705 × 100) / kWh/100mi.
+ *
+ * Note: the RND_ADJ_FE column's unit varies and is declared in FE_UNIT — see
+ * the energy-parsing block below, which normalises RND_ADJ_FE to kWh/100mi
+ * before any value reaches this function.
  *
  * Values ≥ 500 kWh/100mi are EPA sentinel placeholders (e.g. 999 = "label
  * not yet finalized") and are treated as null.
@@ -100,27 +102,39 @@ const PROC_CODE_TO_CATEGORY = {
 };
 
 /**
- * Derive a normalised cycle category string from a row, trying the explicit
- * Test Category column first (TCL format), then the procedure code (MEL),
- * then the procedure description as a last resort.
+ * Derive a normalised cycle category string from a row.
+ *
+ * IMPORTANT: the `Test Category` column is NOT reliable for identifying the
+ * drive cycle. In the EPA Test Car List it holds the *charge mode*
+ * ('CD' = charge-depleting, 'CS' = charge-sustaining) and is identical for
+ * every cycle of a BEV. The actual cycle (UDDS, Highway, US06, …) is named
+ * only in `Test Procedure Description` (e.g. "Charge Depleting Highway").
+ *
+ * Resolution order, most-specific first:
+ *   1. Test Procedure Description text — present in both TCL and MEL formats
+ *   2. Numeric Test Procedure code — last-resort fallback (codes vary by file)
+ *   3. Test Category — only when it names a real cycle (i.e. not CD/CS)
  */
 function deriveCycleCategory(row, get) {
-    // TCL: explicit column
-    const cat = get(row, 'Test Category');
-    if (cat) return cat.toUpperCase();
+    // 1. Procedure description — the authoritative cycle name.
+    const desc = (get(row, 'Test Procedure Description') || '').toUpperCase();
+    if (desc) {
+        if (desc.includes('US06'))                              return 'US06';
+        if (desc.includes('SC03'))                              return 'SC03';
+        if (desc.includes('COLD'))                              return 'COLD FTP';
+        if (desc.includes('HWFET') || desc.includes('HIGHWAY')) return 'HWY';
+        if (desc.includes('UDDS')  || desc.includes('FTP'))     return 'FTP';
+        if (desc.includes('MCT')   || desc.includes('MULTI') || desc.includes('COMBINED')) return 'MCT';
+    }
 
-    // MEL: numeric procedure code
-    const procCode = get(row, 'Test Procedure');
+    // 2. Numeric procedure code (codes differ between file formats — weak signal).
+    const procCode = get(row, 'Test Procedure') || get(row, 'Test Procedure Cd');
     if (PROC_CODE_TO_CATEGORY[procCode]) return PROC_CODE_TO_CATEGORY[procCode];
 
-    // MEL fallback: parse description text
-    const desc = (get(row, 'Test Procedure Description') || '').toUpperCase();
-    if (desc.includes('UDDS'))                        return 'FTP';
-    if (desc.includes('HWFET') || desc.includes('HIGHWAY')) return 'HWY';
-    if (desc.includes('US06'))                        return 'US06';
-    if (desc.includes('SC03'))                        return 'SC03';
-    if (desc.includes('COLD'))                        return 'COLD FTP';
-    if (desc.includes('MCT') || desc.includes('MULTI')) return 'MCT';
+    // 3. Explicit category column — but ignore charge-mode flags (CD/CS),
+    //    which are not cycles.
+    const cat = (get(row, 'Test Category') || '').toUpperCase();
+    if (cat && cat !== 'CD' && cat !== 'CS') return cat;
 
     return '';
 }
@@ -309,10 +323,24 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         if (g.set_c === null && sc !== null) g.set_c = sc;
 
         // ── Per-cycle energy consumption (TCL only) ───────────────────────────
-        // RND_ADJ_FE is kWh/100mi (not MPGe — see kwh100miToMpge comment above).
-        // MEL files do not include this column; energy fields remain null.
-        const feKwh     = getNum(row, 'RND_ADJ_FE');
-        const feKwh100mi = (feKwh != null && feKwh > 0 && feKwh < 500) ? feKwh : null;
+        // RND_ADJ_FE units VARY and are declared in the FE_UNIT column:
+        //   FE_UNIT = 'MPG'  → the value is MPGe (typical for BEV rows)
+        //   otherwise        → already kWh/100mi (legacy / some exports)
+        // Normalise everything to kWh/100mi. MEL files lack this column, so
+        // energy fields remain null for them.
+        const feRaw  = getNum(row, 'RND_ADJ_FE');
+        const feUnit = (get(row, 'FE_UNIT') || '').toUpperCase();
+        let feKwh100mi = null;
+        if (feRaw != null && feRaw > 0) {
+            if (feUnit.includes('MPG')) {
+                // MPGe → kWh/100mi  (kWh/100mi = 33.705 × 100 / MPGe)
+                feKwh100mi = (MPG_E_CONVERSION * 100) / feRaw;
+            } else if (feRaw < 500) {
+                feKwh100mi = feRaw; // already kWh/100mi
+            }
+        }
+        // Keep the raw value (in its source unit) for the import UI toggle.
+        const feKwh = feRaw;
 
         if (feKwh100mi != null) g._hasCycleEnergy = true;
 
@@ -369,6 +397,15 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
     // Anything with no cycle energy at all (e.g. Master Emissions List) stays
     // null. All inferred values are flagged so the UI can mark them uncertain.
     for (const g of groups.values()) {
+        // Derive a combined MPGe from the city + highway cycles when the file
+        // has no explicit combined/MCT summary row (common — many TCL exports
+        // list only the individual UDDS and Highway charge-depleting tests).
+        // EPA combines in consumption space: 55 % city / 45 % highway.
+        if (g.label_combined_mpge == null &&
+            g.udds_adj_kwh_100mi != null && g.hwfet_adj_kwh_100mi != null) {
+            const combinedKwh100mi = 0.55 * g.udds_adj_kwh_100mi + 0.45 * g.hwfet_adj_kwh_100mi;
+            g.label_combined_mpge = kwh100miToMpge(combinedKwh100mi);
+        }
         inferLabelMethod(g);
     }
 
