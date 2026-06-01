@@ -18,9 +18,6 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
     const [selected, setSelected]   = useState(new Set());
     // Map: test_group_id → vehicle id (string) for the link
     const [linkMap, setLinkMap]     = useState({});
-    // Map: test_group_id → 'mpge' when the user has flipped a row's unit assumption.
-    // Default (absent key) means 'kwh' — RND_ADJ_FE treated as kWh/100mi.
-    const [unitOverrides, setUnitOverrides] = useState({});
     const [importing, setImporting] = useState(false);
     const [result, setResult]       = useState(null);
     const [error, setError]         = useState(null);
@@ -38,7 +35,6 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
             setParsed(groups);
             setSelected(new Set(groups.map(g => g.test_group_id)));
             setLinkMap({});
-            setUnitOverrides({});
             setError(null);
             setStep('map');
         };
@@ -62,57 +58,27 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
     const setVehicleLink = (testGroupId, vehicleId) =>
         setLinkMap(prev => ({ ...prev, [testGroupId]: vehicleId }));
 
-    // ── Unit-override helpers ─────────────────────────────────────────────────
-
-    const MPG_E_CONV = 33.705;
+    // ── Pre-upsert cleanup ────────────────────────────────────────────────────
 
     /**
-     * Effective label MPGe for a group given the current unit-override state.
-     * In 'kwh' mode the parser already computed label_combined_mpge correctly.
-     * In 'mpge' mode the raw MCT value IS the MPGe, so use it directly.
+     * Strip parser-only helper fields (_raw, _hasCycleEnergy) that are used by
+     * this modal's preview but are not columns on epa_test_groups.
+     *
+     * Unit handling is now fully automatic: the parser reads the FE_UNIT column
+     * and normalises RND_ADJ_FE to kWh/100mi, so no manual MPGe/kWh toggle is
+     * needed.
      */
-    const effectiveMpge = (g) => {
-        if (unitOverrides[g.test_group_id] === 'mpge') {
-            const raw = g._raw?.combined;
-            return (raw != null && raw > 0 && raw < 999) ? raw : null;
-        }
-        return g.label_combined_mpge;
-    };
-
-    /**
-     * Apply the user's unit-mode choice to a parsed group before DB upsert.
-     * Strips the _raw helper object (not a DB column).
-     * In 'mpge' mode: raw values are MPGe → re-derive kWh/100mi for per-cycle fields.
-     */
-    const applyUnitOverride = (g) => {
+    const stripImportHelpers = (g) => {
         const { _raw, _hasCycleEnergy, ...rest } = g;
-        if (unitOverrides[g.test_group_id] !== 'mpge' || !_raw) return rest;
-        const toKwh = (mpge) => (mpge != null && mpge > 0 && mpge < 999)
-            ? parseFloat((MPG_E_CONV * 100 / mpge).toFixed(4))
-            : null;
-        return {
-            ...rest,
-            label_combined_mpge:    (_raw.combined != null && _raw.combined > 0 && _raw.combined < 999) ? _raw.combined : rest.label_combined_mpge,
-            hwfet_adj_kwh_100mi:    toKwh(_raw.hwfet),
-            udds_adj_kwh_100mi:     toKwh(_raw.udds),
-            us06_adj_kwh_100mi:     toKwh(_raw.us06),
-            sc03_adj_kwh_100mi:     toKwh(_raw.sc03),
-            cold_ftp_adj_kwh_100mi: toKwh(_raw.cold_ftp),
-        };
+        return rest;
     };
-
-    const toggleUnitOverride = (testGroupId) =>
-        setUnitOverrides(prev => ({
-            ...prev,
-            [testGroupId]: prev[testGroupId] === 'mpge' ? undefined : 'mpge',
-        }));
 
     // ── Import ────────────────────────────────────────────────────────────────
 
     const handleImport = async () => {
         const toImport = parsed
             .filter(g => selected.has(g.test_group_id))
-            .map(applyUnitOverride); // apply unit overrides + strip _raw
+            .map(stripImportHelpers); // remove parser-only helper fields
         const mappings = Object.entries(linkMap)
             .filter(([tgid, vid]) => selected.has(tgid) && vid)
             .map(([testGroupId, vehicleId]) => ({ vehicleId: parseInt(vehicleId, 10), testGroupId }));
@@ -277,40 +243,16 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                                     </td>
                                                     <td className="py-2 pr-3 whitespace-nowrap">
                                                         {(() => {
-                                                            const mpge = effectiveMpge(g);
-                                                            const isMpgeMode = unitOverrides[g.test_group_id] === 'mpge';
-                                                            // Flag when converted label is suspiciously low —
-                                                            // likely the column was already in MPGe, not kWh/100mi
-                                                            const suspect = !isMpgeMode && mpge != null && mpge < 60;
-                                                            return (
-                                                                <div className="flex items-center gap-1.5">
-                                                                    {mpge != null ? (
-                                                                        <span className={suspect ? 'text-amber-600 dark:text-amber-400 font-medium' : ''}>
-                                                                            {suspect && '⚠ '}{mpge.toFixed(1)} MPGe
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="text-gray-300">—</span>
-                                                                    )}
-                                                                    {/* Only show toggle when we have a raw value to flip */}
-                                                                    {g._raw?.combined != null && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => toggleUnitOverride(g.test_group_id)}
-                                                                            title={isMpgeMode
-                                                                                ? `Treating as MPGe (raw: ${g._raw.combined}). Click to treat as kWh/100mi.`
-                                                                                : `Treating as kWh/100mi (raw: ${g._raw.combined}). Click to treat as MPGe.`}
-                                                                            className={`text-[10px] px-1.5 py-0.5 rounded border leading-none ${
-                                                                                isMpgeMode
-                                                                                    ? 'border-indigo-400 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30'
-                                                                                    : suspect
-                                                                                        ? 'border-amber-400 text-amber-600 dark:text-amber-400 hover:bg-amber-50'
-                                                                                        : 'border-gray-300 text-gray-400 hover:text-gray-600 hover:border-gray-400'
-                                                                            }`}
-                                                                        >
-                                                                            {isMpgeMode ? 'MPGe' : 'kWh'}
-                                                                        </button>
-                                                                    )}
-                                                                </div>
+                                                            const mpge = g.label_combined_mpge;
+                                                            // A plausible BEV label is well above 60 MPGe; a low value
+                                                            // hints the source data is unusual (passive flag only).
+                                                            const suspect = mpge != null && mpge < 60;
+                                                            return mpge != null ? (
+                                                                <span className={suspect ? 'text-amber-600 dark:text-amber-400 font-medium' : ''}>
+                                                                    {suspect && '⚠ '}{mpge.toFixed(1)} MPGe
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-300">—</span>
                                                             );
                                                         })()}
                                                     </td>
