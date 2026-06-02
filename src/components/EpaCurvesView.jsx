@@ -7,10 +7,10 @@ import { vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
 import { PALETTE } from '../utils/specHelpers';
 import { resolveChartColors } from '../utils/colorUtils';
 import {
-    buildEpaCurve, resolveUseableKwh, resolveUseableKwhSource,
-    resolveCoeffs, calibrateEfficiency,
-    HWFET_AVG_MPH, HIGHWAY_BAND_MPH,
+    resolveUseableKwh, resolveUseableKwhSource,
+    HIGHWAY_BAND_MPH,
 } from '../utils/epaPhysics';
+import { buildEpaCurveFromModel, deriveDrivetrainEta } from '../utils/epaDerivations';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
@@ -263,7 +263,7 @@ export default function EpaCurvesView({
 
                 const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
                 const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
-                const curve            = buildEpaCurve(epaGroup, useableKwh);
+                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh);
                 if (!curve.length) return;
 
                 // Color: user override → vehicleColorMap/vehicle color → palette (with alpha for 2nd+ mapping)
@@ -534,12 +534,10 @@ export default function EpaCurvesView({
                                                             // Strip any alpha suffix for the color input
                                                             const pickerColor = (mappingColors[mapping.id] ?? baseVehicleColor).slice(0, 7);
 
-                                                            const { a, b, c } = resolveCoeffs(epaGroup);
-                                                            const hwfetKwh = epaGroup.hwfet_unadj_kwh_100mi ?? epaGroup.hwfet_adj_kwh_100mi;
-                                                            const eta = a != null ? calibrateEfficiency(a, b, c, hwfetKwh) : null;
-                                                            const hwfetSource = epaGroup.hwfet_unadj_kwh_100mi != null ? 'unadj'
-                                                                              : epaGroup.hwfet_adj_kwh_100mi    != null ? 'adj'
-                                                                              : null;
+                                                            // η from the DC-side curator derivation (proc 77 → 84 → estimated),
+                                                            // with provenance + sanity flags.
+                                                            const etaResult = deriveDrivetrainEta(epaGroup);
+                                                            const eta = etaResult.value;
                                                             const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
                                                             const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
                                                             const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name;
@@ -583,10 +581,14 @@ export default function EpaCurvesView({
                                                                             )}
                                                                             {eta != null && (
                                                                                 <span>
-                                                                                    η<sub>eff</sub>: {(eta * 100).toFixed(1)}%
-                                                                                    {hwfetSource === 'unadj' && <> · HWFET unadj<InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} /></>}
-                                                                                    {hwfetSource === 'adj'   && <> · HWFET adj<InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} /></>}
-                                                                                    {hwfetSource === null    && <> · default η<InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} /></>}
+                                                                                    η<sub>eff</sub>: {!etaResult.certain && '~'}{(eta * 100).toFixed(1)}%
+                                                                                    {etaResult.source === 'measured'          && <> · HWFET DC</>}
+                                                                                    {etaResult.source === 'measured-fallback' && <> · Hwy DC (proc 84)</>}
+                                                                                    {etaResult.source === 'estimated'         && <> · default η</>}
+                                                                                    <InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} />
+                                                                                    {etaResult.flags?.includes('eta-out-of-band') && (
+                                                                                        <span title="Back-solved η outside the 75–92% sanity band — check phase data"> ⚠</span>
+                                                                                    )}
                                                                                 </span>
                                                                             )}
                                                                             {useableKwh && (

@@ -43,6 +43,7 @@ import {
     DEFAULT_ETA,
     HWFET_AVG_MPH,
     MPG_E_CONVERSION,
+    CURVE_SPEED_RANGE,
     roadLoadForce,
 } from './epaPhysics';
 
@@ -321,4 +322,44 @@ export function deriveAll(group) {
 export function kwh100miToMpge(kwh100mi) {
     if (kwh100mi == null || kwh100mi <= 0) return null;
     return (MPG_E_CONVERSION * 100) / kwh100mi;
+}
+
+// ── Curve builder (curator model) ───────────────────────────────────────────
+
+/**
+ * Build the steady-state efficiency curve from the curator model: coefficients
+ * from epa_coefficient_sets (primary set) and η from the DC-side back-solve.
+ * Replaces epaPhysics.buildEpaCurve, which read flat columns and the old
+ * AC-adjusted calibration.
+ *
+ * Uses the same accessory load as the η derivation so the curve is internally
+ * consistent (it passes through the measured HWY point at 48.3 mph).
+ *
+ * @param {object} group       — full group (with epa_coefficient_sets + epa_tests)
+ * @param {number|null} useableKwh — battery capacity for range; null ⇒ rangeMi null
+ * @returns {Array<{ mph, kwh100mi, miPerKwh, mpge, rangeMi }>}
+ */
+export function buildEpaCurveFromModel(group, useableKwh) {
+    const coeffs = resolvePrimaryCoeffs(group);
+    if (!coeffs) return [];
+
+    const eta   = deriveDrivetrainEta(group).value;
+    const accKw = accessoryKw(group);
+    const { a, b, c } = coeffs;
+    const [vMin, vMax] = CURVE_SPEED_RANGE;
+
+    const out = [];
+    for (let v = vMin; v <= vMax; v++) {
+        const kwh100mi = batteryConsumptionAt(v, a, b, c, eta, accKw);
+        if (kwh100mi == null || kwh100mi <= 0) continue;
+        const miPerKwh = 100 / kwh100mi;
+        out.push({
+            mph: v,
+            kwh100mi,
+            miPerKwh,
+            mpge: miPerKwh * MPG_E_CONVERSION,
+            rangeMi: useableKwh > 0 ? useableKwh / (kwh100mi / 100) : null,
+        });
+    }
+    return out;
 }
