@@ -13,6 +13,7 @@ import { useAppContext } from '../../context/AppContext';
 import CuratorField from './CuratorField';
 import DerivedValues from './DerivedValues';
 import TestPhaseEditor from './TestPhaseEditor';
+import AuditHistory from './AuditHistory';
 import { EPA_EXPLAINERS } from '../../utils/epaExplainers';
 
 function Section({ title, children }) {
@@ -28,12 +29,13 @@ export default function EpaCuratorEditor({ testGroupId, canEdit }) {
     const {
         getEpaTestGroupFull, updateEpaTestGroup,
         saveEpaCoefficientSet, saveEpaTest, deleteEpaTest,
-        saveEpaPhase, deleteEpaPhase, logEpaFieldEdit,
+        saveEpaPhase, deleteEpaPhase, logEpaFieldEdit, getEpaAuditForGroup,
     } = useAppContext();
 
     const [group, setGroup]   = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError]   = useState(null);
+    const [citation, setCitation] = useState(''); // optional source for subsequent edits
 
     const reload = useCallback(async () => {
         try {
@@ -60,7 +62,8 @@ export default function EpaCuratorEditor({ testGroupId, canEdit }) {
     const cOv = (f) => primary?.overrides?.[f]?.source;
 
     const audit = (tableName, rowId, field, prior, next) =>
-        logEpaFieldEdit?.({ tableName, rowId, field, priorValue: prior, newValue: next });
+        logEpaFieldEdit?.({ tableName, rowId, field, priorValue: prior, newValue: next,
+            sourceCitation: citation.trim() || null });
 
     // ── Save handlers (mark source:'manual' + audit + reload) ───────────────────
     const saveGroup = async (field, value) => {
@@ -99,9 +102,23 @@ export default function EpaCuratorEditor({ testGroupId, canEdit }) {
 
     return (
         <div className="border-t border-gray-100 dark:border-slate-700 mt-3 pt-3">
-            <p className="text-[10px] text-gray-400 italic mb-3">
+            <p className="text-[10px] text-gray-400 italic mb-2">
                 Editing shared EPA reference data — changes apply to every vehicle linked to this test group.
             </p>
+
+            {/* Optional source citation applied to subsequent edits' audit entries */}
+            {canEdit && (
+                <div className="flex items-center gap-2 mb-3 text-xs">
+                    <span className="text-gray-500 dark:text-slate-400 shrink-0">Source citation</span>
+                    <input
+                        type="text"
+                        value={citation}
+                        onChange={e => setCitation(e.target.value)}
+                        placeholder="e.g. J1634 sheet p.3 / CSI PDF — applied to edits below"
+                        className="form-input text-xs py-0.5 flex-1"
+                    />
+                </div>
+            )}
 
             {/* Section 1: Identity */}
             <Section title="Identity & Configuration">
@@ -163,6 +180,9 @@ export default function EpaCuratorEditor({ testGroupId, canEdit }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 text-xs">
                 <DerivedValues group={group} />
             </div>
+
+            {/* Audit trail */}
+            <AuditHistory group={group} getEpaAuditForGroup={getEpaAuditForGroup} />
         </div>
     );
 }

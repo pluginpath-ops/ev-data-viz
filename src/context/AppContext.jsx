@@ -905,6 +905,10 @@ export function AppProvider({ children }) {
     /** Pass-through: read the audit trail for a row. */
     const getEpaFieldAudit = (tableName, rowId) => dataService.getEpaFieldAudit(tableName, rowId);
 
+    /** Pass-through: read the audit trail for a whole group (+ its child rows). */
+    const getEpaAuditForGroup = (testGroupId, childRowIds) =>
+        dataService.getEpaAuditForGroup(testGroupId, childRowIds);
+
     /** Delete an EPA test group and its vehicle mappings, then refresh vehicles. */
     const deleteEpaTestGroup = async (testGroupId) => {
         try {
@@ -1052,6 +1056,7 @@ export function AppProvider({ children }) {
         deleteEpaPhase,
         logEpaFieldEdit,
         getEpaFieldAudit,
+        getEpaAuditForGroup,
     };
 
     return (
