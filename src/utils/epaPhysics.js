@@ -40,11 +40,12 @@ export const ACCESSORY_LOAD_KW = 0.3;
 export const MPG_E_CONVERSION = 33.705;
 
 /** Unit conversion: lbf-force × 1 mile of travel → kWh of energy.
- *  Derivation: 4.44822 N/lbf × 1609.34 m/mi / 3,600,000 J/kWh = 0.001989. */
-const LBF_MILE_TO_KWH = 0.001989;
+ *  Derivation: 4.44822 N/lbf × 1609.34 m/mi / 3,600,000 J/kWh = 0.001989.
+ *  Exported so the derivation engine (epaDerivations.js) shares one source of truth. */
+export const LBF_MILE_TO_KWH = 0.001989;
 
-/** Fallback drivetrain efficiency when HWFET data is absent. */
-const DEFAULT_ETA = 0.88;
+/** Fallback drivetrain efficiency when no HWFET/DC phase data is available. */
+export const DEFAULT_ETA = 0.88;
 
 /** Speed range for the curve, mph, inclusive. */
 export const CURVE_SPEED_RANGE = [5, 120];
@@ -96,7 +97,7 @@ export function resolveCoeffs(epaGroup) {
  * @param {number} c — lbf/mph² (aerodynamic drag)
  * @returns {number} force in lbf
  */
-function roadLoadForce(v, a, b, c) {
+export function roadLoadForce(v, a, b, c) {
     return a + b * v + c * v * v;
 }
 
