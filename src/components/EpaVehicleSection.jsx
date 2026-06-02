@@ -9,6 +9,8 @@
 import { useState, useRef } from 'react';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
+import DerivedValues from './epa/DerivedValues';
+import EpaCuratorEditor from './epa/EpaCuratorEditor';
 
 const CONFIDENCE_COLORS = {
     verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
@@ -41,10 +43,14 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence, onUpdate
     const [updatingConf, setUpdatingConf] = useState(false);
     const [draftName,    setDraftName]    = useState(null); // null = not editing
     const [savingName,   setSavingName]   = useState(false);
+    const [curating,     setCurating]     = useState(false);
     const g = mapping.epaGroup;
     if (!g) return null;
 
     const fmt = (n, dp = 4) => n != null ? n.toFixed(dp) : null;
+    // Coefficients now live on the primary coefficient set, not flat columns.
+    const coeff = (g.epa_coefficient_sets || []).find(s => s.is_primary)
+        || (g.epa_coefficient_sets || [])[0] || {};
 
     const handleUnlink = async () => {
         setUnlinking(true);
@@ -154,94 +160,73 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence, onUpdate
                     <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1 font-semibold">
                         Test Setup
                     </div>
-                    <DataRow label="Test weight" value={g.equiv_test_weight_lbs != null ? g.equiv_test_weight_lbs.toLocaleString() + ' lbs' : null} />
+                    <DataRow label="Test weight" value={coeff.equiv_test_weight_lbs != null ? coeff.equiv_test_weight_lbs.toLocaleString() + ' lbs' : null} />
                     <DataRow label="Fuel type" value={g.fuel_type} />
+                    <DataRow label="Config #" value={g.vehicle_config_number} />
                 </div>
 
-                {/* Road-load coefficients */}
+                {/* Road-load coefficients (primary set) */}
                 <div>
                     <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1 font-semibold flex items-center gap-1">
                         Road-Load Coefficients
                         <InfoIcon text={EPA_EXPLAINERS.roadLoad} position="right" />
                     </div>
-                    {g.target_a != null && (
+                    {coeff.target_a != null ? (
                         <>
-                            <DataRow label="Target A" value={fmt(g.target_a, 3) + ' lbf'} />
-                            <DataRow label="Target B" value={fmt(g.target_b, 5) + ' lbf/mph'} />
-                            <DataRow label="Target C" value={fmt(g.target_c, 6) + ' lbf/mph²'} />
+                            <DataRow label="Target A" value={fmt(coeff.target_a, 3) + ' lbf'} />
+                            <DataRow label="Target B" value={fmt(coeff.target_b, 5) + ' lbf/mph'} />
+                            <DataRow label="Target C" value={fmt(coeff.target_c, 6) + ' lbf/mph²'} />
                         </>
-                    )}
-                    {g.set_a != null && (
+                    ) : coeff.set_a != null ? (
                         <>
-                            <DataRow label="Set A" value={fmt(g.set_a, 3) + ' lbf'} muted />
-                            <DataRow label="Set B" value={fmt(g.set_b, 5) + ' lbf/mph'} muted />
-                            <DataRow label="Set C" value={fmt(g.set_c, 6) + ' lbf/mph²'} muted />
+                            <DataRow label="Set A" value={fmt(coeff.set_a, 3) + ' lbf'} muted />
+                            <DataRow label="Set B" value={fmt(coeff.set_b, 5) + ' lbf/mph'} muted />
+                            <DataRow label="Set C" value={fmt(coeff.set_c, 6) + ' lbf/mph²'} muted />
                         </>
+                    ) : (
+                        <p className="text-gray-400 text-[10px] italic">No coefficients yet</p>
                     )}
                 </div>
 
-                {/* Cycle results */}
-                <div>
-                    <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1 font-semibold flex items-center gap-1">
-                        Cycle Results
-                        <InfoIcon text={EPA_EXPLAINERS.unadjVsAdj} position="right" />
+                {/* Label results + live derivations */}
+                <div className="space-y-2">
+                    <div>
+                        <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1 font-semibold">
+                            Label Results
+                        </div>
+                        {g.label_combined_mpge != null && g.label_combined_mpge < 500 && (
+                            <DataRow label="Label combined" value={g.label_combined_mpge.toFixed(1) + ' MPGe'} />
+                        )}
+                        {g.label_hwy_mpge != null && g.label_hwy_mpge < 500 && (
+                            <DataRow label="Label highway" value={g.label_hwy_mpge.toFixed(1) + ' MPGe'} />
+                        )}
+                        {g.label_range_published != null && (
+                            <DataRow label="Label range" value={g.label_range_published.toFixed(0) + ' mi'} />
+                        )}
+                        {g.label_combined_mpge == null && g.label_hwy_mpge == null && (
+                            <p className="text-gray-400 text-[10px] italic">No label data</p>
+                        )}
                     </div>
-                    {(g.udds_adj_kwh_100mi != null || g.udds_unadj_kwh_100mi != null) && (
-                        <DataRow
-                            label="UDDS (city)"
-                            value={(g.udds_adj_kwh_100mi ?? g.udds_unadj_kwh_100mi)?.toFixed(1) + ' kWh/100mi'}
-                        />
-                    )}
-                    {(g.hwfet_adj_kwh_100mi != null || g.hwfet_unadj_kwh_100mi != null) && (
-                        <DataRow
-                            label="HWFET (hwy)"
-                            value={(g.hwfet_adj_kwh_100mi ?? g.hwfet_unadj_kwh_100mi)?.toFixed(1) + ' kWh/100mi'}
-                        />
-                    )}
-                    {(g.us06_adj_kwh_100mi != null || g.us06_unadj_kwh_100mi != null) && (
-                        <DataRow
-                            label="US06"
-                            value={(g.us06_adj_kwh_100mi ?? g.us06_unadj_kwh_100mi)?.toFixed(1) + ' kWh/100mi'}
-                        />
-                    )}
-                    {(g.sc03_adj_kwh_100mi != null || g.sc03_unadj_kwh_100mi != null) && (
-                        <DataRow
-                            label="SC03 (AC)"
-                            value={(g.sc03_adj_kwh_100mi ?? g.sc03_unadj_kwh_100mi)?.toFixed(1) + ' kWh/100mi'}
-                        />
-                    )}
-                    {(g.cold_ftp_adj_kwh_100mi != null || g.cold_ftp_unadj_kwh_100mi != null) && (
-                        <DataRow
-                            label="Cold FTP"
-                            value={(g.cold_ftp_adj_kwh_100mi ?? g.cold_ftp_unadj_kwh_100mi)?.toFixed(1) + ' kWh/100mi'}
-                        />
-                    )}
-                    {/* Label values — suppress 999/sentinel placeholders used by EPA
-                        for records where the label has not yet been finalized */}
-                    {g.label_combined_mpge != null && g.label_combined_mpge < 500 && (
-                        <DataRow label="Label combined" value={g.label_combined_mpge.toFixed(1) + ' MPGe'} />
-                    )}
-                    {g.label_hwy_mpge != null && g.label_hwy_mpge < 500 && (
-                        <DataRow label="Label highway" value={g.label_hwy_mpge.toFixed(1) + ' MPGe'} />
-                    )}
-                    {g.label_city_mpge != null && g.label_city_mpge < 500 && (
-                        <DataRow label="Label city" value={g.label_city_mpge.toFixed(1) + ' MPGe'} />
-                    )}
-                    {g.label_combined_mi != null && (
-                        <DataRow label="Label range" value={g.label_combined_mi.toFixed(0) + ' mi'} />
-                    )}
-                    {g.label_method && (
-                        <DataRow label="Label method" value={g.label_method} />
-                    )}
-                    {/* No cycle data at all */}
-                    {g.label_combined_mpge == null && g.hwfet_adj_kwh_100mi == null && g.hwfet_unadj_kwh_100mi == null && (
-                        <p className="text-gray-400 text-[10px] italic">No cycle data in this record</p>
-                    )}
+                    <DerivedValues group={g} />
                 </div>
             </div>
 
             {mapping.notes && (
                 <p className="mt-2 text-xs text-gray-500 dark:text-slate-400 italic border-t pt-2">{mapping.notes}</p>
+            )}
+
+            {/* Curator form — contributor/admin only */}
+            {canEdit && (
+                <>
+                    <button
+                        type="button"
+                        onClick={() => setCurating(c => !c)}
+                        className="mt-3 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                        {curating ? '▾ Hide curator fields' : '▸ Curate fields & test data'}
+                    </button>
+                    {curating && <EpaCuratorEditor testGroupId={g.test_group_id} canEdit={canEdit} />}
+                </>
             )}
         </div>
     );

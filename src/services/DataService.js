@@ -104,7 +104,7 @@ class DataService {
     }
     const { data } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_range_published, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
       .order('created_at', { ascending: false });
 
     // Pass 1: process each vehicle's own data
@@ -1154,11 +1154,9 @@ class DataService {
       .select(`
         test_group_id, epa_test_family_id,
         model_year, make, epa_carline_name, drive, transmission,
-        equiv_test_weight_lbs,
-        target_a, target_b, target_c,
-        set_a, set_b, set_c,
-        label_combined_mpge, label_method, display_name,
+        label_combined_mpge, label_hwy_mpge, display_name,
         source_file, ingested_at,
+        epa_coefficient_sets(category, is_primary, target_a, target_b, target_c, equiv_test_weight_lbs),
         epa_vehicle_mappings(
           id, confidence,
           vehicles(id, name, year)

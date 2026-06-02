@@ -573,12 +573,13 @@ export default function EpaCurvesView({
                                                                         <span className="text-sm text-gray-500 dark:text-slate-400 ml-2">{epaGroup.model_year} · {epaGroup.test_group_id}</span>
                                                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
                                                                             <ConfidenceBadge confidence={confidence} />
-                                                                            {epaGroup.label_combined_mpge && epaGroup.label_combined_mpge < 500 && (
-                                                                                <span>
-                                                                                    EPA rated: {epaGroup.label_combined_mpge} MPGe
-                                                                                    {epaGroup.label_method && <> · {epaGroup.label_method}<InfoIcon text={EPA_EXPLAINERS.labelMethod} /></>}
+                                                                            {epaGroup.label_combined_mpge && epaGroup.label_combined_mpge < 500 ? (
+                                                                                <span>EPA rated: {epaGroup.label_combined_mpge} MPGe</span>
+                                                                            ) : epaGroup.label_hwy_mpge && epaGroup.label_hwy_mpge < 500 ? (
+                                                                                <span title="Highway-only (proc 84); no combined MCT test">
+                                                                                    EPA hwy: {epaGroup.label_hwy_mpge} MPGe
                                                                                 </span>
-                                                                            )}
+                                                                            ) : null}
                                                                             {eta != null && (
                                                                                 <span>
                                                                                     η<sub>eff</sub>: {!etaResult.certain && '~'}{(eta * 100).toFixed(1)}%
