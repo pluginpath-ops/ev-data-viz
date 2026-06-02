@@ -21,7 +21,31 @@ const PHASE_TYPES   = ['UDDS', 'HWY', 'SS', 'Cold-UDDS', 'US06', 'SC03'];
 const SOURCE_OPTS   = ['csv', 'j1634', 'csi_pdf', 'manual'];
 const ORIGINATORS   = ['MFR', 'EPA'];
 
+// Standard cycle distances (miles) for phase-type auto-suggestion.
+const HWFET_MI  = 10.26;
+const UDDS_MI   = 7.45;
+const DIST_TOL  = 0.7;   // ± tolerance around the standard distance
+
 const num = (v) => (v == null || v === '' || isNaN(Number(v)) ? null : Number(v));
+
+/**
+ * Suggest a phase type from its distance (curator can always override):
+ *   ~10.26 mi → HWY, ~7.45 mi → UDDS, a bag ≫10× its neighbors → SS.
+ * Returns a type string or null when nothing matches confidently.
+ *
+ * @param {number} distanceMi
+ * @param {number[]} otherDistances  distances of the test's other phases
+ */
+export function suggestPhaseType(distanceMi, otherDistances = []) {
+    const d = num(distanceMi);
+    if (d == null || d <= 0) return null;
+    // SS: a depletion bag far longer than its shortest neighbor.
+    const others = otherDistances.map(num).filter(x => x != null && x > 0);
+    if (others.length && d >= 10 * Math.min(...others)) return 'SS';
+    if (Math.abs(d - HWFET_MI) <= DIST_TOL) return 'HWY';
+    if (Math.abs(d - UDDS_MI)  <= DIST_TOL) return 'UDDS';
+    return null;
+}
 
 function PhaseRow({ phase, canEdit, onSave, onDelete }) {
     const consumption = (() => {
@@ -81,6 +105,17 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
     const phases = [...(test.epa_test_phases || [])].sort((a, b) => a.phase_index - b.phase_index);
     const saveField = (field) => (val) => onSaveTest({ id: test.id, [field]: val });
 
+    // Auto-suggest the phase type from distance when the curator hasn't set one
+    // (never overrides an explicit choice). Uses sibling distances for the SS case.
+    const handleSavePhase = (row) => {
+        if (!row.phase_type && row.distance_mi != null) {
+            const others = phases.filter(p => p.id !== row.id).map(p => p.distance_mi);
+            const suggested = suggestPhaseType(row.distance_mi, others);
+            if (suggested) { onSavePhase({ ...row, phase_type: suggested }); return; }
+        }
+        onSavePhase(row);
+    };
+
     // Sanity: phase DC sum vs declared total; phase count vs declared bags.
     const phaseSum = phases.reduce((s, p) => s + (num(p.dc_energy_kwh) ?? 0), 0);
     const totalDc  = num(test.total_dc_energy_kwh);
@@ -139,7 +174,7 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
                 <tbody>
                     {phases.map(p => (
                         <PhaseRow key={p.id} phase={p} canEdit={canEdit}
-                            onSave={onSavePhase} onDelete={onDeletePhase} />
+                            onSave={handleSavePhase} onDelete={onDeletePhase} />
                     ))}
                     {phases.length === 0 && (
                         <tr><td colSpan={6} className="py-1 text-gray-400 italic text-[11px]">No phases yet. Add the HWY phase to enable measured η.</td></tr>
