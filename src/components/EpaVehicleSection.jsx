@@ -234,16 +234,44 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence, onUpdate
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroups, onLink, onUnlink, onUpdateConfidence, onUpdateDisplayName }) {
+const EPA_SOURCE_URL = 'https://dis.epa.gov/otaqpub/publist1.jsp';
+
+export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroups, onLink, onCreate, onUnlink, onUpdateConfidence, onUpdateDisplayName }) {
     const [query, setQuery]               = useState('');
     const [results, setResults]           = useState([]);
     const [searching, setSearching]       = useState(false);
     const [searchError, setSearchError]   = useState(null);
     const [showDropdown, setShowDropdown] = useState(false);
     const [linking, setLinking]           = useState(false);
+    const [showCreate, setShowCreate]     = useState(false);
+    const [createDraft, setCreateDraft]   = useState({ test_group_id: '', model_year: '', make: '', epa_carline_name: '' });
+    const [creating, setCreating]         = useState(false);
+    const [createError, setCreateError]   = useState(null);
     const debounceRef = useRef(null);
 
     const mappings = vehicle?.epa_mappings ?? [];
+
+    const handleCreate = async () => {
+        const id = createDraft.test_group_id.trim();
+        if (!id) { setCreateError('Test Group ID is required.'); return; }
+        setCreating(true);
+        setCreateError(null);
+        // Mark hand-entered identity fields as curator-sourced.
+        const overrides = {};
+        const fields = { test_group_id: id, overrides };
+        if (createDraft.model_year.trim())       { fields.model_year = Number(createDraft.model_year) || null; overrides.model_year = { source: 'manual' }; }
+        if (createDraft.make.trim())             { fields.make = createDraft.make.trim(); overrides.make = { source: 'manual' }; }
+        if (createDraft.epa_carline_name.trim()) { fields.epa_carline_name = createDraft.epa_carline_name.trim(); overrides.epa_carline_name = { source: 'manual' }; }
+        try {
+            await onCreate(vehicle.id, fields);
+            setShowCreate(false);
+            setCreateDraft({ test_group_id: '', model_year: '', make: '', epa_carline_name: '' });
+        } catch (e) {
+            setCreateError(e?.message || 'Create failed');
+        } finally {
+            setCreating(false);
+        }
+    };
 
     const handleQueryChange = (e) => {
         const q = e.target.value;
@@ -283,11 +311,20 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
 
     return (
         <div className="mt-6">
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center justify-between gap-2 mb-3">
                 <h3 className="section-title">
                     EPA Testing Data
                     <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" className="ml-1" />
                 </h3>
+                <a
+                    href={EPA_SOURCE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap"
+                    title="EPA Annual Certification Data — look up Test Groups, coefficients, and lab reports"
+                >
+                    EPA source data ↗
+                </a>
             </div>
 
             {/* Existing mappings */}
@@ -353,8 +390,84 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                         )}
                     </div>
                     <p className="text-xs text-gray-400 mt-1">
-                        Results filtered by vehicle year when available. Import test groups via Admin → Import → EPA Test Car Data.
+                        Import test groups via Admin → Import → EPA Test Car Data, or create one by hand below.
                     </p>
+
+                    {/* Create from scratch — for vehicles with only a lab-submission PDF */}
+                    {!showCreate ? (
+                        <button
+                            type="button"
+                            onClick={() => { setShowCreate(true); setCreateError(null); }}
+                            className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline mt-2"
+                        >
+                            + Create EPA test group from scratch
+                        </button>
+                    ) : (
+                        <div className="mt-2 border rounded-lg p-3 border-gray-200 dark:border-slate-700">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold">New EPA test group</span>
+                                <a href={EPA_SOURCE_URL} target="_blank" rel="noopener noreferrer"
+                                    className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">
+                                    Find the Certified Test Group on EPA ↗
+                                </a>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <label className="text-xs">
+                                    <span className="text-gray-500 dark:text-slate-400">Test Group ID *</span>
+                                    <input
+                                        type="text" autoFocus
+                                        value={createDraft.test_group_id}
+                                        onChange={e => setCreateDraft(d => ({ ...d, test_group_id: e.target.value }))}
+                                        placeholder="e.g. SRIVT00.0R2A"
+                                        className="form-input text-xs w-full mt-0.5"
+                                    />
+                                </label>
+                                <label className="text-xs">
+                                    <span className="text-gray-500 dark:text-slate-400">Model year</span>
+                                    <input
+                                        type="number"
+                                        value={createDraft.model_year}
+                                        onChange={e => setCreateDraft(d => ({ ...d, model_year: e.target.value }))}
+                                        className="form-input text-xs w-full mt-0.5"
+                                    />
+                                </label>
+                                <label className="text-xs">
+                                    <span className="text-gray-500 dark:text-slate-400">Manufacturer</span>
+                                    <input
+                                        type="text"
+                                        value={createDraft.make}
+                                        onChange={e => setCreateDraft(d => ({ ...d, make: e.target.value }))}
+                                        placeholder="e.g. Rivian"
+                                        className="form-input text-xs w-full mt-0.5"
+                                    />
+                                </label>
+                                <label className="text-xs">
+                                    <span className="text-gray-500 dark:text-slate-400">Carline</span>
+                                    <input
+                                        type="text"
+                                        value={createDraft.epa_carline_name}
+                                        onChange={e => setCreateDraft(d => ({ ...d, epa_carline_name: e.target.value }))}
+                                        placeholder="e.g. R2"
+                                        className="form-input text-xs w-full mt-0.5"
+                                    />
+                                </label>
+                            </div>
+                            {createError && <p className="text-xs text-red-500 mt-1">{createError}</p>}
+                            <p className="text-[11px] text-gray-400 mt-1">
+                                Creates and links the group; add coefficients, tests and phases in the curator fields afterward.
+                            </p>
+                            <div className="flex gap-2 mt-2">
+                                <button type="button" onClick={handleCreate} disabled={creating}
+                                    className="btn btn-primary text-xs py-1 px-3 disabled:opacity-50">
+                                    {creating ? 'Creating…' : 'Create & link'}
+                                </button>
+                                <button type="button" onClick={() => setShowCreate(false)} disabled={creating}
+                                    className="btn btn-secondary text-xs py-1 px-3">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

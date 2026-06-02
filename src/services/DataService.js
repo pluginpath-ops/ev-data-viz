@@ -1181,6 +1181,24 @@ class DataService {
     if (error) throw error;
   }
 
+  /**
+   * Create a single EPA test group by hand (no CSV) — for vehicles whose data
+   * only exists in a lab-submission PDF. Coefficient sets, tests, and phases
+   * are added afterward via the curator form. Fails on duplicate test_group_id.
+   *
+   * @param {Object} group  epa_test_groups fields (test_group_id required)
+   */
+  async createEpaTestGroup(group) {
+    if (!this.useSupabase) return null;
+    const { data, error } = await getSupabase()
+      .from('epa_test_groups')
+      .insert(group)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
   /** Convenience alias kept for back-compat. */
   async updateEpaLabelMethod(testGroupId, method) {
     return this.updateEpaTestGroup(testGroupId, { label_method: method || null });
@@ -1331,6 +1349,27 @@ class DataService {
       .eq('table_name', tableName)
       .eq('row_id', String(rowId))
       .order('edited_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Fetch the audit trail for a whole test group: the group row plus all of its
+   * child rows (coefficient sets, tests, phases). Matches on the union of row
+   * ids (the group's text id + the stringified child ids). Most recent first.
+   *
+   * @param {string} testGroupId
+   * @param {Array<string|number>} childRowIds  ids of coeff sets / tests / phases
+   */
+  async getEpaAuditForGroup(testGroupId, childRowIds = []) {
+    if (!this.useSupabase) return [];
+    const ids = [String(testGroupId), ...childRowIds.map(String)];
+    const { data, error } = await getSupabase()
+      .from('epa_field_audit')
+      .select('*')
+      .in('row_id', ids)
+      .order('edited_at', { ascending: false })
+      .limit(200);
     if (error) throw error;
     return data || [];
   }
