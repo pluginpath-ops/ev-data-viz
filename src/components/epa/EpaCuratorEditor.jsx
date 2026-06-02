@@ -102,9 +102,20 @@ export default function EpaCuratorEditor({ testGroupId, canEdit }) {
 
     return (
         <div className="border-t border-gray-100 dark:border-slate-700 mt-3 pt-3">
-            <p className="text-[10px] text-gray-400 italic mb-2">
-                Editing shared EPA reference data — changes apply to every vehicle linked to this test group.
-            </p>
+            <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-[10px] text-gray-400 italic">
+                    Editing shared EPA reference data — changes apply to every vehicle linked to this test group.
+                </p>
+                <a
+                    href="https://dis.epa.gov/otaqpub/publist1.jsp"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap shrink-0"
+                    title="EPA Annual Certification Data — source of truth for test groups, coefficients, and lab reports"
+                >
+                    EPA source data ↗
+                </a>
+            </div>
 
             {/* Optional source citation applied to subsequent edits' audit entries */}
             {canEdit && (

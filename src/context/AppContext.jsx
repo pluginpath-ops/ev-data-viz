@@ -789,6 +789,24 @@ export function AppProvider({ children }) {
         }
     };
 
+    /**
+     * Create an EPA test group from scratch (hand-entered, e.g. from a lab PDF)
+     * and link it to the vehicle, then refresh so the curator form can fill in
+     * coefficients, tests and phases.
+     */
+    const createAndLinkEpaTestGroup = async (vehicleId, fields) => {
+        try {
+            await dataService.createEpaTestGroup(fields);
+            await dataService.linkEpaTestGroup(vehicleId, fields.test_group_id, 'likely', null);
+            const updated = await dataService.getVehicles();
+            setVehicles(updated);
+            showSuccess('EPA test group created and linked.');
+        } catch (error) {
+            showError('Error creating EPA test group: ' + error.message);
+            throw error;
+        }
+    };
+
     const updateEpaMapping = async (mappingId, updates) => {
         try {
             await dataService.updateEpaMapping(mappingId, updates);
@@ -1041,6 +1059,7 @@ export function AppProvider({ children }) {
         clearDefaultRun,
         searchEpaTestGroups,
         linkEpaTestGroup,
+        createAndLinkEpaTestGroup,
         updateEpaMapping,
         unlinkEpaTestGroup,
         importEpaTestGroups,
