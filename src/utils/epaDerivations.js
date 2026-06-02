@@ -324,6 +324,24 @@ export function kwh100miToMpge(kwh100mi) {
     return (MPG_E_CONVERSION * 100) / kwh100mi;
 }
 
+// ── Altitude / air density ──────────────────────────────────────────────────
+
+/**
+ * Air-density ratio (ρ_altitude / ρ_sea_level) at a given elevation, via the
+ * standard barometric approximation:  ρ_ratio = (1 − 2.25577e-5·h_m)^4.2559.
+ * Input is in feet; ~0.83 at 5,100 ft. Used only at plot time to scale the
+ * aerodynamic (C) road-load term — never written back to stored data or η.
+ *
+ * @param {number} elevationFt
+ * @returns {number} density ratio (1.0 at sea level)
+ */
+export function airDensityRatio(elevationFt) {
+    const hM = (elevationFt || 0) * 0.3048;
+    const base = 1 - 2.25577e-5 * hM;
+    if (base <= 0) return 0; // far above the troposphere; guard the fractional power
+    return Math.pow(base, 4.2559);
+}
+
 // ── Curve builder (curator model) ───────────────────────────────────────────
 
 /**
@@ -335,17 +353,24 @@ export function kwh100miToMpge(kwh100mi) {
  * Uses the same accessory load as the η derivation so the curve is internally
  * consistent (it passes through the measured HWY point at 48.3 mph).
  *
+ * Altitude (viewing condition): `densityRatio` scales ONLY the aerodynamic C
+ * term, at plot time, AFTER η was derived at standard density. η and the stored
+ * coefficients are never modified — passing 1 (default) reproduces the standard
+ * sea-level curve exactly.
+ *
  * @param {object} group       — full group (with epa_coefficient_sets + epa_tests)
  * @param {number|null} useableKwh — battery capacity for range; null ⇒ rangeMi null
+ * @param {number} densityRatio   — ρ_altitude / ρ_sea_level (default 1 = sea level)
  * @returns {Array<{ mph, kwh100mi, miPerKwh, mpge, rangeMi }>}
  */
-export function buildEpaCurveFromModel(group, useableKwh) {
+export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1) {
     const coeffs = resolvePrimaryCoeffs(group);
     if (!coeffs) return [];
 
     const eta   = deriveDrivetrainEta(group).value;
     const accKw = accessoryKw(group);
-    const { a, b, c } = coeffs;
+    const { a, b } = coeffs;
+    const c = coeffs.c * densityRatio; // aerodynamic term only, display-time scale
     const [vMin, vMax] = CURVE_SPEED_RANGE;
 
     const out = [];

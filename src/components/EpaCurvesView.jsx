@@ -10,7 +10,7 @@ import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH,
 } from '../utils/epaPhysics';
-import { buildEpaCurveFromModel, deriveDrivetrainEta } from '../utils/epaDerivations';
+import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio } from '../utils/epaDerivations';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
@@ -228,6 +228,12 @@ export default function EpaCurvesView({
     const [mappingColors,    setMappingColors]    = useState({});        // mapping.id → hex
     const [urlCopied,        setUrlCopied]        = useState(false);
     const [imageCopied,      setImageCopied]      = useState(false);
+    // Altitude is a viewing condition (like the unit toggle): scales the
+    // aerodynamic C term at plot time for ALL curves. Never persisted; never
+    // affects stored coefficients or the standard-density η.
+    const [elevationFt,      setElevationFt]      = useState(0);
+    const densityRatio = useMemo(() => airDensityRatio(elevationFt), [elevationFt]);
+    const altAdjusted  = Math.abs(densityRatio - 1) > 1e-6;
 
     const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
 
@@ -263,7 +269,7 @@ export default function EpaCurvesView({
 
                 const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
                 const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
-                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh);
+                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh, densityRatio);
                 if (!curve.length) return;
 
                 // Color: user override → vehicleColorMap/vehicle color → palette (with alpha for 2nd+ mapping)
@@ -271,9 +277,11 @@ export default function EpaCurvesView({
                 const autoBase  = mi === 0 ? baseColor : baseColor + 'bb';
                 const color = mappingColors[mapping.id] ?? autoBase;
                 const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name;
-                const label = vehiclesWithEpa.length > 1 || mi > 0
+                const baseLabel = vehiclesWithEpa.length > 1 || mi > 0
                     ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
                     : vehicleLabel(vehicle);
+                // Subtle "altitude-adjusted" marker on each curve's legend entry.
+                const label = altAdjusted ? `${baseLabel} ▲` : baseLabel;
 
                 result.push({
                     label,
@@ -299,7 +307,7 @@ export default function EpaCurvesView({
             });
         });
         return result;
-    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, altAdjusted]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -497,6 +505,33 @@ export default function EpaCurvesView({
                                 <span className="text-sm font-medium">Auto Color</span>
                             </label>
                         )}
+
+                        {/* Altitude — viewing condition, applies to all curves */}
+                        <div className="flex items-center gap-1.5 ml-auto">
+                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                                Altitude
+                                <InfoIcon
+                                    text="Adjusts aerodynamic drag for air density at this elevation. Models air density only — does not capture battery, regen, or cabin-heating effects. Curve is the standard-condition baseline scaled for thinner air."
+                                    position="left"
+                                    className="ml-1"
+                                />
+                            </span>
+                            <input
+                                type="number"
+                                step="100"
+                                value={elevationFt}
+                                onChange={e => setElevationFt(Number(e.target.value) || 0)}
+                                className="form-input text-sm py-1 w-24 text-right"
+                                aria-label="Elevation in feet"
+                            />
+                            <span className="text-sm text-gray-400">ft</span>
+                            <span
+                                className={`text-xs whitespace-nowrap ${altAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-400'}`}
+                                title="Air-density ratio applied to the aerodynamic (C) term"
+                            >
+                                → ρ {densityRatio.toFixed(2)}{altAdjusted ? ' ▲' : ''}
+                            </span>
+                        </div>
                     </div>
 
                     {/* Collapsible EPA test selector */}
