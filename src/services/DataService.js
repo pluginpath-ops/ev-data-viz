@@ -1181,6 +1181,24 @@ class DataService {
     if (error) throw error;
   }
 
+  /**
+   * Create a single EPA test group by hand (no CSV) — for vehicles whose data
+   * only exists in a lab-submission PDF. Coefficient sets, tests, and phases
+   * are added afterward via the curator form. Fails on duplicate test_group_id.
+   *
+   * @param {Object} group  epa_test_groups fields (test_group_id required)
+   */
+  async createEpaTestGroup(group) {
+    if (!this.useSupabase) return null;
+    const { data, error } = await getSupabase()
+      .from('epa_test_groups')
+      .insert(group)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
   /** Convenience alias kept for back-compat. */
   async updateEpaLabelMethod(testGroupId, method) {
     return this.updateEpaTestGroup(testGroupId, { label_method: method || null });

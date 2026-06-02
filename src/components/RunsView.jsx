@@ -278,7 +278,7 @@ const EstimateTimePanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, clearDefaultRun, searchEpaTestGroups, linkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, clearDefaultRun, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
@@ -2526,6 +2526,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 canEdit={isContributor && canEdit(vehicle)}
                 searchEpaTestGroups={searchEpaTestGroups}
                 onLink={linkEpaTestGroup}
+                onCreate={createAndLinkEpaTestGroup}
                 onUnlink={unlinkEpaTestGroup}
                 onUpdateConfidence={updateEpaMapping}
                 onUpdateDisplayName={(testGroupId, name) =>
