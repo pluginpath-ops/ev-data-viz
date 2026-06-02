@@ -217,8 +217,11 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
                 drive,
                 fuel_type:          fuelDesc,
 
-                // Section 6 (AC-side label) — populated from the combined/MCT row.
+                // Section 6 (AC-side labels). label_combined_mpge ← proc-77 MCT row;
+                // label_hwy_mpge ← proc-84 CD-Highway row (highway-only, kept as a
+                // useful secondary metric, distinct from combined).
                 label_combined_mpge: null,
+                label_hwy_mpge:      null,
 
                 source_file: sourceFileName,
                 ingested_at: new Date().toISOString(),
@@ -251,26 +254,30 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         if (cs.set_b === null && sb !== null) cs.set_b = sb;
         if (cs.set_c === null && sc !== null) cs.set_c = sc;
 
-        // Combined label MPGe — ONLY from the Multi-Cycle Test (proc 77) row,
-        // the genuine combined value. (A CD-Highway proc-84 row is highway-only,
-        // not combined, so it must not populate label_combined_mpge.)
+        // Label MPGe (AC-side), unit-normalised, by cycle:
+        //   MCT (proc 77) → label_combined_mpge (the genuine combined value)
+        //   HWY (proc 84) → label_hwy_mpge      (highway-only secondary metric)
         const category = deriveCycleCategory(row, get);
-        if (g.label_combined_mpge == null && category === 'MCT') {
+        if (category === 'MCT' && g.label_combined_mpge == null) {
             const mpge = normalizeFeToMpge(getNum(row, 'RND_ADJ_FE'));
             if (mpge != null) g.label_combined_mpge = Math.round(mpge * 10) / 10;
+        } else if (category === 'HWY' && g.label_hwy_mpge == null) {
+            const mpge = normalizeFeToMpge(getNum(row, 'RND_ADJ_FE'));
+            if (mpge != null) g.label_hwy_mpge = Math.round(mpge * 10) / 10;
         }
     }
 
     // Finalise: attach override provenance + summary flags.
     const GROUP_CSV_FIELDS = ['model_year', 'make', 'epa_carline_name',
-        'vehicle_config_number', 'drive', 'transmission', 'fuel_type', 'label_combined_mpge'];
+        'vehicle_config_number', 'drive', 'transmission', 'fuel_type',
+        'label_combined_mpge', 'label_hwy_mpge'];
     const COEFF_CSV_FIELDS = ['equiv_test_weight_lbs',
         'target_a', 'target_b', 'target_c', 'set_a', 'set_b', 'set_c'];
 
     for (const g of groups.values()) {
         const cs = g._coefficientSet;
         g._hasCoeffs = cs.target_a != null || cs.set_a != null;
-        g._hasMpge   = g.label_combined_mpge != null;
+        g._hasMpge   = g.label_combined_mpge != null || g.label_hwy_mpge != null;
         g.overrides  = csvOverrides(g, GROUP_CSV_FIELDS);
         cs.overrides = csvOverrides(cs, COEFF_CSV_FIELDS);
     }

@@ -230,6 +230,11 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                                     <td className="py-2 pr-3 whitespace-nowrap">
                                                         {g.label_combined_mpge != null ? (
                                                             <span>{g.label_combined_mpge.toFixed(1)} MPGe</span>
+                                                        ) : g.label_hwy_mpge != null ? (
+                                                            <span title="Highway-only (proc 84); no combined MCT test in file">
+                                                                {g.label_hwy_mpge.toFixed(1)} MPGe
+                                                                <span className="text-gray-400 ml-1 text-[10px]">hwy</span>
+                                                            </span>
                                                         ) : (
                                                             <span className="text-gray-300">—</span>
                                                         )}
