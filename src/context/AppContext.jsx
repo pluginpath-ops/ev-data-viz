@@ -828,6 +828,83 @@ export function AppProvider({ children }) {
         await dataService.updateEpaLabelMethod(testGroupId, method);
     };
 
+    // ── EPA curator hierarchy (coefficient sets, tests, phases, audit) ──────────
+    // Used by the curator form in Tests & Data. Save helpers return the saved row
+    // so the form can update local state; the form re-fetches the full hierarchy
+    // via getEpaTestGroupFull as needed.
+
+    /** Pass-through: fetch a group with its coefficient sets, tests and phases. */
+    const getEpaTestGroupFull = (testGroupId) => dataService.getEpaTestGroupFull(testGroupId);
+
+    const saveEpaCoefficientSet = async (row) => {
+        try {
+            const saved = await dataService.saveEpaCoefficientSet(row);
+            softRefreshVehicles(); // primary coeffs feed the curve
+            return saved;
+        } catch (error) {
+            showError('Error saving coefficient set: ' + error.message);
+            throw error;
+        }
+    };
+
+    const deleteEpaCoefficientSet = async (id) => {
+        try {
+            await dataService.deleteEpaCoefficientSet(id);
+            softRefreshVehicles();
+        } catch (error) {
+            showError('Error deleting coefficient set: ' + error.message);
+            throw error;
+        }
+    };
+
+    const saveEpaTest = async (row) => {
+        try {
+            const saved = await dataService.saveEpaTest(row);
+            softRefreshVehicles(); // tests feed η / charger-eff derivations
+            return saved;
+        } catch (error) {
+            showError('Error saving test: ' + error.message);
+            throw error;
+        }
+    };
+
+    const deleteEpaTest = async (id) => {
+        try {
+            await dataService.deleteEpaTest(id);
+            softRefreshVehicles();
+        } catch (error) {
+            showError('Error deleting test: ' + error.message);
+            throw error;
+        }
+    };
+
+    const saveEpaPhase = async (row) => {
+        try {
+            const saved = await dataService.saveEpaPhase(row);
+            softRefreshVehicles(); // HWY-phase consumption drives η
+            return saved;
+        } catch (error) {
+            showError('Error saving phase: ' + error.message);
+            throw error;
+        }
+    };
+
+    const deleteEpaPhase = async (id) => {
+        try {
+            await dataService.deleteEpaPhase(id);
+            softRefreshVehicles();
+        } catch (error) {
+            showError('Error deleting phase: ' + error.message);
+            throw error;
+        }
+    };
+
+    /** Append an audit-trail entry. Best-effort: failures don't block the edit. */
+    const logEpaFieldEdit = (entry) => dataService.logEpaFieldEdit(entry);
+
+    /** Pass-through: read the audit trail for a row. */
+    const getEpaFieldAudit = (tableName, rowId) => dataService.getEpaFieldAudit(tableName, rowId);
+
     /** Delete an EPA test group and its vehicle mappings, then refresh vehicles. */
     const deleteEpaTestGroup = async (testGroupId) => {
         try {
@@ -965,6 +1042,16 @@ export function AppProvider({ children }) {
         deleteEpaTestGroup,
         updateEpaLabelMethod,
         updateEpaTestGroup,
+        // EPA curator hierarchy
+        getEpaTestGroupFull,
+        saveEpaCoefficientSet,
+        deleteEpaCoefficientSet,
+        saveEpaTest,
+        deleteEpaTest,
+        saveEpaPhase,
+        deleteEpaPhase,
+        logEpaFieldEdit,
+        getEpaFieldAudit,
     };
 
     return (

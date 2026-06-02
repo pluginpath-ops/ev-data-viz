@@ -1188,6 +1188,135 @@ class DataService {
     if (error) throw error;
   }
 
+  // ── EPA curator model: coefficient sets, tests, phases, audit ─────────────────
+
+  /**
+   * Fetch a single EPA test group with its full curator hierarchy:
+   * coefficient sets, tests, and each test's phases. Used by the curator
+   * form in Tests & Data.
+   *
+   * @param {string} testGroupId
+   * @returns {Object|null} group row with nested epa_coefficient_sets and
+   *   epa_tests(epa_test_phases), or null if not found.
+   */
+  async getEpaTestGroupFull(testGroupId) {
+    if (!this.useSupabase) return null;
+    const { data, error } = await getSupabase()
+      .from('epa_test_groups')
+      .select(`
+        *,
+        epa_coefficient_sets(*),
+        epa_tests(*, epa_test_phases(*))
+      `)
+      .eq('test_group_id', testGroupId)
+      .single();
+    if (error) throw error;
+    return data || null;
+  }
+
+  /**
+   * Insert (no id) or update (with id) a single coefficient set.
+   * Returns the saved row.
+   */
+  async saveEpaCoefficientSet(row) {
+    if (!this.useSupabase) return null;
+    const db = getSupabase().from('epa_coefficient_sets');
+    const { id, ...fields } = row;
+    const q = id
+      ? db.update(fields).eq('id', id)
+      : db.insert(fields);
+    const { data, error } = await q.select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteEpaCoefficientSet(id) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('epa_coefficient_sets').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /** Insert (no id) or update (with id) a single test record. Returns the saved row. */
+  async saveEpaTest(row) {
+    if (!this.useSupabase) return null;
+    const db = getSupabase().from('epa_tests');
+    const { id, epa_test_phases, ...fields } = row; // never write nested phases here
+    const q = id
+      ? db.update(fields).eq('id', id)
+      : db.insert(fields);
+    const { data, error } = await q.select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteEpaTest(id) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('epa_tests').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /** Insert (no id) or update (with id) a single phase row. Returns the saved row. */
+  async saveEpaPhase(row) {
+    if (!this.useSupabase) return null;
+    const db = getSupabase().from('epa_test_phases');
+    const { id, ...fields } = row;
+    const q = id
+      ? db.update(fields).eq('id', id)
+      : db.insert(fields);
+    const { data, error } = await q.select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteEpaPhase(id) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('epa_test_phases').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /**
+   * Append a row to the field-edit audit trail. Records who/when/prior/new
+   * plus an optional source citation. Insert-only (immutable history).
+   *
+   * @param {{ tableName, rowId, field, priorValue, newValue, sourceCitation }} entry
+   */
+  async logEpaFieldEdit({ tableName, rowId, field, priorValue, newValue, sourceCitation }) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('epa_field_audit')
+      .insert({
+        table_name:      tableName,
+        row_id:          String(rowId),
+        field,
+        prior_value:     priorValue != null ? String(priorValue) : null,
+        new_value:       newValue != null ? String(newValue) : null,
+        source_citation: sourceCitation || null,
+        edited_by:       this.user?.id ?? null,
+      });
+    if (error) throw error;
+  }
+
+  /**
+   * Read the audit trail for a single row (most recent first).
+   *
+   * @param {string} tableName
+   * @param {string|number} rowId
+   */
+  async getEpaFieldAudit(tableName, rowId) {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase()
+      .from('epa_field_audit')
+      .select('*')
+      .eq('table_name', tableName)
+      .eq('row_id', String(rowId))
+      .order('edited_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
   // ── Access logging ──────────────────────────────────────────────────────────
 
   /**
