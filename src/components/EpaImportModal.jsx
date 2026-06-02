@@ -18,9 +18,6 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
     const [selected, setSelected]   = useState(new Set());
     // Map: test_group_id → vehicle id (string) for the link
     const [linkMap, setLinkMap]     = useState({});
-    // Map: test_group_id → 'mpge' when the user has flipped a row's unit assumption.
-    // Default (absent key) means 'kwh' — RND_ADJ_FE treated as kWh/100mi.
-    const [unitOverrides, setUnitOverrides] = useState({});
     const [importing, setImporting] = useState(false);
     const [result, setResult]       = useState(null);
     const [error, setError]         = useState(null);
@@ -38,7 +35,6 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
             setParsed(groups);
             setSelected(new Set(groups.map(g => g.test_group_id)));
             setLinkMap({});
-            setUnitOverrides({});
             setError(null);
             setStep('map');
         };
@@ -62,57 +58,12 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
     const setVehicleLink = (testGroupId, vehicleId) =>
         setLinkMap(prev => ({ ...prev, [testGroupId]: vehicleId }));
 
-    // ── Unit-override helpers ─────────────────────────────────────────────────
-
-    const MPG_E_CONV = 33.705;
-
-    /**
-     * Effective label MPGe for a group given the current unit-override state.
-     * In 'kwh' mode the parser already computed label_combined_mpge correctly.
-     * In 'mpge' mode the raw MCT value IS the MPGe, so use it directly.
-     */
-    const effectiveMpge = (g) => {
-        if (unitOverrides[g.test_group_id] === 'mpge') {
-            const raw = g._raw?.combined;
-            return (raw != null && raw > 0 && raw < 999) ? raw : null;
-        }
-        return g.label_combined_mpge;
-    };
-
-    /**
-     * Apply the user's unit-mode choice to a parsed group before DB upsert.
-     * Strips the _raw helper object (not a DB column).
-     * In 'mpge' mode: raw values are MPGe → re-derive kWh/100mi for per-cycle fields.
-     */
-    const applyUnitOverride = (g) => {
-        const { _raw, _hasCycleEnergy, ...rest } = g;
-        if (unitOverrides[g.test_group_id] !== 'mpge' || !_raw) return rest;
-        const toKwh = (mpge) => (mpge != null && mpge > 0 && mpge < 999)
-            ? parseFloat((MPG_E_CONV * 100 / mpge).toFixed(4))
-            : null;
-        return {
-            ...rest,
-            label_combined_mpge:    (_raw.combined != null && _raw.combined > 0 && _raw.combined < 999) ? _raw.combined : rest.label_combined_mpge,
-            hwfet_adj_kwh_100mi:    toKwh(_raw.hwfet),
-            udds_adj_kwh_100mi:     toKwh(_raw.udds),
-            us06_adj_kwh_100mi:     toKwh(_raw.us06),
-            sc03_adj_kwh_100mi:     toKwh(_raw.sc03),
-            cold_ftp_adj_kwh_100mi: toKwh(_raw.cold_ftp),
-        };
-    };
-
-    const toggleUnitOverride = (testGroupId) =>
-        setUnitOverrides(prev => ({
-            ...prev,
-            [testGroupId]: prev[testGroupId] === 'mpge' ? undefined : 'mpge',
-        }));
-
     // ── Import ────────────────────────────────────────────────────────────────
+    // Parsed groups carry private _coefficientSet / _has* helpers; the service
+    // (bulkUpsertEpaTestGroups) strips them and writes the coefficient set.
 
     const handleImport = async () => {
-        const toImport = parsed
-            .filter(g => selected.has(g.test_group_id))
-            .map(applyUnitOverride); // apply unit overrides + strip _raw
+        const toImport = parsed.filter(g => selected.has(g.test_group_id));
         const mappings = Object.entries(linkMap)
             .filter(([tgid, vid]) => selected.has(tgid) && vid)
             .map(([testGroupId, vehicleId]) => ({ vehicleId: parseInt(vehicleId, 10), testGroupId }));
@@ -236,10 +187,11 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                         {parsed.map(g => {
                                             const isSelected = selected.has(g.test_group_id);
                                             const linkedVid  = linkMap[g.test_group_id] || '';
-                                            // Prefer set coefficients; fall back to target
-                                            const a = g.set_a ?? g.target_a;
-                                            const b = g.set_b ?? g.target_b;
-                                            const c = g.set_c ?? g.target_c;
+                                            // Coefficients live on the primary set; prefer set, fall back to target.
+                                            const cs = g._coefficientSet || {};
+                                            const a = cs.set_a ?? cs.target_a;
+                                            const b = cs.set_b ?? cs.target_b;
+                                            const c = cs.set_c ?? cs.target_c;
                                             return (
                                                 <tr key={g.test_group_id} className={`transition ${isSelected ? '' : 'opacity-40'}`}>
                                                     <td className="py-2 pr-2">
@@ -259,60 +211,28 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                                     </td>
                                                     <td className="py-2 pr-3 whitespace-nowrap">
                                                         <div>{g.drive ?? '—'}</div>
-                                                        <div className="text-gray-400">{g.equiv_test_weight_lbs != null ? `${g.equiv_test_weight_lbs.toLocaleString()} lbs` : '—'}</div>
+                                                        <div className="text-gray-400">{cs.equiv_test_weight_lbs != null ? `${cs.equiv_test_weight_lbs.toLocaleString()} lbs` : '—'}</div>
                                                     </td>
                                                     <td className="py-2 pr-3 font-mono whitespace-nowrap">
                                                         {a != null ? (
                                                             <div>
-                                                                <span className={g.set_a != null ? '' : 'text-gray-400'}>{a?.toFixed(2)}</span>
+                                                                <span className={cs.set_a != null ? '' : 'text-gray-400'}>{a?.toFixed(2)}</span>
                                                                 <span className="text-gray-300 mx-1">/</span>
-                                                                <span className={g.set_b != null ? '' : 'text-gray-400'}>{b?.toFixed(4)}</span>
+                                                                <span className={cs.set_b != null ? '' : 'text-gray-400'}>{b?.toFixed(4)}</span>
                                                                 <span className="text-gray-300 mx-1">/</span>
-                                                                <span className={g.set_c != null ? '' : 'text-gray-400'}>{c?.toFixed(5)}</span>
+                                                                <span className={cs.set_c != null ? '' : 'text-gray-400'}>{c?.toFixed(5)}</span>
                                                             </div>
                                                         ) : <span className="text-gray-300">—</span>}
-                                                        {g.set_a == null && a != null && (
+                                                        {cs.set_a == null && a != null && (
                                                             <div className="text-amber-500 text-[10px]">target only</div>
                                                         )}
                                                     </td>
                                                     <td className="py-2 pr-3 whitespace-nowrap">
-                                                        {(() => {
-                                                            const mpge = effectiveMpge(g);
-                                                            const isMpgeMode = unitOverrides[g.test_group_id] === 'mpge';
-                                                            // Flag when converted label is suspiciously low —
-                                                            // likely the column was already in MPGe, not kWh/100mi
-                                                            const suspect = !isMpgeMode && mpge != null && mpge < 60;
-                                                            return (
-                                                                <div className="flex items-center gap-1.5">
-                                                                    {mpge != null ? (
-                                                                        <span className={suspect ? 'text-amber-600 dark:text-amber-400 font-medium' : ''}>
-                                                                            {suspect && '⚠ '}{mpge.toFixed(1)} MPGe
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="text-gray-300">—</span>
-                                                                    )}
-                                                                    {/* Only show toggle when we have a raw value to flip */}
-                                                                    {g._raw?.combined != null && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => toggleUnitOverride(g.test_group_id)}
-                                                                            title={isMpgeMode
-                                                                                ? `Treating as MPGe (raw: ${g._raw.combined}). Click to treat as kWh/100mi.`
-                                                                                : `Treating as kWh/100mi (raw: ${g._raw.combined}). Click to treat as MPGe.`}
-                                                                            className={`text-[10px] px-1.5 py-0.5 rounded border leading-none ${
-                                                                                isMpgeMode
-                                                                                    ? 'border-indigo-400 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30'
-                                                                                    : suspect
-                                                                                        ? 'border-amber-400 text-amber-600 dark:text-amber-400 hover:bg-amber-50'
-                                                                                        : 'border-gray-300 text-gray-400 hover:text-gray-600 hover:border-gray-400'
-                                                                            }`}
-                                                                        >
-                                                                            {isMpgeMode ? 'MPGe' : 'kWh'}
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })()}
+                                                        {g.label_combined_mpge != null ? (
+                                                            <span>{g.label_combined_mpge.toFixed(1)} MPGe</span>
+                                                        ) : (
+                                                            <span className="text-gray-300">—</span>
+                                                        )}
                                                     </td>
                                                     <td className="py-2">
                                                         <select

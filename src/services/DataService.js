@@ -1111,16 +1111,36 @@ class DataService {
   }
 
   /**
-   * Bulk upsert EPA test group rows (keyed on test_group_id).
-   * Existing rows are updated; new rows are inserted.
-   * @param {Array<Object>} rows  Shaped like epa_test_groups columns
+   * Bulk upsert parsed EPA groups into the curator model:
+   *   1. epa_test_groups            (identity + Section 6 label fields)
+   *   2. epa_coefficient_sets       (the primary 'City/Highway' set per group)
+   *
+   * Each parsed row carries a private `_coefficientSet` plus `_hasCoeffs` /
+   * `_hasMpge` flags (from parseEpaTestCarSheet) — these are stripped before
+   * the group upsert and used to build the coefficient-set upsert.
+   *
+   * @param {Array<Object>} rows  Output of parseEpaTestCarSheet
    */
   async bulkUpsertEpaTestGroups(rows) {
     if (!this.useSupabase || !rows.length) return;
+
+    // 1. Group rows — strip private helpers.
+    const groupRows = rows.map(({ _coefficientSet, _hasCoeffs, _hasMpge, ...g }) => g);
     const { error } = await getSupabase()
       .from('epa_test_groups')
-      .upsert(rows, { onConflict: 'test_group_id', ignoreDuplicates: false });
+      .upsert(groupRows, { onConflict: 'test_group_id', ignoreDuplicates: false });
     if (error) throw error;
+
+    // 2. Primary coefficient sets — only for groups that carried coefficients.
+    const coeffRows = rows
+      .filter(r => r._coefficientSet && r._hasCoeffs)
+      .map(r => ({ test_group_id: r.test_group_id, ...r._coefficientSet }));
+    if (coeffRows.length) {
+      const { error: coeffErr } = await getSupabase()
+        .from('epa_coefficient_sets')
+        .upsert(coeffRows, { onConflict: 'test_group_id,category', ignoreDuplicates: false });
+      if (coeffErr) throw coeffErr;
+    }
   }
 
   /**
