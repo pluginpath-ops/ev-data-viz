@@ -37,26 +37,21 @@ function numOrNull(str) {
 }
 
 /**
- * Normalise a RND_ADJ_FE reading to MPGe, honouring the FE_UNIT column when
- * present and falling back to a magnitude test when it isn't. Rejects EPA
- * placeholder sentinels. Returns MPGe (AC-side) or null.
+ * Normalise a RND_ADJ_FE reading to MPGe. Returns MPGe (AC-side) or null.
+ *
+ * FE_UNIT is deliberately IGNORED: real EPA files label this column 'MPG' even
+ * when the value is plainly kWh/100mi. Observed in the wild — Rivian/Lucid/
+ * Tesla-MCT rows read ~20–36 while Porsche/Tesla-highway rows read ~112–183,
+ * all with FE_UNIT='MPG'. The two scales don't overlap for EVs (consumption
+ * ~15–50 kWh/100mi vs MPGe ~65–250, wide empty gap around the ~58 crossover),
+ * so magnitude is the reliable discriminator. Values ≥ 400 are EPA "no data"
+ * placeholders (999 / near-999).
  */
-function normalizeFeToMpge(feRaw, feUnitRaw) {
+function normalizeFeToMpge(feRaw) {
     if (feRaw == null || feRaw <= 0) return null;
-    const unit = (feUnitRaw || '').toUpperCase();
-    const saysMpge = unit.includes('MPG');
-    const saysKwh  = unit.includes('KWH') || unit.includes('WH');
-
-    let isMpge;
-    if      (saysMpge) isMpge = true;
-    else if (saysKwh)  isMpge = false;
-    else               isMpge = feRaw >= MPGE_MAGNITUDE_THRESHOLD; // magnitude backstop
-
-    if (isMpge) {
-        return feRaw >= MPGE_PLACEHOLDER_MIN ? null : feRaw; // value already IS MPGe
-    }
-    // value is kWh/100mi → convert to MPGe
-    return feRaw < 500 ? (MPG_E_CONVERSION * 100) / feRaw : null;
+    if (feRaw >= MPGE_PLACEHOLDER_MIN)     return null;          // sentinel
+    if (feRaw >= MPGE_MAGNITUDE_THRESHOLD) return feRaw;         // already MPGe
+    return (MPG_E_CONVERSION * 100) / feRaw;                     // kWh/100mi → MPGe
 }
 
 /** Build an { field: { source:'csv' } } override map for the non-null fields. */
@@ -91,28 +86,42 @@ function splitLine(line, sep) {
     return fields;
 }
 
-// ── Master Emissions List: Test Procedure code → cycle category ───────────────
+// ── Test Procedure code → cycle category ──────────────────────────────────────
+// EPA charge-depleting BEV procedure codes (confirmed against real Test Car List
+// rows): 77/78 = Multi-Cycle Test, 81 = CD-UDDS, 84 = CD-Highway. Others are
+// best-effort fallbacks; the description is the primary signal below.
 const PROC_CODE_TO_CATEGORY = {
     '77': 'MCT', '78': 'MCT',
-    '81': 'FTP', '82': 'HWY', '83': 'US06', '84': 'SC03',
-    '85': 'COLD FTP', '86': 'COLD FTP',
+    '81': 'FTP', '84': 'HWY',
+    '83': 'US06', '85': 'COLD FTP', '86': 'COLD FTP',
 };
 
-/** Normalised cycle category from a row: explicit column → proc code → description. */
+/**
+ * Normalised cycle category for a row.
+ *
+ * IMPORTANT: `Test Category` holds the charge MODE ('CD' = charge-depleting,
+ * 'CS' = charge-sustaining), NOT the drive cycle — every BEV row reads 'CD'.
+ * The real cycle lives in `Test Procedure Description` ("Charge Depleting
+ * Highway", "Multi-Cycle Test (MCT)", …), so that's the primary signal, then
+ * the procedure code, and `Test Category` only as a last resort when it carries
+ * a real cycle name rather than the mode.
+ */
 function deriveCycleCategory(row, get) {
-    const cat = get(row, 'Test Category');
-    if (cat) return cat.toUpperCase();
+    const desc = (get(row, 'Test Procedure Description') || '').toUpperCase();
+    if (desc) {
+        if (desc.includes('US06'))                              return 'US06';
+        if (desc.includes('SC03'))                              return 'SC03';
+        if (desc.includes('COLD'))                              return 'COLD FTP';
+        if (desc.includes('HWFET') || desc.includes('HIGHWAY')) return 'HWY';
+        if (desc.includes('UDDS')  || desc.includes('FTP'))     return 'FTP';
+        if (desc.includes('MCT')   || desc.includes('MULTI') || desc.includes('COMBINED')) return 'MCT';
+    }
 
-    const procCode = get(row, 'Test Procedure');
+    const procCode = get(row, 'Test Procedure Cd') || get(row, 'Test Procedure');
     if (PROC_CODE_TO_CATEGORY[procCode]) return PROC_CODE_TO_CATEGORY[procCode];
 
-    const desc = (get(row, 'Test Procedure Description') || '').toUpperCase();
-    if (desc.includes('UDDS'))                              return 'FTP';
-    if (desc.includes('HWFET') || desc.includes('HIGHWAY')) return 'HWY';
-    if (desc.includes('US06'))                              return 'US06';
-    if (desc.includes('SC03'))                              return 'SC03';
-    if (desc.includes('COLD'))                              return 'COLD FTP';
-    if (desc.includes('MCT')  || desc.includes('MULTI'))    return 'MCT';
+    const cat = (get(row, 'Test Category') || '').toUpperCase();
+    if (cat && cat !== 'CD' && cat !== 'CS') return cat; // ignore charge-mode values
     return '';
 }
 
@@ -202,6 +211,8 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
                 model_year:         getNum(row, 'Model Year'),
                 make,
                 epa_carline_name:   model,
+                vehicle_config_number: getAny(row,
+                    'Test Veh Configuration #', 'Vehicle ID / Configuration Number') || null,
                 transmission,
                 drive,
                 fuel_type:          fuelDesc,
@@ -240,17 +251,19 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         if (cs.set_b === null && sb !== null) cs.set_b = sb;
         if (cs.set_c === null && sc !== null) cs.set_c = sc;
 
-        // Combined label MPGe from the MCT/combined row (AC-side, unit-normalised).
+        // Combined label MPGe — ONLY from the Multi-Cycle Test (proc 77) row,
+        // the genuine combined value. (A CD-Highway proc-84 row is highway-only,
+        // not combined, so it must not populate label_combined_mpge.)
         const category = deriveCycleCategory(row, get);
-        if (g.label_combined_mpge == null && (category === 'MCT' || category === 'CD')) {
-            const mpge = normalizeFeToMpge(getNum(row, 'RND_ADJ_FE'), get(row, 'FE_UNIT'));
+        if (g.label_combined_mpge == null && category === 'MCT') {
+            const mpge = normalizeFeToMpge(getNum(row, 'RND_ADJ_FE'));
             if (mpge != null) g.label_combined_mpge = Math.round(mpge * 10) / 10;
         }
     }
 
     // Finalise: attach override provenance + summary flags.
     const GROUP_CSV_FIELDS = ['model_year', 'make', 'epa_carline_name',
-        'drive', 'transmission', 'fuel_type', 'label_combined_mpge'];
+        'vehicle_config_number', 'drive', 'transmission', 'fuel_type', 'label_combined_mpge'];
     const COEFF_CSV_FIELDS = ['equiv_test_weight_lbs',
         'target_a', 'target_b', 'target_c', 'set_a', 'set_b', 'set_c'];
 
