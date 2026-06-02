@@ -20,20 +20,11 @@ const CONFIDENCE_COLORS = {
 };
 
 // Short labels keep the select narrow; full names shown in title tooltip
-const LABEL_METHOD_OPTIONS = [
-    { value: '',                 label: '—',        title: 'Unknown / not set'    },
-    { value: '2-cycle',          label: '2-cycle',  title: '2-cycle (city + hwy)' },
-    { value: '5-cycle',          label: '5-cycle',  title: '5-cycle adjusted'     },
-    { value: 'vehicle-specific', label: 'Veh-spec', title: 'Vehicle-specific test' },
-    { value: 'mpg-based',        label: 'MPG',      title: 'MPG-based (PHEV)'     },
-];
-
-export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup, updateEpaLabelMethod, updateEpaTestGroup }) {
+export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup, updateEpaTestGroup }) {
     const [groups,         setGroups]         = useState([]);
     const [loading,        setLoading]        = useState(true);
     const [query,          setQuery]          = useState('');
     const [deleting,       setDeleting]       = useState(new Set());
-    const [updatingMethod, setUpdatingMethod] = useState(new Set());
     const [draftNames,     setDraftNames]     = useState({});   // keyed by test_group_id
     const [savingName,     setSavingName]     = useState(new Set());
     const [error,          setError]          = useState(null);
@@ -95,22 +86,6 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
             setDraftNames(prev => ({ ...prev, [group.test_group_id]: current }));
         } finally {
             setSavingName(prev => { const s = new Set(prev); s.delete(group.test_group_id); return s; });
-        }
-    }
-
-    async function handleLabelMethodChange(group, method) {
-        setUpdatingMethod(prev => new Set(prev).add(group.test_group_id));
-        try {
-            await updateEpaLabelMethod?.(group.test_group_id, method);
-            setGroups(prev => prev.map(g =>
-                g.test_group_id === group.test_group_id
-                    ? { ...g, label_method: method || null }
-                    : g
-            ));
-        } catch (e) {
-            setError('Update failed: ' + e.message);
-        } finally {
-            setUpdatingMethod(prev => { const s = new Set(prev); s.delete(group.test_group_id); return s; });
         }
     }
 
@@ -186,7 +161,6 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Drive / ETW</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">A · B · C</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">MPGe</th>
-                                <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Method</th>
                                 <th className="px-3 py-2 text-gray-500 font-semibold">Linked Vehicles</th>
                                 <th className="px-3 py-2" />
                             </tr>
@@ -196,6 +170,9 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                 const mappings = g.epa_vehicle_mappings || [];
                                 const isDel    = deleting.has(g.test_group_id);
                                 const isSaving = savingName.has(g.test_group_id);
+                                // Coefficients live on the primary coefficient set now.
+                                const coeff = (g.epa_coefficient_sets || []).find(s => s.is_primary)
+                                    || (g.epa_coefficient_sets || [])[0] || {};
                                 return (
                                     <tr
                                         key={g.test_group_id}
@@ -244,8 +221,8 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                         <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-slate-400">
                                             <div>{g.drive || '—'}</div>
                                             <div className="text-gray-400 dark:text-slate-500 mt-0.5">
-                                                {g.equiv_test_weight_lbs != null
-                                                    ? `${Number(g.equiv_test_weight_lbs).toLocaleString()} lbs`
+                                                {coeff.equiv_test_weight_lbs != null
+                                                    ? `${Number(coeff.equiv_test_weight_lbs).toLocaleString()} lbs`
                                                     : '—'}
                                             </div>
                                         </td>
@@ -253,10 +230,10 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                         {/* Road-load A / B / C — prefer target; fall back to set */}
                                         <td className="px-3 py-2 font-mono whitespace-nowrap">
                                             {(() => {
-                                                const a = g.target_a ?? g.set_a;
-                                                const b = g.target_b ?? g.set_b;
-                                                const c = g.target_c ?? g.set_c;
-                                                const isTarget = g.target_a != null;
+                                                const a = coeff.target_a ?? coeff.set_a;
+                                                const b = coeff.target_b ?? coeff.set_b;
+                                                const c = coeff.target_c ?? coeff.set_c;
+                                                const isTarget = coeff.target_a != null;
                                                 if (a == null) return <span className="text-gray-300 dark:text-slate-600">—</span>;
                                                 return (
                                                     <div
@@ -272,39 +249,17 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                             })()}
                                         </td>
 
-                                        {/* Label MPGe */}
-                                        <td className="px-3 py-2 whitespace-nowrap">
+                                        {/* Label MPGe — combined, else highway-only (tagged) */}
+                                        <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-slate-400">
                                             {g.label_combined_mpge != null && g.label_combined_mpge < 500 ? (
-                                                <span
-                                                    className={g.label_combined_mpge < 60
-                                                        ? 'text-amber-600 dark:text-amber-400 font-medium'
-                                                        : 'text-gray-500 dark:text-slate-400'}
-                                                    title={g.label_combined_mpge < 60
-                                                        ? 'Label < 60 MPGe — source column may be in MPGe not kWh/100mi. Re-import with the unit flip toggle.'
-                                                        : undefined}
-                                                >
-                                                    {g.label_combined_mpge < 60 && '⚠ '}
-                                                    {g.label_combined_mpge}
+                                                <span>{g.label_combined_mpge}</span>
+                                            ) : g.label_hwy_mpge != null && g.label_hwy_mpge < 500 ? (
+                                                <span title="Highway-only (proc 84); no combined MCT test">
+                                                    {g.label_hwy_mpge}<span className="text-gray-400 ml-1 text-[10px]">hwy</span>
                                                 </span>
                                             ) : (
                                                 <span className="text-gray-300 dark:text-slate-600">—</span>
                                             )}
-                                        </td>
-
-                                        {/* Label method — compact select */}
-                                        <td className="px-3 py-2">
-                                            <select
-                                                value={g.label_method ?? ''}
-                                                disabled={updatingMethod.has(g.test_group_id) || isDel}
-                                                onChange={e => handleLabelMethodChange(g, e.target.value)}
-                                                className="form-input text-xs py-0.5 w-24 disabled:opacity-50"
-                                                title={LABEL_METHOD_OPTIONS.find(o => o.value === (g.label_method ?? ''))?.title
-                                                    ?? 'Range label derivation method — look up on fueleconomy.gov'}
-                                            >
-                                                {LABEL_METHOD_OPTIONS.map(o => (
-                                                    <option key={o.value} value={o.value} title={o.title}>{o.label}</option>
-                                                ))}
-                                            </select>
                                         </td>
 
                                         {/* Linked vehicles with confidence badges */}
