@@ -19,6 +19,7 @@ export default function CuratorField({
     step,
     placeholder,
     overrideSource,        // 'csv' | 'manual' | undefined
+    used = false,          // true ⇒ feeds a derived calculation (highlighted)
     canEdit = true,
     onSave,                // (newValue) => Promise|void
 }) {
@@ -47,7 +48,8 @@ export default function CuratorField({
 
     return (
         <div className="flex items-center justify-between gap-2 py-0.5">
-            <span className="text-gray-500 dark:text-slate-400 shrink-0 flex items-center gap-1">
+            <span className={`shrink-0 flex items-center gap-1 ${used ? 'text-gray-700 dark:text-slate-200 font-semibold' : 'text-gray-500 dark:text-slate-400'}`}>
+                {used && <span title="Used in a derived calculation" className="text-indigo-500">∗</span>}
                 {label}
                 {tooltip && <InfoIcon text={tooltip} position="right" />}
                 {overrideSource === 'manual' && (
@@ -57,7 +59,9 @@ export default function CuratorField({
                     <span title="Imported from CSV" className="text-gray-300 dark:text-slate-600 text-[9px]">csv</span>
                 )}
             </span>
-            <span className="flex items-center gap-1 min-w-0">
+            {/* Fixed-width input + always-present unit column so right edges align
+                whether or not a field has a unit label. */}
+            <span className="flex items-center gap-1 shrink-0">
                 {canEdit ? (
                     <input
                         type={type === 'number' ? 'number' : 'text'}
@@ -72,9 +76,9 @@ export default function CuratorField({
                         className="form-input text-xs py-0.5 px-1.5 w-28 text-right font-mono disabled:opacity-50"
                     />
                 ) : (
-                    <span className="font-mono text-xs text-right">{value ?? '—'}</span>
+                    <span className="font-mono text-xs text-right w-28">{value ?? '—'}</span>
                 )}
-                {unit && <span className="text-gray-400 text-[10px] w-12 shrink-0">{unit}</span>}
+                <span className="text-gray-400 text-[10px] w-10 shrink-0">{unit || ''}</span>
             </span>
         </div>
     );
