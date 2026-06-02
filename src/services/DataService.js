@@ -1335,6 +1335,27 @@ class DataService {
     return data || [];
   }
 
+  /**
+   * Fetch the audit trail for a whole test group: the group row plus all of its
+   * child rows (coefficient sets, tests, phases). Matches on the union of row
+   * ids (the group's text id + the stringified child ids). Most recent first.
+   *
+   * @param {string} testGroupId
+   * @param {Array<string|number>} childRowIds  ids of coeff sets / tests / phases
+   */
+  async getEpaAuditForGroup(testGroupId, childRowIds = []) {
+    if (!this.useSupabase) return [];
+    const ids = [String(testGroupId), ...childRowIds.map(String)];
+    const { data, error } = await getSupabase()
+      .from('epa_field_audit')
+      .select('*')
+      .in('row_id', ids)
+      .order('edited_at', { ascending: false })
+      .limit(200);
+    if (error) throw error;
+    return data || [];
+  }
+
   // ── Access logging ──────────────────────────────────────────────────────────
 
   /**
