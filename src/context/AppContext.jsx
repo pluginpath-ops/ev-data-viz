@@ -899,8 +899,10 @@ export function AppProvider({ children }) {
         }
     };
 
-    /** Append an audit-trail entry. Best-effort: failures don't block the edit. */
-    const logEpaFieldEdit = (entry) => dataService.logEpaFieldEdit(entry);
+    /** Append an audit-trail entry. Best-effort: failures must never block or
+     *  surface from the edit that triggered them (fire-and-forget). */
+    const logEpaFieldEdit = (entry) =>
+        Promise.resolve(dataService.logEpaFieldEdit(entry)).catch(() => {});
 
     /** Pass-through: read the audit trail for a row. */
     const getEpaFieldAudit = (tableName, rowId) => dataService.getEpaFieldAudit(tableName, rowId);
