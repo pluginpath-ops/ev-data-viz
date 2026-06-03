@@ -40,8 +40,9 @@ function DataRow({ label, value, muted }) {
 }
 
 /** Card displaying the data for one EPA test group mapping. */
-function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence, onUpdateDisplayName }) {
+function EpaGroupCard({ mapping, canEdit, onUnlink, onDelete, onUpdateConfidence, onUpdateDisplayName }) {
     const [unlinking,    setUnlinking]    = useState(false);
+    const [deleting,     setDeleting]     = useState(false);
     const [updatingConf, setUpdatingConf] = useState(false);
     const [draftName,    setDraftName]    = useState(null); // null = not editing
     const [savingName,   setSavingName]   = useState(false);
@@ -70,6 +71,16 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence, onUpdate
     const handleUnlink = async () => {
         setUnlinking(true);
         try { await onUnlink(mapping.id); } finally { setUnlinking(false); }
+    };
+
+    const handleDelete = async () => {
+        if (!window.confirm(
+            `Delete EPA test group "${g.test_group_id}" entirely?\n\n` +
+            `This removes its coefficients, tests and phases and unlinks it from ALL vehicles. ` +
+            `It cannot be undone. (Use "Unlink" to only detach it from this vehicle.)`
+        )) return;
+        setDeleting(true);
+        try { await onDelete?.(g.test_group_id); } finally { setDeleting(false); }
     };
 
     const handleConfidence = async (e) => {
@@ -158,11 +169,23 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence, onUpdate
                     {canEdit && (
                         <button
                             type="button"
-                            disabled={unlinking}
+                            disabled={unlinking || deleting}
                             onClick={handleUnlink}
                             className="btn btn-secondary text-xs py-0.5 px-2 disabled:opacity-40"
+                            title="Detach this test group from this vehicle (keeps the shared record)"
                         >
                             {unlinking ? '…' : 'Unlink'}
+                        </button>
+                    )}
+                    {canEdit && onDelete && (
+                        <button
+                            type="button"
+                            disabled={unlinking || deleting}
+                            onClick={handleDelete}
+                            className="btn btn-danger text-xs py-0.5 px-2 disabled:opacity-40"
+                            title="Delete the shared test group and all its data (affects every linked vehicle)"
+                        >
+                            {deleting ? '…' : 'Delete'}
                         </button>
                     )}
                 </div>
@@ -266,7 +289,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
     const [showDropdown, setShowDropdown] = useState(false);
     const [linking, setLinking]           = useState(false);
     const [showPdfModal, setShowPdfModal] = useState(false);
-    const { importEpaCsiGroups, getExistingEpaTestGroupIds } = useAppContext();
+    const { importEpaCsiGroups, getExistingEpaTestGroupIds, deleteEpaTestGroup } = useAppContext();
     const [showCreate, setShowCreate]     = useState(false);
     const [createDraft, setCreateDraft]   = useState({ test_group_id: '', model_year: '', make: '', epa_carline_name: '' });
     const [creating, setCreating]         = useState(false);
@@ -364,6 +387,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                         mapping={m}
                         canEdit={canEdit}
                         onUnlink={onUnlink}
+                        onDelete={deleteEpaTestGroup}
                         onUpdateConfidence={onUpdateConfidence}
                         onUpdateDisplayName={onUpdateDisplayName}
                     />
