@@ -100,7 +100,6 @@ export default function VehiclesView({
 
     const {
         units, manufacturers, addManufacturer, isContributor, addSpecLink, deleteSpecLink, user,
-        searchEpaTestGroups, linkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup,
     } = useAppContext();
 
     const {
@@ -410,13 +409,7 @@ export default function VehiclesView({
         // Manufacturer
         manufacturers,
         onAddManufacturer: addManufacturer,
-        // EPA linking (contributor+)
-        ...(isContributor ? {
-            searchEpaTestGroups,
-            onLinkEpaTestGroup:   linkEpaTestGroup,
-            onUpdateEpaMapping:   updateEpaMapping,
-            onUnlinkEpaTestGroup: unlinkEpaTestGroup,
-        } : {}),
+        // EPA test groups are assigned in Tests & Data, not in this edit modal.
     };
 
     const handleMoveVehicle = (vehicleId, direction) => {
