@@ -172,7 +172,14 @@ function parseTests(items, start, end) {
         const phases = parsePhases(items, ti, tEnd, cold);
         const total_dc = phases.reduce((s, p) => s + (p.dc_energy_kwh ?? 0), 0);
         const total_dist = phases.reduce((s, p) => s + (p.distance_mi ?? 0), 0);
+        // The EPA "Test #" + value precede the procedure header (Test # → value
+        // → Test Procedure → "NN - …"), so look back a few items for it.
+        let test_number = null;
+        for (let b = ti - 1; b >= Math.max(0, ti - 6); b--) {
+            if (items[b] === 'Test #') { test_number = items[b + 1] || null; break; }
+        }
         return {
+            test_number,
             procedure_code: procMatch ? Number(procMatch[1]) : null,
             originator: 'MFR',
             lab_id: valAfter(items, 'Verify Test Lab ID', ti, tEnd),
