@@ -971,7 +971,7 @@ export default function VehiclesView({
             {/* Add / Edit vehicle modal */}
             {showForm && (
                 <div className="modal-overlay" onClick={handleCancel}>
-                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4" onClick={e => e.stopPropagation()}>
+                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <EditVehicleForm {...editFormProps} />
                     </div>
                 </div>
