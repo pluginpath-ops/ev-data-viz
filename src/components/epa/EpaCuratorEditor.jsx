@@ -8,7 +8,7 @@
  * row's `overrides`, and appends an audit-trail entry. Derivations (Section 8)
  * recompute live from the edited model.
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import CuratorField from './CuratorField';
 import DerivedValues from './DerivedValues';
@@ -58,15 +58,24 @@ export default function EpaCuratorEditor({ testGroupId, canEdit }) {
         saveEpaPhase, deleteEpaPhase, logEpaFieldEdit, getEpaAuditForGroup,
     } = useAppContext();
 
-    const [group, setGroup]   = useState(null);
+    const [dbGroup, setDbGroup] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError]   = useState(null);
+    const [error, setError]     = useState(null);
     const [citation, setCitation] = useState(''); // optional source for subsequent edits
+    const [saving, setSaving]   = useState(false);
+
+    // Buffered scalar-field edits — gated behind Save (structural add/delete of
+    // tests & phases stay live). Shape:
+    //   group:  { [field]: value }
+    //   coeff:  { [field]: value }          (primary coefficient set)
+    //   tests:  { [testId]:  { [field]: value } }
+    //   phases: { [phaseId]: { [field]: value } }
+    const [edits, setEdits] = useState({ group: {}, coeff: {}, tests: {}, phases: {} });
+    const resetEdits = () => setEdits({ group: {}, coeff: {}, tests: {}, phases: {} });
 
     const reload = useCallback(async () => {
         try {
-            const g = await getEpaTestGroupFull(testGroupId);
-            setGroup(g);
+            setDbGroup(await getEpaTestGroupFull(testGroupId));
         } catch (e) {
             setError(e.message);
         } finally {
@@ -76,50 +85,117 @@ export default function EpaCuratorEditor({ testGroupId, canEdit }) {
 
     useEffect(() => { reload(); }, [reload]);
 
+    const dirty =
+        Object.keys(edits.group).length > 0 ||
+        Object.keys(edits.coeff).length > 0 ||
+        Object.values(edits.tests).some(o => Object.keys(o).length) ||
+        Object.values(edits.phases).some(o => Object.keys(o).length);
+
+    // Warn before leaving/refreshing the tab with unsaved buffered edits.
+    useEffect(() => {
+        if (!dirty) return;
+        const h = (e) => { e.preventDefault(); e.returnValue = ''; };
+        window.addEventListener('beforeunload', h);
+        return () => window.removeEventListener('beforeunload', h);
+    }, [dirty]);
+
+    // Display view = DB truth with buffered edits overlaid. Drives every field
+    // value AND the live derived-value/curve preview, so you see impact before Save.
+    const group = useMemo(() => {
+        if (!dbGroup) return null;
+        const hasPrimary = (dbGroup.epa_coefficient_sets || []).some(s => s.is_primary);
+        const sets = (dbGroup.epa_coefficient_sets || []).map((s, i) =>
+            (s.is_primary || (!hasPrimary && i === 0)) ? { ...s, ...edits.coeff } : s);
+        const tests = (dbGroup.epa_tests || []).map(t => ({
+            ...t,
+            ...(edits.tests[t.id] || {}),
+            epa_test_phases: (t.epa_test_phases || []).map(p => ({ ...p, ...(edits.phases[p.id] || {}) })),
+        }));
+        return { ...dbGroup, ...edits.group, epa_coefficient_sets: sets, epa_tests: tests };
+    }, [dbGroup, edits]);
+
     if (loading) return <p className="text-xs text-gray-400 italic py-2">Loading curator data…</p>;
     if (error)   return <p className="text-xs text-red-500 py-2">Error: {error}</p>;
     if (!group)  return null;
 
-    const primary = (group.epa_coefficient_sets || []).find(s => s.is_primary)
-        || (group.epa_coefficient_sets || [])[0] || null;
+    const primary    = (group.epa_coefficient_sets || []).find(s => s.is_primary)    || (group.epa_coefficient_sets || [])[0]    || null;
+    const primaryRaw = (dbGroup.epa_coefficient_sets || []).find(s => s.is_primary) || (dbGroup.epa_coefficient_sets || [])[0] || null;
 
-    // Provenance helpers
-    const gOv = (f) => group.overrides?.[f]?.source;
-    const cOv = (f) => primary?.overrides?.[f]?.source;
+    // Provenance: 'pending' for unsaved buffered edits, else the saved source.
+    const gOv = (f) => (f in edits.group) ? 'pending' : dbGroup.overrides?.[f]?.source;
+    const cOv = (f) => (f in edits.coeff) ? 'pending' : primaryRaw?.overrides?.[f]?.source;
 
+    const now = () => new Date().toISOString();
     const audit = (tableName, rowId, field, prior, next) =>
         logEpaFieldEdit?.({ tableName, rowId, field, priorValue: prior, newValue: next,
             sourceCitation: citation.trim() || null });
 
-    // ── Save handlers (mark source:'manual' + audit + reload) ───────────────────
-    const saveGroup = async (field, value) => {
-        const prior = group[field];
-        const overrides = { ...(group.overrides || {}), [field]: { source: 'manual', at: new Date().toISOString() } };
-        await updateEpaTestGroup(testGroupId, { [field]: value, overrides });
-        audit('epa_test_groups', testGroupId, field, prior, value);
-        await reload();
+    // ── Buffered field edits (no DB write until Save) ───────────────────────────
+    const saveGroup = (field, value) => setEdits(e => ({ ...e, group: { ...e.group, [field]: value } }));
+    const saveCoeff = (field, value) => setEdits(e => ({ ...e, coeff: { ...e.coeff, [field]: value } }));
+    const saveTest = (row) => {
+        const { id, ...fields } = row;
+        if (id == null) return;
+        setEdits(e => ({ ...e, tests: { ...e.tests, [id]: { ...(e.tests[id] || {}), ...fields } } }));
+    };
+    const savePhase = (row) => {
+        const { id, phase_type, dc_energy_kwh, distance_mi } = row;
+        if (id == null) return;
+        setEdits(e => ({ ...e, phases: { ...e.phases, [id]: { ...(e.phases[id] || {}), phase_type, dc_energy_kwh, distance_mi } } }));
     };
 
-    const saveCoeff = async (field, value) => {
-        const base = primary || { test_group_id: testGroupId, category: 'City/Highway', is_primary: true };
-        const prior = base[field];
-        const overrides = { ...(base.overrides || {}), [field]: { source: 'manual', at: new Date().toISOString() } };
-        const saved = await saveEpaCoefficientSet({ ...(primary?.id ? { id: primary.id } : {}), test_group_id: testGroupId, category: base.category, is_primary: true, [field]: value, overrides });
-        audit('epa_coefficient_sets', saved?.id ?? primary?.id ?? testGroupId, field, prior, value);
-        await reload();
-    };
-
-    const saveTest = async (row) => {
-        await saveEpaTest(row.id ? row : { ...row, test_group_id: testGroupId });
-        await reload();
-    };
-    const removeTest = async (t) => { await deleteEpaTest(t.id); await reload(); };
+    // ── Structural ops stay live (immediate DB write + reload) ──────────────────
+    const dropTestEdits  = (id) => setEdits(e => { const tests = { ...e.tests }; delete tests[id]; return { ...e, tests }; });
+    const dropPhaseEdits = (id) => setEdits(e => { const phases = { ...e.phases }; delete phases[id]; return { ...e, phases }; });
     const addTest = async () => {
         await saveEpaTest({ test_group_id: testGroupId, procedure_code: 77, source: 'manual' });
         await reload();
     };
-    const savePhase = async (row) => { await saveEpaPhase(row); await reload(); };
-    const removePhase = async (p) => { await deleteEpaPhase(p.id); await reload(); };
+    const removeTest = async (t) => {
+        (t.epa_test_phases || []).forEach(p => dropPhaseEdits(p.id));
+        dropTestEdits(t.id);
+        await deleteEpaTest(t.id);
+        await reload();
+    };
+    const removePhase = async (p) => { dropPhaseEdits(p.id); await deleteEpaPhase(p.id); await reload(); };
+
+    // ── Save / Discard the buffered field edits ─────────────────────────────────
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            const gf = edits.group;
+            if (Object.keys(gf).length) {
+                const overrides = { ...(dbGroup.overrides || {}) };
+                Object.keys(gf).forEach(f => { overrides[f] = { source: 'manual', at: now() }; });
+                await updateEpaTestGroup(testGroupId, { ...gf, overrides });
+                Object.keys(gf).forEach(f => audit('epa_test_groups', testGroupId, f, dbGroup[f], gf[f]));
+            }
+            const cf = edits.coeff;
+            if (Object.keys(cf).length) {
+                const base = primaryRaw || { category: 'City/Highway', is_primary: true };
+                const overrides = { ...(base.overrides || {}) };
+                Object.keys(cf).forEach(f => { overrides[f] = { source: 'manual', at: now() }; });
+                const saved = await saveEpaCoefficientSet({
+                    ...(primaryRaw?.id ? { id: primaryRaw.id } : {}),
+                    test_group_id: testGroupId, category: base.category || 'City/Highway', is_primary: true,
+                    ...cf, overrides,
+                });
+                Object.keys(cf).forEach(f => audit('epa_coefficient_sets', saved?.id ?? primaryRaw?.id, f, base[f], cf[f]));
+            }
+            for (const [id, fields] of Object.entries(edits.tests)) {
+                if (Object.keys(fields).length) await saveEpaTest({ id: Number(id), ...fields });
+            }
+            for (const [id, fields] of Object.entries(edits.phases)) {
+                if (Object.keys(fields).length) await saveEpaPhase({ id: Number(id), ...fields });
+            }
+            resetEdits();
+            await reload();
+        } catch (e) {
+            setError('Save failed: ' + e.message);
+        } finally {
+            setSaving(false);
+        }
+    };
     // Add `count` phases (default 1) with no type set, so distance-entry can
     // auto-suggest it. count>1 is used by the "Add X phases" bulk action.
     const addPhase = async (test, count = 1) => {
@@ -158,6 +234,34 @@ export default function EpaCuratorEditor({ testGroupId, canEdit }) {
                         placeholder="e.g. J1634 sheet p.3 / CSI PDF — applied to edits below"
                         className="form-input text-xs py-0.5 flex-1"
                     />
+                </div>
+            )}
+
+            {/* Save / Discard bar — field edits are buffered until saved */}
+            {canEdit && (
+                <div className="flex items-center gap-2 mb-3 py-2 px-3 rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/40 sticky top-0 z-10">
+                    <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={!dirty || saving}
+                        className="btn btn-primary text-xs py-1 px-3 disabled:opacity-40"
+                    >
+                        {saving ? 'Saving…' : 'Save changes'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={resetEdits}
+                        disabled={!dirty || saving}
+                        className="btn btn-secondary text-xs py-1 px-3 disabled:opacity-40"
+                    >
+                        Discard
+                    </button>
+                    <span className={`text-[11px] ${dirty ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-400'}`}>
+                        {dirty ? '● Unsaved field edits' : 'All changes saved'}
+                    </span>
+                    <span className="text-[10px] text-gray-400 ml-auto italic">
+                        Adding/removing tests &amp; phases saves immediately.
+                    </span>
                 </div>
             )}
 

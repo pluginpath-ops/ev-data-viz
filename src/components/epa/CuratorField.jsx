@@ -52,6 +52,9 @@ export default function CuratorField({
                 {used && <span title="Used in a derived calculation" className="text-indigo-500">∗</span>}
                 {label}
                 {tooltip && <InfoIcon text={tooltip} position="right" />}
+                {overrideSource === 'pending' && (
+                    <span title="Unsaved edit — click Save changes to commit" className="text-amber-500 text-[9px] font-bold">✎</span>
+                )}
                 {overrideSource === 'manual' && (
                     <span title="Curator-overridden value" className="text-amber-500 text-[9px] font-bold">●</span>
                 )}
