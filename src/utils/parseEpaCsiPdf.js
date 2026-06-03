@@ -171,7 +171,6 @@ function parseTests(items, start, end) {
         const cdRangeHwy = hwyLabelIdx >= 0 ? parseNum(items[hwyLabelIdx + 2]) : null;
         const phases = parsePhases(items, ti, tEnd, cold);
         const phaseDc = phases.reduce((s, p) => s + (p.dc_energy_kwh ?? 0), 0);
-        const total_dist = phases.reduce((s, p) => s + (p.distance_mi ?? 0), 0);
         // Total DC has two reporting conventions across OEMs — pick data-driven,
         // not per-manufacturer:
         //   1. Real per-phase Integrated DC KW-HRS → their sum (incl. the SS bag).
@@ -185,6 +184,28 @@ function parseTests(items, start, end) {
         const endSoc = parseNum(valAfter(items, 'System End State of Charge Watt-hours', ti, tEnd));
         const endSocKwh = endSoc == null ? null : (endSoc > 400 ? endSoc / 1000 : endSoc);
         const total_dc = phaseDc > 0 ? phaseDc : endSocKwh;
+        const procCode = procMatch ? Number(procMatch[1]) : null;
+
+        // Single-cycle CD tests (84 = Highway, 81 = UDDS) whose per-phase data is
+        // dummy: the whole depletion IS one cycle, so synthesize one phase from
+        // the test totals — actual miles driven + total DC. The CD-Highway test
+        // runs the HWFET cycle, so the resulting HWY phase is a valid η anchor
+        // (e.g. Tesla Model Y: 78.946 kWh / 369 mi = 214 Wh/mi = its HWFE avg).
+        let effPhases = phases;
+        if (phaseDc <= 0 && (procCode === 84 || procCode === 81) && total_dc > 0) {
+            const actualMiles = parseNum(valAfter(items, 'Charge Depleting Range (Actual miles)', ti, tEnd))
+                ?? parseNum(valAfter(items, 'Charge Depleting Range (Calculated miles)', ti, tEnd));
+            if (actualMiles > 0) {
+                effPhases = [{
+                    phase_index: 1,
+                    phase_type: procCode === 84 ? 'HWY' : 'UDDS',
+                    distance_mi: actualMiles,
+                    dc_energy_kwh: Math.round(total_dc * 1000) / 1000,
+                }];
+            }
+        }
+        const total_dist2 = effPhases.reduce((s, p) => s + (p.distance_mi ?? 0), 0);
+
         // The EPA "Test #" + value precede the procedure header (Test # → value
         // → Test Procedure → "NN - …"), so look back a few items for it.
         let test_number = null;
@@ -193,7 +214,7 @@ function parseTests(items, start, end) {
         }
         return {
             test_number,
-            procedure_code: procMatch ? Number(procMatch[1]) : null,
+            procedure_code: procCode,
             originator: 'MFR',
             lab_id: valAfter(items, 'Verify Test Lab ID', ti, tEnd),
             test_date: toIsoDate(valAfter(items, 'Test Date', ti, tEnd)),
@@ -204,8 +225,8 @@ function parseTests(items, start, end) {
             cd_range_hwy_calc: cdRangeHwy,
             bags_phases_conducted: parseNum(valAfter(items, 'Conducted', ti, tEnd)),
             total_dc_energy_kwh: total_dc > 0 ? Math.round(total_dc * 1000) / 1000 : null,
-            total_distance_mi: total_dist > 0 ? Math.round(total_dist * 1000) / 1000 : null,
-            phases,
+            total_distance_mi: total_dist2 > 0 ? Math.round(total_dist2 * 1000) / 1000 : null,
+            phases: effPhases,
         };
     });
 }
