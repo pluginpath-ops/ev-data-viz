@@ -807,6 +807,33 @@ export function AppProvider({ children }) {
         }
     };
 
+    /** Which of these test_group_ids already exist (for overwrite confirmation). */
+    const getExistingEpaTestGroupIds = (ids) => dataService.getExistingEpaTestGroupIds(ids);
+
+    /**
+     * Import parsed CSI-PDF groups (clean-replace each), optionally linking one
+     * to a vehicle, then refresh. Used by the PDF import modal from both Admin
+     * and the per-vehicle curator section.
+     */
+    const importEpaCsiGroups = async (groups, { linkVehicleId, linkTestGroupIds = [] } = {}) => {
+        try {
+            for (const g of groups) await dataService.importEpaGroupFull(g);
+            if (linkVehicleId) {
+                for (const tgid of linkTestGroupIds) {
+                    try { await dataService.linkEpaTestGroup(linkVehicleId, tgid, 'verified', null); }
+                    catch { /* already linked — ignore UNIQUE conflict */ }
+                }
+            }
+            const updated = await dataService.getVehicles();
+            setVehicles(updated);
+            showSuccess(`Imported ${groups.length} EPA config(s) from PDF.`);
+            return { count: groups.length };
+        } catch (error) {
+            showError('PDF import failed: ' + error.message);
+            throw error;
+        }
+    };
+
     const updateEpaMapping = async (mappingId, updates) => {
         try {
             await dataService.updateEpaMapping(mappingId, updates);
@@ -1060,6 +1087,8 @@ export function AppProvider({ children }) {
         searchEpaTestGroups,
         linkEpaTestGroup,
         createAndLinkEpaTestGroup,
+        importEpaCsiGroups,
+        getExistingEpaTestGroupIds,
         updateEpaMapping,
         unlinkEpaTestGroup,
         importEpaTestGroups,

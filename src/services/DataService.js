@@ -1199,6 +1199,71 @@ class DataService {
     return data;
   }
 
+  /** Which of the given test_group_ids already exist (for overwrite confirmation). */
+  async getExistingEpaTestGroupIds(ids) {
+    if (!this.useSupabase || !ids.length) return [];
+    const { data, error } = await getSupabase()
+      .from('epa_test_groups')
+      .select('test_group_id')
+      .in('test_group_id', ids);
+    if (error) throw error;
+    return (data || []).map(r => r.test_group_id);
+  }
+
+  /**
+   * Import one fully-parsed group (from a CSI PDF) into the curator model:
+   * upsert the group, then CLEAN-REPLACE its coefficient sets, tests and phases
+   * (delete existing, insert from the parse) so re-import is deterministic
+   * "upload is truth". Populated fields are tagged source:'pdf' in overrides.
+   *
+   * @param {Object} group  Output element of parseEpaCsiText().groups
+   */
+  async importEpaGroupFull(group) {
+    if (!this.useSupabase) return;
+    const supabase = getSupabase();
+    const { coefficient_sets = [], tests = [], ...g } = group;
+    const tgid = g.test_group_id;
+
+    // Tag every populated scalar field as PDF-sourced.
+    const pdfOverrides = (obj) => {
+      const o = {};
+      for (const [k, v] of Object.entries(obj)) if (v != null && k !== 'overrides') o[k] = { source: 'pdf' };
+      return o;
+    };
+
+    // 1. Group (upsert).
+    const { error: gErr } = await supabase
+      .from('epa_test_groups')
+      .upsert({ ...g, source_file: g.source_file ?? null, overrides: pdfOverrides(g) },
+              { onConflict: 'test_group_id', ignoreDuplicates: false });
+    if (gErr) throw gErr;
+
+    // 2. Coefficient sets (clean-replace).
+    await supabase.from('epa_coefficient_sets').delete().eq('test_group_id', tgid);
+    if (coefficient_sets.length) {
+      const rows = coefficient_sets.map(cs => ({ test_group_id: tgid, ...cs, overrides: pdfOverrides(cs) }));
+      const { error } = await supabase.from('epa_coefficient_sets').insert(rows);
+      if (error) throw error;
+    }
+
+    // 3. Tests + phases (clean-replace; phases cascade on test delete).
+    await supabase.from('epa_tests').delete().eq('test_group_id', tgid);
+    for (const t of tests) {
+      const { phases = [], ...testRow } = t;
+      const { data: savedTest, error: tErr } = await supabase
+        .from('epa_tests')
+        .insert({ test_group_id: tgid, ...testRow, overrides: pdfOverrides(testRow) })
+        .select('id')
+        .single();
+      if (tErr) throw tErr;
+      if (phases.length) {
+        const pRows = phases.map(p => ({ test_id: savedTest.id, ...p, overrides: pdfOverrides(p) }));
+        const { error: pErr } = await supabase.from('epa_test_phases').insert(pRows);
+        if (pErr) throw pErr;
+      }
+    }
+  }
+
   /** Convenience alias kept for back-compat. */
   async updateEpaLabelMethod(testGroupId, method) {
     return this.updateEpaTestGroup(testGroupId, { label_method: method || null });
