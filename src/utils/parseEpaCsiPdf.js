@@ -170,8 +170,15 @@ function parseTests(items, start, end) {
         const hwyLabelIdx = idxOf(items, 'Charge Depleting Range Highway', ti, tEnd);
         const cdRangeHwy = hwyLabelIdx >= 0 ? parseNum(items[hwyLabelIdx + 2]) : null;
         const phases = parsePhases(items, ti, tEnd, cold);
-        const total_dc = phases.reduce((s, p) => s + (p.dc_energy_kwh ?? 0), 0);
+        const phaseDc = phases.reduce((s, p) => s + (p.dc_energy_kwh ?? 0), 0);
         const total_dist = phases.reduce((s, p) => s + (p.distance_mi ?? 0), 0);
+        // Total DC: CD-Highway/UDDS tests (proc 84/81) report dummy per-phase
+        // KW-HRS and instead give the total as "System End State of Charge
+        // Watt-hours". Despite the label, the value is in kWh (e.g. 78.688 =
+        // 78,688 Wh per the test comments), so use it as-is. Prefer it when
+        // present; otherwise fall back to the phase-DC sum (proc-77 MCT).
+        const endSocKwh = parseNum(valAfter(items, 'System End State of Charge Watt-hours', ti, tEnd));
+        const total_dc = endSocKwh != null ? endSocKwh : phaseDc;
         // The EPA "Test #" + value precede the procedure header (Test # → value
         // → Test Procedure → "NN - …"), so look back a few items for it.
         let test_number = null;
