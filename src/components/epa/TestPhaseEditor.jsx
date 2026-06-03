@@ -119,12 +119,20 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
 
     // Sanity: phase DC sum vs declared total; phase count vs declared bags.
     const phaseSum = phases.reduce((s, p) => s + (num(p.dc_energy_kwh) ?? 0), 0);
+    const distSum  = phases.reduce((s, p) => s + (num(p.distance_mi) ?? 0), 0);
     const totalDc  = num(test.total_dc_energy_kwh);
     const sumMismatch = totalDc != null && phaseSum > 0 && Math.abs(phaseSum - totalDc) / totalDc > 0.05;
     const bags = num(test.bags_phases_conducted);
     const bagMismatch = bags != null && bags !== phases.length;
     // When a bag count is declared and no phases exist yet, offer to add them all at once.
     const addCount = (phases.length === 0 && bags != null && bags > 1) ? bags : 1;
+    // Fill Total DC + Total distance from the sum of all phases.
+    const canSumPhases = phaseSum > 0 || distSum > 0;
+    const fillTotalsFromPhases = () => onSaveTest({
+        id: test.id,
+        total_dc_energy_kwh: phaseSum > 0 ? Math.round(phaseSum * 1000) / 1000 : null,
+        total_distance_mi:   distSum  > 0 ? Math.round(distSum  * 1000) / 1000 : null,
+    });
 
     return (
         <div className="border rounded-lg p-3 mb-2 border-gray-200 dark:border-slate-700">
@@ -156,9 +164,9 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
                 <EnumField label="Originator" tooltip="MFR (manufacturer's contracted lab, e.g. FEV) or EPA (Ann Arbor confirmatory). Prefer EPA-run tests when both exist." value={test.originator} options={ORIGINATORS} canEdit={canEdit} onSave={saveField('originator')} />
                 <EnumField label="Source" tooltip="Where this test's detail came from: CSV import, J1634 calculator sheet, CSI PDF, or manual entry." value={test.source} options={SOURCE_OPTS} canEdit={canEdit} onSave={saveField('source')} />
                 <CuratorField label="Test date" type="text" placeholder="YYYY-MM-DD" tooltip="Date of this specific test run." value={test.test_date} canEdit={canEdit} onSave={saveField('test_date')} />
-                <CuratorField label="Total DC" used type="number" step="0.001" unit="kWh" tooltip="Total battery-side energy discharged over the full depletion. Must include SS segments (~78% of total). Anchors useable capacity and charger efficiency." value={test.total_dc_energy_kwh} canEdit={canEdit} onSave={saveField('total_dc_energy_kwh')} />
-                <CuratorField label="AC recharge" used type="number" step="0.001" unit="kWh" tooltip="AC-side energy to refill the pack; includes charger losses. Often blank in CSI PDFs — nullable. Required for measured charger efficiency." value={test.ac_recharge_kwh} canEdit={canEdit} onSave={saveField('ac_recharge_kwh')} />
                 <CuratorField label="Total distance" type="number" step="0.001" unit="mi" tooltip="Total miles over the full depletion run." value={test.total_distance_mi} canEdit={canEdit} onSave={saveField('total_distance_mi')} />
+                <CuratorField label="AC recharge" used type="number" step="0.001" unit="kWh" tooltip="AC-side energy to refill the pack; includes charger losses. Often blank in CSI PDFs — nullable. Required for measured charger efficiency." value={test.ac_recharge_kwh} canEdit={canEdit} onSave={saveField('ac_recharge_kwh')} />
+                <CuratorField label="Total DC" used type="number" step="0.001" unit="kWh" tooltip="Total battery-side energy discharged over the full depletion. Must include SS segments (~78% of total). Anchors useable capacity and charger efficiency." value={test.total_dc_energy_kwh} canEdit={canEdit} onSave={saveField('total_dc_energy_kwh')} />
                 <CuratorField label="Bags/phases" type="number" tooltip="Number of Charge Depleting bags/phases conducted — expected phase count for verification. Your entered phases should match this." value={test.bags_phases_conducted} canEdit={canEdit} onSave={saveField('bags_phases_conducted')} />
                 <CuratorField label="Recharge V" type="number" step="0.1" unit="V" tooltip="AC supply voltage during recharge (e.g. 240V). Context for the recharge measurement." value={test.recharge_voltage} canEdit={canEdit} onSave={saveField('recharge_voltage')} />
             </div>
@@ -186,12 +194,23 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
                 </tbody>
             </table>
             {canEdit && (
-                <button
-                    onClick={() => onAddPhase(test, addCount)}
-                    className="text-xs text-indigo-600 dark:text-indigo-400 mt-1 hover:underline"
-                >
-                    {addCount > 1 ? `+ Add ${addCount} phases` : '+ Add phase'}
-                </button>
+                <div className="flex items-center gap-4 mt-1">
+                    <button
+                        onClick={() => onAddPhase(test, addCount)}
+                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                        {addCount > 1 ? `+ Add ${addCount} phases` : '+ Add phase'}
+                    </button>
+                    {canSumPhases && (
+                        <button
+                            onClick={fillTotalsFromPhases}
+                            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                            title={`Set Total DC (${phaseSum.toFixed(2)} kWh) and Total distance (${distSum.toFixed(2)} mi) from the sum of all phases`}
+                        >
+                            Σ Fill totals from phases
+                        </button>
+                    )}
+                </div>
             )}
 
             {/* Inline sanity */}
