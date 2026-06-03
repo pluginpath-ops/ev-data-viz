@@ -21,7 +21,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
     const [warnings, setWarnings] = useState([]);
     const [existing, setExisting] = useState(new Set());
     const [selected, setSelected] = useState(new Set());   // test_group_ids to import
-    const [linkId, setLinkId]   = useState('');            // config to link (per-vehicle mode)
+    const [linkIds, setLinkIds]   = useState(new Set());   // configs to link (per-vehicle mode)
     const [result, setResult]   = useState(null);
 
     const processFile = async (file) => {
@@ -44,7 +44,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
             if (targetVehicle) {
                 const vn = (targetVehicle.name || '').toLowerCase();
                 const best = g.find(x => vn && (x.epa_carline_name || '').toLowerCase().includes(vn.split(' ')[0]));
-                setLinkId((best || g[0]).test_group_id);
+                setLinkIds(new Set([(best || g[0]).test_group_id]));
             }
             setStep('review');
         } catch (e) {
@@ -55,7 +55,30 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
     };
 
     const onDrop = (e) => { e.preventDefault(); setDragOver(false); processFile(e.dataTransfer.files[0]); };
-    const toggle = (id) => setSelected(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+    // Import-select toggle; deselecting also drops any link.
+    const toggle = (id) => {
+        const willSelect = !selected.has(id);
+        setSelected(p => { const s = new Set(p); willSelect ? s.add(id) : s.delete(id); return s; });
+        if (!willSelect) setLinkIds(p => { const s = new Set(p); s.delete(id); return s; });
+    };
+    // Link toggle (per-vehicle); linking forces the row to be imported.
+    const toggleLink = (id) => {
+        const willLink = !linkIds.has(id);
+        setLinkIds(p => { const s = new Set(p); willLink ? s.add(id) : s.delete(id); return s; });
+        if (willLink) setSelected(p => new Set(p).add(id));
+    };
+    const allIds = groups.map(g => g.test_group_id);
+    const allSelected = allIds.length > 0 && allIds.every(id => selected.has(id));
+    const allLinked   = allIds.length > 0 && allIds.every(id => linkIds.has(id));
+    const toggleAllSelect = () => {
+        if (allSelected) { setSelected(new Set()); setLinkIds(new Set()); }
+        else setSelected(new Set(allIds));
+    };
+    const toggleAllLink = () => {
+        if (allLinked) setLinkIds(new Set());
+        else { setLinkIds(new Set(allIds)); setSelected(new Set(allIds)); }
+    };
 
     const overwriteCount = [...selected].filter(id => existing.has(id)).length;
 
@@ -68,8 +91,8 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
         }
         setBusy(true); setError(null);
         try {
-            const res = await onImport(toImport, targetVehicle && selected.has(linkId)
-                ? { linkVehicleId: targetVehicle.id, linkTestGroupId: linkId }
+            const res = await onImport(toImport, targetVehicle
+                ? { linkVehicleId: targetVehicle.id, linkTestGroupIds: [...linkIds].filter(id => selected.has(id)) }
                 : {});
             setResult(res);
             setStep('done');
@@ -122,8 +145,15 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                             <table className="w-full text-xs">
                                 <thead className="bg-gray-50 dark:bg-slate-800 sticky top-0">
                                     <tr className="text-left text-gray-500">
-                                        <th className="p-2"></th>
-                                        {targetVehicle && <th className="p-2">Link</th>}
+                                        <th className="p-2" title="Select all / none">
+                                            <input type="checkbox" checked={allSelected} onChange={toggleAllSelect} />
+                                        </th>
+                                        {targetVehicle && (
+                                            <th className="p-2">
+                                                <input type="checkbox" checked={allLinked} onChange={toggleAllLink} title="Link all / none" />
+                                                <span className="ml-1">Link</span>
+                                            </th>
+                                        )}
                                         <th className="p-2">Config ID</th>
                                         <th className="p-2">Make · Carline</th>
                                         <th className="p-2">Coeff / Tests / Phases</th>
@@ -139,8 +169,8 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                                 <td className="p-2"><input type="checkbox" checked={selected.has(id)} onChange={() => toggle(id)} /></td>
                                                 {targetVehicle && (
                                                     <td className="p-2">
-                                                        <input type="radio" name="linkcfg" checked={linkId === id}
-                                                            disabled={!selected.has(id)} onChange={() => setLinkId(id)} />
+                                                        <input type="checkbox" checked={linkIds.has(id)}
+                                                            onChange={() => toggleLink(id)} />
                                                     </td>
                                                 )}
                                                 <td className="p-2 font-mono">{id}</td>
@@ -167,7 +197,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                         <div className="flex items-center gap-2 mt-4">
                             <span className="text-xs text-gray-500 flex-1">
                                 {selected.size} selected{overwriteCount ? ` · ${overwriteCount} overwrite` : ''}
-                                {targetVehicle && selected.has(linkId) ? ` · linking ${linkId} to ${targetVehicle.name}` : ''}
+                                {targetVehicle && linkIds.size ? ` · linking ${linkIds.size} to ${targetVehicle.name}` : ''}
                             </span>
                             <button onClick={() => setStep('upload')} className="btn btn-secondary text-sm" disabled={busy}>Back</button>
                             <button onClick={handleImport} className="btn btn-primary text-sm" disabled={busy || !selected.size}>

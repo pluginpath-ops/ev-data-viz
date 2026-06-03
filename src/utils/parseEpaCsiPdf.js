@@ -22,6 +22,12 @@
 
 const HWFET_MI = 10.26, UDDS_MI = 7.45, DIST_TOL = 0.7;
 
+/** MM/DD/YYYY → YYYY-MM-DD (Postgres date); pass through anything else. */
+function toIsoDate(s) {
+    const m = String(s ?? '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    return m ? `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}` : (s || null);
+}
+
 const parseNum = (s) => {
     if (s == null) return null;
     const t = String(s).trim().replace(/,/g, '');
@@ -170,7 +176,7 @@ function parseTests(items, start, end) {
             procedure_code: procMatch ? Number(procMatch[1]) : null,
             originator: 'MFR',
             lab_id: valAfter(items, 'Verify Test Lab ID', ti, tEnd),
-            test_date: valAfter(items, 'Test Date', ti, tEnd),
+            test_date: toIsoDate(valAfter(items, 'Test Date', ti, tEnd)),
             source: 'pdf',
             recharge_voltage: parseNum(valAfter(items, 'Recharge Event Voltage', ti, tEnd)),
             ac_recharge_kwh: parseNum(valAfter(items, 'Recharge Event Energy (kiloWatt-hours)', ti, tEnd)),
@@ -232,6 +238,18 @@ export function parseEpaCsiText(rawItems) {
         const rawMake = valAfter(items, 'Represented Test Vehicle Make', ci, end);
         const make = (!rawMake || /^\d+$/.test(rawMake)) ? groupManufacturer : cleanMake(rawMake);
 
+        const coefficient_sets = parseCoefficients(items, ci, end);
+        const tests = parseTests(items, ci, end);
+
+        // CD range is a GROUP-level (Section 6) field, not an epa_tests column.
+        // Take it from the preferred test (77 → 84 → first), then drop it off the
+        // test rows so the epa_tests insert only has valid columns.
+        const pref = tests.find(t => t.procedure_code === 77)
+            || tests.find(t => t.procedure_code === 84) || tests[0];
+        const cd_range_combined_calc = pref?.cd_range_combined_calc ?? null;
+        const cd_range_hwy_calc = pref?.cd_range_hwy_calc ?? null;
+        tests.forEach(t => { delete t.cd_range_combined_calc; delete t.cd_range_hwy_calc; });
+
         return {
             test_group_id,
             epa_test_family_id: valAfter(items, 'Original Test Group Name', ci, end),
@@ -246,8 +264,10 @@ export function parseEpaCsiText(rawItems) {
             // so it's intentionally not mapped — curator sets useable capacity
             // (best proxy: the MCT total DC to depletion).
             useable_kwh: null,
-            coefficient_sets: parseCoefficients(items, ci, end),
-            tests: parseTests(items, ci, end),
+            cd_range_combined_calc,
+            cd_range_hwy_calc,
+            coefficient_sets,
+            tests,
         };
     }).filter(g => g.test_group_id);
 

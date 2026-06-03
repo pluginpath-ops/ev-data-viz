@@ -815,12 +815,14 @@ export function AppProvider({ children }) {
      * to a vehicle, then refresh. Used by the PDF import modal from both Admin
      * and the per-vehicle curator section.
      */
-    const importEpaCsiGroups = async (groups, { linkVehicleId, linkTestGroupId } = {}) => {
+    const importEpaCsiGroups = async (groups, { linkVehicleId, linkTestGroupIds = [] } = {}) => {
         try {
             for (const g of groups) await dataService.importEpaGroupFull(g);
-            if (linkVehicleId && linkTestGroupId) {
-                try { await dataService.linkEpaTestGroup(linkVehicleId, linkTestGroupId, 'verified', null); }
-                catch { /* already linked — ignore UNIQUE conflict */ }
+            if (linkVehicleId) {
+                for (const tgid of linkTestGroupIds) {
+                    try { await dataService.linkEpaTestGroup(linkVehicleId, tgid, 'verified', null); }
+                    catch { /* already linked — ignore UNIQUE conflict */ }
+                }
             }
             const updated = await dataService.getVehicles();
             setVehicles(updated);
