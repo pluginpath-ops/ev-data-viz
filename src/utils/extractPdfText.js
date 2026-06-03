@@ -12,17 +12,22 @@ export async function extractPdfText(file) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
     const data = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data }).promise;
+    const loadingTask = pdfjsLib.getDocument({ data });
+    const pdf = await loadingTask.promise;
 
     const items = [];
-    for (let p = 1; p <= pdf.numPages; p++) {
-        const page = await pdf.getPage(p);
-        const content = await page.getTextContent();
-        for (const it of content.items) {
-            if (typeof it.str === 'string') items.push(it.str);
+    try {
+        for (let p = 1; p <= pdf.numPages; p++) {
+            const page = await pdf.getPage(p);
+            const content = await page.getTextContent();
+            for (const it of content.items) {
+                if (typeof it.str === 'string') items.push(it.str);
+            }
+            if (typeof page.cleanup === 'function') page.cleanup();
         }
-        page.cleanup();
+    } finally {
+        // pdf.js v6: destroy the loading task (the document proxy has no destroy()).
+        try { await loadingTask.destroy(); } catch { /* best-effort cleanup */ }
     }
-    await pdf.destroy();
     return items;
 }

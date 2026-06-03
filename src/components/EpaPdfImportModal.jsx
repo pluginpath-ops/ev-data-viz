@@ -81,8 +81,10 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content max-w-3xl" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+            <div className="modal-panel rounded-xl p-5"
+                 style={{ maxWidth: '760px', width: '96vw', maxHeight: '90vh', overflowY: 'auto' }}
+                 onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold">
                         Import EPA Lab PDF{targetVehicle ? ` → ${targetVehicle.name}` : ''}
