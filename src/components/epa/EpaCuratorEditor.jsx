@@ -123,6 +123,9 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
 
     const primary    = (group.epa_coefficient_sets || []).find(s => s.is_primary)    || (group.epa_coefficient_sets || [])[0]    || null;
     const primaryRaw = (dbGroup.epa_coefficient_sets || []).find(s => s.is_primary) || (dbGroup.epa_coefficient_sets || [])[0] || null;
+    // Additional (non-primary) coefficient sets captured from the PDF (Cold-CO, US06).
+    const otherSets = (group.epa_coefficient_sets || []).filter(s => s !== primary && (s.target_a != null || s.set_a != null));
+    const coef = (v) => (v == null ? '—' : String(v));
 
     // Provenance: 'pending' for unsaved buffered edits, else the saved source.
     const gOv = (f) => (f in edits.group) ? 'pending' : dbGroup.overrides?.[f]?.source;
@@ -273,7 +276,7 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
             </Section>
 
             {/* Section 2: Road load (Target A/B/C drive the curve & η) */}
-            <Section title="Road Load & Weight">
+            <Section title={`Road Load & Weight — ${primary?.category || 'City/Highway'} (primary, drives the curve)`}>
                 <CuratorField label="Test weight" type="number" unit="lbs" tooltip={TIP.weight} value={primary?.equiv_test_weight_lbs} canEdit={canEdit} overrideSource={cOv('equiv_test_weight_lbs')} onSave={v => saveCoeff('equiv_test_weight_lbs', v)} />
                 <span />
                 <CuratorField label="Target A" used type="number" step="0.0001" unit="lbf" tooltip={TIP.target_a} value={primary?.target_a} canEdit={canEdit} overrideSource={cOv('target_a')} onSave={v => saveCoeff('target_a', v)} />
@@ -283,6 +286,35 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
                 <CuratorField label="Target C" used type="number" step="0.00000001" unit="lbf/mph²" tooltip={TIP.target_c} value={primary?.target_c} canEdit={canEdit} overrideSource={cOv('target_c')} onSave={v => saveCoeff('target_c', v)} />
                 <CuratorField label="Set C" type="number" step="0.00000001" unit="lbf/mph²" tooltip={TIP.set_abc} value={primary?.set_c} canEdit={canEdit} overrideSource={cOv('set_c')} onSave={v => saveCoeff('set_c', v)} />
             </Section>
+
+            {/* Additional coefficient sets (Cold CO / US06) — captured from the PDF,
+                shown for reference. The steady-state curve uses the City/Highway set. */}
+            {otherSets.length > 0 && (
+                <div className="mb-4">
+                    <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1 font-semibold">
+                        Other Coefficient Sets
+                        <span className="normal-case font-normal"> — reference only (Cold-CO / US06; not used by the curve)</span>
+                    </div>
+                    <table className="w-full text-xs">
+                        <thead>
+                            <tr className="text-gray-400 text-[10px] uppercase tracking-wide text-left">
+                                <th className="font-semibold pr-3">Category</th>
+                                <th className="font-semibold pr-3">Target A / B / C</th>
+                                <th className="font-semibold">Set A / B / C</th>
+                            </tr>
+                        </thead>
+                        <tbody className="font-mono">
+                            {otherSets.map(s => (
+                                <tr key={s.id ?? s.category} className="border-t border-gray-100 dark:border-slate-800">
+                                    <td className="pr-3 py-0.5 font-sans">{s.category}</td>
+                                    <td className="pr-3">{coef(s.target_a)} / {coef(s.target_b)} / {coef(s.target_c)}</td>
+                                    <td className="text-gray-500 dark:text-slate-400">{coef(s.set_a)} / {coef(s.set_b)} / {coef(s.set_c)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             {/* Sections 3–5: Tests & phases */}
             <div className="mb-4">
