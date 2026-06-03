@@ -214,11 +214,19 @@ export function parseEpaCsiText(rawItems) {
 
     const groups = cfgIdx.map((ci, k) => {
         const end = k + 1 < cfgIdx.length ? cfgIdx[k + 1] : items.length;
-        const [vehId, cfgNumRaw] = (items[ci + 1] || '').split('/').map(s => s.trim());
-        const cfgNum = cfgNumRaw || valAfter(items, 'Manufacturer Vehicle Configuration Number', ci, end);
-        // Unique key: bare Vehicle ID when unique in this PDF, else suffix the config #.
+        // "Vehicle ID / Configuration" = "<Vehicle ID> / <EPA config index>".
+        // The EPA config index distinguishes records under one reused Vehicle ID
+        // (e.g. BMW's 5 tire packages → 0..4), so it drives the unique key.
+        const idParts = (items[ci + 1] || '').split('/');
+        const vehId = idParts[0].trim();
+        const epaConfigIdx = (idParts[1] || '').trim();
+        // Manufacturer Vehicle Configuration Number is a SEPARATE field — the
+        // manufacturer's "mode" delineator (often 0). Captured on its own; it is
+        // not necessarily unique across configs, so it is NOT used for the key.
+        const modeNum = valAfter(items, 'Manufacturer Vehicle Configuration Number', ci, end);
+        // Unique key: bare Vehicle ID when unique in this PDF, else suffix the EPA config index.
         const test_group_id = vehId
-            ? (idCounts[vehId] > 1 ? `${vehId}-${cfgNum ?? k}` : vehId)
+            ? (idCounts[vehId] > 1 ? `${vehId}-${epaConfigIdx || k}` : vehId)
             : null;
 
         const rawMake = valAfter(items, 'Represented Test Vehicle Make', ci, end);
@@ -227,7 +235,7 @@ export function parseEpaCsiText(rawItems) {
         return {
             test_group_id,
             epa_test_family_id: valAfter(items, 'Original Test Group Name', ci, end),
-            vehicle_config_number: cfgNum ?? null,
+            vehicle_config_number: modeNum ?? null,   // mfr "mode" number, captured separately
             model_year: parseNum(valAfter(items, 'Original Test Vehicle Model Year', ci, end)),
             make,
             epa_carline_name: valAfter(items, 'Represented Test Vehicle Model', ci, end),
