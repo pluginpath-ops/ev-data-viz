@@ -177,7 +177,7 @@ function parseTests(items, start, end) {
             originator: 'MFR',
             lab_id: valAfter(items, 'Verify Test Lab ID', ti, tEnd),
             test_date: toIsoDate(valAfter(items, 'Test Date', ti, tEnd)),
-            source: 'pdf',
+            source: 'csi_pdf',   // epa_tests.source enum (override field-tag stays 'pdf')
             recharge_voltage: parseNum(valAfter(items, 'Recharge Event Voltage', ti, tEnd)),
             ac_recharge_kwh: parseNum(valAfter(items, 'Recharge Event Energy (kiloWatt-hours)', ti, tEnd)),
             cd_range_combined_calc: parseNum(valAfter(items, 'Charge Depleting Range (Calculated miles)', ti, tEnd)),
