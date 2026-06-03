@@ -240,31 +240,24 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
                 </div>
             )}
 
-            {/* Save / Discard bar — field edits are buffered until saved */}
-            {canEdit && (
-                <div className="flex items-center gap-2 mb-3 py-2 px-3 rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/40 sticky top-0 z-10">
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={!dirty || saving}
-                        className="btn btn-primary text-xs py-1 px-3 disabled:opacity-40"
-                    >
-                        {saving ? 'Saving…' : 'Save changes'}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={resetEdits}
-                        disabled={!dirty || saving}
-                        className="btn btn-secondary text-xs py-1 px-3 disabled:opacity-40"
-                    >
-                        Discard
-                    </button>
-                    <span className={`text-[11px] ${dirty ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-400'}`}>
-                        {dirty ? '● Unsaved field edits' : 'All changes saved'}
-                    </span>
-                    <span className="text-[10px] text-gray-400 ml-auto italic">
-                        Adding/removing tests &amp; phases saves immediately.
-                    </span>
+            {/* Save / Discard — fixed bottom action bar (shown only when dirty),
+                matching the app's delete-queue paradigm. */}
+            {canEdit && dirty && (
+                <div className="fixed-action-bar z-50 bg-amber-50 dark:bg-slate-800 border-t-2 border-amber-200 dark:border-slate-600">
+                    <div className="page-container py-3 flex items-center gap-4">
+                        <span className="font-medium flex-1 text-amber-800 dark:text-amber-300">
+                            ✎ Unsaved curator edits
+                            <span className="font-normal text-amber-700/70 dark:text-slate-400 text-sm ml-2">
+                                (adding/removing tests &amp; phases saves immediately)
+                            </span>
+                        </span>
+                        <button onClick={resetEdits} disabled={saving} className="btn btn-secondary text-sm disabled:opacity-40">
+                            Discard
+                        </button>
+                        <button onClick={handleSave} disabled={saving} className="btn btn-primary text-sm disabled:opacity-40">
+                            {saving ? 'Saving…' : 'Save changes'}
+                        </button>
+                    </div>
                 </div>
             )}
 
