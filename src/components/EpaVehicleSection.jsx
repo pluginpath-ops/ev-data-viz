@@ -44,8 +44,21 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence, onUpdate
     const [draftName,    setDraftName]    = useState(null); // null = not editing
     const [savingName,   setSavingName]   = useState(false);
     const [curating,     setCurating]     = useState(false);
+    const [curatorDirty, setCuratorDirty] = useState(false);
     const g = mapping.epaGroup;
     if (!g) return null;
+
+    // Guard collapse: confirm before discarding unsaved buffered curator edits.
+    const toggleCurate = () => {
+        if (curating) {
+            if (curatorDirty && !window.confirm('You have unsaved curator edits. Discard them and close?')) return;
+            setCuratorDirty(false);
+            setCurating(false);
+        } else {
+            setCuratorDirty(false);
+            setCurating(true);
+        }
+    };
 
     const fmt = (n, dp = 4) => n != null ? n.toFixed(dp) : null;
     // Coefficients now live on the primary coefficient set, not flat columns.
@@ -220,12 +233,19 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onUpdateConfidence, onUpdate
                 <>
                     <button
                         type="button"
-                        onClick={() => setCurating(c => !c)}
+                        onClick={toggleCurate}
                         className="mt-3 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
                     >
                         {curating ? '▾ Hide curator fields' : '▸ Curate fields & test data'}
+                        {curating && curatorDirty && <span className="ml-1 text-amber-500" title="Unsaved edits">●</span>}
                     </button>
-                    {curating && <EpaCuratorEditor testGroupId={g.test_group_id} canEdit={canEdit} />}
+                    {curating && (
+                        <EpaCuratorEditor
+                            testGroupId={g.test_group_id}
+                            canEdit={canEdit}
+                            onDirtyChange={setCuratorDirty}
+                        />
+                    )}
                 </>
             )}
         </div>
