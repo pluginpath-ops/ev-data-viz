@@ -11,6 +11,8 @@ import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import DerivedValues from './epa/DerivedValues';
 import EpaCuratorEditor from './epa/EpaCuratorEditor';
+import EpaPdfImportModal from './EpaPdfImportModal';
+import { useAppContext } from '../context/AppContext';
 
 const CONFIDENCE_COLORS = {
     verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
@@ -263,6 +265,8 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
     const [searchError, setSearchError]   = useState(null);
     const [showDropdown, setShowDropdown] = useState(false);
     const [linking, setLinking]           = useState(false);
+    const [showPdfModal, setShowPdfModal] = useState(false);
+    const { importEpaCsiGroups, getExistingEpaTestGroupIds } = useAppContext();
     const [showCreate, setShowCreate]     = useState(false);
     const [createDraft, setCreateDraft]   = useState({ test_group_id: '', model_year: '', make: '', epa_carline_name: '' });
     const [creating, setCreating]         = useState(false);
@@ -410,8 +414,25 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                         )}
                     </div>
                     <p className="text-xs text-gray-400 mt-1">
-                        Import test groups via Admin → Import → EPA Test Car Data, or create one by hand below.
+                        Import an EPA lab PDF, the Test Car Data CSV (Admin), or create one by hand below.
                     </p>
+
+                    {/* Import from lab PDF — parses + links the matching config to this vehicle */}
+                    <button
+                        type="button"
+                        onClick={() => setShowPdfModal(true)}
+                        className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline mt-2 mr-4"
+                    >
+                        📑 Import from EPA lab PDF
+                    </button>
+                    {showPdfModal && (
+                        <EpaPdfImportModal
+                            targetVehicle={vehicle}
+                            onImport={importEpaCsiGroups}
+                            getExistingIds={getExistingEpaTestGroupIds}
+                            onClose={() => setShowPdfModal(false)}
+                        />
+                    )}
 
                     {/* Create from scratch — for vehicles with only a lab-submission PDF */}
                     {!showCreate ? (

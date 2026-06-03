@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import ImportTableauModal from './ImportTableauModal';
 import EpaImportModal from './EpaImportModal';
+import EpaPdfImportModal from './EpaPdfImportModal';
 import EpaDataCard from './EpaDataCard';
 
 const ROLES = ['user', 'contributor', 'admin'];
@@ -16,6 +17,7 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
     const {
         exportData, importData, importTableauSessions,
         importEpaTestGroups, getEpaTestGroupsAdmin, deleteEpaTestGroup, updateEpaTestGroup,
+        importEpaCsiGroups, getExistingEpaTestGroupIds,
         vehicles,
     } = useAppContext();
     const [users, setUsers]           = useState([]);
@@ -25,6 +27,7 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
     const [showImportMenu, setShowImportMenu] = useState(false);
     const [showTableauModal, setShowTableauModal] = useState(false);
     const [showEpaModal, setShowEpaModal]         = useState(false);
+    const [showEpaPdfModal, setShowEpaPdfModal]   = useState(false);
     const jsonImportRef = useRef();
 
     useEffect(() => {
@@ -72,6 +75,13 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                     onClose={() => setShowEpaModal(false)}
                 />
             )}
+            {showEpaPdfModal && (
+                <EpaPdfImportModal
+                    onImport={importEpaCsiGroups}
+                    getExistingIds={getExistingEpaTestGroupIds}
+                    onClose={() => setShowEpaPdfModal(false)}
+                />
+            )}
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="page-title">Admin Panel</h2>
@@ -100,7 +110,11 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                                     </button>
                                     <button className="dropdown-item w-full text-left"
                                         onClick={() => { setShowImportMenu(false); setShowEpaModal(true); }}>
-                                        ⚡ EPA Test Car Data
+                                        ⚡ EPA Test Car Data (CSV)
+                                    </button>
+                                    <button className="dropdown-item w-full text-left"
+                                        onClick={() => { setShowImportMenu(false); setShowEpaPdfModal(true); }}>
+                                        📑 EPA Lab PDF (CSI)
                                     </button>
                                 </div>
                             </>
