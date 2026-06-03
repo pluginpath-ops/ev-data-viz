@@ -51,7 +51,7 @@ const TIP = {
     charger_override:  'Default derived from Total DC ÷ AC Recharge (≈0.84 measured for R2). Falls back to 0.90 when AC recharge is unavailable. Override to pin a known value.',
 };
 
-export default function EpaCuratorEditor({ testGroupId, canEdit }) {
+export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }) {
     const {
         getEpaTestGroupFull, updateEpaTestGroup,
         saveEpaCoefficientSet, saveEpaTest, deleteEpaTest,
@@ -98,6 +98,9 @@ export default function EpaCuratorEditor({ testGroupId, canEdit }) {
         window.addEventListener('beforeunload', h);
         return () => window.removeEventListener('beforeunload', h);
     }, [dirty]);
+
+    // Surface dirty state to the parent so it can guard collapse/navigation.
+    useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
 
     // Display view = DB truth with buffered edits overlaid. Drives every field
     // value AND the live derived-value/curve preview, so you see impact before Save.
