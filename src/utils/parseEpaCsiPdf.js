@@ -313,5 +313,14 @@ export function parseEpaCsiText(rawItems) {
     }).filter(g => g.test_group_id);
 
     if (!groups.length) warnings.push('Configurations found but no Vehicle IDs could be read.');
+
+    // Flag configs where no DC energy could be extracted — some PDFs (e.g. Ford)
+    // report it only in an external EPA spreadsheet, so η can't be measured until
+    // a curator enters Total DC / phase energy by hand.
+    for (const g of groups) {
+        if (g.tests.length && !g.tests.some(t => t.total_dc_energy_kwh != null)) {
+            warnings.push(`${g.test_group_id}: no DC energy in this PDF (often in an external EPA spreadsheet) — enter Total DC / phase energy manually for a measured η.`);
+        }
+    }
     return { groups, warnings };
 }
