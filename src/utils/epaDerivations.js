@@ -61,7 +61,7 @@ export const SS_SPEED_BAND     = [55, 70];   // mph
 /** Default constant accessory draw (W) when no override is set. */
 export const DEFAULT_ACCESSORY_W = 300;
 /** Charger efficiency assumed when AC recharge energy is unavailable. */
-export const ASSUMED_CHARGER_EFF = 0.90;
+export const ASSUMED_CHARGER_EFF = 0.88;  // observed CSI range ~0.87–0.89 (one OEM at 0.90)
 
 // ── Small helpers ───────────────────────────────────────────────────────────
 
@@ -189,7 +189,7 @@ export function deriveDrivetrainEta(group) {
 
 /**
  * Charger efficiency = total DC energy ÷ AC recharge energy for the preferred
- * test. Falls back to an assumed 0.90 when AC recharge is unavailable, or to a
+ * test. Falls back to an assumed 0.88 when AC recharge is unavailable, or to a
  * manual override when pinned.
  *
  * source: 'manual' | 'measured' | 'assumed'
