@@ -170,8 +170,42 @@ function parseTests(items, start, end) {
         const hwyLabelIdx = idxOf(items, 'Charge Depleting Range Highway', ti, tEnd);
         const cdRangeHwy = hwyLabelIdx >= 0 ? parseNum(items[hwyLabelIdx + 2]) : null;
         const phases = parsePhases(items, ti, tEnd, cold);
-        const total_dc = phases.reduce((s, p) => s + (p.dc_energy_kwh ?? 0), 0);
-        const total_dist = phases.reduce((s, p) => s + (p.distance_mi ?? 0), 0);
+        const phaseDc = phases.reduce((s, p) => s + (p.dc_energy_kwh ?? 0), 0);
+        // Total DC has two reporting conventions across OEMs — pick data-driven,
+        // not per-manufacturer:
+        //   1. Real per-phase Integrated DC KW-HRS → their sum (incl. the SS bag).
+        //      Rivian/BMW/Lucid MCT do this (~142 kWh).
+        //   2. Per-phase KW-HRS are dummy/zero and the total is in "System End
+        //      State of Charge Watt-hours" (Tesla CD-Hwy/UDDS).
+        // So: use the phase sum when phases carry real energy; otherwise the SoC
+        // field. The SoC field is *labelled* Watt-hours but some OEMs report kWh
+        // there (Tesla: 78.688) and others Wh — normalise by magnitude (EV packs
+        // are ~30–250 kWh, so >400 ⇒ value is Wh).
+        const endSoc = parseNum(valAfter(items, 'System End State of Charge Watt-hours', ti, tEnd));
+        const endSocKwh = endSoc == null ? null : (endSoc > 400 ? endSoc / 1000 : endSoc);
+        const total_dc = phaseDc > 0 ? phaseDc : endSocKwh;
+        const procCode = procMatch ? Number(procMatch[1]) : null;
+
+        // Single-cycle CD tests (84 = Highway, 81 = UDDS) whose per-phase data is
+        // dummy: the whole depletion IS one cycle, so synthesize one phase from
+        // the test totals — actual miles driven + total DC. The CD-Highway test
+        // runs the HWFET cycle, so the resulting HWY phase is a valid η anchor
+        // (e.g. Tesla Model Y: 78.946 kWh / 369 mi = 214 Wh/mi = its HWFE avg).
+        let effPhases = phases;
+        if (phaseDc <= 0 && (procCode === 84 || procCode === 81) && total_dc > 0) {
+            const actualMiles = parseNum(valAfter(items, 'Charge Depleting Range (Actual miles)', ti, tEnd))
+                ?? parseNum(valAfter(items, 'Charge Depleting Range (Calculated miles)', ti, tEnd));
+            if (actualMiles > 0) {
+                effPhases = [{
+                    phase_index: 1,
+                    phase_type: procCode === 84 ? 'HWY' : 'UDDS',
+                    distance_mi: actualMiles,
+                    dc_energy_kwh: Math.round(total_dc * 1000) / 1000,
+                }];
+            }
+        }
+        const total_dist2 = effPhases.reduce((s, p) => s + (p.distance_mi ?? 0), 0);
+
         // The EPA "Test #" + value precede the procedure header (Test # → value
         // → Test Procedure → "NN - …"), so look back a few items for it.
         let test_number = null;
@@ -180,7 +214,7 @@ function parseTests(items, start, end) {
         }
         return {
             test_number,
-            procedure_code: procMatch ? Number(procMatch[1]) : null,
+            procedure_code: procCode,
             originator: 'MFR',
             lab_id: valAfter(items, 'Verify Test Lab ID', ti, tEnd),
             test_date: toIsoDate(valAfter(items, 'Test Date', ti, tEnd)),
@@ -191,8 +225,8 @@ function parseTests(items, start, end) {
             cd_range_hwy_calc: cdRangeHwy,
             bags_phases_conducted: parseNum(valAfter(items, 'Conducted', ti, tEnd)),
             total_dc_energy_kwh: total_dc > 0 ? Math.round(total_dc * 1000) / 1000 : null,
-            total_distance_mi: total_dist > 0 ? Math.round(total_dist * 1000) / 1000 : null,
-            phases,
+            total_distance_mi: total_dist2 > 0 ? Math.round(total_dist2 * 1000) / 1000 : null,
+            phases: effPhases,
         };
     });
 }
@@ -279,5 +313,14 @@ export function parseEpaCsiText(rawItems) {
     }).filter(g => g.test_group_id);
 
     if (!groups.length) warnings.push('Configurations found but no Vehicle IDs could be read.');
+
+    // Flag configs where no DC energy could be extracted — some PDFs (e.g. Ford)
+    // report it only in an external EPA spreadsheet, so η can't be measured until
+    // a curator enters Total DC / phase energy by hand.
+    for (const g of groups) {
+        if (g.tests.length && !g.tests.some(t => t.total_dc_energy_kwh != null)) {
+            warnings.push(`${g.test_group_id}: no DC energy in this PDF (often in an external EPA spreadsheet) — enter Total DC / phase energy manually for a measured η.`);
+        }
+    }
     return { groups, warnings };
 }
