@@ -4,6 +4,7 @@ import ImportTableauModal from './ImportTableauModal';
 import EpaImportModal from './EpaImportModal';
 import EpaPdfImportModal from './EpaPdfImportModal';
 import EpaDataCard from './EpaDataCard';
+import ConstantsKnobs from './admin/ConstantsKnobs';
 
 const ROLES = ['user', 'contributor', 'admin'];
 
@@ -206,6 +207,8 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                 deleteEpaTestGroup={deleteEpaTestGroup}
                 updateEpaTestGroup={updateEpaTestGroup}
             />
+
+            <ConstantsKnobs />
         </div>
     );
 }

@@ -22,13 +22,9 @@
  *   MEL — one row per emission/region; has `Certification Region`, no energy.
  */
 
-const MPG_E_CONVERSION = 33.705; // kWh per gallon gasoline equivalent
-
-/** A bare RND_ADJ_FE at/above this is MPGe (not kWh/100mi) when FE_UNIT is silent.
- *  EV consumption is ~15–50 kWh/100mi; MPGe ~65–250; crossover ~58, so 60 splits. */
-const MPGE_MAGNITUDE_THRESHOLD = 60;
-/** MPGe at/above this is an EPA "no data" placeholder (999, near-999, etc.). */
-const MPGE_PLACEHOLDER_MIN = 400;
+import {
+    MPG_E_CONVERSION, MPGE_MAGNITUDE_THRESHOLD, MPGE_PLACEHOLDER_MIN,
+} from '../constants/epa';
 
 function numOrNull(str) {
     if (str == null || !String(str).trim()) return null;

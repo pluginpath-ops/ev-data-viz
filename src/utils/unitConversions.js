@@ -1,10 +1,14 @@
-// Conversion factors
-export const MI_TO_KM   = 1.60934;
-export const IN_TO_MM   = 25.4;
-export const LBS_TO_KG  = 0.453592;
-export const CUFT_TO_L  = 28.3168;
-export const LBFT_TO_NM = 1.35582;
-export const FT_TO_M    = 0.3048;
+// Conversion factors live in src/constants/units.js (single source of truth);
+// re-exported here so existing `… from './unitConversions'` imports keep working.
+import {
+    MI_TO_KM, IN_TO_MM, LBS_TO_KG, CUFT_TO_L, LBFT_TO_NM, FT_TO_M, HP_TO_KW,
+    MPG_E_CONVERSION,
+} from '../constants/units';
+
+export {
+    MI_TO_KM, IN_TO_MM, LBS_TO_KG, CUFT_TO_L, LBFT_TO_NM, FT_TO_M, HP_TO_KW,
+    MPG_E_CONVERSION,
+};
 
 // ── Formatted strings (value + unit label) ────────────────────────────────
 
@@ -15,7 +19,7 @@ export const fmtWeight    = (lbs,  sys) => sys === 'metric' ? `${r1(lbs * LBS_TO
 export const fmtVolume    = (cuft, sys) => sys === 'metric' ? `${r1(cuft * CUFT_TO_L)} L`          : `${cuft} cu ft`;
 export const fmtDimension = (in_,  sys) => sys === 'metric' ? `${Math.round(in_ * IN_TO_MM)} mm`   : `${in_} in`;
 export const fmtTorque    = (lbft, sys) => sys === 'metric' ? `${r1(lbft * LBFT_TO_NM)} Nm`       : `${lbft} lb-ft`;
-export const fmtPower     = (hp,   sys) => sys === 'metric' ? `${r1(hp * 0.7457)} kW`              : `${hp} hp`;
+export const fmtPower     = (hp,   sys) => sys === 'metric' ? `${r1(hp * HP_TO_KW)} kW`             : `${hp} hp`;
 
 // ── Raw conversions (no label) — for chart data values ────────────────────
 
@@ -66,7 +70,7 @@ export function convValue(value, unitGroup, sys) {
         case 'volume':    return r1(value * CUFT_TO_L);
         case 'dimension': return Math.round(value * IN_TO_MM);
         case 'torque':    return r1(value * LBFT_TO_NM);
-        case 'power':     return r1(value * 0.7457);
+        case 'power':     return r1(value * HP_TO_KW);
         case 'feet':      return r1(value * FT_TO_M);
         default:          return value;
     }
@@ -90,9 +94,6 @@ export function formatSpecValue(value, unitGroup, sys) {
 }
 
 // ── MPGe (Miles Per Gallon equivalent) ───────────────────────────────────────
-
-/** EPA's kWh per gallon of gasoline equivalent (used to compute MPGe). */
-export const MPG_E_CONVERSION = 33.705;
 
 /**
  * Convert mi/kWh to MPGe (Miles Per Gallon equivalent).

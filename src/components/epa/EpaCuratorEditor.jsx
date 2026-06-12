@@ -14,7 +14,7 @@ import CuratorField from './CuratorField';
 import DerivedValues from './DerivedValues';
 import TestPhaseEditor from './TestPhaseEditor';
 import AuditHistory from './AuditHistory';
-import { ASSUMED_CHARGER_EFF, DEFAULT_ACCESSORY_W } from '../../utils/epaDerivations';
+import { ASSUMED_CHARGER_EFF, DEFAULT_ACCESSORY_W } from '../../constants/epa';
 
 function Section({ title, children }) {
     return (
