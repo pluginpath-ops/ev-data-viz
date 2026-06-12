@@ -14,6 +14,7 @@ import CuratorField from './CuratorField';
 import DerivedValues from './DerivedValues';
 import TestPhaseEditor from './TestPhaseEditor';
 import AuditHistory from './AuditHistory';
+import { ASSUMED_CHARGER_EFF, DEFAULT_ACCESSORY_W } from '../../utils/epaDerivations';
 
 function Section({ title, children }) {
     return (
@@ -47,8 +48,8 @@ const TIP = {
     useable_kwh:       'Useable kWh — distinct from nameplate/gross. Drives range-mode chart. Cross-check against total DC discharged to depletion.',
     total_voltage:     'Pack voltage. With amp-hours, an alternate route to capacity.',
     specific_energy:   'Wh/kg. Fallback capacity estimate when capacity is blank.',
-    accessory_load:    'Default 300 W. Constant parasitic draw assumed in the efficiency back-solve. Override only with documented cause.',
-    charger_override:  'Default derived from Total DC ÷ AC Recharge (≈0.84 measured for R2). Falls back to 0.88 when AC recharge is unavailable. Override to pin a known value.',
+    accessory_load:    `Default ${DEFAULT_ACCESSORY_W} W. Constant parasitic draw assumed in the efficiency back-solve. Override only with documented cause.`,
+    charger_override:  `Default derived from Total DC ÷ AC Recharge (≈0.84 measured for R2). Falls back to ${ASSUMED_CHARGER_EFF} when AC recharge is unavailable. Override to pin a known value.`,
 };
 
 export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }) {
@@ -313,8 +314,8 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
                 <CuratorField label="Useable battery" used type="number" step="0.001" unit="kWh" tooltip={TIP.useable_kwh} value={group.useable_kwh} canEdit={canEdit} overrideSource={gOv('useable_kwh')} onSave={v => saveGroup('useable_kwh', v)} />
                 <CuratorField label="Total voltage" type="number" step="0.1" unit="V" tooltip={TIP.total_voltage} value={group.total_voltage} canEdit={canEdit} overrideSource={gOv('total_voltage')} onSave={v => saveGroup('total_voltage', v)} />
                 <CuratorField label="Specific energy" type="number" step="0.1" unit="Wh/kg" tooltip={TIP.specific_energy} value={group.battery_specific_energy} canEdit={canEdit} overrideSource={gOv('battery_specific_energy')} onSave={v => saveGroup('battery_specific_energy', v)} />
-                <CuratorField label="Accessory load" used type="number" step="1" unit="W" placeholder="300" tooltip={TIP.accessory_load} value={group.accessory_load_w_override} canEdit={canEdit} overrideSource={gOv('accessory_load_w_override')} onSave={v => saveGroup('accessory_load_w_override', v)} />
-                <CuratorField label="Charger eff. override" used type="number" step="0.001" placeholder="0.88" tooltip={TIP.charger_override} value={group.charger_efficiency_override} canEdit={canEdit} overrideSource={gOv('charger_efficiency_override')} onSave={v => saveGroup('charger_efficiency_override', v)} />
+                <CuratorField label="Accessory load" used type="number" step="1" unit="W" placeholder={String(DEFAULT_ACCESSORY_W)} tooltip={TIP.accessory_load} value={group.accessory_load_w_override} canEdit={canEdit} overrideSource={gOv('accessory_load_w_override')} onSave={v => saveGroup('accessory_load_w_override', v)} />
+                <CuratorField label="Charger eff. override" used type="number" step="0.001" placeholder={String(ASSUMED_CHARGER_EFF)} tooltip={TIP.charger_override} value={group.charger_efficiency_override} canEdit={canEdit} overrideSource={gOv('charger_efficiency_override')} onSave={v => saveGroup('charger_efficiency_override', v)} />
             </Section>
 
             {/* Section 8: Derived values */}
