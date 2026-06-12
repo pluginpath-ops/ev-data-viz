@@ -45,7 +45,7 @@ export default function ConstantsKnobs() {
     const anyModified = KNOB_GROUPS.some(g => g.knobs.some(k => isModified(k.key)));
 
     return (
-        <div className="card mt-6 p-5">
+        <div className="card p-5">
             <div className="flex items-start justify-between gap-4 mb-1">
                 <div>
                     <h3 className="text-lg font-semibold text-gray-800">Model Constants</h3>

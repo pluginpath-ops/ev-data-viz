@@ -226,6 +226,16 @@
     color: var(--color-primary-text);
 }
 
+/* Admin sub-tab nav (Roles / EPA Data / Model Constants / Interface) */
+.admin-subtabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.5rem;
+}
+
 /* Tighten Tailwind's default line-height (1.5 feels too spacious) */
 html {
     line-height: 1.4;
