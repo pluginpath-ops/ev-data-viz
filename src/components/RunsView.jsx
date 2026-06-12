@@ -2446,7 +2446,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             {/* Edit vehicle modal */}
             {showEditVehicle && (
                 <div className="modal-overlay" onClick={closeEditVehicle}>
-                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4" onClick={e => e.stopPropagation()}>
+                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <EditVehicleForm
                             formData={vehicleFormData}
                             onFormChange={setVehicleFormData}

@@ -100,7 +100,6 @@ export default function VehiclesView({
 
     const {
         units, manufacturers, addManufacturer, isContributor, addSpecLink, deleteSpecLink, user,
-        searchEpaTestGroups, linkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup,
     } = useAppContext();
 
     const {
@@ -410,13 +409,7 @@ export default function VehiclesView({
         // Manufacturer
         manufacturers,
         onAddManufacturer: addManufacturer,
-        // EPA linking (contributor+)
-        ...(isContributor ? {
-            searchEpaTestGroups,
-            onLinkEpaTestGroup:   linkEpaTestGroup,
-            onUpdateEpaMapping:   updateEpaMapping,
-            onUnlinkEpaTestGroup: unlinkEpaTestGroup,
-        } : {}),
+        // EPA test groups are assigned in Tests & Data, not in this edit modal.
     };
 
     const handleMoveVehicle = (vehicleId, direction) => {
@@ -978,7 +971,7 @@ export default function VehiclesView({
             {/* Add / Edit vehicle modal */}
             {showForm && (
                 <div className="modal-overlay" onClick={handleCancel}>
-                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4" onClick={e => e.stopPropagation()}>
+                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <EditVehicleForm {...editFormProps} />
                     </div>
                 </div>
