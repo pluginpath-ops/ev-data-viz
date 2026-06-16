@@ -96,7 +96,7 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
             <div className="flex justify-between items-center mb-4">
                 <div>
                     <h2 className="page-title">Admin Panel</h2>
-                    <p className="text-gray-500 mt-1">{SUBTITLES[subtab]}</p>
+                    <p className="text-secondary mt-1">{SUBTITLES[subtab]}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={exportData} className="btn btn-secondary text-sm">

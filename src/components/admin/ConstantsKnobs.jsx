@@ -48,8 +48,8 @@ export default function ConstantsKnobs() {
         <div className="card p-5">
             <div className="flex items-start justify-between gap-4 mb-1">
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-800">Model Constants</h3>
-                    <p className="text-sm text-gray-500 mt-0.5">
+                    <h3 className="section-title">Model Constants</h3>
+                    <p className="text-sm text-secondary mt-0.5">
                         Tune the EPA math on <strong>this browser only</strong>. Changes are saved
                         instantly but apply on the next page reload. Never affects the database or
                         other users.
@@ -65,8 +65,8 @@ export default function ConstantsKnobs() {
             </div>
 
             {dirty && (
-                <div className="my-3 flex items-center justify-between gap-3 p-3 rounded-lg border bg-blue-50 border-blue-200">
-                    <span className="text-sm text-blue-800">
+                <div className="notice-info my-3 flex items-center justify-between gap-3 p-3 rounded-lg">
+                    <span className="text-sm">
                         Overrides saved — reload to apply them to the calculations.
                     </span>
                     <button onClick={() => window.location.reload()} className="btn btn-primary text-sm whitespace-nowrap">
@@ -77,9 +77,9 @@ export default function ConstantsKnobs() {
 
             {KNOB_GROUPS.map(group => (
                 <div key={group.title} className="mt-4">
-                    <h4 className="text-sm font-semibold text-gray-700">{group.title}</h4>
-                    {group.blurb && <p className="text-xs text-gray-400 mb-2">{group.blurb}</p>}
-                    <div className="divide-y divide-gray-100 border-t border-gray-100">
+                    <h4 className="subsection-title">{group.title}</h4>
+                    {group.blurb && <p className="text-xs text-faint mb-2">{group.blurb}</p>}
+                    <div className="divide-y divide-[var(--color-border)] border-t border-[var(--color-border)]">
                         {group.knobs.map(knob => (
                             <KnobRow
                                 key={knob.key}
@@ -99,21 +99,24 @@ export default function ConstantsKnobs() {
 }
 
 function KnobRow({ knob, value, def, modified, onChange, onReset }) {
-    const { label, help, kind, min, max, step, unit } = knob;
+    const { key, label, help, kind, min, max, step, unit } = knob;
 
     return (
         <div className="py-3 flex items-start justify-between gap-4">
             <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-800">{label}</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium">{label}</span>
+                    <code className="text-[11px] text-muted bg-[var(--color-surface-sunken)] px-1.5 py-0.5 rounded">
+                        {key}
+                    </code>
                     {modified && (
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">
                             modified
                         </span>
                     )}
                 </div>
-                {help && <p className="text-xs text-gray-400 mt-0.5">{help}</p>}
-                <p className="text-[11px] text-gray-400 mt-0.5">
+                {help && <p className="text-xs text-faint mt-0.5">{help}</p>}
+                <p className="text-[11px] text-faint mt-0.5">
                     default: <code>{Array.isArray(def) ? `${def[0]}–${def[1]}` : String(def)}</code>
                     {unit ? ` ${unit}` : ''}
                 </p>
@@ -128,7 +131,7 @@ function KnobRow({ knob, value, def, modified, onChange, onReset }) {
                             onChange={(e) => onChange([numOrNull(e.target.value) ?? def[0], value[1]])}
                             className="form-input w-20 text-sm"
                         />
-                        <span className="text-gray-400 text-sm">–</span>
+                        <span className="text-faint text-sm">–</span>
                         <input
                             type="number" min={min} max={max} step={step}
                             value={value[1]}
@@ -144,12 +147,12 @@ function KnobRow({ knob, value, def, modified, onChange, onReset }) {
                         className="form-input w-24 text-sm"
                     />
                 )}
-                {unit && <span className="text-xs text-gray-400 w-7">{unit}</span>}
+                {unit && <span className="text-xs text-faint w-7">{unit}</span>}
                 <button
                     onClick={onReset}
                     disabled={!modified}
                     title="Reset to default"
-                    className="text-xs text-gray-400 hover:text-gray-700 disabled:opacity-30 px-1"
+                    className="text-xs text-faint hover:text-secondary disabled:opacity-30 px-1"
                 >
                     ↺
                 </button>

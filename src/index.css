@@ -295,6 +295,26 @@ body {
     @apply text-lg font-bold;
 }
 
+/* Smaller heading for a group within a card (h4) */
+.subsection-title {
+    @apply text-sm font-semibold;
+    color: var(--color-text-primary);
+}
+
+/* Theme-aware text-color helpers. Headings/body inherit --color-text-primary
+   from <body>; these set the dimmer tiers. Prefer these over Tailwind text-gray-*
+   so text adapts to dark mode. */
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted     { color: var(--color-text-muted); }
+.text-faint     { color: var(--color-text-faint); }
+
+/* Inline info/notice banner (theme-aware) */
+.notice-info {
+    background-color: var(--color-primary-light);
+    border: 1px solid var(--color-primary);
+    color: var(--color-text-primary);
+}
+
 /* Horizontal inline group — flex row with standard gap */
 .inline-row {
     @apply flex items-center gap-2;

@@ -25,19 +25,19 @@ export default function InterfaceSettings() {
     return (
         <div className="space-y-6">
             <div className="card p-5">
-                <h3 className="text-lg font-semibold text-gray-800">Site header image</h3>
-                <p className="text-sm text-gray-500 mt-0.5 mb-3">
+                <h3 className="section-title">Site header image</h3>
+                <p className="text-sm text-secondary mt-0.5 mb-3">
                     Background image shown behind the title on the home page. Applies site-wide for
                     all visitors.
                 </p>
 
                 {headerImageUrl ? (
                     <div
-                        className="w-full h-32 rounded-lg border border-gray-200 mb-3"
+                        className="w-full h-32 rounded-lg border border-[var(--color-border)] mb-3"
                         style={{ backgroundImage: `url(${headerImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
                     />
                 ) : (
-                    <div className="w-full h-32 rounded-lg border border-dashed border-gray-300 flex items-center justify-center text-sm text-gray-400 mb-3">
+                    <div className="w-full h-32 rounded-lg border border-dashed border-[var(--color-border-strong)] flex items-center justify-center text-sm text-faint mb-3">
                         No header image set
                     </div>
                 )}
@@ -55,8 +55,8 @@ export default function InterfaceSettings() {
             </div>
 
             <div className="card p-5">
-                <h3 className="text-lg font-semibold text-gray-800">Personal preferences</h3>
-                <p className="text-sm text-gray-500 mt-0.5">
+                <h3 className="section-title">Personal preferences</h3>
+                <p className="text-sm text-secondary mt-0.5">
                     Theme and unit system (imperial/metric) are per-browser preferences — set them
                     from the toggles in the top bar. They aren't site-wide settings, so they live
                     there rather than here.
