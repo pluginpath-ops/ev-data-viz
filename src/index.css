@@ -226,6 +226,16 @@
     color: var(--color-primary-text);
 }
 
+/* Admin sub-tab nav (Roles / EPA Data / Model Constants / Interface) */
+.admin-subtabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.5rem;
+}
+
 /* Tighten Tailwind's default line-height (1.5 feels too spacious) */
 html {
     line-height: 1.4;
@@ -283,6 +293,26 @@ body {
 /* Card/section heading (h3, h4) */
 .section-title {
     @apply text-lg font-bold;
+}
+
+/* Smaller heading for a group within a card (h4) */
+.subsection-title {
+    @apply text-sm font-semibold;
+    color: var(--color-text-primary);
+}
+
+/* Theme-aware text-color helpers. Headings/body inherit --color-text-primary
+   from <body>; these set the dimmer tiers. Prefer these over Tailwind text-gray-*
+   so text adapts to dark mode. */
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted     { color: var(--color-text-muted); }
+.text-faint     { color: var(--color-text-faint); }
+
+/* Inline info/notice banner (theme-aware) */
+.notice-info {
+    background-color: var(--color-primary-light);
+    border: 1px solid var(--color-primary);
+    color: var(--color-text-primary);
 }
 
 /* Horizontal inline group — flex row with standard gap */

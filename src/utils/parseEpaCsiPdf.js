@@ -20,7 +20,7 @@
  * form's auto-suggest. Everything is editable post-import.
  */
 
-const HWFET_MI = 10.26, UDDS_MI = 7.45, DIST_TOL = 0.7;
+import { HWFET_MI, UDDS_MI, CYCLE_DIST_TOL as DIST_TOL } from '../constants/epa';
 
 /** MM/DD/YYYY → YYYY-MM-DD (Postgres date); pass through anything else. */
 function toIsoDate(s) {

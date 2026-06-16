@@ -22,33 +22,17 @@
  */
 
 // ── Physical constants ────────────────────────────────────────────────────────
+// Defined in src/constants/epa.js (single source of truth); re-exported here so
+// existing `import { … } from './epaPhysics'` call sites keep working.
+import {
+    HWFET_AVG_MPH, US06_AVG_MPH, HIGHWAY_BAND_MPH, ACCESSORY_LOAD_KW,
+    MPG_E_CONVERSION, LBF_MILE_TO_KWH, DEFAULT_ETA, CURVE_SPEED_RANGE,
+} from '../constants/epa';
 
-/** Average speed of the HWFET (Highway Fuel Economy Test) drive cycle, mph. */
-export const HWFET_AVG_MPH = 48.3;
-
-/** Average speed of the US06 (Supplemental Federal Test Procedure) cycle, mph.
- *  Note: US06 includes aggressive transients up to 80+ mph; the 48.4 avg understates peak loads. */
-export const US06_AVG_MPH = 48.4;
-
-/** Speed band considered "real highway" for reference overlay on the chart. */
-export const HIGHWAY_BAND_MPH = [65, 75];
-
-/** Constant accessory load assumed for all EVs (HVAC, lighting, electronics). kW. */
-export const ACCESSORY_LOAD_KW = 0.3;
-
-/** EPA's kWh-per-gallon-of-gasoline-equivalent constant, used to compute MPGe. */
-export const MPG_E_CONVERSION = 33.705;
-
-/** Unit conversion: lbf-force × 1 mile of travel → kWh of energy.
- *  Derivation: 4.44822 N/lbf × 1609.34 m/mi / 3,600,000 J/kWh = 0.001989.
- *  Exported so the derivation engine (epaDerivations.js) shares one source of truth. */
-export const LBF_MILE_TO_KWH = 0.001989;
-
-/** Fallback drivetrain efficiency when no HWFET/DC phase data is available. */
-export const DEFAULT_ETA = 0.88;
-
-/** Speed range for the curve, mph, inclusive. */
-export const CURVE_SPEED_RANGE = [5, 120];
+export {
+    HWFET_AVG_MPH, US06_AVG_MPH, HIGHWAY_BAND_MPH, ACCESSORY_LOAD_KW,
+    MPG_E_CONVERSION, LBF_MILE_TO_KWH, DEFAULT_ETA, CURVE_SPEED_RANGE,
+};
 
 // ── Coefficient resolution ────────────────────────────────────────────────────
 

@@ -10,7 +10,10 @@
 import { useState } from 'react';
 import CuratorField from './CuratorField';
 import InfoIcon from '../InfoIcon';
-import { PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75 } from '../../utils/epaDerivations';
+import {
+    PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
+    HWFET_MI, UDDS_MI, CYCLE_DIST_TOL as DIST_TOL,
+} from '../../constants/epa';
 
 const PROC_OPTIONS = [
     { v: PROC_MCT,     label: '77 — Multi-Cycle Test' },
@@ -22,10 +25,6 @@ const PHASE_TYPES   = ['UDDS', 'HWY', 'SS', 'Cold-UDDS', 'US06', 'SC03'];
 const SOURCE_OPTS   = ['csv', 'j1634', 'csi_pdf', 'manual'];
 const ORIGINATORS   = ['MFR', 'EPA'];
 
-// Standard cycle distances (miles) for phase-type auto-suggestion.
-const HWFET_MI  = 10.26;
-const UDDS_MI   = 7.45;
-const DIST_TOL  = 0.7;   // ± tolerance around the standard distance
 
 const num = (v) => (v == null || v === '' || isNaN(Number(v)) ? null : Number(v));
 
