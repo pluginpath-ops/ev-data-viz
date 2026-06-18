@@ -4,3 +4,6 @@ dist/
 DevInfo/
 LocalDev/
 .DS_Store
+
+# Supabase CLI local state
+supabase/.temp/
