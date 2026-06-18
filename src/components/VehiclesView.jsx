@@ -24,9 +24,9 @@ function TestCountPills({ vehicle }) {
     return (
         <p className="flex flex-wrap items-baseline gap-x-1.5">
             <span>Tests:</span>
-            {chargingCount > 0 && <span className="text-xs font-medium text-green-600 dark:text-green-400">Charging ({chargingCount})</span>}
-            {rangeCount    > 0 && <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Range ({rangeCount})</span>}
-            {epaCount      > 0 && <span className="text-xs font-medium text-blue-600 dark:text-blue-400">EPA ({epaCount})</span>}
+            {chargingCount > 0 && <span className="text-[13px] font-medium text-green-600 dark:text-green-400">Charging ({chargingCount})</span>}
+            {rangeCount    > 0 && <span className="text-[13px] font-medium text-amber-600 dark:text-amber-400">Range ({rangeCount})</span>}
+            {epaCount      > 0 && <span className="text-[13px] font-medium text-blue-600 dark:text-blue-400">EPA ({epaCount})</span>}
         </p>
     );
 }
