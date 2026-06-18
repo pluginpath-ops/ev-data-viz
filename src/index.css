@@ -746,6 +746,15 @@ body {
     color: var(--color-text-secondary);
 }
 
+/* "About this chart" help-bubble disclosure toggle */
+.chart-info-toggle {
+    @apply flex items-center gap-2 text-left text-sm font-semibold transition-colors;
+    color: var(--color-text-secondary);
+}
+.chart-info-toggle:hover {
+    color: var(--color-text-primary);
+}
+
 /* Vehicle group list inside the run selector */
 .runs-list {
     @apply space-y-4;

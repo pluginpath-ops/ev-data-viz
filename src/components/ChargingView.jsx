@@ -16,6 +16,7 @@ import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 import LoadingSpinner from './LoadingSpinner';
 import { resolveChartColors } from '../utils/colorUtils';
+import ChartInfoBubble from './ChartInfoBubble';
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, presentationMode = false }) {
     const { units } = useAppContext();
@@ -842,6 +843,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     <p className="text-lg">Select runs to display on the chart</p>
                 </div>
             )}
+
+            {!presentationMode && <ChartInfoBubble chartKey="charging" />}
         </div>
     );
 }
