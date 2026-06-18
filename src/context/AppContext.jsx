@@ -17,6 +17,7 @@ export function AppProvider({ children }) {
     const [runVotes, setRunVotes] = useState({});          // { [runId]: { vouch, flag, myVote } }
     const [units, setUnits] = useState(() => localStorage.getItem('evbench_units') || 'imperial');
     const [manufacturers, setManufacturers] = useState([]);
+    const [chartHelp, setChartHelp] = useState({});        // { [chart_key]: row } — "About this chart" copy
 
     const toggleUnits = () => setUnits(u => {
         const next = u === 'imperial' ? 'metric' : 'imperial';
@@ -68,6 +69,7 @@ export function AppProvider({ children }) {
         const tagsData = dataService.useSupabase ? await dataService.getTags() : [];
         const siteSettings = await dataService.getSiteSettings();
         const manufacturersData = dataService.useSupabase ? await dataService.getManufacturers() : [];
+        const chartHelpData = dataService.useSupabase ? await dataService.getChartHelp() : {};
 
         // Derive custom field name suggestions from all vehicles' specs._custom objects
         const suggestions = {};
@@ -87,6 +89,7 @@ export function AppProvider({ children }) {
         setSelectedVehicles(selectedIds);
         setTags(tagsData);
         setManufacturers(manufacturersData);
+        setChartHelp(chartHelpData);
         setHeaderImageUrl(siteSettings.header_image_url || '');
         setLoading(false);
     }
@@ -569,6 +572,20 @@ export function AppProvider({ children }) {
             await initializeApp();
             return result;
         } catch (error) {
+            throw error;
+        }
+    };
+
+    // ── Chart help ("About this chart" copy) ──────────────────────────────────
+
+    const updateChartHelp = async (chartKey, fields) => {
+        try {
+            const row = await dataService.updateChartHelp(chartKey, fields);
+            setChartHelp(prev => ({ ...prev, [chartKey]: row }));
+            return row;
+        } catch (error) {
+            logIfUnauthorized('update_chart_help', 'chart_help', chartKey, error);
+            showError('Error saving chart help: ' + error.message);
             throw error;
         }
     };
@@ -1077,6 +1094,8 @@ export function AppProvider({ children }) {
         units,
         toggleUnits,
         manufacturers,
+        chartHelp,
+        updateChartHelp,
         addManufacturer,
         updateManufacturer,
         deleteManufacturer,

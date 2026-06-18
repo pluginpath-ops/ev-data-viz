@@ -15,6 +15,7 @@ import {
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { copyChartAsPng } from '../utils/chartUtils';
 import { resolveChartColors } from '../utils/colorUtils';
+import ChartInfoBubble from './ChartInfoBubble';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -617,6 +618,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 onChange={handleScaleChange}
                 showX={CHART_TYPES.find(t => t.key === chartType)?.kind === 'line'}
             />
+
+            {!presentationMode && <ChartInfoBubble chartKey="range" />}
         </div>
     );
 }

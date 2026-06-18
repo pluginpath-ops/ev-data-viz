@@ -7,6 +7,7 @@ import {
     makeVehicleFields, buildFieldGroups, getFieldDef, extractValue,
     detectMode, formatNumericLabel, vehicleColor,
 } from '../utils/specHelpers';
+import ChartInfoBubble from './ChartInfoBubble';
 
 // ── Inside-bar label afterDraw plugin ─────────────────────────────────────────
 
@@ -43,7 +44,7 @@ function makeInsideLabelPlugin(getLabelFn) {
 
 // ── SpecsChartView ────────────────────────────────────────────────────────────
 
-export default function SpecsChartView({ vehicles, selectedField: controlledField = null, onFieldChange }) {
+export default function SpecsChartView({ vehicles, selectedField: controlledField = null, onFieldChange, presentationMode = false }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
 
@@ -212,6 +213,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
     };
 
     return (
+        <>
         <div className="specs-chart-card">
             <div className="specs-chart-controls">
                 <label className="text-sm font-medium text-gray-600">Compare:</label>
@@ -266,5 +268,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                 </div>
             )}
         </div>
+        {!presentationMode && <ChartInfoBubble chartKey="specs" />}
+        </>
     );
 }

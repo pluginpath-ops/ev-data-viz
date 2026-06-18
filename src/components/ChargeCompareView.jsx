@@ -9,6 +9,7 @@ import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import LoadingSpinner from './LoadingSpinner';
+import ChartInfoBubble from './ChartInfoBubble';
 
 // ── Interpolation helper ──────────────────────────────────────────────────────
 // Returns the interpolated yField value at targetX, given points sorted by xField.
@@ -683,6 +684,8 @@ export default function ChargeCompareView({
                     </div>
                 </>
             )}
+
+            {!presentationMode && <ChartInfoBubble chartKey="compare" />}
         </div>
     );
 }

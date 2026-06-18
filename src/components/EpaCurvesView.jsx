@@ -14,6 +14,7 @@ import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio } from '..
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
+import ChartInfoBubble from './ChartInfoBubble';
 
 // ── Highway band plugin ───────────────────────────────────────────────────────
 
@@ -723,6 +724,8 @@ export default function EpaCurvesView({
                     onChange={(key, value) => setEpaConfig(p => ({ ...p, [key]: value }))}
                 />
             )}
+
+            {!presentationMode && <ChartInfoBubble chartKey="epacurves" />}
         </div>
     );
 }

@@ -16,6 +16,7 @@ import {
 } from '../utils/roadTripSimulation';
 import LoadingSpinner from './LoadingSpinner';
 import { resolveChartColors } from '../utils/colorUtils';
+import ChartInfoBubble from './ChartInfoBubble';
 
 Chart.register(ZoomPlugin);
 
@@ -1717,6 +1718,8 @@ export default function RoadTripView({
 
                 </div>
             )}
+
+            {!presentationMode && <ChartInfoBubble chartKey="roadtrip" />}
         </div>
     );
 }

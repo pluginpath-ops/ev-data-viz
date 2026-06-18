@@ -194,6 +194,46 @@ class DataService {
     if (error) throw error;
   }
 
+  // ── Chart help ("About this chart" copy) ──────────────────────────────────
+
+  /**
+   * Fetch all chart-help rows as a map keyed by chart_key. {} in local mode.
+   * Resilient: if the table is missing (migration 031 not yet applied) or read
+   * fails, returns {} so callers fall back to the bundled default copy rather
+   * than blocking app load.
+   */
+  async getChartHelp() {
+    if (!this.useSupabase) return {};
+    try {
+      const { data, error } = await getSupabase().from('chart_help').select('*');
+      if (error) throw error;
+      const map = {};
+      for (const row of data || []) map[row.chart_key] = row;
+      return map;
+    } catch (err) {
+      console.warn('chart_help unavailable — using bundled defaults:', err.message);
+      return {};
+    }
+  }
+
+  /**
+   * Upsert the editable copy for one chart. `fields` is a subset of
+   * { title, data_source, how_to_read, key_terms, math_approach }.
+   * Returns the saved row.
+   */
+  async updateChartHelp(chartKey, fields) {
+    const { data, error } = await getSupabase()
+      .from('chart_help')
+      .upsert(
+        { chart_key: chartKey, ...fields, updated_at: new Date().toISOString(), updated_by: this.user?.id ?? null },
+        { onConflict: 'chart_key' }
+      )
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
   // ── Spec links ────────────────────────────────────────────────────────────
 
   async addSpecLink({ targetVehicleId, sourceRunId, scalingFactor, notes }) {
