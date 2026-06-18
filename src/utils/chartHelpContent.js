@@ -57,14 +57,12 @@ export const CHART_HELP_DEFAULTS = {
             '(available when the X axis is Time) lines runs up at a common starting ' +
             'state-of-charge so you can compare them head-to-head from the same point.',
         key_terms:
-            'SoC (State of Charge) — how full the battery is, 0–100%. ' +
-            'Charge Rate (kW) — power flowing into the battery right now. ' +
-            'C-rate — charge power ÷ battery size (kW ÷ kWh); ~1C means adding roughly a ' +
-            'full pack in an hour, regardless of car size. ' +
-            'Range Rate — miles of range gained per minute. ' +
-            'SoC Added / Range Added — change since the start of the plotted window. ' +
-            'Range – EPA vs Range – Tested — EPA-rated range projected from SoC, vs the ' +
-            'range actually logged in the test.',
+            'SoC (State of Charge) — how full the battery is, 0–100%.\n' +
+            'Charge Rate (kW) — power flowing into the battery right now.\n' +
+            'C-rate — charge power ÷ battery size (kW ÷ kWh); ~1C ≈ adding a full pack in an hour, regardless of car size.\n' +
+            'Range Rate — miles of range gained per minute.\n' +
+            'SoC Added / Range Added — change since the start of the plotted window.\n' +
+            'Range – EPA vs Range – Tested — EPA-rated range projected from SoC, vs the range actually logged in the test.',
         math_approach:
             'Mostly the raw measured points drawn as-is — no smoothing or curve-fitting. ' +
             'The computed fields are simple arithmetic: C-rate = charge kW ÷ battery kWh; ' +
@@ -91,10 +89,10 @@ export const CHART_HELP_DEFAULTS = {
             'range falls off as speed or cold rises. Toggle efficiency between mi/kWh ' +
             '(higher is better) and Wh/mi (lower is better).',
         key_terms:
-            'Projected range — distance scaled up to a full 0–100% charge. ' +
-            'Efficiency — energy used per unit distance. ' +
-            'mi/kWh — miles per kilowatt-hour (higher is better). ' +
-            'Wh/mi — watt-hours per mile (lower is better). ' +
+            'Projected range — distance scaled up to a full 0–100% charge.\n' +
+            'Efficiency — energy used per unit distance.\n' +
+            'mi/kWh — miles per kilowatt-hour (higher is better).\n' +
+            'Wh/mi — watt-hours per mile (lower is better).\n' +
             'SoC used — the test’s start % minus end %.',
         math_approach:
             'Projected range = miles driven × (100 ÷ percent of battery used); if start ' +
@@ -124,10 +122,10 @@ export const CHART_HELP_DEFAULTS = {
             'that low, or didn’t run long enough), so treat amber bars as rougher ' +
             'estimates.',
         key_terms:
-            'Starting SoC — the common battery level all cars are normalized to. ' +
-            'Range added — miles gained in the chosen minutes. ' +
-            'Time to add — minutes to gain the chosen miles. ' +
-            'Interpolation — reading a value between two logged points. ' +
+            'Starting SoC — the common battery level all cars are normalized to.\n' +
+            'Range added — miles gained in the chosen minutes.\n' +
+            'Time to add — minutes to gain the chosen miles.\n' +
+            'Interpolation — reading a value between two logged points.\n' +
             'Extrapolation — estimating past the ends of the logged data (flagged amber).',
         math_approach:
             'Linear interpolation between logged points. It finds the time and range at ' +
@@ -156,12 +154,10 @@ export const CHART_HELP_DEFAULTS = {
             'a fixed accessory load — real trips with hills, weather and stop-and-go will ' +
             'differ.',
         key_terms:
-            'Road-load (A, B, C) — the rolling, speed-proportional and aerodynamic ' +
-            'resistance from EPA coast-down testing: Force = A + B·speed + C·speed². ' +
-            'η (drivetrain efficiency) — the share of battery energy that reaches the ' +
-            'wheels, back-solved from the EPA highway test. ' +
-            'MPGe — miles per gallon-equivalent (33.7 kWh = 1 gallon). ' +
-            'kWh/100mi, Wh/mi — energy used per distance. ' +
+            'Road-load (A, B, C) — the rolling, speed-proportional and aerodynamic resistance from EPA coast-down testing: Force = A + B·speed + C·speed².\n' +
+            'η (drivetrain efficiency) — the share of battery energy that reaches the wheels, back-solved from the EPA highway test.\n' +
+            'MPGe — miles per gallon-equivalent (33.7 kWh = 1 gallon).\n' +
+            'kWh/100mi, Wh/mi — energy used per distance.\n' +
             'Useable kWh — the battery capacity used for the range estimate.',
         math_approach:
             'At each speed: resistance Force = A + B·v + C·v²; wheel energy comes from ' +
@@ -193,11 +189,12 @@ export const CHART_HELP_DEFAULTS = {
             'trip even with less range. Cars that can’t finish (battery depleted, or a stop ' +
             'would need >95% charge) are dropped.',
         key_terms:
-            'SoC — battery %. mi/kWh — driving efficiency. Leg / distance between charges ' +
-            '— how far you drive before each stop. Overhead — fixed minutes added per stop ' +
-            '(park, plug in, break). ICE Reference — a gas car driving 3-hour legs with the ' +
-            'same per-stop overhead. Charge stop — modelled from the real charging curve ' +
-            'between your start and minimum SoC.',
+            'SoC — battery %.\n' +
+            'mi/kWh — driving efficiency.\n' +
+            'Leg / distance between charges — how far you drive before each stop.\n' +
+            'Overhead — fixed minutes added per stop (park, plug in, break).\n' +
+            'ICE Reference — a gas car driving 3-hour legs with the same per-stop overhead.\n' +
+            'Charge stop — modelled from the real charging curve between your start and minimum SoC.',
         math_approach:
             'For each car it steps through drive legs and charge stops: a leg drains the ' +
             'battery at the speed-corrected efficiency; a stop adds energy by following the ' +
@@ -222,8 +219,8 @@ export const CHART_HELP_DEFAULTS = {
             '(e.g. drivetrain) just show the label. A grey stub means the value is missing ' +
             'for that vehicle.',
         key_terms:
-            'Spec — a structured attribute on the vehicle (battery kWh, horsepower, seats, ' +
-            '…). Numeric / boolean / text — the three value types, drawn differently. ' +
+            'Spec — a structured attribute on the vehicle (battery kWh, horsepower, seats, …).\n' +
+            'Numeric / boolean / text — the three value types, drawn differently.\n' +
             'Units follow your imperial/metric toggle.',
         math_approach:
             'No calculation — it reads the stored spec value and converts units for ' +
@@ -244,8 +241,9 @@ export const CHART_HELP_DEFAULTS = {
             'outliers — a car well above the line is doing better than its peers on the Y ' +
             'spec for its X value. Vehicles missing either value aren’t plotted.',
         key_terms:
-            'Trend line — a least-squares straight-line fit through the dots. Outlier — a ' +
-            'vehicle far from the trend. Correlation — how tightly the dots track the line. ' +
+            'Trend line — a least-squares straight-line fit through the dots.\n' +
+            'Outlier — a vehicle far from the trend.\n' +
+            'Correlation — how tightly the dots track the line.\n' +
             'Axes are numeric specs only; units follow your imperial/metric toggle.',
         math_approach:
             'Dots are the stored spec values (unit-converted for display). The trend line ' +

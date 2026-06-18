@@ -48,7 +48,12 @@ INSERT INTO chart_help (chart_key, title, data_source, how_to_read, key_terms, m
     $help$About the Charging chart$help$,
     $help$Plots the time-series readings from your saved charging tests — the log uploaded from a CSV or Tableau export of a real charging session. Each reading stores state-of-charge, elapsed time, charge power, range and temperature (the data points attached to a run marked “has charging”). Pick any field for each axis. A few fields are computed on the fly rather than stored: C-rate, range rate, SoC added, range added and EPA-rated range. If a charging run has no range column, range is filled in from the vehicle’s default range test by matching state-of-charge.$help$,
     $help$Each line is one charging session. Use it to see how fast a car charges and how that changes as the battery fills — for most EVs charge power is highest at a low state-of-charge and tapers as the pack fills. The classic view is Charge Rate (kW) vs State of Charge. Turn on the right-hand (Y2) axis to overlay a second measure, e.g. rate plus range added. “Race mode” (available when the X axis is Time) lines runs up at a common starting state-of-charge so you can compare them head-to-head from the same point.$help$,
-    $help$SoC (State of Charge) — how full the battery is, 0–100%. Charge Rate (kW) — power flowing into the battery right now. C-rate — charge power ÷ battery size (kW ÷ kWh); ~1C means adding roughly a full pack in an hour, regardless of car size. Range Rate — miles of range gained per minute. SoC Added / Range Added — change since the start of the plotted window. Range – EPA vs Range – Tested — EPA-rated range projected from SoC, vs the range actually logged in the test.$help$,
+    $help$SoC (State of Charge) — how full the battery is, 0–100%.
+Charge Rate (kW) — power flowing into the battery right now.
+C-rate — charge power ÷ battery size (kW ÷ kWh); ~1C ≈ adding a full pack in an hour, regardless of car size.
+Range Rate — miles of range gained per minute.
+SoC Added / Range Added — change since the start of the plotted window.
+Range – EPA vs Range – Tested — EPA-rated range projected from SoC, vs the range actually logged in the test.$help$,
     $help$Mostly the raw measured points drawn as-is — no smoothing or curve-fitting. The computed fields are simple arithmetic: C-rate = charge kW ÷ battery kWh; range rate = (rated miles ÷ battery kWh) × charge kW ÷ 60; EPA range = (SoC ÷ 100) × the car’s rated miles; the “added” fields subtract the first reading in view. The optional range backfill matches each SoC to the range from the vehicle’s range test by linear interpolation.$help$
 ),
 (
@@ -56,7 +61,11 @@ INSERT INTO chart_help (chart_key, title, data_source, how_to_read, key_terms, m
     $help$About the Range & Efficiency chart$help$,
     $help$Compares saved range tests (runs marked “has range”). Unlike the Charging chart, this uses each test’s summary numbers — distance driven, start and end state-of-charge, energy used (kWh), test speed and ambient temperature — not the second-by-second log. These are entered or uploaded per run. Bar views group runs by vehicle; line views plot one point per test against speed or temperature.$help$,
     $help$Use it to compare how far cars go and how efficiently they use energy, side by side. When a test didn’t run the battery all the way down, the range bar shows a projected full-pack range (marked ⟳) rather than the miles actually driven. The Range-by-Speed and Range-by-Temperature line views show how range falls off as speed or cold rises. Toggle efficiency between mi/kWh (higher is better) and Wh/mi (lower is better).$help$,
-    $help$Projected range — distance scaled up to a full 0–100% charge. Efficiency — energy used per unit distance. mi/kWh — miles per kilowatt-hour (higher is better). Wh/mi — watt-hours per mile (lower is better). SoC used — the test’s start % minus end %.$help$,
+    $help$Projected range — distance scaled up to a full 0–100% charge.
+Efficiency — energy used per unit distance.
+mi/kWh — miles per kilowatt-hour (higher is better).
+Wh/mi — watt-hours per mile (lower is better).
+SoC used — the test’s start % minus end %.$help$,
     $help$Projected range = miles driven × (100 ÷ percent of battery used); if start and end SoC aren’t recorded it falls back to the raw miles driven. Efficiency = distance ÷ energy for mi/kWh, or energy ÷ distance for Wh/mi. The projection assumes the car uses energy at the same average rate across the whole pack as it did during the tested segment — a simplification, not a guarantee.$help$
 ),
 (
