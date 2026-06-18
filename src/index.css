@@ -285,14 +285,48 @@ body {
     @apply max-w-7xl mx-auto px-6;
 }
 
-/* Page-level heading (h2) */
-.page-title {
-    @apply text-2xl font-bold;
-}
+/* ============================================================================
+   TYPOGRAPHY SYSTEM   (see docs/typography.md)
+   ----------------------------------------------------------------------------
+   Two orthogonal axes — compose one ROLE class with at most one COLOR class:
 
-/* Card/section heading (h3, h4) */
-.section-title {
-    @apply text-lg font-bold;
+     ROLE  (size + weight; defaults to --color-text-primary via <body>)
+       .page-title       h2  page heading
+       .section-title    h3  card / section heading
+       .subsection-title h4  group heading inside a card
+       .text-body            default body copy
+       .text-caption         small secondary copy
+       .text-label           form / field labels
+       .text-hint            helper / sub-text under a control
+       .text-data            numeric / monospace values (tabular)
+
+     COLOR (dimmer tiers; theme-aware — adapt to dark mode)
+       .text-secondary   .text-muted   .text-faint
+
+   ALWAYS prefer these over Tailwind text-gray-* / arbitrary text-[..px], which
+   are NOT theme-aware (fine in light mode, illegible on dark navy).
+   ============================================================================ */
+
+/* — Roles ————————————————————————————————————————————————————————————————— */
+.page-title       { @apply text-2xl font-bold; }
+.section-title    { @apply text-lg font-bold; }
+.subsection-title { @apply text-sm font-semibold; color: var(--color-text-primary); }
+.text-body        { @apply text-sm; }
+.text-caption     { @apply text-xs; }
+.text-label       { @apply text-xs font-medium; color: var(--color-text-secondary); }
+.text-hint        { @apply text-xs; color: var(--color-text-faint); }
+.text-data        { @apply text-sm font-mono tabular-nums; }
+
+/* — Color tiers (compose with a role) ——————————————————————————————————————— */
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted     { color: var(--color-text-muted); }
+.text-faint     { color: var(--color-text-faint); }
+
+/* Inline info/notice banner (theme-aware) */
+.notice-info {
+    background-color: var(--color-primary-light);
+    border: 1px solid var(--color-primary);
+    color: var(--color-text-primary);
 }
 
 /* Smaller heading for a group within a card (h4) */
