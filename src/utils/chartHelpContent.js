@@ -172,6 +172,88 @@ export const CHART_HELP_DEFAULTS = {
             'per mile. Altitude, when set, thins the air by scaling only the aerodynamic ' +
             '(C) term at display time.',
     },
+
+    roadtrip: {
+        title: 'About the Road Trip chart',
+        data_source:
+            'Simulates a long-distance trip for each selected charging test. It combines ' +
+            'that run’s real measured charging curve (the time-series charging points) ' +
+            'with an efficiency (mi/kWh) derived from the vehicle’s range data — either ' +
+            'directly (distance ÷ energy) or estimated from the SoC drop × battery size. ' +
+            'You set the trip: total distance, travel speed, miles between charging stops ' +
+            '(or a target charge time), start/min SoC, and a per-stop overhead. A dashed ' +
+            'grey “ICE Reference” line models a gas car for comparison.',
+        how_to_read:
+            'Read it as a race against the clock (and against gas). The default view plots ' +
+            'distance covered vs elapsed time; flat steps are charging stops, and each ' +
+            'car’s total trip time — and how it compares to ICE — is labelled at the ' +
+            'finish. You can also chart cumulative charge time, per-car SoC “lanes”, or ' +
+            'sweep travel speed / distance-between-stops to find the sweet spot. Because ' +
+            'charging follows each car’s actual curve, a faster-charging car can win a long ' +
+            'trip even with less range. Cars that can’t finish (battery depleted, or a stop ' +
+            'would need >95% charge) are dropped.',
+        key_terms:
+            'SoC — battery %. mi/kWh — driving efficiency. Leg / distance between charges ' +
+            '— how far you drive before each stop. Overhead — fixed minutes added per stop ' +
+            '(park, plug in, break). ICE Reference — a gas car driving 3-hour legs with the ' +
+            'same per-stop overhead. Charge stop — modelled from the real charging curve ' +
+            'between your start and minimum SoC.',
+        math_approach:
+            'For each car it steps through drive legs and charge stops: a leg drains the ' +
+            'battery at the speed-corrected efficiency; a stop adds energy by following the ' +
+            'measured charging curve for the set time (or until there’s enough range for ' +
+            'the next leg). Efficiency is scaled for travel speed (faster = less ' +
+            'efficient). Trip time = driving time + charging time + per-stop overhead. The ' +
+            'ICE line drives fixed 3-hour legs with the same overhead. It’s a model — real ' +
+            'charger availability, weather and traffic will vary.',
+    },
+
+    specs: {
+        title: 'About the Spec Chart',
+        data_source:
+            'A simple side-by-side bar comparison of one spec across the selected ' +
+            'vehicles. Values come from each vehicle’s structured spec sheet (the `specs` ' +
+            'data on the vehicle record, including any custom fields) — not from test ' +
+            'data. Pick any field from the dropdown.',
+        how_to_read:
+            'One bar per vehicle for the chosen spec, so you can rank them at a glance. ' +
+            'Numeric specs (battery, power, price…) are drawn to scale with the value ' +
+            'shown inside the bar; yes/no specs show a green “Yes” or red “No”; text specs ' +
+            '(e.g. drivetrain) just show the label. A grey stub means the value is missing ' +
+            'for that vehicle.',
+        key_terms:
+            'Spec — a structured attribute on the vehicle (battery kWh, horsepower, seats, ' +
+            '…). Numeric / boolean / text — the three value types, drawn differently. ' +
+            'Units follow your imperial/metric toggle.',
+        math_approach:
+            'No calculation — it reads the stored spec value and converts units for ' +
+            'display only (e.g. kW↔hp, mi↔km). Bars show the raw values; missing values ' +
+            'are drawn as a small grey stub.',
+    },
+
+    specscatter: {
+        title: 'About the Spec Scatter chart',
+        data_source:
+            'Plots two numeric specs against each other — one dot per selected vehicle — ' +
+            'to reveal relationships (e.g. battery size vs range, power vs price). Both ' +
+            'axes come from the vehicles’ structured spec sheets (`specs`); only numeric ' +
+            'fields are offered.',
+        how_to_read:
+            'Each dot is a vehicle (X = one spec, Y = another); the dashed grey line is a ' +
+            'best-fit trend across all plotted vehicles. Use it to spot correlations and ' +
+            'outliers — a car well above the line is doing better than its peers on the Y ' +
+            'spec for its X value. Vehicles missing either value aren’t plotted.',
+        key_terms:
+            'Trend line — a least-squares straight-line fit through the dots. Outlier — a ' +
+            'vehicle far from the trend. Correlation — how tightly the dots track the line. ' +
+            'Axes are numeric specs only; units follow your imperial/metric toggle.',
+        math_approach:
+            'Dots are the stored spec values (unit-converted for display). The trend line ' +
+            'is an ordinary least-squares regression (the slope and intercept that ' +
+            'minimise squared vertical error), drawn from the lowest to the highest X. ' +
+            'It’s descriptive only — it doesn’t imply causation, and a few vehicles can ' +
+            'swing the slope.',
+    },
 };
 
 /** Merge a DB row (possibly partial/missing) over the bundled default. */

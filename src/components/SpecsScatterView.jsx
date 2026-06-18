@@ -7,6 +7,7 @@ import {
     makeVehicleFields, buildFieldGroups, getFieldDef, extractValue,
     vehicleColor, formatNumericLabel,
 } from '../utils/specHelpers';
+import ChartInfoBubble from './ChartInfoBubble';
 
 // ── Linear regression ─────────────────────────────────────────────────────────
 
@@ -58,7 +59,7 @@ const pointLabelPlugin = {
 
 // ── SpecsScatterView ──────────────────────────────────────────────────────────
 
-export default function SpecsScatterView({ vehicles, xField: xProp, yField: yProp, onFieldChange }) {
+export default function SpecsScatterView({ vehicles, xField: xProp, yField: yProp, onFieldChange, presentationMode = false }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
 
@@ -259,6 +260,7 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
     };
 
     return (
+        <>
         <div className="specs-chart-card">
             <div className="specs-chart-controls">
                 <label className="text-sm font-medium text-gray-600">X-Axis:</label>
@@ -329,5 +331,7 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
                 </div>
             )}
         </div>
+        {!presentationMode && <ChartInfoBubble chartKey="specscatter" />}
+        </>
     );
 }

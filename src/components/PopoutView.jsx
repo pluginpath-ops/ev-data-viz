@@ -27,6 +27,7 @@ export default function PopoutView({
                 <SpecsChartView
                     vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
                     selectedField={chartConfig.specsField}
+                    presentationMode
                 />
             )}
 
