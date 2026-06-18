@@ -38,30 +38,23 @@
  * efficiency is 'assumed' on the same record.
  */
 
+import { roadLoadForce } from './epaPhysics';
+
+// EPA constants live in src/constants/epa.js (single source of truth). Imported
+// here for use, and re-exported so existing `… from './epaDerivations'` imports
+// (TestPhaseEditor, EpaCuratorEditor, etc.) keep working.
 import {
-    LBF_MILE_TO_KWH,
-    DEFAULT_ETA,
-    HWFET_AVG_MPH,
-    MPG_E_CONVERSION,
-    CURVE_SPEED_RANGE,
-    roadLoadForce,
-} from './epaPhysics';
+    LBF_MILE_TO_KWH, DEFAULT_ETA, HWFET_AVG_MPH, MPG_E_CONVERSION, CURVE_SPEED_RANGE,
+    PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
+    ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND,
+    DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF,
+} from '../constants/epa';
 
-// ── Procedure codes ─────────────────────────────────────────────────────────
-export const PROC_MCT       = 77; // Multi-Cycle Test — city + highway + totals in one run
-export const PROC_CD_HWY    = 84; // Charge Depleting Highway — η fallback
-export const PROC_CD_UDDS   = 81; // Charge Depleting UDDS — stored, excluded from derivation
-export const PROC_FTP75     = 2;
-
-// ── Sanity bands (spec Section 8) ───────────────────────────────────────────
-export const ETA_BAND          = [0.75, 0.92];
-export const CHARGER_EFF_BAND  = [0.80, 0.92];
-export const SS_SPEED_BAND     = [55, 70];   // mph
-
-/** Default constant accessory draw (W) when no override is set. */
-export const DEFAULT_ACCESSORY_W = 300;
-/** Charger efficiency assumed when AC recharge energy is unavailable. */
-export const ASSUMED_CHARGER_EFF = 0.90;
+export {
+    PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
+    ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND,
+    DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF,
+};
 
 // ── Small helpers ───────────────────────────────────────────────────────────
 
@@ -189,7 +182,7 @@ export function deriveDrivetrainEta(group) {
 
 /**
  * Charger efficiency = total DC energy ÷ AC recharge energy for the preferred
- * test. Falls back to an assumed 0.90 when AC recharge is unavailable, or to a
+ * test. Falls back to an assumed 0.88 when AC recharge is unavailable, or to a
  * manual override when pinned.
  *
  * source: 'manual' | 'measured' | 'assumed'
