@@ -47,10 +47,10 @@ const FIELD_META = [
  */
 function RunRangeMetaLine({ run, units }) {
     const rangeFlag = DATA_FLAGS.find(f => f.key === 'range');
-    const dot = <span className="mx-1.5 text-gray-300 select-none">·</span>;
+    const dot = <span className="mx-1.5 text-faint select-none">·</span>;
     const items = [];
     if (run.speed_mph != null) {
-        items.push(<span key="spd" className="text-gray-600">{fmtSpeed(run.speed_mph, units)}</span>);
+        items.push(<span key="spd" className="text-secondary">{fmtSpeed(run.speed_mph, units)}</span>);
     } else {
         items.push(<span key="spd" className="text-amber-600" title="Set Speed (mph) in run metadata for accurate efficiency">{fmtSpeed(70, units)} (est.)</span>);
     }
@@ -60,7 +60,7 @@ function RunRangeMetaLine({ run, units }) {
         items.push(<span key="eff" className="text-blue-700">{calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}</span>);
     if (run.temperature_f != null) items.push(<span key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</span>);
     if (run.start_soc != null && run.end_soc != null)
-        items.push(<span key="soc" className="text-gray-600">SoC {run.start_soc}→{run.end_soc}%</span>);
+        items.push(<span key="soc" className="text-secondary">SoC {run.start_soc}→{run.end_soc}%</span>);
     if (run.url)
         items.push(<a key="url" href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{run.name} ↗</a>);
     return (
@@ -84,12 +84,12 @@ function RunRangeMetaLine({ run, units }) {
  */
 function RunChargingMetaLine({ run, calcKwhByRun, onCheckKwh }) {
     const chargingFlag = DATA_FLAGS.find(f => f.key === 'charging');
-    const dot        = <span className="mx-1.5 text-gray-300 select-none">·</span>;
+    const dot        = <span className="mx-1.5 text-faint select-none">·</span>;
     const fields     = run.populated_fields  || [];
     const calcFields = run.calculated_fields || [];
     const items = [];
 
-    items.push(<span key="pts" className="text-gray-600">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>);
+    items.push(<span key="pts" className="text-secondary">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>);
     if (run.energy_kwh != null && !inferRunFlags(run).includes('range'))
         items.push(<span key="kwh" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.energy_kwh} kWh in</span>);
 
@@ -113,11 +113,11 @@ function RunChargingMetaLine({ run, calcKwhByRun, onCheckKwh }) {
         if (!check) {
             items.push(
                 <button key="cmp" onClick={() => onCheckKwh(run)}
-                    className="text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 transition-colors text-xs"
+                    className="text-faint hover:text-secondary border border-[var(--color-border)] rounded px-1.5 py-0.5 transition-colors text-xs"
                     title="Calculate kWh from data points and compare">Compare ↔</button>
             );
         } else if (check.loading) {
-            items.push(<span key="cmp" className="text-gray-400 text-xs">Calculating…</span>);
+            items.push(<span key="cmp" className="text-faint text-xs">Calculating…</span>);
         } else if (check.kwh != null) {
             const pct = Math.abs(run.energy_kwh - check.kwh) / Math.max(run.energy_kwh, check.kwh) * 100;
             items.push(
@@ -154,17 +154,17 @@ const EstimateTimePanel = ({
     const canPreview = !batteryMissing && validAnchors.length >= 2 && editData !== null && !editDataLoading;
 
     return (
-        <div className="mt-2 border rounded bg-gray-50 p-3 space-y-3">
+        <div className="mt-2 border rounded bg-[var(--color-surface-muted)] p-3 space-y-3">
             {batteryMissing && (
                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
                     ⚠ Set the battery capacity (kWh) on this vehicle to use time estimation.
                 </p>
             )}
-            {editDataLoading && <p className="text-xs text-gray-400">Loading data…</p>}
+            {editDataLoading && <p className="text-xs text-faint">Loading data…</p>}
             {!editDataLoading && (
                 <>
                     <div>
-                        <div className="grid grid-cols-[76px_96px_24px] gap-1 text-xs text-gray-500 px-1 mb-1">
+                        <div className="grid grid-cols-[76px_96px_24px] gap-1 text-xs text-muted px-1 mb-1">
                             <span>SoC (%)</span><span>Elapsed (min)</span>
                         </div>
                         <div className="space-y-1">
@@ -195,7 +195,7 @@ const EstimateTimePanel = ({
                                     <button
                                         type="button"
                                         onClick={() => onChangeAnchors(anchors.filter((_, j) => j !== i))}
-                                        className="text-gray-400 hover:text-red-500 font-bold leading-none"
+                                        className="text-faint hover:text-red-500 font-bold leading-none"
                                         title="Remove anchor"
                                     >✕</button>
                                 </div>
@@ -208,7 +208,7 @@ const EstimateTimePanel = ({
                         >+ Add anchor</button>
                     </div>
 
-                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                    <label className="flex items-center gap-2 text-xs text-secondary cursor-pointer">
                         <input
                             type="checkbox"
                             checked={shiftToZero}
@@ -231,7 +231,7 @@ const EstimateTimePanel = ({
                             className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                         >{applying ? 'Applying…' : 'Apply'}</button>
                         {!batteryMissing && validAnchors.length < 2 && anchors.length >= 1 && (
-                            <span className="text-xs text-gray-400">Need ≥2 anchors to preview</span>
+                            <span className="text-xs text-faint">Need ≥2 anchors to preview</span>
                         )}
                     </div>
 
@@ -248,7 +248,7 @@ const EstimateTimePanel = ({
                             )}
                             <div className="max-h-64 overflow-y-auto border rounded">
                                 <table className="text-xs w-full">
-                                    <thead className="bg-gray-100 sticky top-0">
+                                    <thead className="bg-[var(--color-surface-sunken)] sticky top-0">
                                         <tr>
                                             <th className="px-2 py-1 text-left font-medium">SoC %</th>
                                             <th className="px-2 py-1 text-left font-medium">kW</th>
@@ -266,7 +266,7 @@ const EstimateTimePanel = ({
                                     </tbody>
                                 </table>
                             </div>
-                            <p className="text-xs text-gray-500 font-medium">
+                            <p className="text-xs text-muted font-medium">
                                 Apply will write {preview.points.length} time values to this run.
                             </p>
                         </div>
@@ -1043,8 +1043,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 </div>
                 <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-lg leading-tight">{vehicle.name}</h3>
-                    <p className="text-gray-500 text-sm">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
-                    <div className="text-sm text-gray-600 mt-0.5 flex flex-wrap gap-x-3">
+                    <p className="text-muted text-sm">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
+                    <div className="text-sm text-secondary mt-0.5 flex flex-wrap gap-x-3">
                         {vehicle.battery && <span>Battery: {vehicle.battery} kWh</span>}
                         {vehicle.range && <span>Range: {vehicle.range} mi</span>}
                     </div>
@@ -1056,18 +1056,18 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         return canPublish() ? (
                             <button
                                 onClick={() => onToggleVehicleVisibility(vehicle.id, isPublic ? 'private' : 'public')}
-                                className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200' : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200'}`}
+                                className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200' : 'bg-[var(--color-surface-sunken)] text-muted border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]'}`}
                             >
                                 {isPublic ? '🌐 Public' : '🔒 Private'}
                             </button>
                         ) : (
-                            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-100 text-gray-500 border-gray-300'}`}>
+                            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-[var(--color-surface-sunken)] text-muted border-[var(--color-border)]'}`}>
                                 {isPublic ? '🌐 Public' : '🔒 Private'}
                             </span>
                         );
                     })()}
                     {canEdit(vehicle) && (
-                        <button onClick={openEditVehicle} className="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
+                        <button onClick={openEditVehicle} className="px-3 py-1 rounded-md text-xs font-medium bg-[var(--color-surface-sunken)] text-secondary hover:bg-[var(--color-surface-muted)] transition">
                             Edit
                         </button>
                     )}
@@ -1103,7 +1103,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             <div className="runs-view-header">
                 <div>
                     <h2 className="page-title">{vehicle.name} - Tests &amp; Data</h2>
-                    <p className="text-gray-600">Manage charging test data for this vehicle</p>
+                    <p className="text-secondary">Manage charging test data for this vehicle</p>
                 </div>
                 <div className="flex gap-2">
                     <button
@@ -1160,7 +1160,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <>
                                         {/* Data-type flags — multi-select, at least one must remain active */}
                                         <div>
-                                            <p className="text-xs text-gray-500 mb-1">Data types (select all that apply)</p>
+                                            <p className="text-xs text-muted mb-1">Data types (select all that apply)</p>
                                             <div className="data-type-flags">
                                                 {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
                                                     const active = runMetadata.dataFlags.includes(key);
@@ -1175,7 +1175,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                     : [...m.dataFlags, key];
                                                                 return { ...m, dataFlags: next.length ? next : m.dataFlags };
                                                             })}
-                                                            className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-gray-100 text-gray-400 border-gray-200 hover:border-gray-300'}`}
+                                                            className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-faint border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
                                                         >
                                                             {label}
                                                         </button>
@@ -1214,7 +1214,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         {/* Charging energy field (create mode) */}
                                         {runMetadata.dataFlags.includes('charging') && (
                                             <div className="data-subpanel p-3">
-                                                <p className="text-sm font-semibold text-gray-700 mb-2">Charging Energy <span className="font-normal text-gray-400">(optional)</span></p>
+                                                <p className="text-sm font-semibold text-secondary mb-2">Charging Energy <span className="font-normal text-faint">(optional)</span></p>
                                                 <input
                                                     type="number"
                                                     placeholder="Energy added (kWh)"
@@ -1223,7 +1223,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     onChange={(e) => setRunMetadata({...runMetadata, energyKwh: e.target.value})}
                                                     className="form-input w-full"
                                                 />
-                                                <p className="text-xs text-gray-400 mt-1">
+                                                <p className="text-xs text-faint mt-1">
                                                     Energy measured at charger or vehicle — <em>energy in</em>
                                                 </p>
                                                 <input
@@ -1239,7 +1239,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         {/* Range test fields */}
                                         {runMetadata.dataFlags.includes('range') && (
                                             <div className="data-subpanel p-4 space-y-3">
-                                                <p className="text-sm font-semibold text-gray-700">Range Test Details</p>
+                                                <p className="text-sm font-semibold text-secondary">Range Test Details</p>
                                                 <div className="form-grid gap-3">
                                                     <input
                                                         placeholder="Source (e.g., Out of Spec)"
@@ -1318,7 +1318,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     </>
                                 )}
                                 <div>
-                                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer mb-2">
+                                    <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer mb-2">
                                         <input
                                             type="checkbox"
                                             checked={noHeaders}
@@ -1336,7 +1336,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <div className="csv-drop-zone">
                                         <label className="cursor-pointer">
                                             <span className="text-blue-600 font-medium">Click to upload CSV file</span>
-                                            <span className="block text-xs text-gray-400 mt-1">Optional — attach data points to this record</span>
+                                            <span className="block text-xs text-faint mt-1">Optional — attach data points to this record</span>
                                             <input
                                                 type="file"
                                                 accept=".csv"
@@ -1346,7 +1346,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         </label>
                                     </div>
                                     <div className="mt-3">
-                                        <p className="text-xs text-gray-400 mb-1">Or paste CSV text directly:</p>
+                                        <p className="text-xs text-faint mb-1">Or paste CSV text directly:</p>
                                         <textarea
                                             rows={4}
                                             placeholder={"soc,chargeRate,time\n50,100,0\n80,75,15\n…"}
@@ -1377,11 +1377,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                     {uploadStep === 'mapping' && (
                         <div>
                             <h3 className="section-title mb-4">Map CSV Fields</h3>
-                            <p className="text-gray-600 mb-4">Match your CSV columns to standard fields. We've auto-detected some for you.</p>
+                            <p className="text-secondary mb-4">Match your CSV columns to standard fields. We've auto-detected some for you.</p>
 
                             {/* In create mode, allow editing metadata here too */}
                             {uploadMode === 'create' && (
-                                <div className="mb-6 p-4 bg-gray-50 rounded">
+                                <div className="mb-6 p-4 bg-[var(--color-surface-muted)] rounded">
                                     <h4 className="font-semibold mb-3">Test Metadata</h4>
                                     <div className="space-y-3">
                                         <input
@@ -1521,12 +1521,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 <label className="flex items-center gap-2 cursor-pointer text-sm">
                                                     <input type="radio" name="joinKey" value="soc" checked={joinKey === 'soc'} onChange={() => setJoinKey('soc')} />
                                                     <span className="font-medium">SoC</span>
-                                                    <span className="text-gray-500">(charging curves, SoC-based data)</span>
+                                                    <span className="text-muted">(charging curves, SoC-based data)</span>
                                                 </label>
                                                 <label className="flex items-center gap-2 cursor-pointer text-sm">
                                                     <input type="radio" name="joinKey" value="time" checked={joinKey === 'time'} onChange={() => setJoinKey('time')} />
                                                     <span className="font-medium">Time</span>
-                                                    <span className="text-gray-500">(time-series, e.g. Time+Power → Time+SoC)</span>
+                                                    <span className="text-muted">(time-series, e.g. Time+Power → Time+SoC)</span>
                                                 </label>
                                             </div>
                                         </>
@@ -1584,7 +1584,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 <div className="space-y-3">
                                     {/* Data-type flags — multi-select, at least one must remain active */}
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Data types (select all that apply)</p>
+                                        <p className="text-xs text-muted mb-1">Data types (select all that apply)</p>
                                         <div className="data-type-flags">
                                             {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
                                                 const active = (editFormData.dataFlags || ['charging']).includes(key);
@@ -1600,7 +1600,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 : [...cur, key];
                                                             return { ...f, dataFlags: next.length ? next : cur };
                                                         })}
-                                                        className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-gray-100 text-gray-400 border-gray-200 hover:border-gray-300'}`}
+                                                        className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-faint border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
                                                     >
                                                         {label}
                                                     </button>
@@ -1635,7 +1635,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     {/* Charging energy field — shows energy_kwh for charging runs */}
                                     {(editFormData.dataFlags || ['charging']).includes('charging') && (
                                         <div className="data-subpanel p-3">
-                                            <p className="text-sm font-semibold text-gray-700 mb-2">Charging Energy</p>
+                                            <p className="text-sm font-semibold text-secondary mb-2">Charging Energy</p>
                                             <input
                                                 type="number"
                                                 placeholder="Energy added (kWh)"
@@ -1643,7 +1643,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 onChange={(e) => setEditFormData({...editFormData, energyKwh: e.target.value})}
                                                 className="form-input w-full"
                                             />
-                                            <p className="text-xs text-gray-400 mt-1">
+                                            <p className="text-xs text-faint mt-1">
                                                 Energy measured at charger or vehicle — <em>energy in</em> (not equal to energy used driving due to charging losses)
                                             </p>
                                             <input
@@ -1662,7 +1662,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             <button
                                                 type="button"
                                                 onClick={() => handleToggleEstimatePanel(run.id)}
-                                                className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 mt-1"
+                                                className="text-sm text-secondary hover:text-[var(--color-text-primary)] flex items-center gap-1 mt-1"
                                             >
                                                 <span className="font-semibold">
                                                     {showEstimatePanel ? '▴ Estimate time from power' : '▾ Estimate time from power'}
@@ -1690,7 +1690,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     {/* Range test fields */}
                                     {(editFormData.dataFlags || ['charging']).includes('range') && (
                                         <div className="data-subpanel p-4 space-y-3">
-                                            <p className="text-sm font-semibold text-gray-700">Range Test Details</p>
+                                            <p className="text-sm font-semibold text-secondary">Range Test Details</p>
                                             <div className="form-grid gap-3">
                                                 <input
                                                     placeholder="Source (e.g., Out of Spec)"
@@ -1788,11 +1788,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 <div className="mt-4 border-t pt-3">
                                     <button
                                         onClick={() => handleToggleDataTable(run.id)}
-                                        className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
+                                        className="text-sm text-secondary hover:text-[var(--color-text-primary)] flex items-center gap-1"
                                     >
                                         <span className="font-semibold">{showDataTable ? '▴ Hide data' : '▾ Show data'}</span>
                                         {editData !== null && !editDataLoading && (
-                                            <span className="text-xs text-gray-400">({editData.length} rows)</span>
+                                            <span className="text-xs text-faint">({editData.length} rows)</span>
                                         )}
                                         {editDataDirty && (
                                             <span className="ml-1 text-xs text-orange-500 font-medium">● unsaved changes</span>
@@ -1850,9 +1850,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     : null;
                                                 return (
                                                     <div className={`mb-3 p-3 rounded-lg border flex flex-wrap items-center gap-3 ${pct != null && pct > 5 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
-                                                        <span className="text-xs text-gray-700">
+                                                        <span className="text-xs text-secondary">
                                                             ⚡ <strong>Data points → {editCalcKwh} kWh</strong>
-                                                            {hasManual && <span className="text-gray-500"> (entered: {manual} kWh)</span>}
+                                                            {hasManual && <span className="text-muted"> (entered: {manual} kWh)</span>}
                                                         </span>
                                                         {pct != null && pct > 5 && (
                                                             <span className="text-xs bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-medium">
@@ -1865,23 +1865,23 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             </span>
                                                         )}
                                                         {!hasManual && (
-                                                            <span className="text-xs text-gray-400">Enter energy (kWh) above to compare</span>
+                                                            <span className="text-xs text-faint">Enter energy (kWh) above to compare</span>
                                                         )}
                                                     </div>
                                                 );
                                             })()}
                                             {editDataLoading ? (
-                                                <p className="text-sm text-gray-500 py-4 text-center">Loading…</p>
+                                                <p className="text-sm text-muted py-4 text-center">Loading…</p>
                                             ) : (
                                                 <>
                                                     <div className="overflow-auto rounded border" style={{ maxHeight: 360 }}>
                                                         <table className="w-full text-xs border-collapse">
-                                                            <thead className="bg-gray-50 sticky top-0 z-10 border-b">
+                                                            <thead className="bg-[var(--color-surface-muted)] sticky top-0 z-10 border-b">
                                                                 <tr>
-                                                                    <th className="px-2 py-1.5 text-left text-gray-500 font-medium w-8">#</th>
+                                                                    <th className="px-2 py-1.5 text-left text-muted font-medium w-8">#</th>
                                                                     {/* Read-only timestamp column — only rendered when data has timestamps */}
                                                                     {editData?.some(r => r.timestamp != null) && (
-                                                                        <th className="px-2 py-1.5 text-left text-gray-500 font-medium whitespace-nowrap">
+                                                                        <th className="px-2 py-1.5 text-left text-muted font-medium whitespace-nowrap">
                                                                             Timestamp
                                                                         </th>
                                                                     )}
@@ -1890,12 +1890,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                         const isActive   = sortField === field;
                                                                         const indicator  = isActive ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
                                                                         return (
-                                                                        <th key={field} className="px-2 py-1.5 text-left text-gray-500 font-medium">
+                                                                        <th key={field} className="px-2 py-1.5 text-left text-muted font-medium">
                                                                             <div className="flex flex-col gap-0.5">
                                                                                 <button
                                                                                     onClick={() => handleSortByField(field)}
                                                                                     title={`Sort by ${label}`}
-                                                                                    className={`text-left hover:text-gray-800 transition-colors ${isActive ? 'text-blue-600 font-semibold' : ''}`}
+                                                                                    className={`text-left hover:text-[var(--color-text-primary)] transition-colors ${isActive ? 'text-blue-600 font-semibold' : ''}`}
                                                                                 >
                                                                                     {label}{indicator}
                                                                                 </button>
@@ -1919,7 +1919,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                                         <button
                                                                                             onClick={() => handleClearColumn(field)}
                                                                                             title={`Clear all ${label} values`}
-                                                                                            className="text-[10px] font-normal rounded px-1 leading-tight w-fit text-gray-400 border border-transparent hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors"
+                                                                                            className="text-[10px] font-normal rounded px-1 leading-tight w-fit text-faint border border-transparent hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors"
                                                                                         >
                                                                                             ×clr
                                                                                         </button>
@@ -1933,14 +1933,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             </thead>
                                                             <tbody>
                                                                 {(editData || []).map((row, i) => (
-                                                                    <tr key={i} className={`border-t ${i % 2 !== 0 ? 'bg-gray-50/50' : ''}`}>
+                                                                    <tr key={i} className={`border-t ${i % 2 !== 0 ? 'bg-[var(--color-surface-muted)]' : ''}`}>
                                                                         {/* Row # + delete button share the first cell */}
-                                                                        <td className="px-1 py-0.5 text-gray-400 select-none whitespace-nowrap">
+                                                                        <td className="px-1 py-0.5 text-faint select-none whitespace-nowrap">
                                                                             <div className="flex items-center gap-1">
                                                                                 {canEdit(vehicle) && (
                                                                                     <button
                                                                                         onClick={() => handleDeleteDataRow(i)}
-                                                                                        className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors leading-none flex-shrink-0"
+                                                                                        className="w-5 h-5 flex items-center justify-center rounded text-faint hover:text-red-500 hover:bg-red-50 transition-colors leading-none flex-shrink-0"
                                                                                         title="Remove row"
                                                                                     >×</button>
                                                                                 )}
@@ -1949,10 +1949,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                         </td>
                                                                         {/* Timestamp cell — read-only, only rendered when column is visible */}
                                                                         {editData?.some(r => r.timestamp != null) && (
-                                                                            <td className="px-2 py-0.5 text-gray-500 whitespace-nowrap text-[11px] font-mono select-all">
+                                                                            <td className="px-2 py-0.5 text-muted whitespace-nowrap text-[11px] font-mono select-all">
                                                                                 {row.timestamp
                                                                                     ? new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                                                                                    : <span className="text-gray-300">—</span>}
+                                                                                    : <span className="text-faint">—</span>}
                                                                             </td>
                                                                         )}
                                                                         {['soc','chargeRate','time','range','temperature'].map(field => (
@@ -1966,7 +1966,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                                     className={`w-full text-xs p-0.5 rounded outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                                                                                         canEdit(vehicle)
                                                                                             ? 'bg-transparent hover:bg-white focus:bg-white focus:ring-1 focus:ring-blue-300'
-                                                                                            : 'bg-transparent text-gray-600 cursor-default'
+                                                                                            : 'bg-transparent text-secondary cursor-default'
                                                                                     }`}
                                                                                 />
                                                                             </td>
@@ -2041,7 +2041,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             className={`text-sm px-2 py-1 rounded transition-colors ${
                                                 run.isDefault
                                                     ? 'bg-blue-100 text-blue-700 hover:bg-red-50 hover:text-red-600 border border-blue-200 hover:border-red-200'
-                                                    : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+                                                    : 'text-faint hover:text-green-600 hover:bg-green-50'
                                             }${!canCreate ? ' opacity-50 cursor-not-allowed' : ''}`}
                                         >
                                             {run.isDefault
@@ -2107,7 +2107,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     </div>
                                     {/* Color picker — lower right */}
                                     <div className="run-actions-row">
-                                        <label className="flex items-center gap-1 text-xs text-gray-400 cursor-pointer">
+                                        <label className="flex items-center gap-1 text-xs text-faint cursor-pointer">
                                             <input
                                                 type="color"
                                                 value={run.color || '#3b82f6'}
@@ -2120,7 +2120,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 value={run.color || '#3b82f6'}
                                                 onChange={e => onUpdateRun(run.id, { color: e.target.value })}
                                                 onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRun(run.id, { color: run.color || '#3b82f6' }); }}
-                                                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-600"
+                                                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-secondary"
                                                 placeholder="#3b82f6"
                                                 maxLength={7}
                                             />
@@ -2144,7 +2144,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             {(inheritedRuns.length > 0 || (isContributor && canEdit(vehicle))) && (
                 <div className="mt-6">
                     <div className="flex items-center gap-3 mb-3">
-                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                        <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">
                             Inherited Tests
                         </h3>
                         {isContributor && canEdit(vehicle) && !showAddLink && (
@@ -2176,7 +2176,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 };
                                 const runColor = run.color || '#9ca3af';
                                 return (
-                                    <div key={run.id} className="card border border-dashed border-gray-300 bg-gray-50">
+                                    <div key={run.id} className="card border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]">
                                         <div className="run-card-header">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
@@ -2201,7 +2201,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5">Estimated</span>
                                                 </div>
                                                 <div className="run-meta">
-                                                    <p className="text-gray-500">Inherited from: <span className="font-medium text-gray-700">{srcName}</span></p>
+                                                    <p className="text-muted">Inherited from: <span className="font-medium text-secondary">{srcName}</span></p>
                                                     <p>Date: {run.date}</p>
                                                     {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
                                                     {run.conditions && <p>Notes: {run.conditions}</p>}
@@ -2241,7 +2241,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 </div>
                                                 {/* Row 2: Color Picker | Scale × */}
                                                 <div className="run-actions-row flex-wrap">
-                                                    <label className="flex items-center gap-1 text-xs text-gray-500">
+                                                    <label className="flex items-center gap-1 text-xs text-muted">
                                                         <input
                                                             type="color"
                                                             value={runColor}
@@ -2254,13 +2254,13 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             value={runColor}
                                                             onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
                                                             onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) updateRunColor(vehicle.id, run.id, runColor); }}
-                                                            className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
+                                                            className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-secondary"
                                                             placeholder="#9ca3af"
                                                             maxLength={7}
                                                         />
                                                     </label>
                                                     {isContributor && canEdit(vehicle) ? (
-                                                        <label className="flex items-center gap-1 text-xs text-gray-500">
+                                                        <label className="flex items-center gap-1 text-xs text-muted">
                                                             <span>Scale ×</span>
                                                             <input
                                                                 type="number"
@@ -2271,13 +2271,13 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 step="0.001"
                                                                 min="0.001"
                                                                 placeholder="1.0"
-                                                                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-gray-700"
+                                                                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-secondary"
                                                                 title="Scaling factor (blank = 1.0)"
                                                             />
                                                         </label>
                                                     ) : (
                                                         sf !== 1 && sf != null && (
-                                                            <span className="text-xs font-mono text-gray-500">×{sf}</span>
+                                                            <span className="text-xs font-mono text-muted">×{sf}</span>
                                                         )
                                                     )}
                                                 </div>
@@ -2353,17 +2353,17 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     </select>
                                 </div>
                                 {sourceVehicles.length === 0 && (
-                                    <p className="text-xs text-gray-400 mt-1">
+                                    <p className="text-xs text-faint mt-1">
                                         No other vehicles have unlinked tests.
                                     </p>
                                 )}
                                 {selectedSrc && runsToLink.length === 0 && (
-                                    <p className="text-xs text-gray-400 mt-1">
+                                    <p className="text-xs text-faint mt-1">
                                         All tests from {selectedSrc.name} are already linked.
                                     </p>
                                 )}
                                 {selectedSrc && runsToLink.length > 0 && (
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-xs text-muted mt-1">
                                         Will link {runsToLink.length} test{runsToLink.length !== 1 ? 's' : ''}: {runsToLink.map(r => r.name).join(', ')}
                                     </p>
                                 )}
@@ -2484,7 +2484,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                     <div className="copy-to-modal-panel">
                         <div className="modal-header px-5 py-4 border-b">
                             <h3 className="font-semibold text-base">Copy test to another vehicle</h3>
-                            <p className="text-xs text-gray-500 mt-0.5">"{copyToRun.name}" will be copied as an independent run</p>
+                            <p className="text-xs text-muted mt-0.5">"{copyToRun.name}" will be copied as an independent run</p>
                         </div>
                         <div className="px-5 py-4">
                             <label className="block text-sm font-medium mb-2">Select destination vehicle</label>
