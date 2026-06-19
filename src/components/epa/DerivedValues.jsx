@@ -20,10 +20,10 @@ const SOURCE_LABEL = {
 
 function DerivedRow({ label, tooltip, result, format }) {
     const { value, source, certain, flags = [] } = result || {};
-    const meta = SOURCE_LABEL[source] || { text: source || '—', cls: 'text-gray-400' };
+    const meta = SOURCE_LABEL[source] || { text: source || '—', cls: 'text-faint' };
     return (
         <div className="flex items-center justify-between gap-2 py-0.5">
-            <span className="text-gray-500 dark:text-slate-400 flex items-center gap-1">
+            <span className="text-muted flex items-center gap-1">
                 {label}
                 {tooltip && <InfoIcon text={tooltip} position="right" />}
             </span>
@@ -44,7 +44,7 @@ export default function DerivedValues({ group }) {
     const d = deriveAll(group);
     return (
         <div>
-            <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1 font-semibold">
+            <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
                 Derived Values
             </div>
             <DerivedRow
@@ -64,7 +64,7 @@ export default function DerivedValues({ group }) {
                 format={v => `${v.toFixed(0)} mph`}
             />
             {d.effectiveAdjustmentFactor?.basis?.method && (
-                <p className="text-[10px] text-gray-400 italic mt-1">
+                <p className="text-[10px] text-faint italic mt-1">
                     Method: {d.effectiveAdjustmentFactor.basis.method}
                 </p>
             )}

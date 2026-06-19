@@ -21,18 +21,18 @@ export default function RolesPermissions({ users, loading, saving, currentUserId
                 <div className="card p-0 overflow-hidden">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b bg-gray-50 text-left">
-                                <th className="px-4 py-3 font-semibold text-gray-600">Email</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600">Joined</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600">Role</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600">Change Role</th>
+                            <tr className="border-b bg-[var(--color-surface-muted)] text-left">
+                                <th className="px-4 py-3 font-semibold text-secondary">Email</th>
+                                <th className="px-4 py-3 font-semibold text-secondary">Joined</th>
+                                <th className="px-4 py-3 font-semibold text-secondary">Role</th>
+                                <th className="px-4 py-3 font-semibold text-secondary">Change Role</th>
                             </tr>
                         </thead>
                         <tbody>
                             {users.map(u => (
-                                <tr key={u.id} className="border-t hover:bg-gray-50/50 transition">
-                                    <td className="px-4 py-3 font-medium text-gray-800">{u.email}</td>
-                                    <td className="px-4 py-3 text-gray-500">
+                                <tr key={u.id} className="border-t hover:bg-[var(--color-surface-muted)] transition">
+                                    <td className="px-4 py-3 font-medium text-[var(--color-text-primary)]">{u.email}</td>
+                                    <td className="px-4 py-3 text-muted">
                                         {new Date(u.created_at).toLocaleDateString()}
                                     </td>
                                     <td className="px-4 py-3">
@@ -45,7 +45,7 @@ export default function RolesPermissions({ users, loading, saving, currentUserId
                                     </td>
                                     <td className="px-4 py-3">
                                         {u.id === currentUserId ? (
-                                            <span className="text-xs text-gray-400 italic">can't change own role</span>
+                                            <span className="text-xs text-faint italic">can't change own role</span>
                                         ) : (
                                             <div className="flex gap-1 flex-wrap">
                                                 {ROLES.map(role => (
@@ -56,7 +56,7 @@ export default function RolesPermissions({ users, loading, saving, currentUserId
                                                         className={`px-2.5 py-1 rounded border text-xs font-medium transition ${
                                                             u.role === role
                                                                 ? 'opacity-40 cursor-default'
-                                                                : 'bg-white hover:bg-gray-100 border-gray-300 text-gray-700'
+                                                                : 'bg-[var(--color-surface-input)] hover:bg-[var(--color-surface-sunken)] border-[var(--color-border)] text-secondary'
                                                         }`}
                                                     >
                                                         {saving === u.id && u.role !== role ? '…' : role}

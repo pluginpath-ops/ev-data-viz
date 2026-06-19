@@ -145,14 +145,14 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                 <div className="modal-header px-6 py-4 border-b flex-shrink-0">
                     <div>
                         <h2 className="text-xl font-bold">Import Tableau CSV</h2>
-                        <p className="text-sm text-gray-500 mt-0.5">
+                        <p className="text-sm text-muted mt-0.5">
                             {step === 'upload'    && 'Select an exported Tableau charging curve CSV'}
                             {step === 'mapping'   && `${sessions.length} sessions found — review and map below`}
                             {step === 'importing' && 'Importing…'}
                             {step === 'done'      && 'Import complete'}
                         </p>
                     </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+                    <button onClick={onClose} className="text-faint hover:text-secondary text-2xl leading-none">&times;</button>
                 </div>
 
                 {/* Body */}
@@ -162,7 +162,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                     {step === 'upload' && (
                         <div className="flex flex-col items-center justify-center py-12 gap-4">
                             <div className="text-5xl">📂</div>
-                            <p className="text-gray-600 text-center max-w-sm">
+                            <p className="text-secondary text-center max-w-sm">
                                 Export your Tableau workbook as <strong>CSV</strong> and upload it here.
                                 Columns should include <em>Date of charging test</em>, <em>Optimized</em>,
                                 <em>Vehicle</em>, and numeric SoC columns (0–100).
@@ -206,7 +206,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                 <button
                                     type="button"
                                     onClick={() => setSkipSet(new Set(uniqueVehicles.map(v => v.raw)))}
-                                    className="px-3 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
+                                    className="px-3 py-1 rounded text-xs font-medium bg-[var(--color-surface-sunken)] text-secondary hover:bg-[var(--color-surface-muted)] transition"
                                 >
                                     Skip all
                                 </button>
@@ -220,8 +220,8 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                             </div>
 
                             {/* Global prefix */}
-                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-                                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                            <div className="flex items-center gap-3 p-3 bg-[var(--color-surface-muted)] rounded-lg border">
+                                <label className="text-sm font-medium text-secondary whitespace-nowrap">
                                     Run name prefix:
                                 </label>
                                 <input
@@ -255,7 +255,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                                 title={skipped ? 'Include this vehicle' : 'Skip this vehicle'}
                                                 className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium border transition ${
                                                     skipped
-                                                        ? 'bg-gray-200 text-gray-500 border-gray-300'
+                                                        ? 'bg-[var(--color-surface-muted)] text-muted border-[var(--color-border)]'
                                                         : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
                                                 }`}
                                             >
@@ -263,8 +263,8 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                             </button>
                                             <div className="flex-1 min-w-0">
                                                 <span className="font-semibold">{vehicleName}</span>
-                                                {year && <span className="text-gray-400 text-sm ml-1">({year})</span>}
-                                                <span className="text-gray-400 text-xs ml-2">
+                                                {year && <span className="text-faint text-sm ml-1">({year})</span>}
+                                                <span className="text-faint text-xs ml-2">
                                                     {vehicleSessions.length} session{vehicleSessions.length !== 1 ? 's' : ''}
                                                 </span>
                                             </div>
@@ -295,7 +295,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                                             onChange={e => handleNameChange(idx, e.target.value)}
                                                             className="border rounded px-2 py-1 text-sm flex-1"
                                                         />
-                                                        <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+                                                        <span className="text-xs text-faint whitespace-nowrap flex-shrink-0">
                                                             {date}
                                                         </span>
                                                         {synthetic && (
@@ -304,7 +304,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                                             </span>
                                                         )}
                                                         {globalPrefix && (
-                                                            <span className="text-xs text-gray-400 italic flex-shrink-0 hidden lg:block" title="Final run name">
+                                                            <span className="text-xs text-faint italic flex-shrink-0 hidden lg:block" title="Final run name">
                                                                 → {finalName(idx)}
                                                             </span>
                                                         )}
@@ -313,8 +313,8 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
 
                                                 {/* Existing runs in mapped vehicle */}
                                                 {existingRuns.length > 0 && (
-                                                    <div className="px-4 py-2 bg-gray-50">
-                                                        <p className="text-xs text-gray-400 font-medium mb-1">
+                                                    <div className="px-4 py-2 bg-[var(--color-surface-muted)]">
+                                                        <p className="text-xs text-faint font-medium mb-1">
                                                             Existing runs in "{mappedVehicle.name}":
                                                         </p>
                                                         <ul className="space-y-0.5">
@@ -323,7 +323,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                                                 return (
                                                                     <li
                                                                         key={run.id}
-                                                                        className={`text-xs ${clash ? 'font-bold text-red-600' : 'text-gray-500'}`}
+                                                                        className={`text-xs ${clash ? 'font-bold text-red-600' : 'text-muted'}`}
                                                                     >
                                                                         {clash ? '⚠ ' : '• '}{run.name}
                                                                         {run.date && <span className="ml-1 font-normal opacity-70">({run.date})</span>}
@@ -347,8 +347,8 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                     {step === 'importing' && (
                         <div className="flex flex-col items-center justify-center py-16 gap-4">
                             <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
-                            <p className="text-gray-600">Importing {activeSessions.length} sessions…</p>
-                            <p className="text-xs text-gray-400">This may take a moment for large datasets</p>
+                            <p className="text-secondary">Importing {activeSessions.length} sessions…</p>
+                            <p className="text-xs text-faint">This may take a moment for large datasets</p>
                         </div>
                     )}
 
@@ -371,7 +371,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                         {result.runsSkipped} duplicate{result.runsSkipped !== 1 ? 's' : ''} skipped
                                     </span>
                                 )}
-                                <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
+                                <span className="px-3 py-1 rounded-full text-sm font-medium bg-[var(--color-surface-sunken)] text-secondary">
                                     {result.pointsImported.toLocaleString()} data points
                                 </span>
                             </div>

@@ -48,7 +48,7 @@ export default function CuratorField({
 
     return (
         <div className="flex items-center justify-between gap-2 py-0.5">
-            <span className={`shrink-0 flex items-center gap-1 ${used ? 'text-gray-700 dark:text-slate-200 font-semibold' : 'text-gray-500 dark:text-slate-400'}`}>
+            <span className={`shrink-0 flex items-center gap-1 ${used ? 'text-secondary font-semibold' : 'text-muted'}`}>
                 {used && <span title="Used in a derived calculation" className="text-indigo-500">∗</span>}
                 {label}
                 {tooltip && <InfoIcon text={tooltip} position="right" />}
@@ -59,7 +59,7 @@ export default function CuratorField({
                     <span title="Curator-overridden value" className="text-amber-500 text-[9px] font-bold">●</span>
                 )}
                 {overrideSource === 'csv' && (
-                    <span title="Imported from CSV" className="text-gray-300 dark:text-slate-600 text-[9px]">csv</span>
+                    <span title="Imported from CSV" className="text-faint text-[9px]">csv</span>
                 )}
             </span>
             {/* Fixed-width input + always-present unit column so right edges align
@@ -81,7 +81,7 @@ export default function CuratorField({
                 ) : (
                     <span className="font-mono text-xs text-right w-28">{value ?? '—'}</span>
                 )}
-                <span className="text-gray-400 text-[10px] w-10 shrink-0">{unit || ''}</span>
+                <span className="text-faint text-[10px] w-10 shrink-0">{unit || ''}</span>
             </span>
         </div>
     );
