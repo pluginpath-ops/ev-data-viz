@@ -190,7 +190,7 @@ export default function SpecsView({ selectedVehicleIds }) {
 
         const customRows = customKeys.map(customKey => (
             <tr key={`${cat.key}--custom--${customKey}`}>
-                <td className="specs-table-cell font-medium text-sm text-gray-500 italic">
+                <td className="specs-table-cell font-medium text-sm text-muted italic">
                     {formatCustomKey(customKey)}
                 </td>
                 {resolvedVehicles.map(rv => {

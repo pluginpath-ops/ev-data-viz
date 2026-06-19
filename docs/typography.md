@@ -71,6 +71,12 @@ Rough mapping when migrating a file:
 | `text-[10px]` / `[11px]` / `[13px]` | nearest role / `text-xs` |
 | `bg-gray-*`, `border-gray-*` | `var(--color-surface-*)`, `var(--color-border)` |
 
+**Exception — leave intentional arbitrary sizes alone.** An arbitrary `text-[..px]`
+with a documented rationale (e.g. the test-count badges in `VehiclesView` are
+deliberately `text-[13px]`, 1px smaller than the `text-sm` rows for hierarchy) is
+*not* drift — keep it. Only migrate sizes that are incidental/inconsistent. The
+color migration (gray → semantic) still applies regardless of size.
+
 ## Future: live style knobs
 
 Once text styling flows through these classes/variables, exposing them as

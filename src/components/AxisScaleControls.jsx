@@ -40,11 +40,11 @@ export default function AxisScaleControls({
             {/* ── Y-Axis Scale ─────────────────────────────────────────────── */}
             <div>
                 <div className="flex items-baseline gap-3 mb-2">
-                    <p className="text-sm font-medium text-gray-500">{yAxisLabel}</p>
+                    <p className="text-sm font-medium text-muted">{yAxisLabel}</p>
                     {(yMin != null || yMax != null) && (
                         <button
                             onClick={() => { onChange('yMin', null); onChange('yMax', null); }}
-                            className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                            className="text-xs text-faint hover:text-secondary transition-colors"
                         >
                             Reset
                         </button>
@@ -52,7 +52,7 @@ export default function AxisScaleControls({
                 </div>
                 <div className="axis-scale-group">
                     <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 w-7 text-right">Max</span>
+                        <span className="text-xs text-faint w-7 text-right">Max</span>
                         <input
                             type="number"
                             placeholder="Auto"
@@ -62,7 +62,7 @@ export default function AxisScaleControls({
                         />
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 w-7 text-right">Min</span>
+                        <span className="text-xs text-faint w-7 text-right">Min</span>
                         <input
                             type="number"
                             placeholder="Auto"
@@ -78,11 +78,11 @@ export default function AxisScaleControls({
             {showX && (
                 <div>
                     <div className="flex items-baseline gap-3 mb-2">
-                        <p className="text-sm font-medium text-gray-500">{xAxisLabel}</p>
+                        <p className="text-sm font-medium text-muted">{xAxisLabel}</p>
                         {(xMin != null || xMax != null) && (
                             <button
                                 onClick={() => { onChange('xMin', null); onChange('xMax', null); }}
-                                className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                                className="text-xs text-faint hover:text-secondary transition-colors"
                             >
                                 Reset
                             </button>
@@ -90,7 +90,7 @@ export default function AxisScaleControls({
                     </div>
                     <div className="axis-scale-group">
                         <div className="inline-row">
-                            <span className="text-xs text-gray-400 w-7 text-right">Max</span>
+                            <span className="text-xs text-faint w-7 text-right">Max</span>
                             <input
                                 type="number"
                                 placeholder="Auto"
@@ -100,7 +100,7 @@ export default function AxisScaleControls({
                             />
                         </div>
                         <div className="inline-row">
-                            <span className="text-xs text-gray-400 w-7 text-right">Min</span>
+                            <span className="text-xs text-faint w-7 text-right">Min</span>
                             <input
                                 type="number"
                                 placeholder="Auto"
@@ -117,17 +117,17 @@ export default function AxisScaleControls({
             {showY2 && (
                 <div>
                     <div className="flex items-baseline gap-3 mb-2">
-                        <p className="text-sm font-medium text-gray-500">Right Axis Scale</p>
+                        <p className="text-sm font-medium text-muted">Right Axis Scale</p>
                         <button
                             onClick={() => { onChange('y2Min', null); onChange('y2Max', null); }}
-                            className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                            className="text-xs text-faint hover:text-secondary transition-colors"
                         >
                             Reset
                         </button>
                     </div>
                     <div className="axis-scale-group">
                         <div className="inline-row">
-                            <span className="text-xs text-gray-400 w-7 text-right">Max</span>
+                            <span className="text-xs text-faint w-7 text-right">Max</span>
                             <input
                                 type="number"
                                 placeholder="Auto"
@@ -137,7 +137,7 @@ export default function AxisScaleControls({
                             />
                         </div>
                         <div className="inline-row">
-                            <span className="text-xs text-gray-400 w-7 text-right">Min</span>
+                            <span className="text-xs text-faint w-7 text-right">Min</span>
                             <input
                                 type="number"
                                 placeholder="Auto"

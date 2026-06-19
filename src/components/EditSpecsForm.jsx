@@ -347,7 +347,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                     <h3 className="section-title mb-0">Edit Specs — {vehicle.name}</h3>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                        className="text-faint hover:text-secondary text-xl leading-none"
                         aria-label="Close"
                     >
                         ×
@@ -360,7 +360,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                     {/* ── Inherit from selector (combobox) ── */}
                     <div className="mb-4 pb-4 border-b">
                         <div className="flex items-center gap-3">
-                            <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Inherit from:</label>
+                            <label className="text-sm font-medium text-secondary whitespace-nowrap">Inherit from:</label>
                             <div className="relative flex-1">
                                 {showParentDropdown ? (
                                     <input
@@ -378,13 +378,13 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                         onClick={() => { setParentSearch(''); setShowParentDropdown(true); }}
                                         className="form-input text-sm w-full text-left truncate"
                                     >
-                                        {selectedParentLabel || <span className="text-gray-400">— None —</span>}
+                                        {selectedParentLabel || <span className="text-faint">— None —</span>}
                                     </button>
                                 )}
                                 {showParentDropdown && (
-                                    <ul className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border shadow-lg bg-white dark:bg-slate-800 dark:border-slate-600">
+                                    <ul className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border shadow-lg bg-[var(--color-surface-input)] border-[var(--color-border)]">
                                         <li
-                                            className="px-3 py-2 text-sm cursor-pointer text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+                                            className="px-3 py-2 text-sm cursor-pointer text-faint hover:bg-[var(--color-surface-sunken)]"
                                             onMouseDown={() => {
                                                 setInheritFromId('');
                                                 setShowParentDropdown(false);
@@ -407,7 +407,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                             </li>
                                         ))}
                                         {filteredParents.length === 0 && (
-                                            <li className="px-3 py-2 text-sm text-gray-400 italic">No matches</li>
+                                            <li className="px-3 py-2 text-sm text-faint italic">No matches</li>
                                         )}
                                     </ul>
                                 )}
@@ -416,7 +416,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                 <button
                                     type="button"
                                     onClick={() => setInheritFromId('')}
-                                    className="text-gray-400 hover:text-gray-600 text-lg leading-none flex-shrink-0"
+                                    className="text-faint hover:text-secondary text-lg leading-none flex-shrink-0"
                                     title="Clear inheritance"
                                 >×</button>
                             )}
@@ -429,7 +429,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                     </div>
 
                     <div className="flex items-center justify-between mb-4">
-                        <p className="text-sm text-gray-500">Fields left blank are not saved.</p>
+                        <p className="text-sm text-muted">Fields left blank are not saved.</p>
                         <button
                             type="button"
                             onClick={() => {
@@ -478,7 +478,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                                     : undefined;
                                                 return (
                                                     <div key={field.key}>
-                                                        <label className="block text-xs text-gray-500 mb-0.5 flex items-center gap-1">
+                                                        <label className="block text-xs text-muted mb-0.5 flex items-center gap-1">
                                                             {field.label}
                                                             {isFlagged && (
                                                                 <SpecFieldFlagButton
@@ -502,10 +502,10 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                         {/* Custom fields */}
                                         {(customEntries.length > 0 || true) && (
                                             <div className="mt-3 pt-2 border-t">
-                                                <p className="text-xs text-gray-400 mb-1.5">Custom fields</p>
+                                                <p className="text-xs text-faint mb-1.5">Custom fields</p>
                                                 {customEntries.map(([key, val]) => (
                                                     <div key={key} className="specs-custom-row mb-1.5">
-                                                        <span className="text-xs text-gray-500 w-32 flex-shrink-0 truncate" title={formatCustomKey(key)}>
+                                                        <span className="text-xs text-muted w-32 flex-shrink-0 truncate" title={formatCustomKey(key)}>
                                                             {formatCustomKey(key)}
                                                         </span>
                                                         <input
@@ -553,7 +553,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                                     <button
                                                         type="button"
                                                         onClick={() => addCustomField(cat.key)}
-                                                        className="px-2 py-1 rounded text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 flex-shrink-0"
+                                                        className="px-2 py-1 rounded text-xs bg-[var(--color-surface-sunken)] hover:bg-[var(--color-surface-muted)] text-secondary flex-shrink-0"
                                                     >
                                                         Add
                                                     </button>

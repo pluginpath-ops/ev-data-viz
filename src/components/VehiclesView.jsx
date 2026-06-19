@@ -308,7 +308,7 @@ export default function VehiclesView({
         if (!user) return null;
         const base = `flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition${fullWidth ? ' w-full justify-center' : ''}`;
         const pubCls = 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200';
-        const privCls = 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200';
+        const privCls = 'bg-[var(--color-surface-sunken)] text-muted border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]';
         const isPublic = vehicle.visibility === 'public';
         if (canPublish()) {
             return (
@@ -322,7 +322,7 @@ export default function VehiclesView({
             );
         }
         return (
-            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-100 text-gray-500 border-gray-300'}`}>
+            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-[var(--color-surface-sunken)] text-muted border-[var(--color-border)]'}`}>
                 {isPublic ? '🌐 Public' : '🔒 Private'}
             </span>
         );
@@ -335,7 +335,7 @@ export default function VehiclesView({
                 {canEdit(vehicle) && (
                     <button
                         onClick={(e) => handleEdit(vehicle, e)}
-                        className="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
+                        className="px-3 py-1 rounded-md text-xs font-medium bg-[var(--color-surface-sunken)] text-secondary hover:bg-[var(--color-surface-muted)] transition"
                     >
                         Edit
                     </button>
@@ -505,14 +505,14 @@ export default function VehiclesView({
                         <button
                             onClick={() => setViewMode('card')}
                             title="Card view"
-                            className={`px-2 py-1.5 transition ${viewMode === 'card' ? 'bg-gray-200 text-gray-800' : 'hover:bg-gray-100'}`}
+                            className={`px-2 py-1.5 transition ${viewMode === 'card' ? 'bg-[var(--color-surface-muted)] text-[var(--color-text-primary)]' : 'hover:bg-[var(--color-surface-sunken)]'}`}
                         >
                             <CardViewIcon />
                         </button>
                         <button
                             onClick={() => setViewMode('list')}
                             title="List view"
-                            className={`px-2 py-1.5 transition ${viewMode === 'list' ? 'bg-gray-200 text-gray-800' : 'hover:bg-gray-100'}`}
+                            className={`px-2 py-1.5 transition ${viewMode === 'list' ? 'bg-[var(--color-surface-muted)] text-[var(--color-text-primary)]' : 'hover:bg-[var(--color-surface-sunken)]'}`}
                         >
                             <ListViewIcon />
                         </button>
@@ -559,7 +559,7 @@ export default function VehiclesView({
                         className={`text-sm px-3 py-2 rounded border transition flex-shrink-0 ${
                             editingOrder
                                 ? 'bg-blue-50 border-blue-300 text-blue-700'
-                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                                : 'bg-[var(--color-surface-muted)] border-[var(--color-border)] text-muted hover:bg-[var(--color-surface-sunken)]'
                         }`}
                         style={editingOrder ? { backgroundColor: 'var(--color-primary-light)', borderColor: 'var(--color-primary)', color: 'var(--color-primary-text)' } : {}}
                     >
@@ -571,7 +571,7 @@ export default function VehiclesView({
             {/* Tag filter bar — quad-state: N/A → OR (green) → AND (blue) → NOT (red) */}
             {tags.length > 0 && (
                 <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-gray-500 dark:text-slate-300 flex-shrink-0">Filter:</span>
+                    <span className="text-sm font-medium text-secondary flex-shrink-0">Filter:</span>
                     {tags.map(tag => {
                         const state = tagFilterStates[tag.id]; // undefined = 'na'
                         const stateClass = state === 'or' ? 'tag-filter-or'
@@ -596,7 +596,7 @@ export default function VehiclesView({
                     {Object.keys(tagFilterStates).length > 0 && (
                         <button
                             onClick={() => setTagFilterStates({})}
-                            className="text-xs text-gray-400 hover:text-gray-600 underline ml-1 flex-shrink-0"
+                            className="text-xs text-faint hover:text-secondary underline ml-1 flex-shrink-0"
                         >
                             Clear
                         </button>
@@ -611,7 +611,7 @@ export default function VehiclesView({
             {/* Manufacturer filter bar — tri-state: N/A → OR (green) → NOT (red) → N/A */}
             {manufacturers.length > 0 && (
                 <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-gray-500 dark:text-slate-300 flex-shrink-0">Brand:</span>
+                    <span className="text-sm font-medium text-secondary flex-shrink-0">Brand:</span>
                     {manufacturers.map(mfg => {
                         const state = mfgFilterStates[mfg.id];
                         const stateClass = state === 'or'  ? 'tag-filter-or'
@@ -634,7 +634,7 @@ export default function VehiclesView({
                     {Object.keys(mfgFilterStates).length > 0 && (
                         <button
                             onClick={() => { setMfgFilterStates({}); setModelFilter(new Set()); }}
-                            className="text-xs text-gray-400 hover:text-gray-600 underline ml-1 flex-shrink-0"
+                            className="text-xs text-faint hover:text-secondary underline ml-1 flex-shrink-0"
                         >
                             Clear
                         </button>
@@ -645,7 +645,7 @@ export default function VehiclesView({
             {/* Model filter bar — visible when a brand is selected and multiple models exist */}
             {availableModels.length > 1 && (
                 <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-gray-500 dark:text-slate-300 flex-shrink-0">Model:</span>
+                    <span className="text-sm font-medium text-secondary flex-shrink-0">Model:</span>
                     {availableModels.map(model => {
                         const active = modelFilter.has(model);
                         return (
@@ -666,7 +666,7 @@ export default function VehiclesView({
                     {modelFilter.size > 0 && (
                         <button
                             onClick={() => setModelFilter(new Set())}
-                            className="text-xs text-gray-400 hover:text-gray-600 underline ml-1 flex-shrink-0"
+                            className="text-xs text-faint hover:text-secondary underline ml-1 flex-shrink-0"
                         >
                             Clear
                         </button>
@@ -711,8 +711,8 @@ export default function VehiclesView({
                         return (
                             <div key={vehicle.id} className="contents">
                                 {showMfgHeader && (
-                                    <div className="col-span-full pt-2 pb-1 border-b border-gray-200 dark:border-slate-700 mb-1">
-                                        <h3 className="text-sm font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wider">{mfgName}</h3>
+                                    <div className="col-span-full pt-2 pb-1 border-b border-[var(--color-border)] mb-1">
+                                        <h3 className="text-sm font-semibold text-secondary uppercase tracking-wider">{mfgName}</h3>
                                     </div>
                                 )}
                                 <div
@@ -775,8 +775,8 @@ export default function VehiclesView({
                                             {/* Left: vehicle info */}
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="text-xl font-bold mb-1">{vehicle.name}</h3>
-                                                <p className="text-gray-600 dark:text-slate-200 mb-2">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
-                                                <div className="text-sm text-gray-700 dark:text-slate-200 space-y-1">
+                                                <p className="text-secondary mb-2">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
+                                                <div className="text-sm text-secondary space-y-1">
                                                     {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                                     {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
                                                     <TestCountPills vehicle={vehicle} />
@@ -827,8 +827,8 @@ export default function VehiclesView({
                         return (
                             <div key={vehicle.id}>
                                 {showMfgHeader && (
-                                    <div className="pt-2 pb-1 border-b border-gray-200 dark:border-slate-700 mb-1">
-                                        <h3 className="text-sm font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wider">{mfgName}</h3>
+                                    <div className="pt-2 pb-1 border-b border-[var(--color-border)] mb-1">
+                                        <h3 className="text-sm font-semibold text-secondary uppercase tracking-wider">{mfgName}</h3>
                                     </div>
                                 )}
                                 <div
@@ -881,12 +881,12 @@ export default function VehiclesView({
                                     {/* Name + make + tags */}
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-bold text-lg leading-tight truncate">{vehicle.name}</h3>
-                                        <p className="text-gray-500 dark:text-slate-300 text-sm mb-1">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
+                                        <p className="text-secondary text-sm mb-1">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                                         <TagPills vehicle={vehicle} />
                                     </div>
 
                                     {/* Specs */}
-                                    <div className="text-sm text-gray-600 dark:text-slate-200 space-y-0.5 w-36 flex-shrink-0 hidden sm:block">
+                                    <div className="text-sm text-secondary space-y-0.5 w-36 flex-shrink-0 hidden sm:block">
                                         {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                         {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
                                         {vehicle.power && <p>Power: {vehicle.power} kW</p>}
@@ -919,7 +919,7 @@ export default function VehiclesView({
                 <div className="vehicle-pagination">
                     <button onClick={() => setVehiclePage(1)} disabled={vehiclePage === 1} className="pagination-btn">«</button>
                     <button onClick={() => setVehiclePage(p => p - 1)} disabled={vehiclePage === 1} className="pagination-btn">‹</button>
-                    <span className="text-sm text-gray-600 dark:text-slate-300">Page {vehiclePage} of {totalPages}</span>
+                    <span className="text-sm text-secondary">Page {vehiclePage} of {totalPages}</span>
                     <button onClick={() => setVehiclePage(p => p + 1)} disabled={vehiclePage === totalPages} className="pagination-btn">›</button>
                     <button onClick={() => setVehiclePage(totalPages)} disabled={vehiclePage === totalPages} className="pagination-btn">»</button>
                 </div>

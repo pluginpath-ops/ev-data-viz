@@ -691,7 +691,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                             no offset
                                         </span>
                                     ) : (
-                                        <span className="badge-status bg-gray-100 text-gray-500 border-gray-200" title={`${offset} min of pre-threshold data trimmed`}>
+                                        <span className="badge-status bg-[var(--color-surface-sunken)] text-muted border-[var(--color-border)]" title={`${offset} min of pre-threshold data trimmed`}>
                                             −{offset} min offset
                                         </span>
                                     )
@@ -705,7 +705,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             {/* ── Chart canvas ── */}
             <div className="card mb-4">
                 {loadingData && (
-                    <div className="text-center py-4 text-gray-500 dark:text-slate-300 text-sm">Loading run data...</div>
+                    <div className="text-center py-4 text-secondary text-sm">Loading run data...</div>
                 )}
                 <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px' }}>
                     <canvas ref={chartRef}></canvas>
@@ -749,16 +749,16 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     )}
                 </div>
 
-                <p className="text-xs text-gray-400 mt-1">Drag to box-zoom · Reset Zoom to restore</p>
+                <p className="text-xs text-faint mt-1">Drag to box-zoom · Reset Zoom to restore</p>
 
                 {/* Inline image preview — right-click/long-press to copy or save */}
                 {chartImage && (
                     <div className="mt-3">
-                        <p className="text-xs text-gray-400 mb-1.5">Right-click or long-press to copy / save</p>
+                        <p className="text-xs text-faint mb-1.5">Right-click or long-press to copy / save</p>
                         <img
                             src={chartImage}
                             alt="Chart export"
-                            className="w-full rounded border border-gray-200"
+                            className="w-full rounded border border-[var(--color-border)]"
                         />
                     </div>
                 )}
@@ -778,7 +778,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
                 {/* ── Race mode panel — only visible when X = Time ── */}
                 {chartConfig.xAxis === 'time' && (
-                    <div className={`race-mode-panel ${chartConfig.raceMode ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className={`race-mode-panel ${chartConfig.raceMode ? 'bg-indigo-50 border-indigo-200' : 'bg-[var(--color-surface-muted)] border-[var(--color-border)]'}`}>
                         <div className="flex flex-wrap items-center gap-3">
                             <label className="toggle-label">
                                 <input
@@ -792,7 +792,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
                             {chartConfig.raceMode && (
                                 <>
-                                    <span className="text-sm text-gray-600 dark:text-slate-300">Start at:</span>
+                                    <span className="text-sm text-secondary">Start at:</span>
                                     {/* Quick-select chips */}
                                     <div className="flex gap-1 flex-wrap">
                                         {[5, 10, 15, 20].map(pct => (
@@ -802,7 +802,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                 className={`px-2 py-0.5 text-xs rounded border transition-colors ${
                                                     chartConfig.raceThreshold === pct
                                                         ? 'bg-indigo-600 text-white border-indigo-600'
-                                                        : 'bg-white dark:bg-slate-700 text-gray-600 dark:text-slate-200 border-gray-300 dark:border-slate-500 hover:border-indigo-400'
+                                                        : 'bg-[var(--color-surface-input)] text-secondary border-[var(--color-border-strong)] hover:border-indigo-400'
                                                 }`}
                                             >
                                                 {pct}%
@@ -822,7 +822,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                                 className="w-14 px-1 py-0.5 border rounded text-xs text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                                 min="0" max="100"
                                             />
-                                            <span className="text-xs text-gray-500 dark:text-slate-400">%</span>
+                                            <span className="text-xs text-muted">%</span>
                                         </div>
                                     </div>
                                 </>
@@ -839,7 +839,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             </div>}
 
             {!presentationMode && chartConfig.selectedRuns.length === 0 && (
-                <div className="text-center py-12 text-gray-500 dark:text-slate-300">
+                <div className="text-center py-12 text-secondary">
                     <p className="text-lg">Select runs to display on the chart</p>
                 </div>
             )}

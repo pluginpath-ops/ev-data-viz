@@ -16,7 +16,7 @@ import { useState, useEffect } from 'react';
 const CONFIDENCE_COLORS = {
     verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
     likely:   'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-700',
-    inferred: 'text-gray-500 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-800/40 dark:border-gray-600',
+    inferred: 'text-muted bg-[var(--color-surface-muted)] border-[var(--color-border)]',
 };
 
 // Short labels keep the select narrow; full names shown in title tooltip
@@ -114,7 +114,7 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
             <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b">
                 <div>
                     <h3 className="font-semibold text-sm">EPA Test Groups</h3>
-                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                    <p className="text-xs text-muted mt-0.5">
                         {loading ? 'Loading…' : `${groups.length} imported · ${linkedCount} linked to vehicles`}
                     </p>
                 </div>
@@ -146,22 +146,22 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
 
             {/* Body */}
             {loading ? (
-                <div className="px-4 py-8 text-center text-sm text-gray-400">Loading…</div>
+                <div className="px-4 py-8 text-center text-sm text-faint">Loading…</div>
             ) : filtered.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm text-gray-400">
+                <div className="px-4 py-8 text-center text-sm text-faint">
                     {q ? 'No test groups match that filter.' : 'No EPA test groups imported yet. Use Import → EPA Test Car Data to add some.'}
                 </div>
             ) : (
                 <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                         <thead>
-                            <tr className="border-b bg-gray-50 dark:bg-slate-800/50 text-left">
-                                <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Config ID</th>
-                                <th className="px-3 py-2 text-gray-500 font-semibold">Year · Make · Carline</th>
-                                <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">Drive / ETW</th>
-                                <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">A · B · C</th>
-                                <th className="px-3 py-2 text-gray-500 font-semibold whitespace-nowrap">MPGe</th>
-                                <th className="px-3 py-2 text-gray-500 font-semibold">Linked Vehicles</th>
+                            <tr className="border-b bg-[var(--color-surface-muted)] text-left">
+                                <th className="px-3 py-2 text-muted font-semibold whitespace-nowrap">Config ID</th>
+                                <th className="px-3 py-2 text-muted font-semibold">Year · Make · Carline</th>
+                                <th className="px-3 py-2 text-muted font-semibold whitespace-nowrap">Drive / ETW</th>
+                                <th className="px-3 py-2 text-muted font-semibold whitespace-nowrap">A · B · C</th>
+                                <th className="px-3 py-2 text-muted font-semibold whitespace-nowrap">MPGe</th>
+                                <th className="px-3 py-2 text-muted font-semibold">Linked Vehicles</th>
                                 <th className="px-3 py-2" />
                             </tr>
                         </thead>
@@ -176,13 +176,13 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                 return (
                                     <tr
                                         key={g.test_group_id}
-                                        className={`transition hover:bg-gray-50/50 dark:hover:bg-slate-800/30 ${isDel ? 'opacity-40 pointer-events-none' : ''}`}
+                                        className={`transition hover:bg-[var(--color-surface-muted)] ${isDel ? 'opacity-40 pointer-events-none' : ''}`}
                                     >
                                         {/* Config ID + family ID */}
                                         <td className="px-3 py-2 font-mono whitespace-nowrap">
-                                            <div className="text-gray-700 dark:text-slate-300">{g.test_group_id}</div>
+                                            <div className="text-secondary">{g.test_group_id}</div>
                                             {g.epa_test_family_id && g.epa_test_family_id !== g.test_group_id && (
-                                                <div className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">
+                                                <div className="text-[10px] text-faint mt-0.5">
                                                     fam: {g.epa_test_family_id}
                                                 </div>
                                             )}
@@ -191,10 +191,10 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                         {/* Year / Make / Carline + inline display-name edit */}
                                         <td className="px-3 py-2 max-w-[200px]">
                                             {/* Carline name: wraps, no truncation */}
-                                            <div className="font-medium text-gray-700 dark:text-slate-300 leading-snug">
+                                            <div className="font-medium text-secondary leading-snug">
                                                 {g.epa_carline_name}
                                             </div>
-                                            <div className="text-gray-400 dark:text-slate-500 mt-0.5 whitespace-nowrap">
+                                            <div className="text-faint mt-0.5 whitespace-nowrap">
                                                 {g.model_year}{g.make ? ` · ${g.make}` : ''}
                                             </div>
                                             {/* Display name input — inline below the carline */}
@@ -212,15 +212,15 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                                         e.target.blur();
                                                     }
                                                 }}
-                                                className="form-input text-xs py-0.5 mt-1.5 w-full disabled:opacity-50 placeholder:text-gray-300 dark:placeholder:text-slate-600 placeholder:italic"
+                                                className="form-input text-xs py-0.5 mt-1.5 w-full disabled:opacity-50 placeholder:text-[var(--color-text-faint)] placeholder:italic"
                                                 title="Friendly display name used in charts. Leave blank to use the EPA carline name."
                                             />
                                         </td>
 
                                         {/* Drive / ETW */}
-                                        <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-slate-400">
+                                        <td className="px-3 py-2 whitespace-nowrap text-muted">
                                             <div>{g.drive || '—'}</div>
-                                            <div className="text-gray-400 dark:text-slate-500 mt-0.5">
+                                            <div className="text-faint mt-0.5">
                                                 {coeff.equiv_test_weight_lbs != null
                                                     ? `${Number(coeff.equiv_test_weight_lbs).toLocaleString()} lbs`
                                                     : '—'}
@@ -234,10 +234,10 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                                 const b = coeff.target_b ?? coeff.set_b;
                                                 const c = coeff.target_c ?? coeff.set_c;
                                                 const isTarget = coeff.target_a != null;
-                                                if (a == null) return <span className="text-gray-300 dark:text-slate-600">—</span>;
+                                                if (a == null) return <span className="text-faint">—</span>;
                                                 return (
                                                     <div
-                                                        className={`text-[11px] leading-tight ${isTarget ? 'text-gray-600 dark:text-slate-300' : 'text-gray-400 dark:text-slate-500'}`}
+                                                        className={`text-[11px] leading-tight ${isTarget ? 'text-secondary' : 'text-faint'}`}
                                                         title={isTarget ? 'Target coefficients (road load)' : 'Set coefficients (dyno-programmed)'}
                                                     >
                                                         <div>{Number(a).toFixed(2)}</div>
@@ -250,22 +250,22 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                         </td>
 
                                         {/* Label MPGe — combined, else highway-only (tagged) */}
-                                        <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-slate-400">
+                                        <td className="px-3 py-2 whitespace-nowrap text-muted">
                                             {g.label_combined_mpge != null && g.label_combined_mpge < 500 ? (
                                                 <span>{g.label_combined_mpge}</span>
                                             ) : g.label_hwy_mpge != null && g.label_hwy_mpge < 500 ? (
                                                 <span title="Highway-only (proc 84); no combined MCT test">
-                                                    {g.label_hwy_mpge}<span className="text-gray-400 ml-1 text-[10px]">hwy</span>
+                                                    {g.label_hwy_mpge}<span className="text-faint ml-1 text-[10px]">hwy</span>
                                                 </span>
                                             ) : (
-                                                <span className="text-gray-300 dark:text-slate-600">—</span>
+                                                <span className="text-faint">—</span>
                                             )}
                                         </td>
 
                                         {/* Linked vehicles with confidence badges */}
                                         <td className="px-3 py-2">
                                             {mappings.length === 0 ? (
-                                                <span className="text-gray-300 dark:text-slate-600 italic">none</span>
+                                                <span className="text-faint italic">none</span>
                                             ) : (
                                                 <div className="flex flex-wrap gap-1">
                                                     {mappings.map(m => (
@@ -302,7 +302,7 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
 
             {/* Footer: row count when filter is active */}
             {!loading && groups.length > 0 && q && filtered.length !== groups.length && (
-                <div className="px-4 py-2 border-t text-xs text-gray-400 dark:text-slate-500">
+                <div className="px-4 py-2 border-t text-xs text-faint">
                     Showing {filtered.length} of {groups.length} test groups
                 </div>
             )}

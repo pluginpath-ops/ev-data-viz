@@ -1246,7 +1246,7 @@ export default function RoadTripView({
                     {/* Toggles row */}
                     <div className="flex flex-wrap gap-6 mb-4">
                         <div>
-                            <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">Simulation</span>
+                            <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">Simulation</span>
                             <div className="flex gap-1">
                                 <button
                                     className={`btn btn-sm ${mode === 'distance' ? 'btn-primary' : 'btn-secondary'}`}
@@ -1263,7 +1263,7 @@ export default function RoadTripView({
                             </div>
                         </div>
                         <div>
-                            <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">X Axis</span>
+                            <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">X Axis</span>
                             <div className="flex gap-1">
                                 <button className={`btn btn-sm ${xAxis === 'totalTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'totalTime')}>Total Time</button>
                                 <button className={`btn btn-sm ${xAxis === 'driveTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'driveTime')}>Drive Time</button>
@@ -1274,7 +1274,7 @@ export default function RoadTripView({
                         <div>
                             {isSweepMode ? (
                                 <>
-                                    <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">Y Axis</span>
+                                    <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">Y Axis</span>
                                     <div className="flex gap-1">
                                         <button className={`btn btn-sm ${sweepYAxis === 'totalTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'totalTime')}>Total Time</button>
                                         <button className={`btn btn-sm ${sweepYAxis === 'driveTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'driveTime')}>Drive Time</button>
@@ -1283,7 +1283,7 @@ export default function RoadTripView({
                                 </>
                             ) : (
                                 <>
-                                    <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">Y Axis</span>
+                                    <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">Y Axis</span>
                                     <div className="flex gap-1">
                                         <button className={`btn btn-sm ${yAxis === 'distance'   ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'distance')}>Distance</button>
                                         <button className={`btn btn-sm ${yAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'chargeTime')}>Charge Time</button>
@@ -1293,7 +1293,7 @@ export default function RoadTripView({
                             )}
                         </div>
                         <div>
-                            <span className="text-xs font-semibold text-gray-500 dark:text-slate-300 uppercase tracking-wide block mb-1">Mode</span>
+                            <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">Mode</span>
                             <button
                                 className={`btn btn-sm ${towingMode ? 'btn-primary' : 'btn-secondary'}`}
                                 onClick={() => setField('towingMode', !towingMode)}
@@ -1450,7 +1450,7 @@ export default function RoadTripView({
                                     ? `${fmtSpeed(info.testSpeedMph, units)}`
                                     : '70 mph (assumed)';
                                 return (
-                                    <span className="text-xs text-gray-400 ml-1">
+                                    <span className="text-xs text-faint ml-1">
                                         {eff} {units === 'metric' ? 'km/kWh' : 'mi/kWh'} @ {spd}
                                         {info.efficiencyNote && ` · ${info.efficiencyNote}`}
                                     </span>
@@ -1477,13 +1477,13 @@ export default function RoadTripView({
 
             {/* ── Chart ────────────────────────────────────────────────── */}
             {loading && (
-                <div className="text-center py-8 text-gray-500">Loading charging data…</div>
+                <div className="text-center py-8 text-muted">Loading charging data…</div>
             )}
 
             {!loading && validEntries.length === 0 && (
                 <div className="empty-state">
                     <p className="text-lg">No runs with usable charging and efficiency data.</p>
-                    <p className="text-sm text-gray-500 mt-2">
+                    <p className="text-sm text-muted mt-2">
                         Each run needs charging data, and either its own range test result
                         or another run from the same vehicle with distance &amp; energy data.
                     </p>
@@ -1543,11 +1543,11 @@ export default function RoadTripView({
                             </button>
                         )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">Drag to box-zoom · Reset Zoom to restore</p>
+                    <p className="text-xs text-faint mt-1">Drag to box-zoom · Reset Zoom to restore</p>
                     {chartImage && (
                         <div className="mt-3">
-                            <p className="text-xs text-gray-400 mb-1.5">Right-click or long-press to copy / save</p>
-                            <img src={chartImage} alt="Chart export" className="w-full rounded border border-gray-200" />
+                            <p className="text-xs text-faint mb-1.5">Right-click or long-press to copy / save</p>
+                            <img src={chartImage} alt="Chart export" className="w-full rounded border border-[var(--color-border)]" />
                         </div>
                     )}
                 </div>
@@ -1582,12 +1582,12 @@ export default function RoadTripView({
                                 const arrow = active ? (sortDir === 'asc' ? '↑' : '↓') : '↕';
                                 return (
                                     <th
-                                        className={`px-3 py-2 text-left font-semibold cursor-pointer select-none hover:bg-gray-100 whitespace-nowrap ${active ? 'text-blue-600' : ''} ${className}`}
+                                        className={`px-3 py-2 text-left font-semibold cursor-pointer select-none hover:bg-[var(--color-surface-sunken)] whitespace-nowrap ${active ? 'text-blue-600' : ''} ${className}`}
                                         onClick={() => handleSort(col)}
                                     >
                                         <span className="flex items-center gap-1">
                                             {children}
-                                            <span className={`text-xs ${active ? 'text-blue-500' : 'text-gray-300'}`}>{arrow}</span>
+                                            <span className={`text-xs ${active ? 'text-blue-500' : 'text-faint'}`}>{arrow}</span>
                                         </span>
                                     </th>
                                 );
@@ -1635,7 +1635,7 @@ export default function RoadTripView({
 
                             return (
                         <table className="w-full text-sm">
-                            <thead className="bg-gray-50 dark:bg-slate-700 dark:text-slate-100">
+                            <thead className="bg-[var(--color-surface-muted)]">
                                 <tr>
                                     <SortTh col="vehicle">Vehicle / Run</SortTh>
                                     <SortTh col="totalTime">Total Time</SortTh>
@@ -1658,7 +1658,7 @@ export default function RoadTripView({
                                                           style={{ backgroundColor: entry.color }} />
                                                     <div>
                                                         <div className="font-medium">{vehicleLabel(entry.vehicle)}</div>
-                                                        <div className="text-xs text-gray-400">{entry.run.name}</div>
+                                                        <div className="text-xs text-faint">{entry.run.name}</div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -1675,12 +1675,12 @@ export default function RoadTripView({
                                                     <>
                                                         {entry.miPerKwh.toFixed(1)} {effLabel}
                                                         {entry.testSpeedMph ? (
-                                                            <span className="text-gray-400 ml-1">@ {fmtSpeed(entry.testSpeedMph, units)}</span>
+                                                            <span className="text-faint ml-1">@ {fmtSpeed(entry.testSpeedMph, units)}</span>
                                                         ) : (
                                                             <span className="text-amber-500 ml-1" title="Set Speed (mph) on the run in Tests &amp; Data for accurate speed correction">@ 70 mph (assumed)</span>
                                                         )}
                                                         {entry.efficiencyNote && (
-                                                            <span className="block text-xs text-gray-400">{entry.efficiencyNote}</span>
+                                                            <span className="block text-xs text-faint">{entry.efficiencyNote}</span>
                                                         )}
                                                     </>
                                                 )}

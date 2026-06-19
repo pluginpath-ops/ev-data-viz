@@ -19,7 +19,7 @@ import { ASSUMED_CHARGER_EFF, DEFAULT_ACCESSORY_W } from '../../constants/epa';
 function Section({ title, children }) {
     return (
         <div className="mb-4">
-            <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1 font-semibold">{title}</div>
+            <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">{title}</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 text-xs">{children}</div>
         </div>
     );
@@ -118,7 +118,7 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
         return { ...dbGroup, ...edits.group, epa_coefficient_sets: sets, epa_tests: tests };
     }, [dbGroup, edits]);
 
-    if (loading) return <p className="text-xs text-gray-400 italic py-2">Loading curator data…</p>;
+    if (loading) return <p className="text-xs text-faint italic py-2">Loading curator data…</p>;
     if (error)   return <p className="text-xs text-red-500 py-2">Error: {error}</p>;
     if (!group)  return null;
 
@@ -214,9 +214,9 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
     };
 
     return (
-        <div className="border-t border-gray-100 dark:border-slate-700 mt-3 pt-3">
+        <div className="border-t border-[var(--color-border)] mt-3 pt-3">
             <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="text-[10px] text-gray-400 italic">
+                <p className="text-[10px] text-faint italic">
                     Editing shared EPA reference data — changes apply to every vehicle linked to this test group.
                 </p>
                 <a
@@ -233,7 +233,7 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
             {/* Optional source citation applied to subsequent edits' audit entries */}
             {canEdit && (
                 <div className="flex items-center gap-2 mb-3 text-xs">
-                    <span className="text-gray-500 dark:text-slate-400 shrink-0">Source citation</span>
+                    <span className="text-muted shrink-0">Source citation</span>
                     <input
                         type="text"
                         value={citation}
@@ -292,13 +292,13 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
                 shown for reference. The steady-state curve uses the City/Highway set. */}
             {otherSets.length > 0 && (
                 <div className="mb-4">
-                    <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1 font-semibold">
+                    <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
                         Other Coefficient Sets
                         <span className="normal-case font-normal"> — reference only (Cold-CO / US06; not used by the curve)</span>
                     </div>
                     <table className="w-full text-xs">
                         <thead>
-                            <tr className="text-gray-400 text-[10px] uppercase tracking-wide text-left">
+                            <tr className="text-faint text-[10px] uppercase tracking-wide text-left">
                                 <th className="font-semibold pr-3">Category</th>
                                 <th className="font-semibold pr-3">Target A / B / C</th>
                                 <th className="font-semibold">Set A / B / C</th>
@@ -306,10 +306,10 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
                         </thead>
                         <tbody className="font-mono">
                             {otherSets.map(s => (
-                                <tr key={s.id ?? s.category} className="border-t border-gray-100 dark:border-slate-800">
+                                <tr key={s.id ?? s.category} className="border-t border-[var(--color-border)]">
                                     <td className="pr-3 py-0.5 font-sans">{s.category}</td>
                                     <td className="pr-3">{coef(s.target_a)} / {coef(s.target_b)} / {coef(s.target_c)}</td>
-                                    <td className="text-gray-500 dark:text-slate-400">{coef(s.set_a)} / {coef(s.set_b)} / {coef(s.set_c)}</td>
+                                    <td className="text-muted">{coef(s.set_a)} / {coef(s.set_b)} / {coef(s.set_c)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -354,7 +354,7 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 text-xs">
                 <DerivedValues group={group} />
             </div>
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-[10px] text-faint mt-1">
                 <span className="text-indigo-500">∗</span> feeds a derived calculation below.
             </p>
 

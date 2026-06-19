@@ -216,7 +216,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
         <>
         <div className="specs-chart-card">
             <div className="specs-chart-controls">
-                <label className="text-sm font-medium text-gray-600">Compare:</label>
+                <label className="text-sm font-medium text-secondary">Compare:</label>
                 <select
                     className="specs-chart-field-select"
                     value={selectedField}
@@ -263,8 +263,8 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
             </div>
             {chartImage && (
                 <div className="mt-3">
-                    <p className="text-xs text-gray-400 mb-1.5">Right-click or long-press to copy / save</p>
-                    <img src={chartImage} alt="Chart export" className="w-full rounded border border-gray-200" />
+                    <p className="text-xs text-faint mb-1.5">Right-click or long-press to copy / save</p>
+                    <img src={chartImage} alt="Chart export" className="w-full rounded border border-[var(--color-border)]" />
                 </div>
             )}
         </div>

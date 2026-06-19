@@ -64,7 +64,7 @@ export default function ViewSpecsModal({ vehicle, onClose }) {
                     <h3 className="section-title mb-0">Specs — {liveVehicle.name}</h3>
                     <button
                         onClick={handleClose}
-                        className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                        className="text-faint hover:text-secondary text-xl leading-none"
                         aria-label="Close"
                     >
                         ×
