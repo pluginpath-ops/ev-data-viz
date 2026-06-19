@@ -466,7 +466,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                             key={key}
                             type="button"
                             onClick={() => setEffUnit(key)}
-                            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${effUnit === key ? 'bg-white shadow text-gray-900' : 'text-gray-500 dark:text-slate-300 hover:text-gray-700 dark:hover:text-slate-100'}`}
+                            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${effUnit === key ? 'bg-[var(--color-card)] shadow text-[var(--color-text-primary)]' : 'text-secondary hover:text-[var(--color-text-primary)]'}`}
                         >
                             {label}
                         </button>
@@ -538,7 +538,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         return (
                             <>
                                 {run.speed_mph != null && (
-                                    <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
+                                    <span className="text-xs bg-[var(--color-surface-sunken)] text-secondary px-1.5 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
                                 )}
                                 {run.temperature_f != null && (
                                     <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>
@@ -572,7 +572,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                         style={{ display: plottableRuns.length > 0 ? 'block' : 'none' }}
                     />
                     {plottableRuns.length === 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                        <div className="absolute inset-0 flex items-center justify-center text-faint">
                             <div className="text-center">
                                 <p className="text-lg font-medium">
                                     {selectedRangeRuns.length === 0
@@ -580,7 +580,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                         : 'Selected runs are missing required fields for this chart type'}
                                 </p>
                                 {selectedRangeRuns.length > 0 && (
-                                    <p className="text-sm mt-1 text-gray-400">
+                                    <p className="text-sm mt-1 text-faint">
                                         {CHART_TYPES.find(t => t.key === chartType)?.desc}
                                     </p>
                                 )}

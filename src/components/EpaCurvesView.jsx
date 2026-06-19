@@ -173,7 +173,7 @@ function convertYValue(val, yAxis, units) {
 const CONFIDENCE_COLORS = {
     verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
     likely:   'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-700',
-    inferred: 'text-gray-500 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-800/40 dark:border-gray-600',
+    inferred: 'text-muted bg-[var(--color-surface-muted)] border-[var(--color-border)]',
 };
 
 function ConfidenceBadge({ confidence }) {
@@ -525,9 +525,9 @@ export default function EpaCurvesView({
                                 className="form-input text-sm py-1 w-24 text-right"
                                 aria-label="Elevation in feet"
                             />
-                            <span className="text-sm text-gray-400">ft</span>
+                            <span className="text-sm text-faint">ft</span>
                             <span
-                                className={`text-xs whitespace-nowrap ${altAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-400'}`}
+                                className={`text-xs whitespace-nowrap ${altAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-faint'}`}
                                 title="Air-density ratio applied to the aerodynamic (C) term"
                             >
                                 → ρ {densityRatio.toFixed(2)}{altAdjusted ? ' ▲' : ''}
@@ -544,7 +544,7 @@ export default function EpaCurvesView({
                             >
                                 <span style={{ display: 'inline-block', transform: selectorExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
                                 Select Vehicle Tests to Display
-                                <span className="text-sm font-normal text-gray-500">({visibleCount} of {totalMappings} shown)</span>
+                                <span className="text-sm font-normal text-muted">({visibleCount} of {totalMappings} shown)</span>
                             </button>
 
                             {selectorExpanded && (
@@ -557,7 +557,7 @@ export default function EpaCurvesView({
                                             };
                                             return (
                                                 <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
-                                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">
+                                                    <h4 className="text-sm font-semibold text-secondary mb-2">
                                                         {vehicleLabel(vehicle)}
                                                     </h4>
                                                     <div className="run-items">
@@ -606,7 +606,7 @@ export default function EpaCurvesView({
                                                                     {/* Label + metadata */}
                                                                     <div className="run-label min-w-0">
                                                                         <span className="font-medium">{epaLabel}</span>
-                                                                        <span className="text-sm text-gray-500 dark:text-slate-400 ml-2">{epaGroup.model_year} · {epaGroup.test_group_id}</span>
+                                                                        <span className="text-sm text-muted ml-2">{epaGroup.model_year} · {epaGroup.test_group_id}</span>
                                                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
                                                                             <ConfidenceBadge confidence={confidence} />
                                                                             {epaGroup.label_combined_mpge && epaGroup.label_combined_mpge < 500 ? (
