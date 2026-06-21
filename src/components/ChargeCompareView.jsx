@@ -574,7 +574,7 @@ export default function ChargeCompareView({
             {!presentationMode && <div className="card mb-6">
                 {loading && <LoadingSpinner message="Loading charging data…" />}
                 <div className="flex flex-wrap items-center gap-6">
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
+                    <label className="flex items-center gap-2 text-sm font-medium text-secondary">
                         Starting SoC (%):
                         <input
                             type="number"
@@ -585,7 +585,7 @@ export default function ChargeCompareView({
                             className="w-20 px-2 py-1 border rounded text-sm"
                         />
                     </label>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
+                    <label className="flex items-center gap-2 text-sm font-medium text-secondary">
                         Charging Time (minutes):
                         <input
                             type="number"
@@ -596,7 +596,7 @@ export default function ChargeCompareView({
                             className="w-20 px-2 py-1 border rounded text-sm"
                         />
                     </label>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-200">
+                    <label className="flex items-center gap-2 text-sm font-medium text-secondary">
                         Range to add ({distanceLabel(units)}):
                         <input
                             type="number"
@@ -636,7 +636,7 @@ export default function ChargeCompareView({
                         renderRunMeta={run => (
                             <>
                                 {run.speed_mph != null && (
-                                    <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
+                                    <span className="text-xs bg-[var(--color-surface-sunken)] text-secondary px-1.5 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
                                 )}
                                 {run.temperature_f != null && (
                                     <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>
@@ -648,7 +648,7 @@ export default function ChargeCompareView({
             </div>}
 
             {!hasRangeRuns ? (
-                <div className="card text-center py-12 text-gray-400">
+                <div className="card text-center py-12 text-faint">
                     <p className="text-lg font-medium">No range test runs found for selected vehicles</p>
                     <p className="text-sm mt-1">Add range test records in Tests &amp; Data to use this chart.</p>
                 </div>
@@ -657,7 +657,7 @@ export default function ChargeCompareView({
                     {/* ── Chart 1: Range Added in X Minutes ── */}
                     <div className="card mb-6">
                         <h4 className="text-base font-semibold mb-3">
-                            Range Added in {xMinutes} Minutes <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC, in {distanceLabel(units)})</span>
+                            Range Added in {xMinutes} Minutes <span className="text-faint font-normal">(from ~{startSoc}% SoC, in {distanceLabel(units)})</span>
                         </h4>
                         <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activeResolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart1Ref} />
@@ -667,7 +667,7 @@ export default function ChargeCompareView({
                     {/* ── Chart 2: Time to Add M Miles ── */}
                     <div className="card mb-6">
                         <h4 className="text-base font-semibold mb-3">
-                            Time to Add {units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} {distanceLabel(units)} of Range <span className="text-gray-400 font-normal">(from ~{startSoc}% SoC)</span>
+                            Time to Add {units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} {distanceLabel(units)} of Range <span className="text-faint font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
                         <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activeResolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart2Ref} />
