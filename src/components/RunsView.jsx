@@ -794,6 +794,21 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     // ── Edit handlers ─────────────────────────────────────────────────────────
 
     const handleEditRun = (run) => {
+        // Reset per-run data/panel state so a previously-edited run's points
+        // don't stick (editData is lazy-loaded only when null).
+        setEditData(null);
+        setEditDataDirty(false);
+        setShowDataTable(false);
+        setEditCalcKwh(null);
+        setSortField(null);
+        setSortDir('asc');
+        setShowEstimatePanel(false);
+        setEstimateAnchors([]);
+        setEstimateStartSoc('');
+        setEstimateCalibrate(false);
+        setEstimatePreview(null);
+        setEstimateError('');
+
         setEditingRunId(run.id);
         setEditFormData({
             name: run.name,
