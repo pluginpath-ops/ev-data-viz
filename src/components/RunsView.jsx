@@ -141,31 +141,33 @@ function RunChargingMetaLine({ run, calcKwhByRun, onCheckKwh }) {
 
 // ── Derive-charging-axis panel ────────────────────────────────────────────────
 // Three modes share one engine (src/utils/deriveChargingAxis.js):
-//   time  — integrate elapsed time from (SoC, power), anchored by (SoC, time) pairs
-//   soc   — integrate SoC from (time, power), anchored by (time, SoC); start = origin
+//   time  — integrate elapsed time from (SoC, power); no anchors needed (t=0 origin)
+//   soc   — integrate SoC from (time, power); needs a start-SoC origin
 //   power — differentiate power from (SoC, time); no anchors
+// By default each mode derives straight from the run's already-populated columns;
+// calibration anchors are an opt-in refinement.
 const DERIVE_MODES = {
     time: {
-        label: 'Time', source: 'SoC + power',
+        label: 'Time', source: 'SoC + power', write: 'time',
         anchorCols: [
-            { key: 'x', label: 'SoC (%)',      ph: 'SoC%',   min: 0, max: 100 },
+            { key: 'x', label: 'SoC (%)',       ph: 'SoC%',   min: 0, max: 100 },
             { key: 'y', label: 'Elapsed (min)', ph: 'minutes', step: 0.1 },
         ],
-        minAnchors: 2, showShift: true,
+        canCalibrate: true, calibMinAnchors: 2, showShift: true,
         previewCols: [['soc', 'SoC %', v => `${v}%`], ['chargeRate', 'kW', v => v], ['time', 'Est. time (min)', v => v]],
     },
     soc: {
-        label: 'SoC', source: 'time + power',
+        label: 'SoC', source: 'time + power', write: 'SoC',
         anchorCols: [
             { key: 'x', label: 'Elapsed (min)', ph: 'minutes', step: 0.1 },
             { key: 'y', label: 'SoC (%)',       ph: 'SoC%',   min: 0, max: 100 },
         ],
-        minAnchors: 1, showShift: false,
+        canCalibrate: true, calibMinAnchors: 2, needsOrigin: true, showShift: false,
         previewCols: [['time', 'Elapsed (min)', v => v], ['chargeRate', 'kW', v => v], ['soc', 'Est. SoC %', v => `${v}%`]],
     },
     power: {
-        label: 'Power', source: 'SoC + time',
-        anchorCols: [], minAnchors: 0, showShift: false,
+        label: 'Power', source: 'SoC + time', write: 'power',
+        anchorCols: [], canCalibrate: false, showShift: false,
         previewCols: [['soc', 'SoC %', v => `${v}%`], ['time', 'Elapsed (min)', v => v], ['chargeRate', 'Est. kW', v => v]],
     },
 };
@@ -173,6 +175,8 @@ const DERIVE_MODES = {
 const DeriveAxisPanel = ({
     vehicle, editData, editDataLoading,
     mode, onChangeMode,
+    calibrate, onChangeCalibrate,
+    startSoc, onChangeStartSoc,
     anchors, onChangeAnchors,
     shiftToZero, onShiftToZeroChange,
     preview, applying, error,
@@ -183,11 +187,20 @@ const DeriveAxisPanel = ({
     const validAnchors = anchors.filter(
         a => a.x !== '' && a.y !== '' && !isNaN(Number(a.x)) && !isNaN(Number(a.y))
     );
-    const anchorsOk  = mode === 'power' || validAnchors.length >= cfg.minAnchors;
-    const canPreview = !batteryMissing && anchorsOk && editData !== null && !editDataLoading;
-    const gridCols   = 'grid-cols-[96px_96px_24px]';
+    const gridCols = 'grid-cols-[96px_96px_24px]';
+    const usingAnchors = cfg.canCalibrate && calibrate;
 
-    const writeColMsg = { time: 'time', soc: 'SoC', power: 'power' }[mode];
+    // SoC mode origin: prefer the first already-populated SoC in the data.
+    const originRow = mode === 'soc'
+        ? (editData || []).filter(r => r.time != null && r.soc != null).sort((a, b) => a.time - b.time)[0] || null
+        : null;
+    const startSocOk = !!originRow || (startSoc !== '' && !isNaN(Number(startSoc)));
+
+    let ready;
+    if (usingAnchors)          ready = validAnchors.length >= cfg.calibMinAnchors;
+    else if (mode === 'soc')   ready = startSocOk;
+    else                       ready = true; // time / power derive from populated data
+    const canPreview = !batteryMissing && ready && editData !== null && !editDataLoading;
 
     return (
         <div className="mt-2 border rounded bg-[var(--color-surface-muted)] p-3 space-y-3">
@@ -216,11 +229,47 @@ const DeriveAxisPanel = ({
             {editDataLoading && <p className="text-xs text-faint">Loading data…</p>}
             {!editDataLoading && (
                 <>
-                    {cfg.anchorCols.length > 0 && (
+                    {/* Default: derive straight from the populated columns */}
+                    {!usingAnchors && (
+                        <p className="text-xs text-muted">
+                            {mode === 'time' && 'Elapsed time is integrated from the populated SoC + power columns (t=0 at the first point).'}
+                            {mode === 'power' && 'Power is averaged across each SoC interval from the elapsed-time delta. Needs ≥2 points with both SoC and time.'}
+                            {mode === 'soc' && (originRow
+                                ? `SoC is integrated from time + power, anchored to the first populated SoC (${originRow.soc}% at ${originRow.time} min).`
+                                : 'SoC is integrated from the populated time + power columns. Enter the starting SoC to anchor the origin:')}
+                        </p>
+                    )}
+
+                    {/* SoC origin input — only when no populated SoC is available */}
+                    {!usingAnchors && mode === 'soc' && !originRow && (
+                        <input
+                            type="number" min="0" max="100"
+                            placeholder="Start SoC (%)"
+                            value={startSoc}
+                            onChange={e => onChangeStartSoc(e.target.value)}
+                            className="form-input text-xs py-1 w-32"
+                        />
+                    )}
+
+                    {/* Opt-in calibration toggle */}
+                    {cfg.canCalibrate && (
+                        <label className="flex items-center gap-2 text-xs text-secondary cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={calibrate}
+                                onChange={e => onChangeCalibrate(e.target.checked)}
+                            />
+                            {mode === 'soc'
+                                ? 'Calibrate to a known end SoC (start + end anchors)'
+                                : 'Calibrate to known (SoC, elapsed-time) reference points'}
+                        </label>
+                    )}
+
+                    {usingAnchors && (
                         <div>
                             <p className="text-xs text-muted mb-1">
                                 {mode === 'soc'
-                                    ? 'Start SoC anchors the origin; add an end SoC to calibrate capacity/efficiency.'
+                                    ? 'Start SoC anchors the origin; the end SoC calibrates capacity/efficiency.'
                                     : 'Known (SoC, elapsed-time) reference points.'}
                             </p>
                             <div className={`grid ${gridCols} gap-1 text-xs text-muted px-1 mb-1`}>
@@ -261,12 +310,6 @@ const DeriveAxisPanel = ({
                         </div>
                     )}
 
-                    {mode === 'power' && (
-                        <p className="text-xs text-muted">
-                            Power is averaged across each SoC interval from the elapsed-time delta. Needs ≥2 points with both SoC and time.
-                        </p>
-                    )}
-
                     {cfg.showShift && (
                         <label className="flex items-center gap-2 text-xs text-secondary cursor-pointer">
                             <input
@@ -291,8 +334,11 @@ const DeriveAxisPanel = ({
                             disabled={!preview || applying}
                             className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                         >{applying ? 'Applying…' : 'Apply'}</button>
-                        {!batteryMissing && !anchorsOk && anchors.length >= 1 && (
-                            <span className="text-xs text-faint">Need ≥{cfg.minAnchors} anchor{cfg.minAnchors > 1 ? 's' : ''} to preview</span>
+                        {!batteryMissing && usingAnchors && validAnchors.length < cfg.calibMinAnchors && (
+                            <span className="text-xs text-faint">Need ≥{cfg.calibMinAnchors} anchors to preview</span>
+                        )}
+                        {!batteryMissing && !usingAnchors && mode === 'soc' && !startSocOk && (
+                            <span className="text-xs text-faint">Enter a start SoC to preview</span>
                         )}
                     </div>
 
@@ -328,7 +374,7 @@ const DeriveAxisPanel = ({
                                 </table>
                             </div>
                             <p className="text-xs text-muted font-medium">
-                                Apply will write {preview.points.length} {writeColMsg} values to this run.
+                                Apply will write {preview.points.length} {cfg.write} values to this run.
                             </p>
                         </div>
                     )}
@@ -454,6 +500,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     // ── Derive-charging-axis panel state ──────────────────────────────────────
     const [showEstimatePanel, setShowEstimatePanel] = useState(false);
     const [estimateMode, setEstimateMode]           = useState('time'); // 'time' | 'soc' | 'power'
+    const [estimateCalibrate, setEstimateCalibrate] = useState(false);  // opt-in anchor calibration
+    const [estimateStartSoc, setEstimateStartSoc]   = useState('');     // SoC-mode origin when none populated
     const [estimateAnchors, setEstimateAnchors]     = useState([]);   // [{x:'', y:''}] — x=domain, y=target
     const [estimateShift, setEstimateShift]         = useState(false);
     const [estimatePreview, setEstimatePreview]     = useState(null); // null | {points, warnings}
@@ -921,6 +969,32 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setEstimateError('');
     };
 
+    const handleToggleCalibrate = (on) => {
+        setEstimateCalibrate(on);
+        if (on) setEstimateAnchors(seedAnchorsFor(estimateMode, editData));
+        setEstimatePreview(null);
+        setEstimateError('');
+    };
+
+    // Build the anchor list actually fed to the engine, honouring the
+    // "derive from populated data" default vs. opt-in calibration.
+    const buildDeriveAnchors = () => {
+        if (estimateMode === 'power') return [];
+        if (estimateCalibrate) return estimateAnchors;
+        if (estimateMode === 'time') return []; // pure physics, t=0 origin
+        // SoC origin: prefer the first already-populated SoC, else the typed start SoC.
+        const populated = (editData || [])
+            .filter(r => r.time != null && r.soc != null)
+            .sort((a, b) => a.time - b.time)[0];
+        if (populated) return [{ x: populated.time, y: populated.soc }];
+        if (estimateStartSoc !== '' && !isNaN(Number(estimateStartSoc))) {
+            const times = (editData || []).filter(r => r.time != null).map(r => r.time);
+            const x = times.length ? Math.min(...times) : 0;
+            return [{ x, y: estimateStartSoc }];
+        }
+        return []; // engine throws a friendly "provide a start SoC" error
+    };
+
     const handleToggleEstimatePanel = async (runId) => {
         if (showEstimatePanel) {
             setShowEstimatePanel(false);
@@ -959,7 +1033,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 dataPoints:  editData,
                 batteryKwh:  vehicle.battery,
                 target:      estimateMode,
-                anchors:     estimateAnchors,
+                anchors:     buildDeriveAnchors(),
                 shiftToZero: estimateShift,
             });
             setEstimatePreview(result);
@@ -1724,63 +1798,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         onChange={(e) => setEditFormData({...editFormData, conditions: e.target.value})}
                                         className="form-input w-full"
                                     />
-                                    {/* Charging energy field — shows energy_kwh for charging runs */}
-                                    {(editFormData.dataFlags || ['charging']).includes('charging') && (
-                                        <div className="data-subpanel p-3">
-                                            <p className="text-sm font-semibold text-secondary mb-2">Charging Energy</p>
-                                            <input
-                                                type="number"
-                                                placeholder="Energy added (kWh)"
-                                                value={editFormData.energyKwh}
-                                                onChange={(e) => setEditFormData({...editFormData, energyKwh: e.target.value})}
-                                                className="form-input w-full"
-                                            />
-                                            <p className="text-xs text-faint mt-1">
-                                                Energy measured at charger or vehicle — <em>energy in</em> (not equal to energy used driving due to charging losses)
-                                            </p>
-                                            <input
-                                                type="url"
-                                                placeholder="Charging source URL (optional)"
-                                                value={editFormData.chargingUrl ?? ''}
-                                                onChange={(e) => setEditFormData({...editFormData, chargingUrl: e.target.value})}
-                                                className="form-input w-full mt-2"
-                                            />
-                                        </div>
-                                    )}
-
-                                    {/* Derive charging axis (time / SoC / power) from any two of the three */}
-                                    {canEdit(vehicle) && (editFormData.dataFlags || ['charging']).includes('charging') && (
-                                        <div>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleToggleEstimatePanel(run.id)}
-                                                className="text-sm text-secondary hover:text-[var(--color-text-primary)] flex items-center gap-1 mt-1"
-                                            >
-                                                <span className="font-semibold">
-                                                    {showEstimatePanel ? '▴ Derive charging axis (time / SoC / power)' : '▾ Derive charging axis (time / SoC / power)'}
-                                                </span>
-                                            </button>
-                                            {showEstimatePanel && (
-                                                <DeriveAxisPanel
-                                                    vehicle={vehicle}
-                                                    editData={editData}
-                                                    editDataLoading={editDataLoading}
-                                                    mode={estimateMode}
-                                                    onChangeMode={handleSelectEstimateMode}
-                                                    anchors={estimateAnchors}
-                                                    onChangeAnchors={setEstimateAnchors}
-                                                    shiftToZero={estimateShift}
-                                                    onShiftToZeroChange={setEstimateShift}
-                                                    preview={estimatePreview}
-                                                    applying={estimateApplying}
-                                                    error={estimateError}
-                                                    onPreview={handleEstimatePreview}
-                                                    onApply={() => handleEstimateApply(run)}
-                                                />
-                                            )}
-                                        </div>
-                                    )}
-
                                     {/* Range test fields */}
                                     {(editFormData.dataFlags || ['charging']).includes('range') && (
                                         <div className="data-subpanel p-4 space-y-3">
@@ -1860,6 +1877,30 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Charging energy field — shows energy_kwh for charging runs */}
+                                    {(editFormData.dataFlags || ['charging']).includes('charging') && (
+                                        <div className="data-subpanel p-3">
+                                            <p className="text-sm font-semibold text-secondary mb-2">Charging Energy</p>
+                                            <input
+                                                type="number"
+                                                placeholder="Energy added (kWh)"
+                                                value={editFormData.energyKwh}
+                                                onChange={(e) => setEditFormData({...editFormData, energyKwh: e.target.value})}
+                                                className="form-input w-full"
+                                            />
+                                            <p className="text-xs text-faint mt-1">
+                                                Energy measured at charger or vehicle — <em>energy in</em> (not equal to energy used driving due to charging losses)
+                                            </p>
+                                            <input
+                                                type="url"
+                                                placeholder="Charging source URL (optional)"
+                                                value={editFormData.chargingUrl ?? ''}
+                                                onChange={(e) => setEditFormData({...editFormData, chargingUrl: e.target.value})}
+                                                className="form-input w-full mt-2"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="form-actions mt-4">
                                     <button
@@ -1877,6 +1918,43 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         Cancel
                                     </button>
                                 </div>
+
+                                {/* Derive charging axis (time / SoC / power) from any two of the three */}
+                                {canEdit(vehicle) && (editFormData.dataFlags || ['charging']).includes('charging') && (
+                                    <div className="mt-4 border-t pt-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleToggleEstimatePanel(run.id)}
+                                            className="text-sm text-secondary hover:text-[var(--color-text-primary)] flex items-center gap-1"
+                                        >
+                                            <span className="font-semibold">
+                                                {showEstimatePanel ? '▴ Derive charging axis (time / SoC / power)' : '▾ Derive charging axis (time / SoC / power)'}
+                                            </span>
+                                        </button>
+                                        {showEstimatePanel && (
+                                            <DeriveAxisPanel
+                                                vehicle={vehicle}
+                                                editData={editData}
+                                                editDataLoading={editDataLoading}
+                                                mode={estimateMode}
+                                                onChangeMode={handleSelectEstimateMode}
+                                                calibrate={estimateCalibrate}
+                                                onChangeCalibrate={handleToggleCalibrate}
+                                                startSoc={estimateStartSoc}
+                                                onChangeStartSoc={setEstimateStartSoc}
+                                                anchors={estimateAnchors}
+                                                onChangeAnchors={setEstimateAnchors}
+                                                shiftToZero={estimateShift}
+                                                onShiftToZeroChange={setEstimateShift}
+                                                preview={estimatePreview}
+                                                applying={estimateApplying}
+                                                error={estimateError}
+                                                onPreview={handleEstimatePreview}
+                                                onApply={() => handleEstimateApply(run)}
+                                            />
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* ── Data table toggle ── */}
                                 <div className="mt-4 border-t pt-3">
