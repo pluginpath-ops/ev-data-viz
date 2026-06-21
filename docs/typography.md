@@ -77,10 +77,20 @@ deliberately `text-[13px]`, 1px smaller than the `text-sm` rows for hierarchy) i
 *not* drift — keep it. Only migrate sizes that are incidental/inconsistent. The
 color migration (gray → semantic) still applies regardless of size.
 
-## Future: live style knobs
+## Live style knobs (implemented)
 
-Once text styling flows through these classes/variables, exposing them as
-live-tunable knobs (a "Typography" group in Admin → Interface Settings) reuses
-the same machinery as the EPA Model Constants panel
-(`src/constants/overrides.js`, `knobs.js`, `components/admin/ConstantsKnobs.jsx`).
-Deferred until after the migration.
+Admin → **Interface Settings → Typography** tunes the type system live. Each role
+class reads its font-size/weight from a CSS variable (default = the shipped value,
+so an unset var is a no-op), and the root font-size carries a global `--ui-scale`
+that scales every rem-based size site-wide.
+
+- Defaults + knob metadata + the localStorage store: `src/styles/typographyKnobs.js`
+  (separate store key from the EPA constants, so the two panels are independent).
+- Overrides apply **live** as CSS custom properties on `:root` (no reload), and are
+  re-applied before first paint in `src/main.jsx` via `applyTypographyOverrides()`.
+- Panel: `src/components/admin/TypographyKnobs.jsx` (with a live preview).
+- Per-browser only — never the DB or other users.
+
+To expose a new tunable: variable-ize the property in the role class here, then add
+a knob entry to `TYPO_GROUPS`. Colour tiers are not yet knobs (they're theme-specific
+— a future extension).
