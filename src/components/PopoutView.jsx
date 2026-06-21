@@ -2,6 +2,7 @@ import ChargingView from './ChargingView';
 import ChargeCompareView from './ChargeCompareView';
 import RoadTripView from './RoadTripView';
 import SpecsChartView from './SpecsChartView';
+import SpecsScatterView from './SpecsScatterView';
 import EpaCurvesView from './EpaCurvesView';
 
 /**
@@ -31,6 +32,15 @@ export default function PopoutView({
                 />
             )}
 
+            {selectedVehicles.length > 0 && chartMode === 'specscatter' && (
+                <SpecsScatterView
+                    vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
+                    xField={chartConfig.scatterXField}
+                    yField={chartConfig.scatterYField}
+                    presentationMode
+                />
+            )}
+
             {selectedVehicles.length > 0 && chartMode === 'roadtrip' && roadTripConfig && (
                 <RoadTripView
                     vehicles={vehicles}
@@ -41,7 +51,10 @@ export default function PopoutView({
                 />
             )}
 
-            {selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'roadtrip' && (
+            {/* Charging + Range only — ChargingView delegates to RangeChartView when
+                chartMode === 'range'. Other modes have their own explicit branches so
+                they no longer fall through to the charging chart. */}
+            {selectedVehicles.length > 0 && (chartMode === 'charging' || chartMode === 'range') && (
                 <ChargingView
                     vehicles={vehicles}
                     selectedVehicleIds={selectedVehicles}
@@ -64,7 +77,7 @@ export default function PopoutView({
                 />
             )}
 
-            {chartMode === 'epacurves' && (
+            {selectedVehicles.length > 0 && chartMode === 'epacurves' && (
                 <EpaCurvesView
                     vehicles={vehicles}
                     selectedVehicleIds={selectedVehicles}
