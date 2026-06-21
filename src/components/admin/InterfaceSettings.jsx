@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import TypographyKnobs from './TypographyKnobs';
 
 /**
  * Admin sub-tab: site-wide interface settings.
@@ -53,6 +54,8 @@ export default function InterfaceSettings() {
                     />
                 </label>
             </div>
+
+            <TypographyKnobs />
 
             <div className="card p-5">
                 <h3 className="section-title">Personal preferences</h3>
