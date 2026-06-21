@@ -611,13 +611,16 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     </button>
                 </div>
             </div>
-            {/* ── Axis scale controls (card provided by AxisScaleControls) ── */}
-            <AxisScaleControls
-                xMin={xMin} xMax={xMax}
-                yMin={yMin} yMax={yMax}
-                onChange={handleScaleChange}
-                showX={CHART_TYPES.find(t => t.key === chartType)?.kind === 'line'}
-            />
+            {/* ── Axis scale controls (card provided by AxisScaleControls) ──
+                Hidden in presentation/pop-out mode — these belong on the main page. */}
+            {!presentationMode && (
+                <AxisScaleControls
+                    xMin={xMin} xMax={xMax}
+                    yMin={yMin} yMax={yMax}
+                    onChange={handleScaleChange}
+                    showX={CHART_TYPES.find(t => t.key === chartType)?.kind === 'line'}
+                />
+            )}
 
             {!presentationMode && <ChartInfoBubble chartKey="range" />}
         </div>
