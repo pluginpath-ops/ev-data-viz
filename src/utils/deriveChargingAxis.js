@@ -35,7 +35,7 @@ import { roundTo } from './unitConversions';
  * @param {boolean} [opts.shiftToZero] - shift integration output so its min = 0
  * @returns {{ points: Array, warnings: string[], effectiveKwh: number|null }}
  */
-export function deriveChargingAxis({ dataPoints, batteryKwh, target, anchors = [], shiftToZero = false }) {
+export function deriveChargingAxis({ dataPoints, batteryKwh, target, anchors = [], shiftToZero = false, chargingLoss = 0.05 }) {
     if (!['time', 'soc', 'power'].includes(target))
         throw new Error(`Unknown derive target "${target}"`);
 
@@ -43,31 +43,39 @@ export function deriveChargingAxis({ dataPoints, batteryKwh, target, anchors = [
         throw new Error('Vehicle battery capacity (kWh) is required');
     const kWh = Number(batteryKwh);
 
-    if (target === 'power') return derivePowerCurve({ dataPoints, kWh });
-    return deriveIntegral({ dataPoints, kWh, target, anchors, shiftToZero });
+    // Charging efficiency η: reported kW is charger-side, but only η of it lands
+    // in the pack. Without it, times run ~5–10% optimistic vs. measured. Clamp
+    // the loss to a sane band so a fat-fingered value can't invert the physics.
+    const loss = isNaN(Number(chargingLoss)) ? 0 : Math.min(Math.max(Number(chargingLoss), 0), 0.5);
+    const eta = 1 - loss;
+
+    if (target === 'power') return derivePowerCurve({ dataPoints, kWh, eta });
+    return deriveIntegral({ dataPoints, kWh, target, anchors, shiftToZero, eta });
 }
 
 // ── Per-target field + formula config for the integration engine ───────────────
+// η is the charging efficiency (pack-side energy ÷ charger-side energy).
 const INTEGRAL = {
     time: {
         domain: 'soc', rate: 'chargeRate', out: 'time',
         domainLabel: 'SoC', targetLabel: 'time',
-        // dt in minutes from energy / power
-        delta: (dDomain, avgRate, kWh) => (avgRate > 0 ? (kWh * dDomain / 100) / avgRate * 60 : 0),
+        // dt in minutes from energy / (usable power). Losses shrink usable power,
+        // so time grows by 1/η.
+        delta: (dDomain, avgRate, kWh, eta) => (avgRate > 0 ? (kWh * dDomain / 100) / (avgRate * eta) * 60 : 0),
         // calibration scale s on a time curve means effective capacity = C·s
         effKwh: (kWh, scale) => kWh * scale,
     },
     soc: {
         domain: 'time', rate: 'chargeRate', out: 'soc',
         domainLabel: 'time', targetLabel: 'SoC',
-        // dSoC in percent from energy (power × hours) / capacity
-        delta: (dDomain, avgRate, kWh) => avgRate * (dDomain / 60) / kWh * 100,
+        // dSoC in percent from usable energy (η · power × hours) / capacity
+        delta: (dDomain, avgRate, kWh, eta) => (avgRate * eta) * (dDomain / 60) / kWh * 100,
         // calibration scale s on a SoC curve means effective capacity = C/s
         effKwh: (kWh, scale) => kWh / scale,
     },
 };
 
-function deriveIntegral({ dataPoints, kWh, target, anchors, shiftToZero }) {
+function deriveIntegral({ dataPoints, kWh, target, anchors, shiftToZero, eta }) {
     const cfg = INTEGRAL[target];
     const warnings = [];
 
@@ -96,7 +104,7 @@ function deriveIntegral({ dataPoints, kWh, target, anchors, shiftToZero }) {
     for (let i = 1; i < sorted.length; i++) {
         const dDomain = sorted[i][cfg.domain] - sorted[i - 1][cfg.domain];
         const avgRate = (sorted[i][cfg.rate] + sorted[i - 1][cfg.rate]) / 2;
-        cumRaw[i] = cumRaw[i - 1] + cfg.delta(dDomain, avgRate, kWh);
+        cumRaw[i] = cumRaw[i - 1] + cfg.delta(dDomain, avgRate, kWh, eta);
     }
     const curvePoints = sorted.map((p, i) => ({ d: p[cfg.domain], cumRaw: cumRaw[i] }));
     const cumRawAt = (d) => interpolate(curvePoints, 'd', 'cumRaw', d, true, true);
@@ -191,7 +199,7 @@ function deriveIntegral({ dataPoints, kWh, target, anchors, shiftToZero }) {
 }
 
 // ── Power from (SoC, time): differentiate energy w.r.t. time ───────────────────
-function derivePowerCurve({ dataPoints, kWh }) {
+function derivePowerCurve({ dataPoints, kWh, eta = 1 }) {
     const warnings = [];
 
     const valid = (dataPoints || [])
@@ -217,7 +225,8 @@ function derivePowerCurve({ dataPoints, kWh }) {
         if (dMin <= 0)
             warnings.push(`Non-increasing time between SoC ${sorted[i - 1].soc}% and ${sorted[i].soc}% — segment skipped`);
         else
-            segKw[i - 1] = (kWh * dSoC / 100) / (dMin / 60);
+            // dSoC reflects pack-side energy; divide by η to report charger-side kW.
+            segKw[i - 1] = (kWh * dSoC / 100) / (dMin / 60) / eta;
     }
 
     // Per-point power = central average of the segments on either side.

@@ -177,6 +177,7 @@ const DeriveAxisPanel = ({
     mode, onChangeMode,
     calibrate, onChangeCalibrate,
     startSoc, onChangeStartSoc,
+    chargingLoss, onChangeChargingLoss,
     anchors, onChangeAnchors,
     shiftToZero, onShiftToZeroChange,
     preview, applying, error,
@@ -249,6 +250,23 @@ const DeriveAxisPanel = ({
                             onChange={e => onChangeStartSoc(e.target.value)}
                             className="form-input text-xs py-1 w-32"
                         />
+                    )}
+
+                    {/* Charging-loss factor — reported kW is charger-side; only η lands
+                        in the pack. Moot once anchors calibrate to measured values. */}
+                    {!usingAnchors && (
+                        <div className="flex items-center gap-2 text-xs text-secondary flex-wrap">
+                            <label htmlFor="derive-loss">Charging loss</label>
+                            <input
+                                id="derive-loss"
+                                type="number" min="0" max="50" step="0.5"
+                                value={chargingLoss}
+                                onChange={e => onChangeChargingLoss(e.target.value)}
+                                className="form-input text-xs py-1 w-16"
+                            />
+                            <span>%</span>
+                            <span className="text-faint">reported kW is charger-side; ~5% typical</span>
+                        </div>
                     )}
 
                     {/* Opt-in calibration toggle */}
@@ -502,6 +520,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [estimateMode, setEstimateMode]           = useState('time'); // 'time' | 'soc' | 'power'
     const [estimateCalibrate, setEstimateCalibrate] = useState(false);  // opt-in anchor calibration
     const [estimateStartSoc, setEstimateStartSoc]   = useState('');     // SoC-mode origin when none populated
+    const [estimateLoss, setEstimateLoss]           = useState('5');    // assumed charging loss %, charger→pack
     const [estimateAnchors, setEstimateAnchors]     = useState([]);   // [{x:'', y:''}] — x=domain, y=target
     const [estimateShift, setEstimateShift]         = useState(false);
     const [estimatePreview, setEstimatePreview]     = useState(null); // null | {points, warnings}
@@ -1045,11 +1064,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setEstimatePreview(null);
         try {
             const result = deriveChargingAxis({
-                dataPoints:  editData,
-                batteryKwh:  vehicle.battery,
-                target:      estimateMode,
-                anchors:     buildDeriveAnchors(),
-                shiftToZero: estimateShift,
+                dataPoints:   editData,
+                batteryKwh:   vehicle.battery,
+                target:       estimateMode,
+                anchors:      buildDeriveAnchors(),
+                shiftToZero:  estimateShift,
+                chargingLoss: estimateLoss === '' ? 0 : Number(estimateLoss) / 100,
             });
             setEstimatePreview(result);
         } catch (err) {
@@ -1957,6 +1977,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 onChangeCalibrate={handleToggleCalibrate}
                                                 startSoc={estimateStartSoc}
                                                 onChangeStartSoc={setEstimateStartSoc}
+                                                chargingLoss={estimateLoss}
+                                                onChangeChargingLoss={setEstimateLoss}
                                                 anchors={estimateAnchors}
                                                 onChangeAnchors={setEstimateAnchors}
                                                 shiftToZero={estimateShift}
