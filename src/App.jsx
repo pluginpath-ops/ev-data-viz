@@ -110,6 +110,7 @@ export default function App() {
         towingMode: false,        // override all vehicle efficiencies with a fixed trailer-system value
         towingEfficiency: 1.5,    // mi/kWh for the whole vehicle+trailer system
         towingRefSpeedMph: 70,    // speed at which towingEfficiency was measured
+        perRun: {},               // { [runId]: { minSoc?, legDistance?, chargeTime? } } — per-run overrides
     });
     const [chartConfig, setChartConfig] = useState({
         xAxis: 'soc',

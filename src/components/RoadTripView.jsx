@@ -111,6 +111,57 @@ const PALETTE = [
     '#3b82f6', '#a855f7', '#ec4899', '#14b8a6',
 ];
 
+// ── Per-run override inputs ───────────────────────────────────────────────────
+// Two compact overrides shown beside each selected run: en-route arrival SoC
+// (minSoc) and the mode-dependent charge amount (leg distance / charge time).
+// Empty shows the global value greyed as a placeholder; typing overrides it.
+function RunOverrideInputs({ runId, override, mode, global, units, dl, onChange }) {
+    const num = (v, key, cls) => (
+        <input
+            type="number"
+            value={v === '' || v == null ? '' : v}
+            placeholder={key.placeholder}
+            onChange={key.onChange}
+            onClick={e => e.stopPropagation()}
+            className={`border rounded px-1 py-0.5 text-xs ${cls}`}
+        />
+    );
+    const legGlobal = units === 'metric' ? Math.round(global.legDistance * MI_TO_KM) : global.legDistance;
+    const legValue  = override.legDistance != null
+        ? (units === 'metric' ? Math.round(override.legDistance * MI_TO_KM) : override.legDistance)
+        : '';
+
+    return (
+        <span className="inline-flex items-center gap-1 ml-2 align-middle" onClick={e => e.stopPropagation()}>
+            <span className="text-[10px] text-faint">arr SoC</span>
+            {num(override.minSoc ?? '', {
+                placeholder: `${global.minSoc}`,
+                onChange: e => onChange(runId, 'minSoc', e.target.value),
+            }, 'w-11')}
+            {mode === 'distance' ? (
+                <>
+                    <span className="text-[10px] text-faint">leg {dl}</span>
+                    {num(legValue, {
+                        placeholder: `${legGlobal}`,
+                        onChange: e => {
+                            const v = e.target.value;
+                            onChange(runId, 'legDistance', v === '' ? '' : (units === 'metric' ? Number(v) / MI_TO_KM : Number(v)));
+                        },
+                    }, 'w-14')}
+                </>
+            ) : (
+                <>
+                    <span className="text-[10px] text-faint">chg min</span>
+                    {num(override.chargeTime ?? '', {
+                        placeholder: `${global.chargeTime}`,
+                        onChange: e => onChange(runId, 'chargeTime', e.target.value),
+                    }, 'w-12')}
+                </>
+            )}
+        </span>
+    );
+}
+
 // ── Chart.js plugin: charging badges + finish labels ─────────────────────────
 function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo) {
     return {
@@ -606,10 +657,13 @@ export default function RoadTripView({
             towingMode, towingEfficiency, towingRefSpeedMph,
         } = roadTripConfig;
 
+        const perRun = roadTripConfig.perRun || {};
+
         return validEntries.map(entry => {
             const chargingData = runDataCache[entry.run.id];
             if (!chargingData || chargingData.length === 0) return null;
 
+            const ov = perRun[entry.run.id] || {};
             const result = simulateRoadTrip({
                 batteryKwh:        entry.batteryKwh,
                 // Towing: all vehicles share the same system efficiency; battery still varies per vehicle
@@ -617,12 +671,12 @@ export default function RoadTripView({
                 testSpeedMph:      towingMode ? towingRefSpeedMph : (entry.testSpeedMph || 70),
                 chargingData,
                 startSoc,
-                minSoc,
+                minSoc:            ov.minSoc ?? minSoc,
                 destinationMinSoc,
-                legDistanceMi:     legDistance,
+                legDistanceMi:     ov.legDistance ?? legDistance,
                 totalDistanceMi:   totalDistance,
                 speedMph:          speed,
-                chargeTimeMinutes: chargeTime,
+                chargeTimeMinutes: ov.chargeTime ?? chargeTime,
                 overheadMinutes:   overhead,
                 mode,
                 towingMode,
@@ -643,18 +697,20 @@ export default function RoadTripView({
             startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance, mode, overhead,
             towingMode, towingEfficiency, towingRefSpeedMph,
         } = roadTripConfig;
+        const perRun = roadTripConfig.perRun || {};
         return validEntries.map(entry => {
             const chargingData = runDataCache[entry.run.id] ?? [];
+            const ov = perRun[entry.run.id] || {};
             return SPEED_SWEEP_MPH.map(speedMph => simulateRoadTrip({
                 batteryKwh:        entry.batteryKwh,
                 miPerKwh:          towingMode ? towingEfficiency : entry.miPerKwh,
                 testSpeedMph:      towingMode ? towingRefSpeedMph : (entry.testSpeedMph || 70),
                 chargingData,
-                startSoc, minSoc, destinationMinSoc,
-                legDistanceMi:     legDistance,
+                startSoc, minSoc: ov.minSoc ?? minSoc, destinationMinSoc,
+                legDistanceMi:     ov.legDistance ?? legDistance,
                 totalDistanceMi:   totalDistance,
                 speedMph,
-                chargeTimeMinutes: chargeTime,
+                chargeTimeMinutes: ov.chargeTime ?? chargeTime,
                 overheadMinutes:   overhead,
                 mode,
                 towingMode,
@@ -669,18 +725,21 @@ export default function RoadTripView({
             startSoc, minSoc, destinationMinSoc, chargeTime, totalDistance, speed, mode, overhead,
             towingMode, towingEfficiency, towingRefSpeedMph,
         } = roadTripConfig;
+        const perRun = roadTripConfig.perRun || {};
         return validEntries.map(entry => {
             const chargingData = runDataCache[entry.run.id] ?? [];
+            const ov = perRun[entry.run.id] || {};
+            // Leg distance is the swept axis here, so a per-run leg override doesn't apply.
             return LEG_SWEEP_MI.map(legMi => simulateRoadTrip({
                 batteryKwh:        entry.batteryKwh,
                 miPerKwh:          towingMode ? towingEfficiency : entry.miPerKwh,
                 testSpeedMph:      towingMode ? towingRefSpeedMph : (entry.testSpeedMph || 70),
                 chargingData,
-                startSoc, minSoc, destinationMinSoc,
+                startSoc, minSoc: ov.minSoc ?? minSoc, destinationMinSoc,
                 legDistanceMi:     legMi,
                 totalDistanceMi:   totalDistance,
                 speedMph:          speed,
-                chargeTimeMinutes: chargeTime,
+                chargeTimeMinutes: ov.chargeTime ?? chargeTime,
                 overheadMinutes:   overhead,
                 mode,
                 towingMode,
@@ -1235,6 +1294,18 @@ export default function RoadTripView({
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
 
+    // Per-run override setter. Empty/invalid clears the override (falls back to global);
+    // prunes empty run entries so unset runs use globals cleanly.
+    const setRunOverride = (runId, key, rawVal) => setRoadTripConfig(prev => {
+        const perRun = { ...(prev.perRun || {}) };
+        const cur = { ...(perRun[runId] || {}) };
+        if (rawVal === '' || rawVal == null || isNaN(Number(rawVal))) delete cur[key];
+        else cur[key] = Number(rawVal);
+        if (Object.keys(cur).length) perRun[runId] = cur;
+        else delete perRun[runId];
+        return { ...prev, perRun };
+    });
+
     // ── PNG export ────────────────────────────────────────────────────────────
     const handleCopyImage = async () => {
         if (!chartRef.current) return;
@@ -1524,6 +1595,7 @@ export default function RoadTripView({
                                 const spd = entry.testSpeedMph
                                     ? `${fmtSpeed(entry.testSpeedMph, units)}`
                                     : '70 mph (assumed)';
+                                const selected = selectedRunIds.some(id => String(id) === String(run.id));
                                 return (
                                     <span className="text-xs text-faint ml-1">
                                         {eff} {units === 'metric' ? 'km/kWh' : 'mi/kWh'} @ {spd}
