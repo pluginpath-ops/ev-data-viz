@@ -90,8 +90,8 @@ function RunChargingMetaLine({ run, calcKwhByRun, onCheckKwh }) {
     const items = [];
 
     items.push(<span key="pts" className="text-secondary">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>);
-    if (run.energy_kwh != null && !inferRunFlags(run).includes('range'))
-        items.push(<span key="kwh" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.energy_kwh} kWh in</span>);
+    if (run.charge_energy_kwh != null)
+        items.push(<span key="kwh" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.charge_energy_kwh} kWh in</span>);
 
     FIELD_META.filter(f => fields.includes(f.key)).forEach(f => {
         const isCalc = calcFields.includes(f.key);
@@ -108,7 +108,7 @@ function RunChargingMetaLine({ run, calcKwhByRun, onCheckKwh }) {
         items.push(<a key="curl" href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
 
     // kWh compare button — only on editable (non-inherited) cards
-    if (onCheckKwh && run.energy_kwh != null && (run.dataPointCount ?? 0) > 1) {
+    if (onCheckKwh && run.charge_energy_kwh != null && (run.dataPointCount ?? 0) > 1) {
         const check = calcKwhByRun?.[run.id];
         if (!check) {
             items.push(
@@ -119,7 +119,7 @@ function RunChargingMetaLine({ run, calcKwhByRun, onCheckKwh }) {
         } else if (check.loading) {
             items.push(<span key="cmp" className="text-faint text-xs">Calculating…</span>);
         } else if (check.kwh != null) {
-            const pct = Math.abs(run.energy_kwh - check.kwh) / Math.max(run.energy_kwh, check.kwh) * 100;
+            const pct = Math.abs(run.charge_energy_kwh - check.kwh) / Math.max(run.charge_energy_kwh, check.kwh) * 100;
             items.push(
                 <span key="cmp" title={`Calculated from data points: ${check.kwh} kWh`}
                     className={`text-xs px-1.5 py-0.5 rounded border font-medium ${pct > 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
@@ -453,6 +453,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         speedMph: '',
         distanceMiles: '',
         energyKwh: '',
+        chargeEnergyKwh: '',
         temperatureF: '',
         elevationGainFt: '',
         url: '',
@@ -529,7 +530,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', temperatureF: '', elevationGainFt: '', url: '', chargingUrl: '' });
+        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', elevationGainFt: '', url: '', chargingUrl: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: null });
@@ -822,6 +823,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             speedMph: run.speed_mph ?? '',
             distanceMiles: run.distance_miles ?? '',
             energyKwh: run.energy_kwh ?? '',
+            chargeEnergyKwh: run.charge_energy_kwh ?? '',
             temperatureF: run.temperature_f ?? '',
             elevationGainFt: run.elevation_gain_ft ?? '',
             url: run.url || '',
@@ -1400,8 +1402,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     type="number"
                                                     placeholder="Energy added (kWh)"
                                                     title="Energy measured at charger or vehicle — energy in"
-                                                    value={runMetadata.energyKwh}
-                                                    onChange={(e) => setRunMetadata({...runMetadata, energyKwh: e.target.value})}
+                                                    value={runMetadata.chargeEnergyKwh}
+                                                    onChange={(e) => setRunMetadata({...runMetadata, chargeEnergyKwh: e.target.value})}
                                                     className="form-input w-full"
                                                 />
                                                 <p className="text-xs text-faint mt-1">
@@ -1900,8 +1902,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             <input
                                                 type="number"
                                                 placeholder="Energy added (kWh)"
-                                                value={editFormData.energyKwh}
-                                                onChange={(e) => setEditFormData({...editFormData, energyKwh: e.target.value})}
+                                                value={editFormData.chargeEnergyKwh}
+                                                onChange={(e) => setEditFormData({...editFormData, chargeEnergyKwh: e.target.value})}
                                                 className="form-input w-full"
                                             />
                                             <p className="text-xs text-faint mt-1">
@@ -2028,31 +2030,42 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     </div>
                                                 );
                                             })()}
-                                            {/* kWh comparison — charging runs only, once data is loaded */}
-                                            {!editDataLoading && editCalcKwh != null && (editFormData.dataFlags || ['charging']).includes('charging') && (() => {
-                                                const manual = editFormData.energyKwh !== '' ? parseFloat(editFormData.energyKwh) : NaN;
+                                            {/* Energy sanity — charging runs only, once data is loaded.
+                                                Entered "energy added" is charger-side; it should exceed the
+                                                SoC-implied pack energy (ΔSoC × capacity) by the charging loss.
+                                                Green when that excess is 0 to +10% of capacity. */}
+                                            {!editDataLoading && editData != null && (editFormData.dataFlags || ['charging']).includes('charging') && (() => {
+                                                const cap    = vehicle?.battery ? Number(vehicle.battery) : null;
+                                                const manual = editFormData.chargeEnergyKwh !== '' ? parseFloat(editFormData.chargeEnergyKwh) : NaN;
                                                 const hasManual = !isNaN(manual) && manual > 0;
-                                                const pct = hasManual
-                                                    ? Math.abs(manual - editCalcKwh) / Math.max(manual, editCalcKwh) * 100
-                                                    : null;
+                                                const socs   = (editData || []).filter(r => r.soc != null).map(r => Number(r.soc));
+                                                const dSoC   = socs.length >= 2 ? Math.max(...socs) - Math.min(...socs) : null;
+                                                const packE  = (cap && dSoC != null) ? roundTo(cap * dSoC / 100, 1) : null;
+                                                const excess = (cap && packE != null && hasManual) ? (manual - packE) / cap * 100 : null;
+                                                const good   = excess != null && excess >= 0 && excess <= 10;
+                                                const tone   = excess == null ? 'bg-[var(--color-surface-muted)] border-[var(--color-border)]'
+                                                             : good ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200';
                                                 return (
-                                                    <div className={`mb-3 p-3 rounded-lg border flex flex-wrap items-center gap-3 ${pct != null && pct > 5 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+                                                    <div className={`mb-3 p-3 rounded-lg border flex flex-wrap items-center gap-3 ${tone}`}>
                                                         <span className="text-xs text-secondary">
-                                                            ⚡ <strong>Data points → {editCalcKwh} kWh</strong>
-                                                            {hasManual && <span className="text-muted"> (entered: {manual} kWh)</span>}
+                                                            {editCalcKwh != null && <>⚡ <strong>Data points → {editCalcKwh} kWh</strong> · </>}
+                                                            {packE != null
+                                                                ? <>pack ≈ {packE} kWh <span className="text-muted">({dSoC}% × {cap} kWh)</span></>
+                                                                : <span className="text-muted">add SoC data + battery capacity to validate energy</span>}
+                                                            {hasManual && <span className="text-muted"> · entered {manual} kWh</span>}
                                                         </span>
-                                                        {pct != null && pct > 5 && (
-                                                            <span className="text-xs bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-medium">
-                                                                ⚠️ {pct.toFixed(1)}% mismatch
-                                                            </span>
-                                                        )}
-                                                        {pct != null && pct <= 5 && (
+                                                        {excess != null && good && (
                                                             <span className="text-xs bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full font-medium">
-                                                                ✓ within 5%
+                                                                ✓ +{excess.toFixed(1)}% vs pack (within losses)
                                                             </span>
                                                         )}
-                                                        {!hasManual && (
-                                                            <span className="text-xs text-faint">Enter energy (kWh) above to compare</span>
+                                                        {excess != null && !good && (
+                                                            <span className="text-xs bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-medium">
+                                                                ⚠️ {excess >= 0 ? '+' : ''}{excess.toFixed(1)}% vs pack {excess < 0 ? '(below SoC-implied)' : '(>10% of capacity)'}
+                                                            </span>
+                                                        )}
+                                                        {packE != null && !hasManual && (
+                                                            <span className="text-xs text-faint">Enter energy added above to validate</span>
                                                         )}
                                                     </div>
                                                 );
