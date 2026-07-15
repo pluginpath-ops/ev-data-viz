@@ -1341,7 +1341,7 @@ export default function RoadTripView({
                         </div>
                     )}
 
-                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-4">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
                         <label className="text-sm">
                             <span className="font-medium block mb-1 whitespace-nowrap">Start SoC (%)</span>
                             <input type="number" className="w-full border rounded px-2 py-1"
