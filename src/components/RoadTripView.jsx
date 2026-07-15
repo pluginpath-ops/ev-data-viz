@@ -1007,19 +1007,9 @@ export default function RoadTripView({
         const autoXMax = isDriveTimeXAxis ? maxDriveTime * 1.15 : maxTime * 1.15;
         const autoYMax = isChargeTimeMode ? Math.ceil(maxChargeTime * 1.2 / 10) * 10 : totalDistDisplay;
 
-        // Default X minimum: time of the earliest first charge stop.
-        // In drive-time X mode, compute cumulative drive time up to first stop.
-        const firstChargeStart = isDriveTimeXAxis
-            ? Math.min(...validSims.map(s => {
-                let cum = 0;
-                for (const seg of s.segments) {
-                    if (seg.type === 'charge') return cum;
-                    cum += seg.endTime - seg.startTime;
-                }
-                return Infinity;
-            }))
-            : Math.min(...validSims.map(s => s.segments.find(seg => seg.type === 'charge')?.startTime ?? Infinity));
-        const autoXMin = isFinite(firstChargeStart) && firstChargeStart > 0 ? firstChargeStart : 0;
+        // Default X minimum is always 0 — the trip starts at the origin, not at
+        // the first charging stop.
+        const autoXMin = 0;
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
