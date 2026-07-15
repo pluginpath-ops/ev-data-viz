@@ -12,6 +12,7 @@ import ViewSpecsModal from './ViewSpecsModal';
 import { RunVoteButtons } from './VoteButtons';
 import EpaVehicleSection from './EpaVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
+import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
 
 // ── Data-type flag definitions ────────────────────────────────────────────────
 // Each flag represents a data domain that can independently be present in a run.
@@ -558,19 +559,13 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     };
 
     /**
-     * Return true when a single CSV cell value looks like a wall-clock timestamp
-     * rather than a plain number (seconds / minutes).
-     */
-    const isTimestampValue = (val) =>
-        val != null && typeof val === 'string' && val.trim() !== '' &&
-        isNaN(Number(val)) && !isNaN(Date.parse(val));
-
-    /**
      * After field mapping, detect timestamp columns and convert them to elapsed
-     * minutes from the first data point.
+     * minutes from the first data point. Handles wall-clock datetimes as well as
+     * elapsed clock / SMPTE timecode strings (HH:MM:SS, MM:SS, HH:MM:SS:FF) via
+     * {@link timestampToMs} — see src/utils/parseElapsedTime.js.
      *
      * Two cases handled:
-     *   A. `timestamp` field is mapped (explicit wall-clock column).
+     *   A. `timestamp` field is mapped (explicit wall-clock/timecode column).
      *      → compute `time` from it if `time` is not already mapped.
      *   B. `time` field is mapped but the first non-null value is a timestamp
      *      string, not a number.
@@ -584,31 +579,33 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
         // Case A: explicit timestamp column mapped
         if (firstWithTs && isTimestampValue(firstWithTs.timestamp)) {
-            const t0 = new Date(firstWithTs.timestamp).getTime();
+            const t0 = timestampToMs(firstWithTs.timestamp);
             return {
-                rows: rows.map(row => ({
-                    ...row,
-                    // Only fill `time` when it wasn't already supplied
-                    time: row.time != null ? row.time
-                        : row.timestamp != null
-                            ? roundTo((new Date(row.timestamp).getTime() - t0) / 60000, 3)
-                            : null,
-                })),
+                rows: rows.map(row => {
+                    const ms = row.timestamp != null ? timestampToMs(row.timestamp) : null;
+                    return {
+                        ...row,
+                        // Only fill `time` when it wasn't already supplied
+                        time: row.time != null ? row.time
+                            : ms != null ? roundTo((ms - t0) / 60000, 3) : null,
+                    };
+                }),
                 converted: true,
             };
         }
 
         // Case B: `time` column contains timestamp strings
         if (firstWithTime && isTimestampValue(firstWithTime.time)) {
-            const t0 = new Date(firstWithTime.time).getTime();
+            const t0 = timestampToMs(firstWithTime.time);
             return {
-                rows: rows.map(row => ({
-                    ...row,
-                    timestamp: row.timestamp ?? row.time,   // save original
-                    time: row.time != null
-                        ? roundTo((new Date(row.time).getTime() - t0) / 60000, 3)
-                        : null,
-                })),
+                rows: rows.map(row => {
+                    const ms = row.time != null ? timestampToMs(row.time) : null;
+                    return {
+                        ...row,
+                        timestamp: row.timestamp ?? row.time,   // save original
+                        time: ms != null ? roundTo((ms - t0) / 60000, 3) : null,
+                    };
+                }),
                 converted: true,
             };
         }
