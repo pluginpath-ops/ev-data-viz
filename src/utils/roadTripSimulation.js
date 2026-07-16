@@ -188,12 +188,15 @@ export function simulateRoadTrip({
         const tStart = timeAtSoc(currentSoc);
 
         if (mode === 'distance') {
-            if (canFinishNext) {
-                // Last stop — charge only enough to arrive at destFloor.
-                targetSoc = Math.min(100, Math.max(arrivalRequiredSoc, currentSoc + 1));
+            // Final (short) leg once the remaining trip fits within ~one leg — charge
+            // only enough to cover it and arrive at destFloor. A <2 mi leftover is
+            // absorbed into this leg to avoid a phantom tiny final stop. Otherwise add
+            // exactly one leg's worth of range (never the whole remaining trip).
+            const isLastLeg = remaining <= legDistanceMi + 2.0;
+            if (isLastLeg) {
+                targetSoc = Math.min(100, Math.max(destFloor + socForMiles(remaining), currentSoc + 1));
             } else {
-                // Add one leg's worth of range, capped at 100%.
-                targetSoc = Math.min(currentSoc + socForMiles(Math.min(legDistanceMi, remaining)), 100);
+                targetSoc = Math.min(currentSoc + socForMiles(legDistanceMi), 100);
                 targetSoc = Math.max(targetSoc, currentSoc + 1);
             }
             const tEnd = timeAtSoc(targetSoc);
