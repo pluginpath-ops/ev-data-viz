@@ -48,8 +48,9 @@ const CHARGE_CEIL_SOC = 95; // % — charging above this marks a sim as unrealis
  */
 function isSimUnrealistic(sim) {
     if (!sim) return true;
+    if (sim.completed === false) return true;
     if (sim.segments.some(s => s.type === 'charge' && s.endSoc > CHARGE_CEIL_SOC)) return true;
-    if (sim.warnings.some(w => /depleted|maximum iterations/i.test(w))) return true;
+    if (sim.warnings.some(w => /depleted|maximum iterations|complete trip/i.test(w))) return true;
     return false;
 }
 
@@ -173,8 +174,8 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                     const lastPt = meta.data[meta.data.length - 1];
                     if (!lastPt) return;
 
-                    const timeLabel = formatTime(sim.totalTimeMin);
-                    const deltaMin  = iceTimeMin != null ? sim.totalTimeMin - iceTimeMin : null;
+                    const timeLabel = sim.completed === false ? 'did not finish' : formatTime(sim.totalTimeMin);
+                    const deltaMin  = (sim.completed !== false && iceTimeMin != null) ? sim.totalTimeMin - iceTimeMin : null;
                     const absDelta  = deltaMin != null ? Math.abs(deltaMin) : null;
                     const vsIce     = absDelta != null
                         ? (deltaMin > 0 ? `+${formatTime(absDelta)} vs ICE` : `−${formatTime(absDelta)} vs ICE`)
@@ -297,7 +298,9 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                     const sim = simResults[si++];
                     if (sim) finishLabels.push({
                         x: lastPt.x, y: lastPt.y,
-                        text: `${ds.label} — ${formatTime(sim.totalTimeMin)}`,
+                        text: sim.completed === false
+                            ? `${ds.label} — did not finish`
+                            : `${ds.label} — ${formatTime(sim.totalTimeMin)}`,
                         color: ds.borderColor,
                     });
                 }
@@ -545,7 +548,7 @@ export default function RoadTripView({
     // ── Run simulation for each entry ─────────────────────────────────────────
     const simResults = useMemo(() => {
         const {
-            startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, overhead,
+            startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance, speed, mode, overhead,
             towingMode, towingEfficiency, towingRefSpeedMph,
         } = roadTripConfig;
 
@@ -561,6 +564,7 @@ export default function RoadTripView({
                 chargingData,
                 startSoc,
                 minSoc,
+                destinationMinSoc,
                 legDistanceMi:     legDistance,
                 totalDistanceMi:   totalDistance,
                 speedMph:          speed,
@@ -582,7 +586,7 @@ export default function RoadTripView({
     const speedSweepResults = useMemo(() => {
         if (roadTripConfig.xAxis !== 'speed') return null;
         const {
-            startSoc, minSoc, legDistance, chargeTime, totalDistance, mode, overhead,
+            startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance, mode, overhead,
             towingMode, towingEfficiency, towingRefSpeedMph,
         } = roadTripConfig;
         return validEntries.map(entry => {
@@ -592,7 +596,7 @@ export default function RoadTripView({
                 miPerKwh:          towingMode ? towingEfficiency : entry.miPerKwh,
                 testSpeedMph:      towingMode ? towingRefSpeedMph : (entry.testSpeedMph || 70),
                 chargingData,
-                startSoc, minSoc,
+                startSoc, minSoc, destinationMinSoc,
                 legDistanceMi:     legDistance,
                 totalDistanceMi:   totalDistance,
                 speedMph,
@@ -608,7 +612,7 @@ export default function RoadTripView({
     const distSweepResults = useMemo(() => {
         if (roadTripConfig.xAxis !== 'tripDist') return null;
         const {
-            startSoc, minSoc, chargeTime, totalDistance, speed, mode, overhead,
+            startSoc, minSoc, destinationMinSoc, chargeTime, totalDistance, speed, mode, overhead,
             towingMode, towingEfficiency, towingRefSpeedMph,
         } = roadTripConfig;
         return validEntries.map(entry => {
@@ -618,7 +622,7 @@ export default function RoadTripView({
                 miPerKwh:          towingMode ? towingEfficiency : entry.miPerKwh,
                 testSpeedMph:      towingMode ? towingRefSpeedMph : (entry.testSpeedMph || 70),
                 chargingData,
-                startSoc, minSoc,
+                startSoc, minSoc, destinationMinSoc,
                 legDistanceMi:     legMi,
                 totalDistanceMi:   totalDistance,
                 speedMph:          speed,
@@ -1003,19 +1007,9 @@ export default function RoadTripView({
         const autoXMax = isDriveTimeXAxis ? maxDriveTime * 1.15 : maxTime * 1.15;
         const autoYMax = isChargeTimeMode ? Math.ceil(maxChargeTime * 1.2 / 10) * 10 : totalDistDisplay;
 
-        // Default X minimum: time of the earliest first charge stop.
-        // In drive-time X mode, compute cumulative drive time up to first stop.
-        const firstChargeStart = isDriveTimeXAxis
-            ? Math.min(...validSims.map(s => {
-                let cum = 0;
-                for (const seg of s.segments) {
-                    if (seg.type === 'charge') return cum;
-                    cum += seg.endTime - seg.startTime;
-                }
-                return Infinity;
-            }))
-            : Math.min(...validSims.map(s => s.segments.find(seg => seg.type === 'charge')?.startTime ?? Infinity));
-        const autoXMin = isFinite(firstChargeStart) && firstChargeStart > 0 ? firstChargeStart : 0;
+        // Default X minimum is always 0 — the trip starts at the origin, not at
+        // the first charging stop.
+        const autoXMin = 0;
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
@@ -1200,7 +1194,7 @@ export default function RoadTripView({
 
     // ── Render ───────────────────────────────────────────────────────────────
     const {
-        startSoc, minSoc, legDistance, chargeTime, totalDistance, speed, mode, yAxis, xAxis, sweepYAxis, overhead,
+        startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance, speed, mode, yAxis, xAxis, sweepYAxis, overhead,
         towingMode, towingEfficiency, towingRefSpeedMph,
     } = roadTripConfig;
     const isSpeedMode    = xAxis === 'speed';
@@ -1347,7 +1341,7 @@ export default function RoadTripView({
                         </div>
                     )}
 
-                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-4">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
                         <label className="text-sm">
                             <span className="font-medium block mb-1 whitespace-nowrap">Start SoC (%)</span>
                             <input type="number" className="w-full border rounded px-2 py-1"
@@ -1358,7 +1352,15 @@ export default function RoadTripView({
                             <span className="font-medium block mb-1 whitespace-nowrap">Min SoC (%)</span>
                             <input type="number" className="w-full border rounded px-2 py-1"
                                 min={0} max={30} value={minSoc}
+                                title="Lowest SoC before charging en route"
                                 onChange={e => setField('minSoc', Number(e.target.value))} />
+                        </label>
+                        <label className="text-sm">
+                            <span className="font-medium block mb-1 whitespace-nowrap">Dest. SoC (%)</span>
+                            <input type="number" className="w-full border rounded px-2 py-1"
+                                min={0} max={90} value={destinationMinSoc ?? minSoc}
+                                title="SoC to arrive at the destination with. Higher than Min SoC keeps a bigger buffer for the final leg."
+                                onChange={e => setField('destinationMinSoc', Number(e.target.value))} />
                         </label>
                         {mode === 'distance' && !isTripDistMode && (
                             <label className="text-sm">
@@ -1662,7 +1664,11 @@ export default function RoadTripView({
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-3 py-2 font-medium">{formatTime(sim.totalTimeMin)}</td>
+                                            <td className="px-3 py-2 font-medium">
+                                                {sim.completed === false
+                                                    ? <span className="text-red-500" title={`Only reached ${Math.round(convDistance(sim.totalDistMi, units))} ${dl} of ${Math.round(convDistance(totalDistance, units))} ${dl}`}>Did not finish</span>
+                                                    : formatTime(sim.totalTimeMin)}
+                                            </td>
                                             <td className="px-3 py-2">{sim.chargeStops}</td>
                                             <td className="px-3 py-2">{sim.chargeStops > 0 ? formatTime(avgChargeTime) : '—'}</td>
                                             <td className="px-3 py-2">
@@ -1697,7 +1703,7 @@ export default function RoadTripView({
                                                 )}
                                             </td>
                                             <td className="px-3 py-2 font-medium">
-                                                {(() => {
+                                                {sim.completed === false ? <span className="text-faint">—</span> : (() => {
                                                     const absDelta = Math.abs(vsIce);
                                                     const h = Math.floor(absDelta / 60);
                                                     const m = Math.round(absDelta % 60);

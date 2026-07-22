@@ -5,8 +5,53 @@ import { convDistance, roundTo } from './unitConversions';
 const AERO_FRACTION        = 0.70; // fraction of energy from aero drag at ref speed (unladen EV)
 const TOWING_AERO_FRACTION = 0.85; // higher aero fraction when towing — trailer roughly doubles Cd×A
 const REFERENCE_SPEED      = 70;   // mph
-const MAX_ITERATIONS       = 50;   // safety guard against infinite loops
+const MAX_ITERATIONS       = 200;  // safety guard against infinite loops (≈ enough stops for any trip)
 const MIN_DRIVE_MI         = 0.1;  // minimum driveable distance before bailing
+const TAIL_END_KW          = 5;    // assumed charging power at 100% SoC for the synthetic tail
+const TAIL_STEP_SOC        = 2;    // % SoC step when generating the synthetic high-SoC tail
+
+// ── High-SoC charging tail ─────────────────────────────────────────────────────
+
+/**
+ * Extend a measured charging curve above its last data point with a synthetic
+ * tail: charger power declines linearly from the curve's end power down to
+ * TAIL_END_KW at 100% SoC, integrated to elapsed time. This replaces slope
+ * extrapolation of the time curve (which under-reports, since charge time is
+ * convex in SoC) with a physically-shaped taper. Cheap — ~a dozen points.
+ *
+ * @param {Array}  sortedBySoc  Measured points sorted ascending by soc, each {soc,time,chargeRate?}
+ * @param {number} batteryKwh   Usable capacity (kWh)
+ * @returns {Array} synthetic points {soc,time,chargeRate} above the measured max SoC (may be empty)
+ */
+export function buildChargeTail(sortedBySoc, batteryKwh) {
+    const last = sortedBySoc[sortedBySoc.length - 1];
+    if (!last || last.soc >= 100 - 1e-6 || !batteryKwh || batteryKwh <= 0) return [];
+
+    // End power: prefer the slope of the last measured segment (kW into the pack,
+    // consistent with the time curve we're extending); fall back to charge_rate.
+    const prev = sortedBySoc[sortedBySoc.length - 2];
+    let endKw = null;
+    if (prev) {
+        const dSoc = last.soc - prev.soc, dMin = last.time - prev.time;
+        if (dSoc > 0 && dMin > 0) endKw = (batteryKwh * dSoc / 100) / (dMin / 60);
+    }
+    if (!endKw || !isFinite(endKw) || endKw <= 0) endKw = last.chargeRate ?? 50;
+
+    const p100    = Math.min(TAIL_END_KW, endKw); // never let power rise toward 100%
+    const powerAt = soc => endKw + (p100 - endKw) * (soc - last.soc) / (100 - last.soc);
+
+    const tail = [];
+    let t = last.time, prevSoc = last.soc;
+    for (let soc = last.soc + TAIL_STEP_SOC; soc < 100 + TAIL_STEP_SOC; soc += TAIL_STEP_SOC) {
+        const s = Math.min(soc, 100);
+        const avgKw = (powerAt(prevSoc) + powerAt(s)) / 2;
+        if (avgKw > 0) t += (batteryKwh * (s - prevSoc) / 100) / (avgKw / 60);
+        tail.push({ soc: s, time: round1(t), chargeRate: round1(powerAt(s)) });
+        prevSoc = s;
+        if (s >= 100) break;
+    }
+    return tail;
+}
 
 // ── Speed correction ─────────────────────────────────────────────────────────
 
@@ -38,7 +83,9 @@ export function speedCorrectionFactor(travelMph, testMph, aeroFraction = AERO_FR
  * @param {number}  params.testSpeedMph     Speed the range test was conducted at
  * @param {Array}   params.chargingData     Charging run data points (sorted by frame)
  * @param {number}  params.startSoc         Starting SoC (0–100)
- * @param {number}  params.minSoc           Minimum SoC before charging (0–100)
+ * @param {number}  params.minSoc           Minimum SoC before charging en route (0–100)
+ * @param {number}  [params.destinationMinSoc] SoC to arrive at the destination with
+ *   (defaults to minSoc). Lets the final leg keep a bigger buffer than en-route stops.
  * @param {number}  params.legDistanceMi    Miles of range added per charging stop (distance mode)
  * @param {number}  params.totalDistanceMi  Total trip distance
  * @param {number}  params.speedMph         Travel speed
@@ -47,34 +94,43 @@ export function speedCorrectionFactor(travelMph, testMph, aeroFraction = AERO_FR
  * @param {number}  [params.overheadMinutes] Per-stop overhead (default 5)
  * @param {boolean} [params.towingMode]      When true, use higher aero fraction for speed correction
  *
- * @returns {{ segments, totalTimeMin, chargeStops, warnings, speedFactor }}
+ * @returns {{ segments, totalTimeMin, totalDistMi, chargeStops, warnings, speedFactor, correctedMiPerKwh, completed }}
  */
 export function simulateRoadTrip({
     batteryKwh, miPerKwh, testSpeedMph, chargingData,
-    startSoc, minSoc, legDistanceMi, totalDistanceMi,
+    startSoc, minSoc, destinationMinSoc, legDistanceMi, totalDistanceMi,
     speedMph, chargeTimeMinutes = 30, mode = 'distance',
     overheadMinutes = 5, towingMode = false,
 }) {
     const warnings = [];
     const segments = [];
 
+    // Arrival buffer defaults to the en-route floor (no behaviour change until set).
+    const destFloor = (destinationMinSoc != null && !isNaN(destinationMinSoc)) ? destinationMinSoc : minSoc;
+
     // Speed correction — use higher aero fraction when towing (trailer raises Cd×A of system)
     const aeroFrac = towingMode ? TOWING_AERO_FRACTION : AERO_FRACTION;
     const factor = speedCorrectionFactor(speedMph, testSpeedMph, aeroFrac);
     const correctedMiPerKwh = miPerKwh / factor;
 
-    // Prepare charging curve sorted by SoC and by time
-    const chargingBySoc = chargingData
+    // Prepare charging curve sorted by SoC, extended with a synthetic high-SoC tail
+    // so charging past the measured data tapers realistically instead of via slope
+    // extrapolation. Both lookup orders share the augmented curve.
+    const measuredBySoc = chargingData
         .filter(p => p.soc != null && p.time != null)
         .sort((a, b) => a.soc - b.soc);
 
-    const chargingByTime = chargingData
-        .filter(p => p.soc != null && p.time != null)
-        .sort((a, b) => a.time - b.time);
-
-    if (chargingBySoc.length < 2) {
+    if (measuredBySoc.length < 2) {
         warnings.push('Insufficient charging data points');
     }
+
+    const curveBySoc  = [...measuredBySoc, ...buildChargeTail(measuredBySoc, batteryKwh)];
+    const curveByTime = [...curveBySoc].sort((a, b) => a.time - b.time);
+
+    // Range (mi) available driving from `soc` down to a given floor.
+    const rangeFrom = (soc, floor) => batteryKwh * (soc - floor) / 100 * correctedMiPerKwh;
+    // SoC needed now to cover `mi` of driving.
+    const socForMiles = mi => (mi / (batteryKwh * correctedMiPerKwh)) * 100;
 
     let currentSoc  = startSoc;
     let currentDist = 0;
@@ -86,19 +142,20 @@ export function simulateRoadTrip({
         iterations++;
 
         // ── DRIVE ────────────────────────────────────────────────────────
-        const rangeFromSoc  = batteryKwh * (currentSoc - minSoc) / 100 * correctedMiPerKwh;
         const remainingTrip = totalDistanceMi - currentDist;
 
-        // Both modes: drive until minSoc (or trip end).
-        // Distance mode adds a fixed amount of charge at each stop rather than stopping at fixed intervals.
-        const driveDist = Math.max(0, Math.min(rangeFromSoc, remainingTrip));
+        // Final leg if we can reach the destination while keeping ≥ destFloor;
+        // otherwise drive down to the en-route floor (minSoc) and charge.
+        const driveDist = (rangeFrom(currentSoc, destFloor) >= remainingTrip - 0.01)
+            ? remainingTrip
+            : Math.max(0, Math.min(rangeFrom(currentSoc, minSoc), remainingTrip));
 
         if (driveDist < MIN_DRIVE_MI && currentDist < totalDistanceMi) {
             warnings.push('Battery depleted: cannot drive far enough to reach next charger');
             break;
         }
 
-        const socUsed   = (driveDist / (batteryKwh * correctedMiPerKwh)) * 100;
+        const socUsed   = socForMiles(driveDist);
         const driveTime = (driveDist / speedMph) * 60; // minutes
 
         segments.push({
@@ -122,40 +179,48 @@ export function simulateRoadTrip({
         chargeStops++;
         let chargeTime, targetSoc;
 
+        // SoC needed here to finish the whole remaining trip arriving at destFloor.
+        const remaining = totalDistanceMi - currentDist;
+        const arrivalRequiredSoc = destFloor + socForMiles(remaining);
+        const canFinishNext = arrivalRequiredSoc <= 100 + 1e-6;
+
+        const timeAtSoc = soc => interpolate(curveBySoc, 'soc', 'time', soc, true, true);
+        const tStart = timeAtSoc(currentSoc);
+
         if (mode === 'distance') {
-            // Add a fixed number of miles of range per stop (legDistanceMi), capped at
-            // what's needed for the remaining trip and at 100% SoC.
-            // If the leftover after one legDistanceMi charge would be tiny (< 2 mi),
-            // extend this stop to cover the whole remaining distance — avoids phantom stops
-            // when the trip distance doesn't divide evenly by the leg size.
-            const remaining  = totalDistanceMi - currentDist;
-            const leftover   = remaining - legDistanceMi;
-            const chargeMi   = (leftover > 0 && leftover < 2.0) ? remaining : Math.min(legDistanceMi, remaining);
-            const socToAdd   = (chargeMi / (batteryKwh * correctedMiPerKwh)) * 100;
-            targetSoc = Math.min(currentSoc + socToAdd, 100);
-            targetSoc = Math.max(targetSoc, currentSoc + 1);
-
-            const tStart = interpolate(chargingBySoc, 'soc', 'time', currentSoc, true, true);
-            const tEnd   = interpolate(chargingBySoc, 'soc', 'time', targetSoc,  true, true);
-
-            if (tStart == null || tEnd == null) {
-                warnings.push(`Charging data incomplete for SoC ${round1(currentSoc)}%-${round1(targetSoc)}%`);
-                chargeTime = (targetSoc - currentSoc) * 0.5; // fallback: ~0.5 min per %
+            // Final (short) leg once the remaining trip fits within ~one leg — charge
+            // only enough to cover it and arrive at destFloor. A <2 mi leftover is
+            // absorbed into this leg to avoid a phantom tiny final stop. Otherwise add
+            // exactly one leg's worth of range (never the whole remaining trip).
+            const isLastLeg = remaining <= legDistanceMi + 2.0;
+            if (isLastLeg) {
+                targetSoc = Math.min(100, Math.max(destFloor + socForMiles(remaining), currentSoc + 1));
             } else {
-                chargeTime = Math.max(0, tEnd - tStart);
+                targetSoc = Math.min(currentSoc + socForMiles(legDistanceMi), 100);
+                targetSoc = Math.max(targetSoc, currentSoc + 1);
             }
+            const tEnd = timeAtSoc(targetSoc);
+            chargeTime = (tStart != null && tEnd != null)
+                ? Math.max(0, tEnd - tStart)
+                : (targetSoc - currentSoc) * 0.5; // fallback: ~0.5 min per %
         } else {
-            // Mode B: charge for fixed time
-            const tStart = interpolate(chargingBySoc, 'soc', 'time', currentSoc, true, true);
-            if (tStart == null) {
-                warnings.push(`Charging data incomplete at SoC ${round1(currentSoc)}%`);
-                targetSoc = Math.min(currentSoc + chargeTimeMinutes * 2, 100); // rough fallback
+            // Fixed-time mode. On the final approach, charge only as long as needed
+            // to reach the destination rather than the full fixed duration.
+            const timeToArrival = (canFinishNext && tStart != null) ? (timeAtSoc(arrivalRequiredSoc) - tStart) : Infinity;
+            if (canFinishNext && isFinite(timeToArrival) && timeToArrival <= chargeTimeMinutes) {
+                targetSoc  = Math.min(100, Math.max(arrivalRequiredSoc, currentSoc + 1));
+                chargeTime = Math.max(0, timeToArrival);
             } else {
-                const tEnd = tStart + chargeTimeMinutes;
-                const endSoc = interpolate(chargingByTime, 'time', 'soc', tEnd, false, true);
-                targetSoc = endSoc != null ? Math.min(endSoc, 100) : Math.min(currentSoc + chargeTimeMinutes * 2, 100);
+                // Normal full-duration stop.
+                if (tStart == null) {
+                    warnings.push(`Charging data incomplete at SoC ${round1(currentSoc)}%`);
+                    targetSoc = Math.min(currentSoc + chargeTimeMinutes * 2, 100); // rough fallback
+                } else {
+                    const endSoc = interpolate(curveByTime, 'time', 'soc', tStart + chargeTimeMinutes, false, true);
+                    targetSoc = endSoc != null ? Math.min(endSoc, 100) : Math.min(currentSoc + chargeTimeMinutes * 2, 100);
+                }
+                chargeTime = chargeTimeMinutes;
             }
-            chargeTime = chargeTimeMinutes;
 
             if (targetSoc <= currentSoc + 1) {
                 warnings.push('Charger too slow for meaningful charge');
@@ -179,8 +244,14 @@ export function simulateRoadTrip({
         currentSoc   = targetSoc;
     }
 
-    if (iterations >= MAX_ITERATIONS) {
-        warnings.push('Simulation reached maximum iterations');
+    const completed = currentDist >= totalDistanceMi - 0.01;
+    if (iterations >= MAX_ITERATIONS && !completed) {
+        warnings.push('Could not complete trip: too many charging stops required');
+    }
+    // Reached the destination but below the requested arrival buffer (the buffer was
+    // unachievable given battery / efficiency / charging limits).
+    if (completed && destFloor > minSoc && currentSoc < destFloor - 0.5) {
+        warnings.push(`Arrived at ${round1(currentSoc)}% — below the ${round1(destFloor)}% destination minimum`);
     }
 
     return {
@@ -191,6 +262,7 @@ export function simulateRoadTrip({
         warnings,
         speedFactor: factor,
         correctedMiPerKwh,
+        completed,
     };
 }
 

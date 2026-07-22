@@ -91,7 +91,7 @@ export default function App() {
     const [compareConfig, setCompareConfig] = useState({ xMinutes: 15, mMiles: 150, startSoc: 10 });
     const [epaConfig, setEpaConfig] = useState({ yAxis: 'kwh100mi', xMin: null, xMax: null, yMin: null, yMax: null });
     const [roadTripConfig, setRoadTripConfig] = useState({
-        mode: 'distance', startSoc: 90, minSoc: 10,
+        mode: 'distance', startSoc: 90, minSoc: 10, destinationMinSoc: 10,
         legDistance: 150, chargeTime: 30,
         totalDistance: 500, speed: 70,
         overhead: 5,              // per-stop overhead minutes (applies to EV and ICE)
