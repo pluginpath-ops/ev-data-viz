@@ -668,10 +668,14 @@ export default function EpaCurvesView({
                             <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
                                 Overlay Real World Tests
                                 <InfoIcon
-                                    text="Plot this vehicle's own range-test points on top of its curve. Corrected: scaled by temperature + wind to match the curve's current viewing conditions above — an apples-to-apples comparison (not elevation gain/loss — no model for that yet). Uncorrected: the raw measured value as recorded, unadjusted — not a valid comparison across different test conditions, but useful to see the true recorded data."
+                                    tooltipClassName="info-icon-tooltip--wide"
                                     position="right"
                                     className="ml-1"
-                                />
+                                >
+                                    <p>Plot this vehicle's own range-test points on top of its curve.</p>
+                                    <p className="mt-1.5"><strong>Corrected:</strong> scaled by temperature + wind to match the curve's current viewing conditions above — an apples-to-apples comparison (not elevation gain/loss — no model for that yet).</p>
+                                    <p className="mt-1.5"><strong>Uncorrected:</strong> the raw measured value as recorded, unadjusted — not a valid comparison across different test conditions, but useful to see the true recorded data.</p>
+                                </InfoIcon>
                             </span>
                             <button
                                 type="button"
