@@ -6,16 +6,18 @@
  * toggled by the `.info-icon:hover .info-icon-tooltip` CSS rule in index.css.
  *
  * Props:
- *   text      {string}  — tooltip text (plain string; no HTML)
- *   position  {'above'|'below'|'right'}  — tooltip placement (default: 'above')
- *   className {string}  — extra classes on the wrapper span
+ *   text             {string}  — tooltip text (plain string; no HTML). Ignored if `children` is given.
+ *   children         {node}    — richer tooltip content (e.g. a reference table), in place of `text`
+ *   position         {'above'|'below'|'right'}  — tooltip placement (default: 'above')
+ *   className        {string}  — extra classes on the wrapper span
+ *   tooltipClassName {string}  — extra classes on the tooltip bubble itself (e.g. a width override)
  */
-export default function InfoIcon({ text, position = 'above', className = '' }) {
+export default function InfoIcon({ text, children, position = 'above', className = '', tooltipClassName = '' }) {
     return (
-        <span className={`info-icon ${className}`} aria-label={text} role="img">
+        <span className={`info-icon ${className}`} aria-label={typeof text === 'string' ? text : undefined} role="img">
             <span className="info-icon-glyph">ⓘ</span>
-            <span className={`info-icon-tooltip info-icon-tooltip--${position}`}>
-                {text}
+            <span className={`info-icon-tooltip info-icon-tooltip--${position} ${tooltipClassName}`}>
+                {children ?? text}
             </span>
         </span>
     );
