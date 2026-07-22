@@ -257,6 +257,7 @@ export function AppProvider({ children }) {
                     case 'speedMph':        normalized.speed_mph          = toNum(v);  break;
                     case 'distanceMiles':   normalized.distance_miles     = toNum(v);  break;
                     case 'energyKwh':       normalized.energy_kwh         = toNum(v);  break;
+                    case 'chargeEnergyKwh': normalized.charge_energy_kwh  = toNum(v);  break;
                     case 'temperatureF':    normalized.temperature_f      = toNum(v);  break;
                     case 'elevationGainFt': normalized.elevation_gain_ft  = toNum(v);  break;
                     case 'chargingUrl':     normalized.charging_url       = v;         break;
