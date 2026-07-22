@@ -743,6 +743,12 @@ body {
     @apply flex flex-wrap gap-4 mb-4;
 }
 
+/* EPA Curves viewing-condition controls (altitude/temp/accessory load) —
+   own row below .chart-toggles so they don't compete for space with it */
+.chart-viewing-conditions {
+    @apply flex flex-wrap items-center gap-4 mb-4;
+}
+
 /* Collapsible "Select Runs" section header button */
 .run-selector-header {
     @apply flex items-center gap-2 w-full text-left font-medium transition-colors mb-1;
@@ -1151,6 +1157,28 @@ body {
     left: calc(100% + 6px);
     top: 50%;
     transform: translateY(-50%);
+}
+
+/* Width override for richer tooltip content (e.g. a reference table) */
+.info-icon-tooltip--wide {
+    width: 460px;
+}
+
+/* Reference table shown inside a wide info-icon tooltip (e.g. EPA Curves accessory load) */
+.accessory-load-table {
+    @apply w-full border-collapse text-[11px] mt-1;
+}
+.accessory-load-table th,
+.accessory-load-table td {
+    @apply border px-1 py-0.5 text-center;
+    border-color: var(--color-border);
+}
+.accessory-load-table th {
+    @apply font-semibold;
+}
+.accessory-load-table td:first-child,
+.accessory-load-table th:first-child {
+    @apply text-left;
 }
 
 /* ── Specs comparison chart ──────────────────────────────────────────────────── */

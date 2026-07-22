@@ -335,6 +335,27 @@ export function airDensityRatio(elevationFt) {
     return Math.pow(base, 4.2559);
 }
 
+/** Standard-condition ambient temperature (°F), matching the ISA sea-level
+ *  reference (15°C) that airDensityRatio's altitude formula assumes. */
+export const STANDARD_TEMP_F = 59;
+
+/**
+ * Air-density ratio from ambient temperature alone, via the ideal gas law at
+ * constant pressure (ρ ∝ 1/T): colder air is denser (ratio > 1), hotter air
+ * is thinner (ratio < 1). Independent of, and multiplies with, airDensityRatio
+ * — same plot-time-only scale on the aerodynamic (C) term, never persisted.
+ *
+ * @param {number|null} tempF  ambient temperature in °F; null/undefined ⇒ 1 (no adjustment)
+ * @returns {number} density ratio (1.0 at the standard temperature)
+ */
+export function temperatureDensityRatio(tempF) {
+    if (tempF == null || tempF === '') return 1;
+    const actualRankine   = Number(tempF) + 459.67;
+    const standardRankine = STANDARD_TEMP_F + 459.67;
+    if (actualRankine <= 0) return 1; // guard absolute-zero-adjacent nonsense input
+    return standardRankine / actualRankine;
+}
+
 // ── Curve builder (curator model) ───────────────────────────────────────────
 
 /**
@@ -351,17 +372,22 @@ export function airDensityRatio(elevationFt) {
  * coefficients are never modified — passing 1 (default) reproduces the standard
  * sea-level curve exactly.
  *
+ * Accessory load (viewing condition): `accessoryOverrideW`, when given, replaces
+ * the group's stored accessory load for THIS curve only, at plot time. η (which
+ * was derived using the group's own accessory load) is never recomputed.
+ *
  * @param {object} group       — full group (with epa_coefficient_sets + epa_tests)
  * @param {number|null} useableKwh — battery capacity for range; null ⇒ rangeMi null
  * @param {number} densityRatio   — ρ_altitude / ρ_sea_level (default 1 = sea level)
+ * @param {number|null} accessoryOverrideW — override accessory draw in watts; null ⇒ use the group's own value
  * @returns {Array<{ mph, kwh100mi, miPerKwh, mpge, rangeMi }>}
  */
-export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1) {
+export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1, accessoryOverrideW = null) {
     const coeffs = resolvePrimaryCoeffs(group);
     if (!coeffs) return [];
 
     const eta   = deriveDrivetrainEta(group).value;
-    const accKw = accessoryKw(group);
+    const accKw = accessoryOverrideW != null ? accessoryOverrideW / 1000 : accessoryKw(group);
     const { a, b } = coeffs;
     const c = coeffs.c * densityRatio; // aerodynamic term only, display-time scale
     const [vMin, vMax] = CURVE_SPEED_RANGE;

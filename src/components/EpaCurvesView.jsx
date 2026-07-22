@@ -10,11 +10,16 @@ import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH,
 } from '../utils/epaPhysics';
-import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio } from '../utils/epaDerivations';
+import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio, temperatureDensityRatio, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import ChartInfoBubble from './ChartInfoBubble';
+
+// Sane bounds for the ambient-temperature viewing condition; far outside this
+// the ideal-gas density approximation isn't meaningful anyway.
+const MIN_TEMP_F = -100;
+const MAX_TEMP_F = 150;
 
 // ── Highway band plugin ───────────────────────────────────────────────────────
 
@@ -184,6 +189,58 @@ function ConfidenceBadge({ confidence }) {
     );
 }
 
+// ── Accessory-load reference table (for the Accessory Load info tooltip) ─────
+
+// Steady-state auxiliary draw by ambient temperature, in watts. Heat-pump and
+// resistive rows are alternative heating methods for the same job, not
+// simultaneous loads. Battery conditioning here is steady-state pack-temperature
+// maintenance, not the much higher, short-duration draw of active DC-fast-charge
+// preconditioning.
+const ACCESSORY_LOAD_REFERENCE_W = [
+    { ambient: '0°F',   heatPump: '2500–4000*',  resistive: '4000–6000', ac: '—',         battery: '1000–3000', lighting: '100–300' },
+    { ambient: '32°F',  heatPump: '1000–1500',   resistive: '2000–3000', ac: '—',         battery: '500–1500',  lighting: '100–300' },
+    { ambient: '50°F',  heatPump: '400–700',     resistive: '1000–1500', ac: '—',         battery: '0–500',     lighting: '100–300' },
+    { ambient: '68°F',  heatPump: '~0',          resistive: '~0',        ac: '~0',        battery: '~0',        lighting: '100–300' },
+    { ambient: '80°F',  heatPump: '—',           resistive: '—',         ac: '1000–1500',  battery: '~0',        lighting: '100–300' },
+    { ambient: '90°F',  heatPump: '—',           resistive: '—',         ac: '1500–2500',  battery: '0–500',     lighting: '100–300' },
+    { ambient: '105°F', heatPump: '—',           resistive: '—',         ac: '3000–5000**', battery: '1000–3000', lighting: '100–300' },
+];
+
+function AccessoryLoadReferenceTable() {
+    return (
+        <div>
+            <p className="font-semibold mb-1">EV Auxiliary Load Reference (steady-state, W)</p>
+            <table className="accessory-load-table">
+                <thead>
+                    <tr>
+                        <th>Ambient</th>
+                        <th>Heat Pump</th>
+                        <th>Resistive</th>
+                        <th>A/C</th>
+                        <th>Batt. Cond.</th>
+                        <th>Lighting</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {ACCESSORY_LOAD_REFERENCE_W.map(row => (
+                        <tr key={row.ambient}>
+                            <td>{row.ambient}</td>
+                            <td>{row.heatPump}</td>
+                            <td>{row.resistive}</td>
+                            <td>{row.ac}</td>
+                            <td>{row.battery}</td>
+                            <td>{row.lighting}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            <p className="mt-1.5 text-[10px] leading-snug opacity-80">
+                *At 0°F, heat pump COP approaches its floor, so most heating duty shifts to the resistive backup element. **Assumes a stabilized cabin; hot-soak or high solar load can push this higher during pull-down. Heat pump/resistive are alternative heating methods, not simultaneous loads. Battery conditioning is steady-state maintenance, not active DC-fast-charge preconditioning. Curve default is {DEFAULT_ACCESSORY_W}W.
+            </p>
+        </div>
+    );
+}
+
 // ── Default color for a mapping ───────────────────────────────────────────────
 
 function defaultMappingColor(vehicle, vehicleIdx, mappingIdx) {
@@ -229,12 +286,26 @@ export default function EpaCurvesView({
     const [mappingColors,    setMappingColors]    = useState({});        // mapping.id → hex
     const [urlCopied,        setUrlCopied]        = useState(false);
     const [imageCopied,      setImageCopied]      = useState(false);
-    // Altitude is a viewing condition (like the unit toggle): scales the
-    // aerodynamic C term at plot time for ALL curves. Never persisted; never
-    // affects stored coefficients or the standard-density η.
+    // Altitude, temperature, and accessory load are viewing conditions (like the
+    // unit toggle): they scale the plotted curve at plot time for ALL curves.
+    // Never persisted; never affect stored coefficients, accessory fields, or
+    // the standard-condition η.
     const [elevationFt,      setElevationFt]      = useState(0);
-    const densityRatio = useMemo(() => airDensityRatio(elevationFt), [elevationFt]);
-    const altAdjusted  = Math.abs(densityRatio - 1) > 1e-6;
+    const [tempF,            setTempF]            = useState('');
+    const [accessoryOverrideW, setAccessoryOverrideW] = useState('');
+    const clampTempF = (raw) => {
+        if (raw === '' || raw === '-') return raw; // allow in-progress typing of a negative number
+        const n = Number(raw);
+        if (isNaN(n)) return raw;
+        return String(Math.min(MAX_TEMP_F, Math.max(MIN_TEMP_F, n)));
+    };
+    const densityRatio = useMemo(
+        () => airDensityRatio(elevationFt) * temperatureDensityRatio(tempF === '' ? null : Number(tempF)),
+        [elevationFt, tempF]
+    );
+    const densityAdjusted  = Math.abs(densityRatio - 1) > 1e-6;
+    const accessoryAdjusted = accessoryOverrideW !== '';
+    const accessoryOverrideWNum = accessoryAdjusted ? Number(accessoryOverrideW) : null;
 
     const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
 
@@ -270,7 +341,7 @@ export default function EpaCurvesView({
 
                 const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
                 const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
-                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh, densityRatio);
+                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh, densityRatio, accessoryOverrideWNum);
                 if (!curve.length) return;
 
                 // Color: user override → vehicleColorMap/vehicle color → palette (with alpha for 2nd+ mapping)
@@ -281,8 +352,8 @@ export default function EpaCurvesView({
                 const baseLabel = vehiclesWithEpa.length > 1 || mi > 0
                     ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
                     : vehicleLabel(vehicle);
-                // Subtle "altitude-adjusted" marker on each curve's legend entry.
-                const label = altAdjusted ? `${baseLabel} ▲` : baseLabel;
+                // Subtle "adjusted" marker on each curve's legend entry (density or accessory load).
+                const label = (densityAdjusted || accessoryAdjusted) ? `${baseLabel} ▲` : baseLabel;
 
                 result.push({
                     label,
@@ -308,7 +379,7 @@ export default function EpaCurvesView({
             });
         });
         return result;
-    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, altAdjusted]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -506,14 +577,19 @@ export default function EpaCurvesView({
                                 <span className="text-sm font-medium">Auto Color</span>
                             </label>
                         )}
+                    </div>
 
+                    {/* Viewing conditions — altitude, temperature, accessory load. Kept on
+                        their own row (not wrapped in with the Y-axis controls above) since
+                        three input groups don't fit the same line at most widths. */}
+                    <div className="chart-viewing-conditions">
                         {/* Altitude — viewing condition, applies to all curves */}
-                        <div className="flex items-center gap-1.5 ml-auto">
+                        <div className="flex items-center gap-1.5">
                             <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
                                 Altitude
                                 <InfoIcon
                                     text="Adjusts aerodynamic drag for air density at this elevation. Models air density only — does not capture battery, regen, or cabin-heating effects. Curve is the standard-condition baseline scaled for thinner air."
-                                    position="left"
+                                    position="right"
                                     className="ml-1"
                                 />
                             </span>
@@ -526,12 +602,61 @@ export default function EpaCurvesView({
                                 aria-label="Elevation in feet"
                             />
                             <span className="text-sm text-faint">ft</span>
-                            <span
-                                className={`text-xs whitespace-nowrap ${altAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-faint'}`}
-                                title="Air-density ratio applied to the aerodynamic (C) term"
-                            >
-                                → ρ {densityRatio.toFixed(2)}{altAdjusted ? ' ▲' : ''}
+                        </div>
+
+                        {/* Temperature — viewing condition, applies to all curves */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                                Temp
+                                <InfoIcon
+                                    text={`Adjusts aerodynamic drag for air density at this ambient temperature (colder air is denser). Standard condition is ${STANDARD_TEMP_F}°F. Models air density only — does not capture battery, HVAC, or cold-tire effects.`}
+                                    position="right"
+                                    className="ml-1"
+                                />
                             </span>
+                            <input
+                                type="number"
+                                step="5"
+                                min={MIN_TEMP_F}
+                                max={MAX_TEMP_F}
+                                value={tempF}
+                                onChange={e => setTempF(clampTempF(e.target.value))}
+                                placeholder={String(STANDARD_TEMP_F)}
+                                className="form-input text-sm py-1 w-20 text-right"
+                                aria-label="Ambient temperature in °F"
+                            />
+                            <span className="text-sm text-faint">°F</span>
+                            <span
+                                className={`text-xs whitespace-nowrap ${densityAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-faint'}`}
+                                title="Combined air-density ratio (altitude × temperature) applied to the aerodynamic (C) term"
+                            >
+                                → ρ {densityRatio.toFixed(2)}{densityAdjusted ? ' ▲' : ''}
+                            </span>
+                        </div>
+
+                        {/* Accessory load — viewing condition, applies to all curves */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                                Accessory Load
+                                <InfoIcon
+                                    tooltipClassName="info-icon-tooltip--wide"
+                                    position="right"
+                                    className="ml-1"
+                                >
+                                    <AccessoryLoadReferenceTable />
+                                </InfoIcon>
+                            </span>
+                            <input
+                                type="number"
+                                step="50"
+                                min="0"
+                                value={accessoryOverrideW}
+                                onChange={e => setAccessoryOverrideW(e.target.value)}
+                                placeholder={String(DEFAULT_ACCESSORY_W)}
+                                className="form-input text-sm py-1 w-24 text-right"
+                                aria-label="Accessory load override in watts"
+                            />
+                            <span className="text-sm text-faint">W</span>
                         </div>
                     </div>
 
