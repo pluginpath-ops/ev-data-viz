@@ -299,10 +299,13 @@ export default function EpaCurvesView({
     // (see apparentAirspeed in epaDerivations.js); never persisted, η untouched.
     const [windSpeedMph,     setWindSpeedMph]     = useState('');
     const [windDirectionDeg, setWindDirectionDeg] = useState('');
-    // Overlay real-world range-test points, corrected (temp + wind only, not
-    // elevation gain/loss — no model for that yet) to the viewing conditions
-    // above, so they're comparable to the curve as currently displayed.
-    const [overlayRealWorld, setOverlayRealWorld] = useState(false);
+    // Overlay real-world range-test points on top of the curve. null = off.
+    // 'corrected' scales each point (temp + wind only, not elevation gain/loss
+    // — no model for that yet) to the viewing conditions above, so it's
+    // comparable to the curve as currently displayed. 'uncorrected' plots the
+    // raw measured value as recorded — not a valid comparison across
+    // different test conditions, but useful to see the true recorded data.
+    const [overlayMode, setOverlayMode] = useState(null); // null | 'corrected' | 'uncorrected'
     const clampTempF = (raw) => {
         if (raw === '' || raw === '-') return raw; // allow in-progress typing of a negative number
         const n = Number(raw);
@@ -396,10 +399,11 @@ export default function EpaCurvesView({
                     _curve:            curve,
                 });
 
-                // ── Real-world overlay: this vehicle's own range-test runs, corrected
-                // (temp + wind only — see correctMeasuredConsumption) to the same
-                // viewing conditions as the curve above, plotted as scatter points.
-                if (overlayRealWorld) {
+                // ── Real-world overlay: this vehicle's own range-test runs, plotted as
+                // scatter points. 'corrected' scales each point (temp + wind only — see
+                // correctMeasuredConsumption) to the same viewing conditions as the curve
+                // above; 'uncorrected' plots the raw measured value as recorded.
+                if (overlayMode) {
                     const viewConditions = {
                         densityRatio,
                         accessoryOverrideW: accessoryOverrideWNum,
@@ -410,20 +414,23 @@ export default function EpaCurvesView({
                         .filter(r => !r._inherited && r.speed_mph != null && r.distance_miles > 0 && r.energy_kwh != null)
                         .map(run => {
                             const measuredKwh100mi = (run.energy_kwh / run.distance_miles) * 100;
-                            const runConditions = {
-                                temperatureF:     run.temperature_f,
-                                windSpeedMph:     run.avg_wind_speed_mph,
-                                windDirectionDeg: run.wind_direction_deg,
-                            };
-                            const correctedKwh100mi = correctMeasuredConsumption(epaGroup, run.speed_mph, measuredKwh100mi, runConditions, viewConditions);
-                            if (correctedKwh100mi == null) return null;
-                            const miPerKwh = 100 / correctedKwh100mi;
+                            let kwh100mi = measuredKwh100mi;
+                            if (overlayMode === 'corrected') {
+                                const runConditions = {
+                                    temperatureF:     run.temperature_f,
+                                    windSpeedMph:     run.avg_wind_speed_mph,
+                                    windDirectionDeg: run.wind_direction_deg,
+                                };
+                                kwh100mi = correctMeasuredConsumption(epaGroup, run.speed_mph, measuredKwh100mi, runConditions, viewConditions);
+                                if (kwh100mi == null) return null;
+                            }
+                            const miPerKwh = 100 / kwh100mi;
                             const pt = {
-                                mph:      run.speed_mph,
-                                kwh100mi: correctedKwh100mi,
+                                mph: run.speed_mph,
+                                kwh100mi,
                                 miPerKwh,
-                                mpge:     miPerKwh * MPG_E_CONVERSION,
-                                rangeMi:  useableKwh > 0 ? useableKwh / (correctedKwh100mi / 100) : null,
+                                mpge:    miPerKwh * MPG_E_CONVERSION,
+                                rangeMi: useableKwh > 0 ? useableKwh / (kwh100mi / 100) : null,
                             };
                             return {
                                 x: convSpeed(pt.mph, units),
@@ -435,12 +442,13 @@ export default function EpaCurvesView({
                     if (overlayPoints.length) {
                         result.push({
                             type:            'scatter',
-                            label:           `${baseLabel} (real-world)`,
+                            label:           `${baseLabel} (real-world${overlayMode === 'uncorrected' ? ', uncorrected' : ''})`,
                             data:            overlayPoints,
                             backgroundColor: color,
                             borderColor:     color,
                             pointRadius:     5,
                             pointHoverRadius: 7,
+                            pointStyle:      overlayMode === 'uncorrected' ? 'triangle' : 'circle',
                             showLine:        false,
                             _vehicleId:      vehicle.id,
                             _mappingId:      mapping.id,
@@ -451,7 +459,7 @@ export default function EpaCurvesView({
             });
         });
         return result;
-    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, overlayRealWorld]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, overlayMode]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -656,15 +664,30 @@ export default function EpaCurvesView({
                                 <span className="text-sm font-medium">Auto Color</span>
                             </label>
                         )}
-                        <label className="toggle-label" title="Plot real-world range-test points on top of each curve, corrected for temperature and wind to match the curve's current viewing conditions (not elevation gain/loss — no model for that yet)">
-                            <input
-                                type="checkbox"
-                                checked={overlayRealWorld}
-                                onChange={e => setOverlayRealWorld(e.target.checked)}
-                                className="w-4 h-4"
-                            />
-                            <span className="text-sm font-medium">Overlay Real World Tests</span>
-                        </label>
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                                Overlay Real World Tests
+                                <InfoIcon
+                                    text="Plot this vehicle's own range-test points on top of its curve. Corrected: scaled by temperature + wind to match the curve's current viewing conditions above — an apples-to-apples comparison (not elevation gain/loss — no model for that yet). Uncorrected: the raw measured value as recorded, unadjusted — not a valid comparison across different test conditions, but useful to see the true recorded data."
+                                    position="right"
+                                    className="ml-1"
+                                />
+                            </span>
+                            <button
+                                type="button"
+                                className={`btn btn-sm ${overlayMode === 'corrected' ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setOverlayMode(m => m === 'corrected' ? null : 'corrected')}
+                            >
+                                Corrected
+                            </button>
+                            <button
+                                type="button"
+                                className={`btn btn-sm ${overlayMode === 'uncorrected' ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setOverlayMode(m => m === 'uncorrected' ? null : 'uncorrected')}
+                            >
+                                Uncorrected
+                            </button>
+                        </div>
                     </div>
 
                     {/* Viewing conditions — altitude, temperature, accessory load. Kept on
