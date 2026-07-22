@@ -513,6 +513,8 @@ class DataService {
       charge_energy_kwh: numField(run.chargeEnergyKwh, run.charge_energy_kwh),
       temperature_f:     numField(run.temperatureF,    run.temperature_f),
       elevation_gain_ft: numField(run.elevationGainFt, run.elevation_gain_ft),
+      avg_wind_speed_mph: numField(run.windSpeedMph,     run.avg_wind_speed_mph),
+      wind_direction_deg: numField(run.windDirectionDeg, run.wind_direction_deg),
       url: run.url || null,
       charging_url: coalesce(run.chargingUrl, run.charging_url) || null,
     }).select().single();
@@ -565,6 +567,8 @@ class DataService {
       ...(updates.chargeEnergyKwh !== undefined ? { charge_energy_kwh: updates.chargeEnergyKwh !== '' ? Number(updates.chargeEnergyKwh) : null } : {}),
       ...(updates.temperatureF !== undefined ? { temperature_f: updates.temperatureF !== '' ? Number(updates.temperatureF) : null } : {}),
       ...(updates.elevationGainFt !== undefined ? { elevation_gain_ft: updates.elevationGainFt !== '' ? Number(updates.elevationGainFt) : null } : {}),
+      ...(updates.windSpeedMph !== undefined ? { avg_wind_speed_mph: updates.windSpeedMph !== '' ? Number(updates.windSpeedMph) : null } : {}),
+      ...(updates.windDirectionDeg !== undefined ? { wind_direction_deg: updates.windDirectionDeg !== '' ? Number(updates.windDirectionDeg) : null } : {}),
       ...(updates.url !== undefined ? { url: updates.url || null } : {}),
       ...(updates.chargingUrl !== undefined ? { charging_url: updates.chargingUrl || null } : {}),
     }).eq('id', runId);

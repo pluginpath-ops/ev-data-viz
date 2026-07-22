@@ -60,6 +60,16 @@ function RunRangeMetaLine({ run, units }) {
     if (run.energy_kwh != null && run.distance_miles != null)
         items.push(<span key="eff" className="text-blue-700">{calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}</span>);
     if (run.temperature_f != null) items.push(<span key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</span>);
+    if (run.avg_wind_speed_mph != null) {
+        const dirTitle = run.wind_direction_deg != null
+            ? `${run.wind_direction_deg}° vs travel (0°=tailwind, 180°=headwind)`
+            : 'Direction not recorded';
+        items.push(
+            <span key="wind" className="text-cyan-700" title={dirTitle}>
+                💨 {fmtSpeed(run.avg_wind_speed_mph, units)}{run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : ''}
+            </span>
+        );
+    }
     if (run.start_soc != null && run.end_soc != null)
         items.push(<span key="soc" className="text-secondary">SoC {run.start_soc}→{run.end_soc}%</span>);
     if (run.url)
@@ -475,6 +485,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         chargeEnergyKwh: '',
         temperatureF: '',
         elevationGainFt: '',
+        windSpeedMph: '',
+        windDirectionDeg: '',
         url: '',
         chargingUrl: '',
     });
@@ -550,7 +562,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', elevationGainFt: '', url: '', chargingUrl: '' });
+        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', url: '', chargingUrl: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: null });
@@ -842,6 +854,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             chargeEnergyKwh: run.charge_energy_kwh ?? '',
             temperatureF: run.temperature_f ?? '',
             elevationGainFt: run.elevation_gain_ft ?? '',
+            windSpeedMph: run.avg_wind_speed_mph ?? '',
+            windDirectionDeg: run.wind_direction_deg ?? '',
             url: run.url || '',
             chargingUrl: run.charging_url || '',
         });
@@ -1506,6 +1520,22 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         className="form-input col-span-2"
                                                     />
                                                     <input
+                                                        type="number"
+                                                        placeholder="Avg wind speed (mph)"
+                                                        value={runMetadata.windSpeedMph}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, windSpeedMph: e.target.value})}
+                                                        className="form-input"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Wind dir. vs travel (0-360°)"
+                                                        title="Direction relative to travel: 0° = tailwind, 180° = headwind, 90/270° = crosswind"
+                                                        value={runMetadata.windDirectionDeg}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, windDirectionDeg: e.target.value})}
+                                                        className="form-input"
+                                                        min="0" max="360"
+                                                    />
+                                                    <input
                                                         type="url"
                                                         placeholder="Source URL"
                                                         value={runMetadata.url}
@@ -1900,6 +1930,22 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     value={editFormData.elevationGainFt}
                                                     onChange={(e) => setEditFormData({...editFormData, elevationGainFt: e.target.value})}
                                                     className="form-input col-span-2"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    placeholder="Avg wind speed (mph)"
+                                                    value={editFormData.windSpeedMph}
+                                                    onChange={(e) => setEditFormData({...editFormData, windSpeedMph: e.target.value})}
+                                                    className="form-input"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    placeholder="Wind dir. vs travel (0-360°)"
+                                                    title="Direction relative to travel: 0° = tailwind, 180° = headwind, 90/270° = crosswind"
+                                                    value={editFormData.windDirectionDeg}
+                                                    onChange={(e) => setEditFormData({...editFormData, windDirectionDeg: e.target.value})}
+                                                    className="form-input"
+                                                    min="0" max="360"
                                                 />
                                                 <input
                                                     type="url"
