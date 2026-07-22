@@ -113,9 +113,13 @@ function accessoryKw(group) {
     return (w != null && w > 0 ? w : DEFAULT_ACCESSORY_W) / 1000;
 }
 
-/** Battery-side consumption (kWh/100mi) at a steady speed for a given η. */
-function batteryConsumptionAt(speedMph, a, b, c, eta, accKw) {
-    const eWheel = roadLoadForce(speedMph, a, b, c) * LBF_MILE_TO_KWH * 100;
+/** Battery-side consumption (kWh/100mi) at a steady speed for a given η.
+ *  Optional windSpeedMph/windDirectionDeg apply apparent-airspeed scaling to
+ *  ONLY the aerodynamic (C) term — see apparentAirspeed() below. Defaults to
+ *  no wind, so existing (still-air) call sites are unaffected. */
+function batteryConsumptionAt(speedMph, a, b, c, eta, accKw, windSpeedMph = 0, windDirectionDeg = 0) {
+    const vRel  = windSpeedMph ? apparentAirspeed(speedMph, windSpeedMph, windDirectionDeg) : speedMph;
+    const eWheel = (a + b * speedMph + c * vRel * vRel) * LBF_MILE_TO_KWH * 100;
     const eAcc   = accKw * 100 / speedMph;
     return eWheel / eta + eAcc;
 }
@@ -356,6 +360,79 @@ export function temperatureDensityRatio(tempF) {
     return standardRankine / actualRankine;
 }
 
+// ── Side wind ────────────────────────────────────────────────────────────────
+
+/**
+ * Apparent (relative) airspeed felt by the vehicle given its ground speed and
+ * an ambient wind, via the standard apparent-wind law:
+ *   V_rel = √(V² + W² − 2·V·W·cos ψ)
+ * where ψ (windDirectionDeg) follows the same convention as runs.wind_direction_deg
+ * (#142): 0° = tailwind, 180° = headwind, 90°/270° = crosswind, relative to the
+ * vehicle's direction of travel.
+ *
+ * This models only the MAGNITUDE of the relative airflow (so a headwind raises
+ * effective drag speed, a tailwind lowers it, and a pure crosswind raises it
+ * slightly) — it does NOT model yaw-angle sensitivity of the drag coefficient
+ * itself (real vehicles typically see Cd rise somewhat at non-zero yaw), since
+ * that requires a per-vehicle yaw-sensitivity curve this app doesn't have.
+ *
+ * @param {number} vMph              vehicle ground speed
+ * @param {number} windSpeedMph      ambient wind speed; 0/null ⇒ vRel === vMph
+ * @param {number} windDirectionDeg  wind direction relative to travel, 0-360°
+ * @returns {number} apparent airspeed (mph)
+ */
+export function apparentAirspeed(vMph, windSpeedMph, windDirectionDeg) {
+    if (!windSpeedMph) return vMph;
+    const psi = ((windDirectionDeg || 0) * Math.PI) / 180;
+    const vRelSq = vMph * vMph + windSpeedMph * windSpeedMph - 2 * vMph * windSpeedMph * Math.cos(psi);
+    return Math.sqrt(Math.max(0, vRelSq));
+}
+
+// ── Real-world overlay correction ───────────────────────────────────────────
+
+/**
+ * Correct a real-world range-test point's measured consumption so it's
+ * comparable to an EPA curve drawn at different viewing conditions than the
+ * run was actually driven under (issue #139 step 3).
+ *
+ * Uses the SAME model (a/b/c road-load coefficients + η) as the curve itself:
+ * computes what the model predicts at the run's own conditions vs. at the
+ * curve's current viewing conditions, and scales the measured value by that
+ * ratio. This cancels most model error (it's a delta correction, not an
+ * absolute one) and guarantees a run driven under the exact viewing
+ * conditions is left unchanged (ratio = 1).
+ *
+ * NOT corrected: elevation gain/loss. Unlike static altitude (an air-density
+ * term), route elevation gain/loss is a route-dependent net-energy term with
+ * its own model that doesn't exist yet — see issue #139 step 2. Only
+ * temperature (density) and wind are corrected here.
+ *
+ * @param {object} group             — EPA group (coefficients + tests), same as buildEpaCurveFromModel
+ * @param {number} speedMph          — the run's recorded test speed
+ * @param {number} measuredKwh100mi  — the run's measured consumption (kWh/100mi)
+ * @param {object} runConditions     — { temperatureF, windSpeedMph, windDirectionDeg } as recorded on the run
+ * @param {object} viewConditions    — { densityRatio, accessoryOverrideW, windSpeedMph, windDirectionDeg } — the SAME values driving the curve
+ * @returns {number|null} corrected kWh/100mi, or null if the model can't be evaluated
+ */
+export function correctMeasuredConsumption(group, speedMph, measuredKwh100mi, runConditions, viewConditions) {
+    const coeffs = resolvePrimaryCoeffs(group);
+    if (!coeffs || !speedMph || !measuredKwh100mi) return null;
+
+    const eta   = deriveDrivetrainEta(group).value;
+    const accKw = viewConditions.accessoryOverrideW != null ? viewConditions.accessoryOverrideW / 1000 : accessoryKw(group);
+    const { a, b, c } = coeffs;
+
+    const runDensityRatio = temperatureDensityRatio(runConditions.temperatureF ?? null);
+    const cAtRun  = c * runDensityRatio;
+    const cAtView = c * viewConditions.densityRatio;
+
+    const predictedAtRun  = batteryConsumptionAt(speedMph, a, b, cAtRun,  eta, accKw, runConditions.windSpeedMph  || 0, runConditions.windDirectionDeg  || 0);
+    const predictedAtView = batteryConsumptionAt(speedMph, a, b, cAtView, eta, accKw, viewConditions.windSpeedMph || 0, viewConditions.windDirectionDeg || 0);
+
+    if (!predictedAtRun || predictedAtRun <= 0 || !predictedAtView) return null;
+    return measuredKwh100mi * (predictedAtView / predictedAtRun);
+}
+
 // ── Curve builder (curator model) ───────────────────────────────────────────
 
 /**
@@ -376,13 +453,21 @@ export function temperatureDensityRatio(tempF) {
  * the group's stored accessory load for THIS curve only, at plot time. η (which
  * was derived using the group's own accessory load) is never recomputed.
  *
+ * Side wind (viewing condition): `windSpeedMph`/`windDirectionDeg`, when given,
+ * scale the aerodynamic (C) term by apparent airspeed at EACH point (see
+ * apparentAirspeed() above) instead of ground speed — unlike density, this is
+ * speed-dependent, so it's applied per-point rather than as a single prefactor.
+ * η is never recomputed.
+ *
  * @param {object} group       — full group (with epa_coefficient_sets + epa_tests)
  * @param {number|null} useableKwh — battery capacity for range; null ⇒ rangeMi null
  * @param {number} densityRatio   — ρ_altitude / ρ_sea_level (default 1 = sea level)
  * @param {number|null} accessoryOverrideW — override accessory draw in watts; null ⇒ use the group's own value
+ * @param {number} windSpeedMph      — ambient wind speed; 0 ⇒ no wind effect
+ * @param {number} windDirectionDeg  — wind direction relative to travel (0=tailwind, 180=headwind)
  * @returns {Array<{ mph, kwh100mi, miPerKwh, mpge, rangeMi }>}
  */
-export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1, accessoryOverrideW = null) {
+export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1, accessoryOverrideW = null, windSpeedMph = 0, windDirectionDeg = 0) {
     const coeffs = resolvePrimaryCoeffs(group);
     if (!coeffs) return [];
 
@@ -394,7 +479,7 @@ export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1, acce
 
     const out = [];
     for (let v = vMin; v <= vMax; v++) {
-        const kwh100mi = batteryConsumptionAt(v, a, b, c, eta, accKw);
+        const kwh100mi = batteryConsumptionAt(v, a, b, c, eta, accKw, windSpeedMph, windDirectionDeg);
         if (kwh100mi == null || kwh100mi <= 0) continue;
         const miPerKwh = 100 / kwh100mi;
         out.push({

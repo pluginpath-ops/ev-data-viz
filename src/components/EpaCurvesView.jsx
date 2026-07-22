@@ -8,9 +8,10 @@ import { PALETTE } from '../utils/specHelpers';
 import { resolveChartColors } from '../utils/colorUtils';
 import {
     resolveUseableKwh, resolveUseableKwhSource,
-    HIGHWAY_BAND_MPH,
+    HIGHWAY_BAND_MPH, MPG_E_CONVERSION,
 } from '../utils/epaPhysics';
-import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio, temperatureDensityRatio, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
+import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio, temperatureDensityRatio, correctMeasuredConsumption, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
+import { filterRangeRuns } from '../utils/runUtils';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
@@ -293,11 +294,29 @@ export default function EpaCurvesView({
     const [elevationFt,      setElevationFt]      = useState(0);
     const [tempF,            setTempF]            = useState('');
     const [accessoryOverrideW, setAccessoryOverrideW] = useState('');
+    // Wind — same 0=tailwind/180=headwind/90|270=crosswind convention as
+    // runs.wind_direction_deg (#142). Applied to the curve as apparent airspeed
+    // (see apparentAirspeed in epaDerivations.js); never persisted, η untouched.
+    const [windSpeedMph,     setWindSpeedMph]     = useState('');
+    const [windDirectionDeg, setWindDirectionDeg] = useState('');
+    // Overlay real-world range-test points on top of the curve. null = off.
+    // 'corrected' scales each point (temp + wind only, not elevation gain/loss
+    // — no model for that yet) to the viewing conditions above, so it's
+    // comparable to the curve as currently displayed. 'uncorrected' plots the
+    // raw measured value as recorded — not a valid comparison across
+    // different test conditions, but useful to see the true recorded data.
+    const [overlayMode, setOverlayMode] = useState(null); // null | 'corrected' | 'uncorrected'
     const clampTempF = (raw) => {
         if (raw === '' || raw === '-') return raw; // allow in-progress typing of a negative number
         const n = Number(raw);
         if (isNaN(n)) return raw;
         return String(Math.min(MAX_TEMP_F, Math.max(MIN_TEMP_F, n)));
+    };
+    const clampWindDirection = (raw) => {
+        if (raw === '') return raw;
+        const n = Number(raw);
+        if (isNaN(n)) return raw;
+        return String(Math.min(360, Math.max(0, n)));
     };
     const densityRatio = useMemo(
         () => airDensityRatio(elevationFt) * temperatureDensityRatio(tempF === '' ? null : Number(tempF)),
@@ -306,6 +325,9 @@ export default function EpaCurvesView({
     const densityAdjusted  = Math.abs(densityRatio - 1) > 1e-6;
     const accessoryAdjusted = accessoryOverrideW !== '';
     const accessoryOverrideWNum = accessoryAdjusted ? Number(accessoryOverrideW) : null;
+    const windAdjusted = windSpeedMph !== '' && Number(windSpeedMph) > 0;
+    const windSpeedMphNum = windAdjusted ? Number(windSpeedMph) : 0;
+    const windDirectionDegNum = windDirectionDeg === '' ? 0 : Number(windDirectionDeg);
 
     const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
 
@@ -341,7 +363,7 @@ export default function EpaCurvesView({
 
                 const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
                 const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
-                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh, densityRatio, accessoryOverrideWNum);
+                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh, densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum);
                 if (!curve.length) return;
 
                 // Color: user override → vehicleColorMap/vehicle color → palette (with alpha for 2nd+ mapping)
@@ -353,7 +375,7 @@ export default function EpaCurvesView({
                     ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
                     : vehicleLabel(vehicle);
                 // Subtle "adjusted" marker on each curve's legend entry (density or accessory load).
-                const label = (densityAdjusted || accessoryAdjusted) ? `${baseLabel} ▲` : baseLabel;
+                const label = (densityAdjusted || accessoryAdjusted || windAdjusted) ? `${baseLabel} ▲` : baseLabel;
 
                 result.push({
                     label,
@@ -376,10 +398,68 @@ export default function EpaCurvesView({
                     _useableKwhSource: useableKwhSource,
                     _curve:            curve,
                 });
+
+                // ── Real-world overlay: this vehicle's own range-test runs, plotted as
+                // scatter points. 'corrected' scales each point (temp + wind only — see
+                // correctMeasuredConsumption) to the same viewing conditions as the curve
+                // above; 'uncorrected' plots the raw measured value as recorded.
+                if (overlayMode) {
+                    const viewConditions = {
+                        densityRatio,
+                        accessoryOverrideW: accessoryOverrideWNum,
+                        windSpeedMph:       windSpeedMphNum,
+                        windDirectionDeg:   windDirectionDegNum,
+                    };
+                    const overlayPoints = filterRangeRuns(vehicle.runs)
+                        .filter(r => !r._inherited && r.speed_mph != null && r.distance_miles > 0 && r.energy_kwh != null)
+                        .map(run => {
+                            const measuredKwh100mi = (run.energy_kwh / run.distance_miles) * 100;
+                            let kwh100mi = measuredKwh100mi;
+                            if (overlayMode === 'corrected') {
+                                const runConditions = {
+                                    temperatureF:     run.temperature_f,
+                                    windSpeedMph:     run.avg_wind_speed_mph,
+                                    windDirectionDeg: run.wind_direction_deg,
+                                };
+                                kwh100mi = correctMeasuredConsumption(epaGroup, run.speed_mph, measuredKwh100mi, runConditions, viewConditions);
+                                if (kwh100mi == null) return null;
+                            }
+                            const miPerKwh = 100 / kwh100mi;
+                            const pt = {
+                                mph: run.speed_mph,
+                                kwh100mi,
+                                miPerKwh,
+                                mpge:    miPerKwh * MPG_E_CONVERSION,
+                                rangeMi: useableKwh > 0 ? useableKwh / (kwh100mi / 100) : null,
+                            };
+                            return {
+                                x: convSpeed(pt.mph, units),
+                                y: convertYValue(getYValue(pt, yAxis), yAxis, units),
+                            };
+                        })
+                        .filter(p => p && p.y != null);
+
+                    if (overlayPoints.length) {
+                        result.push({
+                            type:            'scatter',
+                            label:           `${baseLabel} (real-world${overlayMode === 'uncorrected' ? ', uncorrected' : ''})`,
+                            data:            overlayPoints,
+                            backgroundColor: color,
+                            borderColor:     color,
+                            pointRadius:     5,
+                            pointHoverRadius: 7,
+                            pointStyle:      overlayMode === 'uncorrected' ? 'triangle' : 'circle',
+                            showLine:        false,
+                            _vehicleId:      vehicle.id,
+                            _mappingId:      mapping.id,
+                            _isOverlay:      true,
+                        });
+                    }
+                }
             });
         });
         return result;
-    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, overlayMode]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -454,6 +534,13 @@ export default function EpaCurvesView({
                             },
                             label(item) {
                                 const ds = item.dataset;
+                                if (ds._isOverlay) {
+                                    // Overlay points are already corrected/converted at build
+                                    // time (see the datasets useMemo) — use the plotted value
+                                    // directly rather than re-deriving from a curve.
+                                    const decimals = yAxis === 'range_mi' ? 0 : yAxis === 'mi_kwh' ? 2 : 1;
+                                    return `${ds.label}: ${item.parsed.y?.toFixed(decimals)} ${yAxisLabel(yAxis, units)}`;
+                                }
                                 const curve = ds._curve;
                                 const speedMph = units === 'metric'
                                     ? item.parsed.x / 1.60934
@@ -577,6 +664,34 @@ export default function EpaCurvesView({
                                 <span className="text-sm font-medium">Auto Color</span>
                             </label>
                         )}
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                                Overlay Real World Tests
+                                <InfoIcon
+                                    tooltipClassName="info-icon-tooltip--wide"
+                                    position="right"
+                                    className="ml-1"
+                                >
+                                    <p>Plot this vehicle's own range-test points on top of its curve.</p>
+                                    <p className="mt-1.5"><strong>Corrected:</strong> scaled by temperature + wind to match the curve's current viewing conditions above — an apples-to-apples comparison (not elevation gain/loss — no model for that yet).</p>
+                                    <p className="mt-1.5"><strong>Uncorrected:</strong> the raw measured value as recorded, unadjusted — not a valid comparison across different test conditions, but useful to see the true recorded data.</p>
+                                </InfoIcon>
+                            </span>
+                            <button
+                                type="button"
+                                className={`btn btn-sm ${overlayMode === 'corrected' ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setOverlayMode(m => m === 'corrected' ? null : 'corrected')}
+                            >
+                                Corrected
+                            </button>
+                            <button
+                                type="button"
+                                className={`btn btn-sm ${overlayMode === 'uncorrected' ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setOverlayMode(m => m === 'uncorrected' ? null : 'uncorrected')}
+                            >
+                                Uncorrected
+                            </button>
+                        </div>
                     </div>
 
                     {/* Viewing conditions — altitude, temperature, accessory load. Kept on
@@ -657,6 +772,41 @@ export default function EpaCurvesView({
                                 aria-label="Accessory load override in watts"
                             />
                             <span className="text-sm text-faint">W</span>
+                        </div>
+
+                        {/* Wind — viewing condition, applies to all curves */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                                Wind
+                                <InfoIcon
+                                    text="Scales aerodynamic drag by apparent (relative) airspeed — a headwind raises effective drag speed, a tailwind lowers it, a pure crosswind raises it slightly. Direction is relative to travel: 0°=tailwind, 180°=headwind, 90°/270°=crosswind. Models relative-airspeed magnitude only — does not capture yaw-angle sensitivity of drag coefficient."
+                                    position="right"
+                                    className="ml-1"
+                                />
+                            </span>
+                            <input
+                                type="number"
+                                step="5"
+                                min="0"
+                                value={windSpeedMph}
+                                onChange={e => setWindSpeedMph(e.target.value)}
+                                placeholder="0"
+                                className="form-input text-sm py-1 w-16 text-right"
+                                aria-label="Wind speed in mph"
+                            />
+                            <span className="text-sm text-faint">mph @</span>
+                            <input
+                                type="number"
+                                step="15"
+                                min="0"
+                                max="360"
+                                value={windDirectionDeg}
+                                onChange={e => setWindDirectionDeg(clampWindDirection(e.target.value))}
+                                placeholder="180"
+                                className="form-input text-sm py-1 w-16 text-right"
+                                aria-label="Wind direction relative to travel, in degrees"
+                            />
+                            <span className="text-sm text-faint">°{windAdjusted ? ' ▲' : ''}</span>
                         </div>
                     </div>
 
