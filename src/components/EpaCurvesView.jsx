@@ -10,11 +10,16 @@ import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH,
 } from '../utils/epaPhysics';
-import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio, temperatureDensityRatio, STANDARD_TEMP_F } from '../utils/epaDerivations';
+import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio, temperatureDensityRatio, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import ChartInfoBubble from './ChartInfoBubble';
+
+// Sane bounds for the ambient-temperature viewing condition; far outside this
+// the ideal-gas density approximation isn't meaningful anyway.
+const MIN_TEMP_F = -100;
+const MAX_TEMP_F = 150;
 
 // ── Highway band plugin ───────────────────────────────────────────────────────
 
@@ -229,16 +234,26 @@ export default function EpaCurvesView({
     const [mappingColors,    setMappingColors]    = useState({});        // mapping.id → hex
     const [urlCopied,        setUrlCopied]        = useState(false);
     const [imageCopied,      setImageCopied]      = useState(false);
-    // Altitude and temperature are viewing conditions (like the unit toggle):
-    // together they scale the aerodynamic C term at plot time for ALL curves.
-    // Never persisted; never affect stored coefficients or the standard-density η.
+    // Altitude, temperature, and accessory load are viewing conditions (like the
+    // unit toggle): they scale the plotted curve at plot time for ALL curves.
+    // Never persisted; never affect stored coefficients, accessory fields, or
+    // the standard-condition η.
     const [elevationFt,      setElevationFt]      = useState(0);
     const [tempF,            setTempF]            = useState('');
+    const [accessoryOverrideW, setAccessoryOverrideW] = useState('');
+    const clampTempF = (raw) => {
+        if (raw === '' || raw === '-') return raw; // allow in-progress typing of a negative number
+        const n = Number(raw);
+        if (isNaN(n)) return raw;
+        return String(Math.min(MAX_TEMP_F, Math.max(MIN_TEMP_F, n)));
+    };
     const densityRatio = useMemo(
         () => airDensityRatio(elevationFt) * temperatureDensityRatio(tempF === '' ? null : Number(tempF)),
         [elevationFt, tempF]
     );
     const densityAdjusted  = Math.abs(densityRatio - 1) > 1e-6;
+    const accessoryAdjusted = accessoryOverrideW !== '';
+    const accessoryOverrideWNum = accessoryAdjusted ? Number(accessoryOverrideW) : null;
 
     const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
 
@@ -274,7 +289,7 @@ export default function EpaCurvesView({
 
                 const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
                 const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
-                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh, densityRatio);
+                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh, densityRatio, accessoryOverrideWNum);
                 if (!curve.length) return;
 
                 // Color: user override → vehicleColorMap/vehicle color → palette (with alpha for 2nd+ mapping)
@@ -285,8 +300,8 @@ export default function EpaCurvesView({
                 const baseLabel = vehiclesWithEpa.length > 1 || mi > 0
                     ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
                     : vehicleLabel(vehicle);
-                // Subtle "density-adjusted" marker on each curve's legend entry.
-                const label = densityAdjusted ? `${baseLabel} ▲` : baseLabel;
+                // Subtle "adjusted" marker on each curve's legend entry (density or accessory load).
+                const label = (densityAdjusted || accessoryAdjusted) ? `${baseLabel} ▲` : baseLabel;
 
                 result.push({
                     label,
@@ -312,7 +327,7 @@ export default function EpaCurvesView({
             });
         });
         return result;
-    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -545,8 +560,10 @@ export default function EpaCurvesView({
                             <input
                                 type="number"
                                 step="5"
+                                min={MIN_TEMP_F}
+                                max={MAX_TEMP_F}
                                 value={tempF}
-                                onChange={e => setTempF(e.target.value)}
+                                onChange={e => setTempF(clampTempF(e.target.value))}
                                 placeholder={String(STANDARD_TEMP_F)}
                                 className="form-input text-sm py-1 w-20 text-right"
                                 aria-label="Ambient temperature in °F"
@@ -558,6 +575,29 @@ export default function EpaCurvesView({
                             >
                                 → ρ {densityRatio.toFixed(2)}{densityAdjusted ? ' ▲' : ''}
                             </span>
+                        </div>
+
+                        {/* Accessory load — viewing condition, applies to all curves */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                                Accessory Load
+                                <InfoIcon
+                                    text={`Overrides the constant accessory draw (HVAC, lighting, etc.) used in the curve. Default is ${DEFAULT_ACCESSORY_W}W. Typical ranges: cooling (AC compressor) ~1000-2500W; heating ~500-5000W depending on exterior temperature and heat pump vs. resistive; lighting ~100-200W on modern vehicles. Viewing condition only — never persisted, and η is not recomputed.`}
+                                    position="left"
+                                    className="ml-1"
+                                />
+                            </span>
+                            <input
+                                type="number"
+                                step="50"
+                                min="0"
+                                value={accessoryOverrideW}
+                                onChange={e => setAccessoryOverrideW(e.target.value)}
+                                placeholder={String(DEFAULT_ACCESSORY_W)}
+                                className="form-input text-sm py-1 w-24 text-right"
+                                aria-label="Accessory load override in watts"
+                            />
+                            <span className="text-sm text-faint">W</span>
                         </div>
                     </div>
 

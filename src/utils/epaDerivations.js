@@ -372,17 +372,22 @@ export function temperatureDensityRatio(tempF) {
  * coefficients are never modified — passing 1 (default) reproduces the standard
  * sea-level curve exactly.
  *
+ * Accessory load (viewing condition): `accessoryOverrideW`, when given, replaces
+ * the group's stored accessory load for THIS curve only, at plot time. η (which
+ * was derived using the group's own accessory load) is never recomputed.
+ *
  * @param {object} group       — full group (with epa_coefficient_sets + epa_tests)
  * @param {number|null} useableKwh — battery capacity for range; null ⇒ rangeMi null
  * @param {number} densityRatio   — ρ_altitude / ρ_sea_level (default 1 = sea level)
+ * @param {number|null} accessoryOverrideW — override accessory draw in watts; null ⇒ use the group's own value
  * @returns {Array<{ mph, kwh100mi, miPerKwh, mpge, rangeMi }>}
  */
-export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1) {
+export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1, accessoryOverrideW = null) {
     const coeffs = resolvePrimaryCoeffs(group);
     if (!coeffs) return [];
 
     const eta   = deriveDrivetrainEta(group).value;
-    const accKw = accessoryKw(group);
+    const accKw = accessoryOverrideW != null ? accessoryOverrideW / 1000 : accessoryKw(group);
     const { a, b } = coeffs;
     const c = coeffs.c * densityRatio; // aerodynamic term only, display-time scale
     const [vMin, vMax] = CURVE_SPEED_RANGE;
