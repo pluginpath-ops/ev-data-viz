@@ -293,11 +293,22 @@ export default function EpaCurvesView({
     const [elevationFt,      setElevationFt]      = useState(0);
     const [tempF,            setTempF]            = useState('');
     const [accessoryOverrideW, setAccessoryOverrideW] = useState('');
+    // Wind — same 0=tailwind/180=headwind/90|270=crosswind convention as
+    // runs.wind_direction_deg (#142). Applied to the curve as apparent airspeed
+    // (see apparentAirspeed in epaDerivations.js); never persisted, η untouched.
+    const [windSpeedMph,     setWindSpeedMph]     = useState('');
+    const [windDirectionDeg, setWindDirectionDeg] = useState('');
     const clampTempF = (raw) => {
         if (raw === '' || raw === '-') return raw; // allow in-progress typing of a negative number
         const n = Number(raw);
         if (isNaN(n)) return raw;
         return String(Math.min(MAX_TEMP_F, Math.max(MIN_TEMP_F, n)));
+    };
+    const clampWindDirection = (raw) => {
+        if (raw === '') return raw;
+        const n = Number(raw);
+        if (isNaN(n)) return raw;
+        return String(Math.min(360, Math.max(0, n)));
     };
     const densityRatio = useMemo(
         () => airDensityRatio(elevationFt) * temperatureDensityRatio(tempF === '' ? null : Number(tempF)),
@@ -306,6 +317,9 @@ export default function EpaCurvesView({
     const densityAdjusted  = Math.abs(densityRatio - 1) > 1e-6;
     const accessoryAdjusted = accessoryOverrideW !== '';
     const accessoryOverrideWNum = accessoryAdjusted ? Number(accessoryOverrideW) : null;
+    const windAdjusted = windSpeedMph !== '' && Number(windSpeedMph) > 0;
+    const windSpeedMphNum = windAdjusted ? Number(windSpeedMph) : 0;
+    const windDirectionDegNum = windDirectionDeg === '' ? 0 : Number(windDirectionDeg);
 
     const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
 
@@ -341,7 +355,7 @@ export default function EpaCurvesView({
 
                 const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
                 const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
-                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh, densityRatio, accessoryOverrideWNum);
+                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh, densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum);
                 if (!curve.length) return;
 
                 // Color: user override → vehicleColorMap/vehicle color → palette (with alpha for 2nd+ mapping)
@@ -353,7 +367,7 @@ export default function EpaCurvesView({
                     ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
                     : vehicleLabel(vehicle);
                 // Subtle "adjusted" marker on each curve's legend entry (density or accessory load).
-                const label = (densityAdjusted || accessoryAdjusted) ? `${baseLabel} ▲` : baseLabel;
+                const label = (densityAdjusted || accessoryAdjusted || windAdjusted) ? `${baseLabel} ▲` : baseLabel;
 
                 result.push({
                     label,
@@ -379,7 +393,7 @@ export default function EpaCurvesView({
             });
         });
         return result;
-    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -657,6 +671,41 @@ export default function EpaCurvesView({
                                 aria-label="Accessory load override in watts"
                             />
                             <span className="text-sm text-faint">W</span>
+                        </div>
+
+                        {/* Wind — viewing condition, applies to all curves */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                                Wind
+                                <InfoIcon
+                                    text="Scales aerodynamic drag by apparent (relative) airspeed — a headwind raises effective drag speed, a tailwind lowers it, a pure crosswind raises it slightly. Direction is relative to travel: 0°=tailwind, 180°=headwind, 90°/270°=crosswind. Models relative-airspeed magnitude only — does not capture yaw-angle sensitivity of drag coefficient."
+                                    position="right"
+                                    className="ml-1"
+                                />
+                            </span>
+                            <input
+                                type="number"
+                                step="5"
+                                min="0"
+                                value={windSpeedMph}
+                                onChange={e => setWindSpeedMph(e.target.value)}
+                                placeholder="0"
+                                className="form-input text-sm py-1 w-16 text-right"
+                                aria-label="Wind speed in mph"
+                            />
+                            <span className="text-sm text-faint">mph @</span>
+                            <input
+                                type="number"
+                                step="15"
+                                min="0"
+                                max="360"
+                                value={windDirectionDeg}
+                                onChange={e => setWindDirectionDeg(clampWindDirection(e.target.value))}
+                                placeholder="180"
+                                className="form-input text-sm py-1 w-16 text-right"
+                                aria-label="Wind direction relative to travel, in degrees"
+                            />
+                            <span className="text-sm text-faint">°{windAdjusted ? ' ▲' : ''}</span>
                         </div>
                     </div>
 

@@ -256,6 +256,10 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     if (run._yValue != null) badges.push({ text: `${run._yValue} ${run._yUnit}`, primary: true });
                     if (run.speed_mph     != null) badges.push({ text: fmtSpeed(run.speed_mph, units) });
                     if (run.temperature_f != null) badges.push({ text: fmtTemp(run.temperature_f, units) });
+                    if (run.avg_wind_speed_mph != null) {
+                        const dir = run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : '';
+                        badges.push({ text: `💨 ${fmtSpeed(run.avg_wind_speed_mph, units)}${dir}` });
+                    }
                     if (badges.length === 0) return;
 
                     const pillH  = 15, pillPad = 5, gap = 3, topPad = 6;
@@ -542,6 +546,14 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                 )}
                                 {run.temperature_f != null && (
                                     <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>
+                                )}
+                                {run.avg_wind_speed_mph != null && (
+                                    <span
+                                        className="text-xs bg-cyan-50 text-cyan-700 px-1.5 py-0.5 rounded border border-cyan-200"
+                                        title={run.wind_direction_deg != null ? `${run.wind_direction_deg}° vs travel (0°=tailwind, 180°=headwind)` : 'Direction not recorded'}
+                                    >
+                                        💨 {fmtSpeed(run.avg_wind_speed_mph, units)}{run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : ''}
+                                    </span>
                                 )}
                                 {range != null && (
                                     <span

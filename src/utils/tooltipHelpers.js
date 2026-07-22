@@ -5,7 +5,7 @@ import { fmtSpeed, fmtTemp, fmtDistance } from './unitConversions';
  * Sections: Run specifics → Chart specifics (caller-provided).
  * Returns a flat array of strings; empty strings act as spacers.
  *
- * @param {object|null} run  - Run object with optional: source, speed_mph, temperature_f
+ * @param {object|null} run  - Run object with optional: source, speed_mph, temperature_f, avg_wind_speed_mph, wind_direction_deg
  * @param {string[]} chartLines - Additional lines for the chart-specifics section.
  * @param {string} units - 'imperial' | 'metric'
  */
@@ -17,6 +17,10 @@ export function runTooltipLines(run, chartLines = [], units = 'imperial') {
     if (run?.source)               runSection.push(`Source: ${run.source}`);
     if (run?.speed_mph     != null) runSection.push(`Speed: ${fmtSpeed(run.speed_mph, units)}`);
     if (run?.temperature_f != null) runSection.push(`Temp: ${fmtTemp(run.temperature_f, units)}`);
+    if (run?.avg_wind_speed_mph != null) {
+        const dir = run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : '';
+        runSection.push(`Wind: ${fmtSpeed(run.avg_wind_speed_mph, units)}${dir}`);
+    }
     if (runSection.length) lines.push(...runSection);
 
     // ── Chart specifics ────────────────────────────────────────────────────────
