@@ -111,54 +111,97 @@ const PALETTE = [
     '#3b82f6', '#a855f7', '#ec4899', '#14b8a6',
 ];
 
-// ── Per-run override inputs ───────────────────────────────────────────────────
-// Two compact overrides shown beside each selected run: en-route arrival SoC
-// (minSoc) and the mode-dependent charge amount (leg distance / charge time).
-// Empty shows the global value greyed as a placeholder; typing overrides it.
-function RunOverrideInputs({ runId, override, mode, global, units, dl, onChange }) {
-    const num = (v, key, cls) => (
-        <input
-            type="number"
-            value={v === '' || v == null ? '' : v}
-            placeholder={key.placeholder}
-            onChange={key.onChange}
-            onClick={e => e.stopPropagation()}
-            className={`border rounded px-1 py-0.5 text-xs ${cls}`}
-        />
-    );
-    const legGlobal = units === 'metric' ? Math.round(global.legDistance * MI_TO_KM) : global.legDistance;
-    const legValue  = override.legDistance != null
-        ? (units === 'metric' ? Math.round(override.legDistance * MI_TO_KM) : override.legDistance)
-        : '';
+// ── Per-run routing overrides panel ───────────────────────────────────────────
+// Dedicated collapsible section listing the selected runs with per-run overrides
+// of the charging strategy: en-route Charger Arrival SoC (minSoc) and the
+// mode-dependent charge amount (leg distance / charge time). Blank shows the
+// global value greyed as a placeholder; typing overrides just that run.
+function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onChange }) {
+    const [open, setOpen] = useState(false);
+    if (!entries.length) return null;
+
+    const customized  = entries.filter(e => Object.keys(perRun[e.run.id] || {}).length).length;
+    const legGlobal   = units === 'metric' ? Math.round(global.legDistance * MI_TO_KM) : global.legDistance;
+    const amountLabel = mode === 'distance' ? `Leg Distance (${dl})` : 'Charge Time (min)';
+
+    const cell = 'px-3 py-2 text-left font-semibold text-muted whitespace-nowrap';
+    const inputCls = 'w-20 border rounded px-2 py-1 text-sm';
 
     return (
-        <span className="inline-flex items-center gap-1 ml-2 align-middle" onClick={e => e.stopPropagation()}>
-            <span className="text-[10px] text-faint">arr SoC</span>
-            {num(override.minSoc ?? '', {
-                placeholder: `${global.minSoc}`,
-                onChange: e => onChange(runId, 'minSoc', e.target.value),
-            }, 'w-11')}
-            {mode === 'distance' ? (
-                <>
-                    <span className="text-[10px] text-faint">leg {dl}</span>
-                    {num(legValue, {
-                        placeholder: `${legGlobal}`,
-                        onChange: e => {
-                            const v = e.target.value;
-                            onChange(runId, 'legDistance', v === '' ? '' : (units === 'metric' ? Number(v) / MI_TO_KM : Number(v)));
-                        },
-                    }, 'w-14')}
-                </>
-            ) : (
-                <>
-                    <span className="text-[10px] text-faint">chg min</span>
-                    {num(override.chargeTime ?? '', {
-                        placeholder: `${global.chargeTime}`,
-                        onChange: e => onChange(runId, 'chargeTime', e.target.value),
-                    }, 'w-12')}
-                </>
+        <div className="mt-4">
+            <button onClick={() => setOpen(o => !o)} className="run-selector-header">
+                <span style={{ display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
+                Customize routing
+                <span className="text-sm font-normal text-muted">
+                    {customized ? `(${customized} customized)` : '(optional — per test)'}
+                </span>
+            </button>
+
+            {open && (
+                <div className="mt-3 overflow-x-auto">
+                    <table className="text-sm">
+                        <thead className="bg-[var(--color-surface-muted)]">
+                            <tr>
+                                <th className={cell}>Test</th>
+                                <th className={cell}>Charger Arrival SoC (%)</th>
+                                <th className={cell}>{amountLabel}</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y dark:divide-slate-700">
+                            {entries.map(e => {
+                                const ov = perRun[e.run.id] || {};
+                                const legValue = ov.legDistance != null
+                                    ? (units === 'metric' ? Math.round(ov.legDistance * MI_TO_KM) : ov.legDistance)
+                                    : '';
+                                return (
+                                    <tr key={e.run.id}>
+                                        <td className="px-3 py-2">
+                                            <span className="flex items-center gap-2">
+                                                <span className="inline-block w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
+                                                <span className="text-secondary">{vehicleLabel(e.vehicle)}</span>
+                                                <span className="text-muted">· {e.run.name}</span>
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <input
+                                                type="number" min={0} max={100}
+                                                className={inputCls}
+                                                placeholder={`${global.minSoc}`}
+                                                value={ov.minSoc ?? ''}
+                                                onChange={ev => onChange(e.run.id, 'minSoc', ev.target.value)}
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {mode === 'distance' ? (
+                                                <input
+                                                    type="number" min={0}
+                                                    className={inputCls}
+                                                    placeholder={`${legGlobal}`}
+                                                    value={legValue}
+                                                    onChange={ev => {
+                                                        const v = ev.target.value;
+                                                        onChange(e.run.id, 'legDistance', v === '' ? '' : (units === 'metric' ? Number(v) / MI_TO_KM : Number(v)));
+                                                    }}
+                                                />
+                                            ) : (
+                                                <input
+                                                    type="number" min={0}
+                                                    className={inputCls}
+                                                    placeholder={`${global.chargeTime}`}
+                                                    value={ov.chargeTime ?? ''}
+                                                    onChange={ev => onChange(e.run.id, 'chargeTime', ev.target.value)}
+                                                />
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                    <p className="text-xs text-muted mt-2">Blank fields use the global value shown as a placeholder.</p>
+                </div>
             )}
-        </span>
+        </div>
     );
 }
 
@@ -1299,8 +1342,14 @@ export default function RoadTripView({
     const setRunOverride = (runId, key, rawVal) => setRoadTripConfig(prev => {
         const perRun = { ...(prev.perRun || {}) };
         const cur = { ...(perRun[runId] || {}) };
-        if (rawVal === '' || rawVal == null || isNaN(Number(rawVal))) delete cur[key];
-        else cur[key] = Number(rawVal);
+        if (rawVal === '' || rawVal == null || isNaN(Number(rawVal))) {
+            delete cur[key];
+        } else {
+            // Never below 0; SoC additionally capped at 100.
+            let n = Math.max(0, Number(rawVal));
+            if (key === 'minSoc') n = Math.min(100, n);
+            cur[key] = n;
+        }
         if (Object.keys(cur).length) perRun[runId] = cur;
         else delete perRun[runId];
         return { ...prev, perRun };
@@ -1595,7 +1644,6 @@ export default function RoadTripView({
                                 const spd = entry.testSpeedMph
                                     ? `${fmtSpeed(entry.testSpeedMph, units)}`
                                     : '70 mph (assumed)';
-                                const selected = selectedRunIds.some(id => String(id) === String(run.id));
                                 return (
                                     <span className="text-xs text-faint ml-1">
                                         {eff} {units === 'metric' ? 'km/kWh' : 'mi/kWh'} @ {spd}
@@ -1605,6 +1653,19 @@ export default function RoadTripView({
                             }}
                         />
                     </div>
+
+                    {/* Per-run routing overrides */}
+                    {!isSweepMode && (
+                        <RoutingOverridesPanel
+                            entries={validEntries}
+                            perRun={roadTripConfig.perRun || {}}
+                            mode={mode}
+                            global={{ minSoc, legDistance, chargeTime }}
+                            units={units}
+                            dl={dl}
+                            onChange={setRunOverride}
+                        />
+                    )}
 
                     {/* Warnings for vehicles/runs that can't be simulated */}
                     {(vehiclesWithNoChargingRuns.length > 0 || skippedEntries.length > 0) && (
