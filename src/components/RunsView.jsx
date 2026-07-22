@@ -2215,6 +2215,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h3 className="section-title">
                                             {run.name}
+                                            {run.isHidden && (
+                                                <span
+                                                    title="Hidden from regular viewers — only admins/contributors can see this test"
+                                                    className="ml-1 badge-hidden"
+                                                >
+                                                    Hidden
+                                                </span>
+                                            )}
                                             {run.url && (
                                                 <a href={run.url} target="_blank" rel="noopener noreferrer"
                                                     title="Range test source"
@@ -2317,6 +2325,15 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 className="dropdown-item w-full text-left"
                                                             >
                                                                 ↑ Upload additional data
+                                                            </button>
+                                                        )}
+                                                        {isContributor && (
+                                                            <button
+                                                                onClick={() => { onUpdateRun(run.id, { isHidden: !run.isHidden }); setOpenMenuRunId(null); }}
+                                                                title={run.isHidden ? 'Make this test visible to all viewers' : 'Hide this test from regular viewers'}
+                                                                className="dropdown-item w-full text-left"
+                                                            >
+                                                                {run.isHidden ? '◎ Unhide from viewers' : '⊘ Hide from viewers'}
                                                             </button>
                                                         )}
                                                     </div>

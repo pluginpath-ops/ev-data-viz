@@ -572,6 +572,15 @@ body {
     color: rgb(147, 197, 253);
 }
 
+/* Marks a run hidden from regular viewers (admin/contributor-only visibility) */
+.badge-hidden {
+    @apply text-xs font-normal bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded align-middle;
+}
+[data-theme="dark"] .badge-hidden {
+    background-color: rgba(249, 115, 22, 0.2);
+    color: rgb(253, 186, 116);
+}
+
 /* Border-style status badge (full-radius); color classes added inline */
 .badge-status {
     @apply text-xs px-1.5 py-0.5 rounded-full border;
