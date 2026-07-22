@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { dataService } from '../services/DataService';
 
 const AppContext = createContext(null);
@@ -1036,8 +1036,16 @@ export function AppProvider({ children }) {
         window.location.reload();
     };
 
+    // Admins/contributors can hide a run's test data (disputed, incomplete) without
+    // deleting it. Everyone else — including anonymous viewers — never sees it, in
+    // Tests & Data or in any chart/compare tab, since all of those read from `vehicles`.
+    const visibleVehicles = useMemo(() => {
+        if (isContributor) return vehicles;
+        return vehicles.map(v => ({ ...v, runs: (v.runs || []).filter(r => !r.isHidden) }));
+    }, [vehicles, isContributor]);
+
     const value = {
-        vehicles,
+        vehicles: visibleVehicles,
         selectedVehicles,
         user,
         userRole,

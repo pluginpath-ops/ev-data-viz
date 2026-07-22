@@ -139,6 +139,7 @@ class DataService {
           ...r,
           // Normalise DB snake_case to the camelCase used throughout the app.
           isDefault: !!r.is_default,
+          isHidden:  !!r.is_hidden,
           // data_points(count) returns [{ count: N }]; normalise to a plain number
           dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
         })),
@@ -571,6 +572,7 @@ class DataService {
       ...(updates.windDirectionDeg !== undefined ? { wind_direction_deg: updates.windDirectionDeg !== '' ? Number(updates.windDirectionDeg) : null } : {}),
       ...(updates.url !== undefined ? { url: updates.url || null } : {}),
       ...(updates.chargingUrl !== undefined ? { charging_url: updates.chargingUrl || null } : {}),
+      ...(updates.isHidden !== undefined ? { is_hidden: updates.isHidden } : {}),
     }).eq('id', runId);
     if (error) throw error;
   }
