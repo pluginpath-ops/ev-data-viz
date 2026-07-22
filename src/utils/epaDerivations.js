@@ -335,6 +335,27 @@ export function airDensityRatio(elevationFt) {
     return Math.pow(base, 4.2559);
 }
 
+/** Standard-condition ambient temperature (°F), matching the ISA sea-level
+ *  reference (15°C) that airDensityRatio's altitude formula assumes. */
+export const STANDARD_TEMP_F = 59;
+
+/**
+ * Air-density ratio from ambient temperature alone, via the ideal gas law at
+ * constant pressure (ρ ∝ 1/T): colder air is denser (ratio > 1), hotter air
+ * is thinner (ratio < 1). Independent of, and multiplies with, airDensityRatio
+ * — same plot-time-only scale on the aerodynamic (C) term, never persisted.
+ *
+ * @param {number|null} tempF  ambient temperature in °F; null/undefined ⇒ 1 (no adjustment)
+ * @returns {number} density ratio (1.0 at the standard temperature)
+ */
+export function temperatureDensityRatio(tempF) {
+    if (tempF == null || tempF === '') return 1;
+    const actualRankine   = Number(tempF) + 459.67;
+    const standardRankine = STANDARD_TEMP_F + 459.67;
+    if (actualRankine <= 0) return 1; // guard absolute-zero-adjacent nonsense input
+    return standardRankine / actualRankine;
+}
+
 // ── Curve builder (curator model) ───────────────────────────────────────────
 
 /**

@@ -10,7 +10,7 @@ import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH,
 } from '../utils/epaPhysics';
-import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio } from '../utils/epaDerivations';
+import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio, temperatureDensityRatio, STANDARD_TEMP_F } from '../utils/epaDerivations';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
@@ -229,12 +229,16 @@ export default function EpaCurvesView({
     const [mappingColors,    setMappingColors]    = useState({});        // mapping.id → hex
     const [urlCopied,        setUrlCopied]        = useState(false);
     const [imageCopied,      setImageCopied]      = useState(false);
-    // Altitude is a viewing condition (like the unit toggle): scales the
-    // aerodynamic C term at plot time for ALL curves. Never persisted; never
-    // affects stored coefficients or the standard-density η.
+    // Altitude and temperature are viewing conditions (like the unit toggle):
+    // together they scale the aerodynamic C term at plot time for ALL curves.
+    // Never persisted; never affect stored coefficients or the standard-density η.
     const [elevationFt,      setElevationFt]      = useState(0);
-    const densityRatio = useMemo(() => airDensityRatio(elevationFt), [elevationFt]);
-    const altAdjusted  = Math.abs(densityRatio - 1) > 1e-6;
+    const [tempF,            setTempF]            = useState('');
+    const densityRatio = useMemo(
+        () => airDensityRatio(elevationFt) * temperatureDensityRatio(tempF === '' ? null : Number(tempF)),
+        [elevationFt, tempF]
+    );
+    const densityAdjusted  = Math.abs(densityRatio - 1) > 1e-6;
 
     const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
 
@@ -281,8 +285,8 @@ export default function EpaCurvesView({
                 const baseLabel = vehiclesWithEpa.length > 1 || mi > 0
                     ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
                     : vehicleLabel(vehicle);
-                // Subtle "altitude-adjusted" marker on each curve's legend entry.
-                const label = altAdjusted ? `${baseLabel} ▲` : baseLabel;
+                // Subtle "density-adjusted" marker on each curve's legend entry.
+                const label = densityAdjusted ? `${baseLabel} ▲` : baseLabel;
 
                 result.push({
                     label,
@@ -308,7 +312,7 @@ export default function EpaCurvesView({
             });
         });
         return result;
-    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, altAdjusted]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -526,11 +530,33 @@ export default function EpaCurvesView({
                                 aria-label="Elevation in feet"
                             />
                             <span className="text-sm text-faint">ft</span>
+                        </div>
+
+                        {/* Temperature — viewing condition, applies to all curves */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                                Temp
+                                <InfoIcon
+                                    text={`Adjusts aerodynamic drag for air density at this ambient temperature (colder air is denser). Standard condition is ${STANDARD_TEMP_F}°F. Models air density only — does not capture battery, HVAC, or cold-tire effects.`}
+                                    position="left"
+                                    className="ml-1"
+                                />
+                            </span>
+                            <input
+                                type="number"
+                                step="5"
+                                value={tempF}
+                                onChange={e => setTempF(e.target.value)}
+                                placeholder={String(STANDARD_TEMP_F)}
+                                className="form-input text-sm py-1 w-20 text-right"
+                                aria-label="Ambient temperature in °F"
+                            />
+                            <span className="text-sm text-faint">°F</span>
                             <span
-                                className={`text-xs whitespace-nowrap ${altAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-faint'}`}
-                                title="Air-density ratio applied to the aerodynamic (C) term"
+                                className={`text-xs whitespace-nowrap ${densityAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-faint'}`}
+                                title="Combined air-density ratio (altitude × temperature) applied to the aerodynamic (C) term"
                             >
-                                → ρ {densityRatio.toFixed(2)}{altAdjusted ? ' ▲' : ''}
+                                → ρ {densityRatio.toFixed(2)}{densityAdjusted ? ' ▲' : ''}
                             </span>
                         </div>
                     </div>
