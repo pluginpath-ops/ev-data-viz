@@ -388,6 +388,51 @@ export function apparentAirspeed(vMph, windSpeedMph, windDirectionDeg) {
     return Math.sqrt(Math.max(0, vRelSq));
 }
 
+// ── Real-world overlay correction ───────────────────────────────────────────
+
+/**
+ * Correct a real-world range-test point's measured consumption so it's
+ * comparable to an EPA curve drawn at different viewing conditions than the
+ * run was actually driven under (issue #139 step 3).
+ *
+ * Uses the SAME model (a/b/c road-load coefficients + η) as the curve itself:
+ * computes what the model predicts at the run's own conditions vs. at the
+ * curve's current viewing conditions, and scales the measured value by that
+ * ratio. This cancels most model error (it's a delta correction, not an
+ * absolute one) and guarantees a run driven under the exact viewing
+ * conditions is left unchanged (ratio = 1).
+ *
+ * NOT corrected: elevation gain/loss. Unlike static altitude (an air-density
+ * term), route elevation gain/loss is a route-dependent net-energy term with
+ * its own model that doesn't exist yet — see issue #139 step 2. Only
+ * temperature (density) and wind are corrected here.
+ *
+ * @param {object} group             — EPA group (coefficients + tests), same as buildEpaCurveFromModel
+ * @param {number} speedMph          — the run's recorded test speed
+ * @param {number} measuredKwh100mi  — the run's measured consumption (kWh/100mi)
+ * @param {object} runConditions     — { temperatureF, windSpeedMph, windDirectionDeg } as recorded on the run
+ * @param {object} viewConditions    — { densityRatio, accessoryOverrideW, windSpeedMph, windDirectionDeg } — the SAME values driving the curve
+ * @returns {number|null} corrected kWh/100mi, or null if the model can't be evaluated
+ */
+export function correctMeasuredConsumption(group, speedMph, measuredKwh100mi, runConditions, viewConditions) {
+    const coeffs = resolvePrimaryCoeffs(group);
+    if (!coeffs || !speedMph || !measuredKwh100mi) return null;
+
+    const eta   = deriveDrivetrainEta(group).value;
+    const accKw = viewConditions.accessoryOverrideW != null ? viewConditions.accessoryOverrideW / 1000 : accessoryKw(group);
+    const { a, b, c } = coeffs;
+
+    const runDensityRatio = temperatureDensityRatio(runConditions.temperatureF ?? null);
+    const cAtRun  = c * runDensityRatio;
+    const cAtView = c * viewConditions.densityRatio;
+
+    const predictedAtRun  = batteryConsumptionAt(speedMph, a, b, cAtRun,  eta, accKw, runConditions.windSpeedMph  || 0, runConditions.windDirectionDeg  || 0);
+    const predictedAtView = batteryConsumptionAt(speedMph, a, b, cAtView, eta, accKw, viewConditions.windSpeedMph || 0, viewConditions.windDirectionDeg || 0);
+
+    if (!predictedAtRun || predictedAtRun <= 0 || !predictedAtView) return null;
+    return measuredKwh100mi * (predictedAtView / predictedAtRun);
+}
+
 // ── Curve builder (curator model) ───────────────────────────────────────────
 
 /**

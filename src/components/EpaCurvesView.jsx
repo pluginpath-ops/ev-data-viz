@@ -8,9 +8,10 @@ import { PALETTE } from '../utils/specHelpers';
 import { resolveChartColors } from '../utils/colorUtils';
 import {
     resolveUseableKwh, resolveUseableKwhSource,
-    HIGHWAY_BAND_MPH,
+    HIGHWAY_BAND_MPH, MPG_E_CONVERSION,
 } from '../utils/epaPhysics';
-import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio, temperatureDensityRatio, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
+import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio, temperatureDensityRatio, correctMeasuredConsumption, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
+import { filterRangeRuns } from '../utils/runUtils';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
@@ -298,6 +299,10 @@ export default function EpaCurvesView({
     // (see apparentAirspeed in epaDerivations.js); never persisted, η untouched.
     const [windSpeedMph,     setWindSpeedMph]     = useState('');
     const [windDirectionDeg, setWindDirectionDeg] = useState('');
+    // Overlay real-world range-test points, corrected (temp + wind only, not
+    // elevation gain/loss — no model for that yet) to the viewing conditions
+    // above, so they're comparable to the curve as currently displayed.
+    const [overlayRealWorld, setOverlayRealWorld] = useState(false);
     const clampTempF = (raw) => {
         if (raw === '' || raw === '-') return raw; // allow in-progress typing of a negative number
         const n = Number(raw);
@@ -390,10 +395,63 @@ export default function EpaCurvesView({
                     _useableKwhSource: useableKwhSource,
                     _curve:            curve,
                 });
+
+                // ── Real-world overlay: this vehicle's own range-test runs, corrected
+                // (temp + wind only — see correctMeasuredConsumption) to the same
+                // viewing conditions as the curve above, plotted as scatter points.
+                if (overlayRealWorld) {
+                    const viewConditions = {
+                        densityRatio,
+                        accessoryOverrideW: accessoryOverrideWNum,
+                        windSpeedMph:       windSpeedMphNum,
+                        windDirectionDeg:   windDirectionDegNum,
+                    };
+                    const overlayPoints = filterRangeRuns(vehicle.runs)
+                        .filter(r => !r._inherited && r.speed_mph != null && r.distance_miles > 0 && r.energy_kwh != null)
+                        .map(run => {
+                            const measuredKwh100mi = (run.energy_kwh / run.distance_miles) * 100;
+                            const runConditions = {
+                                temperatureF:     run.temperature_f,
+                                windSpeedMph:     run.avg_wind_speed_mph,
+                                windDirectionDeg: run.wind_direction_deg,
+                            };
+                            const correctedKwh100mi = correctMeasuredConsumption(epaGroup, run.speed_mph, measuredKwh100mi, runConditions, viewConditions);
+                            if (correctedKwh100mi == null) return null;
+                            const miPerKwh = 100 / correctedKwh100mi;
+                            const pt = {
+                                mph:      run.speed_mph,
+                                kwh100mi: correctedKwh100mi,
+                                miPerKwh,
+                                mpge:     miPerKwh * MPG_E_CONVERSION,
+                                rangeMi:  useableKwh > 0 ? useableKwh / (correctedKwh100mi / 100) : null,
+                            };
+                            return {
+                                x: convSpeed(pt.mph, units),
+                                y: convertYValue(getYValue(pt, yAxis), yAxis, units),
+                            };
+                        })
+                        .filter(p => p && p.y != null);
+
+                    if (overlayPoints.length) {
+                        result.push({
+                            type:            'scatter',
+                            label:           `${baseLabel} (real-world)`,
+                            data:            overlayPoints,
+                            backgroundColor: color,
+                            borderColor:     color,
+                            pointRadius:     5,
+                            pointHoverRadius: 7,
+                            showLine:        false,
+                            _vehicleId:      vehicle.id,
+                            _mappingId:      mapping.id,
+                            _isOverlay:      true,
+                        });
+                    }
+                }
             });
         });
         return result;
-    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, overlayRealWorld]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -468,6 +526,13 @@ export default function EpaCurvesView({
                             },
                             label(item) {
                                 const ds = item.dataset;
+                                if (ds._isOverlay) {
+                                    // Overlay points are already corrected/converted at build
+                                    // time (see the datasets useMemo) — use the plotted value
+                                    // directly rather than re-deriving from a curve.
+                                    const decimals = yAxis === 'range_mi' ? 0 : yAxis === 'mi_kwh' ? 2 : 1;
+                                    return `${ds.label}: ${item.parsed.y?.toFixed(decimals)} ${yAxisLabel(yAxis, units)}`;
+                                }
                                 const curve = ds._curve;
                                 const speedMph = units === 'metric'
                                     ? item.parsed.x / 1.60934
@@ -591,6 +656,15 @@ export default function EpaCurvesView({
                                 <span className="text-sm font-medium">Auto Color</span>
                             </label>
                         )}
+                        <label className="toggle-label" title="Plot real-world range-test points on top of each curve, corrected for temperature and wind to match the curve's current viewing conditions (not elevation gain/loss — no model for that yet)">
+                            <input
+                                type="checkbox"
+                                checked={overlayRealWorld}
+                                onChange={e => setOverlayRealWorld(e.target.checked)}
+                                className="w-4 h-4"
+                            />
+                            <span className="text-sm font-medium">Overlay Real World Tests</span>
+                        </label>
                     </div>
 
                     {/* Viewing conditions — altitude, temperature, accessory load. Kept on
