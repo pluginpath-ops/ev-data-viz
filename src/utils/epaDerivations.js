@@ -65,7 +65,7 @@ const inBand = (v, [lo, hi]) => v != null && v >= lo && v <= hi;
  * Pick the coefficient set that drives derivations: the primary (City/Highway)
  * set, else the first available. Prefers target_* coefficients over set_*.
  *
- * @returns {{ a, b, c, source: 'target'|'set', category }|null}
+ * @returns {{ a, b, c, source: 'target'|'set', category, equivTestWeightLbs }|null}
  */
 export function resolvePrimaryCoeffs(group) {
     const sets = group?.epa_coefficient_sets || [];
@@ -73,14 +73,15 @@ export function resolvePrimaryCoeffs(group) {
     const primary = sets.find(s => s.is_primary)
         || sets.find(s => s.category === 'City/Highway')
         || sets[0];
+    const equivTestWeightLbs = num(primary.equiv_test_weight_lbs);
 
     const ta = num(primary.target_a), tb = num(primary.target_b), tc = num(primary.target_c);
     if (ta != null && tb != null && tc != null) {
-        return { a: ta, b: tb, c: tc, source: 'target', category: primary.category };
+        return { a: ta, b: tb, c: tc, source: 'target', category: primary.category, equivTestWeightLbs };
     }
     const sa = num(primary.set_a), sb = num(primary.set_b), sc = num(primary.set_c);
     if (sa != null && sb != null && sc != null) {
-        return { a: sa, b: sb, c: sc, source: 'set', category: primary.category };
+        return { a: sa, b: sb, c: sc, source: 'set', category: primary.category, equivTestWeightLbs };
     }
     return null;
 }
@@ -388,6 +389,57 @@ export function apparentAirspeed(vMph, windSpeedMph, windDirectionDeg) {
     return Math.sqrt(Math.max(0, vRelSq));
 }
 
+// ── Elevation gain/loss (grade) ──────────────────────────────────────────────
+
+/** Fraction of the theoretical descent PE actually recovered to the battery
+ *  via regen — the rest is lost to rolling/aero drag during the descent and
+ *  motor/inverter conversion losses. Real-world EVs recover roughly 60-80%;
+ *  this is a single fleet-wide approximation, not vehicle-specific. */
+export const REGEN_EFFICIENCY = 0.7;
+
+/**
+ * Average grade, as a percentage (rise/run), for a net elevation change over
+ * a horizontal distance. Display-only — not used in the energy math directly
+ * (that uses the same rise/run fraction, unitless).
+ *
+ * @param {number} elevationGainFt  net elevation change (ft); + = net climb
+ * @param {number} distanceMiles    horizontal distance the gain is spread over
+ * @returns {number} grade, as a percentage (0 if either input is falsy)
+ */
+export function averageGradePercent(elevationGainFt, distanceMiles) {
+    if (!elevationGainFt || !distanceMiles) return 0;
+    return (elevationGainFt / (distanceMiles * 5280)) * 100;
+}
+
+/**
+ * Energy contribution (kWh/100mi) from a net elevation change over a given
+ * distance — a route/grade effect, distinct from static altitude (which is an
+ * air-density effect on aerodynamic drag, see airDensityRatio). Unlike
+ * density or wind, grade doesn't vary with speed: climbing a given grade
+ * costs the same energy per mile regardless of how fast it's driven, so this
+ * is a constant additive term, not a per-speed curve-shape scale.
+ *
+ * Climbing (positive grade): full small-angle PE physics (energy = weight ×
+ * rise, via the same LBF_MILE_TO_KWH conversion used for road-load force),
+ * divided by η like any other wheel-level work.
+ * Descending (negative grade): only REGEN_EFFICIENCY of the theoretical PE
+ * is assumed recovered — regen braking never returns 100%.
+ *
+ * @param {number|null} weightLbs    vehicle weight (EPA equivalent test weight — same
+ *                                   basis as the a/b/c road-load coefficients); null/0 ⇒ 0
+ * @param {number} elevationGainFt   net elevation change (ft); + = net climb
+ * @param {number} distanceMiles     horizontal distance the gain is spread over
+ * @param {number} eta               drivetrain efficiency (same η used for the rest of the curve)
+ * @returns {number} signed kWh/100mi contribution (+ increases consumption, − decreases it)
+ */
+export function gradeEnergyKwh100mi(weightLbs, elevationGainFt, distanceMiles, eta) {
+    if (!weightLbs || !elevationGainFt || !distanceMiles) return 0;
+    const gradeFraction = elevationGainFt / (distanceMiles * 5280); // rise/run, small-angle approx
+    const gradeForceLbf = weightLbs * gradeFraction;
+    const rawKwh100mi = gradeForceLbf * LBF_MILE_TO_KWH * 100;
+    return gradeFraction > 0 ? rawKwh100mi / eta : rawKwh100mi * REGEN_EFFICIENCY;
+}
+
 // ── Real-world overlay correction ───────────────────────────────────────────
 
 /**
@@ -395,23 +447,24 @@ export function apparentAirspeed(vMph, windSpeedMph, windDirectionDeg) {
  * comparable to an EPA curve drawn at different viewing conditions than the
  * run was actually driven under (issue #139 step 3).
  *
- * Uses the SAME model (a/b/c road-load coefficients + η) as the curve itself:
- * computes what the model predicts at the run's own conditions vs. at the
- * curve's current viewing conditions, and scales the measured value by that
- * ratio. This cancels most model error (it's a delta correction, not an
- * absolute one) and guarantees a run driven under the exact viewing
- * conditions is left unchanged (ratio = 1).
+ * Temperature and wind use the SAME model (a/b/c road-load coefficients + η)
+ * as the curve itself: computes what the model predicts at the run's own
+ * conditions vs. at the curve's current viewing conditions, and scales the
+ * measured value by that ratio. This cancels most model error (it's a delta
+ * correction, not an absolute one) and guarantees a run driven under the
+ * exact viewing conditions is left unchanged (ratio = 1).
  *
- * NOT corrected: elevation gain/loss. Unlike static altitude (an air-density
- * term), route elevation gain/loss is a route-dependent net-energy term with
- * its own model that doesn't exist yet — see issue #139 step 2. Only
- * temperature (density) and wind are corrected here.
+ * Elevation gain/loss is additive rather than multiplicative (see
+ * gradeEnergyKwh100mi), so it's composed around the ratio step instead of
+ * inside it: the run's own grade contribution is subtracted out first (to
+ * isolate the flat-ground-equivalent measured value), then the view's grade
+ * contribution is added back in after scaling.
  *
  * @param {object} group             — EPA group (coefficients + tests), same as buildEpaCurveFromModel
  * @param {number} speedMph          — the run's recorded test speed
  * @param {number} measuredKwh100mi  — the run's measured consumption (kWh/100mi)
- * @param {object} runConditions     — { temperatureF, windSpeedMph, windDirectionDeg } as recorded on the run
- * @param {object} viewConditions    — { densityRatio, accessoryOverrideW, windSpeedMph, windDirectionDeg } — the SAME values driving the curve
+ * @param {object} runConditions     — { temperatureF, windSpeedMph, windDirectionDeg, elevationGainFt, distanceMiles } as recorded on the run
+ * @param {object} viewConditions    — { densityRatio, accessoryOverrideW, windSpeedMph, windDirectionDeg, elevationGainFt, elevationDistanceMiles } — the SAME values driving the curve
  * @returns {number|null} corrected kWh/100mi, or null if the model can't be evaluated
  */
 export function correctMeasuredConsumption(group, speedMph, measuredKwh100mi, runConditions, viewConditions) {
@@ -420,7 +473,7 @@ export function correctMeasuredConsumption(group, speedMph, measuredKwh100mi, ru
 
     const eta   = deriveDrivetrainEta(group).value;
     const accKw = viewConditions.accessoryOverrideW != null ? viewConditions.accessoryOverrideW / 1000 : accessoryKw(group);
-    const { a, b, c } = coeffs;
+    const { a, b, c, equivTestWeightLbs } = coeffs;
 
     const runDensityRatio = temperatureDensityRatio(runConditions.temperatureF ?? null);
     const cAtRun  = c * runDensityRatio;
@@ -430,7 +483,12 @@ export function correctMeasuredConsumption(group, speedMph, measuredKwh100mi, ru
     const predictedAtView = batteryConsumptionAt(speedMph, a, b, cAtView, eta, accKw, viewConditions.windSpeedMph || 0, viewConditions.windDirectionDeg || 0);
 
     if (!predictedAtRun || predictedAtRun <= 0 || !predictedAtView) return null;
-    return measuredKwh100mi * (predictedAtView / predictedAtRun);
+
+    const runGradeKwh100mi  = gradeEnergyKwh100mi(equivTestWeightLbs, runConditions.elevationGainFt,  runConditions.distanceMiles,        eta);
+    const viewGradeKwh100mi = gradeEnergyKwh100mi(equivTestWeightLbs, viewConditions.elevationGainFt, viewConditions.elevationDistanceMiles, eta);
+
+    const flatEquivalentMeasured = measuredKwh100mi - runGradeKwh100mi;
+    return flatEquivalentMeasured * (predictedAtView / predictedAtRun) + viewGradeKwh100mi;
 }
 
 // ── Curve builder (curator model) ───────────────────────────────────────────
@@ -459,15 +517,23 @@ export function correctMeasuredConsumption(group, speedMph, measuredKwh100mi, ru
  * speed-dependent, so it's applied per-point rather than as a single prefactor.
  * η is never recomputed.
  *
+ * Elevation gain/loss (viewing condition): `elevationGainFt`/`elevationDistanceMiles`
+ * add a constant kWh/100mi offset (see gradeEnergyKwh100mi) — unlike density/wind,
+ * grade doesn't vary with speed, so it's the same shift at every point. Uses the
+ * EPA coefficient set's own equivalent test weight; a group with no weight on
+ * file has no grade effect (gradeEnergyKwh100mi returns 0).
+ *
  * @param {object} group       — full group (with epa_coefficient_sets + epa_tests)
  * @param {number|null} useableKwh — battery capacity for range; null ⇒ rangeMi null
  * @param {number} densityRatio   — ρ_altitude / ρ_sea_level (default 1 = sea level)
  * @param {number|null} accessoryOverrideW — override accessory draw in watts; null ⇒ use the group's own value
  * @param {number} windSpeedMph      — ambient wind speed; 0 ⇒ no wind effect
  * @param {number} windDirectionDeg  — wind direction relative to travel (0=tailwind, 180=headwind)
+ * @param {number} elevationGainFt          — net elevation change (ft) over elevationDistanceMiles; + = net climb
+ * @param {number} elevationDistanceMiles   — horizontal distance the gain is spread over
  * @returns {Array<{ mph, kwh100mi, miPerKwh, mpge, rangeMi }>}
  */
-export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1, accessoryOverrideW = null, windSpeedMph = 0, windDirectionDeg = 0) {
+export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1, accessoryOverrideW = null, windSpeedMph = 0, windDirectionDeg = 0, elevationGainFt = 0, elevationDistanceMiles = 0) {
     const coeffs = resolvePrimaryCoeffs(group);
     if (!coeffs) return [];
 
@@ -475,12 +541,15 @@ export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1, acce
     const accKw = accessoryOverrideW != null ? accessoryOverrideW / 1000 : accessoryKw(group);
     const { a, b } = coeffs;
     const c = coeffs.c * densityRatio; // aerodynamic term only, display-time scale
+    const gradeKwh100mi = gradeEnergyKwh100mi(coeffs.equivTestWeightLbs, elevationGainFt, elevationDistanceMiles, eta);
     const [vMin, vMax] = CURVE_SPEED_RANGE;
 
     const out = [];
     for (let v = vMin; v <= vMax; v++) {
-        const kwh100mi = batteryConsumptionAt(v, a, b, c, eta, accKw, windSpeedMph, windDirectionDeg);
-        if (kwh100mi == null || kwh100mi <= 0) continue;
+        const base = batteryConsumptionAt(v, a, b, c, eta, accKw, windSpeedMph, windDirectionDeg);
+        if (base == null) continue;
+        const kwh100mi = base + gradeKwh100mi;
+        if (kwh100mi <= 0) continue;
         const miPerKwh = 100 / kwh100mi;
         out.push({
             mph: v,

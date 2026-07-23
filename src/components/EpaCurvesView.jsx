@@ -10,7 +10,7 @@ import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH, MPG_E_CONVERSION,
 } from '../utils/epaPhysics';
-import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio, temperatureDensityRatio, correctMeasuredConsumption, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
+import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio, temperatureDensityRatio, correctMeasuredConsumption, averageGradePercent, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
 import { filterRangeRuns } from '../utils/runUtils';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
@@ -299,12 +299,19 @@ export default function EpaCurvesView({
     // (see apparentAirspeed in epaDerivations.js); never persisted, η untouched.
     const [windSpeedMph,     setWindSpeedMph]     = useState('');
     const [windDirectionDeg, setWindDirectionDeg] = useState('');
+    // Elevation gain/loss — a route/grade effect, distinct from static altitude
+    // (an air-density effect). Almost always 0; hidden behind a collapsible
+    // disclosure since the physics (weight-based PE, regen-efficiency
+    // approximation for descents) is more involved than the other conditions.
+    const [gradeExpanded,        setGradeExpanded]        = useState(false);
+    const [gradeGainFt,          setGradeGainFt]          = useState('');
+    const [gradeDistanceMiles,   setGradeDistanceMiles]   = useState('');
     // Overlay real-world range-test points on top of the curve. null = off.
-    // 'corrected' scales each point (temp + wind only, not elevation gain/loss
-    // — no model for that yet) to the viewing conditions above, so it's
-    // comparable to the curve as currently displayed. 'uncorrected' plots the
-    // raw measured value as recorded — not a valid comparison across
-    // different test conditions, but useful to see the true recorded data.
+    // 'corrected' scales each point (temp, wind, and elevation gain/loss) to
+    // the viewing conditions above, so it's comparable to the curve as
+    // currently displayed. 'uncorrected' plots the raw measured value as
+    // recorded — not a valid comparison across different test conditions,
+    // but useful to see the true recorded data.
     const [overlayMode, setOverlayMode] = useState(null); // null | 'corrected' | 'uncorrected'
     const clampTempF = (raw) => {
         if (raw === '' || raw === '-') return raw; // allow in-progress typing of a negative number
@@ -328,6 +335,10 @@ export default function EpaCurvesView({
     const windAdjusted = windSpeedMph !== '' && Number(windSpeedMph) > 0;
     const windSpeedMphNum = windAdjusted ? Number(windSpeedMph) : 0;
     const windDirectionDegNum = windDirectionDeg === '' ? 0 : Number(windDirectionDeg);
+    const gradeGainFtNum        = gradeGainFt === '' ? 0 : Number(gradeGainFt);
+    const gradeDistanceMilesNum = gradeDistanceMiles === '' ? 0 : Number(gradeDistanceMiles);
+    const gradeAdjusted    = gradeGainFtNum !== 0 && gradeDistanceMilesNum > 0;
+    const avgGradePercent  = averageGradePercent(gradeGainFtNum, gradeDistanceMilesNum);
 
     const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
 
@@ -363,7 +374,7 @@ export default function EpaCurvesView({
 
                 const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
                 const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
-                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh, densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum);
+                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh, densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum, gradeGainFtNum, gradeDistanceMilesNum);
                 if (!curve.length) return;
 
                 // Color: user override → vehicleColorMap/vehicle color → palette (with alpha for 2nd+ mapping)
@@ -375,7 +386,7 @@ export default function EpaCurvesView({
                     ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
                     : vehicleLabel(vehicle);
                 // Subtle "adjusted" marker on each curve's legend entry (density or accessory load).
-                const label = (densityAdjusted || accessoryAdjusted || windAdjusted) ? `${baseLabel} ▲` : baseLabel;
+                const label = (densityAdjusted || accessoryAdjusted || windAdjusted || gradeAdjusted) ? `${baseLabel} ▲` : baseLabel;
 
                 result.push({
                     label,
@@ -400,15 +411,18 @@ export default function EpaCurvesView({
                 });
 
                 // ── Real-world overlay: this vehicle's own range-test runs, plotted as
-                // scatter points. 'corrected' scales each point (temp + wind only — see
-                // correctMeasuredConsumption) to the same viewing conditions as the curve
-                // above; 'uncorrected' plots the raw measured value as recorded.
+                // scatter points. 'corrected' scales each point (temp, wind, and
+                // elevation gain/loss — see correctMeasuredConsumption) to the same
+                // viewing conditions as the curve above; 'uncorrected' plots the raw
+                // measured value as recorded.
                 if (overlayMode) {
                     const viewConditions = {
                         densityRatio,
-                        accessoryOverrideW: accessoryOverrideWNum,
-                        windSpeedMph:       windSpeedMphNum,
-                        windDirectionDeg:   windDirectionDegNum,
+                        accessoryOverrideW:     accessoryOverrideWNum,
+                        windSpeedMph:           windSpeedMphNum,
+                        windDirectionDeg:       windDirectionDegNum,
+                        elevationGainFt:        gradeGainFtNum,
+                        elevationDistanceMiles: gradeDistanceMilesNum,
                     };
                     const overlayPoints = filterRangeRuns(vehicle.runs)
                         .filter(r => !r._inherited && r.speed_mph != null && r.distance_miles > 0 && r.energy_kwh != null)
@@ -420,6 +434,8 @@ export default function EpaCurvesView({
                                     temperatureF:     run.temperature_f,
                                     windSpeedMph:     run.avg_wind_speed_mph,
                                     windDirectionDeg: run.wind_direction_deg,
+                                    elevationGainFt:  run.elevation_gain_ft,
+                                    distanceMiles:    run.distance_miles,
                                 };
                                 kwh100mi = correctMeasuredConsumption(epaGroup, run.speed_mph, measuredKwh100mi, runConditions, viewConditions);
                                 if (kwh100mi == null) return null;
@@ -459,7 +475,7 @@ export default function EpaCurvesView({
             });
         });
         return result;
-    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, overlayMode]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted, overlayMode]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -677,7 +693,7 @@ export default function EpaCurvesView({
                                     className="ml-1"
                                 >
                                     <p>Plot this vehicle's own range-test points on top of its curve.</p>
-                                    <p className="mt-1.5"><strong>Corrected:</strong> scaled by temperature + wind to match the curve's current viewing conditions above — an apples-to-apples comparison (not elevation gain/loss — no model for that yet).</p>
+                                    <p className="mt-1.5"><strong>Corrected:</strong> scaled by temperature, wind, and elevation gain/loss to match the curve's current viewing conditions above — an apples-to-apples comparison.</p>
                                     <p className="mt-1.5"><strong>Uncorrected:</strong> the raw measured value as recorded, unadjusted — not a valid comparison across different test conditions, but useful to see the true recorded data.</p>
                                 </InfoIcon>
                             </span>
@@ -811,6 +827,61 @@ export default function EpaCurvesView({
                                 aria-label="Wind direction relative to travel, in degrees"
                             />
                             <span className="text-sm text-faint">°{windAdjusted ? ' ▲' : ''}</span>
+                        </div>
+
+                        {/* Elevation gain/loss — a route/grade effect (distinct from static
+                            altitude). Almost always 0, and more convoluted than the other
+                            conditions (weight-based PE physics, regen-efficiency approximation
+                            for descents), so it's collapsed by default. */}
+                        <div className="flex items-center gap-1.5">
+                            <span
+                                onClick={() => setGradeExpanded(e => !e)}
+                                className="text-sm font-medium flex items-center cursor-pointer"
+                                style={{ color: 'var(--color-text-secondary)' }}
+                            >
+                                {gradeExpanded ? '▾' : '▸'} Elevation Gain/Loss
+                                <InfoIcon
+                                    text="Adds a fixed energy cost/credit for a net climb or descent over a given distance — a route effect, distinct from static altitude (air density). Climbing: full physics based on vehicle weight. Descending: only ~70% of the theoretical energy is assumed recovered via regen. Usually 0 — most tests are round trips or flat routes."
+                                    position="right"
+                                    className="ml-1"
+                                />
+                            </span>
+                            {!gradeExpanded && gradeAdjusted && (
+                                <span className="text-xs text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">
+                                    ({avgGradePercent.toFixed(1)}% grade ▲)
+                                </span>
+                            )}
+                            {gradeExpanded && (
+                                <>
+                                    <input
+                                        type="number"
+                                        step="50"
+                                        value={gradeGainFt}
+                                        onChange={e => setGradeGainFt(e.target.value)}
+                                        placeholder="0"
+                                        className="form-input text-sm py-1 w-20 text-right"
+                                        aria-label="Net elevation gain in feet (negative for net descent)"
+                                    />
+                                    <span className="text-sm text-faint">ft over</span>
+                                    <input
+                                        type="number"
+                                        step="5"
+                                        min="0"
+                                        value={gradeDistanceMiles}
+                                        onChange={e => setGradeDistanceMiles(e.target.value)}
+                                        placeholder="0"
+                                        className="form-input text-sm py-1 w-16 text-right"
+                                        aria-label="Distance in miles the elevation change is spread over"
+                                    />
+                                    <span className="text-sm text-faint">mi</span>
+                                    <span
+                                        className={`text-xs whitespace-nowrap ${gradeAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-faint'}`}
+                                        title="Average grade over the distance above"
+                                    >
+                                        → {avgGradePercent.toFixed(1)}% grade{gradeAdjusted ? ' ▲' : ''}
+                                    </span>
+                                </>
+                            )}
                         </div>
                     </div>
 
