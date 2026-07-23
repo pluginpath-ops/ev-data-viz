@@ -758,6 +758,17 @@ body {
     @apply flex flex-wrap items-center gap-4 mb-4;
 }
 
+/* Warning banner for a viewing condition that can't be applied (e.g. EPA
+   Curves elevation adjustment missing a required weight for one vehicle) */
+.chart-warning-banner {
+    @apply text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-4;
+}
+[data-theme="dark"] .chart-warning-banner {
+    background-color: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.3);
+    color: rgb(252, 211, 77);
+}
+
 /* Collapsible "Select Runs" section header button */
 .run-selector-header {
     @apply flex items-center gap-2 w-full text-left font-medium transition-colors mb-1;
@@ -1131,6 +1142,7 @@ body {
     position: absolute;
     z-index: 100;
     width: 240px;
+    max-width: calc(100vw - 2rem); /* never wider than the viewport on narrow screens */
     padding: 0.5rem 0.625rem;
     font-size: 0.75rem;
     line-height: 1.4;
@@ -1171,6 +1183,7 @@ body {
 /* Width override for richer tooltip content (e.g. a reference table) */
 .info-icon-tooltip--wide {
     width: 460px;
+    max-width: calc(100vw - 2rem);
 }
 
 /* Reference table shown inside a wide info-icon tooltip (e.g. EPA Curves accessory load) */

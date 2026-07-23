@@ -10,7 +10,7 @@ import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH, MPG_E_CONVERSION,
 } from '../utils/epaPhysics';
-import { buildEpaCurveFromModel, deriveDrivetrainEta, airDensityRatio, temperatureDensityRatio, correctMeasuredConsumption, averageGradePercent, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
+import { buildEpaCurveFromModel, deriveDrivetrainEta, resolvePrimaryCoeffs, airDensityRatio, temperatureDensityRatio, correctMeasuredConsumption, averageGradePercent, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
 import { filterRangeRuns } from '../utils/runUtils';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
@@ -360,8 +360,9 @@ export default function EpaCurvesView({
     );
 
     // ── Datasets ──────────────────────────────────────────────────────────────
-    const datasets = useMemo(() => {
+    const { datasets, missingWeightWarnings } = useMemo(() => {
         const result = [];
+        const missingWeightWarnings = [];
         vehiclesWithEpa.forEach((vehicle, vi) => {
             const effectiveVehicle = {
                 ...vehicle,
@@ -371,6 +372,18 @@ export default function EpaCurvesView({
                 const { epaGroup, confidence } = mapping;
                 if (!epaGroup) return;
                 if (hiddenMappings.has(mapping.id)) return;
+
+                // An elevation adjustment needs the group's own EPA equivalent test
+                // weight (see gradeEnergyKwh100mi) — some imports never captured it.
+                // Rather than silently drawing an unadjusted curve as if there were
+                // no grade, drop the curve (and its overlay) entirely and flag it.
+                if (gradeAdjusted && !resolvePrimaryCoeffs(epaGroup)?.equivTestWeightLbs) {
+                    missingWeightWarnings.push({
+                        vehicleName: vehicleLabel(vehicle),
+                        epaLabel: epaGroup.display_name || epaGroup.epa_carline_name,
+                    });
+                    return;
+                }
 
                 const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
                 const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
@@ -474,7 +487,7 @@ export default function EpaCurvesView({
                 }
             });
         });
-        return result;
+        return { datasets: result, missingWeightWarnings };
     }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted, overlayMode]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
@@ -712,6 +725,16 @@ export default function EpaCurvesView({
                                 Uncorrected
                             </button>
                         </div>
+                        {/* Advanced/experimental toggles — collapsed by default, own panel
+                            row below so opening one never reflows the rows above it. */}
+                        <button
+                            type="button"
+                            className={`btn btn-sm ${gradeExpanded || gradeAdjusted ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => setGradeExpanded(e => !e)}
+                            title="Adjust for a net elevation gain/loss over a route (advanced — usually 0)"
+                        >
+                            Adj. Elevation{gradeAdjusted ? ` (${avgGradePercent.toFixed(1)}%)` : ''}
+                        </button>
                     </div>
 
                     {/* Viewing conditions — altitude, temperature, accessory load. Kept on
@@ -828,62 +851,58 @@ export default function EpaCurvesView({
                             />
                             <span className="text-sm text-faint">°{windAdjusted ? ' ▲' : ''}</span>
                         </div>
-
-                        {/* Elevation gain/loss — a route/grade effect (distinct from static
-                            altitude). Almost always 0, and more convoluted than the other
-                            conditions (weight-based PE physics, regen-efficiency approximation
-                            for descents), so it's collapsed by default. */}
-                        <div className="flex items-center gap-1.5">
-                            <span
-                                onClick={() => setGradeExpanded(e => !e)}
-                                className="text-sm font-medium flex items-center cursor-pointer"
-                                style={{ color: 'var(--color-text-secondary)' }}
-                            >
-                                {gradeExpanded ? '▾' : '▸'} Elevation Gain/Loss
-                                <InfoIcon
-                                    text="Adds a fixed energy cost/credit for a net climb or descent over a given distance — a route effect, distinct from static altitude (air density). Climbing: full physics based on vehicle weight. Descending: only ~70% of the theoretical energy is assumed recovered via regen. Usually 0 — most tests are round trips or flat routes."
-                                    position="right"
-                                    className="ml-1"
-                                />
-                            </span>
-                            {!gradeExpanded && gradeAdjusted && (
-                                <span className="text-xs text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">
-                                    ({avgGradePercent.toFixed(1)}% grade ▲)
-                                </span>
-                            )}
-                            {gradeExpanded && (
-                                <>
-                                    <input
-                                        type="number"
-                                        step="50"
-                                        value={gradeGainFt}
-                                        onChange={e => setGradeGainFt(e.target.value)}
-                                        placeholder="0"
-                                        className="form-input text-sm py-1 w-20 text-right"
-                                        aria-label="Net elevation gain in feet (negative for net descent)"
-                                    />
-                                    <span className="text-sm text-faint">ft over</span>
-                                    <input
-                                        type="number"
-                                        step="5"
-                                        min="0"
-                                        value={gradeDistanceMiles}
-                                        onChange={e => setGradeDistanceMiles(e.target.value)}
-                                        placeholder="0"
-                                        className="form-input text-sm py-1 w-16 text-right"
-                                        aria-label="Distance in miles the elevation change is spread over"
-                                    />
-                                    <span className="text-sm text-faint">mi</span>
-                                    <span
-                                        className={`text-xs whitespace-nowrap ${gradeAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-faint'}`}
-                                        title="Average grade over the distance above"
-                                    >
-                                        → {avgGradePercent.toFixed(1)}% grade{gradeAdjusted ? ' ▲' : ''}
-                                    </span>
-                                </>
-                            )}
-                        </div>
                     </div>
+
+                    {/* Elevation gain/loss panel — a route/grade effect (distinct from static
+                        altitude). Its own row, toggled by the "Adj. Elevation" button above, so
+                        opening/closing it never reflows the altitude/temp/wind row. */}
+                    {gradeExpanded && (
+                        <div className="chart-viewing-conditions">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                                    Elevation Gain/Loss
+                                    <InfoIcon
+                                        text="Adds a fixed energy cost/credit for a net climb or descent over a given distance — a route effect, distinct from static altitude (air density). Climbing: full physics based on vehicle weight. Descending: only ~70% of the theoretical energy is assumed recovered via regen. Usually 0 — most tests are round trips or flat routes."
+                                        position="right"
+                                        className="ml-1"
+                                    />
+                                </span>
+                                <input
+                                    type="number"
+                                    step="50"
+                                    value={gradeGainFt}
+                                    onChange={e => setGradeGainFt(e.target.value)}
+                                    placeholder="0"
+                                    className="form-input text-sm py-1 w-20 text-right"
+                                    aria-label="Net elevation gain in feet (negative for net descent)"
+                                />
+                                <span className="text-sm text-faint">ft over</span>
+                                <input
+                                    type="number"
+                                    step="5"
+                                    min="0"
+                                    value={gradeDistanceMiles}
+                                    onChange={e => setGradeDistanceMiles(e.target.value)}
+                                    placeholder="0"
+                                    className="form-input text-sm py-1 w-16 text-right"
+                                    aria-label="Distance in miles the elevation change is spread over"
+                                />
+                                <span className="text-sm text-faint">mi</span>
+                                <span
+                                    className={`text-xs whitespace-nowrap ${gradeAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-faint'}`}
+                                    title="Average grade over the distance above"
+                                >
+                                    → {avgGradePercent.toFixed(1)}% grade{gradeAdjusted ? ' ▲' : ''}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
+                    {missingWeightWarnings.length > 0 && (
+                        <div className="chart-warning-banner">
+                            ⚠ Elevation Gain/Loss can't be applied for {missingWeightWarnings.map(w => `${w.vehicleName} (${w.epaLabel})`).join(', ')} — no EPA equivalent test weight on file. That curve is hidden while an elevation adjustment is active.
+                        </div>
+                    )}
 
                     {/* Collapsible EPA test selector */}
                     {vehiclesWithEpa.length > 0 && (
