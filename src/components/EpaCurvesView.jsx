@@ -729,11 +729,20 @@ export default function EpaCurvesView({
                             row below so opening one never reflows the rows above it. */}
                         <button
                             type="button"
-                            className={`btn btn-sm ${gradeExpanded || gradeAdjusted ? 'btn-primary' : 'btn-secondary'}`}
-                            onClick={() => setGradeExpanded(e => !e)}
+                            className={`btn btn-sm ${gradeExpanded ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => setGradeExpanded(e => {
+                                const next = !e;
+                                // Turning off fully disables the adjustment, not just hides
+                                // the panel — otherwise it keeps applying invisibly.
+                                if (!next) {
+                                    setGradeGainFt('');
+                                    setGradeDistanceMiles('');
+                                }
+                                return next;
+                            })}
                             title="Adjust for a net elevation gain/loss over a route (advanced — usually 0)"
                         >
-                            Adj. Elevation{gradeAdjusted ? ` (${avgGradePercent.toFixed(1)}%)` : ''}
+                            Adj. Elevation
                         </button>
                     </div>
 
