@@ -507,23 +507,27 @@ export default function EpaCurvesView({
                         display: datasets.length > 1,
                         labels: {
                             color: legendColor,
-                            // Draw a short dashed line matching each dataset's line style
-                            // rather than the default filled circle.
+                            // Curve datasets get a short line swatch; the real-world
+                            // overlay (a scatter dataset) gets a dot/triangle swatch
+                            // matching its actual point marker — previously every
+                            // dataset used a line swatch regardless of type, so the
+                            // overlay's legend entry didn't match its plotted dots.
+                            usePointStyle: true,
                             generateLabels(chart) {
-                                return chart.data.datasets.map((ds, i) => ({
-                                    text:        ds.label,
-                                    fontColor:   legendColor,
-                                    fillStyle:   'transparent',
-                                    strokeStyle: ds.borderColor,
-                                    lineWidth:   ds.borderWidth ?? 2,
-                                    lineDash:    ds.borderDash  ?? [],
-                                    hidden:      !chart.isDatasetVisible(i),
-                                    datasetIndex: i,
-                                }));
+                                return chart.data.datasets.map((ds, i) => {
+                                    const isPointDataset = ds.type === 'scatter';
+                                    return {
+                                        text:        ds.label,
+                                        fontColor:   legendColor,
+                                        pointStyle:  isPointDataset ? (ds.pointStyle || 'circle') : 'line',
+                                        fillStyle:   isPointDataset ? ds.backgroundColor : 'transparent',
+                                        strokeStyle: ds.borderColor,
+                                        lineWidth:   ds.borderWidth ?? 2,
+                                        hidden:      !chart.isDatasetVisible(i),
+                                        datasetIndex: i,
+                                    };
+                                });
                             },
-                            usePointStyle: false,
-                            boxWidth: 24,
-                            boxHeight: 2,
                         },
                     },
                     tooltip: {
