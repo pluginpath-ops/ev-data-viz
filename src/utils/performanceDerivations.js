@@ -27,7 +27,7 @@
  *     basis   — what it was computed from, for UI drill-down
  */
 
-import { MI_TO_KM, FT_TO_M } from '../constants/units';
+import { MI_TO_KM, FT_TO_M, MPH_TO_MS, G_MS2 } from '../constants/units';
 
 const num = (v) => (v == null || v === '' || isNaN(Number(v)) ? null : Number(v));
 
@@ -318,6 +318,57 @@ export function windowLabel(interval) {
 }
 
 /**
+ * Average acceleration/deceleration over a window, in g.
+ *
+ * Lets otherwise-incomparable windows be put on one axis: a 50-80 against a
+ * 50-90, or a 60-0 against a 100-0 km/h. Two forms depending on what was
+ * measured:
+ *
+ *   timed windows (accel/passing)    a = Δv / Δt
+ *   distance windows (braking)       a = (v₁² − v₂²) / 2d
+ *
+ * ── ACCURACY, because this matters for how it should be presented ──
+ *
+ * BRAKING normalises well, and this is measured rather than assumed: on the
+ * sample data one car's 60-0 (0.986 g) and 75-0 (0.983 g) agree to 0.3%.
+ * Braking is grip-limited, so deceleration really is near-constant across the
+ * stop and the constant-rate assumption roughly holds. Cross-window braking
+ * comparison is trustworthy.
+ *
+ * ACCELERATION is the subtler case. The rate is near-constant while the car is
+ * traction/torque-limited — measured segment rates across 0-50 mph hold at
+ * 0.77-0.80 g — but collapses once it goes power-limited higher up: the same
+ * class of car averages ~0.57 g over 50-80 and ~0.51 g over 50-90.
+ *
+ * So it isn't window WIDTH that breaks comparability, it's window SPEED RANGE.
+ * 0-30 against 0-60 is reasonable; 0-60 (~0.79 g) against 50-90 (~0.51 g) is
+ * not, and reads as a far bigger gap than the cars actually differ by.
+ *
+ * Callers get `rateCertain` to reflect this: true for braking, false for timed
+ * windows, so the UI can mark the latter as indicative.
+ */
+export function averageRateG(interval) {
+    const fromMph = speedToMph(interval.from_speed, interval.speed_unit);
+    const toMph   = speedToMph(interval.to_speed ?? 0, interval.speed_unit);
+    if (fromMph == null || toMph == null) return null;
+
+    const v1 = fromMph * MPH_TO_MS;
+    const v2 = toMph   * MPH_TO_MS;
+
+    if (interval.kind === 'braking') {
+        const distFt = distanceToFt(interval.distance, interval.distance_unit);
+        if (distFt == null || distFt <= 0) return null;
+        const d = distFt * FT_TO_M;
+        // v₂² = v₁² − 2ad  ⇒  a = (v₁² − v₂²) / 2d
+        return Math.abs(v1 * v1 - v2 * v2) / (2 * d) / G_MS2;
+    }
+
+    const dt = num(interval.elapsed_s);
+    if (dt == null || dt <= 0) return null;
+    return Math.abs(v2 - v1) / dt / G_MS2;
+}
+
+/**
  * Normalise an interval row into a comparable record.
  * `value` is in the interval's natural unit; `comparable` is mph/ft/seconds.
  */
@@ -333,7 +384,41 @@ export function normaliseInterval(interval) {
         comparable: isBraking ? distanceToFt(interval.distance, interval.distance_unit) : raw,
         displayUnit: isBraking ? (interval.distance_unit || 'ft') : 's',
         lowerIsBetter: true,
+        // Cross-window normalisation — see averageRateG for the caveats.
+        rateG: averageRateG(interval),
+        rateCertain: isBraking,
     };
+}
+
+/**
+ * Every interval for a vehicle, expressed as an average rate in g so windows
+ * that aren't otherwise comparable can share an axis.
+ *
+ * Sorted strongest-first. `certain` distinguishes braking (grip-limited, so the
+ * constant-rate assumption roughly holds) from timed windows (rate falls away
+ * with speed, so cross-window reads are indicative only).
+ */
+export function ratesByWindow(summaries = [], kind = null) {
+    const out = [];
+    for (const s of summaries || []) {
+        for (const iv of s.performance_intervals || []) {
+            if (kind && iv.kind !== kind) continue;
+            const n = normaliseInterval(iv);
+            if (n.rateG == null) continue;
+            out.push({
+                key: n.key,
+                label: n.label,
+                kind: n.kind,
+                rateG: n.rateG,
+                certain: n.rateCertain,
+                value: n.value,
+                unit: n.displayUnit,
+                source_name: s.source_name ?? null,
+                summary_id: s.id ?? null,
+            });
+        }
+    }
+    return out.sort((a, b) => b.rateG - a.rateG);
 }
 
 /**
