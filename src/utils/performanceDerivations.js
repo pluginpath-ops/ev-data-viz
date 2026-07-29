@@ -27,6 +27,8 @@
  *     basis   — what it was computed from, for UI drill-down
  */
 
+import { MI_TO_KM, FT_TO_M } from '../constants/units';
+
 const num = (v) => (v == null || v === '' || isNaN(Number(v)) ? null : Number(v));
 
 const EMPTY = Object.freeze({ value: null, source: null, certain: false, flags: [] });
@@ -38,10 +40,12 @@ const EMPTY = Object.freeze({ value: null, source: null, certain: false, flags: 
  */
 export const GRADE_FLAG_PCT = 1.0;
 
-/** Metrics that are "lower is better" — the whole set, currently. */
+/**
+ * Metrics where a smaller number is a better result. Trap speed is the one
+ * exception — higher is quicker.
+ */
 const LOWER_IS_BETTER = new Set([
     'zero_to_60_sec', 'zero_to_60_rollout_sec', 'quarter_mile_sec',
-    'fifty_to_ninety_sec', 'braking_distance_ft',
 ]);
 
 // ── Session / run flattening ────────────────────────────────────────────────
@@ -264,9 +268,131 @@ export const PERFORMANCE_METRICS = [
     { field: 'zero_to_60_rollout_sec', label: '0–60 mph',        unit: 's',   note: '1 ft rollout' },
     { field: 'quarter_mile_sec',       label: '¼ mile',          unit: 's' },
     { field: 'quarter_mile_trap_mph',  label: '¼ mile trap',     unit: 'mph' },
-    { field: 'fifty_to_ninety_sec',    label: '50–90 mph',       unit: 's' },
-    { field: 'braking_distance_ft',    label: 'Braking',         unit: 'ft' },
 ];
+
+// ── Variable speed-window results (performance_intervals) ───────────────────
+//
+// Braking windows vary (75-0, 70-0, 60-0) and passing windows vary (50-80,
+// 50-90), so these can't be fixed columns like 0-60. Sources also report metric
+// (100-0 km/h in metres), and normalising on write would destroy the label —
+// so values are stored as reported and converted here.
+
+const KPH_TO_MPH = 1 / MI_TO_KM;
+const M_TO_FT    = 1 / FT_TO_M;
+
+/** Speed in mph, whatever unit it was reported in. */
+export const speedToMph = (value, unit) => {
+    const v = num(value);
+    if (v == null) return null;
+    return unit === 'kph' ? v * KPH_TO_MPH : v;
+};
+
+/** Distance in feet, whatever unit it was reported in. */
+export const distanceToFt = (value, unit) => {
+    const v = num(value);
+    if (v == null) return null;
+    return unit === 'm' ? v * M_TO_FT : v;
+};
+
+/**
+ * Canonical key for a speed window, so results from different sources and unit
+ * systems land in the same comparison bucket.
+ *
+ * Metric windows are kept as their own bucket rather than converted: "100-0
+ * km/h" is a standard test in its own right, and folding it into "62-0 mph"
+ * would invent a window nobody actually tested and compare it against a 60-0.
+ */
+export function windowKey(interval) {
+    const from = num(interval.from_speed);
+    const to   = num(interval.to_speed) ?? 0;
+    const unit = interval.speed_unit || 'mph';
+    return `${interval.kind}:${from}-${to}${unit}`;
+}
+
+/** Human label for a window, e.g. "75–0 mph", "100–0 km/h", "50–90 mph". */
+export function windowLabel(interval) {
+    const unit = (interval.speed_unit || 'mph') === 'kph' ? 'km/h' : 'mph';
+    const from = num(interval.from_speed);
+    const to   = num(interval.to_speed) ?? 0;
+    return `${from}–${to} ${unit}`;
+}
+
+/**
+ * Normalise an interval row into a comparable record.
+ * `value` is in the interval's natural unit; `comparable` is mph/ft/seconds.
+ */
+export function normaliseInterval(interval) {
+    const isBraking = interval.kind === 'braking';
+    const raw = isBraking ? num(interval.distance) : num(interval.elapsed_s);
+    return {
+        ...interval,
+        key: windowKey(interval),
+        label: windowLabel(interval),
+        value: raw,
+        // Braking compares in feet; timed windows are already unit-agnostic.
+        comparable: isBraking ? distanceToFt(interval.distance, interval.distance_unit) : raw,
+        displayUnit: isBraking ? (interval.distance_unit || 'ft') : 's',
+        lowerIsBetter: true,
+    };
+}
+
+/**
+ * Group every interval across a vehicle's summaries by comparable window.
+ * Feeds both the summary UI and any chart that needs to compare one window
+ * across vehicles.
+ *
+ * @returns {Array<{key, label, kind, best, rows}>} best-first within each window
+ */
+export function groupIntervals(summaries = []) {
+    const buckets = new Map();
+    for (const s of summaries || []) {
+        for (const iv of s.performance_intervals || []) {
+            const n = normaliseInterval(iv);
+            if (n.comparable == null) continue;
+            n.source_name = s.source_name ?? null;
+            n.summary_id  = s.id ?? null;
+            if (!buckets.has(n.key)) {
+                buckets.set(n.key, { key: n.key, label: n.label, kind: n.kind, rows: [] });
+            }
+            buckets.get(n.key).rows.push(n);
+        }
+    }
+    return [...buckets.values()].map(b => {
+        b.rows.sort((a, c) => a.comparable - c.comparable);
+        b.best = b.rows[0]?.comparable ?? null;
+        return b;
+    });
+}
+
+/**
+ * Resolve one speed window across a vehicle's sources, e.g. its best 75-0.
+ *
+ * source: 'reported' — intervals only ever come from entered summary data.
+ */
+export function resolveInterval(summaries, key) {
+    const bucket = groupIntervals(summaries).find(b => b.key === key);
+    if (!bucket || bucket.rows.length === 0) return { ...EMPTY };
+    const best = bucket.rows[0];
+    return {
+        value: best.value,
+        source: 'reported',
+        certain: false,
+        flags: bucket.rows.length > 1 ? ['multiple-sources'] : [],
+        basis: {
+            summary_id: best.summary_id,
+            source_name: best.source_name,
+            label: bucket.label,
+            unit: best.displayUnit,
+            comparable_ft: bucket.kind === 'braking' ? best.comparable : null,
+            all: bucket.rows.map(r => ({
+                summary_id: r.summary_id,
+                source_name: r.source_name,
+                value: r.value,
+                unit: r.displayUnit,
+            })),
+        },
+    };
+}
 
 /**
  * Resolve every metric for a vehicle.

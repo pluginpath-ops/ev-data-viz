@@ -104,7 +104,7 @@ class DataService {
     }
     const { data } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), performance_summaries(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), performance_summaries(*, performance_intervals(*)), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
       .order('created_at', { ascending: false });
 
     // Pass 1: process each vehicle's own data
@@ -1638,7 +1638,7 @@ class DataService {
   async savePerformanceSummary(row) {
     if (!this.useSupabase) return null;
     const db = getSupabase().from('performance_summaries');
-    const { id, ...fields } = row;
+    const { id, performance_intervals, ...fields } = row; // intervals saved separately
     const q = id
       ? db.update({ ...fields, updated_at: new Date().toISOString() }).eq('id', id)
       : db.insert(fields);
@@ -1651,6 +1651,28 @@ class DataService {
     if (!this.useSupabase) return;
     const { error } = await getSupabase()
       .from('performance_summaries').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /**
+   * Insert (no id) or update (with id) one variable-window result — a braking
+   * distance, passing time, or a non-canonical accel window. Values are stored
+   * in the unit they were reported in; see migration 040.
+   */
+  async savePerformanceInterval(row) {
+    if (!this.useSupabase) return null;
+    const db = getSupabase().from('performance_intervals');
+    const { id, ...fields } = row;
+    const q = id ? db.update(fields).eq('id', id) : db.insert(fields);
+    const { data, error } = await q.select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async deletePerformanceInterval(id) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('performance_intervals').delete().eq('id', id);
     if (error) throw error;
   }
 
