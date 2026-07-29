@@ -102,10 +102,24 @@ class DataService {
       const saved = localStorage.getItem('evData');
       return saved ? (JSON.parse(saved).vehicles || []) : [];
     }
-    const { data } = await getSupabase()
+    // NOTE: performance_summaries / performance_intervals are deliberately NOT
+    // embedded here. This query backs the entire app, and a nested select against
+    // a table that doesn't exist yet fails the WHOLE query — which previously
+    // surfaced as "No vehicles yet" on any environment where the newest migration
+    // hadn't been applied. Performance data is fetched separately, where a missing
+    // table degrades to "no performance data" instead of "no vehicles".
+    const { data, error } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), performance_summaries(*, performance_intervals(*)), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
       .order('created_at', { ascending: false });
+
+    // Never swallow this. Destructuring only `data` made a failed query look
+    // identical to an empty account, which turned a missing migration into a
+    // silent "No vehicles yet" that took a live debugging session to trace.
+    if (error) {
+      console.error('getVehicles failed:', error.message, error);
+      throw error;
+    }
 
     // Pass 1: process each vehicle's own data
     const processed = (data || []).map(v => {
@@ -1632,6 +1646,30 @@ class DataService {
     }
 
     return sessionRow;
+  }
+
+  /**
+   * Reported summaries with their variable-window intervals, for one vehicle or
+   * (omit the argument) all of them — the cross-vehicle compare charts need the
+   * whole set.
+   *
+   * Fetched separately from getVehicles() on purpose: this is new-table
+   * territory, and embedding it in the main vehicles query meant an unapplied
+   * migration blanked the entire app. Here a missing table degrades to "no
+   * performance data" and is logged, rather than taking the vehicle list with it.
+   */
+  async getPerformanceSummaries(vehicleId = null) {
+    if (!this.useSupabase) return [];
+    let q = getSupabase()
+      .from('performance_summaries')
+      .select('*, performance_intervals(*)');
+    if (vehicleId != null) q = q.eq('vehicle_id', vehicleId);
+    const { data, error } = await q;
+    if (error) {
+      console.warn('Performance summaries unavailable (migrations 039/040 applied?):', error.message);
+      return [];
+    }
+    return data || [];
   }
 
   /** Insert (no id) or update (with id) a reported summary. Returns the saved row. */
