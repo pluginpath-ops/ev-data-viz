@@ -14,7 +14,7 @@ import SpecsChartView from './components/SpecsChartView';
 import SpecsScatterView from './components/SpecsScatterView';
 import EpaCurvesView from './components/EpaCurvesView';
 import AdminView from './components/AdminView';
-import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode } from './constants/chartNav';
+import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory } from './constants/chartNav';
 
 export default function App() {
     const {
@@ -123,30 +123,33 @@ export default function App() {
         scatterXField:  null,   // selected X field key for Spec Scatter mode
         scatterYField:  null,   // selected Y field key for Spec Scatter mode
     });
+    // Each chart category is its own top-level tab, so `view` holds the category
+    // key directly ('efficiency', 'specifications', …) and this is non-null
+    // exactly when one of them is showing.
+    const activeChartCategory = categoryByKey(view);
+
+    // Remember the last mode used in each category so switching away and back
+    // returns you where you were rather than resetting to the first sub-tab. A
+    // ref, not state — it's read during a click handler, never rendered.
+    const lastModeByCategory = useRef({});
+
     const handleChartModeChange = (newMode) => {
+        const categoryKey = categoryForMode(newMode).key;
         // Push a history entry so "back" can return to the previous chart mode.
         history.pushState(
-            { view: 'chart', chartMode: newMode },
+            { view: categoryKey, chartMode: newMode },
             '',
-            `?tab=chart&m=${newMode}`,   // URL sync effect will replaceState with full params
+            `?tab=${categoryKey}&m=${newMode}`, // URL sync effect replaces with full params
         );
-        lastModeByCategory.current[categoryForMode(newMode).key] = newMode;
+        lastModeByCategory.current[categoryKey] = newMode;
+        setView(categoryKey);
         setChartMode(newMode);
         setChartConfig(prev => ({ ...prev, selectedRuns: [] }));
     };
 
-    // Which category is showing is derived from chartMode — no separate state to
-    // fall out of sync with it, and no extra URL param to serialise.
-    const activeChartCategory = categoryForMode(chartMode);
-
-    // Remember the last mode used in each category so switching away and back
-    // returns you where you were rather than resetting to the first tab. A ref,
-    // not state — it's read during a click handler, never rendered.
-    const lastModeByCategory = useRef({});
-
-    const handleChartCategoryChange = (categoryKey) => {
-        if (categoryKey === activeChartCategory.key) return;
-        const category = CHART_CATEGORIES.find(c => c.key === categoryKey);
+    /** Enter a chart category tab, restoring whichever mode you last used in it. */
+    const navigateToChartCategory = (categoryKey) => {
+        const category = categoryByKey(categoryKey);
         if (!category) return;
         const remembered = lastModeByCategory.current[categoryKey];
         const valid = remembered && category.modes.some(m => m.key === remembered);
@@ -165,8 +168,10 @@ export default function App() {
     // Navigate to a new top-level view and push a browser history entry so the
     // back button works within the app instead of exiting to the auth page.
     const navigateTo = useCallback((newView) => {
-        const url = newView === 'chart'
-            ? (window.location.search.includes('tab=chart') ? window.location.search : '?tab=chart')
+        // Re-entering the category you're already in keeps the full query string
+        // (axes, selections) rather than resetting it to a bare tab param.
+        const url = isChartCategory(newView) && window.location.search.includes(`tab=${newView}`)
+            ? window.location.search
             : `?tab=${newView}`;
         history.pushState({ view: newView, chartMode }, '', url);
         setView(newView);
@@ -180,16 +185,28 @@ export default function App() {
     // ── Parse URL on mount ──────────────────────────────────────────────────
     useEffect(() => {
         const p = new URLSearchParams(window.location.search);
-        // Compare Specs used to be a top-level tab (?tab=specs). It's now a view
-        // inside Charts, so redirect old links rather than dropping them on the
-        // Vehicles tab with no explanation.
-        if (p.get('tab') === 'specs') {
-            history.replaceState({ view: 'chart', chartMode: 'specstable' }, '', '?tab=chart&m=specstable');
-            setView('chart');
-            setChartMode('specstable');
-            return;
+        const rawTab = p.get('tab');
+
+        // ── Legacy URL shapes ───────────────────────────────────────────────
+        // Charts used to be one tab with the categories nested under it
+        // (?tab=chart&m=…), and before that Compare Specs was its own top-level
+        // tab (?tab=specs). Both still circulate in shared links, so rewrite
+        // them onto the category that now owns that mode rather than dropping
+        // the visitor on Vehicles with no explanation.
+        if (rawTab === 'chart' || rawTab === 'specs') {
+            const mode = rawTab === 'specs'
+                ? 'specstable'
+                : (ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE);
+            const categoryKey = categoryForMode(mode).key;
+            p.set('tab', categoryKey);
+            p.set('m', mode);
+            history.replaceState({ view: categoryKey, chartMode: mode }, '', '?' + p.toString());
+            // Fall through so the rest of the query string (vehicles, axes) is
+            // still parsed — these links carry more than just the tab.
         }
-        if (p.get('tab') !== 'chart') return;
+
+        const tab = p.get('tab');
+        if (!isChartCategory(tab)) return;
         pendingUrlState.current = {
             vehicleIds:    (p.get('v')?.split(',').filter(Boolean) || []).map(id => isNaN(Number(id)) ? id : Number(id)),
             runIds:        (p.get('r')?.split(',').filter(Boolean) || []).map(id => isNaN(Number(id)) ? id : Number(id)),
@@ -302,15 +319,16 @@ export default function App() {
             ...(s.scatterXField && { scatterXField: s.scatterXField }),
             ...(s.scatterYField && { scatterYField: s.scatterYField }),
         }));
-        setView('chart');
+        // Land on the category that owns the restored mode.
+        setView(categoryForMode(s.chartMode).key);
     }, [loading]);
 
-    // ── Keep URL in sync while on chart tab ─────────────────────────────────
+    // ── Keep URL in sync while on a chart category tab ──────────────────────
     useEffect(() => {
         if (isPopout) return;   // pop-out doesn't manage its own URL
-        if (view !== 'chart') return;
+        if (!isChartCategory(view)) return;
         const p = new URLSearchParams();
-        p.set('tab', 'chart');
+        p.set('tab', view);
         if (chartMode === 'charging' && chartConfig.selectedRuns.length > 0)  p.set('r', chartConfig.selectedRuns.join(','));
         // Include v= only for selected vehicles that have no runs in r (run-less selections)
         const runVehicleIds = new Set(
@@ -374,7 +392,7 @@ export default function App() {
             if (epaConfig.yAxis && epaConfig.yAxis !== 'kwh100mi') p.set('epa_ya', epaConfig.yAxis);
         }
 
-        history.replaceState({ view: 'chart', chartMode }, '', '?' + p.toString());
+        history.replaceState({ view, chartMode }, '', '?' + p.toString());
     }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig]);
 
     // ── Broadcast chart state to any open pop-out windows ───────────────────
@@ -499,7 +517,7 @@ export default function App() {
                           * but col-reverse flips that so actions render on TOP and tabs below.
                           * sm:flex-row restores the normal side-by-side layout on wider screens.
                           */}
-                        <div className={`flex flex-col-reverse gap-y-2 sm:flex-row sm:items-center ${view === 'chart' ? 'mb-1' : 'mb-3'}`}>
+                        <div className={`flex flex-col-reverse gap-y-2 sm:flex-row sm:items-center ${activeChartCategory ? 'mb-1' : 'mb-3'}`}>
                             {/* Tab group */}
                             <div className="nav-tab-group">
                                 <button
@@ -515,13 +533,19 @@ export default function App() {
                                 >
                                     Tests &amp; Data {currentActiveVehicle ? `(${currentActiveVehicle.name})` : ''}
                                 </button>
-                                <button
-                                    onClick={() => selectedVehicles.length > 0 && navigateTo('chart')}
-                                    disabled={selectedVehicles.length === 0}
-                                    className={`btn-tab ${view === 'chart' ? 'active' : ''}`}
-                                >
-                                    Charts
-                                </button>
+                                {/* One top-level tab per chart category. All are
+                                    driven by the current vehicle selection, so
+                                    they share the same gate. */}
+                                {CHART_CATEGORIES.map(({ key, label }) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => selectedVehicles.length > 0 && navigateToChartCategory(key)}
+                                        disabled={selectedVehicles.length === 0}
+                                        className={`btn-tab ${view === key ? 'active' : ''}`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
                                 {isAdmin && (
                                     <button
                                         onClick={() => navigateTo('admin')}
@@ -556,25 +580,10 @@ export default function App() {
                             </div>
                         </div>
 
-                        {/* Chart category + mode sub-nav — only visible in chart view.
-                          * Two levels: category picks the group, modes are that
-                          * group's views. The active category is DERIVED from
-                          * chartMode rather than stored, so the two can't desync. */}
-                        {view === 'chart' && (
-                            <>
-                            <div className="flex items-center gap-2 pb-1">
-                                <div className="flex gap-0.5">
-                                    {CHART_CATEGORIES.map(({ key, label }) => (
-                                        <button
-                                            key={key}
-                                            onClick={() => handleChartCategoryChange(key)}
-                                            className={`btn-chart-category ${activeChartCategory.key === key ? 'active' : ''}`}
-                                        >
-                                            {label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                        {/* Sub-nav for the active chart category — the views within
+                          * whichever of Performance / Range & Efficiency /
+                          * Specifications is the current top-level tab. */}
+                        {activeChartCategory && (
                             <div className="flex items-center gap-2 pb-2">
                                 <div className="flex gap-0.5">
                                     {activeChartCategory.modes.map(({ key, label }) => (
@@ -599,7 +608,6 @@ export default function App() {
                                     ⧉ Open Chart in New Window
                                 </button>
                             </div>
-                            </>
                         )}
 
                     </div>
@@ -730,7 +738,7 @@ export default function App() {
                             onMergeRunData={(runId, pts, joinKey) => mergeRunData(currentActiveVehicle.id, runId, pts, joinKey)}
                             onReplaceRunData={(runId, pts) => replaceRunData(currentActiveVehicle.id, runId, pts)}
                             onDuplicateRun={(runId) => duplicateRun(currentActiveVehicle.id, runId)}
-                            onViewChart={() => navigateTo('chart')}
+                            onViewChart={() => handleChartModeChange(DEFAULT_CHART_MODE)}
                             onToggleVehicleVisibility={toggleVehicleVisibility}
                             onUpdateVehicle={updateVehicle}
                             onDuplicateVehicle={async (id) => {
@@ -752,7 +760,7 @@ export default function App() {
                       * listed here, so every new chart mode must be added to this
                       * exclusion list or it silently renders the charging chart
                       * instead of itself. */}
-                    {view === 'chart' && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'epacurves' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'epacurves' && (
                         <ChargingView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -762,7 +770,7 @@ export default function App() {
                             chartMode={chartMode}
                         />
                     )}
-                    {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'roadtrip' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'roadtrip' && (
                         <RoadTripView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -773,7 +781,7 @@ export default function App() {
                             setChartConfig={setChartConfig}
                         />
                     )}
-                    {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'compare' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'compare' && (
                         <ChargeCompareView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -786,14 +794,14 @@ export default function App() {
                             onUpdateRunColor={updateRunColor}
                         />
                     )}
-                    {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'specs' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specs' && (
                         <SpecsChartView
                             vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
                             selectedField={chartConfig.specsField}
                             onFieldChange={field => setChartConfig(p => ({ ...p, specsField: field }))}
                         />
                     )}
-                    {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'specscatter' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specscatter' && (
                         <SpecsScatterView
                             vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
                             xField={chartConfig.scatterXField}
@@ -801,7 +809,7 @@ export default function App() {
                             onFieldChange={(x, y) => setChartConfig(p => ({ ...p, scatterXField: x, scatterYField: y }))}
                         />
                     )}
-                    {view === 'chart' && chartMode === 'epacurves' && (
+                    {activeChartCategory && chartMode === 'epacurves' && (
                         <EpaCurvesView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -811,7 +819,7 @@ export default function App() {
                             setChartConfig={setChartConfig}
                         />
                     )}
-                    {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'specstable' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specstable' && (
                         <SpecsView
                             selectedVehicleIds={selectedVehicles}
                         />

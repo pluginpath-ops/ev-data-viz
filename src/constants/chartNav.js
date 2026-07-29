@@ -1,8 +1,10 @@
 /**
- * Charts navigation — categories and their sub-tabs.
+ * Chart navigation — the top-level data categories and their sub-tabs.
  *
- * The Charts tab groups its views into categories. This file is the single
- * source of truth for that structure; App.jsx renders directly from it.
+ * Each category here is a TOP-LEVEL tab, sitting alongside Vehicles, Tests &
+ * Data and Admin. There is no "Charts" wrapper tab; a category IS the tab, and
+ * its `modes` are that tab's sub-nav. This file is the single source of truth
+ * for that structure; App.jsx renders directly from it.
  *
  * ── WHY THE MODE KEYS ARE FROZEN ────────────────────────────────────────────
  *
@@ -59,6 +61,17 @@ export const DEFAULT_CHART_MODE = 'charging';
 
 /** Every valid mode key, for validating URL input. */
 export const ALL_CHART_MODES = CHART_CATEGORIES.flatMap(c => c.modes.map(m => m.key));
+
+/** Category keys — these double as top-level `view` values in App.jsx. */
+export const CHART_CATEGORY_KEYS = CHART_CATEGORIES.map(c => c.key);
+
+/** True when a top-level view is one of the chart categories. */
+export const isChartCategory = (view) => CHART_CATEGORY_KEYS.includes(view);
+
+/** The category object for a top-level view key, or null if it isn't one. */
+export function categoryByKey(view) {
+    return CHART_CATEGORIES.find(c => c.key === view) ?? null;
+}
 
 /** The category containing `mode`, or the first category if it isn't found. */
 export function categoryForMode(mode) {
