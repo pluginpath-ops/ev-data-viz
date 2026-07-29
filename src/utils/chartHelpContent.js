@@ -205,6 +205,28 @@ export const CHART_HELP_DEFAULTS = {
             'charger availability, weather and traffic will vary.',
     },
 
+    specstable: {
+        title: 'About Compare Specs',
+        data_source:
+            'A side-by-side table of every structured spec for the selected vehicles, ' +
+            'read from each vehicle’s spec sheet (the `specs` data on the vehicle record, ' +
+            'including custom fields). These are published figures — manufacturer claims ' +
+            'and road-test results cited from elsewhere — not values measured by EVBench.',
+        how_to_read:
+            'One column per selected vehicle, one row per spec, grouped by category. ' +
+            'Blank cells mean the value hasn’t been entered for that vehicle. Community ' +
+            'members can vouch for a value’s accuracy or flag it as suspect; flagged ' +
+            'fields are highlighted until an admin clears them.',
+        key_terms:
+            'Spec — a structured attribute on the vehicle (battery kWh, horsepower, seats, …).\n' +
+            'Custom field — a free-form spec added outside the standard schema.\n' +
+            'Vouch / flag — community accuracy signals on an individual value.\n' +
+            'Units follow your imperial/metric toggle.',
+        math_approach:
+            'No calculation — values are shown as stored, converted only for unit display ' +
+            '(e.g. kW↔hp, mi↔km).',
+    },
+
     specs: {
         title: 'About the Spec Chart',
         data_source:

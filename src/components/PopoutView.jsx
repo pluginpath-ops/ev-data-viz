@@ -3,6 +3,7 @@ import ChargeCompareView from './ChargeCompareView';
 import RoadTripView from './RoadTripView';
 import SpecsChartView from './SpecsChartView';
 import SpecsScatterView from './SpecsScatterView';
+import SpecsView from './SpecsView';
 import EpaCurvesView from './EpaCurvesView';
 
 /**
@@ -30,6 +31,12 @@ export default function PopoutView({
                     selectedField={chartConfig.specsField}
                     presentationMode
                 />
+            )}
+
+            {/* Compare Specs — the table. Moved under the Charts nav, so it pops
+                out like every other view there. */}
+            {selectedVehicles.length > 0 && chartMode === 'specstable' && (
+                <SpecsView selectedVehicleIds={selectedVehicles} />
             )}
 
             {selectedVehicles.length > 0 && chartMode === 'specscatter' && (

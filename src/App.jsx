@@ -14,6 +14,7 @@ import SpecsChartView from './components/SpecsChartView';
 import SpecsScatterView from './components/SpecsScatterView';
 import EpaCurvesView from './components/EpaCurvesView';
 import AdminView from './components/AdminView';
+import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode } from './constants/chartNav';
 
 export default function App() {
     const {
@@ -129,8 +130,27 @@ export default function App() {
             '',
             `?tab=chart&m=${newMode}`,   // URL sync effect will replaceState with full params
         );
+        lastModeByCategory.current[categoryForMode(newMode).key] = newMode;
         setChartMode(newMode);
         setChartConfig(prev => ({ ...prev, selectedRuns: [] }));
+    };
+
+    // Which category is showing is derived from chartMode — no separate state to
+    // fall out of sync with it, and no extra URL param to serialise.
+    const activeChartCategory = categoryForMode(chartMode);
+
+    // Remember the last mode used in each category so switching away and back
+    // returns you where you were rather than resetting to the first tab. A ref,
+    // not state — it's read during a click handler, never rendered.
+    const lastModeByCategory = useRef({});
+
+    const handleChartCategoryChange = (categoryKey) => {
+        if (categoryKey === activeChartCategory.key) return;
+        const category = CHART_CATEGORIES.find(c => c.key === categoryKey);
+        if (!category) return;
+        const remembered = lastModeByCategory.current[categoryKey];
+        const valid = remembered && category.modes.some(m => m.key === remembered);
+        handleChartModeChange(valid ? remembered : category.modes[0].key);
     };
 
     const { theme, cycleTheme, isDark } = useTheme();
@@ -160,6 +180,15 @@ export default function App() {
     // ── Parse URL on mount ──────────────────────────────────────────────────
     useEffect(() => {
         const p = new URLSearchParams(window.location.search);
+        // Compare Specs used to be a top-level tab (?tab=specs). It's now a view
+        // inside Charts, so redirect old links rather than dropping them on the
+        // Vehicles tab with no explanation.
+        if (p.get('tab') === 'specs') {
+            history.replaceState({ view: 'chart', chartMode: 'specstable' }, '', '?tab=chart&m=specstable');
+            setView('chart');
+            setChartMode('specstable');
+            return;
+        }
         if (p.get('tab') !== 'chart') return;
         pendingUrlState.current = {
             vehicleIds:    (p.get('v')?.split(',').filter(Boolean) || []).map(id => isNaN(Number(id)) ? id : Number(id)),
@@ -177,7 +206,9 @@ export default function App() {
             y2Max: p.get('y2x') !== null && p.get('y2x') !== '' ? Number(p.get('y2x')) : null,
             showLine:   p.get('line') !== '0', // default to true if not present, false if explicitly set to 0
             showPoints: p.get('pts') === '1', // default to false if not present, true if explicitly set to 1
-            chartMode:     p.get('m') || 'charging',
+            // Guard against a stale or hand-edited ?m= — an unknown mode would
+            // otherwise fall through to the charging chart with no indication why.
+            chartMode:     ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE,
             scatterXField: p.get('scx') || null,
             scatterYField: p.get('scy') || null,
         };
@@ -491,12 +522,6 @@ export default function App() {
                                 >
                                     Charts
                                 </button>
-                                <button
-                                    onClick={() => navigateTo('specs')}
-                                    className={`btn-tab ${view === 'specs' ? 'active' : ''}`}
-                                >
-                                    Compare Specs
-                                </button>
                                 {isAdmin && (
                                     <button
                                         onClick={() => navigateTo('admin')}
@@ -531,19 +556,28 @@ export default function App() {
                             </div>
                         </div>
 
-                        {/* Chart mode sub-nav — only visible in chart view */}
+                        {/* Chart category + mode sub-nav — only visible in chart view.
+                          * Two levels: category picks the group, modes are that
+                          * group's views. The active category is DERIVED from
+                          * chartMode rather than stored, so the two can't desync. */}
                         {view === 'chart' && (
+                            <>
+                            <div className="flex items-center gap-2 pb-1">
+                                <div className="flex gap-0.5">
+                                    {CHART_CATEGORIES.map(({ key, label }) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => handleChartCategoryChange(key)}
+                                            className={`btn-chart-category ${activeChartCategory.key === key ? 'active' : ''}`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                             <div className="flex items-center gap-2 pb-2">
                                 <div className="flex gap-0.5">
-                                    {[
-                                        { key: 'charging',  label: 'Charging' },
-                                        { key: 'range',     label: 'Range & Efficiency' },
-                                        { key: 'compare',   label: 'Charge Compare' },
-                                        { key: 'roadtrip',  label: 'Road Trip' },
-                                        { key: 'specs',       label: 'Spec Chart' },
-                                        { key: 'specscatter', label: 'Spec Scatter' },
-                                        { key: 'epacurves',   label: 'EPA Curves' },
-                                    ].map(({ key, label }) => (
+                                    {activeChartCategory.modes.map(({ key, label }) => (
                                         <button
                                             key={key}
                                             onClick={() => handleChartModeChange(key)}
@@ -565,6 +599,7 @@ export default function App() {
                                     ⧉ Open Chart in New Window
                                 </button>
                             </div>
+                            </>
                         )}
 
                     </div>
@@ -713,7 +748,11 @@ export default function App() {
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                         />
                     )}
-                    {view === 'chart' && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'epacurves' && (
+                    {/* ChargingView is the fall-through: it renders for any mode NOT
+                      * listed here, so every new chart mode must be added to this
+                      * exclusion list or it silently renders the charging chart
+                      * instead of itself. */}
+                    {view === 'chart' && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'epacurves' && (
                         <ChargingView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -772,7 +811,7 @@ export default function App() {
                             setChartConfig={setChartConfig}
                         />
                     )}
-                    {view === 'specs' && (
+                    {view === 'chart' && selectedVehicles.length > 0 && chartMode === 'specstable' && (
                         <SpecsView
                             selectedVehicleIds={selectedVehicles}
                         />
