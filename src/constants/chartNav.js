@@ -35,8 +35,12 @@
 
 export const CHART_CATEGORIES = [
     {
+        // "Charging & Efficiency", not "Range & Efficiency": the 'range' mode
+        // below already carries that name, and a tab sharing a label with one of
+        // its own sub-tabs made the nav ambiguous. The key stays 'efficiency' —
+        // it's the ?tab= token, and churning it would gain nothing visible.
         key: 'efficiency',
-        label: 'Range & Efficiency',
+        label: 'Charging & Efficiency',
         modes: [
             { key: 'charging',  label: 'Charging' },
             { key: 'range',     label: 'Range & Efficiency' },

@@ -581,7 +581,7 @@ export default function App() {
                         </div>
 
                         {/* Sub-nav for the active chart category — the views within
-                          * whichever of Performance / Range & Efficiency /
+                          * whichever of Performance / Charging & Efficiency /
                           * Specifications is the current top-level tab. */}
                         {activeChartCategory && (
                             <div className="flex items-center gap-2 pb-2">
