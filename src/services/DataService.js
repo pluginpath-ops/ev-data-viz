@@ -102,10 +102,24 @@ class DataService {
       const saved = localStorage.getItem('evData');
       return saved ? (JSON.parse(saved).vehicles || []) : [];
     }
-    const { data } = await getSupabase()
+    // NOTE: performance_summaries / performance_intervals are deliberately NOT
+    // embedded here. This query backs the entire app, and a nested select against
+    // a table that doesn't exist yet fails the WHOLE query — which previously
+    // surfaced as "No vehicles yet" on any environment where the newest migration
+    // hadn't been applied. Performance data is fetched separately, where a missing
+    // table degrades to "no performance data" instead of "no vehicles".
+    const { data, error } = await getSupabase()
       .from('vehicles')
       .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
       .order('created_at', { ascending: false });
+
+    // Never swallow this. Destructuring only `data` made a failed query look
+    // identical to an empty account, which turned a missing migration into a
+    // silent "No vehicles yet" that took a live debugging session to trace.
+    if (error) {
+      console.error('getVehicles failed:', error.message, error);
+      throw error;
+    }
 
     // Pass 1: process each vehicle's own data
     const processed = (data || []).map(v => {
@@ -1485,6 +1499,219 @@ class DataService {
       .limit(200);
     if (error) throw error;
     return data || [];
+  }
+
+  // ── Performance testing (acceleration / braking) ────────────────────────────
+  //
+  // Deliberately separate from `runs`: a session yields ~8 launches in 90
+  // seconds, and runs rows feed the charging/range selectors and vehicle-card
+  // counts (isChargingRun treats anything without has_charging=false as a
+  // charging run). See migration 036 for the full rationale.
+
+  /**
+   * All performance sessions for a vehicle, with runs and split points nested.
+   * Single relational query, same shape as getEpaTestGroupFull().
+   */
+  async getPerformanceSessions(vehicleId) {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase()
+      .from('performance_sessions')
+      .select(`
+        *,
+        performance_runs(*, performance_run_points(*))
+      `)
+      .eq('vehicle_id', vehicleId)
+      .order('tested_at', { ascending: false });
+    if (error) throw error;
+    // PostgREST doesn't order nested rows — sort children so runs and their
+    // splits read in test order rather than insertion order.
+    for (const session of data || []) {
+      const runs = session.performance_runs || [];
+      runs.sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+      for (const run of runs) {
+        (run.performance_run_points || []).sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+      }
+    }
+    return data || [];
+  }
+
+  /** Insert (no id) or update (with id) a session. Returns the saved row. */
+  async savePerformanceSession(row) {
+    if (!this.useSupabase) return null;
+    const db = getSupabase().from('performance_sessions');
+    const { id, performance_runs, ...fields } = row; // never write nested runs here
+    const q = id ? db.update(fields).eq('id', id) : db.insert(fields);
+    const { data, error } = await q.select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async deletePerformanceSession(id) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('performance_sessions').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /** Insert (no id) or update (with id) a single run. Returns the saved row. */
+  async savePerformanceRun(row) {
+    if (!this.useSupabase) return null;
+    const db = getSupabase().from('performance_runs');
+    const { id, performance_run_points, ...fields } = row;
+    const q = id ? db.update(fields).eq('id', id) : db.insert(fields);
+    const { data, error } = await q.select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async deletePerformanceRun(id) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('performance_runs').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /**
+   * Import a parsed performance CSV as one session with its runs and splits.
+   *
+   * Takes the output of parsePerformanceCSV() directly. Rolls the session back
+   * if any child insert fails, so a partial import can't leave an empty session
+   * card behind (there are no transactions over PostgREST).
+   *
+   * @param {number} vehicleId
+   * @param {{session: object, runs: object[]}} parsed
+   * @param {{trimId?: number, sourceName?: string, youtubeUrl?: string,
+   *          spreadsheetUrl?: string, notes?: string}} [meta]
+   * @returns {Promise<object>} the created session row
+   */
+  async importPerformanceSession(vehicleId, parsed, meta = {}) {
+    if (!this.useSupabase || !this.user) throw new Error('Must be logged in to import.');
+    const { session, runs } = parsed;
+
+    const sessionRow = await this.savePerformanceSession({
+      vehicle_id: vehicleId,
+      trim_id: meta.trimId ?? null,
+      test_type: session.testType,
+      tested_at: session.testedAt,
+      location_name: session.locationName ?? null,
+      latitude: session.latitude ?? null,
+      longitude: session.longitude ?? null,
+      temperature_f: session.temperatureF ?? null,
+      humidity_pct: session.humidityPct ?? null,
+      pressure_inhg: session.pressureInHg ?? null,
+      wind_speed_mph: session.windSpeedMph ?? null,
+      wind_bearing_deg: session.windBearingDeg ?? null,
+      cloud_cover_pct: session.cloudCoverPct ?? null,
+      visibility_mi: session.visibilityMi ?? null,
+      source_name: meta.sourceName ?? null,
+      youtube_url: meta.youtubeUrl ?? null,
+      spreadsheet_url: meta.spreadsheetUrl ?? null,
+      notes: meta.notes ?? null,
+    });
+
+    try {
+      for (const run of runs) {
+        const runRow = await this.savePerformanceRun({
+          session_id: sessionRow.id,
+          sequence: run.sequence,
+          drive_mode: run.driveMode ?? null,
+          run_at: run.runAt ?? null,
+          altitude_ft: run.altitudeFt ?? null,
+          density_altitude_ft: run.densityAltitudeFt ?? null,
+          slope_pct: run.slopePct ?? null,
+          distance_run_ft: run.distanceRunFt ?? null,
+          max_g_force: run.maxGForce ?? null,
+          zero_to_60_sec: run.zeroTo60Sec ?? null,
+          zero_to_60_rollout_sec: run.zeroTo60RolloutSec ?? null,
+          braking_distance_ft: run.brakingDistanceFt ?? null,
+          braking_from_mph: run.brakingFromMph ?? null,
+        });
+
+        if (run.splits?.length) {
+          const points = run.splits.map((s, i) => ({
+            run_id: runRow.id,
+            sequence: i,
+            label: s.label ?? null,
+            speed_mph: s.speedMph ?? null,
+            elapsed_s: s.elapsedS ?? null,
+            distance_ft: s.distanceFt ?? null,
+          }));
+          const { error } = await getSupabase().from('performance_run_points').insert(points);
+          if (error) throw error;
+        }
+      }
+    } catch (err) {
+      await this.deletePerformanceSession(sessionRow.id).catch(() => {});
+      throw err;
+    }
+
+    return sessionRow;
+  }
+
+  /**
+   * Reported summaries with their variable-window intervals, for one vehicle or
+   * (omit the argument) all of them — the cross-vehicle compare charts need the
+   * whole set.
+   *
+   * Fetched separately from getVehicles() on purpose: this is new-table
+   * territory, and embedding it in the main vehicles query meant an unapplied
+   * migration blanked the entire app. Here a missing table degrades to "no
+   * performance data" and is logged, rather than taking the vehicle list with it.
+   */
+  async getPerformanceSummaries(vehicleId = null) {
+    if (!this.useSupabase) return [];
+    let q = getSupabase()
+      .from('performance_summaries')
+      .select('*, performance_intervals(*)');
+    if (vehicleId != null) q = q.eq('vehicle_id', vehicleId);
+    const { data, error } = await q;
+    if (error) {
+      console.warn('Performance summaries unavailable (migrations 039/040 applied?):', error.message);
+      return [];
+    }
+    return data || [];
+  }
+
+  /** Insert (no id) or update (with id) a reported summary. Returns the saved row. */
+  async savePerformanceSummary(row) {
+    if (!this.useSupabase) return null;
+    const db = getSupabase().from('performance_summaries');
+    const { id, performance_intervals, ...fields } = row; // intervals saved separately
+    const q = id
+      ? db.update({ ...fields, updated_at: new Date().toISOString() }).eq('id', id)
+      : db.insert(fields);
+    const { data, error } = await q.select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async deletePerformanceSummary(id) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('performance_summaries').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /**
+   * Insert (no id) or update (with id) one variable-window result — a braking
+   * distance, passing time, or a non-canonical accel window. Values are stored
+   * in the unit they were reported in; see migration 040.
+   */
+  async savePerformanceInterval(row) {
+    if (!this.useSupabase) return null;
+    const db = getSupabase().from('performance_intervals');
+    const { id, ...fields } = row;
+    const q = id ? db.update(fields).eq('id', id) : db.insert(fields);
+    const { data, error } = await q.select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async deletePerformanceInterval(id) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('performance_intervals').delete().eq('id', id);
+    if (error) throw error;
   }
 
   // ── Access logging ──────────────────────────────────────────────────────────
