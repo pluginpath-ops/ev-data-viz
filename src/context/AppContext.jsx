@@ -534,6 +534,123 @@ export function AppProvider({ children }) {
         }
     };
 
+    /**
+     * Execute a bulk vehicle import plan (see utils/vehicleImportPlan.js).
+     *
+     * Runs in dependency order: new manufacturers and tags first, then every
+     * vehicle create/update, then specs + tags + inheritance links — so a row
+     * may inherit from a vehicle created earlier in the same file.
+     *
+     * Per-row failures are collected rather than aborting the run; the caller
+     * shows them in the import modal.
+     */
+    const importVehicles = async (plan) => {
+        const failures = [];
+        let created = 0, updated = 0;
+
+        // 1. Reference data the rows depend on.
+        const mfgByName = new Map(manufacturers.map(m => [m.name.toLowerCase(), m]));
+        for (const name of plan.summary.newManufacturers) {
+            try {
+                const mfg = await dataService.addManufacturer(name);
+                mfgByName.set(name.toLowerCase(), mfg);
+            } catch (error) {
+                failures.push({ label: name, message: `Manufacturer: ${error.message}` });
+            }
+        }
+
+        const tagByName = new Map(tags.map(t => [t.name.toLowerCase(), t]));
+        for (const name of plan.summary.newTags) {
+            try {
+                const tag = await dataService.createTag(name);
+                tagByName.set(name.toLowerCase(), tag);
+            } catch (error) {
+                failures.push({ label: name, message: `Tag: ${error.message}` });
+            }
+        }
+
+        // 2. Create / update the vehicle rows. rowVehicleIds lets pass 3 resolve
+        //    inherits_from references that point at rows in this same file.
+        const actionable = plan.rows
+            .map((row, planIndex) => ({ row, planIndex }))
+            .filter(({ row }) => row.action === 'create' || row.action === 'update');
+        const rowVehicleIds = new Map(); // plan-row array index → vehicle id
+        const done = [];
+
+        for (const { row, planIndex } of actionable) {
+            const mfgId = row.manufacturerName
+                ? mfgByName.get(row.manufacturerName.toLowerCase())?.id ?? null
+                : null;
+            try {
+                if (row.action === 'create') {
+                    const newVehicle = await dataService.addVehicle({
+                        ...row.coreWrites,
+                        ...(mfgId ? { manufacturer_id: mfgId } : {}),
+                    });
+                    rowVehicleIds.set(planIndex, newVehicle.id);
+                    created++;
+                } else {
+                    const updates = { ...row.coreWrites };
+                    if (mfgId) updates.manufacturer_id = mfgId;
+                    if (Object.keys(updates).length > 0) {
+                        // updateVehicle writes every core column, so send the
+                        // vehicle's current values for anything not being filled.
+                        const current = vehicles.find(v => v.id === row.vehicleId) || {};
+                        await dataService.updateVehicle(row.vehicleId, {
+                            name: current.name, make: current.make, model: current.model,
+                            trim: current.trim, year: current.year, battery: current.battery,
+                            range: current.range, power: current.power,
+                            ...updates,
+                        });
+                    }
+                    rowVehicleIds.set(planIndex, row.vehicleId);
+                    updated++;
+                }
+                done.push({ row, planIndex });
+            } catch (error) {
+                logIfUnauthorized('import_vehicle', 'vehicle', row.vehicleId, error);
+                failures.push({ label: row.label, message: error.message });
+            }
+        }
+
+        // 3. Specs, tags and inheritance — all vehicle ids are known by now.
+        for (const { row, planIndex } of done) {
+            const vehicleId = rowVehicleIds.get(planIndex);
+            try {
+                if (row.tagNames.length > 0) {
+                    const existingIds = (vehicles.find(v => v.id === vehicleId)?.tags || []).map(t => t.id);
+                    const newIds = row.tagNames
+                        .map(name => tagByName.get(name.toLowerCase())?.id)
+                        .filter(id => id != null);
+                    await dataService.syncVehicleTags(vehicleId, [...new Set([...existingIds, ...newIds])]);
+                }
+
+                const parentId = row.inherit
+                    ? (row.inherit.vehicleId ?? rowVehicleIds.get(row.inherit.rowIndex) ?? null)
+                    : undefined;
+                if (row.needsSpecWrite) {
+                    await dataService.updateVehicleSpecs(vehicleId, row.mergedSpecs, parentId);
+                }
+            } catch (error) {
+                logIfUnauthorized('import_vehicle_specs', 'vehicle', vehicleId, error);
+                failures.push({ label: row.label, message: error.message });
+            }
+        }
+
+        // Refresh without initializeApp()'s loading flag — that would unmount the
+        // import modal before it can show the result.
+        const [vehiclesData, tagsData, mfgData] = await Promise.all([
+            dataService.getVehicles(),
+            dataService.useSupabase ? dataService.getTags() : Promise.resolve(tags),
+            dataService.useSupabase ? dataService.getManufacturers() : Promise.resolve(manufacturers),
+        ]);
+        setVehicles(vehiclesData);
+        setTags(tagsData);
+        setManufacturers(mfgData);
+
+        return { created, updated, failures };
+    };
+
     const uploadVehicleImage = async (vehicleId, file) => {
         try {
             const imageUrl = await dataService.uploadVehicleImage(vehicleId, file);
@@ -1065,6 +1182,7 @@ export function AppProvider({ children }) {
         clearAllSelections,
         setVehicleSelection,
         addVehicle,
+        importVehicles,
         updateVehicle,
         reorderVehicles,
         duplicateVehicle,
