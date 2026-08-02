@@ -223,8 +223,10 @@ export function buildImportPlan(rows, { vehicles = [], manufacturers = [], tags 
                 warnings.push(`Already inherits from another vehicle — "${row.inheritsFrom}" ignored.`);
             } else {
                 const resolved = resolveInheritRef(row.inheritsFrom, vehicles, rowsByName);
-                if (resolved.error) errors.push(`inherits_from: ${resolved.error}`);
-                else if (resolved.rowIndex === i) errors.push('inherits_from: a vehicle cannot inherit from itself.');
+                // An unusable link is reported and dropped, not fatal — the rest
+                // of the row is still worth importing.
+                if (resolved.error) warnings.push(`inherits_from: ${resolved.error} — link skipped.`);
+                else if (resolved.rowIndex === i) warnings.push('inherits_from: a vehicle cannot inherit from itself — link skipped.');
                 else inherit = resolved;
             }
         }
@@ -259,6 +261,8 @@ export function buildImportPlan(rows, { vehicles = [], manufacturers = [], tags 
             tagNames,
             inherit,
             inheritRef: inherit ? row.inheritsFrom : null,
+            fieldSkips: row.skipped,   // values that could not be read — reported, not written
+            coercions: row.coercions,  // loose enum matches, shown so they can be checked
             errors,
             warnings,
         };
@@ -273,6 +277,8 @@ export function buildImportPlan(rows, { vehicles = [], manufacturers = [], tags 
         fieldWrites: planned
             .filter(r => r.action !== 'error')
             .reduce((n, r) => n + r.specWrites.length + Object.keys(r.coreWrites).length, 0),
+        fieldSkips:  planned.reduce((n, r) => n + r.fieldSkips.length, 0),
+        coercions:   planned.reduce((n, r) => n + r.coercions.length, 0),
         newManufacturers: [...newManufacturers.values()],
         newTags: [...newTags.values()],
     };

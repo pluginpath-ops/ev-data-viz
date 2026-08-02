@@ -144,7 +144,45 @@ function coerceNumber(raw, { integer = false } = {}) {
     return { value: integer ? Math.round(n) : n };
 }
 
-/** Coerce a raw cell/JSON value for a schema field. Returns { value } or { error }. */
+const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Match a value against an enum's options, tolerating values that are more
+ * specific than the schema's vocabulary:
+ *   "NACS (SAE J3400)"                    → NACS
+ *   "Permanent Magnet Synchronous (E-GMP)" → Permanent Magnet
+ *
+ * An option must match at a word boundary, and exactly one option may match —
+ * anything ambiguous or unrecognised is still rejected. A loose match reports
+ * `coercedFrom` so the import preview can show what it decided.
+ */
+function matchEnumOption(raw, options) {
+    const s = String(raw).trim();
+    const lower = s.toLowerCase();
+
+    const exact = options.find(o => o.toLowerCase() === lower);
+    if (exact) return { value: exact };
+
+    // Leading match: the option opens the value and ends on a word boundary.
+    const prefix = options.filter(o => {
+        const ol = o.toLowerCase();
+        return lower.startsWith(ol) && !/[a-z0-9]/.test(lower[ol.length] ?? ' ');
+    });
+    if (prefix.length === 1) return { value: prefix[0], coercedFrom: s };
+
+    // Otherwise the option may appear as a whole word anywhere in the value.
+    const contained = options.filter(o =>
+        new RegExp(`\\b${escapeRegExp(o.toLowerCase())}\\b`).test(lower)
+    );
+    if (contained.length === 1) return { value: contained[0], coercedFrom: s };
+
+    return { error: `"${raw}" is not one of: ${options.join(', ')}` };
+}
+
+/**
+ * Coerce a raw cell/JSON value for a schema field.
+ * Returns { value }, { value, coercedFrom } for a loose enum match, or { error }.
+ */
 export function coerceValue(raw, field) {
     if (field.type === 'boolean') {
         if (typeof raw === 'boolean') return { value: raw };
@@ -153,12 +191,7 @@ export function coerceValue(raw, field) {
         if (FALSE_WORDS.has(s)) return { value: false };
         return { error: `"${raw}" is not Yes/No` };
     }
-    if (field.type === 'enum') {
-        const s = String(raw).trim();
-        const match = field.options.find(o => o.toLowerCase() === s.toLowerCase());
-        if (match) return { value: match };
-        return { error: `"${raw}" is not one of: ${field.options.join(', ')}` };
-    }
+    if (field.type === 'enum') return matchEnumOption(raw, field.options);
     if (field.type === 'integer') return coerceNumber(raw, { integer: true });
     if (field.type === 'number')  return coerceNumber(raw);
     return { value: String(raw).trim() };
@@ -185,12 +218,19 @@ function emptyRow(index) {
         custom: {},            // { [catKey]: { [customKey]: value } }
         tagNames: [],
         inheritsFrom: null,    // raw reference (id or vehicle name) — resolved later
-        errors: [],
+        skipped: [],           // [{ path, reason }] values that could not be read
+        coercions: [],         // [{ path, from, to }] loose enum matches, for the preview
+        errors: [],            // row-fatal problems only (identity, duplicates)
         warnings: [],
     };
 }
 
-/** Write one resolved column's value into the row being built. */
+/**
+ * Write one resolved column's value into the row being built.
+ *
+ * A value that cannot be coerced is recorded on `skipped` rather than failing
+ * the row — one over-specific string shouldn't discard the other 30 good fields.
+ */
 function applyCell(row, target, raw) {
     if (isBlankCell(raw)) return;
 
@@ -201,7 +241,7 @@ function applyCell(row, target, raw) {
         if (key === 'manufacturer') { row.manufacturerName = String(raw).trim(); return; }
         if (NUMERIC_CORE.has(key)) {
             const { value, error } = coerceNumber(raw);
-            if (error) row.errors.push(`${key}: ${error}`);
+            if (error) row.skipped.push({ path: key, reason: error });
             else row.core[key] = value;
             return;
         }
@@ -217,10 +257,12 @@ function applyCell(row, target, raw) {
     }
 
     if (target.kind === 'spec') {
-        const { value, error } = coerceValue(raw, target.field);
+        const path = `${target.catKey}.${target.fieldKey}`;
+        const { value, error, coercedFrom } = coerceValue(raw, target.field);
         if (error) {
-            row.errors.push(`${target.catKey}.${target.fieldKey}: ${error}`);
+            row.skipped.push({ path, reason: error });
         } else {
+            if (coercedFrom !== undefined) row.coercions.push({ path, from: coercedFrom, to: value });
             row.specs[target.catKey] = { ...row.specs[target.catKey], [target.fieldKey]: value };
         }
         return;
@@ -242,6 +284,7 @@ function rowIsEmpty(row) {
         && Object.keys(row.custom).length === 0
         && row.tagNames.length === 0
         && !row.inheritsFrom
+        && row.skipped.length === 0
         && row.errors.length === 0;
 }
 

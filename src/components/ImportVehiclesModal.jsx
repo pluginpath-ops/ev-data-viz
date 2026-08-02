@@ -61,6 +61,30 @@ function RowDetail({ row }) {
                 </>
             )}
 
+            {row.coercions.length > 0 && (
+                <>
+                    <p className="font-medium mt-1">Adjusted to a schema value</p>
+                    <ul className="import-detail-list text-amber-600 dark:text-amber-400">
+                        {row.coercions.map(c => (
+                            <li key={c.path}>
+                                {fieldPathLabel(c.path)}: <span className="font-mono">{c.from}</span> → <span className="font-mono">{String(c.to)}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            )}
+
+            {row.fieldSkips.length > 0 && (
+                <>
+                    <p className="font-medium mt-1">Skipped — value not understood</p>
+                    <ul className="import-detail-list text-amber-600 dark:text-amber-400">
+                        {row.fieldSkips.map(s => (
+                            <li key={s.path}>{fieldPathLabel(s.path)}: {s.reason}</li>
+                        ))}
+                    </ul>
+                </>
+            )}
+
             {row.specSkips.length > 0 && (
                 <>
                     <p className="font-medium mt-1">Kept (already set)</p>
@@ -257,6 +281,14 @@ export default function ImportVehiclesModal({ onClose }) {
                             {plan.summary.errors > 0 && <span className="import-badge-error">{plan.summary.errors} with errors</span>}
                         </div>
 
+                        {(plan.summary.coercions > 0 || plan.summary.fieldSkips > 0) && (
+                            <p className="text-hint mt-2">
+                                {plan.summary.coercions > 0 && <>ⓘ {plan.summary.coercions} value(s) adjusted to a schema option. </>}
+                                {plan.summary.fieldSkips > 0 && <>⚠ {plan.summary.fieldSkips} value(s) couldn't be read and will be left blank. </>}
+                                Expand a row to see which.
+                            </p>
+                        )}
+
                         {(summary.newManufacturers.length > 0 || summary.newTags.length > 0) && (
                             <p className="text-hint mt-2">
                                 Will also create
@@ -320,6 +352,12 @@ export default function ImportVehiclesModal({ onClose }) {
                                                     <td className="p-2 font-mono">
                                                         {fills || '—'}
                                                         {row.tagNames.length > 0 && <span className="text-muted"> +{row.tagNames.length} tag</span>}
+                                                        {(row.coercions.length > 0 || row.fieldSkips.length > 0) && (
+                                                            <span className="text-amber-600 dark:text-amber-400">
+                                                                {row.coercions.length > 0 && ` ⓘ${row.coercions.length}`}
+                                                                {row.fieldSkips.length > 0 && ` ⚠${row.fieldSkips.length}`}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="p-2">
                                                         <button
