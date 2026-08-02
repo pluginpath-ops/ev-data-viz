@@ -13,7 +13,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { parseVehicleImportText } from '../utils/parseVehicleImport';
 import {
-    buildImportPlan, selectPlanRows, fieldPathLabel,
+    buildImportPlan, selectPlanRows, fieldPathLabel, fieldShortLabel,
     buildCsvTemplate, buildJsonTemplate,
 } from '../utils/vehicleImportPlan';
 
@@ -31,6 +31,44 @@ function downloadText(filename, text, mime) {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+}
+
+/**
+ * Inline note cell — names the fields that were adjusted or skipped rather than
+ * only counting them, so the table itself answers "which ones?". The full
+ * before/after text is in the title attribute and in the expanded detail.
+ */
+function RowNotes({ row }) {
+    if (row.coercions.length === 0 && row.fieldSkips.length === 0) {
+        return <span className="text-faint">—</span>;
+    }
+
+    // Two names inline, the rest as "+n" — keeps the column from wrapping.
+    const nameList = paths => {
+        const names = paths.map(fieldShortLabel);
+        return names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2}` : '');
+    };
+
+    return (
+        <span className="import-note-cell">
+            {row.coercions.length > 0 && (
+                <span
+                    className="import-note-info"
+                    title={row.coercions.map(c => `${fieldPathLabel(c.path)}: "${c.from}" → "${c.to}"`).join('\n')}
+                >
+                    ⓘ {nameList(row.coercions.map(c => c.path))} adjusted
+                </span>
+            )}
+            {row.fieldSkips.length > 0 && (
+                <span
+                    className="import-note-warn"
+                    title={row.fieldSkips.map(s => `${fieldPathLabel(s.path)}: ${s.reason}`).join('\n')}
+                >
+                    ⚠ {nameList(row.fieldSkips.map(s => s.path))} skipped
+                </span>
+            )}
+        </span>
+    );
 }
 
 /** Expanded detail for one planned row: what gets written, what is left alone. */
@@ -77,7 +115,7 @@ function RowDetail({ row }) {
             {row.fieldSkips.length > 0 && (
                 <>
                     <p className="font-medium mt-1">Skipped — value not understood</p>
-                    <ul className="import-detail-list text-amber-600 dark:text-amber-400">
+                    <ul className="import-detail-list text-red-600 dark:text-red-400">
                         {row.fieldSkips.map(s => (
                             <li key={s.path}>{fieldPathLabel(s.path)}: {s.reason}</li>
                         ))}
@@ -161,6 +199,13 @@ export default function ImportVehiclesModal({ onClose }) {
     const selectablePlanRows = plan
         ? plan.rows.flatMap((r, i) => (r.action === 'create' || r.action === 'update') ? [i] : [])
         : [];
+
+    // Rows carrying an adjusted or skipped value — the ones worth reading in full.
+    const notedPlanRows = plan
+        ? plan.rows.flatMap((r, i) => (r.coercions.length > 0 || r.fieldSkips.length > 0) ? [i] : [])
+        : [];
+    const allNotedExpanded = notedPlanRows.length > 0 && notedPlanRows.every(i => expanded.has(i));
+    const toggleAllNoted = () => setExpanded(allNotedExpanded ? new Set() : new Set(notedPlanRows));
     const allSelected = selectablePlanRows.length > 0 && selectablePlanRows.every(i => selected.has(i));
 
     const applyPlan = useMemo(
@@ -285,7 +330,9 @@ export default function ImportVehiclesModal({ onClose }) {
                             <p className="text-hint mt-2">
                                 {plan.summary.coercions > 0 && <>ⓘ {plan.summary.coercions} value(s) adjusted to a schema option. </>}
                                 {plan.summary.fieldSkips > 0 && <>⚠ {plan.summary.fieldSkips} value(s) couldn't be read and will be left blank. </>}
-                                Expand a row to see which.
+                                <button type="button" onClick={toggleAllNoted} className="import-link-button">
+                                    {allNotedExpanded ? 'Hide the details' : 'Show which fields'}
+                                </button>
                             </p>
                         )}
 
@@ -326,7 +373,8 @@ export default function ImportVehiclesModal({ onClose }) {
                                         <th className="p-2">Action</th>
                                         <th className="p-2">Matched by</th>
                                         <th className="p-2">Fills</th>
-                                        <th className="p-2 w-8"></th>
+                                        <th className="p-2">Notes</th>
+                                        <th className="p-2 w-20"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
@@ -337,8 +385,12 @@ export default function ImportVehiclesModal({ onClose }) {
                                         const fills = Object.keys(row.coreWrites).length + row.specWrites.length;
                                         return (
                                             <Fragment key={i}>
-                                                <tr className={selectable && isSelected ? '' : 'opacity-50'}>
-                                                    <td className="p-2">
+                                                {/* Whole row toggles its detail panel — the checkbox cell opts out. */}
+                                                <tr
+                                                    className={`import-row ${selectable && isSelected ? '' : 'opacity-50'}`}
+                                                    onClick={() => toggleExpanded(i)}
+                                                >
+                                                    <td className="p-2" onClick={e => e.stopPropagation()}>
                                                         <input
                                                             type="checkbox"
                                                             checked={isSelected}
@@ -352,26 +404,19 @@ export default function ImportVehiclesModal({ onClose }) {
                                                     <td className="p-2 font-mono">
                                                         {fills || '—'}
                                                         {row.tagNames.length > 0 && <span className="text-muted"> +{row.tagNames.length} tag</span>}
-                                                        {(row.coercions.length > 0 || row.fieldSkips.length > 0) && (
-                                                            <span className="text-amber-600 dark:text-amber-400">
-                                                                {row.coercions.length > 0 && ` ⓘ${row.coercions.length}`}
-                                                                {row.fieldSkips.length > 0 && ` ⚠${row.fieldSkips.length}`}
-                                                            </span>
-                                                        )}
                                                     </td>
                                                     <td className="p-2">
-                                                        <button
-                                                            onClick={() => toggleExpanded(i)}
-                                                            className="text-faint hover:text-secondary"
-                                                            title="Show details"
-                                                        >
-                                                            {expanded.has(i) ? '▾' : '▸'}
-                                                        </button>
+                                                        <RowNotes row={row} />
+                                                    </td>
+                                                    <td className="p-2 text-right">
+                                                        <span className="import-detail-toggle">
+                                                            {expanded.has(i) ? 'Hide ▾' : 'Details ▸'}
+                                                        </span>
                                                     </td>
                                                 </tr>
                                                 {expanded.has(i) && (
                                                     <tr>
-                                                        <td colSpan={6} className="p-0"><RowDetail row={row} /></td>
+                                                        <td colSpan={7} className="p-0"><RowDetail row={row} /></td>
                                                     </tr>
                                                 )}
                                             </Fragment>

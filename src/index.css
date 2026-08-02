@@ -538,6 +538,37 @@ body {
 .import-badge-skip   { @apply bg-gray-100  text-gray-600  dark:bg-slate-700 dark:text-slate-300; }
 .import-badge-error  { @apply bg-red-100   text-red-800   dark:bg-red-900   dark:text-red-200; }
 
+/* Preview table row — clicking anywhere on it opens the detail panel */
+.import-row {
+    @apply cursor-pointer transition;
+}
+.import-row:hover {
+    background-color: var(--color-surface-muted);
+}
+
+/* Right-hand expand affordance; reads as a control rather than a bare glyph */
+.import-detail-toggle {
+    @apply text-xs whitespace-nowrap;
+    color: var(--color-primary);
+}
+
+/* Inline note cell naming adjusted / skipped fields */
+.import-note-cell {
+    @apply flex flex-col gap-0.5;
+}
+.import-note-info,
+.import-note-warn {
+    @apply text-xs whitespace-nowrap cursor-help;
+}
+.import-note-info { @apply text-amber-600 dark:text-amber-400; }
+.import-note-warn { @apply text-red-600   dark:text-red-400; }
+
+/* Inline text button used in the summary line above the table */
+.import-link-button {
+    @apply underline;
+    color: var(--color-primary);
+}
+
 /* Expanded per-row detail panel inside the preview table */
 .import-row-detail {
     @apply px-4 py-2 text-xs;

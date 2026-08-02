@@ -8,7 +8,7 @@
  *
  * Pure module — the plan it returns is handed to AppContext.importVehicles() to run.
  */
-import { SPEC_CATEGORIES } from './vehicleSpecSchema';
+import { SPEC_CATEGORIES, formatCustomKey } from './vehicleSpecSchema';
 import { vehicleLabel } from './specHelpers';
 
 const isBlank = v => v === null || v === undefined || v === '';
@@ -28,6 +28,17 @@ for (const cat of SPEC_CATEGORIES) {
 /** Human-readable label for a written field path, for the preview table. */
 export function fieldPathLabel(path) {
     return FIELD_LABELS.get(path) ?? path;
+}
+
+/**
+ * Just the field's own label, without its category — for tight columns where
+ * "Motor Type" reads better than "Powertrain › Motor Type".
+ */
+export function fieldShortLabel(path) {
+    const full = FIELD_LABELS.get(path);
+    if (full) return full.split(' › ').pop();
+    // Custom field path ("interior._custom.cup_holders") or a core column name.
+    return formatCustomKey(path.split('.').pop());
 }
 
 // ── Matching ─────────────────────────────────────────────────────────────────
