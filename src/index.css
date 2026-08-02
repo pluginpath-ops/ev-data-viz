@@ -512,6 +512,74 @@ body {
     width: min(90vw, 420px);
 }
 
+/* ── Bulk vehicle import modal ──────────────────────────────────────────────── */
+
+/* Scrollable preview table of planned rows */
+.import-table-container {
+    @apply rounded-lg border overflow-auto;
+    max-height: 22rem;
+    border-color: var(--color-border);
+}
+
+/* Chip row summarising the plan (create / fill / skip / error counts) */
+.import-summary-row {
+    @apply flex flex-wrap items-center gap-2;
+}
+
+/* Per-action status badges — also used as the row badge in the table */
+.import-badge-create,
+.import-badge-update,
+.import-badge-skip,
+.import-badge-error {
+    @apply text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap;
+}
+.import-badge-create { @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200; }
+.import-badge-update { @apply bg-blue-100  text-blue-800  dark:bg-blue-900  dark:text-blue-200; }
+.import-badge-skip   { @apply bg-gray-100  text-gray-600  dark:bg-slate-700 dark:text-slate-300; }
+.import-badge-error  { @apply bg-red-100   text-red-800   dark:bg-red-900   dark:text-red-200; }
+
+/* Preview table row — clicking anywhere on it opens the detail panel */
+.import-row {
+    @apply cursor-pointer transition;
+}
+.import-row:hover {
+    background-color: var(--color-surface-muted);
+}
+
+/* Right-hand expand affordance; reads as a control rather than a bare glyph */
+.import-detail-toggle {
+    @apply text-xs whitespace-nowrap;
+    color: var(--color-primary);
+}
+
+/* Inline note cell naming adjusted / skipped fields */
+.import-note-cell {
+    @apply flex flex-col gap-0.5;
+}
+.import-note-info,
+.import-note-warn {
+    @apply text-xs whitespace-nowrap cursor-help;
+}
+.import-note-info { @apply text-amber-600 dark:text-amber-400; }
+.import-note-warn { @apply text-red-600   dark:text-red-400; }
+
+/* Inline text button used in the summary line above the table */
+.import-link-button {
+    @apply underline;
+    color: var(--color-primary);
+}
+
+/* Expanded per-row detail panel inside the preview table */
+.import-row-detail {
+    @apply px-4 py-2 text-xs;
+    background-color: var(--color-surface-sunken);
+}
+
+/* Compact bulleted list used in the row detail and the format help */
+.import-detail-list {
+    @apply list-disc pl-5 space-y-0.5;
+}
+
 /* ── Forms ──────────────────────────────────────────────────────────────────── */
 
 /* Two-column form field grid; gap added inline (gap-3 or gap-4) */

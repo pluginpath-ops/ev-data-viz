@@ -38,20 +38,27 @@ export const SPEC_CATEGORIES = [
         ],
     },
     {
+        // NOTHING in this category is measured by EVBench — every value is cited
+        // from elsewhere, so the labels say where it came from. Acceleration and
+        // top-speed figures are manufacturer claims; the handling/braking figures
+        // come from published road tests. Independently-tested acceleration and
+        // braking results live separately, in performance_summaries /
+        // performance_sessions (see migration 039), and are surfaced with their
+        // own provenance so the two are never confused.
         key: 'performance',
-        label: 'Performance',
+        label: 'Performance (Published)',
         fields: [
-            { key: 'zero_to_60_mph_sec', label: '0–60 mph (sec)',              type: 'number' },
-            { key: 'quarter_mile_sec',   label: '¼ Mile (sec)',                type: 'number' },
-            { key: 'quarter_mile_mph',   label: '¼ Mile Trap Speed',           type: 'number', unitGroup: 'speed' },
-            { key: 'top_speed_mph',      label: 'Top Speed',                   type: 'number', unitGroup: 'speed' },
-            { key: 'weight_lbs',         label: 'Curb Weight',                 type: 'number', unitGroup: 'weight' },
-            { key: 'braking_60_0_ft',    label: 'Braking 60–0',               type: 'number', unitGroup: 'feet' },
-            { key: 'braking_70_0_ft',    label: 'Braking 70–0',               type: 'number', unitGroup: 'feet' },
-            { key: 'lateral_g',          label: 'Lateral Grip (g)',            type: 'number' },
-            { key: 'figure_8_sec',       label: 'Figure 8 (sec)',              type: 'number' },
-            { key: 'slalom_mph',         label: 'Slalom Speed',                type: 'number', unitGroup: 'speed' },
-            { key: 'elk_test_mph',       label: 'Elk Test Speed (Moose Test)', type: 'number', unitGroup: 'speed' },
+            { key: 'zero_to_60_mph_sec', label: '0–60 mph (sec) — claimed',     type: 'number' },
+            { key: 'quarter_mile_sec',   label: '¼ Mile (sec) — claimed',       type: 'number' },
+            { key: 'quarter_mile_mph',   label: '¼ Mile Trap Speed — claimed',  type: 'number', unitGroup: 'speed' },
+            { key: 'top_speed_mph',      label: 'Top Speed — claimed',          type: 'number', unitGroup: 'speed' },
+            { key: 'weight_lbs',         label: 'Curb Weight',                  type: 'number', unitGroup: 'weight' },
+            { key: 'braking_60_0_ft',    label: 'Braking 60–0 — published',     type: 'number', unitGroup: 'feet' },
+            { key: 'braking_70_0_ft',    label: 'Braking 70–0 — published',     type: 'number', unitGroup: 'feet' },
+            { key: 'lateral_g',          label: 'Lateral Grip (g) — published', type: 'number' },
+            { key: 'figure_8_sec',       label: 'Figure 8 (sec) — published',   type: 'number' },
+            { key: 'slalom_mph',         label: 'Slalom Speed — published',     type: 'number', unitGroup: 'speed' },
+            { key: 'elk_test_mph',       label: 'Elk Test Speed (Moose Test) — published', type: 'number', unitGroup: 'speed' },
         ],
     },
     {

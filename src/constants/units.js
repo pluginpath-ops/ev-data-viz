@@ -11,6 +11,10 @@ export const CUFT_TO_L  = 28.3168;   // cubic feet → litres
 export const LBFT_TO_NM = 1.35582;   // lb-ft → newton-metres
 export const FT_TO_M    = 0.3048;    // feet → metres
 export const HP_TO_KW   = 0.7457;    // horsepower → kilowatts
+export const MPH_TO_MS  = 0.44704;   // miles per hour → metres per second
+
+/** Standard gravity (m/s²) — expresses accel/decel rates in g. */
+export const G_MS2 = 9.80665;
 
 /** kWh per gallon of gasoline-equivalent — the MPGe basis. */
 export const MPG_E_CONVERSION = 33.705;
