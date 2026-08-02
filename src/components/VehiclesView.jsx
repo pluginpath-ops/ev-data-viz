@@ -6,6 +6,7 @@ import DeleteQueueBar from './DeleteQueueBar';
 import EditVehicleForm from './EditVehicleForm';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
+import ImportVehiclesModal from './ImportVehiclesModal';
 
 // ── Test-count row ────────────────────────────────────────────────────────────
 
@@ -81,6 +82,7 @@ export default function VehiclesView({
     const [vehiclePage, setVehiclePage] = useState(savedState?.vehiclePage ?? 1);
     const [specsEditingVehicle, setSpecsEditingVehicle] = useState(null);
     const [specsViewingVehicle, setSpecsViewingVehicle] = useState(null);
+    const [showImportModal, setShowImportModal] = useState(false);
     const VEHICLES_PER_PAGE = 24;
 
     // Keep a ref always pointing at latest filter/sort/page so the unmount
@@ -518,12 +520,21 @@ export default function VehiclesView({
                         </button>
                     </div>
                     {canCreate && (
-                        <button
-                            onClick={() => { setEditingId(null); setShowForm(!showForm); }}
-                            className="btn btn-primary"
-                        >
-                            {showForm && !editingId ? 'Cancel' : '+ Add Vehicle'}
-                        </button>
+                        <>
+                            <button
+                                onClick={() => setShowImportModal(true)}
+                                className="btn btn-secondary"
+                                title="Bulk-add vehicles and specs from a CSV or JSON file"
+                            >
+                                Import…
+                            </button>
+                            <button
+                                onClick={() => { setEditingId(null); setShowForm(!showForm); }}
+                                className="btn btn-primary"
+                            >
+                                {showForm && !editingId ? 'Cancel' : '+ Add Vehicle'}
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -993,6 +1004,11 @@ export default function VehiclesView({
                     vehicle={specsViewingVehicle}
                     onClose={() => setSpecsViewingVehicle(null)}
                 />
+            )}
+
+            {/* Bulk import modal (contributors/owners) */}
+            {showImportModal && (
+                <ImportVehiclesModal onClose={() => setShowImportModal(false)} />
             )}
         </div>
     );
