@@ -1,18 +1,13 @@
 /**
  * Performance Compare — one bar per vehicle for a chosen metric.
  *
- * ── LIKE FOR LIKE IS THE WHOLE POINT ────────────────────────────────────────
+ * Every bar is a TESTED figure, and they all rank together: a result derived
+ * from a session imported here and one published by a magazine are the same
+ * kind of claim, so there is no basis to choose between. Each bar names the
+ * source it came from, and marks the ones EVBench holds the full run data for.
  *
- * Every bar on the chart comes from the SAME kind of source, chosen by the
- * basis selector: measured against measured, or reported against reported.
- * A vehicle with no data on the selected basis is shown explicitly as having
- * none — it is never quietly filled in from the other basis.
- *
- * This is why the chart does NOT use resolveMetric().preferred, which falls
- * back measured → reported → claimed. That fallback is right for a single
- * vehicle's summary panel, but on a comparison it would silently put one
- * vehicle's stopwatch next to another vehicle's press release and draw them as
- * if they were the same measurement.
+ * Manufacturer claims are deliberately absent — a marketing figure is not a
+ * test result, and mixing one into this ranking would misrepresent the rest.
  */
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Chart from 'chart.js/auto';
@@ -22,20 +17,16 @@ import { useTheme } from '../hooks/useTheme';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import {
-    deriveFromRuns, deriveFromSummaries, groupIntervals, normaliseInterval,
+    deriveTested, groupIntervals, normaliseInterval, PINNED_WINDOWS,
 } from '../utils/performanceDerivations';
 
 /** Metrics stored as promoted columns, available on both bases. */
 const SCALAR_METRICS = [
     { key: 'zero_to_60_sec',         label: '0–60 mph (no rollout)', unit: 's',   lowerIsBetter: true  },
     { key: 'zero_to_60_rollout_sec', label: '0–60 mph (1 ft)',        unit: 's',   lowerIsBetter: true  },
+    { key: 'zero_to_100_sec',        label: '0–100 mph',              unit: 's',   lowerIsBetter: true  },
     { key: 'quarter_mile_sec',       label: '¼ mile',                 unit: 's',   lowerIsBetter: true  },
     { key: 'quarter_mile_trap_mph',  label: '¼ mile trap',            unit: 'mph', lowerIsBetter: false },
-];
-
-const BASES = [
-    { key: 'measured', label: 'Measured', hint: 'Derived from testing sessions imported into EVBench.' },
-    { key: 'reported', label: 'Reported', hint: 'Published figures entered from a source.' },
 ];
 
 export default function PerformanceCompareView({ vehicles, selectedVehicleIds, presentationMode }) {
@@ -43,7 +34,6 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
     const canvasRef  = useRef(null);
     const chartRef   = useRef(null);
 
-    const [basis, setBasis]   = useState('measured');
     const [sortDir, setSortDir] = useState('best');
     const [metric, setMetric] = useState('zero_to_60_sec');
     const [data, setData]     = useState(null);   // { [vehicleId]: {sessions, summaries} }
@@ -76,37 +66,44 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
         return () => { cancelled = true; };
     }, [selected.map(v => v.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Speed windows are only ever reported, so they appear as metric options
-    // only on that basis — and only the windows some selected vehicle actually has.
+    // Every window some selected vehicle actually has. Pinned ones are listed
+    // as standard metrics instead, so 0-100 sits beside 0-60 rather than being
+    // buried among braking distances.
     const windowOptions = useMemo(() => {
-        if (!data || basis !== 'reported') return [];
+        if (!data) return [];
         const seen = new Map();
         for (const v of selected) {
             for (const b of groupIntervals(data[v.id]?.summaries || [])) {
+                if (PINNED_WINDOWS.some(p => p.key === b.key)) continue;
                 if (!seen.has(b.key)) seen.set(b.key, { key: b.key, label: b.label, kind: b.kind });
             }
         }
         return [...seen.values()];
-    }, [data, selected, basis]);
+    }, [data, selected]);
 
-    // Selecting a window then switching to Measured would leave an impossible
-    // metric selected; fall back rather than rendering an empty chart.
+    /** Pinned + discovered windows — everything resolvable as a speed window. */
+    const allWindows = useMemo(
+        () => [...PINNED_WINDOWS, ...windowOptions],
+        [windowOptions],
+    );
+
+    // A window can stop existing when the selection changes; fall back rather
+    // than rendering an empty chart against a metric nobody has.
     useEffect(() => {
-        const isWindow = metric.includes(':');
-        if (isWindow && (basis !== 'reported' || !windowOptions.some(w => w.key === metric))) {
+        if (metric.includes(':') && !allWindows.some(w => w.key === metric)) {
             setMetric('zero_to_60_sec');
         }
-    }, [basis, windowOptions, metric]);
+    }, [allWindows, metric]);
 
     const activeMetric = useMemo(() => {
         if (metric.includes(':')) {
-            const w = windowOptions.find(o => o.key === metric);
+            const w = allWindows.find(o => o.key === metric);
             return w
                 ? { key: w.key, label: w.label, isWindow: true, kind: w.kind, lowerIsBetter: true }
                 : SCALAR_METRICS[0];
         }
         return SCALAR_METRICS.find(m => m.key === metric) || SCALAR_METRICS[0];
-    }, [metric, windowOptions]);
+    }, [metric, allWindows]);
 
     /** One row per selected vehicle on the ACTIVE BASIS ONLY. */
     const rows = useMemo(() => {
@@ -128,22 +125,22 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                 };
             }
 
-            const rec = basis === 'measured'
-                ? deriveFromRuns(bucket.sessions, activeMetric.key)
-                : deriveFromSummaries(bucket.summaries, activeMetric.key);
+            const rec = deriveTested(bucket.sessions, bucket.summaries, activeMetric.key);
 
             return {
                 id: v.id, name,
                 value: rec.value,
                 display: rec.value != null ? `${rec.value.toFixed(3)} ${activeMetric.unit}` : null,
-                sub: basis === 'measured'
-                    ? (rec.basis?.drive_mode || null)
-                    : (rec.basis?.source_name || null),
+                // The source is the useful label — a bar is only meaningful if you
+                // can see who produced the number.
+                sub: rec.basis?.sourceName || null,
+                fullData: rec.basis?.origin === 'session',
+                sourceCount: rec.basis?.all?.length ?? 0,
                 flags: rec.flags || [],
                 unit: activeMetric.unit,
             };
         });
-    }, [data, selected, activeMetric, basis]);
+    }, [data, selected, activeMetric]);
 
     const withData    = rows.filter(r => r.value != null);
     const withoutData = rows.filter(r => r.value == null);
@@ -178,7 +175,8 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                     if (!row) return;
                     const pills = [row.display];
                     if (row.rateG != null) pills.push(`${row.rateG.toFixed(3)} g`);
-                    if (row.sub) pills.push(row.sub);
+                    // Source, and a marker when the run data sits behind it.
+                    if (row.sub) pills.push(row.fullData ? `${row.sub} ✦` : row.sub);
 
                     let x = bar.base + 8;
                     const y = bar.y - 7;
@@ -228,7 +226,8 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                                 if (r.sub) lines.push(r.sub);
                                 if (r.flags?.includes('single-run')) lines.push('⚠ Single run only');
                                 if (r.flags?.includes('steep-grade')) lines.push('⚠ Best run was on a grade');
-                                if (r.flags?.includes('multiple-sources')) lines.push('⚠ Sources disagree');
+                                if (r.fullData) lines.push('✦ Full run data held here');
+                                if (r.sourceCount > 1) lines.push(`${r.sourceCount} sources have tested this`);
                                 return lines;
                             },
                         },
@@ -263,19 +262,6 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
             {!presentationMode && <div className="card mb-6">
                 <div className="axis-selectors">
                     <div>
-                        <label className="block font-medium mb-2">Compare using:</label>
-                        <select
-                            value={basis}
-                            onChange={e => setBasis(e.target.value)}
-                            className="border p-2 rounded w-full"
-                            title={BASES.find(b => b.key === basis)?.hint}
-                        >
-                            {BASES.map(b => (
-                                <option key={b.key} value={b.key}>{b.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
                         <label className="block font-medium mb-2">Metric:</label>
                         <select
                             value={metric}
@@ -284,6 +270,9 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                         >
                             {SCALAR_METRICS.map(m => (
                                 <option key={m.key} value={m.key}>{m.label}</option>
+                            ))}
+                            {PINNED_WINDOWS.map(w => (
+                                <option key={w.key} value={w.key}>{w.label}</option>
                             ))}
                             {windowOptions.length > 0 && (
                                 <optgroup label="Speed windows">
@@ -309,24 +298,22 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                     </div>
                 </div>
                 <p className="text-xs text-muted">
-                    Every bar comes from the basis selected above — measured against
-                    measured, reported against reported. Vehicles without data on that
-                    basis are listed under the chart rather than filled in from the other.
+                    Each bar is the best tested figure for that vehicle, whoever produced
+                    it — results derived from imported sessions rank alongside published
+                    ones, and the bar names its source. Manufacturer claims are excluded.
                 </p>
             </div>}
 
             <div className="card mb-4">
                 <h3 className="text-lg font-semibold mb-3">
                     {activeMetric.label}
-                    <span className="text-muted font-normal text-sm"> · {basis}</span>
+                    <span className="text-muted font-normal text-sm"> · tested</span>
                 </h3>
 
                 {sorted.length === 0 ? (
                     <p className="text-sm text-muted py-8 text-center">
-                        None of the selected vehicles has {basis} data for this metric.
-                        {basis === 'measured'
-                            ? ' Import a testing CSV in Tests & Data, or switch to Reported.'
-                            : ' Add a reported result in Tests & Data, or switch to Measured.'}
+                        None of the selected vehicles has a tested figure for this metric.
+                        Import a testing CSV or add a published result in Tests &amp; Data.
                     </p>
                 ) : (
                     <div style={{ height: Math.max(180, sorted.length * 46) }}>
@@ -341,8 +328,8 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                 {withoutData.length > 0 && sorted.length > 0 && (
                     <p className="text-xs text-faint mt-2">
                         {withoutData.length <= 6
-                            ? `No ${basis} data for: ${withoutData.map(r => r.name).join(', ')}`
-                            : `${withoutData.length} other selected vehicles have no ${basis} data.`}
+                            ? `No tested figure for: ${withoutData.map(r => r.name).join(', ')}`
+                            : `${withoutData.length} other selected vehicles have no tested figure for this metric.`}
                     </p>
                 )}
             </div>

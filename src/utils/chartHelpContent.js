@@ -208,34 +208,32 @@ export const CHART_HELP_DEFAULTS = {
     perfcompare: {
         title: 'About the Performance Compare chart',
         data_source:
-            'Ranks the selected vehicles on one acceleration or braking metric. The ' +
-            '“Compare using” switch chooses where every bar comes from: Measured ' +
-            'derives from testing sessions imported into EVBench, Reported uses ' +
-            'published figures entered from a source. Speed windows (braking ' +
-            'distances, passing times) only exist as reported figures, so they appear ' +
-            'only on that basis.',
+            'Ranks the selected vehicles on one acceleration or braking metric, using ' +
+            'every tested figure EVBench holds for them. Two kinds of figure rank ' +
+            'together: results derived here from an imported testing session, and ' +
+            'results entered from a published source. Manufacturer claims are not ' +
+            'included — a marketing number is not a test result.',
         how_to_read:
-            'Every bar on the chart comes from the same kind of source — that is the ' +
-            'point of the basis switch. A vehicle with no data on the selected basis ' +
-            'is listed underneath as having none, rather than being quietly filled in ' +
-            'from the other basis, because mixing a stopwatch reading with a press ' +
-            'release would make the bars meaningless. Pills inside each bar show the ' +
-            'value, the average rate in g where it applies, and the drive mode or ' +
-            'source it came from. Warnings in the tooltip flag figures resting on a ' +
-            'single run, a run taken on a grade, or sources that disagree.',
+            'Each bar is the best tested figure for that vehicle and names the source ' +
+            'that produced it. A ✦ marks figures EVBench holds the full run data for, ' +
+            'which are derived from that data rather than quoted; the tooltip then adds ' +
+            'the drive mode, how many comparable runs back it, and the spread between ' +
+            'them. Where several sources have tested the same car, the tooltip says so — ' +
+            'the bar shows the quickest. Vehicles with no tested figure are listed under ' +
+            'the chart rather than dropped, so a missing bar doesn’t read as a slow car.',
         key_terms:
-            'Measured — derived here from imported session data.\n' +
-            'Reported — a published figure entered from a source.\n' +
+            'Tested — somebody ran the car and timed it, whether or not we hold the trace.\n' +
+            'Full data (✦) — the underlying run data is stored here, so the figure is derived, not quoted.\n' +
             'No rollout vs 1 ft — two 0–60 conventions about 0.3 s apart; not interchangeable.\n' +
             'Speed window — a from/to speed pair, e.g. 75–0 mph braking or 50–90 mph passing.\n' +
             'Average rate (g) — the window expressed as an average acceleration.',
         math_approach:
-            'Measured figures take the best run and report the spread across comparable ' +
-            'runs in the same drive mode; nothing is averaged across drive modes. ' +
-            'Reported figures take the best value when several sources disagree, and ' +
-            'flag the disagreement. Braking distances are converted to a common unit ' +
-            'for ranking but displayed as reported. Average rate is Δv/Δt for timed ' +
-            'windows and (v₁²−v₂²)/2d for braking.',
+            'Session-backed figures take the best run and report the spread across ' +
+            'comparable runs in the same drive mode; nothing is averaged across drive ' +
+            'modes, and a figure resting on one run or a run taken on a grade is ' +
+            'flagged. Published figures are used as given. Braking distances are ' +
+            'converted to a common unit for ranking but displayed as reported. Average ' +
+            'rate is Δv/Δt for timed windows and (v₁²−v₂²)/2d for braking.',
     },
 
     perfcurve: {

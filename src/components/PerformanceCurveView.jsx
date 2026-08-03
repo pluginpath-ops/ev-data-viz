@@ -17,6 +17,8 @@ import { useTheme } from '../hooks/useTheme';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import AxisScaleControls from './AxisScaleControls';
+import PerformanceRunSelector from './performance/PerformanceRunSelector';
+import { buildSyntheticCurve } from '../utils/performanceDerivations';
 
 /** Okabe-Ito, matching the palette the other charts use for run colours. */
 const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
@@ -27,12 +29,19 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     const chartRef   = useRef(null);
 
     const [sessionsByVehicle, setSessionsByVehicle] = useState(null);
+    const [summariesByVehicle, setSummariesByVehicle] = useState({});
+    // Published-only vehicles can't otherwise appear here at all, so this is on
+    // by default; the dashes keep them from being mistaken for measured traces.
+    const [showPublished, setShowPublished] = useState(true);
     const [loading, setLoading] = useState(true);
     // 'mode'   — quickest run in each drive mode (default: the mode comparison)
     // 'vehicle' — one line per vehicle, its single quickest run
     // 'all'     — every run, for run-to-run consistency
     const [grouping, setGrouping] = useState('mode');
     const [scale, setScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
+    // Only consulted when grouping is 'all'; null means "not curated yet", which
+    // shows everything rather than an empty chart on first switch.
+    const [pickedRunIds, setPickedRunIds] = useState(null);
 
     const selected = useMemo(
         () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
@@ -44,14 +53,44 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         setLoading(true);
         (async () => {
             const ids = selected.map(v => v.id);
-            const allSessions = await dataService.getPerformanceSessions(ids);
-            const next = {};
-            for (const id of ids) next[id] = [];
-            for (const s of allSessions) next[s.vehicle_id]?.push(s);
-            if (!cancelled) { setSessionsByVehicle(next); setLoading(false); }
+            const [allSessions, allSummaries] = await Promise.all([
+                dataService.getPerformanceSessions(ids),
+                dataService.getPerformanceSummaries(ids),
+            ]);
+            const next = {}, sums = {};
+            for (const id of ids) { next[id] = []; sums[id] = []; }
+            for (const s of allSessions)  next[s.vehicle_id]?.push(s);
+            for (const s of allSummaries) sums[s.vehicle_id]?.push(s);
+            if (!cancelled) { setSessionsByVehicle(next); setSummariesByVehicle(sums); setLoading(false); }
         })();
         return () => { cancelled = true; };
     }, [selected.map(v => v.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /**
+     * Every plottable accel run, per vehicle, for the picker.
+     */
+    const selectorVehicles = useMemo(() => {
+        if (!sessionsByVehicle) return [];
+        return selected.map(v => ({
+            id: v.id,
+            name: v.name,
+            runs: (sessionsByVehicle[v.id] || [])
+                .filter(s => s.test_type === 'accel')
+                .flatMap(s => (s.performance_runs || [])
+                    .filter(r => (r.performance_run_points || []).length >= 2)
+                    .map(r => ({
+                        id: r.id,
+                        name: `Run #${(r.sequence ?? 0) + 1}`,
+                        driveMode: r.drive_mode,
+                        zeroTo60: r.zero_to_60_sec,
+                    }))),
+        })).filter(v => v.runs.length > 0);
+    }, [sessionsByVehicle, selected]);
+
+    const allRunIds = useMemo(
+        () => selectorVehicles.flatMap(v => v.runs.map(r => r.id)),
+        [selectorVehicles],
+    );
 
     /**
      * One series per run worth plotting. A run needs at least two split points
@@ -75,7 +114,10 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
 
             let chosen;
             if (grouping === 'all') {
-                chosen = allRuns;
+                // Curated subset when the user has picked; everything until then.
+                chosen = pickedRunIds === null
+                    ? allRuns
+                    : allRuns.filter(r => pickedRunIds.some(id => String(id) === String(r.id)));
             } else if (grouping === 'vehicle') {
                 chosen = [allRuns.reduce(quickest)];
             } else {
@@ -123,8 +165,27 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                 }
             }
         }
+        // Curves reconstructed from published headline figures. Drawn dashed and
+        // listed after the traced runs, because three points off a spec sheet is
+        // a sketch of a curve, not a measurement of one.
+        if (showPublished) {
+            for (const v of selected) {
+                for (const summary of summariesByVehicle[v.id] || []) {
+                    const synth = buildSyntheticCurve(summary);
+                    if (!synth) continue;
+                    out.push({
+                        label: `${v.name} · ${summary.source_name || 'published'}`,
+                        fullLabel: `${vehicleLabel(v)} · ${summary.source_name || 'published'}`,
+                        points: synth.points,
+                        synthetic: true,
+                        basis: synth.basis,
+                        flags: synth.flags,
+                    });
+                }
+            }
+        }
         return out;
-    }, [sessionsByVehicle, selected, grouping]);
+    }, [sessionsByVehicle, summariesByVehicle, selected, grouping, pickedRunIds, showPublished]);
 
     useEffect(() => {
         if (!canvasRef.current || series.length === 0) {
@@ -146,8 +207,13 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     borderColor: PALETTE[i % PALETTE.length],
                     backgroundColor: PALETTE[i % PALETTE.length],
                     borderWidth: 2,
-                    pointRadius: presentationMode ? 0 : 2.5,
-                    tension: 0.25,
+                    // Dashed = reconstructed from headline figures, not traced.
+                    borderDash: s.synthetic ? [6, 4] : [],
+                    pointStyle: s.synthetic ? 'rectRot' : 'circle',
+                    pointRadius: presentationMode ? 0 : (s.synthetic ? 4 : 2.5),
+                    // Straight segments: with three points, a curve fit would
+                    // invent shape the figures don't support.
+                    tension: s.synthetic ? 0 : 0.25,
                 })),
             },
             options: {
@@ -179,7 +245,20 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             title: (items) => `${items[0].parsed.x.toFixed(3)} s`,
                             // Tooltip shows the untruncated name, so the legend can
                             // stay short without losing which vehicle a line is.
-                            label: (c) => `${series[c.datasetIndex]?.fullLabel ?? c.dataset.label}: ${c.parsed.y.toFixed(0)} mph`,
+                            label: (c) => {
+                                const sr = series[c.datasetIndex];
+                                const lines = [`${sr?.fullLabel ?? c.dataset.label}: ${c.parsed.y.toFixed(0)} mph`];
+                                if (sr?.synthetic) {
+                                    lines.push(`Reconstructed from ${sr.basis.join(' + ')}`);
+                                    if (sr.flags.includes('mixed-rollout')) {
+                                        lines.push('⚠ 0–60 is a no-rollout figure paired with a ¼-mile ET, which is not');
+                                    }
+                                    if (sr.flags.includes('non-monotonic')) {
+                                        lines.push('⚠ The published figures disagree with each other');
+                                    }
+                                }
+                                return lines;
+                            },
                         },
                     },
                 },
@@ -226,15 +305,40 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             <option value="all">Every run</option>
                         </select>
                     </div>
+                    <label className="flex items-center gap-1.5 text-xs cursor-pointer pb-3">
+                        <input
+                            type="checkbox"
+                            checked={showPublished}
+                            onChange={e => setShowPublished(e.target.checked)}
+                        />
+                        <span className="text-secondary">Include published figures</span>
+                    </label>
                     <span className="text-xs text-faint pb-3">
                         {series.length} line{series.length === 1 ? '' : 's'} plotted
                     </span>
                 </div>
                 <p className="text-xs text-muted mt-3">
-                    Built from imported split times. The 1&nbsp;ft-rollout split is left out —
-                    it is the same 60&nbsp;mph point on a different clock — and the 0–60 time is
-                    added as the final point, since sources list splits only to 0–50.
+                    Solid lines are traced from imported split times: the 1&nbsp;ft-rollout
+                    split is left out, being the same 60&nbsp;mph point on a different clock,
+                    and the 0–60 time is added as the final point since sources list splits
+                    only to 0–50. Dashed lines are reconstructed from a source’s headline
+                    figures — 0–60, 0–100 where given, and the ¼-mile ET paired with its trap
+                    speed, which is a real point rather than a guess. Three points is a sketch
+                    of a curve, not a measurement of one.
                 </p>
+
+                {/* Curation sits with the control that enables it, and only under
+                    "Every run" — the other groupings already pick for you, so a
+                    picker there would silently do nothing. */}
+                {grouping === 'all' && selectorVehicles.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
+                        <PerformanceRunSelector
+                            vehicles={selectorVehicles}
+                            selectedRunIds={pickedRunIds}
+                            onChange={setPickedRunIds}
+                        />
+                    </div>
+                )}
             </div>}
 
             <div className="card mb-4">

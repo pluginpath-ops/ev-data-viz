@@ -80,7 +80,8 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
 
             {intervals.length === 0 && !draft && (
                 <p className="text-faint text-[11px] italic">
-                    No braking or passing figures yet.
+                    No braking, passing or rolling-start figures yet. Fixed headline
+                    figures like 0–60 and 0–100 have their own fields above.
                 </p>
             )}
 
@@ -122,7 +123,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                     onClick={() => { setDraft({ ...BLANK }); setError(null); }}
                     className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline mt-1"
                 >
-                    + Add braking / passing figure
+                    + Add braking / passing / rolling-start figure
                 </button>
             )}
 

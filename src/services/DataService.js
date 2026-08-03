@@ -1540,6 +1540,35 @@ class DataService {
     return data || [];
   }
 
+  /**
+   * Per-vehicle counts of performance runs, split by test type — for the
+   * vehicle-card badges.
+   *
+   * Its own query rather than part of getVehicles: performance tables stay out
+   * of that select on purpose (see the note there), and this pulls only the
+   * three columns needed instead of the full session/run/point tree.
+   *
+   * @returns {Promise<Record<number, {accel: number, braking: number}>>}
+   */
+  async getPerformanceRunCounts() {
+    if (!this.useSupabase) return {};
+    const { data, error } = await getSupabase()
+      .from('performance_sessions')
+      .select('vehicle_id, test_type, performance_runs(count)');
+    if (error) {
+      console.warn('Performance counts unavailable:', error.message);
+      return {};
+    }
+    const out = {};
+    for (const row of data || []) {
+      const n = Array.isArray(row.performance_runs) ? (row.performance_runs[0]?.count ?? 0) : 0;
+      if (!out[row.vehicle_id]) out[row.vehicle_id] = { accel: 0, braking: 0 };
+      if (row.test_type === 'braking') out[row.vehicle_id].braking += n;
+      else                              out[row.vehicle_id].accel   += n;
+    }
+    return out;
+  }
+
   /** Insert (no id) or update (with id) a session. Returns the saved row. */
   async savePerformanceSession(row) {
     if (!this.useSupabase) return null;

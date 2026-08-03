@@ -18,6 +18,7 @@ export function AppProvider({ children }) {
     const [units, setUnits] = useState(() => localStorage.getItem('evbench_units') || 'imperial');
     const [manufacturers, setManufacturers] = useState([]);
     const [chartHelp, setChartHelp] = useState({});        // { [chart_key]: row } — "About this chart" copy
+    const [performanceCounts, setPerformanceCounts] = useState({}); // { [vehicleId]: {accel, braking} } — card badges
 
     const toggleUnits = () => setUnits(u => {
         const next = u === 'imperial' ? 'metric' : 'imperial';
@@ -70,6 +71,9 @@ export function AppProvider({ children }) {
         const siteSettings = await dataService.getSiteSettings();
         const manufacturersData = dataService.useSupabase ? await dataService.getManufacturers() : [];
         const chartHelpData = dataService.useSupabase ? await dataService.getChartHelp() : {};
+        // One extra query, kept out of getVehicles so a missing performance table
+        // can never take the vehicles list down with it.
+        const perfCounts = dataService.useSupabase ? await dataService.getPerformanceRunCounts() : {};
 
         // Derive custom field name suggestions from all vehicles' specs._custom objects
         const suggestions = {};
@@ -90,6 +94,7 @@ export function AppProvider({ children }) {
         setTags(tagsData);
         setManufacturers(manufacturersData);
         setChartHelp(chartHelpData);
+        setPerformanceCounts(perfCounts);
         setHeaderImageUrl(siteSettings.header_image_url || '');
         setLoading(false);
     }
@@ -1114,6 +1119,16 @@ export function AppProvider({ children }) {
         }
     };
 
+    /** Edit a session's own fields — its attribution, chiefly. */
+    const savePerformanceSession = async (row) => {
+        try {
+            return await dataService.savePerformanceSession(row);
+        } catch (error) {
+            showError('Save failed: ' + error.message);
+            throw error;
+        }
+    };
+
     const deletePerformanceSession = async (id) => {
         try {
             await dataService.deletePerformanceSession(id);
@@ -1321,9 +1336,11 @@ export function AppProvider({ children }) {
         updateEpaLabelMethod,
         updateEpaTestGroup,
         // Performance testing (acceleration / braking)
+        performanceCounts,
         getPerformanceSessions,
         getPerformanceSummaries,
         importPerformanceSession,
+        savePerformanceSession,
         deletePerformanceSession,
         savePerformanceSummary,
         deletePerformanceSummary,

@@ -15,12 +15,16 @@ import ImportVehiclesModal from './ImportVehiclesModal';
  * styling of Battery/Range rows. "Tests:" inherits the parent's text-sm color;
  * the type names are 1pt smaller and colored. Zero-count categories omitted.
  */
-function TestCountPills({ vehicle }) {
+function TestCountPills({ vehicle, performanceCounts = {} }) {
     const chargingCount = vehicle.runs?.filter(r => r.has_charging).length ?? 0;
     const rangeCount    = vehicle.runs?.filter(r => r.has_range).length    ?? 0;
     const epaCount      = vehicle.epa_mappings?.length                     ?? 0;
+    // Performance runs aren't on vehicle.runs — they live in their own tables
+    // and are counted by a separate query (see AppContext.performanceCounts).
+    const accelCount    = performanceCounts[vehicle.id]?.accel   ?? 0;
+    const brakingCount  = performanceCounts[vehicle.id]?.braking ?? 0;
 
-    if (!chargingCount && !rangeCount && !epaCount) return null;
+    if (!chargingCount && !rangeCount && !epaCount && !accelCount && !brakingCount) return null;
 
     return (
         <p className="flex flex-wrap items-baseline gap-x-1.5">
@@ -28,6 +32,8 @@ function TestCountPills({ vehicle }) {
             {chargingCount > 0 && <span className="text-[13px] font-medium text-green-600 dark:text-green-400">Charging ({chargingCount})</span>}
             {rangeCount    > 0 && <span className="text-[13px] font-medium text-amber-600 dark:text-amber-400">Range ({rangeCount})</span>}
             {epaCount      > 0 && <span className="text-[13px] font-medium text-blue-600 dark:text-blue-400">EPA ({epaCount})</span>}
+            {accelCount    > 0 && <span className="text-[13px] font-medium text-purple-600 dark:text-purple-400">Acceleration ({accelCount})</span>}
+            {brakingCount  > 0 && <span className="text-[13px] font-medium text-rose-600 dark:text-rose-400">Braking ({brakingCount})</span>}
         </p>
     );
 }
@@ -102,6 +108,7 @@ export default function VehiclesView({
 
     const {
         units, manufacturers, addManufacturer, isContributor, addSpecLink, deleteSpecLink, user,
+        performanceCounts,
     } = useAppContext();
 
     const {
@@ -790,7 +797,7 @@ export default function VehiclesView({
                                                 <div className="text-sm text-secondary space-y-1">
                                                     {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                                     {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
-                                                    <TestCountPills vehicle={vehicle} />
+                                                    <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
                                                 </div>
                                                 {vehicle.tags?.length > 0 && (
                                                     <div className="mt-2">
@@ -901,7 +908,7 @@ export default function VehiclesView({
                                         {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
                                         {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
                                         {vehicle.power && <p>Power: {vehicle.power} kW</p>}
-                                        <TestCountPills vehicle={vehicle} />
+                                        <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
                                     </div>
 
                                     {/* View Tests & Data — dedicated column */}

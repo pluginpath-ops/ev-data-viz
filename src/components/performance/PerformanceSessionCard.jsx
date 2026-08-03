@@ -8,6 +8,7 @@
  * session and materially affect the result.
  */
 import { useState } from 'react';
+import CuratorField from '../epa/CuratorField';
 import { groupByDriveMode } from '../../utils/performanceDerivations';
 
 const fmt = (v, dp = 1, suffix = '') =>
@@ -40,9 +41,28 @@ function Condition({ label, value }) {
     );
 }
 
-export default function PerformanceSessionCard({ session, canEdit, onDelete }) {
+export default function PerformanceSessionCard({ session, canEdit, onDelete, onSave }) {
     const [open, setOpen]         = useState(false);
     const [deleting, setDeleting] = useState(false);
+    // Attribution was previously fixed at import time, so a name typed wrong
+    // once could never be corrected. Buffered like the result card's fields.
+    const [editingSource, setEditingSource] = useState(false);
+    const [edits, setEdits] = useState({});
+    const [saving, setSaving] = useState(false);
+
+    const shown = (f) => (f in edits ? edits[f] : session[f]);
+    const dirty = Object.keys(edits).length > 0;
+
+    const saveSource = async () => {
+        setSaving(true);
+        try {
+            await onSave?.({ id: session.id, ...edits });
+            setEdits({});
+            setEditingSource(false);
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const runs = session.performance_runs || [];
     const isAccel = session.test_type === 'accel';
@@ -74,8 +94,60 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete }) {
                     {session.location_name && (
                         <div className="text-xs text-muted mt-0.5">{session.location_name}</div>
                     )}
-                    {session.source_name && (
-                        <div className="text-xs text-faint mt-0.5">{session.source_name}</div>
+                    {/* Attribution. source_url was captured on import but never
+                        shown until now — a session with no visible provenance is
+                        just a number you have to take on trust. */}
+                    <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium text-muted bg-[var(--color-surface-muted)] border-[var(--color-border)]">
+                            {shown('source_name') || 'Unattributed'}
+                        </span>
+                        {shown('source_url') && (
+                            <a
+                                href={shown('source_url')}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                            >
+                                source ↗
+                            </a>
+                        )}
+                        {canEdit && !editingSource && (
+                            <button
+                                type="button"
+                                onClick={() => setEditingSource(true)}
+                                className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                            >
+                                edit
+                            </button>
+                        )}
+                    </div>
+
+                    {editingSource && (
+                        <div className="mt-2 border rounded-lg p-2 border-[var(--color-border)] max-w-md">
+                            <CuratorField
+                                label="Source" value={shown('source_name')} canEdit
+                                overrideSource={'source_name' in edits ? 'pending' : undefined}
+                                placeholder="e.g. Out of Spec"
+                                onSave={(v) => setEdits(e => ({ ...e, source_name: v }))}
+                            />
+                            <CuratorField
+                                label="Source link" value={shown('source_url')} canEdit
+                                overrideSource={'source_url' in edits ? 'pending' : undefined}
+                                placeholder="https://…"
+                                onSave={(v) => setEdits(e => ({ ...e, source_url: v }))}
+                            />
+                            <div className="flex gap-2 mt-2">
+                                <button type="button" onClick={saveSource} disabled={saving || !dirty}
+                                    className="btn btn-primary text-[11px] py-0.5 px-2 disabled:opacity-50">
+                                    {saving ? 'Saving…' : 'Save'}
+                                </button>
+                                <button type="button" disabled={saving}
+                                    onClick={() => { setEdits({}); setEditingSource(false); }}
+                                    className="btn btn-secondary text-[11px] py-0.5 px-2">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
                     )}
                 </div>
                 {canEdit && (
