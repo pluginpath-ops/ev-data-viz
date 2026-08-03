@@ -1119,6 +1119,16 @@ export function AppProvider({ children }) {
         }
     };
 
+    /** Edit a session's own fields — its attribution, chiefly. */
+    const savePerformanceSession = async (row) => {
+        try {
+            return await dataService.savePerformanceSession(row);
+        } catch (error) {
+            showError('Save failed: ' + error.message);
+            throw error;
+        }
+    };
+
     const deletePerformanceSession = async (id) => {
         try {
             await dataService.deletePerformanceSession(id);
@@ -1330,6 +1340,7 @@ export function AppProvider({ children }) {
         getPerformanceSessions,
         getPerformanceSummaries,
         importPerformanceSession,
+        savePerformanceSession,
         deletePerformanceSession,
         savePerformanceSummary,
         deletePerformanceSummary,

@@ -94,15 +94,15 @@ export default function PerformanceSummaryCard({
             <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="min-w-0 flex-1">
                     <div className="font-semibold text-sm truncate">
-                        {summary.source_name || <span className="text-faint italic">Unattributed source</span>}
+                        {shown('source_name') || <span className="text-faint italic">Unattributed source</span>}
                         {dirty && (
                             <span className="ml-2 text-amber-500 text-[10px] font-normal" title="Unsaved edits">
                                 ● unsaved
                             </span>
                         )}
                     </div>
-                    {summary.trim_label && (
-                        <div className="text-xs text-muted mt-0.5">{summary.trim_label}</div>
+                    {shown('trim_label') && (
+                        <div className="text-xs text-muted mt-0.5">{shown('trim_label')}</div>
                     )}
                 </div>
                 {canEdit && (
@@ -138,8 +138,19 @@ export default function PerformanceSummaryCard({
                 onDelete={onDeleteInterval}
             />
 
-            {/* Source links — the provenance for figures with no backing data */}
+            {/* Attribution and links. Editable here rather than only at creation —
+                a name typed wrong once was otherwise permanent. */}
             <div className="mt-2 pt-2 border-t border-[var(--color-border)] grid grid-cols-1 sm:grid-cols-2 gap-x-6 text-xs">
+                <CuratorField
+                    label="Source" value={shown('source_name')} canEdit={canEdit}
+                    overrideSource={mark('source_name')}
+                    placeholder="e.g. Car and Driver" onSave={buffer('source_name')}
+                />
+                <CuratorField
+                    label="Trim / config" value={shown('trim_label')} canEdit={canEdit}
+                    overrideSource={mark('trim_label')}
+                    placeholder="e.g. Dual Standard LFP" onSave={buffer('trim_label')}
+                />
                 <CuratorField
                     label="Source link" value={shown('source_url')} canEdit={canEdit}
                     overrideSource={mark('source_url')}

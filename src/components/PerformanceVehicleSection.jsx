@@ -30,6 +30,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
         getPerformanceSessions,
         getPerformanceSummaries,
         importPerformanceSession,
+        savePerformanceSession,
         deletePerformanceSession,
         savePerformanceSummary,
         deletePerformanceSummary,
@@ -88,6 +89,11 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
 
     const handleImport = async (vehicleId, parsed, meta) => {
         await importPerformanceSession(vehicleId, parsed, meta);
+        reload();
+    };
+
+    const handleSaveSession = async (row) => {
+        await savePerformanceSession(row);
         reload();
     };
 
@@ -163,6 +169,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                         session={s}
                         canEdit={canEdit}
                         onDelete={handleDeleteSession}
+                        onSave={handleSaveSession}
                     />
                 ))
             )}
