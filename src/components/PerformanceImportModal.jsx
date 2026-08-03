@@ -8,8 +8,10 @@
  */
 import { useState } from 'react';
 import { parsePerformanceCSV } from '../utils/parsePerformanceCSV';
+import { useAppContext } from '../context/AppContext';
 
-export default function PerformanceImportModal({ vehicle, onImport, onClose }) {
+export default function PerformanceImportModal({ vehicle, onImport, onMerge, onClose }) {
+    const { findMatchingPerformanceRuns } = useAppContext();
     const [parsed, setParsed]     = useState(null);
     const [fileName, setFileName] = useState(null);
     const [testType, setTestType] = useState('accel');
@@ -17,15 +19,23 @@ export default function PerformanceImportModal({ vehicle, onImport, onClose }) {
     const [sourceUrl, setSourceUrl] = useState('');
     const [busy, setBusy]         = useState(false);
     const [error, setError]       = useState(null);
+    // Non-null when this file describes runs already stored — see below.
+    const [match, setMatch]       = useState(null);
 
     const handleFile = async (file) => {
         if (!file) return;
         setError(null);
         setParsed(null);
         setFileName(file.name);
+        setMatch(null);
         try {
             const result = await parsePerformanceCSV(file, { testType });
             setParsed(result);
+            // Draggy exports one file per metric set for the SAME physical runs,
+            // with identical timestamps. Importing the second as a new session
+            // would duplicate every run, so look for an overlap first.
+            const found = await findMatchingPerformanceRuns(vehicle.id, result.runs);
+            if (found?.matched > 0) setMatch(found);
         } catch (e) {
             setError(e?.message || 'Could not parse this file.');
         }
@@ -36,10 +46,14 @@ export default function PerformanceImportModal({ vehicle, onImport, onClose }) {
         setBusy(true);
         setError(null);
         try {
-            await onImport(vehicle.id, parsed, {
-                sourceName: sourceName.trim() || null,
-                sourceUrl: sourceUrl.trim() || null,
-            });
+            if (match) {
+                await onMerge(match, parsed.runs);
+            } else {
+                await onImport(vehicle.id, parsed, {
+                    sourceName: sourceName.trim() || null,
+                    sourceUrl: sourceUrl.trim() || null,
+                });
+            }
             onClose();
         } catch (e) {
             setError(e?.message || 'Import failed.');
@@ -107,10 +121,36 @@ export default function PerformanceImportModal({ vehicle, onImport, onClose }) {
                 {fileName && <p className="text-[11px] text-faint mt-1">{fileName}</p>}
                 {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
 
+                {match && (
+                    <div className="mt-3 border rounded-lg p-3 border-amber-500/40 bg-amber-500/5">
+                        <div className="text-sm font-semibold text-amber-600 dark:text-amber-400 mb-1">
+                            These runs are already here
+                        </div>
+                        <p className="text-xs text-muted">
+                            {match.matched} of {parsed?.runs.length} runs match an existing session by
+                            timestamp{match.session.tested_at ? ` (${String(match.session.tested_at).replace('T', ' ')})` : ''}.
+                            Testing apps export one file per metric set for the same physical runs, so
+                            this will be <span className="font-semibold">added to those runs</span> rather
+                            than creating a second session. Splits already present are skipped, so
+                            re-importing the same file changes nothing.
+                        </p>
+                        {match.unmatched.length > 0 && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                {match.unmatched.length} run(s) in this file have no match and will be
+                                left out — import them separately if they belong to another session.
+                            </p>
+                        )}
+                    </div>
+                )}
+
                 {parsed && (
                     <div className="mt-3 border rounded-lg p-3 border-[var(--color-border)]">
                         <div className="font-semibold text-sm mb-1">
                             {parsed.runs.length} run{parsed.runs.length === 1 ? '' : 's'} found
+                            <span className="text-faint font-normal ml-2 text-xs">
+                                {parsed.format === 'distance' ? 'distance splits' :
+                                 parsed.format === 'mixed' ? 'speed + distance splits' : 'speed splits'}
+                            </span>
                         </div>
                         <div className="text-xs text-muted mb-2">
                             {session.locationName && <>{session.locationName} · </>}
@@ -123,8 +163,12 @@ export default function PerformanceImportModal({ vehicle, onImport, onClose }) {
                             <thead>
                                 <tr className="text-faint text-[10px] uppercase tracking-wide">
                                     <th className="text-left font-semibold py-1">Drive mode</th>
-                                    <th className="text-right font-semibold py-1">0–60</th>
-                                    <th className="text-right font-semibold py-1">0–60 (1ft)</th>
+                                    <th className="text-right font-semibold py-1">
+                                        {parsed.format === 'distance' ? '¼ mile' : '0–60'}
+                                    </th>
+                                    <th className="text-right font-semibold py-1">
+                                        {parsed.format === 'distance' ? 'trap' : '0–60 (1ft)'}
+                                    </th>
                                     <th className="text-right font-semibold py-1">Max g</th>
                                     <th className="text-right font-semibold py-1">Splits</th>
                                 </tr>
@@ -134,10 +178,14 @@ export default function PerformanceImportModal({ vehicle, onImport, onClose }) {
                                     <tr key={r.sequence} className="border-t border-[var(--color-border)]">
                                         <td className="py-0.5 text-muted truncate max-w-[12rem]">{r.driveMode || '—'}</td>
                                         <td className="py-0.5 text-right font-mono">
-                                            {r.zeroTo60Sec != null ? r.zeroTo60Sec.toFixed(3) : '—'}
+                                            {parsed.format === 'distance'
+                                                ? (r.quarterMileSec != null ? r.quarterMileSec.toFixed(3) : '—')
+                                                : (r.zeroTo60Sec != null ? r.zeroTo60Sec.toFixed(3) : '—')}
                                         </td>
                                         <td className="py-0.5 text-right font-mono text-muted">
-                                            {r.zeroTo60RolloutSec != null ? r.zeroTo60RolloutSec.toFixed(3) : '—'}
+                                            {parsed.format === 'distance'
+                                                ? (r.quarterMileTrapMph != null ? `${r.quarterMileTrapMph} mph` : '—')
+                                                : (r.zeroTo60RolloutSec != null ? r.zeroTo60RolloutSec.toFixed(3) : '—')}
                                         </td>
                                         <td className="py-0.5 text-right font-mono">
                                             {r.maxGForce != null ? r.maxGForce.toFixed(3) : '—'}
@@ -165,7 +213,9 @@ export default function PerformanceImportModal({ vehicle, onImport, onClose }) {
                         type="button" onClick={handleImport} disabled={!parsed || busy}
                         className="btn btn-primary text-sm disabled:opacity-50"
                     >
-                        {busy ? 'Importing…' : `Import ${parsed?.runs.length || ''} run${parsed?.runs.length === 1 ? '' : 's'}`}
+                        {busy ? 'Working…'
+                            : match ? `Add splits to ${match.matched} existing run${match.matched === 1 ? '' : 's'}`
+                            : `Import ${parsed?.runs.length || ''} run${parsed?.runs.length === 1 ? '' : 's'}`}
                     </button>
                     <button type="button" onClick={onClose} disabled={busy} className="btn btn-secondary text-sm">
                         Cancel

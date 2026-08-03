@@ -30,6 +30,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
         getPerformanceSessions,
         getPerformanceSummaries,
         importPerformanceSession,
+        mergePerformanceSplits,
         savePerformanceSession,
         deletePerformanceSession,
         savePerformanceSummary,
@@ -89,6 +90,11 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
 
     const handleImport = async (vehicleId, parsed, meta) => {
         await importPerformanceSession(vehicleId, parsed, meta);
+        reload();
+    };
+
+    const handleMerge = async (match, parsedRuns) => {
+        await mergePerformanceSplits(match, parsedRuns);
         reload();
     };
 
@@ -259,6 +265,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                 <PerformanceImportModal
                     vehicle={vehicle}
                     onImport={handleImport}
+                    onMerge={handleMerge}
                     onClose={() => setShowImport(false)}
                 />
             )}

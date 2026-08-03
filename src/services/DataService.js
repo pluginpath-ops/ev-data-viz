@@ -1569,6 +1569,86 @@ class DataService {
     return out;
   }
 
+  /**
+   * Find the existing runs a parsed export describes, if any.
+   *
+   * A Draggy session is exported once per metric set — speed-threshold splits
+   * in one file, distance splits in another — for the SAME physical runs. Both
+   * carry identical wall-clock timestamps, which makes run_at an exact match
+   * key. Importing the second file as a new session would duplicate every run.
+   *
+   * @returns {Promise<{session, matches: Map<string, object>, matched: number,
+   *                    unmatched: string[]}|null>} null when nothing lines up
+   */
+  async findMatchingPerformanceRuns(vehicleId, parsedRuns) {
+    if (!this.useSupabase) return null;
+    const stamps = parsedRuns.map(r => r.runAt).filter(Boolean);
+    if (stamps.length === 0) return null;
+
+    const sessions = await this.getPerformanceSessions(vehicleId);
+    let best = null;
+    for (const session of sessions) {
+      const byStamp = new Map();
+      for (const run of session.performance_runs || []) {
+        if (run.run_at) byStamp.set(String(run.run_at), run);
+      }
+      const matched = stamps.filter(s => byStamp.has(String(s)));
+      if (matched.length === 0) continue;
+      if (!best || matched.length > best.matched) {
+        best = {
+          session,
+          matches: byStamp,
+          matched: matched.length,
+          unmatched: stamps.filter(s => !byStamp.has(String(s))),
+        };
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Layer a second export's splits onto runs that already exist.
+   *
+   * Only adds points whose label isn't already on the run, so re-importing the
+   * same file is a no-op rather than a duplicate ladder. Sequence numbers
+   * continue from the highest already stored, since (run_id, sequence) is
+   * unique.
+   *
+   * @returns {Promise<{runsUpdated: number, pointsAdded: number}>}
+   */
+  async mergePerformanceSplits(match, parsedRuns) {
+    if (!this.useSupabase || !this.user) throw new Error('Must be logged in to import.');
+    let runsUpdated = 0, pointsAdded = 0;
+
+    for (const parsed of parsedRuns) {
+      const existing = match.matches.get(String(parsed.runAt));
+      if (!existing || !parsed.splits?.length) continue;
+
+      const have = new Set((existing.performance_run_points || []).map(p => p.label));
+      const fresh = parsed.splits.filter(sp => !have.has(sp.label));
+      if (fresh.length === 0) continue;
+
+      let seq = (existing.performance_run_points || [])
+        .reduce((m, p) => Math.max(m, p.sequence ?? 0), -1) + 1;
+
+      const rows = fresh.map(sp => ({
+        run_id: existing.id,
+        sequence: seq++,
+        label: sp.label ?? null,
+        speed_mph: sp.speedMph ?? null,
+        elapsed_s: sp.elapsedS ?? null,
+        distance_ft: sp.distanceFt ?? null,
+      }));
+      const { error } = await getSupabase().from('performance_run_points').insert(rows);
+      if (error) throw error;
+
+      pointsAdded += rows.length;
+      runsUpdated += 1;
+    }
+
+    return { runsUpdated, pointsAdded };
+  }
+
   /** Insert (no id) or update (with id) a session. Returns the saved row. */
   async savePerformanceSession(row) {
     if (!this.useSupabase) return null;
