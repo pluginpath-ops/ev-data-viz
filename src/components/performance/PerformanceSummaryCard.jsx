@@ -26,6 +26,10 @@ const FIELDS = [
         key: 'zero_to_60_rollout_sec', label: '0–60 (1ft)', unit: 's', step: '0.001',
         tooltip: 'The 1-foot-rollout figure, drag-strip convention — about 0.3 s quicker than the no-rollout time. The two are not interchangeable.',
     },
+    {
+        key: 'zero_to_100_sec', label: '0–100 mph', unit: 's', step: '0.001',
+        tooltip: 'Time to 100 mph, on whichever rollout convention the source uses for its 0–60.',
+    },
     { key: 'quarter_mile_sec',      label: '¼ mile',       unit: 's',   step: '0.001' },
     { key: 'quarter_mile_trap_mph', label: '¼ mile trap',  unit: 'mph', step: '0.01'  },
     {

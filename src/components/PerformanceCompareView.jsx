@@ -24,6 +24,7 @@ import {
 const SCALAR_METRICS = [
     { key: 'zero_to_60_sec',         label: '0–60 mph (no rollout)', unit: 's',   lowerIsBetter: true  },
     { key: 'zero_to_60_rollout_sec', label: '0–60 mph (1 ft)',        unit: 's',   lowerIsBetter: true  },
+    { key: 'zero_to_100_sec',        label: '0–100 mph',              unit: 's',   lowerIsBetter: true  },
     { key: 'quarter_mile_sec',       label: '¼ mile',                 unit: 's',   lowerIsBetter: true  },
     { key: 'quarter_mile_trap_mph',  label: '¼ mile trap',            unit: 'mph', lowerIsBetter: false },
 ];

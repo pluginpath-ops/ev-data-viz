@@ -50,7 +50,7 @@ export const GRADE_FLAG_PCT = 1.0;
  * exception — higher is quicker.
  */
 const LOWER_IS_BETTER = new Set([
-    'zero_to_60_sec', 'zero_to_60_rollout_sec', 'quarter_mile_sec',
+    'zero_to_60_sec', 'zero_to_60_rollout_sec', 'zero_to_100_sec', 'quarter_mile_sec',
 ]);
 
 // ── Session / run flattening ────────────────────────────────────────────────
@@ -320,12 +320,11 @@ export function deriveTested(sessions, summaries, field) {
 // ── Synthetic curves from headline figures ──────────────────────────────────
 
 /**
- * Well-known acceleration windows worth naming rather than leaving buried in a
- * generic speed-window list. Keys match `windowKey()` output.
+ * Windows surfaced as named metrics rather than left in the generic list.
+ * Empty since 0-100 became a promoted column — kept as the hook for the next
+ * fixed window that earns promotion.
  */
-export const PINNED_WINDOWS = [
-    { key: 'accel:0-100mph', label: '0–100 mph', kind: 'accel', lowerIsBetter: true },
-];
+export const PINNED_WINDOWS = [];
 
 /**
  * Reconstruct a speed-vs-time curve from a source's headline figures, for
@@ -370,10 +369,11 @@ export function buildSyntheticCurve(summary) {
         if (rollout == null && qtrSec != null) flags.push('mixed-rollout');
     }
 
-    // 0-100 lives as an accel speed window, not a promoted column.
-    const hundred = intervals.find(iv =>
+    // 0-100 is a promoted column (migration 042); the interval lookup is kept
+    // for anyone who entered it as a speed window before that existed.
+    const legacyHundred = intervals.find(iv =>
         iv.kind === 'accel' && Number(iv.to_speed) === 100 && Number(iv.from_speed) === 0);
-    const t100 = hundred ? num(hundred.elapsed_s) : null;
+    const t100 = num(summary.zero_to_100_sec) ?? (legacyHundred ? num(legacyHundred.elapsed_s) : null);
     if (t100 != null) basis.push('0–100');
 
     const points = [{ x: 0, y: 0 }];
@@ -435,6 +435,7 @@ export function resolveMetric(vehicle, sessions, summaries, field) {
 export const PERFORMANCE_METRICS = [
     { field: 'zero_to_60_sec',         label: '0–60 mph',        unit: 's',   note: 'no rollout' },
     { field: 'zero_to_60_rollout_sec', label: '0–60 mph',        unit: 's',   note: '1 ft rollout' },
+    { field: 'zero_to_100_sec',        label: '0–100 mph',       unit: 's' },
     { field: 'quarter_mile_sec',       label: '¼ mile',          unit: 's' },
     { field: 'quarter_mile_trap_mph',  label: '¼ mile trap',     unit: 'mph' },
 ];
