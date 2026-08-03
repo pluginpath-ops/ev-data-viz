@@ -1128,12 +1128,13 @@ export function AppProvider({ children }) {
      * Save a reported result. Refreshes vehicles because summaries ride along on
      * the vehicle record and feed the comparison charts.
      */
+    // These do NOT refresh the vehicles list. Summaries aren't embedded in
+    // getVehicles (see the note there), so refetching every vehicle on each
+    // field blur would cost a full reload and change nothing on screen — the
+    // performance section owns and reloads its own data.
     const savePerformanceSummary = async (row) => {
         try {
-            const saved = await dataService.savePerformanceSummary(row);
-            const updated = await dataService.getVehicles();
-            setVehicles(updated);
-            return saved;
+            return await dataService.savePerformanceSummary(row);
         } catch (error) {
             showError('Save failed: ' + error.message);
             throw error;
@@ -1143,8 +1144,6 @@ export function AppProvider({ children }) {
     const deletePerformanceSummary = async (id) => {
         try {
             await dataService.deletePerformanceSummary(id);
-            const updated = await dataService.getVehicles();
-            setVehicles(updated);
             showSuccess('Result deleted.');
         } catch (error) {
             showError('Delete failed: ' + error.message);
@@ -1154,10 +1153,7 @@ export function AppProvider({ children }) {
 
     const savePerformanceInterval = async (row) => {
         try {
-            const saved = await dataService.savePerformanceInterval(row);
-            const updated = await dataService.getVehicles();
-            setVehicles(updated);
-            return saved;
+            return await dataService.savePerformanceInterval(row);
         } catch (error) {
             showError('Save failed: ' + error.message);
             throw error;
@@ -1167,8 +1163,6 @@ export function AppProvider({ children }) {
     const deletePerformanceInterval = async (id) => {
         try {
             await dataService.deletePerformanceInterval(id);
-            const updated = await dataService.getVehicles();
-            setVehicles(updated);
         } catch (error) {
             showError('Delete failed: ' + error.message);
             throw error;

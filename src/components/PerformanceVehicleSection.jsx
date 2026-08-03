@@ -28,6 +28,7 @@ const SECTION_HELP =
 export default function PerformanceVehicleSection({ vehicle, canEdit }) {
     const {
         getPerformanceSessions,
+        getPerformanceSummaries,
         importPerformanceSession,
         deletePerformanceSession,
         savePerformanceSummary,
@@ -47,28 +48,33 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
     const [newTrim, setNewTrim]     = useState('');
     const [creating, setCreating]   = useState(false);
 
-    // Summaries ride along on the vehicle record (they feed the comparison
-    // charts); sessions are fetched per vehicle since they're only needed here.
-    const summaries = vehicle?.performance_summaries ?? [];
+    // Summaries are fetched here rather than read off the vehicle record:
+    // getVehicles() deliberately does NOT embed them, because a nested select
+    // against a table that doesn't exist yet fails the whole vehicles query and
+    // blanks the app (see the note in DataService.getVehicles).
+    const [summaries, setSummaries] = useState([]);
 
     // AppContext rebuilds its value object every render, so every function it
     // hands out is a new identity each time. Depending on one directly would
     // re-fire this effect on every context render — refetching constantly and
     // flickering the panel. Read it through a ref so the effect depends only on
     // what actually changes: the vehicle, and an explicit reload.
-    const getSessionsRef = useRef(getPerformanceSessions);
-    getSessionsRef.current = getPerformanceSessions;
+    const fetchersRef = useRef(null);
+    fetchersRef.current = { getPerformanceSessions, getPerformanceSummaries };
 
     useEffect(() => {
-        if (!vehicle?.id) { setSessions([]); setLoaded(true); return; }
+        if (!vehicle?.id) { setSessions([]); setSummaries([]); setLoaded(true); return; }
         // Guards against a slow response for a previous vehicle landing after a
         // faster one for the vehicle now on screen.
         let cancelled = false;
         setLoaded(false);
         (async () => {
             try {
-                const rows = await getSessionsRef.current(vehicle.id);
-                if (!cancelled) setSessions(rows);
+                const [s, sum] = await Promise.all([
+                    fetchersRef.current.getPerformanceSessions(vehicle.id),
+                    fetchersRef.current.getPerformanceSummaries(vehicle.id),
+                ]);
+                if (!cancelled) { setSessions(s); setSummaries(sum); }
             } finally {
                 if (!cancelled) setLoaded(true);
             }
@@ -76,16 +82,18 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
         return () => { cancelled = true; };
     }, [vehicle?.id, reloadToken]);
 
-    const reloadSessions = () => setReloadToken(t => t + 1);
+    /** Re-run the fetch effect. Every mutation below routes through this, since
+     *  this component owns the sessions and summaries lists. */
+    const reload = () => setReloadToken(t => t + 1);
 
     const handleImport = async (vehicleId, parsed, meta) => {
         await importPerformanceSession(vehicleId, parsed, meta);
-        reloadSessions();
+        reload();
     };
 
     const handleDeleteSession = async (id) => {
         await deletePerformanceSession(id);
-        reloadSessions();
+        reload();
     };
 
     const handleAddResult = async () => {
@@ -99,13 +107,31 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
             setNewSource('');
             setNewTrim('');
             setAddingResult(false);
+            reload();
         } finally {
             setCreating(false);
         }
     };
 
-    const saveSummaryField = (id, field, value) =>
-        savePerformanceSummary({ id, [field]: value });
+    const saveSummaryField = async (id, field, value) => {
+        await savePerformanceSummary({ id, [field]: value });
+        reload();
+    };
+
+    const handleDeleteSummary = async (id) => {
+        await deletePerformanceSummary(id);
+        reload();
+    };
+
+    const handleSaveInterval = async (row) => {
+        await savePerformanceInterval(row);
+        reload();
+    };
+
+    const handleDeleteInterval = async (id) => {
+        await deletePerformanceInterval(id);
+        reload();
+    };
 
     return (
         <div className="mt-6">
@@ -165,9 +191,9 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                         summary={s}
                         canEdit={canEdit}
                         onSaveField={saveSummaryField}
-                        onDelete={deletePerformanceSummary}
-                        onSaveInterval={savePerformanceInterval}
-                        onDeleteInterval={deletePerformanceInterval}
+                        onDelete={handleDeleteSummary}
+                        onSaveInterval={handleSaveInterval}
+                        onDeleteInterval={handleDeleteInterval}
                     />
                 ))
             )}
