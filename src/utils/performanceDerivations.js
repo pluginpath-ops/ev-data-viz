@@ -333,10 +333,13 @@ export const PINNED_WINDOWS = [];
  * Points come from whatever exists:
  *   (0, 0)                          every launch starts from rest
  *   (t 0-60,  60)
- *   (t 0-100, 100)                  from an accel 0-100 speed window
+ *   (t 0-100, 100)
  *   (¼-mile ET, ¼-mile trap speed)  trap IS the speed at the ¼-mile mark, so
  *                                   the ET/trap pair is a genuine (time, speed)
  *                                   point rather than a derived guess
+ *   every other FROM-REST accel window (0-130, 0-150, …), which is where the
+ *   top end of the curve comes from — rolling starts are excluded, since they
+ *   begin at speed and don't share the from-rest clock
  *
  * ── ROLLOUT, WHICH DECIDES WHETHER THIS IS HONEST ───────────────────────────
  *
@@ -369,11 +372,23 @@ export function buildSyntheticCurve(summary) {
         if (rollout == null && qtrSec != null) flags.push('mixed-rollout');
     }
 
-    // 0-100 is a promoted column (migration 042); the interval lookup is kept
-    // for anyone who entered it as a speed window before that existed.
-    const legacyHundred = intervals.find(iv =>
-        iv.kind === 'accel' && Number(iv.to_speed) === 100 && Number(iv.from_speed) === 0);
-    const t100 = num(summary.zero_to_100_sec) ?? (legacyHundred ? num(legacyHundred.elapsed_s) : null);
+    // Every acceleration window measured FROM REST is a point on this curve —
+    // 0-130, 0-150, whatever the source published. Rolling starts (5-60 and the
+    // like) are excluded: they begin at speed, so plotting their elapsed time
+    // against the from-rest clock would place them far to the left of where the
+    // car actually was.
+    const fromRest = (intervals || [])
+        .filter(iv => iv.kind === 'accel'
+            && Number(iv.from_speed) === 0
+            && num(iv.elapsed_s) != null
+            && num(iv.to_speed) != null)
+        .map(iv => ({ x: num(iv.elapsed_s), y: num(iv.to_speed) }));
+
+    // 0-100 is a promoted column (migration 042); the interval form is still
+    // honoured for anything entered before that existed.
+    const t100 = num(summary.zero_to_100_sec)
+        ?? fromRest.find(p => p.y === 100)?.x
+        ?? null;
     if (t100 != null) basis.push('0–100');
 
     const points = [{ x: 0, y: 0 }];
@@ -382,6 +397,16 @@ export function buildSyntheticCurve(summary) {
     if (qtrSec != null && qtrTrap != null) {
         points.push({ x: qtrSec, y: qtrTrap });
         basis.push('¼ mile @ trap');
+    }
+
+    // Add the remaining from-rest windows, skipping speeds a column already
+    // supplied so one figure entered twice doesn't become two stacked points.
+    const extras = fromRest
+        .filter(p => !points.some(q => q.y === p.y))
+        .sort((a, b) => a.y - b.y);
+    for (const p of extras) {
+        points.push(p);
+        basis.push(`0–${p.y}`);
     }
 
     if (points.length < 3) return null;   // origin plus one point is a line, not a curve
