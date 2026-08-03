@@ -1127,9 +1127,18 @@ export function AppProvider({ children }) {
     const mergePerformanceSplits = async (match, parsedRuns) => {
         try {
             const res = await dataService.mergePerformanceSplits(match, parsedRuns);
-            showSuccess(res.pointsAdded === 0
-                ? 'Those splits were already on these runs — nothing to add.'
-                : `Added ${res.pointsAdded} splits across ${res.runsUpdated} existing runs.`);
+            if (res.pointsAdded > 0) {
+                showSuccess(`Added ${res.pointsAdded} splits across ${res.runsUpdated} existing runs.`);
+            } else {
+                // A no-op is NOT a success. Say which step produced nothing, so
+                // "it said it worked but nothing appeared" can't happen again.
+                const why =
+                    res.runsMatched === 0   ? 'none of the runs in this file matched by timestamp'
+                  : res.splitsSeen === 0    ? 'no splits were found in the file — the format may not be recognised'
+                  : res.alreadyPresent > 0  ? 'every split in this file is already on these runs'
+                  : 'the file produced no new splits';
+                showError(`Nothing was added: ${why}.`);
+            }
             return res;
         } catch (error) {
             showError('Merge failed: ' + error.message);

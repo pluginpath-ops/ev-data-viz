@@ -1619,13 +1619,20 @@ class DataService {
   async mergePerformanceSplits(match, parsedRuns) {
     if (!this.useSupabase || !this.user) throw new Error('Must be logged in to import.');
     let runsUpdated = 0, pointsAdded = 0;
+    // Counted so a no-op can say WHICH step produced nothing.
+    let runsSeen = 0, runsMatched = 0, splitsSeen = 0, alreadyPresent = 0;
 
     for (const parsed of parsedRuns) {
+      runsSeen += 1;
+      splitsSeen += parsed.splits?.length ?? 0;
       const existing = match.matches.get(String(parsed.runAt));
-      if (!existing || !parsed.splits?.length) continue;
+      if (!existing) continue;
+      runsMatched += 1;
+      if (!parsed.splits?.length) continue;
 
       const have = new Set((existing.performance_run_points || []).map(p => p.label));
       const fresh = parsed.splits.filter(sp => !have.has(sp.label));
+      alreadyPresent += parsed.splits.length - fresh.length;
       if (fresh.length === 0) continue;
 
       let seq = (existing.performance_run_points || [])
@@ -1639,14 +1646,18 @@ class DataService {
         elapsed_s: sp.elapsedS ?? null,
         distance_ft: sp.distanceFt ?? null,
       }));
-      const { error } = await getSupabase().from('performance_run_points').insert(rows);
+      // .select() so the count is what the database actually stored, not what
+      // we hoped it would. A merge that silently writes nothing is worse than
+      // one that fails, because it looks like it worked.
+      const { data: inserted, error } = await getSupabase()
+        .from('performance_run_points').insert(rows).select();
       if (error) throw error;
 
-      pointsAdded += rows.length;
+      pointsAdded += inserted?.length ?? 0;
       runsUpdated += 1;
     }
 
-    return { runsUpdated, pointsAdded };
+    return { runsUpdated, pointsAdded, runsSeen, runsMatched, splitsSeen, alreadyPresent };
   }
 
   /** Insert (no id) or update (with id) a session. Returns the saved row. */

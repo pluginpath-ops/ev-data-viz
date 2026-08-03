@@ -77,7 +77,12 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                         <span className="text-muted block mb-0.5">Test type</span>
                         <select
                             value={testType}
-                            onChange={e => { setTestType(e.target.value); setParsed(null); setFileName(null); }}
+                            onChange={e => {
+                                // Clear the match too — leaving it set with no parse
+                                // means a stale overlap is carried into the next file.
+                                setTestType(e.target.value);
+                                setParsed(null); setFileName(null); setMatch(null);
+                            }}
                             className="form-input text-xs py-1 w-32"
                         >
                             <option value="accel">Acceleration</option>
@@ -195,6 +200,10 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                                 ))}
                             </tbody>
                         </table>
+
+                        <p className="text-[10px] text-faint mt-2">
+                            Splits found per run: {parsed.runs[0]?.splits.map(s => s.label).join(', ') || 'none'}
+                        </p>
 
                         {parsed.warnings.length > 0 && (
                             <ul className="mt-2 text-[11px] text-amber-600 dark:text-amber-400 list-disc list-inside">
