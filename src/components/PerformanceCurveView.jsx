@@ -21,14 +21,12 @@ import PerformanceRunSelector from './performance/PerformanceRunSelector';
 import { buildSyntheticCurve } from '../utils/performanceDerivations';
 import { resolveChartColors } from '../utils/colorUtils';
 import ChartExportButtons from './ChartExportButtons';
-import { useAppContext } from '../context/AppContext';
 
 /** Okabe-Ito, matching the palette the other charts use for run colours. */
 const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
 
 export default function PerformanceCurveView({ vehicles, selectedVehicleIds, presentationMode }) {
     const { isDark } = useTheme();
-    const { updatePerformanceRunColor } = useAppContext();
     const canvasRef  = useRef(null);
     const chartRef   = useRef(null);
 
@@ -46,8 +44,12 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     // Only consulted when grouping is 'all'; null means "not curated yet", which
     // shows everything rather than an empty chart on first switch.
     const [pickedRunIds, setPickedRunIds] = useState(null);
-    // Colour picks applied immediately in the chart and saved in the background,
-    // so the line changes as you drag the picker rather than after a round trip.
+    // Colour picks are LOCAL TO THIS VIEW and deliberately not written to the
+    // database. Recolouring a line to read a chart is a viewing preference, not
+    // a change to the data — and persisting it would need contributor rights,
+    // so a signed-out visitor would recolour a line, see it change, and have it
+    // silently revert on reload. Anyone can recolour here; nobody's choice
+    // leaks onto anyone else's view.
     const [colorEdits, setColorEdits] = useState({});
 
     const selected = useMemo(
@@ -107,13 +109,17 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     const colorMap = useMemo(() => {
         const runs = (sessionsByVehicle ? Object.values(sessionsByVehicle).flat() : [])
             .flatMap(s => s.performance_runs || [])
-            .map(r => ({ id: r.id, color: colorEdits[r.id] ?? r.color, created_at: r.created_at }));
+            .map(r => ({ id: r.id, color: colorEdits[r.id] ?? null, created_at: r.created_at }));
         return resolveChartColors(runs, colorEdits, 'manual');
     }, [sessionsByVehicle, colorEdits]);
 
     const handleRunColor = (runId, hex) => {
-        setColorEdits(prev => ({ ...prev, [runId]: hex }));
-        updatePerformanceRunColor(runId, hex).catch(() => {});
+        setColorEdits(prev => {
+            const next = { ...prev };
+            // null clears the pick and hands the run back to the auto palette.
+            if (hex == null) delete next[runId]; else next[runId] = hex;
+            return next;
+        });
     };
 
     /**
@@ -443,6 +449,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             onChange={setPickedRunIds}
                             colorMap={colorMap}
                             onUpdateColor={handleRunColor}
+                            colorPicked={id => id in colorEdits}
                         />
                     </div>
                 )}

@@ -1119,16 +1119,6 @@ export function AppProvider({ children }) {
         }
     };
 
-    /** Set a performance run's chart colour. */
-    const updatePerformanceRunColor = async (runId, color) => {
-        try {
-            await dataService.updatePerformanceRunColor(runId, color);
-        } catch (error) {
-            showError('Could not save colour: ' + error.message);
-            throw error;
-        }
-    };
-
     /** Which existing runs, if any, a parsed export already describes. */
     const findMatchingPerformanceRuns = (vehicleId, parsedRuns) =>
         dataService.findMatchingPerformanceRuns(vehicleId, parsedRuns);
@@ -1379,7 +1369,6 @@ export function AppProvider({ children }) {
         importPerformanceSession,
         findMatchingPerformanceRuns,
         mergePerformanceSplits,
-        updatePerformanceRunColor,
         savePerformanceSession,
         deletePerformanceSession,
         savePerformanceSummary,

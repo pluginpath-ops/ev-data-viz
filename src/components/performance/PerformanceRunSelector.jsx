@@ -21,6 +21,7 @@ export default function PerformanceRunSelector({
     onChange,           // (nextIds: array) => void
     colorMap = {},      // resolved colour per run id, for the swatch
     onUpdateColor,       // (runId, hex|null) => void; omit to hide the pickers
+    colorPicked,         // (runId) => bool — has this run been recoloured here?
 }) {
     const [expanded, setExpanded] = useState(false);
     const [collapsed, setCollapsed] = useState({});
@@ -128,7 +129,7 @@ export default function PerformanceRunSelector({
                                                                     {Number(run.zeroTo60).toFixed(3)} s
                                                                 </span>
                                                             )}
-                                                            {onUpdateColor && run.color && (
+                                                            {onUpdateColor && colorPicked?.(run.id) && (
                                                                 <button
                                                                     type="button"
                                                                     onClick={e => { e.preventDefault(); onUpdateColor(run.id, null); }}
