@@ -28,6 +28,8 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     const [sessionsByVehicle, setSessionsByVehicle] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showAllRuns, setShowAllRuns] = useState(false);
+    const [xMax, setXMax] = useState('');   // '' = auto-scale
+    const [yMax, setYMax] = useState('');
 
     const selected = useMemo(
         () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
@@ -171,12 +173,14 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     x: {
                         type: 'linear',
                         beginAtZero: true,
+                        ...(Number(xMax) > 0 ? { max: Number(xMax) } : {}),
                         grid: { color: grid },
                         ticks: { color: tick },
                         title: { display: true, text: 'Elapsed time (s)', color: tick },
                     },
                     y: {
                         beginAtZero: true,
+                        ...(Number(yMax) > 0 ? { max: Number(yMax) } : {}),
                         grid: { color: grid },
                         ticks: { color: tick },
                         title: { display: true, text: 'Speed (mph)', color: tick },
@@ -186,42 +190,90 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         });
 
         return () => { chartRef.current?.destroy(); chartRef.current = null; };
-    }, [series, isDark, presentationMode]);
+    }, [series, isDark, presentationMode, xMax, yMax]);
 
     if (loading) return <LoadingSpinner />;
 
     return (
-        <div className="chart-card">
-            {!presentationMode && series.length > 0 && (
-                <div className="flex items-center gap-3 mb-3">
-                    <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+        <>
+            {!presentationMode && <div className="card mb-6">
+                <div className="axis-selectors">
+                    <div>
+                        <label className="block font-medium mb-2">X-Axis:</label>
+                        <select disabled value="time" className="border p-2 rounded w-full opacity-60">
+                            <option value="time">Elapsed time (s)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block font-medium mb-2">Y-Axis:</label>
+                        <select disabled value="speed" className="border p-2 rounded w-full opacity-60">
+                            <option value="speed">Speed (mph)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block font-medium mb-2">Runs shown:</label>
+                        <select
+                            value={showAllRuns ? 'all' : 'best'}
+                            onChange={e => setShowAllRuns(e.target.value === 'all')}
+                            className="border p-2 rounded w-full"
+                        >
+                            <option value="best">Best per drive mode</option>
+                            <option value="all">Every run</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* A single slow mode stretches the time axis and squashes every
+                    other line into the left edge, so the range is clampable. */}
+                <div className="axis-selectors">
+                    <div>
+                        <label className="block font-medium mb-2">Max time (s):</label>
                         <input
-                            type="checkbox"
-                            checked={showAllRuns}
-                            onChange={e => setShowAllRuns(e.target.checked)}
+                            type="number" step="0.5" min="0" value={xMax}
+                            onChange={e => setXMax(e.target.value)}
+                            placeholder="auto"
+                            className="border p-2 rounded w-full"
                         />
-                        <span className="text-secondary">Show every run</span>
-                    </label>
-                    <span className="text-xs text-faint">
-                        {showAllRuns ? 'All runs' : 'Best run per drive mode'} · {series.length} plotted
-                    </span>
+                    </div>
+                    <div>
+                        <label className="block font-medium mb-2">Max speed (mph):</label>
+                        <input
+                            type="number" step="5" min="0" value={yMax}
+                            onChange={e => setYMax(e.target.value)}
+                            placeholder="auto"
+                            className="border p-2 rounded w-full"
+                        />
+                    </div>
+                    <div className="flex items-end">
+                        <span className="text-xs text-faint pb-2">
+                            {showAllRuns ? 'All runs' : 'Best run per drive mode'} · {series.length} plotted
+                        </span>
+                    </div>
                 </div>
-            )}
 
-            <h3 className="chart-title">Speed vs Time</h3>
-
-            {series.length === 0 ? (
-                <p className="text-sm text-muted py-8 text-center">
-                    No acceleration split data for the selected vehicles. This chart is built
-                    from imported testing CSVs — reported figures alone carry no trace to plot.
+                <p className="text-xs text-muted">
+                    Built from imported split times. The 1&nbsp;ft-rollout split is left out —
+                    it is the same 60&nbsp;mph point on a different clock — and the 0–60 time is
+                    added as the final point, since sources list splits only to 0–50.
                 </p>
-            ) : (
-                <div style={{ height: presentationMode ? '75vh' : 420 }}>
-                    <canvas ref={canvasRef} />
-                </div>
-            )}
+            </div>}
+
+            <div className="card mb-4">
+                <h3 className="text-lg font-semibold mb-3">Speed vs Time</h3>
+
+                {series.length === 0 ? (
+                    <p className="text-sm text-muted py-8 text-center">
+                        No acceleration split data for the selected vehicles. This chart is built
+                        from imported testing CSVs — reported figures alone carry no trace to plot.
+                    </p>
+                ) : (
+                    <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460 }}>
+                        <canvas ref={canvasRef} />
+                    </div>
+                )}
+            </div>
 
             {!presentationMode && <ChartInfoBubble chartKey="perfcurve" />}
-        </div>
+        </>
     );
 }

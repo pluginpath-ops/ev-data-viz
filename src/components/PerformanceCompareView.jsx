@@ -44,6 +44,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
     const chartRef   = useRef(null);
 
     const [basis, setBasis]   = useState('measured');
+    const [sortDir, setSortDir] = useState('best');
     const [metric, setMetric] = useState('zero_to_60_sec');
     const [data, setData]     = useState(null);   // { [vehicleId]: {sessions, summaries} }
     const [loading, setLoading] = useState(true);
@@ -148,9 +149,12 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
     const withoutData = rows.filter(r => r.value == null);
 
     const sorted = useMemo(() => {
-        const lower = activeMetric.lowerIsBetter !== false;
-        return [...withData].sort((a, b) => lower ? a.value - b.value : b.value - a.value);
-    }, [withData, activeMetric]);
+        // "Best" depends on the metric: quicker is better for a time, but higher
+        // is better for a trap speed.
+        const lowerIsBest = activeMetric.lowerIsBetter !== false;
+        const bestFirst = sortDir === 'best' ? lowerIsBest : !lowerIsBest;
+        return [...withData].sort((a, b) => bestFirst ? a.value - b.value : b.value - a.value);
+    }, [withData, activeMetric, sortDir]);
 
     // ── Chart ───────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -255,30 +259,28 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
     if (loading) return <LoadingSpinner />;
 
     return (
-        <div className="chart-card">
-            {!presentationMode && (
-                <div className="flex flex-wrap items-end gap-4 mb-3">
+        <>
+            {!presentationMode && <div className="card mb-6">
+                <div className="axis-selectors">
                     <div>
-                        <span className="text-xs text-muted block mb-1">Compare using</span>
-                        <div className="flex gap-0.5">
+                        <label className="block font-medium mb-2">Compare using:</label>
+                        <select
+                            value={basis}
+                            onChange={e => setBasis(e.target.value)}
+                            className="border p-2 rounded w-full"
+                            title={BASES.find(b => b.key === basis)?.hint}
+                        >
                             {BASES.map(b => (
-                                <button
-                                    key={b.key}
-                                    onClick={() => setBasis(b.key)}
-                                    title={b.hint}
-                                    className={`btn-chart-mode ${basis === b.key ? 'active' : ''}`}
-                                >
-                                    {b.label}
-                                </button>
+                                <option key={b.key} value={b.key}>{b.label}</option>
                             ))}
-                        </div>
+                        </select>
                     </div>
-                    <label className="text-xs">
-                        <span className="text-muted block mb-1">Metric</span>
+                    <div>
+                        <label className="block font-medium mb-2">Metric:</label>
                         <select
                             value={metric}
                             onChange={e => setMetric(e.target.value)}
-                            className="form-input text-sm py-1 min-w-[14rem]"
+                            className="border p-2 rounded w-full"
                         >
                             {SCALAR_METRICS.map(m => (
                                 <option key={m.key} value={m.key}>{m.label}</option>
@@ -293,41 +295,59 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                                 </optgroup>
                             )}
                         </select>
-                    </label>
+                    </div>
+                    <div>
+                        <label className="block font-medium mb-2">Sort:</label>
+                        <select
+                            value={sortDir}
+                            onChange={e => setSortDir(e.target.value)}
+                            className="border p-2 rounded w-full"
+                        >
+                            <option value="best">Best first</option>
+                            <option value="worst">Worst first</option>
+                        </select>
+                    </div>
                 </div>
-            )}
-
-            <h3 className="chart-title">
-                {activeMetric.label}
-                <span className="text-muted font-normal"> · {basis}</span>
-            </h3>
-
-            {sorted.length === 0 ? (
-                <p className="text-sm text-muted py-8 text-center">
-                    None of the selected vehicles has {basis} data for this metric.
-                    {basis === 'measured'
-                        ? ' Import a testing CSV in Tests & Data, or switch to Reported.'
-                        : ' Add a reported result in Tests & Data, or switch to Measured.'}
+                <p className="text-xs text-muted">
+                    Every bar comes from the basis selected above — measured against
+                    measured, reported against reported. Vehicles without data on that
+                    basis are listed under the chart rather than filled in from the other.
                 </p>
-            ) : (
-                <div style={{ height: Math.max(180, sorted.length * 46) }}>
-                    <canvas ref={canvasRef} />
-                </div>
-            )}
+            </div>}
 
-            {/* Absent vehicles are acknowledged rather than dropped, so a missing
-                bar doesn't read as a vehicle that simply performed badly. Named
-                only while the list is short enough to be worth reading — most
-                selections have far more vehicles without data than with. */}
-            {withoutData.length > 0 && sorted.length > 0 && (
-                <p className="text-xs text-faint mt-2">
-                    {withoutData.length <= 6
-                        ? `No ${basis} data for: ${withoutData.map(r => r.name).join(', ')}`
-                        : `${withoutData.length} other selected vehicles have no ${basis} data.`}
-                </p>
-            )}
+            <div className="card mb-4">
+                <h3 className="text-lg font-semibold mb-3">
+                    {activeMetric.label}
+                    <span className="text-muted font-normal text-sm"> · {basis}</span>
+                </h3>
+
+                {sorted.length === 0 ? (
+                    <p className="text-sm text-muted py-8 text-center">
+                        None of the selected vehicles has {basis} data for this metric.
+                        {basis === 'measured'
+                            ? ' Import a testing CSV in Tests & Data, or switch to Reported.'
+                            : ' Add a reported result in Tests & Data, or switch to Measured.'}
+                    </p>
+                ) : (
+                    <div style={{ height: Math.max(180, sorted.length * 46) }}>
+                        <canvas ref={canvasRef} />
+                    </div>
+                )}
+
+                {/* Absent vehicles are acknowledged rather than dropped, so a missing
+                    bar doesn't read as a vehicle that simply performed badly. Named
+                    only while the list is short enough to be worth reading — most
+                    selections have far more vehicles without data than with. */}
+                {withoutData.length > 0 && sorted.length > 0 && (
+                    <p className="text-xs text-faint mt-2">
+                        {withoutData.length <= 6
+                            ? `No ${basis} data for: ${withoutData.map(r => r.name).join(', ')}`
+                            : `${withoutData.length} other selected vehicles have no ${basis} data.`}
+                    </p>
+                )}
+            </div>
 
             {!presentationMode && <ChartInfoBubble chartKey="perfcompare" />}
-        </div>
+        </>
     );
 }
