@@ -130,11 +130,35 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
 
             {
                 for (const run of chosen) {
-                    // Drop the 1ft-rollout split: it's the same 60 mph point on a
-                    // different clock, and mixing it with the zero-start splits
-                    // would double back on the curve.
-                    const points = (run.performance_run_points || [])
-                        .filter(p => p.speed_mph != null && p.elapsed_s != null && !/\(1ft\)/.test(p.label || ''))
+                    // Two ladders can sit on one run: speed thresholds (0-10 … 0-50)
+                    // and a drag distance ladder (60ft, 330ft, … 1/4). They come from
+                    // separate exports and DO NOT share a clock — measured on real
+                    // data, the drag ladder reads ~0.1 s later than the speed ladder
+                    // at the same speed, in the direction the 1 ft rollout would
+                    // explain but only about half its magnitude, with the rest
+                    // likely the difference between a position trigger and a speed
+                    // trigger.
+                    //
+                    // Each ladder is internally smooth, so each is used only where it
+                    // is authoritative: speed thresholds up to their top, the drag
+                    // ladder above that. Interleaving them instead produced a visible
+                    // kink around 30 mph, which asserted a shared clock they don't have.
+                    const raw = (run.performance_run_points || [])
+                        .filter(p => p.speed_mph != null && p.elapsed_s != null
+                            // The 1ft split is the same 60 mph point on the rollout
+                            // clock and would double back on the curve.
+                            && !/\(1ft\)/.test(p.label || ''));
+
+                    const speedLadder = raw.filter(p => p.distance_ft == null);
+                    const dragLadder  = raw.filter(p => p.distance_ft != null);
+                    const speedTop = speedLadder.reduce((m, p) => Math.max(m, Number(p.speed_mph)), 0);
+                    // 60 mph comes from the headline below, so hand over above it.
+                    const handover = Math.max(speedTop, speedLadder.length ? 60 : 0);
+
+                    const points = [
+                        ...speedLadder,
+                        ...dragLadder.filter(p => speedLadder.length === 0 || Number(p.speed_mph) > handover),
+                    ]
                         .map(p => ({ x: Number(p.elapsed_s), y: Number(p.speed_mph) }))
                         .sort((a, b) => a.x - b.x);
                     if (points.length < 2) continue;
