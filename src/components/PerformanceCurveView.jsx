@@ -16,6 +16,7 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { useTheme } from '../hooks/useTheme';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
+import AxisScaleControls from './AxisScaleControls';
 
 /** Okabe-Ito, matching the palette the other charts use for run colours. */
 const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
@@ -27,9 +28,11 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
 
     const [sessionsByVehicle, setSessionsByVehicle] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [showAllRuns, setShowAllRuns] = useState(false);
-    const [xMax, setXMax] = useState('');   // '' = auto-scale
-    const [yMax, setYMax] = useState('');
+    // 'mode'   — quickest run in each drive mode (default: the mode comparison)
+    // 'vehicle' — one line per vehicle, its single quickest run
+    // 'all'     — every run, for run-to-run consistency
+    const [grouping, setGrouping] = useState('mode');
+    const [scale, setScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
 
     const selected = useMemo(
         () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
@@ -56,26 +59,34 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
      */
     const series = useMemo(() => {
         if (!sessionsByVehicle) return [];
+        const quickest = (a, b) => (a?.zero_to_60_sec ?? Infinity) <= (b?.zero_to_60_sec ?? Infinity) ? a : b;
         const out = [];
         for (const v of selected) {
             const name = vehicleLabel(v);
-            for (const session of sessionsByVehicle[v.id] || []) {
-                if (session.test_type !== 'accel') continue;
 
-                const runs = (session.performance_runs || []).filter(
+            // Runs across every accel session this vehicle has, since a vehicle's
+            // quickest run isn't necessarily in its most recent session.
+            const allRuns = (sessionsByVehicle[v.id] || [])
+                .filter(s => s.test_type === 'accel')
+                .flatMap(s => (s.performance_runs || []).filter(
                     r => (r.performance_run_points || []).length >= 2,
-                );
-                // Best (quickest) run per drive mode unless showing everything.
-                const chosen = showAllRuns ? runs : Object.values(
-                    runs.reduce((acc, r) => {
-                        const key = r.drive_mode || 'Unspecified';
-                        const cur = acc[key];
-                        const t = r.zero_to_60_sec ?? Infinity;
-                        if (!cur || t < (cur.zero_to_60_sec ?? Infinity)) acc[key] = r;
-                        return acc;
-                    }, {}),
-                );
+                ));
+            if (allRuns.length === 0) continue;
 
+            let chosen;
+            if (grouping === 'all') {
+                chosen = allRuns;
+            } else if (grouping === 'vehicle') {
+                chosen = [allRuns.reduce(quickest)];
+            } else {
+                chosen = Object.values(allRuns.reduce((acc, r) => {
+                    const key = r.drive_mode || 'Unspecified';
+                    acc[key] = acc[key] ? quickest(acc[key], r) : r;
+                    return acc;
+                }, {}));
+            }
+
+            {
                 for (const run of chosen) {
                     // Drop the 1ft-rollout split: it's the same 60 mph point on a
                     // different clock, and mixing it with the zero-start splits
@@ -101,7 +112,10 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     out.push({
                         // Year and trim are dropped: with one line per drive mode the
                         // legend is already long, and the mode is what distinguishes them.
-                        label: `${v.name} · ${run.drive_mode || 'Run'}${showAllRuns ? ` #${(run.sequence ?? 0) + 1}` : ''}`,
+                        // Best-per-vehicle needs no mode in the label — there's one line.
+                        label: grouping === 'vehicle'
+                            ? v.name
+                            : `${v.name} · ${run.drive_mode || 'Run'}${grouping === 'all' ? ` #${(run.sequence ?? 0) + 1}` : ''}`,
                         fullLabel: `${name} · ${run.drive_mode || 'Run'}`,
                         points,
                         zeroTo60: run.zero_to_60_sec,
@@ -110,7 +124,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
             }
         }
         return out;
-    }, [sessionsByVehicle, selected, showAllRuns]);
+    }, [sessionsByVehicle, selected, grouping]);
 
     useEffect(() => {
         if (!canvasRef.current || series.length === 0) {
@@ -172,15 +186,17 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                 scales: {
                     x: {
                         type: 'linear',
-                        beginAtZero: true,
-                        ...(Number(xMax) > 0 ? { max: Number(xMax) } : {}),
+                        beginAtZero: scale.xMin == null,
+                        ...(scale.xMin != null ? { min: scale.xMin } : {}),
+                        ...(scale.xMax != null ? { max: scale.xMax } : {}),
                         grid: { color: grid },
                         ticks: { color: tick },
                         title: { display: true, text: 'Elapsed time (s)', color: tick },
                     },
                     y: {
-                        beginAtZero: true,
-                        ...(Number(yMax) > 0 ? { max: Number(yMax) } : {}),
+                        beginAtZero: scale.yMin == null,
+                        ...(scale.yMin != null ? { min: scale.yMin } : {}),
+                        ...(scale.yMax != null ? { max: scale.yMax } : {}),
                         grid: { color: grid },
                         ticks: { color: tick },
                         title: { display: true, text: 'Speed (mph)', color: tick },
@@ -190,68 +206,31 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         });
 
         return () => { chartRef.current?.destroy(); chartRef.current = null; };
-    }, [series, isDark, presentationMode, xMax, yMax]);
+    }, [series, isDark, presentationMode, scale]);
 
     if (loading) return <LoadingSpinner />;
 
     return (
         <>
             {!presentationMode && <div className="card mb-6">
-                <div className="axis-selectors">
-                    <div>
-                        <label className="block font-medium mb-2">X-Axis:</label>
-                        <select disabled value="time" className="border p-2 rounded w-full opacity-60">
-                            <option value="time">Elapsed time (s)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block font-medium mb-2">Y-Axis:</label>
-                        <select disabled value="speed" className="border p-2 rounded w-full opacity-60">
-                            <option value="speed">Speed (mph)</option>
-                        </select>
-                    </div>
+                <div className="flex flex-wrap items-end gap-6">
                     <div>
                         <label className="block font-medium mb-2">Runs shown:</label>
                         <select
-                            value={showAllRuns ? 'all' : 'best'}
-                            onChange={e => setShowAllRuns(e.target.value === 'all')}
-                            className="border p-2 rounded w-full"
+                            value={grouping}
+                            onChange={e => setGrouping(e.target.value)}
+                            className="border p-2 rounded"
                         >
-                            <option value="best">Best per drive mode</option>
+                            <option value="mode">Best per drive mode</option>
+                            <option value="vehicle">Best per vehicle</option>
                             <option value="all">Every run</option>
                         </select>
                     </div>
+                    <span className="text-xs text-faint pb-3">
+                        {series.length} line{series.length === 1 ? '' : 's'} plotted
+                    </span>
                 </div>
-
-                {/* A single slow mode stretches the time axis and squashes every
-                    other line into the left edge, so the range is clampable. */}
-                <div className="axis-selectors">
-                    <div>
-                        <label className="block font-medium mb-2">Max time (s):</label>
-                        <input
-                            type="number" step="0.5" min="0" value={xMax}
-                            onChange={e => setXMax(e.target.value)}
-                            placeholder="auto"
-                            className="border p-2 rounded w-full"
-                        />
-                    </div>
-                    <div>
-                        <label className="block font-medium mb-2">Max speed (mph):</label>
-                        <input
-                            type="number" step="5" min="0" value={yMax}
-                            onChange={e => setYMax(e.target.value)}
-                            placeholder="auto"
-                            className="border p-2 rounded w-full"
-                        />
-                    </div>
-                    <div className="flex items-end">
-                        <span className="text-xs text-faint pb-2">
-                            {showAllRuns ? 'All runs' : 'Best run per drive mode'} · {series.length} plotted
-                        </span>
-                    </div>
-                </div>
-
-                <p className="text-xs text-muted">
+                <p className="text-xs text-muted mt-3">
                     Built from imported split times. The 1&nbsp;ft-rollout split is left out —
                     it is the same 60&nbsp;mph point on a different clock — and the 0–60 time is
                     added as the final point, since sources list splits only to 0–50.
@@ -272,6 +251,20 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     </div>
                 )}
             </div>
+
+            {/* Scale controls sit BELOW the chart in their own card, matching every
+                other chart view. X and Y value pickers are omitted: the split
+                series supports only time-versus-speed, and a control with one
+                option is noise. */}
+            {!presentationMode && series.length > 0 && (
+                <AxisScaleControls
+                    xMin={scale.xMin} xMax={scale.xMax}
+                    yMin={scale.yMin} yMax={scale.yMax}
+                    onChange={(key, val) => setScale(prev => ({ ...prev, [key]: val }))}
+                    xAxisLabel="X-Axis Scale (s)"
+                    yAxisLabel="Y-Axis Scale (mph)"
+                />
+            )}
 
             {!presentationMode && <ChartInfoBubble chartKey="perfcurve" />}
         </>
