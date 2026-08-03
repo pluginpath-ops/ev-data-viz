@@ -17,7 +17,8 @@ import { useTheme } from '../hooks/useTheme';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import {
-    deriveTested, groupIntervals, normaliseInterval, PINNED_WINDOWS,
+    deriveTestedResults, groupIntervals, normaliseInterval, parseWindowKey,
+    windowFromSessions, PINNED_WINDOWS,
 } from '../utils/performanceDerivations';
 
 /** Metrics stored as promoted columns, available on both bases. */
@@ -35,6 +36,9 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
     const chartRef   = useRef(null);
 
     const [sortDir, setSortDir] = useState('best');
+    // 'best'   — one bar per vehicle, its strongest figure
+    // 'source' — one bar per vehicle+source, to compare publications directly
+    const [barMode, setBarMode] = useState('best');
     const [metric, setMetric] = useState('zero_to_60_sec');
     const [data, setData]     = useState(null);   // { [vehicleId]: {sessions, summaries} }
     const [loading, setLoading] = useState(true);
@@ -105,42 +109,94 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
         return SCALAR_METRICS.find(m => m.key === metric) || SCALAR_METRICS[0];
     }, [metric, allWindows]);
 
-    /** One row per selected vehicle on the ACTIVE BASIS ONLY. */
-    const rows = useMemo(() => {
+    /**
+     * Every tested entry per vehicle, from every source.
+     *
+     * Speed windows pull from two places: published interval rows, and windows
+     * cut out of session split data (a Draggy trace contains a 30-50 as
+     * t(50) − t(30)). Without the second, a vehicle with full run data would
+     * show nothing for a window that its own trace clearly measures.
+     */
+    const entriesByVehicle = useMemo(() => {
         if (!data) return [];
         return selected.map(v => {
             const bucket = data[v.id] || { sessions: [], summaries: [] };
             const name = vehicleLabel(v);
+            let entries = [];
 
             if (activeMetric.isWindow) {
-                const b = groupIntervals(bucket.summaries).find(x => x.key === activeMetric.key);
-                const best = b?.rows?.[0];
-                return {
-                    id: v.id, name,
-                    value: best?.comparable ?? null,
-                    display: best ? `${best.value} ${best.displayUnit}` : null,
-                    sub: best?.source_name ?? null,
-                    rateG: best ? normaliseInterval(best).rateG : null,
-                    unit: best?.displayUnit ?? '',
-                };
+                const w = parseWindowKey(activeMetric.key);
+                const bucketRows = groupIntervals(bucket.summaries)
+                    .find(x => x.key === activeMetric.key)?.rows || [];
+
+                entries = bucketRows.map(r => ({
+                    value: r.comparable,
+                    display: `${r.value} ${r.displayUnit}`,
+                    rateG: normaliseInterval(r).rateG,
+                    sourceName: r.source_name || 'Unattributed',
+                    origin: 'published',
+                    flags: [],
+                }));
+
+                // Metric units are seconds for timed windows, feet for braking.
+                if (w && w.kind !== 'braking' && w.unit === 'mph') {
+                    const derived = windowFromSessions(bucket.sessions, w.kind, w.from, w.to);
+                    if (derived) {
+                        entries.push({
+                            value: derived.value,
+                            display: `${derived.value.toFixed(3)} s`,
+                            rateG: null,
+                            sourceName: bucket.sessions.find(x => x.source_name)?.source_name || 'EVBench',
+                            origin: 'session',
+                            flags: derived.flags,
+                        });
+                    }
+                }
+            } else {
+                entries = deriveTestedResults(bucket.sessions, bucket.summaries, activeMetric.key)
+                    .map(e => ({
+                        value: e.value,
+                        display: `${e.value.toFixed(3)} ${activeMetric.unit}`,
+                        rateG: null,
+                        sourceName: e.sourceName,
+                        origin: e.origin,
+                        flags: e.flags,
+                        basis: e.basis,
+                    }));
             }
 
-            const rec = deriveTested(bucket.sessions, bucket.summaries, activeMetric.key);
-
-            return {
-                id: v.id, name,
-                value: rec.value,
-                display: rec.value != null ? `${rec.value.toFixed(3)} ${activeMetric.unit}` : null,
-                // The source is the useful label — a bar is only meaningful if you
-                // can see who produced the number.
-                sub: rec.basis?.sourceName || null,
-                fullData: rec.basis?.origin === 'session',
-                sourceCount: rec.basis?.all?.length ?? 0,
-                flags: rec.flags || [],
-                unit: activeMetric.unit,
-            };
+            const lower = activeMetric.lowerIsBetter !== false;
+            entries.sort((a, b) => lower ? a.value - b.value : b.value - a.value);
+            return { id: v.id, name, entries };
         });
     }, [data, selected, activeMetric]);
+
+    /** Flattened to bars, either best-per-vehicle or one per source. */
+    const rows = useMemo(() => {
+        const out = [];
+        for (const v of entriesByVehicle) {
+            if (v.entries.length === 0) {
+                out.push({ id: v.id, name: v.name, value: null });
+                continue;
+            }
+            const picked = barMode === 'source' ? v.entries : [v.entries[0]];
+            for (const e of picked) {
+                out.push({
+                    id: `${v.id}-${e.sourceName}-${e.origin}`,
+                    name: barMode === 'source' ? `${v.name} · ${e.sourceName}` : v.name,
+                    value: e.value,
+                    display: e.display,
+                    rateG: e.rateG,
+                    sub: barMode === 'source' ? null : e.sourceName,
+                    fullData: e.origin === 'session',
+                    sourceCount: v.entries.length,
+                    flags: e.flags || [],
+                    unit: activeMetric.unit,
+                });
+            }
+        }
+        return out;
+    }, [entriesByVehicle, barMode, activeMetric]);
 
     const withData    = rows.filter(r => r.value != null);
     const withoutData = rows.filter(r => r.value == null);
@@ -227,7 +283,14 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                                 if (r.flags?.includes('single-run')) lines.push('⚠ Single run only');
                                 if (r.flags?.includes('steep-grade')) lines.push('⚠ Best run was on a grade');
                                 if (r.fullData) lines.push('✦ Full run data held here');
-                                if (r.sourceCount > 1) lines.push(`${r.sourceCount} sources have tested this`);
+                                if (r.flags?.includes('derived-from-launch')) {
+                                    lines.push('Cut from a standing-start launch, not a roll-on —');
+                                    lines.push('the car was already at full power, so this reads slightly quick');
+                                }
+                                if (r.flags?.includes('interpolated')) lines.push('⚠ Interpolated between recorded splits');
+                                if (r.sourceCount > 1 && barMode !== 'source') {
+                                    lines.push(`${r.sourceCount} sources have tested this — switch Bars to "One per source"`);
+                                }
                                 return lines;
                             },
                         },
@@ -253,7 +316,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
         });
 
         return () => { chartRef.current?.destroy(); chartRef.current = null; };
-    }, [sorted, isDark, activeMetric]);
+    }, [sorted, isDark, activeMetric, barMode]);
 
     if (loading) return <LoadingSpinner />;
 
@@ -286,6 +349,17 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                         </select>
                     </div>
                     <div>
+                        <label className="block font-medium mb-2">Bars:</label>
+                        <select
+                            value={barMode}
+                            onChange={e => setBarMode(e.target.value)}
+                            className="border p-2 rounded w-full"
+                        >
+                            <option value="best">Best per vehicle</option>
+                            <option value="source">One per source</option>
+                        </select>
+                    </div>
+                    <div>
                         <label className="block font-medium mb-2">Sort:</label>
                         <select
                             value={sortDir}
@@ -298,9 +372,13 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                     </div>
                 </div>
                 <p className="text-xs text-muted">
-                    Each bar is the best tested figure for that vehicle, whoever produced
-                    it — results derived from imported sessions rank alongside published
-                    ones, and the bar names its source. Manufacturer claims are excluded.
+                    Every bar is a tested figure, whoever produced it — results derived from
+                    imported sessions rank alongside published ones. “One per source” splits
+                    a vehicle into a bar per publication, to compare who measured what.
+                    Speed windows are also read out of session split data where the trace
+                    covers them; those are marked ✦ and, being cut from a standing-start
+                    launch rather than a roll-on, read slightly quicker than a published
+                    roll-on of the same window. Manufacturer claims are excluded.
                 </p>
             </div>}
 

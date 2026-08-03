@@ -231,6 +231,87 @@ export function deriveClaimed(vehicle, field) {
     };
 }
 
+// ── Speed windows derived from split data ───────────────────────────────────
+
+/**
+ * A speed window read out of a run's split times — 30-50 from a Draggy trace,
+ * say, as t(50) − t(30).
+ *
+ * ── WHY THIS ISN'T QUITE A PUBLISHED ROLL-ON ────────────────────────────────
+ *
+ * A published "Top Gear, 30–50" is a roll-on: the car is cruising steadily at
+ * 30 and then goes to full throttle, so the figure includes the torque ramp. A
+ * window cut out of a standing-start launch has the car already at full power
+ * as it passes 30. For an EV the two are usually close, but they are different
+ * tests and the launch-derived one flatters slightly.
+ *
+ * So the result is tagged `derivedFrom: 'launch'` and flagged, rather than
+ * being quietly presented as the same measurement.
+ *
+ * Interpolates between splits when the exact speeds aren't recorded, and
+ * refuses to extrapolate past the fastest split — a window reaching beyond the
+ * data isn't measured, it's guessed.
+ *
+ * @returns {{value, runId, driveMode, flags}|null} seconds for the window
+ */
+export function windowFromSplits(run, fromSpeed, toSpeed) {
+    const pts = (run?.performance_run_points || [])
+        .filter(p => !/\(1ft\)/.test(p.label || '') && num(p.speed_mph) != null && num(p.elapsed_s) != null)
+        .map(p => ({ speed: num(p.speed_mph), t: num(p.elapsed_s) }))
+        .sort((a, b) => a.speed - b.speed);
+    // Every launch starts from rest, and exports omit that point.
+    if (pts.length && pts[0].speed > 0) pts.unshift({ speed: 0, t: 0 });
+    // The 0-60 headline extends the usable range past the last split.
+    const t60 = num(run?.zero_to_60_sec);
+    if (t60 != null && !pts.some(p => p.speed === 60)) pts.push({ speed: 60, t: t60 });
+    if (pts.length < 2) return null;
+
+    const timeAt = (speed) => {
+        if (speed <= 0) return 0;
+        const max = pts[pts.length - 1].speed;
+        if (speed > max) return null;              // no extrapolation
+        const exact = pts.find(p => p.speed === speed);
+        if (exact) return exact.t;
+        const after  = pts.find(p => p.speed > speed);
+        const before = [...pts].reverse().find(p => p.speed < speed);
+        if (!after || !before) return null;
+        const f = (speed - before.speed) / (after.speed - before.speed);
+        return before.t + f * (after.t - before.t);
+    };
+
+    const tFrom = timeAt(fromSpeed);
+    const tTo   = timeAt(toSpeed);
+    if (tFrom == null || tTo == null || tTo <= tFrom) return null;
+
+    const flags = ['derived-from-launch'];
+    // Interpolated endpoints are softer evidence than recorded ones.
+    if (![fromSpeed, toSpeed].every(sp => pts.some(p => p.speed === sp))) {
+        flags.push('interpolated');
+    }
+
+    return {
+        value: tTo - tFrom,
+        runId: run.id ?? null,
+        driveMode: run.drive_mode ?? null,
+        flags,
+    };
+}
+
+/**
+ * Best split-derived figure for a window across a group of sessions.
+ * Braking windows are never derivable this way — a launch trace contains no
+ * deceleration — so only timed windows are attempted.
+ */
+export function windowFromSessions(sessions = [], kind, fromSpeed, toSpeed) {
+    if (kind === 'braking') return null;
+    let best = null;
+    for (const run of flattenRuns(sessions)) {
+        const r = windowFromSplits(run, fromSpeed, toSpeed);
+        if (r && (!best || r.value < best.value)) best = r;
+    }
+    return best;
+}
+
 // ── Tested results: one pool ────────────────────────────────────────────────
 
 /**
@@ -502,6 +583,13 @@ export function windowKey(interval) {
     const to   = num(interval.to_speed) ?? 0;
     const unit = interval.speed_unit || 'mph';
     return `${interval.kind}:${from}-${to}${unit}`;
+}
+
+/** Inverse of windowKey: "passing:30-50mph" → {kind, from, to, unit}. */
+export function parseWindowKey(key) {
+    const m = /^([a-z]+):(-?[\d.]+)-(-?[\d.]+)(mph|kph)$/.exec(key || '');
+    if (!m) return null;
+    return { kind: m[1], from: Number(m[2]), to: Number(m[3]), unit: m[4] };
 }
 
 /** Human label for a window, e.g. "75–0 mph", "100–0 km/h", "50–90 mph". */
