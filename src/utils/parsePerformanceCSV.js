@@ -59,6 +59,36 @@ function cellValue(rows, label, col) {
 }
 
 /**
+ * Named drag-strip distances, in feet. The fractional ones are written as
+ * fractions by the exporter rather than as a distance.
+ */
+const DRAG_DISTANCES = {
+    '60ft': 60, '330ft': 330, '500ft': 500, '1000ft': 1000,
+    '1/8': 660, '1/4': 1320,
+};
+
+/**
+ * Distance-split rows from a drag export:
+ *   "• 60ft: 1.973 s @ 31.70 mph (0.7Gs)"
+ *   "• 1/4: 11.299 s @ 127.44 mph (0.2Gs)"
+ *
+ * Richer than the speed-threshold splits: each carries distance, time AND
+ * speed, so one row is a complete (time, speed) point on the curve.
+ *
+ * Returns { label, distanceFt, elapsedS, speedMph } or null.
+ */
+function parseDistanceSplit(cell) {
+    const text = stripBullet(normaliseDashes(cell || '')).trim();
+    const m = /^(60ft|330ft|500ft|1000ft|1\/8|1\/4)\s*:\s*([\d.]+)\s*s\s*@\s*([\d.]+)\s*mph/i.exec(text);
+    if (!m) return null;
+    const label = m[1].toLowerCase();
+    const elapsedS = parseFloat(m[2]);
+    const speedMph = parseFloat(m[3]);
+    if (!Number.isFinite(elapsedS) || !Number.isFinite(speedMph)) return null;
+    return { label, distanceFt: DRAG_DISTANCES[label] ?? null, elapsedS, speedMph };
+}
+
+/**
  * Split rows look like "• 0-10: 0.578 s" or "• 0-60(1ft): 3.300 s".
  * Returns { speedMph, label, elapsedS } or null.
  */
@@ -109,7 +139,7 @@ function parseTestTime(raw) {
  * Session-level fields (weather, location) are read here too; the caller
  * hoists them since they repeat identically across columns.
  */
-function parseColumn(rows, col, splitRows) {
+function parseColumn(rows, col, splitRows, distanceRows) {
     const raw = (label) => cellValue(rows, label, col);
 
     // "Distance: 49.372 m ≈ 162.0 ft (161 ft 11.8 in)" → prefer the ft figure
@@ -162,10 +192,32 @@ function parseColumn(rows, col, splitRows) {
         splits.push({ label: s.label, speedMph: s.speedMph, elapsedS: s.elapsedS });
         if (s.rollout && s.speedMph === 60) zeroTo60RolloutSec = s.elapsedS;
     }
+    for (const row of distanceRows) {
+        const d = parseDistanceSplit(row[col]);
+        if (!d) continue;
+        splits.push({
+            label: d.label, speedMph: d.speedMph,
+            elapsedS: d.elapsedS, distanceFt: d.distanceFt,
+        });
+    }
+
+    const distanceSplits = distanceRows
+        .map(row => parseDistanceSplit(row[col]))
+        .filter(Boolean);
+    const namedSplit = (l) => distanceSplits.find(d => d.label === l) || null;
+    const quarter = namedSplit('1/4');
+    const eighth  = namedSplit('1/8');
+    const sixtyFt = namedSplit('60ft');
 
     return {
         driveMode: null, // filled by caller from the header row
         runAt: parseTestTime(raw('Test Time')),
+        // Headline drag figures, read straight off their splits.
+        quarterMileSec:     quarter?.elapsedS ?? null,
+        quarterMileTrapMph: quarter?.speedMph ?? null,
+        eighthMileSec:      eighth?.elapsedS ?? null,
+        eighthMileTrapMph:  eighth?.speedMph ?? null,
+        sixtyFtSec:         sixtyFt?.elapsedS ?? null,
 
         altitudeFt:        num(raw('Altitude') || '', /(-?[\d.]+)\s*ft/),
         densityAltitudeFt: num(raw('Density Altitude (DA)') || '', /(-?[\d.]+)\s*ft/),
@@ -221,13 +273,14 @@ export function parsePerformanceCSVText(text, { testType = 'accel' } = {}) {
     const colCount = header.filter(Boolean).length;
     if (colCount === 0) throw new Error('No drive-mode names found in the first row.');
 
-    const splitRows = rows.filter(row => row.some(cell => parseSplit(cell)));
+    const splitRows    = rows.filter(row => row.some(cell => parseSplit(cell)));
+    const distanceRows = rows.filter(row => row.some(cell => parseDistanceSplit(cell)));
 
     const runs = [];
     let session = null;
 
     for (let col = 0; col < colCount; col++) {
-        const parsed = parseColumn(rows, col, splitRows);
+        const parsed = parseColumn(rows, col, splitRows, distanceRows);
         const { _session, ...run } = parsed;
 
         // The same drive mode is typically run several times in a row. Keep every
@@ -236,7 +289,7 @@ export function parsePerformanceCSVText(text, { testType = 'accel' } = {}) {
         run.driveMode = header[col] || null;
         run.sequence  = col;
 
-        if (run.zeroTo60Sec == null && run.splits.length === 0) {
+        if (run.zeroTo60Sec == null && run.splits.length === 0 && run.quarterMileSec == null) {
             warnings.push(`Column ${col + 1} ("${run.driveMode ?? 'unnamed'}") has no timing data — skipped.`);
             continue;
         }
@@ -248,12 +301,19 @@ export function parsePerformanceCSVText(text, { testType = 'accel' } = {}) {
 
     if (runs.length === 0) throw new Error('No runs with timing data found in the file.');
 
+    // A distance export carries no 0-60 line at all; callers use this to decide
+    // whether the file starts a session or layers onto one that already exists.
+    const format = runs.some(r => r.splits.some(s => s.distanceFt != null))
+        ? (runs.some(r => r.zeroTo60Sec != null) ? 'mixed' : 'distance')
+        : 'speed';
+
     // Test time of the first run stands in for the session time.
     const testedAt = runs.find(r => r.runAt)?.runAt ?? null;
 
     return {
         session: { ...session, testType, testedAt },
         runs,
+        format,
         warnings,
     };
 }

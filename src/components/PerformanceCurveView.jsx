@@ -19,6 +19,8 @@ import ChartInfoBubble from './ChartInfoBubble';
 import AxisScaleControls from './AxisScaleControls';
 import PerformanceRunSelector from './performance/PerformanceRunSelector';
 import { buildSyntheticCurve } from '../utils/performanceDerivations';
+import { resolveChartColors } from '../utils/colorUtils';
+import ChartExportButtons from './ChartExportButtons';
 
 /** Okabe-Ito, matching the palette the other charts use for run colours. */
 const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
@@ -42,6 +44,13 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     // Only consulted when grouping is 'all'; null means "not curated yet", which
     // shows everything rather than an empty chart on first switch.
     const [pickedRunIds, setPickedRunIds] = useState(null);
+    // Colour picks are LOCAL TO THIS VIEW and deliberately not written to the
+    // database. Recolouring a line to read a chart is a viewing preference, not
+    // a change to the data — and persisting it would need contributor rights,
+    // so a signed-out visitor would recolour a line, see it change, and have it
+    // silently revert on reload. Anyone can recolour here; nobody's choice
+    // leaks onto anyone else's view.
+    const [colorEdits, setColorEdits] = useState({});
 
     const selected = useMemo(
         () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
@@ -93,6 +102,27 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     );
 
     /**
+     * Colour per run, from the same Okabe-Ito resolver the charging and range
+     * charts use — so a run keeps its colour across both, and unset runs get
+     * maximally distinct hues rather than a fixed rotation.
+     */
+    const colorMap = useMemo(() => {
+        const runs = (sessionsByVehicle ? Object.values(sessionsByVehicle).flat() : [])
+            .flatMap(s => s.performance_runs || [])
+            .map(r => ({ id: r.id, color: colorEdits[r.id] ?? null, created_at: r.created_at }));
+        return resolveChartColors(runs, colorEdits, 'manual');
+    }, [sessionsByVehicle, colorEdits]);
+
+    const handleRunColor = (runId, hex) => {
+        setColorEdits(prev => {
+            const next = { ...prev };
+            // null clears the pick and hands the run back to the auto palette.
+            if (hex == null) delete next[runId]; else next[runId] = hex;
+            return next;
+        });
+    };
+
+    /**
      * One series per run worth plotting. A run needs at least two split points
      * to be a curve rather than a dot.
      */
@@ -130,28 +160,76 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
 
             {
                 for (const run of chosen) {
-                    // Drop the 1ft-rollout split: it's the same 60 mph point on a
-                    // different clock, and mixing it with the zero-start splits
-                    // would double back on the curve.
-                    const points = (run.performance_run_points || [])
-                        .filter(p => p.speed_mph != null && p.elapsed_s != null && !/\(1ft\)/.test(p.label || ''))
-                        .map(p => ({ x: Number(p.elapsed_s), y: Number(p.speed_mph) }))
-                        .sort((a, b) => a.x - b.x);
+                    // Two ladders can sit on one run: speed thresholds (0-10 … 0-50)
+                    // and a drag distance ladder (60ft, 330ft, … 1/4). They are
+                    // timestamped on different epochs — measured across 13 runs of
+                    // two vehicles and seven drive modes, the drag ladder reads
+                    // 0.0997 s late with a standard deviation of 4.5 ms.
+                    //
+                    // That constancy is what makes it correctable. It is NOT the
+                    // rollout: the rollout offset on those same runs ranges 0.182
+                    // to 0.301 s and tracks launch aggression, while this sits flat
+                    // at 0.100 s regardless of car, mode or how hard it left the
+                    // line — the signature of a fixed instrumentation latency.
+                    //
+                    // So the offset is measured per run from wherever the ladders
+                    // overlap and subtracted, which puts both on one clock and keeps
+                    // every point. Self-calibrating rather than a hardcoded 0.1, so
+                    // a source with a different latency corrects itself.
+                    const raw = (run.performance_run_points || [])
+                        .filter(p => p.speed_mph != null && p.elapsed_s != null
+                            // The 1ft split is the same 60 mph point on the rollout
+                            // clock and would double back on the curve.
+                            && !/\(1ft\)/.test(p.label || ''));
+
+                    const speedLadder = raw.filter(p => p.distance_ft == null)
+                        .map(p => ({ x: Number(p.elapsed_s), y: Number(p.speed_mph) }));
+                    const dragLadder = raw.filter(p => p.distance_ft != null)
+                        .map(p => ({ x: Number(p.elapsed_s), y: Number(p.speed_mph) }));
+
+                    // Where the speed ladder says the car hit a given speed.
+                    const speedSorted = [...speedLadder].sort((a, b) => a.y - b.y);
+                    const tAtSpeed = (v) => {
+                        const after  = speedSorted.find(p => p.y >= v);
+                        const before = [...speedSorted].reverse().find(p => p.y <= v);
+                        if (!after || !before || after.y === before.y) return null;
+                        return before.x + (v - before.y) / (after.y - before.y) * (after.x - before.x);
+                    };
+
+                    let offset = 0;
+                    if (speedLadder.length >= 2) {
+                        const deltas = dragLadder
+                            .map(p => { const t = tAtSpeed(p.y); return t == null ? null : p.x - t; })
+                            .filter(d => d != null);
+                        if (deltas.length) offset = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+                    }
+
+                    const points = [
+                        ...speedLadder,
+                        ...dragLadder.map(p => ({ x: p.x - offset, y: p.y })),
+                    ].sort((a, b) => a.x - b.x);
                     if (points.length < 2) continue;
 
                     // Every launch starts from rest; the export omits that point.
                     if (points[0].x > 0 && points[0].y > 0) points.unshift({ x: 0, y: 0 });
 
-                    // Sources list splits up to 0-50 and then give 0-60 only as the
-                    // headline figure, so without this the curve stops short of the
-                    // very speed the run is named for. zero_to_60_sec is the
-                    // no-rollout time — the same clock as the splits above.
+                    // Speed splits stop at 0-50 and give 0-60 only as the headline
+                    // figure, so without this the curve skips the very speed the run
+                    // is named for. zero_to_60_sec is the no-rollout time — the same
+                    // clock as the splits.
+                    //
+                    // Inserted wherever it belongs rather than only at the end: once
+                    // a drag ladder is merged in, the run continues past 60 mph to
+                    // the quarter mile, and an append-only rule would drop the point
+                    // and leave a gap between 50 and ~77 mph.
                     const t60 = Number(run.zero_to_60_sec);
-                    if (Number.isFinite(t60) && t60 > points[points.length - 1].x) {
+                    if (Number.isFinite(t60) && !points.some(p => p.y === 60)) {
                         points.push({ x: t60, y: 60 });
+                        points.sort((a, b) => a.x - b.x);
                     }
 
                     out.push({
+                        runId: run.id,
                         // Year and trim are dropped: with one line per drive mode the
                         // legend is already long, and the mode is what distinguishes them.
                         // Best-per-vehicle needs no mode in the label — there's one line.
@@ -198,14 +276,29 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         const grid = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
         const tick = isDark ? '#cbd5e1' : '#475569';
 
+        // Traced runs take their resolved colour first; reconstructed curves then
+        // fill from the palette AROUND those, so a dashed line can't land on the
+        // same hue as a solid one and be mistaken for it.
+        const taken = new Set(
+            series.map(s => (s.runId != null ? colorMap[s.runId] : null)).filter(Boolean),
+        );
+        const spare = PALETTE.filter(c => !taken.has(c));
+        let spareIdx = 0;
+        const seriesColors = series.map((s, i) =>
+            (s.runId != null && colorMap[s.runId])
+            || spare[spareIdx++ % (spare.length || 1)]
+            || PALETTE[i % PALETTE.length]);
+
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
             data: {
-                datasets: series.map((s, i) => ({
+                datasets: series.map((s, i) => {
+                    const c = seriesColors[i];
+                    return {
                     label: s.label,
                     data: s.points,
-                    borderColor: PALETTE[i % PALETTE.length],
-                    backgroundColor: PALETTE[i % PALETTE.length],
+                    borderColor: c,
+                    backgroundColor: c,
                     borderWidth: 2,
                     // Dashed = reconstructed from headline figures, not traced.
                     borderDash: s.synthetic ? [6, 4] : [],
@@ -214,7 +307,8 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     // Straight segments: with three points, a curve fit would
                     // invent shape the figures don't support.
                     tension: s.synthetic ? 0 : 0.25,
-                })),
+                    };
+                }),
             },
             options: {
                 responsive: true,
@@ -285,7 +379,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         });
 
         return () => { chartRef.current?.destroy(); chartRef.current = null; };
-    }, [series, isDark, presentationMode, scale]);
+    }, [series, isDark, presentationMode, scale, colorMap]);
 
     if (loading) return <LoadingSpinner />;
 
@@ -293,6 +387,23 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         <>
             {!presentationMode && <div className="card mb-6">
                 <div className="flex flex-wrap items-end gap-6">
+                    <div>
+                        <label className="block font-medium mb-2">Focus:</label>
+                        <select
+                            value={scale.xMax == null ? 'full' : 'launch'}
+                            onChange={e => setScale(prev => ({
+                                ...prev,
+                                // A merged drag ladder stretches the axis to ~13 s and
+                                // squeezes the whole 0-60 into the left quarter, which
+                                // reads as if the low-speed splits had gone missing.
+                                xMax: e.target.value === 'launch' ? 5 : null,
+                            }))}
+                            className="border p-2 rounded"
+                        >
+                            <option value="full">Full run</option>
+                            <option value="launch">Launch (0–5 s)</option>
+                        </select>
+                    </div>
                     <div>
                         <label className="block font-medium mb-2">Runs shown:</label>
                         <select
@@ -336,6 +447,9 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             vehicles={selectorVehicles}
                             selectedRunIds={pickedRunIds}
                             onChange={setPickedRunIds}
+                            colorMap={colorMap}
+                            onUpdateColor={handleRunColor}
+                            colorPicked={id => id in colorEdits}
                         />
                     </div>
                 )}
@@ -353,6 +467,16 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460 }}>
                         <canvas ref={canvasRef} />
                     </div>
+                )}
+                {!presentationMode && series.length > 0 && (
+                    <ChartExportButtons
+                        chartRef={chartRef}
+                        isDark={isDark}
+                        buildParams={p => {
+                            p.set('tab', 'performance');
+                            p.set('m', 'perfcurve');
+                        }}
+                    />
                 )}
             </div>
 

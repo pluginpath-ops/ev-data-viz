@@ -16,9 +16,12 @@
 import { useState } from 'react';
 
 export default function PerformanceRunSelector({
-    vehicles,          // [{ id, name, runs: [{ id, name, driveMode, zeroTo60 }] }]
+    vehicles,          // [{ id, name, runs: [{ id, name, driveMode, zeroTo60, color }] }]
     selectedRunIds,     // array of ids, or null meaning "everything"
     onChange,           // (nextIds: array) => void
+    colorMap = {},      // resolved colour per run id, for the swatch
+    onUpdateColor,       // (runId, hex|null) => void; omit to hide the pickers
+    colorPicked,         // (runId) => bool — has this run been recoloured here?
 }) {
     const [expanded, setExpanded] = useState(false);
     const [collapsed, setCollapsed] = useState({});
@@ -110,11 +113,31 @@ export default function PerformanceRunSelector({
                                                                 checked={isSelected(run.id)}
                                                                 onChange={() => toggle(run.id)}
                                                             />
+                                                            {onUpdateColor && (
+                                                                <input
+                                                                    type="color"
+                                                                    value={colorMap[run.id] || run.color || '#3b82f6'}
+                                                                    onChange={e => onUpdateColor(run.id, e.target.value)}
+                                                                    onClick={e => e.stopPropagation()}
+                                                                    className="w-7 h-5 border-0 rounded cursor-pointer shrink-0"
+                                                                    title="Set this run's colour"
+                                                                />
+                                                            )}
                                                             <span className="text-secondary">{run.name}</span>
                                                             {run.zeroTo60 != null && (
                                                                 <span className="font-mono text-faint">
                                                                     {Number(run.zeroTo60).toFixed(3)} s
                                                                 </span>
+                                                            )}
+                                                            {onUpdateColor && colorPicked?.(run.id) && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={e => { e.preventDefault(); onUpdateColor(run.id, null); }}
+                                                                    className="text-[10px] text-faint hover:text-secondary"
+                                                                    title="Clear — back to the auto palette"
+                                                                >
+                                                                    reset
+                                                                </button>
                                                             )}
                                                         </label>
                                                     ))}

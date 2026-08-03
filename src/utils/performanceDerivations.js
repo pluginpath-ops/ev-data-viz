@@ -50,7 +50,8 @@ export const GRADE_FLAG_PCT = 1.0;
  * exception — higher is quicker.
  */
 const LOWER_IS_BETTER = new Set([
-    'zero_to_60_sec', 'zero_to_60_rollout_sec', 'zero_to_100_sec', 'quarter_mile_sec',
+    'zero_to_60_sec', 'zero_to_60_rollout_sec', 'zero_to_100_sec',
+    'quarter_mile_sec', 'eighth_mile_sec', 'sixty_ft_sec',
 ]);
 
 // ── Session / run flattening ────────────────────────────────────────────────
@@ -73,6 +74,36 @@ export function flattenRuns(sessions = []) {
 }
 
 /**
+ * Metrics a session carries in its SPLIT POINTS rather than as a column.
+ *
+ * performance_runs deliberately has no quarter-mile column: the figure is
+ * already in the points as the '1/4' split, and copying it into a column would
+ * let the two drift. That means anything reading these metrics off a run has to
+ * look in the points — without this map they simply read undefined, and a
+ * session's drag figures are stored but invisible.
+ */
+const POINT_DERIVED = {
+    quarter_mile_sec:       { label: '1/4',  field: 'elapsed_s' },
+    quarter_mile_trap_mph:  { label: '1/4',  field: 'speed_mph' },
+    eighth_mile_sec:        { label: '1/8',  field: 'elapsed_s' },
+    eighth_mile_trap_mph:   { label: '1/8',  field: 'speed_mph' },
+    sixty_ft_sec:           { label: '60ft', field: 'elapsed_s' },
+};
+
+/**
+ * A metric's value on a run — the column when there is one, otherwise the
+ * matching split point.
+ */
+export function runValue(run, field) {
+    const direct = num(run?.[field]);
+    if (direct != null) return direct;
+    const from = POINT_DERIVED[field];
+    if (!from) return null;
+    const pt = (run?.performance_run_points || []).find(p => p.label === from.label);
+    return pt ? num(pt[from.field]) : null;
+}
+
+/**
  * Best (fastest / shortest) run for a metric, ignoring runs that lack it.
  *
  * Best-of rather than mean: these are repeated attempts at the same maximum-
@@ -84,11 +115,10 @@ export function flattenRuns(sessions = []) {
 export function bestRunFor(runs, field) {
     let best = null;
     for (const r of runs) {
-        const v = num(r[field]);
+        const v = runValue(r, field);
         if (v == null) continue;
-        if (!best || (LOWER_IS_BETTER.has(field) ? v < num(best[field]) : v > num(best[field]))) {
-            best = r;
-        }
+        const bv = best ? runValue(best, field) : null;
+        if (bv == null || (LOWER_IS_BETTER.has(field) ? v < bv : v > bv)) best = r;
     }
     return best;
 }
@@ -101,17 +131,17 @@ export function bestRunFor(runs, field) {
  *          be distinguished from a fluke).
  */
 export function deriveFromRuns(sessions, field) {
-    const runs = flattenRuns(sessions).filter(r => num(r[field]) != null);
+    const runs = flattenRuns(sessions).filter(r => runValue(r, field) != null);
     if (runs.length === 0) return { ...EMPTY };
 
     const best = bestRunFor(runs, field);
-    const value = num(best[field]);
+    const value = runValue(best, field);
 
     // Spread is only meaningful between comparable attempts. A session sweeps
     // drive modes (Insane → Chill), so spanning all of them would report a
     // ~4 s "spread" that just measures the modes, not run-to-run variance.
     const comparable = runs.filter(r => r.drive_mode === best.drive_mode);
-    const values = comparable.map(r => num(r[field])).sort((a, b) => a - b);
+    const values = comparable.map(r => runValue(r, field)).sort((a, b) => a - b);
 
     const flags = [];
     if (comparable.length === 1) flags.push('single-run');
@@ -145,7 +175,7 @@ export function deriveFromRuns(sessions, field) {
 export function groupByDriveMode(sessions, field = 'zero_to_60_sec') {
     const groups = new Map();
     for (const r of flattenRuns(sessions)) {
-        if (num(r[field]) == null) continue;
+        if (runValue(r, field) == null) continue;
         const key = r.drive_mode || 'Unspecified';
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(r);
@@ -154,8 +184,8 @@ export function groupByDriveMode(sessions, field = 'zero_to_60_sec') {
     return [...groups.entries()]
         .map(([driveMode, runs]) => {
             const sorted = [...runs].sort((a, b) =>
-                lower ? num(a[field]) - num(b[field]) : num(b[field]) - num(a[field]));
-            return { driveMode, runs: sorted, best: num(sorted[0][field]), count: runs.length };
+                lower ? runValue(a, field) - runValue(b, field) : runValue(b, field) - runValue(a, field));
+            return { driveMode, runs: sorted, best: runValue(sorted[0], field), count: runs.length };
         })
         .sort((a, b) => (lower ? a.best - b.best : b.best - a.best));
 }
@@ -229,6 +259,87 @@ export function deriveClaimed(vehicle, field) {
         flags: field === 'zero_to_60_rollout_sec' ? ['rollout-convention-unknown'] : [],
         basis: { spec_key: `performance.${key}` },
     };
+}
+
+// ── Speed windows derived from split data ───────────────────────────────────
+
+/**
+ * A speed window read out of a run's split times — 30-50 from a Draggy trace,
+ * say, as t(50) − t(30).
+ *
+ * ── WHY THIS ISN'T QUITE A PUBLISHED ROLL-ON ────────────────────────────────
+ *
+ * A published "Top Gear, 30–50" is a roll-on: the car is cruising steadily at
+ * 30 and then goes to full throttle, so the figure includes the torque ramp. A
+ * window cut out of a standing-start launch has the car already at full power
+ * as it passes 30. For an EV the two are usually close, but they are different
+ * tests and the launch-derived one flatters slightly.
+ *
+ * So the result is tagged `derivedFrom: 'launch'` and flagged, rather than
+ * being quietly presented as the same measurement.
+ *
+ * Interpolates between splits when the exact speeds aren't recorded, and
+ * refuses to extrapolate past the fastest split — a window reaching beyond the
+ * data isn't measured, it's guessed.
+ *
+ * @returns {{value, runId, driveMode, flags}|null} seconds for the window
+ */
+export function windowFromSplits(run, fromSpeed, toSpeed) {
+    const pts = (run?.performance_run_points || [])
+        .filter(p => !/\(1ft\)/.test(p.label || '') && num(p.speed_mph) != null && num(p.elapsed_s) != null)
+        .map(p => ({ speed: num(p.speed_mph), t: num(p.elapsed_s) }))
+        .sort((a, b) => a.speed - b.speed);
+    // Every launch starts from rest, and exports omit that point.
+    if (pts.length && pts[0].speed > 0) pts.unshift({ speed: 0, t: 0 });
+    // The 0-60 headline extends the usable range past the last split.
+    const t60 = num(run?.zero_to_60_sec);
+    if (t60 != null && !pts.some(p => p.speed === 60)) pts.push({ speed: 60, t: t60 });
+    if (pts.length < 2) return null;
+
+    const timeAt = (speed) => {
+        if (speed <= 0) return 0;
+        const max = pts[pts.length - 1].speed;
+        if (speed > max) return null;              // no extrapolation
+        const exact = pts.find(p => p.speed === speed);
+        if (exact) return exact.t;
+        const after  = pts.find(p => p.speed > speed);
+        const before = [...pts].reverse().find(p => p.speed < speed);
+        if (!after || !before) return null;
+        const f = (speed - before.speed) / (after.speed - before.speed);
+        return before.t + f * (after.t - before.t);
+    };
+
+    const tFrom = timeAt(fromSpeed);
+    const tTo   = timeAt(toSpeed);
+    if (tFrom == null || tTo == null || tTo <= tFrom) return null;
+
+    const flags = ['derived-from-launch'];
+    // Interpolated endpoints are softer evidence than recorded ones.
+    if (![fromSpeed, toSpeed].every(sp => pts.some(p => p.speed === sp))) {
+        flags.push('interpolated');
+    }
+
+    return {
+        value: tTo - tFrom,
+        runId: run.id ?? null,
+        driveMode: run.drive_mode ?? null,
+        flags,
+    };
+}
+
+/**
+ * Best split-derived figure for a window across a group of sessions.
+ * Braking windows are never derivable this way — a launch trace contains no
+ * deceleration — so only timed windows are attempted.
+ */
+export function windowFromSessions(sessions = [], kind, fromSpeed, toSpeed) {
+    if (kind === 'braking') return null;
+    let best = null;
+    for (const run of flattenRuns(sessions)) {
+        const r = windowFromSplits(run, fromSpeed, toSpeed);
+        if (r && (!best || r.value < best.value)) best = r;
+    }
+    return best;
 }
 
 // ── Tested results: one pool ────────────────────────────────────────────────
@@ -463,6 +574,9 @@ export const PERFORMANCE_METRICS = [
     { field: 'zero_to_100_sec',        label: '0–100 mph',       unit: 's' },
     { field: 'quarter_mile_sec',       label: '¼ mile',          unit: 's' },
     { field: 'quarter_mile_trap_mph',  label: '¼ mile trap',     unit: 'mph' },
+    { field: 'eighth_mile_sec',        label: '⅛ mile',          unit: 's' },
+    { field: 'eighth_mile_trap_mph',   label: '⅛ mile trap',     unit: 'mph' },
+    { field: 'sixty_ft_sec',           label: '60 ft',           unit: 's' },
 ];
 
 // ── Variable speed-window results (performance_intervals) ───────────────────
@@ -502,6 +616,13 @@ export function windowKey(interval) {
     const to   = num(interval.to_speed) ?? 0;
     const unit = interval.speed_unit || 'mph';
     return `${interval.kind}:${from}-${to}${unit}`;
+}
+
+/** Inverse of windowKey: "passing:30-50mph" → {kind, from, to, unit}. */
+export function parseWindowKey(key) {
+    const m = /^([a-z]+):(-?[\d.]+)-(-?[\d.]+)(mph|kph)$/.exec(key || '');
+    if (!m) return null;
+    return { kind: m[1], from: Number(m[2]), to: Number(m[3]), unit: m[4] };
 }
 
 /** Human label for a window, e.g. "75–0 mph", "100–0 km/h", "50–90 mph". */

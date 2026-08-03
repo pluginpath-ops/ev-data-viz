@@ -1119,6 +1119,33 @@ export function AppProvider({ children }) {
         }
     };
 
+    /** Which existing runs, if any, a parsed export already describes. */
+    const findMatchingPerformanceRuns = (vehicleId, parsedRuns) =>
+        dataService.findMatchingPerformanceRuns(vehicleId, parsedRuns);
+
+    /** Layer a second export's splits onto runs that already exist. */
+    const mergePerformanceSplits = async (match, parsedRuns) => {
+        try {
+            const res = await dataService.mergePerformanceSplits(match, parsedRuns);
+            if (res.pointsAdded > 0) {
+                showSuccess(`Added ${res.pointsAdded} splits across ${res.runsUpdated} existing runs.`);
+            } else {
+                // A no-op is NOT a success. Say which step produced nothing, so
+                // "it said it worked but nothing appeared" can't happen again.
+                const why =
+                    res.runsMatched === 0   ? 'none of the runs in this file matched by timestamp'
+                  : res.splitsSeen === 0    ? 'no splits were found in the file — the format may not be recognised'
+                  : res.alreadyPresent > 0  ? 'every split in this file is already on these runs'
+                  : 'the file produced no new splits';
+                showError(`Nothing was added: ${why}.`);
+            }
+            return res;
+        } catch (error) {
+            showError('Merge failed: ' + error.message);
+            throw error;
+        }
+    };
+
     /** Edit a session's own fields — its attribution, chiefly. */
     const savePerformanceSession = async (row) => {
         try {
@@ -1340,6 +1367,8 @@ export function AppProvider({ children }) {
         getPerformanceSessions,
         getPerformanceSummaries,
         importPerformanceSession,
+        findMatchingPerformanceRuns,
+        mergePerformanceSplits,
         savePerformanceSession,
         deletePerformanceSession,
         savePerformanceSummary,
