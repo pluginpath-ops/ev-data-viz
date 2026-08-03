@@ -5,6 +5,8 @@ import SpecsChartView from './SpecsChartView';
 import SpecsScatterView from './SpecsScatterView';
 import SpecsView from './SpecsView';
 import EpaCurvesView from './EpaCurvesView';
+import PerformanceCompareView from './PerformanceCompareView';
+import PerformanceCurveView from './PerformanceCurveView';
 
 /**
  * Minimal fullscreen chart-only view rendered in the pop-out tab.
@@ -29,6 +31,22 @@ export default function PopoutView({
                 <SpecsChartView
                     vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
                     selectedField={chartConfig.specsField}
+                    presentationMode
+                />
+            )}
+
+            {selectedVehicles.length > 0 && chartMode === 'perfcompare' && (
+                <PerformanceCompareView
+                    vehicles={vehicles}
+                    selectedVehicleIds={selectedVehicles}
+                    presentationMode
+                />
+            )}
+
+            {selectedVehicles.length > 0 && chartMode === 'perfcurve' && (
+                <PerformanceCurveView
+                    vehicles={vehicles}
+                    selectedVehicleIds={selectedVehicles}
                     presentationMode
                 />
             )}

@@ -205,6 +205,64 @@ export const CHART_HELP_DEFAULTS = {
             'charger availability, weather and traffic will vary.',
     },
 
+    perfcompare: {
+        title: 'About the Performance Compare chart',
+        data_source:
+            'Ranks the selected vehicles on one acceleration or braking metric. The ' +
+            '“Compare using” switch chooses where every bar comes from: Measured ' +
+            'derives from testing sessions imported into EVBench, Reported uses ' +
+            'published figures entered from a source. Speed windows (braking ' +
+            'distances, passing times) only exist as reported figures, so they appear ' +
+            'only on that basis.',
+        how_to_read:
+            'Every bar on the chart comes from the same kind of source — that is the ' +
+            'point of the basis switch. A vehicle with no data on the selected basis ' +
+            'is listed underneath as having none, rather than being quietly filled in ' +
+            'from the other basis, because mixing a stopwatch reading with a press ' +
+            'release would make the bars meaningless. Pills inside each bar show the ' +
+            'value, the average rate in g where it applies, and the drive mode or ' +
+            'source it came from. Warnings in the tooltip flag figures resting on a ' +
+            'single run, a run taken on a grade, or sources that disagree.',
+        key_terms:
+            'Measured — derived here from imported session data.\n' +
+            'Reported — a published figure entered from a source.\n' +
+            'No rollout vs 1 ft — two 0–60 conventions about 0.3 s apart; not interchangeable.\n' +
+            'Speed window — a from/to speed pair, e.g. 75–0 mph braking or 50–90 mph passing.\n' +
+            'Average rate (g) — the window expressed as an average acceleration.',
+        math_approach:
+            'Measured figures take the best run and report the spread across comparable ' +
+            'runs in the same drive mode; nothing is averaged across drive modes. ' +
+            'Reported figures take the best value when several sources disagree, and ' +
+            'flag the disagreement. Braking distances are converted to a common unit ' +
+            'for ranking but displayed as reported. Average rate is Δv/Δt for timed ' +
+            'windows and (v₁²−v₂²)/2d for braking.',
+    },
+
+    perfcurve: {
+        title: 'About the Acceleration Curve',
+        data_source:
+            'Plots speed against elapsed time from the split times recorded in an ' +
+            'imported testing CSV (0–10, 0–20, … 0–60). Only vehicles with imported ' +
+            'detail data appear — a reported 0–60 figure on its own carries no trace, ' +
+            'and no curve is invented for it.',
+        how_to_read:
+            'Each line is one run. By default the quickest run per drive mode is shown, ' +
+            'because a session is usually eight launches and plotting all of them buries ' +
+            'the comparison that matters — what each drive mode actually costs you. Tick ' +
+            '“Show every run” to see run-to-run consistency instead. A line that is ' +
+            'steeper early is quicker off the line; lines converging at the top mean the ' +
+            'difference was all in the launch.',
+        key_terms:
+            'Split — a recorded time to reach a given speed.\n' +
+            'Drive mode — the vehicle setting under test, e.g. a launch mode versus a comfort mode.\n' +
+            'Elapsed time — seconds from a standing start.',
+        math_approach:
+            'The recorded splits drawn as-is, with a zero point added at the origin since ' +
+            'every launch starts from rest and exports omit it. The 1 ft-rollout split is ' +
+            'excluded — it is the same 60 mph point measured a different way, and would ' +
+            'double back on the curve. No smoothing or curve-fitting beyond line tension.',
+    },
+
     specstable: {
         title: 'About Compare Specs',
         data_source:

@@ -1509,18 +1509,23 @@ class DataService {
   // charging run). See migration 036 for the full rationale.
 
   /**
-   * All performance sessions for a vehicle, with runs and split points nested.
-   * Single relational query, same shape as getEpaTestGroupFull().
+   * Performance sessions with runs and split points nested, for one vehicle or
+   * a list of them. Single relational query, same shape as getEpaTestGroupFull().
+   *
+   * Accepts an array so the comparison charts can load every selected vehicle in
+   * ONE round trip — fetching per vehicle meant ~50 queries on a wide selection.
    */
   async getPerformanceSessions(vehicleId) {
     if (!this.useSupabase) return [];
+    const ids = Array.isArray(vehicleId) ? vehicleId : [vehicleId];
+    if (ids.length === 0) return [];
     const { data, error } = await getSupabase()
       .from('performance_sessions')
       .select(`
         *,
         performance_runs(*, performance_run_points(*))
       `)
-      .eq('vehicle_id', vehicleId)
+      .in('vehicle_id', ids)
       .order('tested_at', { ascending: false });
     if (error) throw error;
     // PostgREST doesn't order nested rows — sort children so runs and their
@@ -1663,7 +1668,13 @@ class DataService {
     let q = getSupabase()
       .from('performance_summaries')
       .select('*, performance_intervals(*)');
-    if (vehicleId != null) q = q.eq('vehicle_id', vehicleId);
+    // Array form keeps the comparison charts to one query across the selection.
+    if (Array.isArray(vehicleId)) {
+      if (vehicleId.length === 0) return [];
+      q = q.in('vehicle_id', vehicleId);
+    } else if (vehicleId != null) {
+      q = q.eq('vehicle_id', vehicleId);
+    }
     const { data, error } = await q;
     if (error) {
       console.warn('Performance summaries unavailable (migrations 039/040 applied?):', error.message);

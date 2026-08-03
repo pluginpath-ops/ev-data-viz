@@ -35,6 +35,14 @@
 
 export const CHART_CATEGORIES = [
     {
+        key: 'performance',
+        label: 'Performance',
+        modes: [
+            { key: 'perfcompare', label: 'Compare' },
+            { key: 'perfcurve',   label: 'Acceleration Curve' },
+        ],
+    },
+    {
         // "Charging & Efficiency", not "Range & Efficiency": the 'range' mode
         // below already carries that name, and a tab sharing a label with one of
         // its own sub-tabs made the nav ambiguous. The key stays 'efficiency' —
