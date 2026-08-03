@@ -28,6 +28,9 @@ const SCALAR_METRICS = [
     { key: 'zero_to_100_sec',        label: '0–100 mph',              unit: 's',   lowerIsBetter: true  },
     { key: 'quarter_mile_sec',       label: '¼ mile',                 unit: 's',   lowerIsBetter: true  },
     { key: 'quarter_mile_trap_mph',  label: '¼ mile trap',            unit: 'mph', lowerIsBetter: false },
+    { key: 'eighth_mile_sec',        label: '⅛ mile',                 unit: 's',   lowerIsBetter: true  },
+    { key: 'eighth_mile_trap_mph',   label: '⅛ mile trap',            unit: 'mph', lowerIsBetter: false },
+    { key: 'sixty_ft_sec',           label: '60 ft',                  unit: 's',   lowerIsBetter: true  },
 ];
 
 export default function PerformanceCompareView({ vehicles, selectedVehicleIds, presentationMode }) {
