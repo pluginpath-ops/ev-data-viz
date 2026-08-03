@@ -1,0 +1,177 @@
+/**
+ * Import a GPS performance-testing CSV as one session for a vehicle.
+ *
+ * Parses in the browser and shows what was found before writing anything — the
+ * file format is transposed (one column per run) and easy to mistake for a
+ * different export, so a preview is the cheapest way to catch a wrong file
+ * before it becomes a session with eight bogus runs in it.
+ */
+import { useState } from 'react';
+import { parsePerformanceCSV } from '../utils/parsePerformanceCSV';
+
+export default function PerformanceImportModal({ vehicle, onImport, onClose }) {
+    const [parsed, setParsed]     = useState(null);
+    const [fileName, setFileName] = useState(null);
+    const [testType, setTestType] = useState('accel');
+    const [sourceName, setSourceName] = useState('');
+    const [youtubeUrl, setYoutubeUrl] = useState('');
+    const [busy, setBusy]         = useState(false);
+    const [error, setError]       = useState(null);
+
+    const handleFile = async (file) => {
+        if (!file) return;
+        setError(null);
+        setParsed(null);
+        setFileName(file.name);
+        try {
+            const result = await parsePerformanceCSV(file, { testType });
+            setParsed(result);
+        } catch (e) {
+            setError(e?.message || 'Could not parse this file.');
+        }
+    };
+
+    const handleImport = async () => {
+        if (!parsed) return;
+        setBusy(true);
+        setError(null);
+        try {
+            await onImport(vehicle.id, parsed, {
+                sourceName: sourceName.trim() || null,
+                youtubeUrl: youtubeUrl.trim() || null,
+            });
+            onClose();
+        } catch (e) {
+            setError(e?.message || 'Import failed.');
+            setBusy(false);
+        }
+    };
+
+    const session = parsed?.session;
+
+    return (
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+            <div className="modal-panel rounded-xl p-5 max-w-2xl w-full max-h-[85vh] overflow-y-auto">
+                <h3 className="section-title mb-1">Import performance testing data</h3>
+                <p className="text-xs text-muted mb-3">
+                    For <span className="font-semibold">{vehicle?.name}</span>. Expects a GPS
+                    testing export with one column per run.
+                </p>
+
+                <div className="flex flex-wrap items-end gap-3 mb-3">
+                    <label className="text-xs">
+                        <span className="text-muted block mb-0.5">Test type</span>
+                        <select
+                            value={testType}
+                            onChange={e => { setTestType(e.target.value); setParsed(null); setFileName(null); }}
+                            className="form-input text-xs py-1 w-32"
+                        >
+                            <option value="accel">Acceleration</option>
+                            <option value="braking">Braking</option>
+                        </select>
+                    </label>
+                    <label className="text-xs flex-1 min-w-[10rem]">
+                        <span className="text-muted block mb-0.5">Source (optional)</span>
+                        <input
+                            type="text" value={sourceName}
+                            onChange={e => setSourceName(e.target.value)}
+                            placeholder="e.g. Out of Spec"
+                            className="form-input text-xs py-1 w-full"
+                        />
+                    </label>
+                    <label className="text-xs flex-1 min-w-[12rem]">
+                        <span className="text-muted block mb-0.5">Video link (optional)</span>
+                        <input
+                            type="text" value={youtubeUrl}
+                            onChange={e => setYoutubeUrl(e.target.value)}
+                            placeholder="https://youtu.be/…"
+                            className="form-input text-xs py-1 w-full"
+                        />
+                    </label>
+                </div>
+
+                {testType === 'braking' && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-2">
+                        Braking exports haven’t been seen yet, so the parser is written against the
+                        acceleration layout. If the import looks wrong, enter the figures by hand as
+                        speed windows instead.
+                    </p>
+                )}
+
+                <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={e => handleFile(e.target.files?.[0])}
+                    className="form-input text-xs w-full py-1"
+                />
+                {fileName && <p className="text-[11px] text-faint mt-1">{fileName}</p>}
+                {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
+
+                {parsed && (
+                    <div className="mt-3 border rounded-lg p-3 border-[var(--color-border)]">
+                        <div className="font-semibold text-sm mb-1">
+                            {parsed.runs.length} run{parsed.runs.length === 1 ? '' : 's'} found
+                        </div>
+                        <div className="text-xs text-muted mb-2">
+                            {session.locationName && <>{session.locationName} · </>}
+                            {session.testedAt?.replace('T', ' ')}
+                            {session.temperatureF != null && <> · {Math.round(session.temperatureF)}°F</>}
+                            {session.windSpeedMph != null && <> · wind {session.windSpeedMph.toFixed(1)} mph</>}
+                        </div>
+
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="text-faint text-[10px] uppercase tracking-wide">
+                                    <th className="text-left font-semibold py-1">Drive mode</th>
+                                    <th className="text-right font-semibold py-1">0–60</th>
+                                    <th className="text-right font-semibold py-1">0–60 (1ft)</th>
+                                    <th className="text-right font-semibold py-1">Max g</th>
+                                    <th className="text-right font-semibold py-1">Splits</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {parsed.runs.map(r => (
+                                    <tr key={r.sequence} className="border-t border-[var(--color-border)]">
+                                        <td className="py-0.5 text-muted truncate max-w-[12rem]">{r.driveMode || '—'}</td>
+                                        <td className="py-0.5 text-right font-mono">
+                                            {r.zeroTo60Sec != null ? r.zeroTo60Sec.toFixed(3) : '—'}
+                                        </td>
+                                        <td className="py-0.5 text-right font-mono text-muted">
+                                            {r.zeroTo60RolloutSec != null ? r.zeroTo60RolloutSec.toFixed(3) : '—'}
+                                        </td>
+                                        <td className="py-0.5 text-right font-mono">
+                                            {r.maxGForce != null ? r.maxGForce.toFixed(3) : '—'}
+                                        </td>
+                                        <td className="py-0.5 text-right font-mono text-faint">{r.splits.length}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+
+                        {parsed.warnings.length > 0 && (
+                            <ul className="mt-2 text-[11px] text-amber-600 dark:text-amber-400 list-disc list-inside">
+                                {parsed.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                            </ul>
+                        )}
+                        <p className="text-[10px] text-faint mt-2">
+                            The two 0–60 columns are different conventions, not a duplicate: the first
+                            starts the clock at 0 mph, the second allows the 1 ft drag-strip rollout.
+                        </p>
+                    </div>
+                )}
+
+                <div className="flex gap-2 mt-4">
+                    <button
+                        type="button" onClick={handleImport} disabled={!parsed || busy}
+                        className="btn btn-primary text-sm disabled:opacity-50"
+                    >
+                        {busy ? 'Importing…' : `Import ${parsed?.runs.length || ''} run${parsed?.runs.length === 1 ? '' : 's'}`}
+                    </button>
+                    <button type="button" onClick={onClose} disabled={busy} className="btn btn-secondary text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}

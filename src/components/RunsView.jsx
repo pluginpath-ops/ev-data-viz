@@ -11,6 +11,7 @@ import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 import { RunVoteButtons } from './VoteButtons';
 import EpaVehicleSection from './EpaVehicleSection';
+import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
 import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
 
@@ -2814,6 +2815,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 onUpdateDisplayName={(testGroupId, name) =>
                     updateEpaTestGroup(testGroupId, { display_name: name || null })
                 }
+            />
+
+            {/* ── Performance Testing (acceleration / braking) ──────────────── */}
+            <PerformanceVehicleSection
+                vehicle={vehicle}
+                canEdit={isContributor && canEdit(vehicle)}
             />
         </div>
     );
