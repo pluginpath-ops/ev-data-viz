@@ -1606,6 +1606,14 @@ class DataService {
     return best;
   }
 
+  /** Set a performance run's chart colour. Null hands it back to auto-assign. */
+  async updatePerformanceRunColor(runId, color) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('performance_runs').update({ color: color || null }).eq('id', runId);
+    if (error) throw error;
+  }
+
   /**
    * Layer a second export's splits onto runs that already exist.
    *

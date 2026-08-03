@@ -16,6 +16,7 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { useTheme } from '../hooks/useTheme';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
+import ChartExportButtons from './ChartExportButtons';
 import {
     deriveTestedResults, groupIntervals, normaliseInterval, parseWindowKey,
     windowFromSessions, PINNED_WINDOWS,
@@ -406,6 +407,17 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                     bar doesn't read as a vehicle that simply performed badly. Named
                     only while the list is short enough to be worth reading — most
                     selections have far more vehicles without data than with. */}
+                {!presentationMode && sorted.length > 0 && (
+                    <ChartExportButtons
+                        chartRef={chartRef}
+                        isDark={isDark}
+                        buildParams={p => {
+                            p.set('tab', 'performance');
+                            p.set('m', 'perfcompare');
+                        }}
+                    />
+                )}
+
                 {withoutData.length > 0 && sorted.length > 0 && (
                     <p className="text-xs text-faint mt-2">
                         {withoutData.length <= 6

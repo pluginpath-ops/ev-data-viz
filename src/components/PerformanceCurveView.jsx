@@ -19,12 +19,16 @@ import ChartInfoBubble from './ChartInfoBubble';
 import AxisScaleControls from './AxisScaleControls';
 import PerformanceRunSelector from './performance/PerformanceRunSelector';
 import { buildSyntheticCurve } from '../utils/performanceDerivations';
+import { resolveChartColors } from '../utils/colorUtils';
+import ChartExportButtons from './ChartExportButtons';
+import { useAppContext } from '../context/AppContext';
 
 /** Okabe-Ito, matching the palette the other charts use for run colours. */
 const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
 
 export default function PerformanceCurveView({ vehicles, selectedVehicleIds, presentationMode }) {
     const { isDark } = useTheme();
+    const { updatePerformanceRunColor } = useAppContext();
     const canvasRef  = useRef(null);
     const chartRef   = useRef(null);
 
@@ -42,6 +46,9 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     // Only consulted when grouping is 'all'; null means "not curated yet", which
     // shows everything rather than an empty chart on first switch.
     const [pickedRunIds, setPickedRunIds] = useState(null);
+    // Colour picks applied immediately in the chart and saved in the background,
+    // so the line changes as you drag the picker rather than after a round trip.
+    const [colorEdits, setColorEdits] = useState({});
 
     const selected = useMemo(
         () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
@@ -91,6 +98,23 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         () => selectorVehicles.flatMap(v => v.runs.map(r => r.id)),
         [selectorVehicles],
     );
+
+    /**
+     * Colour per run, from the same Okabe-Ito resolver the charging and range
+     * charts use — so a run keeps its colour across both, and unset runs get
+     * maximally distinct hues rather than a fixed rotation.
+     */
+    const colorMap = useMemo(() => {
+        const runs = (sessionsByVehicle ? Object.values(sessionsByVehicle).flat() : [])
+            .flatMap(s => s.performance_runs || [])
+            .map(r => ({ id: r.id, color: colorEdits[r.id] ?? r.color, created_at: r.created_at }));
+        return resolveChartColors(runs, colorEdits, 'manual');
+    }, [sessionsByVehicle, colorEdits]);
+
+    const handleRunColor = (runId, hex) => {
+        setColorEdits(prev => ({ ...prev, [runId]: hex }));
+        updatePerformanceRunColor(runId, hex).catch(() => {});
+    };
 
     /**
      * One series per run worth plotting. A run needs at least two split points
@@ -182,6 +206,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     }
 
                     out.push({
+                        runId: run.id,
                         // Year and trim are dropped: with one line per drive mode the
                         // legend is already long, and the mode is what distinguishes them.
                         // Best-per-vehicle needs no mode in the label — there's one line.
@@ -228,14 +253,29 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         const grid = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
         const tick = isDark ? '#cbd5e1' : '#475569';
 
+        // Traced runs take their resolved colour first; reconstructed curves then
+        // fill from the palette AROUND those, so a dashed line can't land on the
+        // same hue as a solid one and be mistaken for it.
+        const taken = new Set(
+            series.map(s => (s.runId != null ? colorMap[s.runId] : null)).filter(Boolean),
+        );
+        const spare = PALETTE.filter(c => !taken.has(c));
+        let spareIdx = 0;
+        const seriesColors = series.map((s, i) =>
+            (s.runId != null && colorMap[s.runId])
+            || spare[spareIdx++ % (spare.length || 1)]
+            || PALETTE[i % PALETTE.length]);
+
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
             data: {
-                datasets: series.map((s, i) => ({
+                datasets: series.map((s, i) => {
+                    const c = seriesColors[i];
+                    return {
                     label: s.label,
                     data: s.points,
-                    borderColor: PALETTE[i % PALETTE.length],
-                    backgroundColor: PALETTE[i % PALETTE.length],
+                    borderColor: c,
+                    backgroundColor: c,
                     borderWidth: 2,
                     // Dashed = reconstructed from headline figures, not traced.
                     borderDash: s.synthetic ? [6, 4] : [],
@@ -244,7 +284,8 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     // Straight segments: with three points, a curve fit would
                     // invent shape the figures don't support.
                     tension: s.synthetic ? 0 : 0.25,
-                })),
+                    };
+                }),
             },
             options: {
                 responsive: true,
@@ -315,7 +356,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         });
 
         return () => { chartRef.current?.destroy(); chartRef.current = null; };
-    }, [series, isDark, presentationMode, scale]);
+    }, [series, isDark, presentationMode, scale, colorMap]);
 
     if (loading) return <LoadingSpinner />;
 
@@ -323,6 +364,23 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         <>
             {!presentationMode && <div className="card mb-6">
                 <div className="flex flex-wrap items-end gap-6">
+                    <div>
+                        <label className="block font-medium mb-2">Focus:</label>
+                        <select
+                            value={scale.xMax == null ? 'full' : 'launch'}
+                            onChange={e => setScale(prev => ({
+                                ...prev,
+                                // A merged drag ladder stretches the axis to ~13 s and
+                                // squeezes the whole 0-60 into the left quarter, which
+                                // reads as if the low-speed splits had gone missing.
+                                xMax: e.target.value === 'launch' ? 5 : null,
+                            }))}
+                            className="border p-2 rounded"
+                        >
+                            <option value="full">Full run</option>
+                            <option value="launch">Launch (0–5 s)</option>
+                        </select>
+                    </div>
                     <div>
                         <label className="block font-medium mb-2">Runs shown:</label>
                         <select
@@ -366,6 +424,8 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             vehicles={selectorVehicles}
                             selectedRunIds={pickedRunIds}
                             onChange={setPickedRunIds}
+                            colorMap={colorMap}
+                            onUpdateColor={handleRunColor}
                         />
                     </div>
                 )}
@@ -383,6 +443,16 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460 }}>
                         <canvas ref={canvasRef} />
                     </div>
+                )}
+                {!presentationMode && series.length > 0 && (
+                    <ChartExportButtons
+                        chartRef={chartRef}
+                        isDark={isDark}
+                        buildParams={p => {
+                            p.set('tab', 'performance');
+                            p.set('m', 'perfcurve');
+                        }}
+                    />
                 )}
             </div>
 
