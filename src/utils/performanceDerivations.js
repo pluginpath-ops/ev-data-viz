@@ -6,23 +6,28 @@
  * is the same discipline epaDerivations.js follows and the reason a stored
  * "derived" value can't go stale when its backing runs change.
  *
- * Three independent things can supply the same metric:
+ * ── EVERYTHING TESTED IS ONE POOL ──────────────────────────────────────────
  *
- *   measured  — computed from this vehicle's own detail sessions
- *               (performance_sessions → performance_runs)
- *   reported   — a published figure entered in performance_summaries
- *   claimed    — the manufacturer's own number, from the vehicle_performance
- *                table surfaced via specs.performance.*
+ * A figure derived from a session imported here and a figure published by Car
+ * and Driver are the same KIND of thing: somebody put a car on a surface and
+ * timed it. The only difference is whether we also hold the full trace behind
+ * the number. So they rank together as TESTED results, and holding the detail
+ * data is provenance on an entry — not a separate axis to compare along.
  *
- * They are deliberately NOT merged into one number. The gap between claimed and
- * measured is the interesting part, so `resolveMetric` returns all of them and
- * lets the UI decide what to show.
+ * `deriveTestedResults` is the entry point: it returns one ranked list per
+ * metric, mixing entries derived on the fly from sessions with entries entered
+ * from a published source. Each carries where it came from and how much is
+ * known about it.
+ *
+ * Manufacturer claims are deliberately NOT in that pool — a marketing figure
+ * is not a test result. `deriveClaimed` still exists for anyone who wants to
+ * contrast the two, but nothing in the UI currently uses it.
  *
  * Each derivation returns a provenance record, matching epaDerivations.js:
  *   { value, source, certain, flags[], basis? }
  *     value   — number, or null when uncomputable
- *     source  — 'measured' | 'reported' | 'claimed' | null
- *     certain — true only for a measured value with enough supporting runs
+ *     source  — 'tested' | 'claimed' | null
+ *     certain — true only when backed by enough runs to rule out a fluke
  *     flags   — machine-readable warnings ('single-run', 'steep-grade', …)
  *     basis   — what it was computed from, for UI drill-down
  */
@@ -223,6 +228,92 @@ export function deriveClaimed(vehicle, field) {
         certain: false,
         flags: field === 'zero_to_60_rollout_sec' ? ['rollout-convention-unknown'] : [],
         basis: { spec_key: `performance.${key}` },
+    };
+}
+
+// ── Tested results: one pool ────────────────────────────────────────────────
+
+/**
+ * Every tested figure for a metric, from every source, ranked best first.
+ *
+ * Two kinds of entry, ranked together because they are the same kind of claim:
+ *
+ *   origin 'session'   — derived here from imported run data. Carries the extra
+ *                        detail we hold: which drive mode, how many comparable
+ *                        runs, the spread between them, and warnings when the
+ *                        figure rests on one run or a run taken on a grade.
+ *   origin 'published'  — a figure entered from a source, with no trace behind it.
+ *
+ * Sessions are grouped by source so a vehicle tested twice by different people
+ * yields two entries rather than one merged best-of. Sessions with no source
+ * name are attributed to EVBench, since importing the raw data here is what
+ * makes the result ours.
+ *
+ * @returns {Array<{value, sourceName, origin, certain, flags, url, basis}>}
+ */
+export function deriveTestedResults(sessions = [], summaries = [], field) {
+    const lower = LOWER_IS_BETTER.has(field);
+    const out = [];
+
+    // Sessions → one entry per source, derived on the fly.
+    const bySource = new Map();
+    for (const s of sessions || []) {
+        const key = s.source_name?.trim() || 'EVBench';
+        if (!bySource.has(key)) bySource.set(key, []);
+        bySource.get(key).push(s);
+    }
+    for (const [sourceName, group] of bySource) {
+        const rec = deriveFromRuns(group, field);
+        if (rec.value == null) continue;
+        out.push({
+            value: rec.value,
+            sourceName,
+            origin: 'session',
+            certain: rec.certain,
+            flags: rec.flags,
+            url: group.find(s => s.source_url)?.source_url ?? null,
+            basis: rec.basis,
+        });
+    }
+
+    // Published figures → one entry each, so disagreement stays visible.
+    for (const row of summaries || []) {
+        const value = num(row[field]);
+        if (value == null) continue;
+        out.push({
+            value,
+            sourceName: row.source_name?.trim() || 'Unattributed',
+            origin: 'published',
+            // Someone else's methodology can't be checked from here.
+            certain: false,
+            flags: [],
+            url: row.source_url || row.spreadsheet_url || null,
+            basis: { summary_id: row.id ?? null, trim_label: row.trim_label ?? null },
+        });
+    }
+
+    return out.sort((a, b) => (lower ? a.value - b.value : b.value - a.value));
+}
+
+/**
+ * The single best tested figure for a metric, in the provenance-record shape
+ * the rest of this module returns.
+ *
+ * source is always 'tested'; `basis.all` carries every entry so the UI can show
+ * who else tested it and whether they agree.
+ */
+export function deriveTested(sessions, summaries, field) {
+    const all = deriveTestedResults(sessions, summaries, field);
+    if (all.length === 0) return { ...EMPTY };
+    const best = all[0];
+    const flags = [...best.flags];
+    if (all.length > 1) flags.push('multiple-sources');
+    return {
+        value: best.value,
+        source: 'tested',
+        certain: best.certain,
+        flags,
+        basis: { ...best.basis, sourceName: best.sourceName, origin: best.origin, url: best.url, all },
     };
 }
 

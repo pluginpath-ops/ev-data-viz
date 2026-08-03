@@ -5,7 +5,7 @@
  * Two independent layers, deliberately kept visually separate:
  *   • Test sessions — detail data imported from a GPS testing export, with
  *     every individual run and its conditions.
- *   • Reported results — published figures from a source, often the ONLY data
+ *   • Published results — published figures from a source, often the ONLY data
  *     available for a car (a 0-60 and a video link, no CSV behind it). This is
  *     the normal case, not a degraded one.
  *
@@ -15,7 +15,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import InfoIcon from './InfoIcon';
-import MeasuredValues from './performance/MeasuredValues';
+import TestedResults from './performance/TestedResults';
 import PerformanceSessionCard from './performance/PerformanceSessionCard';
 import PerformanceSummaryCard from './performance/PerformanceSummaryCard';
 import PerformanceImportModal from './PerformanceImportModal';
@@ -143,7 +143,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                 </h3>
             </div>
 
-            <MeasuredValues vehicle={vehicle} sessions={sessions} summaries={summaries} />
+            <TestedResults sessions={sessions} summaries={summaries} />
 
             {/* ── Test sessions ─────────────────────────────────────────── */}
             <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
@@ -177,13 +177,13 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                 </button>
             )}
 
-            {/* ── Reported results ──────────────────────────────────────── */}
+            {/* ── Published results ──────────────────────────────────────── */}
             <div className="text-faint text-[10px] uppercase tracking-wide mt-4 mb-1 font-semibold">
-                Reported results
+                Published results
             </div>
             {summaries.length === 0 ? (
                 <p className="text-sm text-muted mb-2">
-                    No published figures recorded.
+                    No published figures recorded. Add one for any source that tested this car without sharing full data.
                 </p>
             ) : (
                 summaries.map(s => (

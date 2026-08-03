@@ -74,8 +74,25 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete }) {
                     {session.location_name && (
                         <div className="text-xs text-muted mt-0.5">{session.location_name}</div>
                     )}
-                    {session.source_name && (
-                        <div className="text-xs text-faint mt-0.5">{session.source_name}</div>
+                    {/* Attribution. source_url was captured on import but never
+                        shown until now — a session with no visible provenance is
+                        just a number you have to take on trust. */}
+                    {(session.source_name || session.source_url) && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium text-muted bg-[var(--color-surface-muted)] border-[var(--color-border)]">
+                                {session.source_name || 'Unattributed'}
+                            </span>
+                            {session.source_url && (
+                                <a
+                                    href={session.source_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                                >
+                                    source ↗
+                                </a>
+                            )}
+                        </div>
                     )}
                 </div>
                 {canEdit && (

@@ -17,6 +17,7 @@ import { useTheme } from '../hooks/useTheme';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import AxisScaleControls from './AxisScaleControls';
+import PerformanceRunSelector from './performance/PerformanceRunSelector';
 
 /** Okabe-Ito, matching the palette the other charts use for run colours. */
 const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
@@ -33,6 +34,9 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     // 'all'     — every run, for run-to-run consistency
     const [grouping, setGrouping] = useState('mode');
     const [scale, setScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
+    // Only consulted when grouping is 'all'; null means "not curated yet", which
+    // shows everything rather than an empty chart on first switch.
+    const [pickedRunIds, setPickedRunIds] = useState(null);
 
     const selected = useMemo(
         () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
@@ -52,6 +56,32 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         })();
         return () => { cancelled = true; };
     }, [selected.map(v => v.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /**
+     * Every plottable accel run, per vehicle, for the picker.
+     */
+    const selectorVehicles = useMemo(() => {
+        if (!sessionsByVehicle) return [];
+        return selected.map(v => ({
+            id: v.id,
+            name: v.name,
+            runs: (sessionsByVehicle[v.id] || [])
+                .filter(s => s.test_type === 'accel')
+                .flatMap(s => (s.performance_runs || [])
+                    .filter(r => (r.performance_run_points || []).length >= 2)
+                    .map(r => ({
+                        id: r.id,
+                        name: `Run #${(r.sequence ?? 0) + 1}`,
+                        driveMode: r.drive_mode,
+                        zeroTo60: r.zero_to_60_sec,
+                    }))),
+        })).filter(v => v.runs.length > 0);
+    }, [sessionsByVehicle, selected]);
+
+    const allRunIds = useMemo(
+        () => selectorVehicles.flatMap(v => v.runs.map(r => r.id)),
+        [selectorVehicles],
+    );
 
     /**
      * One series per run worth plotting. A run needs at least two split points
@@ -75,7 +105,10 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
 
             let chosen;
             if (grouping === 'all') {
-                chosen = allRuns;
+                // Curated subset when the user has picked; everything until then.
+                chosen = pickedRunIds === null
+                    ? allRuns
+                    : allRuns.filter(r => pickedRunIds.some(id => String(id) === String(r.id)));
             } else if (grouping === 'vehicle') {
                 chosen = [allRuns.reduce(quickest)];
             } else {
@@ -124,7 +157,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
             }
         }
         return out;
-    }, [sessionsByVehicle, selected, grouping]);
+    }, [sessionsByVehicle, selected, grouping, pickedRunIds]);
 
     useEffect(() => {
         if (!canvasRef.current || series.length === 0) {
@@ -235,6 +268,19 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     it is the same 60&nbsp;mph point on a different clock — and the 0–60 time is
                     added as the final point, since sources list splits only to 0–50.
                 </p>
+
+                {/* Curation sits with the control that enables it, and only under
+                    "Every run" — the other groupings already pick for you, so a
+                    picker there would silently do nothing. */}
+                {grouping === 'all' && selectorVehicles.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
+                        <PerformanceRunSelector
+                            vehicles={selectorVehicles}
+                            selectedRunIds={pickedRunIds}
+                            onChange={setPickedRunIds}
+                        />
+                    </div>
+                )}
             </div>}
 
             <div className="card mb-4">
