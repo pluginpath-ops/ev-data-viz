@@ -13,6 +13,8 @@ import SpecsView from './components/SpecsView';
 import SpecsChartView from './components/SpecsChartView';
 import SpecsScatterView from './components/SpecsScatterView';
 import EpaCurvesView from './components/EpaCurvesView';
+import PerformanceCompareView from './components/PerformanceCompareView';
+import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView from './components/AdminView';
 import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory } from './constants/chartNav';
 
@@ -760,7 +762,7 @@ export default function App() {
                       * listed here, so every new chart mode must be added to this
                       * exclusion list or it silently renders the charging chart
                       * instead of itself. */}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'epacurves' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && (
                         <ChargingView
                             vehicles={vehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -817,6 +819,18 @@ export default function App() {
                             setEpaConfig={setEpaConfig}
                             autoColor={chartConfig.autoColor ?? true}
                             setChartConfig={setChartConfig}
+                        />
+                    )}
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'perfcompare' && (
+                        <PerformanceCompareView
+                            vehicles={vehicles}
+                            selectedVehicleIds={selectedVehicles}
+                        />
+                    )}
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'perfcurve' && (
+                        <PerformanceCurveView
+                            vehicles={vehicles}
+                            selectedVehicleIds={selectedVehicles}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specstable' && (
