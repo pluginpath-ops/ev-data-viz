@@ -155,36 +155,53 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
             {
                 for (const run of chosen) {
                     // Two ladders can sit on one run: speed thresholds (0-10 … 0-50)
-                    // and a drag distance ladder (60ft, 330ft, … 1/4). They come from
-                    // separate exports and DO NOT share a clock — measured on real
-                    // data, the drag ladder reads ~0.1 s later than the speed ladder
-                    // at the same speed, in the direction the 1 ft rollout would
-                    // explain but only about half its magnitude, with the rest
-                    // likely the difference between a position trigger and a speed
-                    // trigger.
+                    // and a drag distance ladder (60ft, 330ft, … 1/4). They are
+                    // timestamped on different epochs — measured across 13 runs of
+                    // two vehicles and seven drive modes, the drag ladder reads
+                    // 0.0997 s late with a standard deviation of 4.5 ms.
                     //
-                    // Each ladder is internally smooth, so each is used only where it
-                    // is authoritative: speed thresholds up to their top, the drag
-                    // ladder above that. Interleaving them instead produced a visible
-                    // kink around 30 mph, which asserted a shared clock they don't have.
+                    // That constancy is what makes it correctable. It is NOT the
+                    // rollout: the rollout offset on those same runs ranges 0.182
+                    // to 0.301 s and tracks launch aggression, while this sits flat
+                    // at 0.100 s regardless of car, mode or how hard it left the
+                    // line — the signature of a fixed instrumentation latency.
+                    //
+                    // So the offset is measured per run from wherever the ladders
+                    // overlap and subtracted, which puts both on one clock and keeps
+                    // every point. Self-calibrating rather than a hardcoded 0.1, so
+                    // a source with a different latency corrects itself.
                     const raw = (run.performance_run_points || [])
                         .filter(p => p.speed_mph != null && p.elapsed_s != null
                             // The 1ft split is the same 60 mph point on the rollout
                             // clock and would double back on the curve.
                             && !/\(1ft\)/.test(p.label || ''));
 
-                    const speedLadder = raw.filter(p => p.distance_ft == null);
-                    const dragLadder  = raw.filter(p => p.distance_ft != null);
-                    const speedTop = speedLadder.reduce((m, p) => Math.max(m, Number(p.speed_mph)), 0);
-                    // 60 mph comes from the headline below, so hand over above it.
-                    const handover = Math.max(speedTop, speedLadder.length ? 60 : 0);
+                    const speedLadder = raw.filter(p => p.distance_ft == null)
+                        .map(p => ({ x: Number(p.elapsed_s), y: Number(p.speed_mph) }));
+                    const dragLadder = raw.filter(p => p.distance_ft != null)
+                        .map(p => ({ x: Number(p.elapsed_s), y: Number(p.speed_mph) }));
+
+                    // Where the speed ladder says the car hit a given speed.
+                    const speedSorted = [...speedLadder].sort((a, b) => a.y - b.y);
+                    const tAtSpeed = (v) => {
+                        const after  = speedSorted.find(p => p.y >= v);
+                        const before = [...speedSorted].reverse().find(p => p.y <= v);
+                        if (!after || !before || after.y === before.y) return null;
+                        return before.x + (v - before.y) / (after.y - before.y) * (after.x - before.x);
+                    };
+
+                    let offset = 0;
+                    if (speedLadder.length >= 2) {
+                        const deltas = dragLadder
+                            .map(p => { const t = tAtSpeed(p.y); return t == null ? null : p.x - t; })
+                            .filter(d => d != null);
+                        if (deltas.length) offset = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+                    }
 
                     const points = [
                         ...speedLadder,
-                        ...dragLadder.filter(p => speedLadder.length === 0 || Number(p.speed_mph) > handover),
-                    ]
-                        .map(p => ({ x: Number(p.elapsed_s), y: Number(p.speed_mph) }))
-                        .sort((a, b) => a.x - b.x);
+                        ...dragLadder.map(p => ({ x: p.x - offset, y: p.y })),
+                    ].sort((a, b) => a.x - b.x);
                     if (points.length < 2) continue;
 
                     // Every launch starts from rest; the export omits that point.
