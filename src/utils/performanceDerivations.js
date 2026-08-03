@@ -183,7 +183,7 @@ export function deriveFromSummaries(summaries = [], field) {
             summary_id: pick.id ?? null,
             source_name: pick.source_name ?? null,
             trim_label: pick.trim_label ?? null,
-            url: pick.youtube_url || pick.spreadsheet_url || null,
+            url: pick.source_url || pick.spreadsheet_url || null,
             all: sorted.map(s => ({
                 summary_id: s.id ?? null,
                 source_name: s.source_name ?? null,

@@ -11,6 +11,7 @@ import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 import { RunVoteButtons } from './VoteButtons';
 import EpaVehicleSection from './EpaVehicleSection';
+import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
 import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
 
@@ -2801,6 +2802,15 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                     </div>
                 </div>
             )}
+
+            {/* ── Performance Testing (acceleration / braking) ──────────────── */}
+            {/* Above EPA: both are independently-measured test data, so they sit
+                next to the charging/range runs, while EPA is certification
+                reference data and reads last. */}
+            <PerformanceVehicleSection
+                vehicle={vehicle}
+                canEdit={isContributor && canEdit(vehicle)}
+            />
 
             {/* ── EPA Testing Data ──────────────────────────────────────────── */}
             <EpaVehicleSection

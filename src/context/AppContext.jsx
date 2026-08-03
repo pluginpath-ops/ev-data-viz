@@ -1091,6 +1091,84 @@ export function AppProvider({ children }) {
     const getEpaAuditForGroup = (testGroupId, childRowIds) =>
         dataService.getEpaAuditForGroup(testGroupId, childRowIds);
 
+    // ── Performance testing (acceleration / braking) ────────────────────────
+
+    /** Sessions (with runs and splits) for one vehicle. Read-only, no refresh. */
+    const getPerformanceSessions = (vehicleId) => dataService.getPerformanceSessions(vehicleId);
+
+    /** Reported summaries with their speed-window intervals, for one vehicle. */
+    const getPerformanceSummaries = (vehicleId) => dataService.getPerformanceSummaries(vehicleId);
+
+    /**
+     * Import a parsed performance CSV as one session with its runs and splits.
+     * `parsed` is the output of parsePerformanceCSV().
+     */
+    const importPerformanceSession = async (vehicleId, parsed, meta) => {
+        try {
+            const session = await dataService.importPerformanceSession(vehicleId, parsed, meta);
+            showSuccess(`Imported ${parsed.runs.length} run${parsed.runs.length === 1 ? '' : 's'}.`);
+            return session;
+        } catch (error) {
+            showError('Import failed: ' + error.message);
+            throw error;
+        }
+    };
+
+    const deletePerformanceSession = async (id) => {
+        try {
+            await dataService.deletePerformanceSession(id);
+            showSuccess('Testing session deleted.');
+        } catch (error) {
+            showError('Delete failed: ' + error.message);
+            throw error;
+        }
+    };
+
+    /**
+     * Save a reported result. Refreshes vehicles because summaries ride along on
+     * the vehicle record and feed the comparison charts.
+     */
+    // These do NOT refresh the vehicles list. Summaries aren't embedded in
+    // getVehicles (see the note there), so refetching every vehicle on each
+    // field blur would cost a full reload and change nothing on screen — the
+    // performance section owns and reloads its own data.
+    const savePerformanceSummary = async (row) => {
+        try {
+            return await dataService.savePerformanceSummary(row);
+        } catch (error) {
+            showError('Save failed: ' + error.message);
+            throw error;
+        }
+    };
+
+    const deletePerformanceSummary = async (id) => {
+        try {
+            await dataService.deletePerformanceSummary(id);
+            showSuccess('Result deleted.');
+        } catch (error) {
+            showError('Delete failed: ' + error.message);
+            throw error;
+        }
+    };
+
+    const savePerformanceInterval = async (row) => {
+        try {
+            return await dataService.savePerformanceInterval(row);
+        } catch (error) {
+            showError('Save failed: ' + error.message);
+            throw error;
+        }
+    };
+
+    const deletePerformanceInterval = async (id) => {
+        try {
+            await dataService.deletePerformanceInterval(id);
+        } catch (error) {
+            showError('Delete failed: ' + error.message);
+            throw error;
+        }
+    };
+
     /** Delete an EPA test group and its vehicle mappings, then refresh vehicles. */
     const deleteEpaTestGroup = async (testGroupId) => {
         try {
@@ -1242,6 +1320,15 @@ export function AppProvider({ children }) {
         deleteEpaTestGroup,
         updateEpaLabelMethod,
         updateEpaTestGroup,
+        // Performance testing (acceleration / braking)
+        getPerformanceSessions,
+        getPerformanceSummaries,
+        importPerformanceSession,
+        deletePerformanceSession,
+        savePerformanceSummary,
+        deletePerformanceSummary,
+        savePerformanceInterval,
+        deletePerformanceInterval,
         // EPA curator hierarchy
         getEpaTestGroupFull,
         saveEpaCoefficientSet,
