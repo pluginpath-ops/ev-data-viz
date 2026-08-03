@@ -142,13 +142,19 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     // Every launch starts from rest; the export omits that point.
                     if (points[0].x > 0 && points[0].y > 0) points.unshift({ x: 0, y: 0 });
 
-                    // Sources list splits up to 0-50 and then give 0-60 only as the
-                    // headline figure, so without this the curve stops short of the
-                    // very speed the run is named for. zero_to_60_sec is the
-                    // no-rollout time — the same clock as the splits above.
+                    // Speed splits stop at 0-50 and give 0-60 only as the headline
+                    // figure, so without this the curve skips the very speed the run
+                    // is named for. zero_to_60_sec is the no-rollout time — the same
+                    // clock as the splits.
+                    //
+                    // Inserted wherever it belongs rather than only at the end: once
+                    // a drag ladder is merged in, the run continues past 60 mph to
+                    // the quarter mile, and an append-only rule would drop the point
+                    // and leave a gap between 50 and ~77 mph.
                     const t60 = Number(run.zero_to_60_sec);
-                    if (Number.isFinite(t60) && t60 > points[points.length - 1].x) {
+                    if (Number.isFinite(t60) && !points.some(p => p.y === 60)) {
                         points.push({ x: t60, y: 60 });
+                        points.sort((a, b) => a.x - b.x);
                     }
 
                     out.push({
