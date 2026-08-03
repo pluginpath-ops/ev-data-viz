@@ -17,7 +17,7 @@ import { useTheme } from '../hooks/useTheme';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import {
-    deriveTested, groupIntervals, normaliseInterval,
+    deriveTested, groupIntervals, normaliseInterval, PINNED_WINDOWS,
 } from '../utils/performanceDerivations';
 
 /** Metrics stored as promoted columns, available on both bases. */
@@ -65,35 +65,44 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
         return () => { cancelled = true; };
     }, [selected.map(v => v.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Only the windows some selected vehicle actually has.
+    // Every window some selected vehicle actually has. Pinned ones are listed
+    // as standard metrics instead, so 0-100 sits beside 0-60 rather than being
+    // buried among braking distances.
     const windowOptions = useMemo(() => {
         if (!data) return [];
         const seen = new Map();
         for (const v of selected) {
             for (const b of groupIntervals(data[v.id]?.summaries || [])) {
+                if (PINNED_WINDOWS.some(p => p.key === b.key)) continue;
                 if (!seen.has(b.key)) seen.set(b.key, { key: b.key, label: b.label, kind: b.kind });
             }
         }
         return [...seen.values()];
     }, [data, selected]);
 
+    /** Pinned + discovered windows — everything resolvable as a speed window. */
+    const allWindows = useMemo(
+        () => [...PINNED_WINDOWS, ...windowOptions],
+        [windowOptions],
+    );
+
     // A window can stop existing when the selection changes; fall back rather
     // than rendering an empty chart against a metric nobody has.
     useEffect(() => {
-        if (metric.includes(':') && !windowOptions.some(w => w.key === metric)) {
+        if (metric.includes(':') && !allWindows.some(w => w.key === metric)) {
             setMetric('zero_to_60_sec');
         }
-    }, [windowOptions, metric]);
+    }, [allWindows, metric]);
 
     const activeMetric = useMemo(() => {
         if (metric.includes(':')) {
-            const w = windowOptions.find(o => o.key === metric);
+            const w = allWindows.find(o => o.key === metric);
             return w
                 ? { key: w.key, label: w.label, isWindow: true, kind: w.kind, lowerIsBetter: true }
                 : SCALAR_METRICS[0];
         }
         return SCALAR_METRICS.find(m => m.key === metric) || SCALAR_METRICS[0];
-    }, [metric, windowOptions]);
+    }, [metric, allWindows]);
 
     /** One row per selected vehicle on the ACTIVE BASIS ONLY. */
     const rows = useMemo(() => {
@@ -260,6 +269,9 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                         >
                             {SCALAR_METRICS.map(m => (
                                 <option key={m.key} value={m.key}>{m.label}</option>
+                            ))}
+                            {PINNED_WINDOWS.map(w => (
+                                <option key={w.key} value={w.key}>{w.label}</option>
                             ))}
                             {windowOptions.length > 0 && (
                                 <optgroup label="Speed windows">

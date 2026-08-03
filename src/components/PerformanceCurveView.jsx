@@ -18,6 +18,7 @@ import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import AxisScaleControls from './AxisScaleControls';
 import PerformanceRunSelector from './performance/PerformanceRunSelector';
+import { buildSyntheticCurve } from '../utils/performanceDerivations';
 
 /** Okabe-Ito, matching the palette the other charts use for run colours. */
 const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
@@ -28,6 +29,10 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     const chartRef   = useRef(null);
 
     const [sessionsByVehicle, setSessionsByVehicle] = useState(null);
+    const [summariesByVehicle, setSummariesByVehicle] = useState({});
+    // Published-only vehicles can't otherwise appear here at all, so this is on
+    // by default; the dashes keep them from being mistaken for measured traces.
+    const [showPublished, setShowPublished] = useState(true);
     const [loading, setLoading] = useState(true);
     // 'mode'   — quickest run in each drive mode (default: the mode comparison)
     // 'vehicle' — one line per vehicle, its single quickest run
@@ -48,11 +53,15 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         setLoading(true);
         (async () => {
             const ids = selected.map(v => v.id);
-            const allSessions = await dataService.getPerformanceSessions(ids);
-            const next = {};
-            for (const id of ids) next[id] = [];
-            for (const s of allSessions) next[s.vehicle_id]?.push(s);
-            if (!cancelled) { setSessionsByVehicle(next); setLoading(false); }
+            const [allSessions, allSummaries] = await Promise.all([
+                dataService.getPerformanceSessions(ids),
+                dataService.getPerformanceSummaries(ids),
+            ]);
+            const next = {}, sums = {};
+            for (const id of ids) { next[id] = []; sums[id] = []; }
+            for (const s of allSessions)  next[s.vehicle_id]?.push(s);
+            for (const s of allSummaries) sums[s.vehicle_id]?.push(s);
+            if (!cancelled) { setSessionsByVehicle(next); setSummariesByVehicle(sums); setLoading(false); }
         })();
         return () => { cancelled = true; };
     }, [selected.map(v => v.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -156,8 +165,27 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                 }
             }
         }
+        // Curves reconstructed from published headline figures. Drawn dashed and
+        // listed after the traced runs, because three points off a spec sheet is
+        // a sketch of a curve, not a measurement of one.
+        if (showPublished) {
+            for (const v of selected) {
+                for (const summary of summariesByVehicle[v.id] || []) {
+                    const synth = buildSyntheticCurve(summary);
+                    if (!synth) continue;
+                    out.push({
+                        label: `${v.name} · ${summary.source_name || 'published'}`,
+                        fullLabel: `${vehicleLabel(v)} · ${summary.source_name || 'published'}`,
+                        points: synth.points,
+                        synthetic: true,
+                        basis: synth.basis,
+                        flags: synth.flags,
+                    });
+                }
+            }
+        }
         return out;
-    }, [sessionsByVehicle, selected, grouping, pickedRunIds]);
+    }, [sessionsByVehicle, summariesByVehicle, selected, grouping, pickedRunIds, showPublished]);
 
     useEffect(() => {
         if (!canvasRef.current || series.length === 0) {
@@ -179,8 +207,13 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     borderColor: PALETTE[i % PALETTE.length],
                     backgroundColor: PALETTE[i % PALETTE.length],
                     borderWidth: 2,
-                    pointRadius: presentationMode ? 0 : 2.5,
-                    tension: 0.25,
+                    // Dashed = reconstructed from headline figures, not traced.
+                    borderDash: s.synthetic ? [6, 4] : [],
+                    pointStyle: s.synthetic ? 'rectRot' : 'circle',
+                    pointRadius: presentationMode ? 0 : (s.synthetic ? 4 : 2.5),
+                    // Straight segments: with three points, a curve fit would
+                    // invent shape the figures don't support.
+                    tension: s.synthetic ? 0 : 0.25,
                 })),
             },
             options: {
@@ -212,7 +245,20 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             title: (items) => `${items[0].parsed.x.toFixed(3)} s`,
                             // Tooltip shows the untruncated name, so the legend can
                             // stay short without losing which vehicle a line is.
-                            label: (c) => `${series[c.datasetIndex]?.fullLabel ?? c.dataset.label}: ${c.parsed.y.toFixed(0)} mph`,
+                            label: (c) => {
+                                const sr = series[c.datasetIndex];
+                                const lines = [`${sr?.fullLabel ?? c.dataset.label}: ${c.parsed.y.toFixed(0)} mph`];
+                                if (sr?.synthetic) {
+                                    lines.push(`Reconstructed from ${sr.basis.join(' + ')}`);
+                                    if (sr.flags.includes('mixed-rollout')) {
+                                        lines.push('⚠ 0–60 is a no-rollout figure paired with a ¼-mile ET, which is not');
+                                    }
+                                    if (sr.flags.includes('non-monotonic')) {
+                                        lines.push('⚠ The published figures disagree with each other');
+                                    }
+                                }
+                                return lines;
+                            },
                         },
                     },
                 },
@@ -259,14 +305,26 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             <option value="all">Every run</option>
                         </select>
                     </div>
+                    <label className="flex items-center gap-1.5 text-xs cursor-pointer pb-3">
+                        <input
+                            type="checkbox"
+                            checked={showPublished}
+                            onChange={e => setShowPublished(e.target.checked)}
+                        />
+                        <span className="text-secondary">Include published figures</span>
+                    </label>
                     <span className="text-xs text-faint pb-3">
                         {series.length} line{series.length === 1 ? '' : 's'} plotted
                     </span>
                 </div>
                 <p className="text-xs text-muted mt-3">
-                    Built from imported split times. The 1&nbsp;ft-rollout split is left out —
-                    it is the same 60&nbsp;mph point on a different clock — and the 0–60 time is
-                    added as the final point, since sources list splits only to 0–50.
+                    Solid lines are traced from imported split times: the 1&nbsp;ft-rollout
+                    split is left out, being the same 60&nbsp;mph point on a different clock,
+                    and the 0–60 time is added as the final point since sources list splits
+                    only to 0–50. Dashed lines are reconstructed from a source’s headline
+                    figures — 0–60, 0–100 where given, and the ¼-mile ET paired with its trap
+                    speed, which is a real point rather than a guess. Three points is a sketch
+                    of a curve, not a measurement of one.
                 </p>
 
                 {/* Curation sits with the control that enables it, and only under

@@ -317,6 +317,84 @@ export function deriveTested(sessions, summaries, field) {
     };
 }
 
+// ── Synthetic curves from headline figures ──────────────────────────────────
+
+/**
+ * Well-known acceleration windows worth naming rather than leaving buried in a
+ * generic speed-window list. Keys match `windowKey()` output.
+ */
+export const PINNED_WINDOWS = [
+    { key: 'accel:0-100mph', label: '0–100 mph', kind: 'accel', lowerIsBetter: true },
+];
+
+/**
+ * Reconstruct a speed-vs-time curve from a source's headline figures, for
+ * vehicles that have published numbers but no split trace.
+ *
+ * Points come from whatever exists:
+ *   (0, 0)                          every launch starts from rest
+ *   (t 0-60,  60)
+ *   (t 0-100, 100)                  from an accel 0-100 speed window
+ *   (¼-mile ET, ¼-mile trap speed)  trap IS the speed at the ¼-mile mark, so
+ *                                   the ET/trap pair is a genuine (time, speed)
+ *                                   point rather than a derived guess
+ *
+ * ── ROLLOUT, WHICH DECIDES WHETHER THIS IS HONEST ───────────────────────────
+ *
+ * A quarter-mile ET is a drag-strip measure and so includes the 1 ft rollout.
+ * Pairing it with a NO-rollout 0-60 would put two clocks ~0.3 s apart on one
+ * time axis and bend the curve by more than the difference between many cars.
+ * So the rollout 0-60 is preferred whenever the source gives one, and when only
+ * the no-rollout figure exists the result is flagged `mixed-rollout` rather
+ * than silently drawn as if it were consistent.
+ *
+ * Fewer than two points beyond the origin isn't a curve — those return null.
+ *
+ * @returns {{points: Array<{x,y}>, basis: string[], flags: string[]}|null}
+ */
+export function buildSyntheticCurve(summary) {
+    if (!summary) return null;
+    const intervals = summary.performance_intervals || [];
+    const flags = [];
+    const basis = [];
+
+    const rollout   = num(summary.zero_to_60_rollout_sec);
+    const noRollout = num(summary.zero_to_60_sec);
+    const qtrSec    = num(summary.quarter_mile_sec);
+    const qtrTrap   = num(summary.quarter_mile_trap_mph);
+
+    // Prefer the rollout clock, since the quarter-mile point is on it.
+    const t60 = rollout ?? noRollout;
+    if (t60 != null) {
+        basis.push(rollout != null ? '0–60 (1 ft)' : '0–60 (no rollout)');
+        if (rollout == null && qtrSec != null) flags.push('mixed-rollout');
+    }
+
+    // 0-100 lives as an accel speed window, not a promoted column.
+    const hundred = intervals.find(iv =>
+        iv.kind === 'accel' && Number(iv.to_speed) === 100 && Number(iv.from_speed) === 0);
+    const t100 = hundred ? num(hundred.elapsed_s) : null;
+    if (t100 != null) basis.push('0–100');
+
+    const points = [{ x: 0, y: 0 }];
+    if (t60  != null) points.push({ x: t60,  y: 60 });
+    if (t100 != null) points.push({ x: t100, y: 100 });
+    if (qtrSec != null && qtrTrap != null) {
+        points.push({ x: qtrSec, y: qtrTrap });
+        basis.push('¼ mile @ trap');
+    }
+
+    if (points.length < 3) return null;   // origin plus one point is a line, not a curve
+
+    points.sort((a, b) => a.x - b.x);
+    // A later point at a lower speed means the figures disagree with each other.
+    for (let i = 1; i < points.length; i++) {
+        if (points[i].y <= points[i - 1].y) { flags.push('non-monotonic'); break; }
+    }
+
+    return { points, basis, flags };
+}
+
 // ── Top-level resolution ────────────────────────────────────────────────────
 
 /**
