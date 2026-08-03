@@ -2803,6 +2803,15 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 </div>
             )}
 
+            {/* ── Performance Testing (acceleration / braking) ──────────────── */}
+            {/* Above EPA: both are independently-measured test data, so they sit
+                next to the charging/range runs, while EPA is certification
+                reference data and reads last. */}
+            <PerformanceVehicleSection
+                vehicle={vehicle}
+                canEdit={isContributor && canEdit(vehicle)}
+            />
+
             {/* ── EPA Testing Data ──────────────────────────────────────────── */}
             <EpaVehicleSection
                 vehicle={vehicle}
@@ -2815,12 +2824,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 onUpdateDisplayName={(testGroupId, name) =>
                     updateEpaTestGroup(testGroupId, { display_name: name || null })
                 }
-            />
-
-            {/* ── Performance Testing (acceleration / braking) ──────────────── */}
-            <PerformanceVehicleSection
-                vehicle={vehicle}
-                canEdit={isContributor && canEdit(vehicle)}
             />
         </div>
     );
