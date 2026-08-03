@@ -14,7 +14,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onClose }) {
     const [fileName, setFileName] = useState(null);
     const [testType, setTestType] = useState('accel');
     const [sourceName, setSourceName] = useState('');
-    const [youtubeUrl, setYoutubeUrl] = useState('');
+    const [sourceUrl, setSourceUrl] = useState('');
     const [busy, setBusy]         = useState(false);
     const [error, setError]       = useState(null);
 
@@ -38,7 +38,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onClose }) {
         try {
             await onImport(vehicle.id, parsed, {
                 sourceName: sourceName.trim() || null,
-                youtubeUrl: youtubeUrl.trim() || null,
+                sourceUrl: sourceUrl.trim() || null,
             });
             onClose();
         } catch (e) {
@@ -80,11 +80,11 @@ export default function PerformanceImportModal({ vehicle, onImport, onClose }) {
                         />
                     </label>
                     <label className="text-xs flex-1 min-w-[12rem]">
-                        <span className="text-muted block mb-0.5">Video link (optional)</span>
+                        <span className="text-muted block mb-0.5">Source link (optional)</span>
                         <input
-                            type="text" value={youtubeUrl}
-                            onChange={e => setYoutubeUrl(e.target.value)}
-                            placeholder="https://youtu.be/…"
+                            type="text" value={sourceUrl}
+                            onChange={e => setSourceUrl(e.target.value)}
+                            placeholder="https://…"
                             className="form-input text-xs py-1 w-full"
                         />
                     </label>

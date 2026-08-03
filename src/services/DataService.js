@@ -1580,7 +1580,7 @@ class DataService {
    *
    * @param {number} vehicleId
    * @param {{session: object, runs: object[]}} parsed
-   * @param {{trimId?: number, sourceName?: string, youtubeUrl?: string,
+   * @param {{trimId?: number, sourceName?: string, sourceUrl?: string,
    *          spreadsheetUrl?: string, notes?: string}} [meta]
    * @returns {Promise<object>} the created session row
    */
@@ -1604,7 +1604,7 @@ class DataService {
       cloud_cover_pct: session.cloudCoverPct ?? null,
       visibility_mi: session.visibilityMi ?? null,
       source_name: meta.sourceName ?? null,
-      youtube_url: meta.youtubeUrl ?? null,
+      source_url: meta.sourceUrl ?? null,
       spreadsheet_url: meta.spreadsheetUrl ?? null,
       notes: meta.notes ?? null,
     });

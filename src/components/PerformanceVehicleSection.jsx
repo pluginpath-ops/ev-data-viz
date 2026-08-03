@@ -113,8 +113,9 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
         }
     };
 
-    const saveSummaryField = async (id, field, value) => {
-        await savePerformanceSummary({ id, [field]: value });
+    /** Commit a card's buffered edits in one write. */
+    const saveSummaryFields = async (id, fields) => {
+        await savePerformanceSummary({ id, ...fields });
         reload();
     };
 
@@ -190,7 +191,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                         key={s.id}
                         summary={s}
                         canEdit={canEdit}
-                        onSaveField={saveSummaryField}
+                        onSaveFields={saveSummaryFields}
                         onDelete={handleDeleteSummary}
                         onSaveInterval={handleSaveInterval}
                         onDeleteInterval={handleDeleteInterval}
