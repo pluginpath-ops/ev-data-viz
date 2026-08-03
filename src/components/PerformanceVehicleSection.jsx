@@ -12,7 +12,7 @@
  * Measured values are derived from the sessions at read time and shown in their
  * own panel, so a measured number is never confused with a published claim.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import InfoIcon from './InfoIcon';
 import MeasuredValues from './performance/MeasuredValues';
@@ -37,7 +37,10 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
     } = useAppContext();
 
     const [sessions, setSessions] = useState([]);
-    const [loading, setLoading]   = useState(false);
+    // `loaded`, not `loading`: starting from "not yet loaded" means the empty
+    // state can never flash before the first fetch has had a chance to run.
+    const [loaded, setLoaded]     = useState(false);
+    const [reloadToken, setReloadToken] = useState(0);
     const [showImport, setShowImport] = useState(false);
     const [addingResult, setAddingResult] = useState(false);
     const [newSource, setNewSource] = useState('');
@@ -48,26 +51,41 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
     // charts); sessions are fetched per vehicle since they're only needed here.
     const summaries = vehicle?.performance_summaries ?? [];
 
-    const loadSessions = useCallback(async () => {
-        if (!vehicle?.id) return;
-        setLoading(true);
-        try {
-            setSessions(await getPerformanceSessions(vehicle.id));
-        } finally {
-            setLoading(false);
-        }
-    }, [vehicle?.id, getPerformanceSessions]);
+    // AppContext rebuilds its value object every render, so every function it
+    // hands out is a new identity each time. Depending on one directly would
+    // re-fire this effect on every context render — refetching constantly and
+    // flickering the panel. Read it through a ref so the effect depends only on
+    // what actually changes: the vehicle, and an explicit reload.
+    const getSessionsRef = useRef(getPerformanceSessions);
+    getSessionsRef.current = getPerformanceSessions;
 
-    useEffect(() => { loadSessions(); }, [loadSessions]);
+    useEffect(() => {
+        if (!vehicle?.id) { setSessions([]); setLoaded(true); return; }
+        // Guards against a slow response for a previous vehicle landing after a
+        // faster one for the vehicle now on screen.
+        let cancelled = false;
+        setLoaded(false);
+        (async () => {
+            try {
+                const rows = await getSessionsRef.current(vehicle.id);
+                if (!cancelled) setSessions(rows);
+            } finally {
+                if (!cancelled) setLoaded(true);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [vehicle?.id, reloadToken]);
+
+    const reloadSessions = () => setReloadToken(t => t + 1);
 
     const handleImport = async (vehicleId, parsed, meta) => {
         await importPerformanceSession(vehicleId, parsed, meta);
-        await loadSessions();
+        reloadSessions();
     };
 
     const handleDeleteSession = async (id) => {
         await deletePerformanceSession(id);
-        await loadSessions();
+        reloadSessions();
     };
 
     const handleAddResult = async () => {
@@ -104,7 +122,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
             <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
                 Test sessions
             </div>
-            {loading && sessions.length === 0 ? (
+            {!loaded ? (
                 <p className="text-sm text-muted mb-2">Loading…</p>
             ) : sessions.length === 0 ? (
                 <p className="text-sm text-muted mb-2">
