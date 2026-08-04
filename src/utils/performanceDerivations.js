@@ -507,21 +507,42 @@ export function tracedCurvePoints(run) {
  * band at 0.7 g and ±25% at 0.2 g, while a finite difference over times stored
  * to 3 decimals is good to well under 1%.
  *
- * Each entry describes the SEGMENT between two points, not either endpoint —
- * plot it stepped, not as a smooth line through point positions.
+ * Each entry describes the SEGMENT between two points, not either endpoint.
  *
- * @returns {Array<{x0, x1, y0, y1, g, label}>}
+ * ── CLAMPED TO THE RUN'S RECORDED PEAK ──────────────────────────────────────
+ *
+ * An average over an interval cannot exceed the instantaneous peak over the
+ * whole run, so any segment computing above `max_g_force` is measurement error
+ * rather than a reading. It shows up on the shortest intervals — the first
+ * segment off the line, where a launch reaches 10 mph in under 0.3 s and any
+ * latency between the clock starting and the first threshold crossing is a
+ * large fraction of the elapsed time. The quicker the car, the worse it gets:
+ * the Cayenne Turbo's best launch computed 1.646 g against a recorded peak of
+ * 1.273.
+ *
+ * A fixed epoch offset was tested against all 33 stored runs and rejected — the
+ * correction needed varies 0.029-0.081 s (SD 0.018), unlike the ladder offset
+ * which was constant to 4.5 ms. Only 6 of 33 runs are affected at all, so the
+ * clamp is a bound on a known-noisy edge case rather than a correction applied
+ * across the board. Clamped segments are flagged so the chart can say so.
+ *
+ * @returns {Array<{x0, x1, y0, y1, g, label, clamped}>}
  */
 export function segmentAccelerationG(run) {
     const { points } = tracedCurvePoints(run);
+    const peak = num(run?.max_g_force);
     const out = [];
     for (let i = 1; i < points.length; i++) {
         const a = points[i - 1], b = points[i];
         const dt = b.x - a.x;
         if (!(dt > 0)) continue;
+        const raw = ((b.y - a.y) * MPH_TO_MS) / dt / G_MS2;
+        const clamped = peak != null && raw > peak;
         out.push({
             x0: a.x, x1: b.x, y0: a.y, y1: b.y,
-            g: ((b.y - a.y) * MPH_TO_MS) / dt / G_MS2,
+            g: clamped ? peak : raw,
+            rawG: raw,
+            clamped,
             label: `${a.label ?? ''}→${b.label ?? ''}`,
         });
     }

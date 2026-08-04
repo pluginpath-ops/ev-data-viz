@@ -318,7 +318,14 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                                 // so anything past series.length is an acceleration
                                 // span and is measured in g, not mph.
                                 if (c.datasetIndex >= series.length) {
-                                    return `${c.dataset.label}: ${c.parsed.y.toFixed(3)} g`;
+                                    const sr = series[c.datasetIndex - series.length];
+                                    const seg = sr?.gSegments?.[c.dataIndex];
+                                    const line = `${c.dataset.label}: ${c.parsed.y.toFixed(3)} g`;
+                                    // Say so rather than quietly showing a bound as if
+                                    // it were a reading.
+                                    return seg?.clamped
+                                        ? [line, `Capped at this run's recorded peak (computed ${seg.rawG.toFixed(3)} g over ${(seg.x1 - seg.x0).toFixed(3)} s)`]
+                                        : line;
                                 }
                                 const sr = series[c.datasetIndex];
                                 const lines = [`${sr?.fullLabel ?? c.dataset.label}: ${c.parsed.y.toFixed(0)} mph`];
