@@ -239,10 +239,13 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         const gDatasets = !showG ? [] : series.flatMap((s, i) => {
             if (!s.gSegments?.length) return [];
             const c = seriesColors[i];
-            const data = [];
-            for (const seg of s.gSegments) {
-                data.push({ x: seg.x0, y: seg.g }, { x: seg.x1, y: seg.g }, { x: seg.x1, y: null });
-            }
+            // Plotted at each segment's MIDPOINT and splined, rather than as flat
+            // spans from x0 to x1. The spans were technically honest — a g value
+            // describes an interval — but a ladder of disconnected horizontal
+            // dashes reads as noise. The midpoint is where that average best
+            // represents the instant, and a smooth line through them shows the
+            // shape of the falloff, which is the thing worth seeing.
+            const data = s.gSegments.map(seg => ({ x: (seg.x0 + seg.x1) / 2, y: seg.g }));
             return [{
                 label: `${s.label} · g`,
                 data,
@@ -250,10 +253,9 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                 borderColor: c,
                 backgroundColor: c,
                 borderWidth: 1.5,
-                borderDash: [2, 2],
-                pointRadius: 0,
-                spanGaps: false,
-                tension: 0,
+                borderDash: [4, 3],
+                pointRadius: presentationMode ? 0 : 2,
+                tension: 0.35,
             }];
         });
 
@@ -390,17 +392,6 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                         </select>
                     </div>
                     <div>
-                        <label className="block font-medium mb-2">Acceleration:</label>
-                        <label className="flex items-center gap-2 text-sm cursor-pointer py-2">
-                            <input
-                                type="checkbox"
-                                checked={showG}
-                                onChange={e => setShowG(e.target.checked)}
-                            />
-                            <span className="text-secondary">Show g on right axis</span>
-                        </label>
-                    </div>
-                    <div>
                         <label className="block font-medium mb-2">Runs shown:</label>
                         <select
                             value={grouping}
@@ -412,27 +403,36 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             <option value="all">Every run</option>
                         </select>
                     </div>
-                    <label className="flex items-center gap-1.5 text-xs cursor-pointer pb-3">
-                        <input
-                            type="checkbox"
-                            checked={showPublished}
-                            onChange={e => setShowPublished(e.target.checked)}
-                        />
-                        <span className="text-secondary">Include published figures</span>
-                    </label>
-                    <span className="text-xs text-faint pb-3">
+                    {/* Both toggles sit together to the right of the pickers, styled
+                        alike so they read as one pair rather than two controls that
+                        happen to be checkboxes. */}
+                    <div className="flex flex-col gap-1.5 pb-1">
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={showPublished}
+                                onChange={e => setShowPublished(e.target.checked)}
+                            />
+                            <span className="text-secondary">Include published figures</span>
+                        </label>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={showG}
+                                onChange={e => setShowG(e.target.checked)}
+                            />
+                            <span className="text-secondary">Show acceleration (g)</span>
+                        </label>
+                    </div>
+                    <span className="text-xs text-faint pb-1">
                         {series.length} line{series.length === 1 ? '' : 's'} plotted
                     </span>
                 </div>
                 <p className="text-xs text-muted mt-3">
-                    {showG && 'Dotted spans on the right axis are acceleration between splits, derived from the corrected times — each is a value for the interval, not a point. '}
-                    Solid lines are traced from imported split times: the 1&nbsp;ft-rollout
-                    split is left out, being the same 60&nbsp;mph point on a different clock,
-                    and the 0–60 time is added as the final point since sources list splits
-                    only to 0–50. Dashed lines are reconstructed from a source’s headline
-                    figures — 0–60, 0–100 where given, and the ¼-mile ET paired with its trap
-                    speed, which is a real point rather than a guess. Three points is a sketch
-                    of a curve, not a measurement of one.
+                    Solid lines are traced from imported splits, dashed lines reconstructed
+                    from a source’s headline figures. The 1&nbsp;ft-rollout split is left out —
+                    it is the same 60&nbsp;mph point on a different clock.
+                    {showG && ' Dotted lines are estimated acceleration between splits.'}
                 </p>
 
                 {/* Curation sits with the control that enables it, and only under
