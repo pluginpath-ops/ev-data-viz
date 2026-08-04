@@ -428,6 +428,106 @@ export function deriveTested(sessions, summaries, field) {
     };
 }
 
+// ── Traced curve points ─────────────────────────────────────────────────────
+
+/**
+ * The (time, speed) points for one run, on a single consistent clock.
+ *
+ * A run can carry two split ladders: speed thresholds (0-10 … 0-50) and a drag
+ * distance ladder (60ft, 330ft, … 1/4). They come from separate exports and are
+ * timestamped on different epochs — measured across 13 runs of two vehicles and
+ * seven drive modes, the drag ladder reads 0.0997 s late, SD 0.0045 s. That is
+ * NOT the rollout, which varies 0.182-0.301 s on the same runs and tracks launch
+ * aggression; this sits flat regardless of car, mode or launch, which is a fixed
+ * instrumentation latency between distance triggers and speed-threshold
+ * crossings.
+ *
+ * The offset is measured per run from wherever the ladders overlap and
+ * subtracted, so every point lands on one clock. Self-calibrating rather than a
+ * hardcoded 0.1, so a source with different latency corrects itself.
+ *
+ * THIS IS THE ONLY PLACE THAT CORRECTION LIVES. Anything reading elapsed times
+ * off the raw points instead will be wrong in a way that barely shows on a speed
+ * curve but wrecks a derivative: uncorrected, the segments either side of the
+ * 60 ft point read 0.378 and 0.923 g where the truth is 0.741 for both.
+ *
+ * @returns {{points: Array<{x,y,label}>, offset: number}}
+ */
+export function tracedCurvePoints(run) {
+    const raw = (run?.performance_run_points || []).filter(p =>
+        p.speed_mph != null && p.elapsed_s != null
+        // The 1ft split is the same 60 mph point on the rollout clock and would
+        // double back on the curve.
+        && !/\(1ft\)/.test(p.label || ''));
+
+    const speedLadder = raw.filter(p => p.distance_ft == null)
+        .map(p => ({ x: num(p.elapsed_s), y: num(p.speed_mph), label: p.label }));
+    const dragLadder = raw.filter(p => p.distance_ft != null)
+        .map(p => ({ x: num(p.elapsed_s), y: num(p.speed_mph), label: p.label }));
+
+    const bySpeed = [...speedLadder].sort((a, b) => a.y - b.y);
+    const tAtSpeed = (v) => {
+        const after  = bySpeed.find(p => p.y >= v);
+        const before = [...bySpeed].reverse().find(p => p.y <= v);
+        if (!after || !before || after.y === before.y) return null;
+        return before.x + (v - before.y) / (after.y - before.y) * (after.x - before.x);
+    };
+
+    let offset = 0;
+    if (speedLadder.length >= 2) {
+        const deltas = dragLadder
+            .map(p => { const t = tAtSpeed(p.y); return t == null ? null : p.x - t; })
+            .filter(d => d != null);
+        if (deltas.length) offset = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+    }
+
+    const points = [
+        ...speedLadder,
+        ...dragLadder.map(p => ({ ...p, x: p.x - offset })),
+    ].sort((a, b) => a.x - b.x);
+
+    // Speed splits stop at 0-50 and give 0-60 only as the headline figure.
+    const t60 = num(run?.zero_to_60_sec);
+    if (t60 != null && !points.some(p => p.y === 60)) {
+        points.push({ x: t60, y: 60, label: '0-60' });
+        points.sort((a, b) => a.x - b.x);
+    }
+    // Every launch starts from rest; exports omit that point.
+    if (points.length && points[0].x > 0 && points[0].y > 0) {
+        points.unshift({ x: 0, y: 0, label: 'rest' });
+    }
+
+    return { points, offset };
+}
+
+/**
+ * Per-segment acceleration in g along a run's curve.
+ *
+ * Derived rather than imported: sources print g to one decimal, which is a ±7%
+ * band at 0.7 g and ±25% at 0.2 g, while a finite difference over times stored
+ * to 3 decimals is good to well under 1%.
+ *
+ * Each entry describes the SEGMENT between two points, not either endpoint —
+ * plot it stepped, not as a smooth line through point positions.
+ *
+ * @returns {Array<{x0, x1, y0, y1, g, label}>}
+ */
+export function segmentAccelerationG(run) {
+    const { points } = tracedCurvePoints(run);
+    const out = [];
+    for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1], b = points[i];
+        const dt = b.x - a.x;
+        if (!(dt > 0)) continue;
+        out.push({
+            x0: a.x, x1: b.x, y0: a.y, y1: b.y,
+            g: ((b.y - a.y) * MPH_TO_MS) / dt / G_MS2,
+            label: `${a.label ?? ''}→${b.label ?? ''}`,
+        });
+    }
+    return out;
+}
+
 // ── Synthetic curves from headline figures ──────────────────────────────────
 
 /**
