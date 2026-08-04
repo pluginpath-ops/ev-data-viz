@@ -265,6 +265,10 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     return {
                     label: s.label,
                     data: s.points,
+                    // Named explicitly: without it Chart.js assigns the dataset to
+                    // the FIRST y-scale in definition order, which put speed on the
+                    // g axis and g on the speed axis while the titles stayed put.
+                    yAxisID: 'y',
                     borderColor: c,
                     backgroundColor: c,
                     borderWidth: 2,
@@ -308,6 +312,12 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             // Tooltip shows the untruncated name, so the legend can
                             // stay short without losing which vehicle a line is.
                             label: (c) => {
+                                // g datasets are concatenated after the speed ones,
+                                // so anything past series.length is an acceleration
+                                // span and is measured in g, not mph.
+                                if (c.datasetIndex >= series.length) {
+                                    return `${c.dataset.label}: ${c.parsed.y.toFixed(3)} g`;
+                                }
                                 const sr = series[c.datasetIndex];
                                 const lines = [`${sr?.fullLabel ?? c.dataset.label}: ${c.parsed.y.toFixed(0)} mph`];
                                 if (sr?.synthetic) {
@@ -334,13 +344,6 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                         ticks: { color: tick },
                         title: { display: true, text: 'Elapsed time (s)', color: tick },
                     },
-                    ...(showG ? { yG: {
-                        position: 'right',
-                        beginAtZero: true,
-                        grid: { drawOnChartArea: false },
-                        ticks: { color: tick },
-                        title: { display: true, text: 'Acceleration (g)', color: tick },
-                    } } : {}),
                     y: {
                         beginAtZero: scale.yMin == null,
                         ...(scale.yMin != null ? { min: scale.yMin } : {}),
@@ -349,6 +352,13 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                         ticks: { color: tick },
                         title: { display: true, text: 'Speed (mph)', color: tick },
                     },
+                    ...(showG ? { yG: {
+                        position: 'right',
+                        beginAtZero: true,
+                        grid: { drawOnChartArea: false },
+                        ticks: { color: tick },
+                        title: { display: true, text: 'Acceleration (g)', color: tick },
+                    } } : {}),
                 },
             },
         });
@@ -380,15 +390,15 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                         </select>
                     </div>
                     <div>
-                        <label className="block font-medium mb-2">Acceleration (g):</label>
-                        <select
-                            value={showG ? 'on' : 'off'}
-                            onChange={e => setShowG(e.target.value === 'on')}
-                            className="border p-2 rounded"
-                        >
-                            <option value="off">Hidden</option>
-                            <option value="on">Show as second axis</option>
-                        </select>
+                        <label className="block font-medium mb-2">Acceleration:</label>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer py-2">
+                            <input
+                                type="checkbox"
+                                checked={showG}
+                                onChange={e => setShowG(e.target.checked)}
+                            />
+                            <span className="text-secondary">Show g on right axis</span>
+                        </label>
                     </div>
                     <div>
                         <label className="block font-medium mb-2">Runs shown:</label>
