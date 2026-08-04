@@ -77,17 +77,67 @@ function isDefaultColor(color) {
  * `orderedCandidates` controls the priority when distances are tied (first
  * element wins ties), which is used in auto mode to express hue preference.
  */
+/**
+ * Shift a hex colour's lightness, keeping its hue. Used to extend the palette
+ * past its length: the second time round every base colour reappears lighter,
+ * the third time darker, so a 15-run chart still reads as 15 distinguishable
+ * lines rather than repeats of the same seven.
+ *
+ * @param {string} hex
+ * @param {number} amount  -1..1; positive lightens toward white, negative darkens
+ */
+function shiftLightness(hex, amount) {
+    const { r, g, b } = hexToRgb(hex);
+    const mix = (c) => amount >= 0
+        ? Math.round(c + (255 - c) * amount)
+        : Math.round(c * (1 + amount));
+    const to2 = (n) => Math.max(0, Math.min(255, mix(n))).toString(16).padStart(2, '0');
+    return `#${to2(r)}${to2(g)}${to2(b)}`;
+}
+
+/** Lightness offsets applied on each successive pass through the palette. */
+const PALETTE_PASSES = [0, 0.42, -0.32, 0.66, -0.52];
+
+/**
+ * The candidate list extended far enough to cover `count` runs, by cycling the
+ * base palette through progressively lighter and darker variants.
+ */
+function expandedCandidates(base, count) {
+    const out = [...base];
+    for (let pass = 1; pass < PALETTE_PASSES.length && out.length < count; pass++) {
+        for (const c of base) out.push(shiftLightness(c, PALETTE_PASSES[pass]));
+    }
+    return out;
+}
+
+/**
+ * Pick the candidate furthest from everything already used.
+ *
+ * Ties are broken by how many times a colour has already been placed, then by
+ * palette order. Without the usage tiebreak, once every candidate has been used
+ * they all score deltaE 0 against `placed`, the strict `>` never fires again,
+ * and every remaining run collapses onto `orderedCandidates[0]` — which is
+ * exactly what happened past the 7th run before this.
+ */
 function pickBestSlot(orderedCandidates, placed) {
-    let bestColor    = orderedCandidates[0];
+    const usage = new Map();
+    for (const p of placed) usage.set(p, (usage.get(p) || 0) + 1);
+
+    let bestColor = orderedCandidates[0];
     let bestMinDelta = -1;
+    let bestUsage = Infinity;
 
     for (const candidate of orderedCandidates) {
+        const used = usage.get(candidate) || 0;
         const minDelta = placed.length === 0
             ? Infinity
             : Math.min(...placed.map(p => deltaE(candidate, p)));
-        if (minDelta > bestMinDelta) {
+
+        // Least-used first; among equally-used, the most visually distant.
+        if (used < bestUsage || (used === bestUsage && minDelta > bestMinDelta)) {
+            bestUsage = used;
             bestMinDelta = minDelta;
-            bestColor    = candidate;
+            bestColor = candidate;
         }
     }
     return bestColor;
@@ -143,10 +193,13 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual')
             //    Auto mode with an explicit color: sort candidates by proximity
             //    to the stored color so the family preference is expressed first.
             //    Default / unset colors: use the standard palette order.
+            // Extended so there are always at least as many candidates as runs;
+            // otherwise every run past the palette length ties and collapses.
+            const pool = expandedCandidates(OKABE_ITO, sorted.length);
             const candidates =
                 mode === 'auto' && !isDefaultColor(run.color)
-                    ? [...OKABE_ITO].sort((a, b) => deltaE(a, run.color) - deltaE(b, run.color))
-                    : OKABE_ITO;
+                    ? [...pool].sort((a, b) => deltaE(a, run.color) - deltaE(b, run.color))
+                    : pool;
 
             chosen = pickBestSlot(candidates, placed);
         }

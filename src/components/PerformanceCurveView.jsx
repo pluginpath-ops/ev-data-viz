@@ -18,7 +18,7 @@ import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import AxisScaleControls from './AxisScaleControls';
 import PerformanceRunSelector from './performance/PerformanceRunSelector';
-import { buildSyntheticCurve } from '../utils/performanceDerivations';
+import { buildSyntheticCurve, tracedCurvePoints, segmentAccelerationG } from '../utils/performanceDerivations';
 import { resolveChartColors } from '../utils/colorUtils';
 import ChartExportButtons from './ChartExportButtons';
 
@@ -51,6 +51,10 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     // silently revert on reload. Anyone can recolour here; nobody's choice
     // leaks onto anyone else's view.
     const [colorEdits, setColorEdits] = useState({});
+    // Acceleration between points, as a second axis. Off by default — it's a
+    // derivative, so it's spikier than the speed curve and would distract from
+    // the primary read.
+    const [showG, setShowG] = useState(false);
 
     const selected = useMemo(
         () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
@@ -160,76 +164,15 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
 
             {
                 for (const run of chosen) {
-                    // Two ladders can sit on one run: speed thresholds (0-10 … 0-50)
-                    // and a drag distance ladder (60ft, 330ft, … 1/4). They are
-                    // timestamped on different epochs — measured across 13 runs of
-                    // two vehicles and seven drive modes, the drag ladder reads
-                    // 0.0997 s late with a standard deviation of 4.5 ms.
-                    //
-                    // That constancy is what makes it correctable. It is NOT the
-                    // rollout: the rollout offset on those same runs ranges 0.182
-                    // to 0.301 s and tracks launch aggression, while this sits flat
-                    // at 0.100 s regardless of car, mode or how hard it left the
-                    // line — the signature of a fixed instrumentation latency.
-                    //
-                    // So the offset is measured per run from wherever the ladders
-                    // overlap and subtracted, which puts both on one clock and keeps
-                    // every point. Self-calibrating rather than a hardcoded 0.1, so
-                    // a source with a different latency corrects itself.
-                    const raw = (run.performance_run_points || [])
-                        .filter(p => p.speed_mph != null && p.elapsed_s != null
-                            // The 1ft split is the same 60 mph point on the rollout
-                            // clock and would double back on the curve.
-                            && !/\(1ft\)/.test(p.label || ''));
-
-                    const speedLadder = raw.filter(p => p.distance_ft == null)
-                        .map(p => ({ x: Number(p.elapsed_s), y: Number(p.speed_mph) }));
-                    const dragLadder = raw.filter(p => p.distance_ft != null)
-                        .map(p => ({ x: Number(p.elapsed_s), y: Number(p.speed_mph) }));
-
-                    // Where the speed ladder says the car hit a given speed.
-                    const speedSorted = [...speedLadder].sort((a, b) => a.y - b.y);
-                    const tAtSpeed = (v) => {
-                        const after  = speedSorted.find(p => p.y >= v);
-                        const before = [...speedSorted].reverse().find(p => p.y <= v);
-                        if (!after || !before || after.y === before.y) return null;
-                        return before.x + (v - before.y) / (after.y - before.y) * (after.x - before.x);
-                    };
-
-                    let offset = 0;
-                    if (speedLadder.length >= 2) {
-                        const deltas = dragLadder
-                            .map(p => { const t = tAtSpeed(p.y); return t == null ? null : p.x - t; })
-                            .filter(d => d != null);
-                        if (deltas.length) offset = deltas.reduce((a, b) => a + b, 0) / deltas.length;
-                    }
-
-                    const points = [
-                        ...speedLadder,
-                        ...dragLadder.map(p => ({ x: p.x - offset, y: p.y })),
-                    ].sort((a, b) => a.x - b.x);
+                    // One consistent clock, ladder offset corrected — see
+                    // tracedCurvePoints. Deliberately not reimplemented here:
+                    // the g series below depends on the same correction.
+                    const { points } = tracedCurvePoints(run);
                     if (points.length < 2) continue;
-
-                    // Every launch starts from rest; the export omits that point.
-                    if (points[0].x > 0 && points[0].y > 0) points.unshift({ x: 0, y: 0 });
-
-                    // Speed splits stop at 0-50 and give 0-60 only as the headline
-                    // figure, so without this the curve skips the very speed the run
-                    // is named for. zero_to_60_sec is the no-rollout time — the same
-                    // clock as the splits.
-                    //
-                    // Inserted wherever it belongs rather than only at the end: once
-                    // a drag ladder is merged in, the run continues past 60 mph to
-                    // the quarter mile, and an append-only rule would drop the point
-                    // and leave a gap between 50 and ~77 mph.
-                    const t60 = Number(run.zero_to_60_sec);
-                    if (Number.isFinite(t60) && !points.some(p => p.y === 60)) {
-                        points.push({ x: t60, y: 60 });
-                        points.sort((a, b) => a.x - b.x);
-                    }
 
                     out.push({
                         runId: run.id,
+                        gSegments: segmentAccelerationG(run),
                         // Year and trim are dropped: with one line per drive mode the
                         // legend is already long, and the mode is what distinguishes them.
                         // Best-per-vehicle needs no mode in the label — there's one line.
@@ -289,6 +232,33 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
             || spare[spareIdx++ % (spare.length || 1)]
             || PALETTE[i % PALETTE.length]);
 
+        // Acceleration segments, drawn as horizontal spans on a second axis.
+        // Each g value describes the interval between two points, so it's plotted
+        // as a flat segment from x0 to x1 rather than a smooth line through point
+        // positions, which would imply a value at each instant that wasn't measured.
+        const gDatasets = !showG ? [] : series.flatMap((s, i) => {
+            if (!s.gSegments?.length) return [];
+            const c = seriesColors[i];
+            // Plotted at each segment's MIDPOINT and splined, rather than as flat
+            // spans from x0 to x1. The spans were technically honest — a g value
+            // describes an interval — but a ladder of disconnected horizontal
+            // dashes reads as noise. The midpoint is where that average best
+            // represents the instant, and a smooth line through them shows the
+            // shape of the falloff, which is the thing worth seeing.
+            const data = s.gSegments.map(seg => ({ x: (seg.x0 + seg.x1) / 2, y: seg.g }));
+            return [{
+                label: `${s.label} · g`,
+                data,
+                yAxisID: 'yG',
+                borderColor: c,
+                backgroundColor: c,
+                borderWidth: 1.5,
+                borderDash: [4, 3],
+                pointRadius: presentationMode ? 0 : 2,
+                tension: 0.35,
+            }];
+        });
+
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
             data: {
@@ -297,6 +267,10 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     return {
                     label: s.label,
                     data: s.points,
+                    // Named explicitly: without it Chart.js assigns the dataset to
+                    // the FIRST y-scale in definition order, which put speed on the
+                    // g axis and g on the speed axis while the titles stayed put.
+                    yAxisID: 'y',
                     borderColor: c,
                     backgroundColor: c,
                     borderWidth: 2,
@@ -308,7 +282,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     // invent shape the figures don't support.
                     tension: s.synthetic ? 0 : 0.25,
                     };
-                }),
+                }).concat(gDatasets),
             },
             options: {
                 responsive: true,
@@ -340,6 +314,19 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             // Tooltip shows the untruncated name, so the legend can
                             // stay short without losing which vehicle a line is.
                             label: (c) => {
+                                // g datasets are concatenated after the speed ones,
+                                // so anything past series.length is an acceleration
+                                // span and is measured in g, not mph.
+                                if (c.datasetIndex >= series.length) {
+                                    const sr = series[c.datasetIndex - series.length];
+                                    const seg = sr?.gSegments?.[c.dataIndex];
+                                    const line = `${c.dataset.label}: ${c.parsed.y.toFixed(3)} g`;
+                                    // Say so rather than quietly showing a bound as if
+                                    // it were a reading.
+                                    return seg?.clamped
+                                        ? [line, `Capped at this run's recorded peak (computed ${seg.rawG.toFixed(3)} g over ${(seg.x1 - seg.x0).toFixed(3)} s)`]
+                                        : line;
+                                }
                                 const sr = series[c.datasetIndex];
                                 const lines = [`${sr?.fullLabel ?? c.dataset.label}: ${c.parsed.y.toFixed(0)} mph`];
                                 if (sr?.synthetic) {
@@ -374,12 +361,19 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                         ticks: { color: tick },
                         title: { display: true, text: 'Speed (mph)', color: tick },
                     },
+                    ...(showG ? { yG: {
+                        position: 'right',
+                        beginAtZero: true,
+                        grid: { drawOnChartArea: false },
+                        ticks: { color: tick },
+                        title: { display: true, text: 'Acceleration (g)', color: tick },
+                    } } : {}),
                 },
             },
         });
 
         return () => { chartRef.current?.destroy(); chartRef.current = null; };
-    }, [series, isDark, presentationMode, scale, colorMap]);
+    }, [series, isDark, presentationMode, scale, colorMap, showG]);
 
     if (loading) return <LoadingSpinner />;
 
@@ -416,26 +410,36 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             <option value="all">Every run</option>
                         </select>
                     </div>
-                    <label className="flex items-center gap-1.5 text-xs cursor-pointer pb-3">
-                        <input
-                            type="checkbox"
-                            checked={showPublished}
-                            onChange={e => setShowPublished(e.target.checked)}
-                        />
-                        <span className="text-secondary">Include published figures</span>
-                    </label>
-                    <span className="text-xs text-faint pb-3">
+                    {/* Both toggles sit together to the right of the pickers, styled
+                        alike so they read as one pair rather than two controls that
+                        happen to be checkboxes. */}
+                    <div className="flex flex-col gap-1.5 pb-1">
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={showPublished}
+                                onChange={e => setShowPublished(e.target.checked)}
+                            />
+                            <span className="text-secondary">Include published figures</span>
+                        </label>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={showG}
+                                onChange={e => setShowG(e.target.checked)}
+                            />
+                            <span className="text-secondary">Show acceleration (g)</span>
+                        </label>
+                    </div>
+                    <span className="text-xs text-faint pb-1">
                         {series.length} line{series.length === 1 ? '' : 's'} plotted
                     </span>
                 </div>
                 <p className="text-xs text-muted mt-3">
-                    Solid lines are traced from imported split times: the 1&nbsp;ft-rollout
-                    split is left out, being the same 60&nbsp;mph point on a different clock,
-                    and the 0–60 time is added as the final point since sources list splits
-                    only to 0–50. Dashed lines are reconstructed from a source’s headline
-                    figures — 0–60, 0–100 where given, and the ¼-mile ET paired with its trap
-                    speed, which is a real point rather than a guess. Three points is a sketch
-                    of a curve, not a measurement of one.
+                    Solid lines are traced from imported splits, dashed lines reconstructed
+                    from a source’s headline figures. The 1&nbsp;ft-rollout split is left out —
+                    it is the same 60&nbsp;mph point on a different clock.
+                    {showG && ' Dotted lines are estimated acceleration between splits.'}
                 </p>
 
                 {/* Curation sits with the control that enables it, and only under
