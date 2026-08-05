@@ -9,7 +9,13 @@
  * they aren't on the vehicle record — getVehicles deliberately doesn't embed the
  * performance tables (a nested select against a table that doesn't exist yet
  * fails the whole query and blanks the app), so AppContext loads them separately.
+ *
+ * Charging and range counts go through the shared runUtils predicates rather
+ * than reading the role flags directly, so the card pills, the data filter and
+ * the chart run selectors can never disagree about what counts as a charging
+ * run — and all of them pick up `kind` (migration 044) together.
  */
+import { isChargingRun, isRangeRun } from './runUtils';
 
 /**
  * Category definitions, in display order.
@@ -22,13 +28,13 @@ export const DATA_CATEGORIES = [
         key: 'charging',
         label: 'Charging',
         colorClass: 'text-green-600 dark:text-green-400',
-        count: (v) => v.runs?.filter(r => r.has_charging).length ?? 0,
+        count: (v) => (v.runs || []).filter(isChargingRun).length,
     },
     {
         key: 'range',
         label: 'Range',
         colorClass: 'text-amber-600 dark:text-amber-400',
-        count: (v) => v.runs?.filter(r => r.has_range).length ?? 0,
+        count: (v) => (v.runs || []).filter(isRangeRun).length,
     },
     {
         key: 'epa',
