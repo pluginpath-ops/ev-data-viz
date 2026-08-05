@@ -7,6 +7,7 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, isChargingRun } from '../utils/runUtils';
+import { resolveRangeSource } from '../utils/rangeSource';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import {
@@ -78,37 +79,11 @@ function calcIceTotalTimeAtSpeed(speedMph, totalDistanceMi, overheadMin) {
     return t;
 }
 
-// ── Efficiency helpers ───────────────────────────────────────────────────────
-
-/**
- * Derive mi/kWh from a run record, with two fallback methods:
- *   1. Direct:    distance_miles / energy_kwh          (preferred — measured energy)
- *   2. SoC-delta: distance_miles / (ΔSoC% × battery)  (estimated — uses usable capacity)
- * Returns null when there is insufficient data.
- */
-function computeMiPerKwh(run, batteryKwh) {
-    if (!run?.distance_miles) return null;
-    if (run.energy_kwh)
-        return run.distance_miles / run.energy_kwh;
-    // Estimate via SoC delta × battery capacity
-    if (run.start_soc != null && run.end_soc != null && batteryKwh
-            && run.start_soc > run.end_soc) {
-        const energyEst = (run.start_soc - run.end_soc) / 100 * batteryKwh;
-        if (energyEst > 0) return run.distance_miles / energyEst;
-    }
-    return null;
-}
-
-/** True when computeMiPerKwh will return a non-null value. */
-function hasRangeData(run, batteryKwh) {
-    return computeMiPerKwh(run, batteryKwh) !== null;
-}
-
-/** Human-readable note describing how efficiency was derived. */
-function efficiencyMethod(run) {
-    if (!run?.distance_miles) return null;
-    return run.energy_kwh ? null : 'est. from SoC Δ';
-}
+// Efficiency derivation moved to utils/rangeSource.js, shared with Charge
+// Compare. The mi/kWh math is unchanged (measured energy preferred, SoC-delta
+// estimate as fallback); what changed is that choosing WHICH range test to
+// derive from is now one ranked, user-overridable decision instead of two
+// views each guessing separately.
 
 // ── Default vehicle colors ───────────────────────────────────────────────────
 const PALETTE = [
@@ -454,35 +429,22 @@ export default function RoadTripView({
         const map = {};
         let colorIdx = 0;
         for (const vehicle of selectedVehicles) {
-            const bestRangeRun = [...(vehicle.runs || [])]
-                .filter(r => hasRangeData(r, vehicle.battery))
-                .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null;
-
             for (const run of filterChargingRuns(vehicle.runs)) {
-                const hasOwnRange = hasRangeData(run, vehicle.battery);
-                const rangeSource  = hasOwnRange ? run : bestRangeRun;
-                const miPerKwh     = rangeSource ? computeMiPerKwh(rangeSource, vehicle.battery) : null;
-
-                // Build a human-readable note about the efficiency source / method
-                let efficiencyNote = null;
-                if (!hasOwnRange && bestRangeRun) {
-                    const method = efficiencyMethod(bestRangeRun);
-                    efficiencyNote = method
-                        ? `eff. from ${bestRangeRun.name} (${method})`
-                        : `eff. from ${bestRangeRun.name}`;
-                } else if (hasOwnRange && efficiencyMethod(run)) {
-                    efficiencyNote = efficiencyMethod(run); // "est. from SoC Δ"
-                }
+                // Shared resolver (utils/rangeSource.js) — the same ranking Charge
+                // Compare uses, so the two views can no longer disagree about which
+                // range test a charging run's miles came from. It also supplies the
+                // provenance note this view used to assemble by hand.
+                const src = resolveRangeSource(run, { vehicle, batteryKwh: vehicle.battery });
 
                 map[run.id] = {
                     vehicle,
                     run,
-                    miPerKwh,
+                    miPerKwh:       src.miPerKwh,
                     // Assume 70 mph if not specified on the run or its range source
-                    testSpeedMph:   run.speed_mph ?? bestRangeRun?.speed_mph ?? null,
+                    testSpeedMph:   run.speed_mph ?? src.sourceRun?.speed_mph ?? null,
                     batteryKwh:     vehicle.battery,
                     color:          colorMap[run.id] || run.color || PALETTE[colorIdx % PALETTE.length],
-                    efficiencyNote,
+                    efficiencyNote: src.note,
                 };
                 colorIdx++;
             }

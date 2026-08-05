@@ -7,7 +7,8 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
-import { filterChargingRuns, filterRangeRuns, isRangeRun } from '../utils/runUtils';
+import { filterChargingRuns, filterRangeRuns, isRangeRun, isChargingRun } from '../utils/runUtils';
+import { resolveRangeSource } from '../utils/rangeSource';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 
@@ -319,12 +320,20 @@ export default function ChargeCompareView({
                 null;
 
             for (const rangeRun of rangeRuns) {
-                const selfHasCharging = rangeRun.has_charging !== false;
-                const chargingRun     = selfHasCharging ? rangeRun : defaultCharging;
+                const chargingRun = isChargingRun(rangeRun) ? rangeRun : defaultCharging;
+                // Selecting a range run for this bar IS an explicit pairing, so it
+                // takes rank 1. The resolver still falls through to the vehicle
+                // default or the recorded range column when the chosen test has no
+                // usable distance/SoC data, and reports which it landed on.
+                const rangeSrc = resolveRangeSource(chargingRun, {
+                    vehicle,
+                    explicitPairing: rangeRun,
+                });
                 result.push({
                     rangeRun:        { ...rangeRun, vehicleName: vehicleLabel(vehicle), vehicleId: vehicle.id },
                     chargingRunId:   chargingRun?.id   ?? null,
                     chargingRunName: chargingRun?.name ?? null,
+                    rangeSrc,
                 });
             }
         }
@@ -385,7 +394,7 @@ export default function ChargeCompareView({
     const buildBars = (chartType) => {
         const flatRuns = [];
 
-        for (const { rangeRun, chargingRunId, chargingRunName } of activeResolvedRuns) {
+        for (const { rangeRun, chargingRunId, chargingRunName, rangeSrc } of activeResolvedRuns) {
             const base = {
                 id:              rangeRun.id,
                 name:            rangeRun.name,
@@ -399,6 +408,10 @@ export default function ChargeCompareView({
                 _chargingRunName: chargingRunName,
                 _yUnit:          chartType === 'range_added' ? distanceLabel(units) : 'min',
                 _rangeUnit:      distanceLabel(units),
+                // Which range basis produced these miles, for the provenance label.
+                _rangeSource:    rangeSrc?.source ?? 'none',
+                _rangeSourceNote: rangeSrc?.note ?? null,
+                _rangeSourceRun:  rangeSrc?.sourceRun?.name ?? null,
             };
 
             // No charging run resolved, or data not yet loaded
@@ -407,9 +420,19 @@ export default function ChargeCompareView({
                 continue;
             }
 
-            // Filter to points that have all three fields we need
+            // Which range basis is in play (see utils/rangeSource.js).
+            //
+            // miPerSoc present → LINEAR: miles come from the paired range test's
+            //   measured miles-per-%SoC, so the charging run only has to supply
+            //   SoC against time. Runs with no recorded range column now work.
+            // miPerSoc null    → RECORDED: fall back to interpolating the run's
+            //   own range_value points, which is what this chart always did.
+            const miPerSoc  = rangeSrc?.miPerSoc ?? null;
+            const useLinear = miPerSoc != null;
+
+            // The recorded path additionally needs the range column.
             const raw = (runDataCache[chargingRunId] || []).filter(
-                p => p.soc != null && p.time != null && p.range != null
+                p => p.soc != null && p.time != null && (useLinear || p.range != null)
             );
 
             if (raw.length === 0) {
@@ -418,14 +441,20 @@ export default function ChargeCompareView({
             }
 
             // Sort by each axis for clean interpolation
-            const bySoc   = [...raw].sort((a, b) => a.soc   - b.soc);
-            const byTime  = [...raw].sort((a, b) => a.time  - b.time);
-            const byRange = [...raw].sort((a, b) => a.range - b.range);
+            const bySoc  = [...raw].sort((a, b) => a.soc  - b.soc);
+            const byTime = [...raw].sort((a, b) => a.time - b.time);
+
+            // Absolute range at a given SoC. Linear reads it off the paired test
+            // (range remaining at that SoC); recorded interpolates the run's own
+            // range column.
+            const rangeAtSoc = (soc) => useLinear
+                ? soc * miPerSoc
+                : interpolate(bySoc, 'soc', 'range', soc, true);
 
             // Z baseline: exact interpolation (or backward extrapolation) to startSoc.
             // allowExtrapolateBefore=true lets us normalize runs whose data starts above startSoc.
-            const Tz = interpolate(bySoc, 'soc', 'time',  startSoc, true);
-            const Rz = interpolate(bySoc, 'soc', 'range', startSoc, true);
+            const Tz = interpolate(bySoc, 'soc', 'time', startSoc, true);
+            const Rz = rangeAtSoc(startSoc);
 
             if (Tz == null || Rz == null) {
                 flatRuns.push({ ...base, _yValue: 0, _startSoc: startSoc, _startRange: null, _noData: true });
@@ -439,8 +468,12 @@ export default function ChargeCompareView({
                 const targetTime  = Tz + xMinutes;
                 const lastTime    = byTime[byTime.length - 1].time;
                 const timeOvershoot = Math.max(0, targetTime - lastTime);
-                const Rend   = interpolate(byTime, 'time', 'range', targetTime, false, true);
-                const SocEnd = interpolate(byTime, 'time', 'soc',   targetTime, false, true);
+                const SocEnd = interpolate(byTime, 'time', 'soc', targetTime, false, true);
+                // Linear: the SoC gained over the window, priced at the paired
+                // test's miles-per-%SoC. Recorded: read the range column directly.
+                const Rend = useLinear
+                    ? (SocEnd != null ? SocEnd * miPerSoc : null)
+                    : interpolate(byTime, 'time', 'range', targetTime, false, true);
                 const yValueMi = Rend != null ? Math.round((Rend - Rz) * 10) / 10 : null;
                 const yValue   = yValueMi != null ? convDistance(yValueMi, units) : null;
                 flatRuns.push({
@@ -455,11 +488,25 @@ export default function ChargeCompareView({
                     _noData:          yValue == null,
                 });
             } else {
-                const targetRange  = Rz + mMiles;
-                const lastRange    = byRange[byRange.length - 1].range;
-                const rangeOvershoot = Math.max(0, targetRange - lastRange);
-                const Tend   = interpolate(byRange, 'range', 'time', targetRange, false, true);
-                const SocEnd = interpolate(byRange, 'range', 'soc',  targetRange, false, true);
+                // Linear: the miles asked for convert to a SoC target, and the
+                // charging curve is read on the SoC axis. Recorded: sort by the
+                // range column and read time off it, as before.
+                let Tend, SocEnd, rangeOvershoot;
+                if (useLinear) {
+                    const targetSoc = startSoc + mMiles / miPerSoc;
+                    const lastSoc   = bySoc[bySoc.length - 1].soc;
+                    Tend   = interpolate(bySoc, 'soc', 'time', targetSoc, false, true);
+                    SocEnd = targetSoc;
+                    // Expressed in miles so it stays comparable with mMiles.
+                    rangeOvershoot = Math.max(0, targetSoc - lastSoc) * miPerSoc;
+                } else {
+                    const byRange     = [...raw].sort((a, b) => a.range - b.range);
+                    const targetRange = Rz + mMiles;
+                    const lastRange   = byRange[byRange.length - 1].range;
+                    Tend   = interpolate(byRange, 'range', 'time', targetRange, false, true);
+                    SocEnd = interpolate(byRange, 'range', 'soc',  targetRange, false, true);
+                    rangeOvershoot = Math.max(0, targetRange - lastRange);
+                }
                 const yValue = Tend != null ? Math.round((Tend - Tz) * 10) / 10 : null;
                 flatRuns.push({
                     ...base,
@@ -539,6 +586,14 @@ export default function ChargeCompareView({
                                         run._startSoc   != null ? (run._endSoc   != null ? `SoC: ${run._startSoc}% → ${run._endSoc}%`                   : `Start SoC: ${run._startSoc}%`)        : null,
                                         run._startRange != null ? (run._endRange != null ? `Range: ${run._startRange} → ${run._endRange} ${ru}` : `Start range: ${run._startRange} ${ru}`) : null,
                                         run._chargingRunName && run._chargingRunName !== run.name ? `Charging data: ${run._chargingRunName}` : null,
+                                        // Which range basis priced these miles. Named on every
+                                        // bar: a measured-efficiency figure and a guess-o-meter
+                                        // readout must never be silently interchangeable.
+                                        run._rangeSource === 'recorded'
+                                            ? 'Range: recorded range column'
+                                            : run._rangeSourceRun && run._rangeSourceRun !== run.name
+                                                ? `Range basis: ${run._rangeSourceRun}`
+                                                : null,
                                     ].filter(Boolean), units);
                                 },
                             },
