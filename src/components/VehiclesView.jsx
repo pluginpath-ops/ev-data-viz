@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { DATA_CATEGORIES, vehicleDataCategories, hasDataCategory, filterByDataCategories } from '../utils/vehicleDataCategories';
 import { fmtDistance } from '../utils/unitConversions';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
@@ -16,24 +17,18 @@ import ImportVehiclesModal from './ImportVehiclesModal';
  * the type names are 1pt smaller and colored. Zero-count categories omitted.
  */
 function TestCountPills({ vehicle, performanceCounts = {} }) {
-    const chargingCount = vehicle.runs?.filter(r => r.has_charging).length ?? 0;
-    const rangeCount    = vehicle.runs?.filter(r => r.has_range).length    ?? 0;
-    const epaCount      = vehicle.epa_mappings?.length                     ?? 0;
-    // Performance runs aren't on vehicle.runs — they live in their own tables
-    // and are counted by a separate query (see AppContext.performanceCounts).
-    const accelCount    = performanceCounts[vehicle.id]?.accel   ?? 0;
-    const brakingCount  = performanceCounts[vehicle.id]?.braking ?? 0;
-
-    if (!chargingCount && !rangeCount && !epaCount && !accelCount && !brakingCount) return null;
+    const counts = vehicleDataCategories(vehicle, performanceCounts);
+    const shown = DATA_CATEGORIES.filter(c => counts[c.key] > 0);
+    if (shown.length === 0) return null;
 
     return (
         <p className="flex flex-wrap items-baseline gap-x-1.5">
             <span>Tests:</span>
-            {chargingCount > 0 && <span className="text-[13px] font-medium text-green-600 dark:text-green-400">Charging ({chargingCount})</span>}
-            {rangeCount    > 0 && <span className="text-[13px] font-medium text-amber-600 dark:text-amber-400">Range ({rangeCount})</span>}
-            {epaCount      > 0 && <span className="text-[13px] font-medium text-blue-600 dark:text-blue-400">EPA ({epaCount})</span>}
-            {accelCount    > 0 && <span className="text-[13px] font-medium text-purple-600 dark:text-purple-400">Acceleration ({accelCount})</span>}
-            {brakingCount  > 0 && <span className="text-[13px] font-medium text-rose-600 dark:text-rose-400">Braking ({brakingCount})</span>}
+            {shown.map(c => (
+                <span key={c.key} className={`text-[13px] font-medium ${c.colorClass}`}>
+                    {c.label} ({counts[c.key]})
+                </span>
+            ))}
         </p>
     );
 }
@@ -77,6 +72,7 @@ export default function VehiclesView({
     const [formTags, setFormTags] = useState([]);
     const [newTagName, setNewTagName] = useState('');
     const [tagFilterStates, setTagFilterStates] = useState(savedState?.tagFilterStates ?? {}); // { [tagId]: 'or' | 'and' | 'not' }
+    const [dataFilterStates, setDataFilterStates] = useState(savedState?.dataFilterStates ?? {}); // { [categoryKey]: 'or' | 'and' | 'not' }
     const [imageUploading, setImageUploading] = useState(false);
     const [viewMode, setViewMode] = useState(savedState?.viewMode ?? 'card'); // 'card' | 'list'
     const [sortBy, setSortBy] = useState(savedState?.sortBy ?? 'default');
@@ -96,10 +92,10 @@ export default function VehiclesView({
     const persistableState = useRef({});
     useEffect(() => {
         persistableState.current = {
-            textFilter, tagFilterStates, mfgFilterStates, modelFilter,
+            textFilter, tagFilterStates, mfgFilterStates, dataFilterStates, modelFilter,
             sortBy, viewMode, vehiclePage,
         };
-    }, [textFilter, tagFilterStates, mfgFilterStates, modelFilter, sortBy, viewMode, vehiclePage]);
+    }, [textFilter, tagFilterStates, mfgFilterStates, dataFilterStates, modelFilter, sortBy, viewMode, vehiclePage]);
 
     // Save state back to App when this tab is left (unmount).
     useEffect(() => {
@@ -229,6 +225,18 @@ export default function VehiclesView({
         });
     };
 
+    // AND → NOT → clear. No OR state: the useful questions about data coverage
+    // are "has charging AND range" and "has no EPA data" — nobody asks for
+    // "charging or braking", so that state would only sit in the way.
+    const cycleDataFilter = (key) => {
+        setDataFilterStates(prev => {
+            const cur = prev[key];
+            if (!cur)          return { ...prev, [key]: 'and' };
+            if (cur === 'and') return { ...prev, [key]: 'not' };
+            const next = { ...prev }; delete next[key]; return next;
+        });
+    };
+
     // Stage 1: quad-state tag filter + committed-delete filter
     const orTags  = Object.entries(tagFilterStates).filter(([, s]) => s === 'or' ).map(([id]) => Number(id));
     const andTags = Object.entries(tagFilterStates).filter(([, s]) => s === 'and').map(([id]) => Number(id));
@@ -258,9 +266,12 @@ export default function VehiclesView({
         v.model && modelFilter.has(v.model)
     );
 
+    // Stage 2c: data-type filter — which kinds of test data the vehicle holds
+    const dataFiltered = filterByDataCategories(modelFiltered, dataFilterStates, performanceCounts);
+
     // Stage 3: text filter
     const textLower = textFilter.trim().toLowerCase();
-    const textFiltered = !textLower ? modelFiltered : modelFiltered.filter(v => {
+    const textFiltered = !textLower ? dataFiltered : dataFiltered.filter(v => {
         if ([v.name, v.make, v.model].some(f => (f || '').toLowerCase().includes(textLower))) return true;
         const year = String(v.year || '');
         if (year.toLowerCase().includes(textLower)) return true;
@@ -493,7 +504,7 @@ export default function VehiclesView({
     useEffect(() => {
         if (!didMount.current) { didMount.current = true; return; }
         setVehiclePage(1);
-    }, [textFilter, tagFilterStates, sortBy, mfgFilterStates]);
+    }, [textFilter, tagFilterStates, sortBy, mfgFilterStates, dataFilterStates]);
 
     const showReorderButtons = canEdit({}) && sortBy === 'default'
         && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0
@@ -691,6 +702,42 @@ export default function VehiclesView({
                     )}
                 </div>
             )}
+
+            {/* Data filter bar — which kinds of test data a vehicle holds.
+                Tri-state AND (blue) → NOT (red) → clear; no OR, see cycleDataFilter.
+                Counts are of the vehicles still standing after the tag/brand/model
+                filters, so a zero here means "none left", not "none in the database". */}
+            <div className="tag-filter-bar">
+                <span className="text-sm font-medium text-secondary flex-shrink-0">Data:</span>
+                {DATA_CATEGORIES.map(cat => {
+                    const state = dataFilterStates[cat.key];
+                    const stateClass = state === 'and' ? 'tag-filter-and'
+                        : state === 'not' ? 'tag-filter-not'
+                        : 'tag-filter-na';
+                    const available = modelFiltered.filter(v => hasDataCategory(v, cat.key, performanceCounts)).length;
+                    const tooltip = state === 'and' ? `AND — vehicles must have ${cat.label} data. Click for NOT.`
+                        : state === 'not' ? `NOT — vehicles with ${cat.label} data are hidden. Click to clear.`
+                        : `Click to show only vehicles with ${cat.label} data`;
+                    return (
+                        <button
+                            key={cat.key}
+                            onClick={() => cycleDataFilter(cat.key)}
+                            className={`tag-filter-btn ${stateClass}`}
+                            title={tooltip}
+                        >
+                            {cat.label} ({available})
+                        </button>
+                    );
+                })}
+                {Object.keys(dataFilterStates).length > 0 && (
+                    <button
+                        onClick={() => setDataFilterStates({})}
+                        className="text-xs text-faint hover:text-secondary underline ml-1 flex-shrink-0"
+                    >
+                        Clear
+                    </button>
+                )}
+            </div>
 
             {/* Select All / Clear All Visible */}
             {textFiltered.length > 0 && (
