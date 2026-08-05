@@ -25,22 +25,26 @@
  * ── Resolution order ─────────────────────────────────────────────────────────
  *
  *   1. 'paired'        explicit pairing chosen for this chart session
- *   2. 'same-run'      the charging run's OWN measured range data
- *   3. 'default-range' the vehicle's default range test
+ *   2. 'default-range' the vehicle's default range test
+ *   3. 'same-run'      the charging run's OWN measured range data
  *   4. 'recorded'      the charging run's recorded range_value data points
  *   5. 'none'          nothing usable
  *
- * Rank 2 is a refinement of the order agreed in #150. A dual-role run — one
- * drive recorded as a single row with both a charging curve and measured range
- * — is its own same-session partner, and 35 of 76 runs on the live database are
- * exactly that. Ranking the vehicle's default range test above it would pair a
- * drive against some other day's conditions while the conditions measured on
- * that very drive sat unused. After #155 splits those rows this rank stops
- * being a special case and becomes an ordinary same-session pairing.
+ * Rank 3 extends the order agreed in #150, which did not cover dual-role runs —
+ * one drive recorded as a single row carrying both a charging curve and measured
+ * range, which is 35 of 76 runs on the live database. It sits BELOW the vehicle
+ * default deliberately: the default range test is a deliberate, curated choice,
+ * whereas a row being dual-role is an artifact of how the data happened to be
+ * collected. Provenance, not a judgement about which conditions to compare against.
  *
- * 'recorded' stays last, as agreed: range_value is usually the car's own
- * guess-o-meter readout, it may not match the range shown anywhere else, and it
- * answers a different question than a measured-efficiency computation.
+ * Note this is the run's *measured* distance and SoC bounds, which is a different
+ * thing from rank 4. 'recorded' stays last as agreed: range_value is usually the
+ * car's own guess-o-meter readout, it may not match the range shown anywhere
+ * else, and it answers a different question than measured efficiency.
+ *
+ * Rank 3 goes dormant after #155: a split charging row carries no range columns,
+ * so it can never match. The same-session partner is surfaced through rank 1
+ * instead, with paired_range_run_id populated from the session.
  *
  * Pure module — no data-point access. The 'recorded' branch is *signalled* here
  * and computed by the caller, which is the side that holds the time series.
@@ -166,14 +170,15 @@ export function resolveRangeSource(chargingRun, {
     // Ranks 1–3 all resolve to a range run; pick the first that yields data.
     const candidates = [
         ['paired',        explicitPairing],
-        ['same-run',      isRangeRun(chargingRun) ? chargingRun : null],
         ['default-range', defaultRangeRun(vehicle, batteryKwh)],
+        ['same-run',      isRangeRun(chargingRun) ? chargingRun : null],
     ];
 
     for (const [source, run] of candidates) {
         if (!run || !hasUsableRangeData(run, batteryKwh)) continue;
-        // A default that resolves back to this same run is the same-run case,
-        // already tried above — don't relabel it as inherited from elsewhere.
+        // When the vehicle default resolves back to this very run, that is the
+        // same-run case reached by another route — fall through so it gets the
+        // 'same-run' label rather than reading as inherited from elsewhere.
         if (source === 'default-range' && run.id === chargingRun.id) continue;
 
         const { miPerKwh, method } = miPerKwhFrom(run, batteryKwh);
