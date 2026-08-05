@@ -78,7 +78,7 @@ One charging or range test session per vehicle.
 | `id` | `bigint` | auto | PK |
 | `vehicle_id` | `bigint` | — | FK → `vehicles.id` |
 | `name` | `text` | — | |
-| `date` | `text` | — | ISO date string |
+| `date` | `text` | — | ISO date string. **NOT NULL** — inserts must supply it |
 | `color` | `text` | `'#3b82f6'` | Chart series color |
 | `is_default` | `boolean` | `false` | |
 | `synthetic` | `boolean` | `false` | True for estimated/simulated data |

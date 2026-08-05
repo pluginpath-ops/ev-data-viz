@@ -198,9 +198,14 @@ COMMIT;
 --             count(*) FILTER (WHERE NOT has_charging AND NOT has_range)   AS neither
 --      FROM runs GROUP BY kind;
 --
--- 3. The trigger fires on insert — expect 'range':
+-- 3. The trigger fires on insert — expect 'range'.
 --
---      INSERT INTO runs (vehicle_id, name, has_charging, has_range)
---      VALUES ((SELECT id FROM vehicles LIMIT 1), 'trigger test', false, true)
---      RETURNING kind;
---      -- then: DELETE FROM runs WHERE name = 'trigger test';
+--    Wrapped in a transaction that is rolled back, so nothing is written and
+--    there is no cleanup step to forget. `date` is NOT NULL on runs, hence the
+--    placeholder — omitting it fails on that constraint, not on anything here.
+--
+--      BEGIN;
+--      INSERT INTO runs (vehicle_id, name, date, has_charging, has_range)
+--      VALUES ((SELECT id FROM vehicles LIMIT 1), 'trigger test', '2026-01-01', false, true)
+--      RETURNING name, kind;
+--      ROLLBACK;
