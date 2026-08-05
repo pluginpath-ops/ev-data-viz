@@ -6,8 +6,18 @@
 //   isXxxRun(run)        — predicate, takes a single run, returns boolean.
 //                          Use as a runFilter prop: <RunSelector runFilter={isChargingRun} />
 
-export const isChargingRun = (r) => r.has_charging !== false;
-export const isRangeRun    = (r) => !!r.has_range;
+// `kind` (migration 044) is the discriminator; the has_charging / has_range
+// booleans it replaced are still written by the app and kept in sync by a DB
+// trigger until #155 drops them. Reading kind-first with a boolean fallback
+// means this works whether or not migration 044 has been applied yet, so code
+// and migration can be deployed in either order.
+//
+// Note the fallback keeps the old asymmetry deliberately: a run with neither
+// flag set counts as charging (has_charging !== false), matching how these
+// predicates have always behaved. Migration 044 backfills those rows the same
+// way, so the two paths agree.
+export const isChargingRun = (r) => r.kind ? r.kind === 'charging' : r.has_charging !== false;
+export const isRangeRun    = (r) => r.kind ? r.kind === 'range'    : !!r.has_range;
 
 export const filterChargingRuns = (runs) => (runs || []).filter(isChargingRun);
 export const filterRangeRuns    = (runs) => (runs || []).filter(isRangeRun);

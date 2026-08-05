@@ -82,8 +82,11 @@ One charging or range test session per vehicle.
 | `color` | `text` | `'#3b82f6'` | Chart series color |
 | `is_default` | `boolean` | `false` | |
 | `synthetic` | `boolean` | `false` | True for estimated/simulated data |
-| `has_charging` | `boolean` | `true` | |
-| `has_range` | `boolean` | `false` | |
+| `kind` | `text` | — | `'charging'` \| `'range'`. Test role discriminator. Derived from the two booleans below by trigger `trg_runs_sync_kind`; see migration 044 |
+| `has_charging` | `boolean` | `true` | **Superseded by `kind`** — still written, no longer read. Dropped in #155 |
+| `has_range` | `boolean` | `false` | **Superseded by `kind`** — still written, no longer read. Dropped in #155 |
+| `session_id` | `bigint` | `NULL` | FK → `test_sessions.id` ON DELETE SET NULL. Advisory grouping; never required |
+| `paired_range_run_id` | `bigint` | `NULL` | FK → `runs.id` ON DELETE SET NULL. Curator-set default range partner for a charging run |
 | `software_version` | `text` | — | |
 | `conditions` | `text` | — | Freeform notes |
 | `source` | `text` | — | URL to source video/post |
@@ -102,6 +105,29 @@ One charging or range test session per vehicle.
 | `created_at` | `timestamptz` | `now()` | |
 
 > Runs have no `user_id`. Ownership and edit permission are inherited from the parent vehicle via RLS subquery joins.
+
+---
+
+### `test_sessions`
+
+One testing outing — the runs measured during it share weather, route and afternoon. Added by migration 044 as groundwork for charging/range pairing (#150).
+
+**No `vehicle_id` by design:** a session can span several vehicles (three cars driven side by side on one loop is a single outing, and shared conditions are the whole point of grouping them). Each run carries its own `vehicle_id`, so one session's runs may belong to different vehicles.
+
+Distinct from `performance_sessions` (migration 036), which is one vehicle's accel/braking outing and shares none of these columns.
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `id` | `bigint` | auto | PK |
+| `name` | `text` | — | Human label, e.g. "Ottawa winter loop". Doubles as the short chart label for a pair whose halves both come from this session |
+| `tested_at` | `timestamp` | — | Wall-clock at the test site; zone-less, as sources report local time with no offset |
+| `tester` | `text` | — | |
+| `location_name` | `text` | — | |
+| `temperature_f` | `numeric` | — | Session-level reading. `runs.temperature_f` stays authoritative per row; congruence checks prefer this when present |
+| `source_name` | `text` | — | |
+| `url` | `text` | — | |
+| `notes` | `text` | — | |
+| `created_at` | `timestamptz` | `now()` | |
 
 ---
 
@@ -273,6 +299,19 @@ Runs inherit ownership from their parent vehicle via subquery join.
 | INSERT | Parent vehicle is owned by user OR role is `admin`/`contributor` |
 | UPDATE | Parent vehicle is owned by user OR role is `admin`/`contributor` |
 | DELETE | Parent vehicle is owned by user OR role is `admin` |
+
+---
+
+### `test_sessions`
+
+Has no parent vehicle to inherit from (a session may span several), so it carries its own policies — the same shape as `manufacturers`.
+
+| Operation | Allowed when |
+|-----------|-------------|
+| SELECT | Always (public read) |
+| INSERT | Role is `admin`/`contributor` |
+| UPDATE | Role is `admin`/`contributor` |
+| DELETE | Role is `admin` |
 
 ---
 
