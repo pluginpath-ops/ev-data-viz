@@ -1816,6 +1816,34 @@ class DataService {
     return data;
   }
 
+  /**
+   * Create one published result and its speed windows together, from a parsed
+   * paste (see parsePublishedResults.js).
+   *
+   * The windows go in a single insert so they land atomically. If they fail,
+   * the summary is removed again rather than left behind holding half a result
+   * — a result card missing its braking rows looks like a source that didn't
+   * report them, which is a different claim from an import that broke.
+   *
+   * @param {{ fields: object, intervals: object[] }} parsed
+   * @returns {object} the saved summary row
+   */
+  async importPublishedResult({ fields, intervals = [] }) {
+    if (!this.useSupabase) return null;
+    const summary = await this.savePerformanceSummary(fields);
+    if (!intervals.length) return summary;
+
+    const { error } = await getSupabase()
+      .from('performance_intervals')
+      .insert(intervals.map(iv => ({ ...iv, summary_id: summary.id })));
+
+    if (error) {
+      await this.deletePerformanceSummary(summary.id).catch(() => {});
+      throw new Error(`Speed windows could not be saved (${error.message}). Nothing was imported.`);
+    }
+    return summary;
+  }
+
   async deletePerformanceSummary(id) {
     if (!this.useSupabase) return;
     const { error } = await getSupabase()

@@ -15,32 +15,7 @@
 import { useState, useEffect } from 'react';
 import CuratorField from '../epa/CuratorField';
 import PerformanceIntervals from './PerformanceIntervals';
-
-/** Scalar fields, in entry order. Speed windows are handled separately. */
-const FIELDS = [
-    {
-        key: 'zero_to_60_sec', label: '0–60 mph', unit: 's', step: '0.001',
-        tooltip: 'Clock starts at 0 mph, with no rollout allowance. Sources differ on which of the two 0–60 figures they headline — check the source’s own footnote before entering.',
-    },
-    {
-        key: 'zero_to_60_rollout_sec', label: '0–60 (1ft)', unit: 's', step: '0.001',
-        tooltip: 'The 1-foot-rollout figure, drag-strip convention — about 0.3 s quicker than the no-rollout time. The two are not interchangeable.',
-    },
-    {
-        key: 'zero_to_100_sec', label: '0–100 mph', unit: 's', step: '0.001',
-        tooltip: 'Time to 100 mph, on whichever rollout convention the source uses for its 0–60.',
-    },
-    { key: 'quarter_mile_sec',      label: '¼ mile',       unit: 's',   step: '0.001' },
-    { key: 'quarter_mile_trap_mph', label: '¼ mile trap',  unit: 'mph', step: '0.01'  },
-    {
-        key: 'top_speed_mph', label: 'Top speed', unit: 'mph', step: '0.1',
-        tooltip: 'Measured top speed. Often governor-limited rather than aerodynamically limited.',
-    },
-    {
-        key: 'skidpad_g', label: 'Skidpad', unit: 'g', step: '0.001',
-        tooltip: 'Lateral grip, conventionally measured on a 300 ft skidpad.',
-    },
-];
+import { SUMMARY_FIELDS } from '../../utils/performanceSummaryFields';
 
 export default function PerformanceSummaryCard({
     summary,
@@ -116,7 +91,7 @@ export default function PerformanceSummaryCard({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 text-xs">
-                {FIELDS.map(f => (
+                {SUMMARY_FIELDS.map(f => (
                     <CuratorField
                         key={f.key}
                         label={f.label} unit={f.unit} type="number" step={f.step}
