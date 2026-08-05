@@ -17,7 +17,19 @@
 // predicates have always behaved. Migration 044 backfills those rows the same
 // way, so the two paths agree.
 export const isChargingRun = (r) => r.kind ? r.kind === 'charging' : r.has_charging !== false;
-export const isRangeRun    = (r) => r.kind ? r.kind === 'range'    : !!r.has_range;
+
+// `kind` alone CANNOT decide this one until #155 runs.
+//
+// A dual-role row — one drive recorded as a single run, with both flags set —
+// is genuinely both a charging test and a range test, and a single discriminator
+// cannot say so. The backfill assigns it kind='charging' (it is split into two
+// rows in #155), so testing kind alone would drop every such row out of the
+// range views. On the current database that is 35 of 76 runs.
+//
+// So has_range stays part of this predicate through the transition. After #155
+// the column is gone, `r.has_range` is undefined, and this collapses to the
+// kind check on its own with no further edit.
+export const isRangeRun = (r) => r.kind === 'range' || !!r.has_range;
 
 export const filterChargingRuns = (runs) => (runs || []).filter(isChargingRun);
 export const filterRangeRuns    = (runs) => (runs || []).filter(isRangeRun);
