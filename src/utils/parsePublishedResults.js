@@ -86,6 +86,13 @@ const RE = {
  * Matched loosely — the wording drifts between eras and outlets — but the two
  * things that matter are extracted explicitly: the verb (omit / include) and
  * the allowance in seconds.
+ *
+ * The verb applies to THE TIME TAKEN TO ROLL THE FIRST FOOT, not to the rollout
+ * as a feature of the test. "Omits 1-ft rollout of 0.3 sec" means that 0.3 s is
+ * not counted in the printed number — so the printed number is the quicker
+ * drag-strip figure, and the standing start is 0.3 s slower. Mapping the verb
+ * to a column is left to the caller precisely because it reads backwards at a
+ * glance; see buildSummaryPayload.
  */
 function parseRolloutFootnote(line) {
     if (!/roll\s?out/i.test(line)) return null;
@@ -301,7 +308,7 @@ function validate({ accelWindows, drag, intervals, rollout, warn }) {
     }
 
     if (!rollout && accelWindows.length > 0) {
-        warn('warn', 'No rollout footnote found in this block. The rollout basis has to be set by hand below — the two 0-60 figures differ by about 0.3 s and are not interchangeable.');
+        warn('warn', 'No rollout footnote found in this block. Check the rollout basis below — the two 0-60 figures differ by about 0.3 s and are not interchangeable.');
     } else if (rollout && !rollout.stated) {
         warn('warn', `Rollout footnote found but its wording is unclear: "${rollout.raw}". Confirm the basis below.`);
     }
@@ -311,8 +318,11 @@ function validate({ accelWindows, drag, intervals, rollout, warn }) {
  * Turn a parse into the rows to write, once the rollout basis is settled.
  *
  * `rolloutBasis` is the caller's decision, not the parser's:
- *   'none'    — printed figures are standing-start, clock from 0 mph
- *   'rollout' — printed figures include the 1-ft drag-strip rollout
+ *   'rollout' — the printed time does NOT include the time taken to roll the
+ *               first foot: the drag-strip figure, the quicker of the two.
+ *               Lands in zero_to_60_rollout_sec.
+ *   'none'    — the clock ran through that first foot: a standing start,
+ *               about 0.3 s slower. Lands in zero_to_60_sec.
  *   null      — not yet decided. Columns are laid out as for 'none' so a
  *               preview can render, but no interval is stamped with a rollout
  *               convention, because that would be asserting the answer.

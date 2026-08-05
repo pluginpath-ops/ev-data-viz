@@ -39,15 +39,21 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
         [text],
     );
 
-    // The footnote's plain reading, when it has one. "omit" means the printed
-    // figures exclude the rollout allowance, so they are standing-start times.
-    const footnoteBasis = parsed?.rollout?.stated === 'omit' ? 'none'
-        : parsed?.rollout?.stated === 'include' ? 'rollout'
+    // What the footnote's verb applies to is the TIME TAKEN TO ROLL THE FIRST
+    // FOOT, not the rollout as a feature of the test. So:
+    //   "omits 1-ft rollout of 0.3 sec"    → that 0.3 s is NOT in the printed
+    //                                        number → it's the quicker
+    //                                        drag-strip figure → 'rollout'
+    //   "includes 1-ft rollout of 0.3 sec" → the clock ran through that first
+    //                                        foot → standing start → 'none'
+    // Read the other way round this silently files every figure in the wrong
+    // column, which is the whole reason this screen exists.
+    const footnoteBasis = parsed?.rollout?.stated === 'omit' ? 'rollout'
+        : parsed?.rollout?.stated === 'include' ? 'none'
         : null;
-    // Null until the block's own footnote settles it or the user picks. Left
-    // null on purpose when neither has happened — that's the case where a
-    // default would be a silent guess at the contested question.
-    const effectiveBasis = basis ?? footnoteBasis;
+    // Falls back to the rollout convention, which is what published road-test
+    // figures now use — the footnote still wins when the block has one.
+    const effectiveBasis = basis ?? footnoteBasis ?? 'rollout';
 
     const payload = useMemo(
         () => (parsed ? buildSummaryPayload(parsed, { rolloutBasis: effectiveBasis }) : null),
@@ -63,8 +69,6 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
     // is indistinguishable from a reported one afterwards.
     const allowance = parsed?.rollout?.seconds ?? 0.3;
     const printedSixty = parsed?.accelWindows.find(w => w.unit === 'mph' && w.toSpeed === 60)?.seconds ?? null;
-    // A 0-60 with no settled basis can't be filed in either column honestly.
-    const basisNeeded = printedSixty != null && effectiveBasis == null;
 
     const handleImport = async () => {
         if (!payload) return;
@@ -133,8 +137,8 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                                                             <td className="py-0.5 pr-2 text-muted">
                                                                 {fld.label}
                                                                 {isRolloutField && (
-                                                                    <span className={`ml-1 text-[10px] ${basisNeeded ? 'text-amber-600 dark:text-amber-400' : 'text-faint'}`}>
-                                                                        {basisNeeded ? '← basis not confirmed' : '← rollout basis'}
+                                                                    <span className="text-faint ml-1 text-[10px]">
+                                                                        ← rollout basis
                                                                     </span>
                                                                 )}
                                                             </td>
@@ -206,7 +210,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                 {printedSixty != null && (
                     <div className="mt-3 border rounded-lg p-3 border-[var(--color-border)]">
                         <div className="text-xs font-semibold mb-1">
-                            Rollout basis — confirm before importing
+                            Rollout basis — check before importing
                         </div>
                         {parsed.rollout?.raw ? (
                             <p className="text-[11px] text-muted mb-2">
@@ -214,20 +218,22 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                             </p>
                         ) : (
                             <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-2">
-                                No footnote in this block — check the source’s own wording and pick one.
+                                No footnote in this block. Defaulted to the rollout convention, which
+                                is what published road-test figures now use — check the source’s own
+                                wording.
                             </p>
                         )}
 
                         {[
                             {
-                                key: 'none',
-                                title: `${printedSixty} s is a standing start (no rollout)`,
-                                detail: `Saved to “0–60 mph”. Implies a 1-ft-rollout time of about ${(printedSixty - allowance).toFixed(1)} s.`,
+                                key: 'rollout',
+                                title: `${printedSixty} s omits the time to roll the first foot`,
+                                detail: `Drag-strip convention. Saved to “0–60 (1ft)”. Implies a standing start of about ${(printedSixty + allowance).toFixed(1)} s.`,
                             },
                             {
-                                key: 'rollout',
-                                title: `${printedSixty} s includes the 1-ft rollout`,
-                                detail: `Saved to “0–60 (1ft)”. Implies a standing start of about ${(printedSixty + allowance).toFixed(1)} s.`,
+                                key: 'none',
+                                title: `${printedSixty} s includes the time to roll the first foot`,
+                                detail: `Standing start, clock from 0 mph. Saved to “0–60 mph”. Implies a rollout time of about ${(printedSixty - allowance).toFixed(1)} s.`,
                             },
                         ].map(opt => (
                             <label key={opt.key} className="flex items-start gap-2 text-xs py-1 cursor-pointer">
@@ -289,11 +295,9 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                 <div className="flex gap-2 mt-4">
                     <button
                         type="button" onClick={handleImport}
-                        disabled={busy || !hasAnything || basisNeeded}
+                        disabled={busy || !hasAnything}
                         className="btn btn-primary text-sm py-1.5 px-4 disabled:opacity-40"
-                        title={!hasAnything ? 'Paste a result block first'
-                            : basisNeeded ? 'Choose a rollout basis first'
-                            : undefined}
+                        title={!hasAnything ? 'Paste a result block first' : undefined}
                     >
                         {busy ? 'Importing…' : 'Import result'}
                     </button>
