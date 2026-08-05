@@ -19,6 +19,7 @@ import TestedResults from './performance/TestedResults';
 import PerformanceSessionCard from './performance/PerformanceSessionCard';
 import PerformanceSummaryCard from './performance/PerformanceSummaryCard';
 import PerformanceImportModal from './PerformanceImportModal';
+import PastePublishedResultsModal from './PastePublishedResultsModal';
 
 const SECTION_HELP =
     'Independently-tested acceleration and braking results. Separate from the ' +
@@ -34,6 +35,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
         savePerformanceSession,
         deletePerformanceSession,
         savePerformanceSummary,
+        importPublishedResult,
         deletePerformanceSummary,
         savePerformanceInterval,
         deletePerformanceInterval,
@@ -46,6 +48,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
     const [reloadToken, setReloadToken] = useState(0);
     const [showImport, setShowImport] = useState(false);
     const [addingResult, setAddingResult] = useState(false);
+    const [showPaste, setShowPaste] = useState(false);
     const [newSource, setNewSource] = useState('');
     const [newTrim, setNewTrim]     = useState('');
     const [creating, setCreating]   = useState(false);
@@ -125,6 +128,11 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
         }
     };
 
+    const handlePasteImport = async (parsed) => {
+        await importPublishedResult(parsed);
+        reload();
+    };
+
     /** Commit a card's buffered edits in one write. */
     const saveSummaryFields = async (id, fields) => {
         await savePerformanceSummary({ id, ...fields });
@@ -196,7 +204,8 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
             </div>
             {summaries.length === 0 ? (
                 <p className="text-sm text-muted mb-2">
-                    No published figures recorded. Add one for any source that tested this car without sharing full data.
+                    No published figures recorded. Paste a result block from a road test, or add
+                    one by hand for any source that tested this car without sharing full data.
                 </p>
             ) : (
                 summaries.map(s => (
@@ -213,13 +222,22 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
             )}
 
             {canEdit && !addingResult && (
-                <button
-                    type="button"
-                    onClick={() => setAddingResult(true)}
-                    className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
-                >
-                    + Add reported result
-                </button>
+                <div className="flex flex-wrap items-center gap-4">
+                    <button
+                        type="button"
+                        onClick={() => setShowPaste(true)}
+                        className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                        📋 Paste a result block
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setAddingResult(true)}
+                        className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                        + Add reported result
+                    </button>
+                </div>
             )}
 
             {canEdit && addingResult && (
@@ -259,6 +277,14 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                         </button>
                     </div>
                 </div>
+            )}
+
+            {showPaste && (
+                <PastePublishedResultsModal
+                    vehicle={vehicle}
+                    onImport={handlePasteImport}
+                    onClose={() => setShowPaste(false)}
+                />
             )}
 
             {showImport && (

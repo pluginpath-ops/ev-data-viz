@@ -1183,6 +1183,19 @@ export function AppProvider({ children }) {
         }
     };
 
+    /** Create a published result and its speed windows from a parsed paste. */
+    const importPublishedResult = async (parsed) => {
+        try {
+            const saved = await dataService.importPublishedResult(parsed);
+            const n = parsed.intervals?.length ?? 0;
+            showSuccess(`Result imported${n ? ` with ${n} speed window${n === 1 ? '' : 's'}` : ''}.`);
+            return saved;
+        } catch (error) {
+            showError('Import failed: ' + error.message);
+            throw error;
+        }
+    };
+
     const deletePerformanceSummary = async (id) => {
         try {
             await dataService.deletePerformanceSummary(id);
@@ -1372,6 +1385,7 @@ export function AppProvider({ children }) {
         savePerformanceSession,
         deletePerformanceSession,
         savePerformanceSummary,
+        importPublishedResult,
         deletePerformanceSummary,
         savePerformanceInterval,
         deletePerformanceInterval,
