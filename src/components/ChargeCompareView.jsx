@@ -7,7 +7,7 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
-import { filterChargingRuns, filterRangeRuns, isRangeRun, defaultChargingRun } from '../utils/runUtils';
+import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import LoadingSpinner from './LoadingSpinner';
@@ -325,7 +325,6 @@ export default function ChargeCompareView({
         const result = [];
         for (const vehicle of selectedVehicles) {
             const chargingRuns = filterChargingRuns(vehicle.runs);
-            const autoCharging = defaultChargingRun(vehicle);
             // EPA rated range is a range basis with no test behind it, so it joins
             // the primary list rather than the partner dropdown.
             const epa = epaRangeOption(vehicle);
@@ -336,6 +335,8 @@ export default function ChargeCompareView({
                 const rows   = pinned.length ? pinned : [null];
 
                 for (const partnerId of rows) {
+                    // URL pairing → curator's stored pairing → vehicle default.
+                    const autoCharging = pairedChargingRun(rangeRun, vehicle);
                     const chargingRun = partnerId
                         ? chargingRuns.find(r => String(r.id) === String(partnerId)) ?? autoCharging
                         : autoCharging;
@@ -733,9 +734,11 @@ export default function ChargeCompareView({
                             const epa = epaRangeOption(vehicle);
                             return epa ? [epa] : [];
                         }}
-                        resolvePartner={(_rangeRun, vehicle) => {
-                            const run = defaultChargingRun(vehicle);
-                            return run ? { sourceRun: run, note: null } : null;
+                        resolvePartner={(rangeRun, vehicle) => {
+                            const run = pairedChargingRun(rangeRun, vehicle);
+                            return run
+                                ? { sourceRun: run, note: rangeRun?.paired_charging_run_id != null ? 'curated' : null }
+                                : null;
                         }}
                         onSetPartner={(rangeId, oldChargingId, newChargingId) =>
                             setPairings(prev => replacePartner(prev, rangeId, oldChargingId, newChargingId))}

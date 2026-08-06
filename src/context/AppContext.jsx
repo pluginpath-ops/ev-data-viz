@@ -314,6 +314,28 @@ export function AppProvider({ children }) {
         }
     };
 
+    /**
+     * Set the curator's default charging test for a range test, or clear it with
+     * null. This is the durable pairing — a chart-session pairing lives only in
+     * the URL, so this is what a visitor arriving without one sees.
+     */
+    const setPairedChargingRun = async (vehicleId, rangeRunId, chargingRunId) => {
+        try {
+            await dataService.setPairedChargingRun(rangeRunId, chargingRunId);
+            setVehicles(prev => prev.map(v =>
+                v.id !== vehicleId ? v : {
+                    ...v,
+                    runs: v.runs.map(r => r.id === rangeRunId
+                        ? { ...r, paired_charging_run_id: chargingRunId ? Number(chargingRunId) : null }
+                        : r),
+                }
+            ));
+        } catch (error) {
+            logIfUnauthorized('set_paired_charging_run', 'run', rangeRunId, error);
+            showError('Error saving pairing: ' + error.message);
+        }
+    };
+
     const updateRunColor = async (vehicleId, runId, color) => {
         try {
             if (typeof runId === 'string' && runId.startsWith('inherited_')) {
@@ -1326,6 +1348,7 @@ export function AppProvider({ children }) {
         updateRun,
         setDefaultRun,
         updateRunColor,
+        setPairedChargingRun,
         deleteRun,
         tags,
         createTag,

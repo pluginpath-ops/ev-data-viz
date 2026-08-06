@@ -615,6 +615,30 @@ class DataService {
     if (error) throw error;
   }
 
+  /**
+   * Set (or clear, with null) the curator's default charging test for a range
+   * test. Unlike a chart-session pairing, which lives only in the URL, this is
+   * what a visitor arriving without one sees. See migration 045.
+   */
+  async setPairedChargingRun(rangeRunId, chargingRunId) {
+    if (!this.useSupabase || !this.user) {
+      const saved = localStorage.getItem('evData');
+      const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
+      data.vehicles = (data.vehicles || []).map(v => ({
+        ...v,
+        runs: (v.runs || []).map(r =>
+          r.id === rangeRunId ? { ...r, paired_charging_run_id: chargingRunId ?? null } : r),
+      }));
+      localStorage.setItem('evData', JSON.stringify(data));
+      return;
+    }
+    const { error } = await getSupabase()
+      .from('runs')
+      .update({ paired_charging_run_id: chargingRunId ? Number(chargingRunId) : null })
+      .eq('id', rangeRunId);
+    if (error) throw error;
+  }
+
   async updateRunColor(vehicleId, runId, color) {
     if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');

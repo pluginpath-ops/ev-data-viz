@@ -86,7 +86,7 @@ One charging or range test session per vehicle.
 | `has_charging` | `boolean` | `true` | **Superseded by `kind`** — still written, no longer read. Dropped in #155 |
 | `has_range` | `boolean` | `false` | **Superseded by `kind`** — still written, no longer read. Dropped in #155 |
 | `session_id` | `bigint` | `NULL` | FK → `test_sessions.id` ON DELETE SET NULL. Advisory grouping; never required |
-| `paired_range_run_id` | `bigint` | `NULL` | FK → `runs.id` ON DELETE SET NULL. Curator-set default range partner for a charging run |
+| `paired_charging_run_id` | `bigint` | `NULL` | FK → `runs.id` ON DELETE SET NULL. Curator-set default charging test for a **range** test (migration 045). Overrides the automatic pick; a URL pairing still overrides this |
 | `software_version` | `text` | — | |
 | `conditions` | `text` | — | Freeform notes |
 | `source` | `text` | — | URL to source video/post |
