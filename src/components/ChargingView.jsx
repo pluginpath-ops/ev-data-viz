@@ -14,6 +14,7 @@ import { useTheme } from '../hooks/useTheme';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
 import { rangePartnersOfCharging } from '../utils/pairings';
+import { resolveRangeSource, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 import LoadingSpinner from './LoadingSpinner';
 import { resolveChartColors } from '../utils/colorUtils';
@@ -185,37 +186,54 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             runData = await dataService.getRunData(runId);
                         }
 
-                        // Derive range from a range test via SoC interpolation when
-                        // this charging run has none of its own — or whenever the
-                        // user has explicitly paired one, in which case their choice
-                        // overrides the recorded range column.
+                        // Range axis, resolved on the same ranking as every other
+                        // chart (utils/rangeSource.js):
                         //
-                        // Only an EXPLICIT pairing overrides. Letting the automatic
-                        // pick outrank the recorded column too would restate every
-                        // existing chart's range axis without anyone asking.
-                        const pairedRangeIds = rangePartnersOfCharging(pairings, runId);
-                        const hasOwnRange = runData.some(p => p.range != null);
-                        if (runData.length > 0 && (pairedRangeIds.length > 0 || !hasOwnRange)) {
+                        //   pairing → default range test → recorded range column
+                        //
+                        // A range test now outranks the recorded column outright,
+                        // not just when one was explicitly paired. The recorded
+                        // values are themselves mostly estimates — usually the car's
+                        // guess-o-meter — so they carry no more authority than a
+                        // figure derived from a measured range test, and treating
+                        // them as more authoritative was the anomaly.
+                        if (runData.length > 0) {
                             const parentVehicle = vehicles.find(v =>
                                 v.runs?.some(r => String(r.id) === String(runId))
                             );
+                            const pairedRangeIds = rangePartnersOfCharging(pairings, runId);
                             const own = (parentVehicle?.runs || []).filter(r => !r._inherited && isRangeRun(r));
-                            const rangeRun =
-                                (pairedRangeIds.length
-                                    ? own.find(r => String(r.id) === pairedRangeIds[0])
-                                    : null) ??
-                                own.find(r => r.isDefault) ??
-                                own[0];
-                            if (rangeRun) {
-                                try {
-                                    const lookup = await dataService.buildRangePerSocLookup(rangeRun.id);
-                                    if (lookup) {
-                                        runData = runData.map(p => ({
-                                            ...p,
-                                            range: p.soc != null ? lookup(p.soc) : null,
-                                        }));
-                                    }
-                                } catch (_) { /* non-fatal — chart will just lack range axis */ }
+                            const pairedRange = pairedRangeIds.length
+                                ? (pairedRangeIds[0] === EPA_PARTNER_ID
+                                    ? EPA_PARTNER_ID
+                                    : own.find(r => String(r.id) === pairedRangeIds[0]) ?? null)
+                                : null;
+
+                            const src = resolveRangeSource(run ?? { id: runId }, {
+                                vehicle: parentVehicle,
+                                explicitPairing: pairedRange,
+                            });
+
+                            // 'recorded' and 'none' mean no range test won — leave
+                            // the run's own column alone.
+                            if (src.miPerSoc != null) {
+                                let lookup = null;
+                                // A range test WITH its own SoC/range time series gives
+                                // the real, non-linear shape; prefer it. Most range
+                                // tests are scalar (distance + SoC bounds), so the
+                                // linear miPerSoc model is the usual path.
+                                if (src.sourceRun?.id && src.sourceRun.id !== EPA_PARTNER_ID) {
+                                    try {
+                                        lookup = await dataService.buildRangePerSocLookup(src.sourceRun.id);
+                                    } catch (_) { /* fall through to linear */ }
+                                }
+                                const rangeAt = lookup
+                                    ? (soc) => lookup(soc)
+                                    : (soc) => Math.round(soc * src.miPerSoc * 10) / 10;
+                                runData = runData.map(p => ({
+                                    ...p,
+                                    range: p.soc != null ? rangeAt(p.soc) : null,
+                                }));
                             }
                         }
                     } else {
