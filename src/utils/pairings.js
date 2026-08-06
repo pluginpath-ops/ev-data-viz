@@ -35,6 +35,23 @@
 
 const key = id => String(id);
 
+// ── Pair identity ────────────────────────────────────────────────────────────
+//
+// One charging run plotted against three range tests is three series, so a run
+// id is no longer enough to identify a selection or a chart series. The pair is.
+// '::' because synthetic inherited-run ids already contain '-'.
+
+const PAIR_SEP = '::';
+
+export function pairKey(chargingRunId, rangeRunId) {
+    return `${key(chargingRunId)}${PAIR_SEP}${rangeRunId == null ? '' : key(rangeRunId)}`;
+}
+
+export function parsePairKey(k) {
+    const [chargingRunId, rangeRunId] = String(k).split(PAIR_SEP);
+    return { chargingRunId, rangeRunId: rangeRunId || null };
+}
+
 /** Range partners explicitly chosen for a charging run. Empty when unpaired. */
 export function partnersFor(pairings, chargingRunId) {
     return pairings?.[key(chargingRunId)] ?? [];

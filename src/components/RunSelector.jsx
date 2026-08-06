@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { pairKey, partnersFor } from '../utils/pairings';
 
 /**
  * Shared collapsible run selector used by ChargingView, RangeChartView,
@@ -6,12 +7,31 @@ import { useState, useRef, useEffect } from 'react';
  *
  * Props:
  *   vehicles        — array of vehicle objects with .runs, in display order
- *   selectedRunIds  — array of selected run IDs
- *   onToggleRun     — (runId) => void
+ *   selectedRunIds  — array of selected run IDs (pair keys in pair mode)
+ *   onToggleRun     — (runId | pairKey) => void
  *   onUpdateRunColor — (vehicleId, runId, color) => void, or null to hide color inputs
  *   runFilter       — (run) => boolean — which runs to show per vehicle
  *   emptyMessage    — string shown when no runs pass the filter for a vehicle
  *   renderRunMeta   — optional (run) => ReactNode — extra badges after name/date
+ *
+ * ── Pair mode (opt-in) ───────────────────────────────────────────────────────
+ *
+ * Set `pairMode` and the list becomes charging tests, each with an inline
+ * `Range: … ▾` control naming the range test that supplies its miles, and a ＋
+ * that duplicates the row with the charging test pre-filled. The 1:1 case looks
+ * almost exactly like the flat list; the UI only grows when asked.
+ *
+ * Rows are keyed by PAIR, not by run — one charging curve against three range
+ * tests is three series, so a run id can no longer identify a selection.
+ *
+ *   pairMode        — enable the above
+ *   pairings        — { [chargingRunId]: [rangeRunId, ...] } (utils/pairings.js)
+ *   rangeRunsFor    — (vehicle) => range runs available as partners
+ *   resolvePartner  — (chargingRun, vehicle) => { sourceRun, note } for the
+ *                     automatic choice shown when nothing is pinned
+ *   onSetPartner    — (chargingRunId, oldRangeRunId, newRangeRunId) => void
+ *   onAddPartner    — (chargingRunId, rangeRunId) => void
+ *   onRemovePartner — (chargingRunId, rangeRunId) => void
  */
 export default function RunSelector({
     vehicles,
@@ -22,6 +42,14 @@ export default function RunSelector({
     emptyMessage = 'No runs',
     renderRunMeta = null,
     colorMap = {},
+    // Pair mode
+    pairMode = false,
+    pairings = {},
+    rangeRunsFor = null,
+    resolvePartner = null,
+    onSetPartner = null,
+    onAddPartner = null,
+    onRemovePartner = null,
 }) {
     const [expanded, setExpanded] = useState(false);
     // Default all vehicles to expanded; track explicit collapses
@@ -32,8 +60,24 @@ export default function RunSelector({
 
     const isSelected = (run) => selectedRunIds.some(id => String(id) === String(run.id));
 
-    const selectedCount = vehicles.reduce((n, v) =>
-        n + (v.runs || []).filter(runFilter).filter(isSelected).length, 0);
+    /**
+     * The partner rows for one charging run: whatever the user pinned, or a
+     * single row for the automatic choice. `null` means "resolved automatically"
+     * and still gets a row, so every charging test is visible and selectable
+     * whether or not anyone has paired it.
+     */
+    const partnerRowsFor = (run) => {
+        const pinned = partnersFor(pairings, run.id);
+        return pinned.length ? pinned : [null];
+    };
+
+    const selectedCount = pairMode
+        ? vehicles.reduce((n, v) => n + (v.runs || []).filter(runFilter).reduce(
+            (m, run) => m + partnerRowsFor(run).filter(
+                partnerId => selectedRunIds.some(id => String(id) === pairKey(run.id, partnerId))
+            ).length, 0), 0)
+        : vehicles.reduce((n, v) =>
+            n + (v.runs || []).filter(runFilter).filter(isSelected).length, 0);
 
     return (
         <div>
@@ -73,7 +117,24 @@ export default function RunSelector({
                                             <p className="text-sm text-faint italic">{emptyMessage}</p>
                                         ) : (
                                             <div className="run-items">
-                                                {filteredRuns.map(run => (
+                                                {filteredRuns.map(run => pairMode ? (
+                                                    <PairRows
+                                                        key={run.id}
+                                                        run={run}
+                                                        vehicle={vehicle}
+                                                        partnerIds={partnerRowsFor(run)}
+                                                        rangeRuns={rangeRunsFor?.(vehicle) ?? []}
+                                                        resolvePartner={resolvePartner}
+                                                        selectedRunIds={selectedRunIds}
+                                                        onToggleRun={onToggleRun}
+                                                        onSetPartner={onSetPartner}
+                                                        onAddPartner={onAddPartner}
+                                                        onRemovePartner={onRemovePartner}
+                                                        onUpdateRunColor={onUpdateRunColor}
+                                                        renderRunMeta={renderRunMeta}
+                                                        colorMap={colorMap}
+                                                    />
+                                                ) : (
                                                     <RunRow
                                                         key={run.id}
                                                         run={run}
@@ -94,6 +155,122 @@ export default function RunSelector({
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+/**
+ * One charging test and its range partner(s) — a row per pair.
+ *
+ * The first row carries the checkbox, colour and charging-test name; additional
+ * partners are continuation rows showing only their own dropdown, so a single
+ * curve compared across three conditions reads as one block rather than three
+ * unrelated entries.
+ */
+function PairRows({
+    run, vehicle, partnerIds, rangeRuns, resolvePartner,
+    selectedRunIds, onToggleRun, onSetPartner, onAddPartner, onRemovePartner,
+    onUpdateRunColor, renderRunMeta, colorMap,
+}) {
+    // What the resolver would pick with nothing pinned — shown as the dropdown's
+    // placeholder so an unpaired row still says where its miles come from.
+    const auto = resolvePartner?.(run, vehicle) ?? null;
+    const autoLabel = auto?.sourceRun?.name
+        ?? (auto?.source === 'recorded' ? 'recorded range column' : 'no range data');
+
+    // Range tests not already used by this charging run — the discovery badge.
+    const used = new Set(partnerIds.filter(Boolean).map(String));
+    const unused = rangeRuns.filter(r => !used.has(String(r.id)));
+
+    const isSelected = (partnerId) =>
+        selectedRunIds.some(id => String(id) === pairKey(run.id, partnerId));
+
+    return (
+        <div className="pair-group">
+            {partnerIds.map((partnerId, idx) => (
+                <label key={partnerId ?? 'auto'} className={`pair-row ${isSelected(partnerId) ? '' : 'opacity-60 hover:opacity-100'}`}>
+                    <input
+                        type="checkbox"
+                        checked={isSelected(partnerId)}
+                        onChange={() => onToggleRun(pairKey(run.id, partnerId))}
+                        className="w-4 h-4 shrink-0"
+                    />
+
+                    {/* Charging test identity — only on the first row of the group */}
+                    {idx === 0 ? (
+                        <span className="pair-charging-label">
+                            {onUpdateRunColor && (
+                                <span
+                                    className="w-3 h-5 rounded-sm shrink-0 border border-black/10"
+                                    style={{ backgroundColor: colorMap[run.id] || run.color || '#3b82f6' }}
+                                />
+                            )}
+                            <span className="truncate">{run.name}</span>
+                            <span className="text-sm text-muted shrink-0"> ({run.date})</span>
+                            {renderRunMeta?.(run)}
+                        </span>
+                    ) : (
+                        <span className="pair-charging-label text-faint">↳</span>
+                    )}
+
+                    {/* The range basis for this pair */}
+                    <span className="pair-range-control" onClick={e => e.preventDefault()}>
+                        <span className="text-label shrink-0">Range:</span>
+                        <select
+                            className="form-input text-sm py-0.5"
+                            value={partnerId ?? ''}
+                            onChange={e => {
+                                const next = e.target.value;
+                                if (!next) onRemovePartner?.(run.id, partnerId);
+                                else onSetPartner?.(run.id, partnerId, next);
+                            }}
+                        >
+                            <option value="">Auto — {autoLabel}</option>
+                            {rangeRuns.map(r => (
+                                <option key={r.id} value={r.id}>{r.name}</option>
+                            ))}
+                        </select>
+
+                        {/* Discovery: how many other range tests could go here */}
+                        {idx === 0 && unused.length > 0 && (
+                            <span
+                                className="pair-more-badge"
+                                title={`${unused.length} more range test(s): ${unused.map(r => r.name).join(', ')}`}
+                            >
+                                +{unused.length}
+                            </span>
+                        )}
+
+                        {idx === 0 ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    // Duplicate this row with the charging test pre-filled —
+                                    // the point of the design is never re-picking it.
+                                    const next = unused[0];
+                                    if (!next) return;
+                                    if (!partnerId && auto?.sourceRun) onAddPartner?.(run.id, auto.sourceRun.id);
+                                    onAddPartner?.(run.id, next.id);
+                                }}
+                                disabled={unused.length === 0}
+                                className="pair-add-btn"
+                                title={unused.length ? 'Compare this charging test against another range test' : 'No other range tests available'}
+                            >
+                                ＋
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => onRemovePartner?.(run.id, partnerId)}
+                                className="pair-remove-btn"
+                                title="Remove this pairing"
+                            >
+                                ×
+                            </button>
+                        )}
+                    </span>
+                </label>
+            ))}
         </div>
     );
 }
