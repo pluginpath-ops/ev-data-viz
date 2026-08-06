@@ -826,6 +826,8 @@ export default function App() {
                             setXMinutes={v => setCompareConfig(p => ({ ...p, xMinutes: v }))}
                             setMMiles={v => setCompareConfig(p => ({ ...p, mMiles: v }))}
                             setStartSoc={v => setCompareConfig(p => ({ ...p, startSoc: v }))}
+                            pairings={pairings}
+                            setPairings={setPairings}
                             onUpdateRunColor={updateRunColor}
                         />
                     )}

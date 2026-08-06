@@ -15,7 +15,7 @@ import PerformanceCurveView from './PerformanceCurveView';
  */
 export default function PopoutView({
     vehicles, selectedVehicles, chartMode, chartConfig,
-    setChartConfig, compareConfig, roadTripConfig, epaConfig, onUpdateRunColor,
+    setChartConfig, compareConfig, roadTripConfig, epaConfig, pairings, onUpdateRunColor,
 }) {
     return (
         <div className="popout-root">
@@ -98,6 +98,7 @@ export default function PopoutView({
                     xMinutes={compareConfig.xMinutes}
                     mMiles={compareConfig.mMiles}
                     startSoc={compareConfig.startSoc}
+                    pairings={pairings}
                     presentationMode
                 />
             )}

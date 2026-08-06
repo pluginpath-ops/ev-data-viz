@@ -179,7 +179,13 @@ function PairRows({
         ?? (auto?.source === 'recorded' ? 'recorded range column' : 'no range data');
 
     // Range tests not already used by this charging run — the discovery badge.
+    //
+    // An unpinned row is still *showing* the auto-resolved partner, so that one
+    // counts as used. Without this the badge over-counts ("+2" when only one
+    // other test exists) and ＋ can pick the partner already on screen, which
+    // dedupes to a no-op and looks like a dead button.
     const used = new Set(partnerIds.filter(Boolean).map(String));
+    if (!partnerIds.some(Boolean) && auto?.sourceRun) used.add(String(auto.sourceRun.id));
     const unused = rangeRuns.filter(r => !used.has(String(r.id)));
 
     const isSelected = (partnerId) =>

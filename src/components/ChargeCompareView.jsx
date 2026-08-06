@@ -7,8 +7,9 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
-import { filterChargingRuns, filterRangeRuns, isRangeRun, isChargingRun } from '../utils/runUtils';
+import { filterChargingRuns, filterRangeRuns, isChargingRun } from '../utils/runUtils';
 import { resolveRangeSource } from '../utils/rangeSource';
+import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 
@@ -274,6 +275,10 @@ export default function ChargeCompareView({
     xMinutes = 15, setXMinutes,
     mMiles   = 150, setMMiles,
     startSoc = 10,  setStartSoc,
+    // Global chart-session pairings (utils/pairings.js). Read-only in the
+    // pop-out, which receives them over BroadcastChannel and must not edit.
+    pairings = {},
+    setPairings = () => {},
     onUpdateRunColor = null,
     presentationMode = false,
 }) {
@@ -306,43 +311,52 @@ export default function ChargeCompareView({
         [vehicles, selectedVehicleIds]
     );
 
-    // For each range run: resolve which charging run supplies the data_points.
-    // - If the range run itself has charging data → use its own ID.
-    // - Otherwise → vehicle's is_default charging run, or most recent.
-    const resolvedRuns = useMemo(() => {
+    // Charging-primary: one series per (charging test × range test) pair.
+    //
+    // This chart used to iterate range runs and hunt for a charging run to supply
+    // the data points, which made the range test the subject and buried the
+    // pairing. Inverted, the charging curve is the subject and the range test is
+    // the basis you choose for it — which is the question the chart answers.
+    //
+    // A charging run with no explicit pairing still gets one row, whose partner
+    // the resolver picks (ranks 2-4). So an untouched chart behaves exactly as it
+    // did before anyone pairs anything.
+    const resolvedPairs = useMemo(() => {
         const result = [];
         for (const vehicle of selectedVehicles) {
-            const rangeRuns    = filterRangeRuns(vehicle.runs);
-            const chargingRuns = filterChargingRuns(vehicle.runs);
-            const defaultCharging =
-                chargingRuns.find(r => r.isDefault) ||
-                [...chargingRuns].sort((a, b) => new Date(b.date) - new Date(a.date))[0] ||
-                null;
+            const rangeRuns = filterRangeRuns(vehicle.runs);
 
-            for (const rangeRun of rangeRuns) {
-                const chargingRun = isChargingRun(rangeRun) ? rangeRun : defaultCharging;
-                // Selecting a range run for this bar IS an explicit pairing, so it
-                // takes rank 1. The resolver still falls through to the vehicle
-                // default or the recorded range column when the chosen test has no
-                // usable distance/SoC data, and reports which it landed on.
-                const rangeSrc = resolveRangeSource(chargingRun, {
-                    vehicle,
-                    explicitPairing: rangeRun,
-                });
-                result.push({
-                    rangeRun:        { ...rangeRun, vehicleName: vehicleLabel(vehicle), vehicleId: vehicle.id },
-                    chargingRunId:   chargingRun?.id   ?? null,
-                    chargingRunName: chargingRun?.name ?? null,
-                    rangeSrc,
-                });
+            for (const chargingRun of filterChargingRuns(vehicle.runs)) {
+                const pinned = partnersFor(pairings, chargingRun.id);
+                const rows   = pinned.length ? pinned : [null];
+
+                for (const partnerId of rows) {
+                    const explicit = partnerId
+                        ? rangeRuns.find(r => String(r.id) === String(partnerId)) ?? null
+                        : null;
+                    const rangeSrc = resolveRangeSource(chargingRun, {
+                        vehicle,
+                        explicitPairing: explicit,
+                    });
+                    result.push({
+                        key:         pairKey(chargingRun.id, partnerId),
+                        chargingRun: { ...chargingRun, vehicleName: vehicleLabel(vehicle), vehicleId: vehicle.id },
+                        // Only disambiguate when a curve is shown more than once —
+                        // the 1:1 case keeps the charging test's own name.
+                        label:       rows.length > 1 && rangeSrc.sourceRun
+                            ? `${chargingRun.name} × ${rangeSrc.sourceRun.name}`
+                            : chargingRun.name,
+                        rangeSrc,
+                    });
+                }
             }
         }
         return result;
-    }, [selectedVehicles]);
+    }, [selectedVehicles, pairings]);
 
     const neededRunIds = useMemo(
-        () => [...new Set(resolvedRuns.map(r => r.chargingRunId).filter(Boolean))],
-        [resolvedRuns]
+        () => [...new Set(resolvedPairs.map(p => p.chargingRun.id).filter(Boolean))],
+        [resolvedPairs]
     );
 
     // ── Lazy-load data_points for resolved charging runs ──────────────────────
@@ -378,34 +392,40 @@ export default function ChargeCompareView({
         fetchMissing();
     }, [neededRunIds.join(',')]);
 
-    // ── Auto-select any new range runs when vehicles change ───────────────────
+    // ── Auto-select any new pairs when vehicles or pairings change ────────────
+    // Selection is by pair key, so adding a second range partner to a charging
+    // test brings the new series in already selected rather than requiring a
+    // second click in a different part of the UI.
     useEffect(() => {
-        const allRangeRunIds = resolvedRuns.map(r => r.rangeRun.id);
+        const allKeys = resolvedPairs.map(p => p.key);
         setSelectedRuns(prev => {
-            const newIds = allRangeRunIds.filter(id => !prev.includes(id));
-            return newIds.length ? [...prev, ...newIds] : prev;
+            const newKeys = allKeys.filter(k => !prev.includes(k));
+            return newKeys.length ? [...prev, ...newKeys] : prev;
         });
-    }, [resolvedRuns]);
+    }, [resolvedPairs]);
 
-    const activeResolvedRuns = resolvedRuns.filter(r => selectedRuns.includes(r.rangeRun.id));
+    const activePairs = resolvedPairs.filter(p => selectedRuns.includes(p.key));
 
     // ── Compute bars for one chart type ──────────────────────────────────────
     // chartType: 'range_added' | 'time_to_range'
     const buildBars = (chartType) => {
         const flatRuns = [];
 
-        for (const { rangeRun, chargingRunId, chargingRunName, rangeSrc } of activeResolvedRuns) {
+        for (const { key, chargingRun, label, rangeSrc } of activePairs) {
+            const chargingRunId = chargingRun.id;
             const base = {
-                id:              rangeRun.id,
-                name:            rangeRun.name,
-                vehicleName:     rangeRun.vehicleName,
-                vehicleId:       rangeRun.vehicleId,
-                color:           rangeRun.color || '#3b82f6',
-                speed_mph:       rangeRun.speed_mph,
-                temperature_f:   rangeRun.temperature_f,
-                source:          rangeRun.source,
-                _trim:           rangeRun._trim ?? null,
-                _chargingRunName: chargingRunName,
+                id:              key,
+                name:            label,
+                vehicleName:     chargingRun.vehicleName,
+                vehicleId:       chargingRun.vehicleId,
+                color:           chargingRun.color || '#3b82f6',
+                // Each pill describes the half it came from: speed is a property of
+                // the range test, temperature of the charging session.
+                speed_mph:       rangeSrc?.sourceRun?.speed_mph ?? chargingRun.speed_mph,
+                temperature_f:   chargingRun.temperature_f,
+                source:          chargingRun.source,
+                _trim:           chargingRun._trim ?? null,
+                _chargingRunName: chargingRun.name,
                 _yUnit:          chartType === 'range_added' ? distanceLabel(units) : 'min',
                 _rangeUnit:      distanceLabel(units),
                 // Which range basis produced these miles, for the provenance label.
@@ -620,7 +640,7 @@ export default function ChargeCompareView({
         };
     }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns, units, isDark]);
 
-    const hasRangeRuns = resolvedRuns.length > 0;
+    const hasRangeRuns = resolvedPairs.length > 0;
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
@@ -686,8 +706,19 @@ export default function ChargeCompareView({
                             prev.includes(runId) ? prev.filter(id => id !== runId) : [...prev, runId]
                         )}
                         onUpdateRunColor={onUpdateRunColor}
-                        runFilter={isRangeRun}
-                        emptyMessage="No range test records"
+                        runFilter={isChargingRun}
+                        emptyMessage="No charging test records"
+                        pairMode
+                        pairings={pairings}
+                        rangeRunsFor={vehicle => filterRangeRuns(vehicle.runs)}
+                        resolvePartner={(chargingRun, vehicle) =>
+                            resolveRangeSource(chargingRun, { vehicle })}
+                        onSetPartner={(chargingId, oldRangeId, newRangeId) =>
+                            setPairings(prev => replacePartner(prev, chargingId, oldRangeId, newRangeId))}
+                        onAddPartner={(chargingId, rangeId) =>
+                            setPairings(prev => addPartner(prev, chargingId, rangeId))}
+                        onRemovePartner={(chargingId, rangeId) =>
+                            setPairings(prev => removePartner(prev, chargingId, rangeId))}
                         renderRunMeta={run => (
                             <>
                                 {run.speed_mph != null && (
@@ -714,7 +745,7 @@ export default function ChargeCompareView({
                         <h4 className="text-base font-semibold mb-3">
                             Range Added in {xMinutes} Minutes <span className="text-faint font-normal">(from ~{startSoc}% SoC, in {distanceLabel(units)})</span>
                         </h4>
-                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activeResolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
+                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart1Ref} />
                         </div>
                     </div>
@@ -724,7 +755,7 @@ export default function ChargeCompareView({
                         <h4 className="text-base font-semibold mb-3">
                             Time to Add {units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} {distanceLabel(units)} of Range <span className="text-faint font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
-                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activeResolvedRuns.length * 48)}px` : '450px', position: 'relative' }}>
+                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart2Ref} />
                         </div>
                         <div className="mt-3 flex gap-2">
