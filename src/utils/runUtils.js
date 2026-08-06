@@ -34,6 +34,23 @@ export const isRangeRun = (r) => r.kind === 'range' || !!r.has_range;
 export const filterChargingRuns = (runs) => (runs || []).filter(isChargingRun);
 export const filterRangeRuns    = (runs) => (runs || []).filter(isRangeRun);
 
+/**
+ * The charging test to use for a vehicle when the user hasn't picked one:
+ * the explicitly-defaulted run, else the most recent.
+ *
+ * The mirror of defaultRangeRun() in utils/rangeSource.js. Charging curves vary
+ * far less than range tests — they're a property of the car, where a range test
+ * is a property of the day — so this default is usually the right answer and
+ * rarely worth overriding.
+ */
+export function defaultChargingRun(vehicle) {
+    const charging = filterChargingRuns(vehicle?.runs);
+    if (!charging.length) return null;
+    return charging.find(r => r.isDefault || r.is_default)
+        ?? [...charging].sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+        ?? null;
+}
+
 // ── Populated-field detection ─────────────────────────────────────────────────
 
 /**

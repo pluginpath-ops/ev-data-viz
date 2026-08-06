@@ -887,6 +887,12 @@ body {
     @apply flex items-center gap-2 cursor-pointer;
 }
 
+/* Additional partners for the same charging test — indented so the branch
+   reads as belonging to the row above, checkbox included. */
+.pair-row-child {
+    @apply pl-8;
+}
+
 /* Charging-test identity; blank on continuation rows so partners line up */
 .pair-charging-label {
     @apply flex items-center gap-2 min-w-0;

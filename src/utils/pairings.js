@@ -4,17 +4,24 @@
  *
  * A pairing is rank 1 of the resolution order in utils/rangeSource.js: it beats
  * the vehicle default, the charging run's own range half, and the recorded
- * range column. Everything below rank 1 still applies to any charging run the
- * user has not paired explicitly, so an empty pairing map means "resolve
- * everything automatically" rather than "show nothing".
+ * range column. Everything below rank 1 still applies wherever the user has not
+ * paired explicitly, so an empty pairing map means "resolve everything
+ * automatically" rather than "show nothing".
  *
  * ── Shape ────────────────────────────────────────────────────────────────────
  *
- *     { [chargingRunId]: [rangeRunId, ...] }
+ *     { [rangeRunId]: [chargingRunId, ...] }
  *
- * A charging run may carry several range partners — one curve against 70 mph
- * mild AND 80 mph cold is the case the whole epic exists for — so the value is
- * a list, and each entry becomes its own chart series.
+ * Keyed by the RANGE test, because that is the axis worth enumerating: a
+ * charging curve is a property of the car and varies little, while a range test
+ * is a property of the day — wind, temperature, HVAC, tyres, elevation,
+ * humidity and load all move it, often drastically. So the list shows the
+ * variable thing and you pick the stable one for it.
+ *
+ * The value is a list because a range test may be compared against several
+ * charging curves, and each entry becomes its own chart series. The tuple is
+ * symmetric — (range, charging) either way — so only the enumeration order
+ * changes, never the maths.
  *
  * Keys are stringified because run ids arrive as numbers from the database and
  * as strings from the URL, and inherited runs (spec_links) carry synthetic
@@ -37,58 +44,58 @@ const key = id => String(id);
 
 // ── Pair identity ────────────────────────────────────────────────────────────
 //
-// One charging run plotted against three range tests is three series, so a run
-// id is no longer enough to identify a selection or a chart series. The pair is.
+// One range test plotted against three charging curves is three series, so a
+// run id is no longer enough to identify a selection or a chart series. The pair is.
 // '::' because synthetic inherited-run ids already contain '-'.
 
 const PAIR_SEP = '::';
 
-export function pairKey(chargingRunId, rangeRunId) {
-    return `${key(chargingRunId)}${PAIR_SEP}${rangeRunId == null ? '' : key(rangeRunId)}`;
+export function pairKey(rangeRunId, chargingRunId) {
+    return `${key(rangeRunId)}${PAIR_SEP}${chargingRunId == null ? '' : key(chargingRunId)}`;
 }
 
 export function parsePairKey(k) {
-    const [chargingRunId, rangeRunId] = String(k).split(PAIR_SEP);
-    return { chargingRunId, rangeRunId: rangeRunId || null };
+    const [rangeRunId, chargingRunId] = String(k).split(PAIR_SEP);
+    return { rangeRunId, chargingRunId: chargingRunId || null };
 }
 
-/** Range partners explicitly chosen for a charging run. Empty when unpaired. */
-export function partnersFor(pairings, chargingRunId) {
-    return pairings?.[key(chargingRunId)] ?? [];
+/** Charging partners explicitly chosen for a range test. Empty when unpaired. */
+export function partnersFor(pairings, rangeRunId) {
+    return pairings?.[key(rangeRunId)] ?? [];
 }
 
-/** True when the user has explicitly paired this charging run. */
-export function isPaired(pairings, chargingRunId) {
-    return partnersFor(pairings, chargingRunId).length > 0;
+/** True when the user has explicitly paired this range test. */
+export function isPaired(pairings, rangeRunId) {
+    return partnersFor(pairings, rangeRunId).length > 0;
 }
 
 /**
- * Add a range partner. Returns a new map — never mutates, so React state
+ * Add a charging partner. Returns a new map — never mutates, so React state
  * updates and the URL/broadcast effects fire correctly.
  */
-export function addPartner(pairings, chargingRunId, rangeRunId) {
-    const k = key(chargingRunId);
+export function addPartner(pairings, rangeRunId, chargingRunId) {
+    const k = key(rangeRunId);
     const existing = pairings[k] ?? [];
-    if (existing.includes(key(rangeRunId))) return pairings;
-    return { ...pairings, [k]: [...existing, key(rangeRunId)] };
+    if (existing.includes(key(chargingRunId))) return pairings;
+    return { ...pairings, [k]: [...existing, key(chargingRunId)] };
 }
 
 /** Replace one partner with another, preserving its position in the list. */
-export function replacePartner(pairings, chargingRunId, oldRangeRunId, newRangeRunId) {
-    const k = key(chargingRunId);
+export function replacePartner(pairings, rangeRunId, oldChargingRunId, newChargingRunId) {
+    const k = key(rangeRunId);
     const existing = pairings[k] ?? [];
-    const idx = existing.indexOf(key(oldRangeRunId));
-    if (idx === -1) return addPartner(pairings, chargingRunId, newRangeRunId);
+    const idx = existing.indexOf(key(oldChargingRunId));
+    if (idx === -1) return addPartner(pairings, rangeRunId, newChargingRunId);
     const next = [...existing];
-    next[idx] = key(newRangeRunId);
+    next[idx] = key(newChargingRunId);
     return { ...pairings, [k]: next };
 }
 
-/** Drop one partner; drops the charging run's entry entirely when it empties. */
-export function removePartner(pairings, chargingRunId, rangeRunId) {
-    const k = key(chargingRunId);
+/** Drop one partner; drops the range test's entry entirely when it empties. */
+export function removePartner(pairings, rangeRunId, chargingRunId) {
+    const k = key(rangeRunId);
     const existing = pairings[k] ?? [];
-    const next = existing.filter(id => id !== key(rangeRunId));
+    const next = existing.filter(id => id !== key(chargingRunId));
     const out = { ...pairings };
     if (next.length === 0) delete out[k];
     else out[k] = next;
@@ -96,7 +103,7 @@ export function removePartner(pairings, chargingRunId, rangeRunId) {
 }
 
 /**
- * Drop every pairing whose charging run or range partner is no longer present.
+ * Drop every pairing whose range test or charging partner is no longer present.
  *
  * Called when the vehicle selection changes: a pairing referencing a run the
  * user can no longer see is dead weight that would otherwise ride along in the
@@ -105,23 +112,23 @@ export function removePartner(pairings, chargingRunId, rangeRunId) {
 export function prunePairings(pairings, availableRunIds) {
     const live = new Set([...availableRunIds].map(key));
     const out = {};
-    for (const [chargingId, partners] of Object.entries(pairings || {})) {
-        if (!live.has(chargingId)) continue;
+    for (const [primaryId, partners] of Object.entries(pairings || {})) {
+        if (!live.has(primaryId)) continue;
         const kept = partners.filter(id => live.has(id));
-        if (kept.length) out[chargingId] = kept;
+        if (kept.length) out[primaryId] = kept;
     }
     return out;
 }
 
 // ── URL encoding ─────────────────────────────────────────────────────────────
 //
-// `12:5,7;13:9` — charging run 12 paired with range runs 5 and 7; 13 with 9.
+// `12:5,7;13:9` — range test 12 paired with charging runs 5 and 7; 13 with 9.
 // Compact enough that a chart with a dozen pairs still yields a usable link.
 
 export function encodePairings(pairings) {
     const parts = Object.entries(pairings || {})
         .filter(([, partners]) => partners?.length)
-        .map(([chargingId, partners]) => `${chargingId}:${partners.join(',')}`);
+        .map(([primaryId, partners]) => `${primaryId}:${partners.join(',')}`);
     return parts.join(';');
 }
 
@@ -130,10 +137,10 @@ export function decodePairings(raw) {
     const out = {};
     for (const group of String(raw).split(';')) {
         if (!group) continue;
-        const [chargingId, partnerList] = group.split(':');
-        if (!chargingId || !partnerList) continue;
+        const [primaryId, partnerList] = group.split(':');
+        if (!primaryId || !partnerList) continue;
         const partners = partnerList.split(',').filter(Boolean);
-        if (partners.length) out[chargingId] = partners;
+        if (partners.length) out[primaryId] = partners;
     }
     return out;
 }

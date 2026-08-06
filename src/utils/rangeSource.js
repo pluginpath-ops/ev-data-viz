@@ -53,6 +53,27 @@
 import { isRangeRun } from './runUtils';
 
 /**
+ * Sentinel partner id for "use the vehicle's EPA range".
+ *
+ * EPA range is a legitimate basis that is not a run: it is the manufacturer's
+ * rated full-pack figure, so it prices a %SoC without any test at all. Useful
+ * as a neutral yardstick when a vehicle's own range tests are all in unusual
+ * conditions, or when it has none.
+ *
+ * A string sentinel rather than a fake run row, so it can never be confused
+ * with a real run id, survives the URL round trip, and cannot be picked up by
+ * defaultRangeRun() — EPA is only ever an explicit choice.
+ */
+export const EPA_PARTNER_ID = 'epa';
+
+/** The EPA option for a vehicle's partner dropdown, or null when it has no rated range. */
+export function epaRangeOption(vehicle) {
+    return vehicle?.range > 0
+        ? { id: EPA_PARTNER_ID, name: 'EPA range', _synthetic: true }
+        : null;
+}
+
+/**
  * Miles per %SoC from a range test.
  *
  * Guards the degenerate cases: no distance, missing SoC bounds, and
@@ -166,6 +187,22 @@ export function resolveRangeSource(chargingRun, {
         miPerSoc: null, miPerKwh: null, energyMethod: null, note: null,
     };
     if (!chargingRun) return none;
+
+    // EPA range, when explicitly chosen. Rated range is a full-pack figure, so
+    // one percent of SoC buys one hundredth of it. Only ever reachable by
+    // explicit choice — it is never resolved automatically, because a real
+    // measured test on this vehicle is always the better default.
+    const wantsEpa = explicitPairing === EPA_PARTNER_ID || explicitPairing?.id === EPA_PARTNER_ID;
+    if (wantsEpa && vehicle?.range > 0) {
+        return {
+            source: 'epa',
+            sourceRun: epaRangeOption(vehicle),
+            miPerSoc: vehicle.range / 100,
+            miPerKwh: batteryKwh > 0 ? vehicle.range / batteryKwh : null,
+            energyMethod: 'epa-rated',
+            note: 'EPA rated range',
+        };
+    }
 
     // Ranks 1–3 all resolve to a range run; pick the first that yields data.
     const candidates = [

@@ -7,8 +7,8 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
-import { filterChargingRuns, filterRangeRuns, isChargingRun } from '../utils/runUtils';
-import { resolveRangeSource } from '../utils/rangeSource';
+import { filterChargingRuns, filterRangeRuns, isRangeRun, defaultChargingRun } from '../utils/runUtils';
+import { resolveRangeSource, epaRangeOption, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
@@ -324,28 +324,40 @@ export default function ChargeCompareView({
     const resolvedPairs = useMemo(() => {
         const result = [];
         for (const vehicle of selectedVehicles) {
-            const rangeRuns = filterRangeRuns(vehicle.runs);
+            const chargingRuns = filterChargingRuns(vehicle.runs);
+            const autoCharging = defaultChargingRun(vehicle);
+            // EPA rated range is a range basis with no test behind it, so it joins
+            // the primary list rather than the partner dropdown.
+            const epa = epaRangeOption(vehicle);
+            const primaries = epa ? [...filterRangeRuns(vehicle.runs), epa] : filterRangeRuns(vehicle.runs);
 
-            for (const chargingRun of filterChargingRuns(vehicle.runs)) {
-                const pinned = partnersFor(pairings, chargingRun.id);
+            for (const rangeRun of primaries) {
+                const pinned = partnersFor(pairings, rangeRun.id);
                 const rows   = pinned.length ? pinned : [null];
 
                 for (const partnerId of rows) {
-                    const explicit = partnerId
-                        ? rangeRuns.find(r => String(r.id) === String(partnerId)) ?? null
-                        : null;
+                    const chargingRun = partnerId
+                        ? chargingRuns.find(r => String(r.id) === String(partnerId)) ?? autoCharging
+                        : autoCharging;
+                    if (!chargingRun) continue;
+
+                    // The range side is always explicit here — it IS the row — so
+                    // the resolver is entered at rank 1 and its fallbacks only
+                    // matter when the chosen test carries no usable data.
                     const rangeSrc = resolveRangeSource(chargingRun, {
                         vehicle,
-                        explicitPairing: explicit,
+                        explicitPairing: rangeRun.id === EPA_PARTNER_ID ? EPA_PARTNER_ID : rangeRun,
                     });
+
                     result.push({
-                        key:         pairKey(chargingRun.id, partnerId),
-                        chargingRun: { ...chargingRun, vehicleName: vehicleLabel(vehicle), vehicleId: vehicle.id },
-                        // Only disambiguate when a curve is shown more than once —
-                        // the 1:1 case keeps the charging test's own name.
-                        label:       rows.length > 1 && rangeSrc.sourceRun
-                            ? `${chargingRun.name} × ${rangeSrc.sourceRun.name}`
-                            : chargingRun.name,
+                        key:         pairKey(rangeRun.id, partnerId),
+                        rangeRun:    { ...rangeRun, vehicleName: vehicleLabel(vehicle), vehicleId: vehicle.id },
+                        chargingRun,
+                        // Only disambiguate when a range test is shown more than
+                        // once — the 1:1 case keeps its own name.
+                        label:       rows.length > 1
+                            ? `${rangeRun.name} × ${chargingRun.name}`
+                            : rangeRun.name,
                         rangeSrc,
                     });
                 }
@@ -355,7 +367,7 @@ export default function ChargeCompareView({
     }, [selectedVehicles, pairings]);
 
     const neededRunIds = useMemo(
-        () => [...new Set(resolvedPairs.map(p => p.chargingRun.id).filter(Boolean))],
+        () => [...new Set(resolvedPairs.map(p => p.chargingRun?.id).filter(Boolean))],
         [resolvedPairs]
     );
 
@@ -411,20 +423,20 @@ export default function ChargeCompareView({
     const buildBars = (chartType) => {
         const flatRuns = [];
 
-        for (const { key, chargingRun, label, rangeSrc } of activePairs) {
+        for (const { key, rangeRun, chargingRun, label, rangeSrc } of activePairs) {
             const chargingRunId = chargingRun.id;
             const base = {
                 id:              key,
                 name:            label,
-                vehicleName:     chargingRun.vehicleName,
-                vehicleId:       chargingRun.vehicleId,
-                color:           chargingRun.color || '#3b82f6',
-                // Each pill describes the half it came from: speed is a property of
-                // the range test, temperature of the charging session.
-                speed_mph:       rangeSrc?.sourceRun?.speed_mph ?? chargingRun.speed_mph,
-                temperature_f:   chargingRun.temperature_f,
-                source:          chargingRun.source,
-                _trim:           chargingRun._trim ?? null,
+                vehicleName:     rangeRun.vehicleName,
+                vehicleId:       rangeRun.vehicleId,
+                color:           rangeRun.color || chargingRun.color || '#3b82f6',
+                // Each pill describes the half it came from: speed and conditions
+                // belong to the range test, which is what this row enumerates.
+                speed_mph:       rangeRun.speed_mph,
+                temperature_f:   rangeRun.temperature_f,
+                source:          rangeRun.source,
+                _trim:           rangeRun._trim ?? null,
                 _chargingRunName: chargingRun.name,
                 _yUnit:          chartType === 'range_added' ? distanceLabel(units) : 'min',
                 _rangeUnit:      distanceLabel(units),
@@ -706,26 +718,41 @@ export default function ChargeCompareView({
                             prev.includes(runId) ? prev.filter(id => id !== runId) : [...prev, runId]
                         )}
                         onUpdateRunColor={onUpdateRunColor}
-                        runFilter={isChargingRun}
-                        emptyMessage="No charging test records"
+                        runFilter={(run, vehicle) =>
+                            // A range test with no charging curve to pair against
+                            // cannot produce a bar, so it is not offered.
+                            isRangeRun(run) && filterChargingRuns(vehicle.runs).length > 0}
+                        emptyMessage="No range test records"
                         pairMode
                         pairings={pairings}
-                        rangeRunsFor={vehicle => filterRangeRuns(vehicle.runs)}
-                        resolvePartner={(chargingRun, vehicle) =>
-                            resolveRangeSource(chargingRun, { vehicle })}
-                        onSetPartner={(chargingId, oldRangeId, newRangeId) =>
-                            setPairings(prev => replacePartner(prev, chargingId, oldRangeId, newRangeId))}
-                        onAddPartner={(chargingId, rangeId) =>
-                            setPairings(prev => addPartner(prev, chargingId, rangeId))}
-                        onRemovePartner={(chargingId, rangeId) =>
-                            setPairings(prev => removePartner(prev, chargingId, rangeId))}
+                        primaryLabel="Range:"
+                        partnerLabel="Charging:"
+                        partnerRunsFor={vehicle => filterChargingRuns(vehicle.runs)}
+                        extraPrimaryRunsFor={vehicle => {
+                            if (!filterChargingRuns(vehicle.runs).length) return [];
+                            const epa = epaRangeOption(vehicle);
+                            return epa ? [epa] : [];
+                        }}
+                        resolvePartner={(_rangeRun, vehicle) => {
+                            const run = defaultChargingRun(vehicle);
+                            return run ? { sourceRun: run, note: null } : null;
+                        }}
+                        onSetPartner={(rangeId, oldChargingId, newChargingId) =>
+                            setPairings(prev => replacePartner(prev, rangeId, oldChargingId, newChargingId))}
+                        onAddPartner={(rangeId, chargingId) =>
+                            setPairings(prev => addPartner(prev, rangeId, chargingId))}
+                        onRemovePartner={(rangeId, chargingId) =>
+                            setPairings(prev => removePartner(prev, rangeId, chargingId))}
                         renderRunMeta={run => (
+                            // Speed and temperature stay on the left now that it
+                            // enumerates range tests: they are what distinguishes
+                            // one range test from another. Date is still omitted.
                             <>
                                 {run.speed_mph != null && (
-                                    <span className="text-xs bg-[var(--color-surface-sunken)] text-secondary px-1.5 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
+                                    <span className="text-xs bg-[var(--color-surface-sunken)] text-secondary px-1.5 py-0.5 rounded shrink-0">{fmtSpeed(run.speed_mph, units)}</span>
                                 )}
                                 {run.temperature_f != null && (
-                                    <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>
+                                    <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200 shrink-0">{fmtTemp(run.temperature_f, units)}</span>
                                 )}
                             </>
                         )}
