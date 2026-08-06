@@ -70,6 +70,27 @@ export function isPaired(pairings, rangeRunId) {
 }
 
 /**
+ * The inverse lookup: range tests explicitly paired to a given charging run.
+ *
+ * The map is keyed by range test because that is the axis worth enumerating,
+ * but Road Trip and the charging chart are charging-primary — they plot a
+ * charging curve and need to know which range test prices it. Without this,
+ * a pairing chosen in Charge Compare would not reach them, and two charts on
+ * one screen would disagree about what "range" means, which is precisely what
+ * making pairings global was meant to prevent.
+ *
+ * Usually returns zero or one. Several means the user deliberately compared one
+ * charging curve against multiple conditions, which a charging-primary view
+ * cannot show in a single series — callers take the first and should say so.
+ */
+export function rangePartnersOfCharging(pairings, chargingRunId) {
+    const target = key(chargingRunId);
+    return Object.entries(pairings || {})
+        .filter(([, partners]) => partners.includes(target))
+        .map(([rangeRunId]) => rangeRunId);
+}
+
+/**
  * Add a charging partner. Returns a new map — never mutates, so React state
  * updates and the URL/broadcast effects fire correctly.
  */

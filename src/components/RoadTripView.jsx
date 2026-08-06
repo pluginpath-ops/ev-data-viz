@@ -6,8 +6,9 @@ import { dataService } from '../services/DataService';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
-import { filterChargingRuns, isChargingRun } from '../utils/runUtils';
+import { filterChargingRuns, filterRangeRuns, isChargingRun } from '../utils/runUtils';
 import { resolveRangeSource } from '../utils/rangeSource';
+import { rangePartnersOfCharging } from '../utils/pairings';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import {
@@ -357,6 +358,10 @@ export default function RoadTripView({
     selectedVehicleIds,
     roadTripConfig,
     setRoadTripConfig,
+    // Global chart-session pairings (utils/pairings.js). Read-only here: this
+    // view consumes a pairing chosen in Charge Compare but does not set one,
+    // because it is charging-primary and the pairing is keyed by range test.
+    pairings = {},
     onUpdateRunColor = null,
     presentationMode = false,
     autoColor = true,
@@ -430,11 +435,25 @@ export default function RoadTripView({
         let colorIdx = 0;
         for (const vehicle of selectedVehicles) {
             for (const run of filterChargingRuns(vehicle.runs)) {
+                // Honour the chart-session pairing. The map is keyed by range test
+                // because that is the axis worth enumerating, but this view is
+                // charging-primary, so the inverse lookup is what carries a pairing
+                // chosen in Charge Compare across to here. Without it the two
+                // charts disagree about which range test prices the same curve.
+                const pairedRangeIds = rangePartnersOfCharging(pairings, run.id);
+                const pairedRange = pairedRangeIds.length
+                    ? filterRangeRuns(vehicle.runs).find(r => String(r.id) === pairedRangeIds[0]) ?? null
+                    : null;
+
                 // Shared resolver (utils/rangeSource.js) — the same ranking Charge
                 // Compare uses, so the two views can no longer disagree about which
                 // range test a charging run's miles came from. It also supplies the
                 // provenance note this view used to assemble by hand.
-                const src = resolveRangeSource(run, { vehicle, batteryKwh: vehicle.battery });
+                const src = resolveRangeSource(run, {
+                    vehicle,
+                    batteryKwh: vehicle.battery,
+                    explicitPairing: pairedRange,
+                });
 
                 map[run.id] = {
                     vehicle,
@@ -444,13 +463,15 @@ export default function RoadTripView({
                     testSpeedMph:   run.speed_mph ?? src.sourceRun?.speed_mph ?? null,
                     batteryKwh:     vehicle.battery,
                     color:          colorMap[run.id] || run.color || PALETTE[colorIdx % PALETTE.length],
-                    efficiencyNote: src.note,
+                    efficiencyNote: pairedRangeIds.length > 1
+                        ? `${src.note ?? `eff. from ${src.sourceRun?.name ?? '?'}`} · +${pairedRangeIds.length - 1} more pairing(s) not shown here`
+                        : src.note,
                 };
                 colorIdx++;
             }
         }
         return map;
-    }, [selectedVehicles, colorMap]);
+    }, [selectedVehicles, colorMap, pairings]);
 
     // ── Active run entries — ordered by vehicle pill position ─────────────────
     const runEntries = useMemo(() => {

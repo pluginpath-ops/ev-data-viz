@@ -13,12 +13,13 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
+import { rangePartnersOfCharging } from '../utils/pairings';
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 import LoadingSpinner from './LoadingSpinner';
 import { resolveChartColors } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 
-export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, presentationMode = false }) {
+export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, pairings = {}, presentationMode = false }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
     const chartRef = useRef(null);
@@ -140,6 +141,30 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         }
     }, [selectedVehicleIds, chartConfig.selectedRuns, chartMode]);
 
+    // A pairing change invalidates cached range values: the derived range is
+    // baked into the cached points, so without this the axis would keep showing
+    // the previous partner's numbers until the run was reselected.
+    const prevPairingsRef = useRef(pairings);
+    useEffect(() => {
+        const prev = prevPairingsRef.current;
+        prevPairingsRef.current = pairings;
+        if (prev === pairings) return;
+        // Values are charging-run ids, which are exactly this cache's keys.
+        const affected = new Set(
+            [...Object.values(prev || {}).flat(), ...Object.values(pairings || {}).flat()].map(String)
+        );
+        if (!affected.size) return;
+        setRunDataCache(cache => {
+            const next = {};
+            let evicted = false;
+            for (const [id, data] of Object.entries(cache)) {
+                if (affected.has(String(id))) { evicted = true; continue; }
+                next[id] = data;
+            }
+            return evicted ? next : cache;
+        });
+    }, [pairings]);
+
     // Lazy-load data_points for newly selected runs
     useEffect(() => {
         const fetchMissingData = async () => {
@@ -160,15 +185,27 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             runData = await dataService.getRunData(runId);
                         }
 
-                        // If this charging run has no range values at all, derive them
-                        // on the fly from the vehicle's range test via SoC interpolation.
-                        if (runData.length > 0 && !runData.some(p => p.range != null)) {
+                        // Derive range from a range test via SoC interpolation when
+                        // this charging run has none of its own — or whenever the
+                        // user has explicitly paired one, in which case their choice
+                        // overrides the recorded range column.
+                        //
+                        // Only an EXPLICIT pairing overrides. Letting the automatic
+                        // pick outrank the recorded column too would restate every
+                        // existing chart's range axis without anyone asking.
+                        const pairedRangeIds = rangePartnersOfCharging(pairings, runId);
+                        const hasOwnRange = runData.some(p => p.range != null);
+                        if (runData.length > 0 && (pairedRangeIds.length > 0 || !hasOwnRange)) {
                             const parentVehicle = vehicles.find(v =>
                                 v.runs?.some(r => String(r.id) === String(runId))
                             );
+                            const own = (parentVehicle?.runs || []).filter(r => !r._inherited && isRangeRun(r));
                             const rangeRun =
-                                parentVehicle?.runs?.find(r => !r._inherited && r.has_range && r.isDefault) ??
-                                parentVehicle?.runs?.find(r => !r._inherited && r.has_range);
+                                (pairedRangeIds.length
+                                    ? own.find(r => String(r.id) === pairedRangeIds[0])
+                                    : null) ??
+                                own.find(r => r.isDefault) ??
+                                own[0];
                             if (rangeRun) {
                                 try {
                                     const lookup = await dataService.buildRangePerSocLookup(rangeRun.id);
