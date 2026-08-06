@@ -875,6 +875,56 @@ body {
     @apply flex-1 flex items-center gap-2 flex-wrap;
 }
 
+/* ── Pair mode (charging test × range test) ─────────────────────────────────── */
+
+/* One charging test and all of its range partners, kept visually together */
+.pair-group {
+    @apply space-y-1;
+}
+
+/* A single charging × range pair */
+.pair-row {
+    @apply flex items-center gap-2 cursor-pointer;
+}
+
+/* Additional partners for the same charging test — indented so the branch
+   reads as belonging to the row above, checkbox included. */
+.pair-row-child {
+    @apply pl-8;
+}
+
+/* Charging-test identity; blank on continuation rows so partners line up */
+.pair-charging-label {
+    @apply flex items-center gap-2 min-w-0;
+    flex: 1 1 40%;
+}
+
+/* The "Range: [select] +n ＋" cluster on the right of each pair row */
+.pair-range-control {
+    @apply flex items-center gap-1.5 shrink-0;
+}
+
+/* "+3" — how many other range tests could be paired with this charging test */
+.pair-more-badge {
+    @apply text-xs font-medium px-1.5 py-0.5 rounded-full cursor-help;
+    background-color: var(--color-surface-muted);
+    color: var(--color-text-muted);
+}
+
+.pair-add-btn,
+.pair-remove-btn {
+    @apply text-sm leading-none px-1 rounded transition;
+    color: var(--color-text-faint);
+}
+.pair-add-btn:hover:not(:disabled),
+.pair-remove-btn:hover {
+    color: var(--color-primary);
+    background-color: var(--color-surface-muted);
+}
+.pair-add-btn:disabled {
+    @apply opacity-30 cursor-not-allowed;
+}
+
 /* Copy chart as PNG / Reset Zoom / action button strip below charts */
 .chart-copy-btn {
     @apply text-sm flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors;

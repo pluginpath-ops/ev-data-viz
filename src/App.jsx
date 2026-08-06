@@ -17,6 +17,8 @@ import PerformanceCompareView from './components/PerformanceCompareView';
 import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView from './components/AdminView';
 import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory } from './constants/chartNav';
+import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
+import { EPA_PARTNER_ID } from './utils/rangeSource';
 
 export default function App() {
     const {
@@ -92,6 +94,10 @@ export default function App() {
     const [dragOverIdx, setDragOverIdx] = useState(null); // pill drop-indicator position
     const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare' | 'epacurves' | …
     const [compareConfig, setCompareConfig] = useState({ xMinutes: 15, mMiles: 150, startSoc: 10 });
+    // Which range test supplies the miles for which charging test. Global to the
+    // chart session rather than per-view, so two charts on one screen can never
+    // disagree about what "range" means. See utils/pairings.js.
+    const [pairings, setPairings] = useState({});
     const [epaConfig, setEpaConfig] = useState({ yAxis: 'kwh100mi', xMin: null, xMax: null, yMin: null, yMax: null });
     const [roadTripConfig, setRoadTripConfig] = useState({
         mode: 'distance', startSoc: 90, minSoc: 10, destinationMinSoc: 10,
@@ -163,8 +169,8 @@ export default function App() {
     const themeTitle = theme === 'dark' ? 'Dark mode (click for system)' : theme === 'light' ? 'Light mode (click for dark)' : 'System theme (click for light)';
 
     const { isPopout, sendState } = useChartSync({
-        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig,
-        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig,
+        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings,
+        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings,
     });
 
     // Navigate to a new top-level view and push a browser history entry so the
@@ -244,6 +250,10 @@ export default function App() {
                 ...(cmpMi   != null && { mMiles:   Number(cmpMi)   }),
             }));
         }
+
+        // Pairings — global across chart modes, so read unconditionally.
+        const pairsParam = p.get('pairs');
+        if (pairsParam) setPairings(decodePairings(pairsParam));
 
         // Road Trip config
         const n = (key) => { const v = p.get(key); return v != null ? Number(v) : null; };
@@ -362,6 +372,12 @@ export default function App() {
             p.set('cmp_mi',   compareConfig.mMiles);
         }
 
+        // Pairings apply to every chart mode, so they are written whenever any
+        // exist rather than being scoped to one tab. Omitted when empty so an
+        // untouched chart keeps a clean URL.
+        const pairsEncoded = encodePairings(pairings);
+        if (pairsEncoded) p.set('pairs', pairsEncoded);
+
         // Road Trip options
         if (chartMode === 'roadtrip') {
             const rt = roadTripConfig;
@@ -395,12 +411,33 @@ export default function App() {
         }
 
         history.replaceState({ view, chartMode }, '', '?' + p.toString());
-    }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig]);
+    }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings]);
+
+    // ── Drop pairings for runs that are no longer on screen ─────────────────
+    // A pairing referencing a deselected vehicle's run would otherwise ride along
+    // in the URL forever and silently resurrect if that vehicle came back.
+    // Waits for vehicles to load so the first render can't prune a URL-restored
+    // map against an empty list.
+    useEffect(() => {
+        if (!vehicles.length) return;
+        const liveRunIds = vehicles
+            .filter(v => selectedVehicles.includes(v.id))
+            .flatMap(v => (v.runs || []).map(r => r.id));
+        // EPA rated range is a valid pairing side with no run behind it, so it
+        // would otherwise be pruned as an unknown id on every selection change.
+        liveRunIds.push(EPA_PARTNER_ID);
+        setPairings(prev => {
+            const pruned = prunePairings(prev, liveRunIds);
+            // Same-value guard: returning a fresh object every time would retrigger
+            // the URL and broadcast effects on every render.
+            return Object.keys(pruned).length === Object.keys(prev).length ? prev : pruned;
+        });
+    }, [selectedVehicles, vehicles]);
 
     // ── Broadcast chart state to any open pop-out windows ───────────────────
     useEffect(() => {
         sendState();
-    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, sendState]);
+    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, sendState]);
 
     // Keep activeVehicle in sync with vehicles state
     const currentActiveVehicle = activeVehicle
@@ -793,6 +830,8 @@ export default function App() {
                             setXMinutes={v => setCompareConfig(p => ({ ...p, xMinutes: v }))}
                             setMMiles={v => setCompareConfig(p => ({ ...p, mMiles: v }))}
                             setStartSoc={v => setCompareConfig(p => ({ ...p, startSoc: v }))}
+                            pairings={pairings}
+                            setPairings={setPairings}
                             onUpdateRunColor={updateRunColor}
                         />
                     )}
