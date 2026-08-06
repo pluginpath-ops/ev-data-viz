@@ -409,11 +409,19 @@ export default function ChargeCompareView({
     // Selection is by pair key, so adding a second range partner to a charging
     // test brings the new series in already selected rather than requiring a
     // second click in a different part of the UI.
+    // Stale keys are also dropped. Repinning a row changes its key (`70::` becomes
+    // `70::12`), so without pruning the old key lingers forever — and returning
+    // the row to Auto would then find its key already selected, leave the array
+    // untouched, and give the chart nothing to react to.
     useEffect(() => {
         const allKeys = resolvedPairs.map(p => p.key);
+        const live = new Set(allKeys);
         setSelectedRuns(prev => {
-            const newKeys = allKeys.filter(k => !prev.includes(k));
-            return newKeys.length ? [...prev, ...newKeys] : prev;
+            const kept = prev.filter(k => live.has(k));
+            const added = allKeys.filter(k => !prev.includes(k));
+            const next = [...kept, ...added];
+            const unchanged = next.length === prev.length && next.every((k, i) => k === prev[i]);
+            return unchanged ? prev : next;
         });
     }, [resolvedPairs]);
 
@@ -501,7 +509,12 @@ export default function ChargeCompareView({
                 const targetTime  = Tz + xMinutes;
                 const lastTime    = byTime[byTime.length - 1].time;
                 const timeOvershoot = Math.max(0, targetTime - lastTime);
-                const SocEnd = interpolate(byTime, 'time', 'soc', targetTime, false, true);
+                const SocRaw = interpolate(byTime, 'time', 'soc', targetTime, false, true);
+                // A pack cannot exceed 100% SoC. Extrapolating forward past the end
+                // of a short run can produce SoC well above that, and the linear
+                // model has no ceiling of its own to catch it — unclamped, a run
+                // whose data spans a couple of minutes yielded 4800 mi added in 15.
+                const SocEnd = SocRaw != null ? Math.min(100, SocRaw) : null;
                 // Linear: the SoC gained over the window, priced at the paired
                 // test's miles-per-%SoC. Recorded: read the range column directly.
                 const Rend = useLinear
@@ -524,12 +537,16 @@ export default function ChargeCompareView({
                 // Linear: the miles asked for convert to a SoC target, and the
                 // charging curve is read on the SoC axis. Recorded: sort by the
                 // range column and read time off it, as before.
-                let Tend, SocEnd, rangeOvershoot;
+                let Tend, SocEnd, rangeOvershoot, unreachable = false;
                 if (useLinear) {
                     const targetSoc = startSoc + mMiles / miPerSoc;
                     const lastSoc   = bySoc[bySoc.length - 1].soc;
-                    Tend   = interpolate(bySoc, 'soc', 'time', targetSoc, false, true);
-                    SocEnd = targetSoc;
+                    // Asking for more miles than a full pack holds from this SoC is
+                    // not a long charge, it is impossible — report no data rather
+                    // than extrapolating past 100% into a fictional time.
+                    unreachable = targetSoc > 100;
+                    Tend   = unreachable ? null : interpolate(bySoc, 'soc', 'time', targetSoc, false, true);
+                    SocEnd = Math.min(100, targetSoc);
                     // Expressed in miles so it stays comparable with mMiles.
                     rangeOvershoot = Math.max(0, targetSoc - lastSoc) * miPerSoc;
                 } else {
@@ -651,7 +668,10 @@ export default function ChargeCompareView({
                 if (inst.current) { inst.current.destroy(); inst.current = null; }
             });
         };
-    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns, units, isDark]);
+    // resolvedPairs, not just selectedRuns: changing a row's partner can leave the
+    // selection array identical (same row, different pairing) while every bar's
+    // value changes, and the chart would keep the previous partner's numbers.
+    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns, resolvedPairs, units, isDark]);
 
     const hasRangeRuns = resolvedPairs.length > 0;
 
