@@ -7,8 +7,8 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isChargingRun } from '../utils/runUtils';
-import { resolveRangeSource } from '../utils/rangeSource';
-import { rangePartnersOfCharging } from '../utils/pairings';
+import { resolveRangeSource, epaRangeOption } from '../utils/rangeSource';
+import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import {
@@ -362,6 +362,7 @@ export default function RoadTripView({
     // view consumes a pairing chosen in Charge Compare but does not set one,
     // because it is charging-primary and the pairing is keyed by range test.
     pairings = {},
+    setPairings = () => {},
     onUpdateRunColor = null,
     presentationMode = false,
     autoColor = true,
@@ -1424,6 +1425,20 @@ export default function RoadTripView({
                             colorMap={colorMap}
                             runFilter={isChargingRun}
                             emptyMessage="No charging test data"
+                            pairMode
+                            singlePartner
+                            pairings={pairings}
+                            primaryLabel="Charging:"
+                            partnerLabel="Range:"
+                            partnerRunsFor={vehicle => {
+                                const epa = epaRangeOption(vehicle);
+                                return epa ? [...filterRangeRuns(vehicle.runs), epa] : filterRangeRuns(vehicle.runs);
+                            }}
+                            partnerIdFor={run => rangePartnersOfCharging(pairings, run.id)[0] ?? null}
+                            resolvePartner={(chargingRun, vehicle) =>
+                                resolveRangeSource(chargingRun, { vehicle, batteryKwh: vehicle.battery })}
+                            onSetPartner={(chargingId, _old, newRangeId) =>
+                                setPairings(prev => setChargingPartner(prev, chargingId, newRangeId))}
                             renderRunMeta={run => {
                                 const info = allChargingRunsInfo[run.id];
                                 if (!info) return null;

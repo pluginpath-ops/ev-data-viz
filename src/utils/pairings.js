@@ -91,6 +91,26 @@ export function rangePartnersOfCharging(pairings, chargingRunId) {
 }
 
 /**
+ * Write from the charging side: give this charging run the given range test,
+ * or `null` to return it to automatic resolution.
+ *
+ * The map stays keyed by range test — there is exactly one map, so a pairing
+ * made in a charging-primary view is the same pairing Charge Compare shows.
+ * That means detaching the charging run from wherever it currently sits before
+ * attaching it to the new range test, or the two views would disagree about a
+ * pairing they are both meant to be reading.
+ */
+export function setChargingPartner(pairings, chargingRunId, rangeRunId) {
+    const target = key(chargingRunId);
+    const out = {};
+    for (const [primaryId, partners] of Object.entries(pairings || {})) {
+        const kept = partners.filter(id => id !== target);
+        if (kept.length) out[primaryId] = kept;
+    }
+    return rangeRunId ? addPartner(out, rangeRunId, chargingRunId) : out;
+}
+
+/**
  * Add a charging partner. Returns a new map — never mutates, so React state
  * updates and the URL/broadcast effects fire correctly.
  */

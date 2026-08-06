@@ -809,6 +809,7 @@ export default function App() {
                             onUpdateRunColor={updateRunColor}
                             chartMode={chartMode}
                             pairings={pairings}
+                            setPairings={setPairings}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'roadtrip' && (
@@ -818,6 +819,7 @@ export default function App() {
                             roadTripConfig={roadTripConfig}
                             setRoadTripConfig={setRoadTripConfig}
                             pairings={pairings}
+                            setPairings={setPairings}
                             onUpdateRunColor={updateRunColor}
                             autoColor={chartConfig.autoColor ?? true}
                             setChartConfig={setChartConfig}

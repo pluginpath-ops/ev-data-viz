@@ -13,14 +13,14 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
-import { rangePartnersOfCharging } from '../utils/pairings';
-import { resolveRangeSource, EPA_PARTNER_ID } from '../utils/rangeSource';
+import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
+import { resolveRangeSource, epaRangeOption, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 import LoadingSpinner from './LoadingSpinner';
 import { resolveChartColors } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 
-export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, pairings = {}, presentationMode = false }) {
+export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, pairings = {}, setPairings = () => {}, presentationMode = false }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
     const chartRef = useRef(null);
@@ -723,6 +723,20 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     runFilter={isChargingRun}
                     colorMap={colorMap}
                     emptyMessage="No charging test records"
+                    pairMode
+                    singlePartner
+                    pairings={pairings}
+                    primaryLabel="Charging:"
+                    partnerLabel="Range:"
+                    partnerRunsFor={vehicle => {
+                        const epa = epaRangeOption(vehicle);
+                        return epa ? [...filterRangeRuns(vehicle.runs), epa] : filterRangeRuns(vehicle.runs);
+                    }}
+                    partnerIdFor={run => rangePartnersOfCharging(pairings, run.id)[0] ?? null}
+                    resolvePartner={(chargingRun, vehicle) =>
+                        resolveRangeSource(chargingRun, { vehicle })}
+                    onSetPartner={(chargingId, _old, newRangeId) =>
+                        setPairings(prev => setChargingPartner(prev, chargingId, newRangeId))}
                     renderRunMeta={run => {
                         const exclusionReason = getRaceExclusionReason(run.id);
                         const offset = getRaceOffset(run.id);

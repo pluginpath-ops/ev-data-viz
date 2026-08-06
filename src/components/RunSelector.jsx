@@ -35,6 +35,8 @@ import { pairKey, partnersFor } from '../utils/pairings';
  *   partnerLabel    — prefix before the dropdown,      e.g. "Charging:"
  *   partnerRunsFor  — (vehicle) => runs offered as partners
  *   extraPrimaryRunsFor — (vehicle) => synthetic primary rows (e.g. EPA range)
+ *   singlePartner   — one partner per row, selection still keyed by run id
+ *   partnerIdFor    — (run) => partnerRunId | null, single-partner mode only
  *   resolvePartner  — (primaryRun, vehicle) => { sourceRun, note } for the
  *                     automatic choice shown when nothing is pinned
  *   onSetPartner    — (primaryRunId, oldPartnerId, newPartnerId) => void
@@ -55,6 +57,13 @@ export default function RunSelector({
     pairings = {},
     primaryLabel = null,
     partnerLabel = 'Paired with:',
+    // One partner per row, selection still keyed by run id. For views whose
+    // subject is the primary run (the charging chart plots one curve per run,
+    // Road Trip simulates one trip per run) — they cannot render a run twice, so
+    // they get the same row shape without the ＋ that would imply they could.
+    singlePartner = false,
+    // (run) => partnerRunId | null — single-partner mode only
+    partnerIdFor = null,
     partnerRunsFor = null,
     // Rows that are not runs — e.g. the vehicle's EPA rated range, which is a
     // legitimate range basis with no test behind it.
@@ -80,6 +89,10 @@ export default function RunSelector({
      * whether or not anyone has paired it.
      */
     const partnerRowsFor = (run) => {
+        // Single-partner views ask the parent which partner this row holds: the
+        // map is keyed by the other side, and knowing that would make this
+        // component orientation-aware again.
+        if (singlePartner) return [partnerIdFor ? (partnerIdFor(run) ?? null) : null];
         const pinned = partnersFor(pairings, run.id);
         return pinned.length ? pinned : [null];
     };
@@ -98,9 +111,11 @@ export default function RunSelector({
 
     const selectedCount = pairMode
         ? vehicles.reduce((n, v) => n + primaryRunsFor(v).reduce(
-            (m, run) => m + partnerRowsFor(run).filter(
-                partnerId => selectedRunIds.some(id => String(id) === pairKey(run.id, partnerId))
-            ).length, 0), 0)
+            (m, run) => m + (singlePartner
+                ? (selectedRunIds.some(id => String(id) === String(run.id)) ? 1 : 0)
+                : partnerRowsFor(run).filter(
+                    partnerId => selectedRunIds.some(id => String(id) === pairKey(run.id, partnerId))
+                  ).length), 0), 0)
         : vehicles.reduce((n, v) =>
             n + (v.runs || []).filter(r => runFilter(r, v)).filter(isSelected).length, 0);
 
@@ -152,6 +167,7 @@ export default function RunSelector({
                                                         resolvePartner={resolvePartner}
                                                         primaryLabel={primaryLabel}
                                                         partnerLabel={partnerLabel}
+                                                        singlePartner={singlePartner}
                                                         selectedRunIds={selectedRunIds}
                                                         onToggleRun={onToggleRun}
                                                         onSetPartner={onSetPartner}
@@ -196,7 +212,7 @@ export default function RunSelector({
  */
 function PairRows({
     run, vehicle, partnerIds, partnerRuns, resolvePartner,
-    primaryLabel, partnerLabel,
+    primaryLabel, partnerLabel, singlePartner,
     selectedRunIds, onToggleRun, onSetPartner, onAddPartner, onRemovePartner,
     onUpdateRunColor, renderRunMeta, colorMap,
 }) {
@@ -216,8 +232,9 @@ function PairRows({
     if (!partnerIds.some(Boolean) && auto?.sourceRun) used.add(String(auto.sourceRun.id));
     const unused = partnerRuns.filter(r => !used.has(String(r.id)));
 
+    const rowKey = (partnerId) => singlePartner ? String(run.id) : pairKey(run.id, partnerId);
     const isSelected = (partnerId) =>
-        selectedRunIds.some(id => String(id) === pairKey(run.id, partnerId));
+        selectedRunIds.some(id => String(id) === rowKey(partnerId));
 
     return (
         <div className="pair-group">
@@ -229,7 +246,7 @@ function PairRows({
                     <input
                         type="checkbox"
                         checked={isSelected(partnerId)}
-                        onChange={() => onToggleRun(pairKey(run.id, partnerId))}
+                        onChange={() => onToggleRun(singlePartner ? run.id : rowKey(partnerId))}
                         className="w-4 h-4 shrink-0"
                     />
 
@@ -271,7 +288,7 @@ function PairRows({
                         </select>
 
                         {/* Discovery: how many other range tests could go here */}
-                        {idx === 0 && unused.length > 0 && (
+                        {!singlePartner && idx === 0 && unused.length > 0 && (
                             <span
                                 className="pair-more-badge"
                                 title={`${unused.length} more option(s): ${unused.map(r => r.name).join(', ')}`}
@@ -280,7 +297,7 @@ function PairRows({
                             </span>
                         )}
 
-                        {idx === 0 ? (
+                        {singlePartner ? null : idx === 0 ? (
                             <button
                                 type="button"
                                 onClick={() => {
