@@ -391,31 +391,30 @@ function RunColorControl({ run, vehicleId, onUpdateRunColor, colorMap = {} }) {
     // Resolved chart colour (Okabe-Ito in auto mode, stored colour otherwise)
     const resolvedColor = colorMap[run.id] || localColor;
 
+    // One chip, not two. There used to be a read-only swatch showing the RESOLVED
+    // chart colour beside a picker showing the STORED preference — with Auto
+    // Color on those differ for most runs, so the row displayed two colour chips
+    // that disagreed and only one of which could be clicked. The picker stays,
+    // since it is the one you can act on, and the resolved colour moves into its
+    // tooltip so the difference is still discoverable rather than just gone.
     return (
-        <>
-            <span
-                className="w-3 h-5 rounded-sm shrink-0 border border-black/10"
-                style={{ backgroundColor: resolvedColor }}
-                title={resolvedColor !== localColor
-                    ? `Chart color: ${resolvedColor} (stored: ${localColor})`
-                    : `Color: ${resolvedColor}`}
-            />
-            <input
-                type="color"
-                value={localColor}
-                onChange={e => {
-                    e.stopPropagation();
-                    const val = e.target.value;
-                    setLocalColor(val);
-                    clearTimeout(commitTimer.current);
-                    commitTimer.current = setTimeout(() => commit(val), 400);
-                }}
-                onBlur={() => { clearTimeout(commitTimer.current); commit(localColor); }}
-                onClick={e => e.stopPropagation()}
-                className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
-                title="Set color preference (influences auto-color hue family when Auto Color is on)"
-            />
-        </>
+        <input
+            type="color"
+            value={localColor}
+            onChange={e => {
+                e.stopPropagation();
+                const val = e.target.value;
+                setLocalColor(val);
+                clearTimeout(commitTimer.current);
+                commitTimer.current = setTimeout(() => commit(val), 400);
+            }}
+            onBlur={() => { clearTimeout(commitTimer.current); commit(localColor); }}
+            onClick={e => e.stopPropagation()}
+            className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
+            title={resolvedColor !== localColor
+                ? `Stored preference ${localColor} — plotted as ${resolvedColor} while Auto Color is on`
+                : `Color ${localColor}`}
+        />
     );
 }
 
