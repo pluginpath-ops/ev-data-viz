@@ -1,7 +1,7 @@
 import { getSupabase } from './supabase';
 import { vehicleLabel } from '../utils/specHelpers';
 import { roundTo, } from '../utils/unitConversions';
-import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId } from '../utils/runUtils';
+import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom } from '../utils/runUtils';
 
 const roundField = roundTo;
 
@@ -517,8 +517,7 @@ class DataService {
       color: run.color || '#3b82f6',
       is_default: coalesce(run.isDefault,  run.is_default)  || false,
       synthetic:  coalesce(run.synthetic,  run.synthetic)   || false,
-      has_charging: coalesce(run.hasCharging, run.has_charging) ?? true,
-      has_range:    coalesce(run.hasRange,    run.has_range)    ?? false,
+      kind: runKindFrom(run),
       source: run.source || null,
       start_soc:         numField(run.startSoc,        run.start_soc),
       end_soc:           numField(run.endSoc,          run.end_soc),
@@ -571,8 +570,7 @@ class DataService {
       name: updates.name, date: updates.date,
       software_version: updates.softwareVersion, conditions: updates.conditions, color: updates.color,
       ...(updates.calculated_fields !== undefined ? { calculated_fields: updates.calculated_fields } : {}),
-      ...(updates.hasCharging !== undefined ? { has_charging: updates.hasCharging } : {}),
-      ...(updates.hasRange    !== undefined ? { has_range:    updates.hasRange    } : {}),
+      ...(updates.kind !== undefined ? { kind: updates.kind } : {}),
       ...(updates.source !== undefined ? { source: updates.source || null } : {}),
       ...(updates.startSoc !== undefined ? { start_soc: updates.startSoc !== '' ? Number(updates.startSoc) : null } : {}),
       ...(updates.endSoc !== undefined ? { end_soc: updates.endSoc !== '' ? Number(updates.endSoc) : null } : {}),
@@ -607,10 +605,21 @@ class DataService {
       localStorage.setItem('evData', JSON.stringify(data));
       return;
     }
-    // Clear all defaults for this vehicle first (runs + inherited links) so
-    // exactly one run is ever marked as default at a time.
-    await getSupabase().from('runs').update({ is_default: false }).eq('vehicle_id', vehicleId);
-    await getSupabase().from('spec_links').update({ is_default: false }).eq('target_vehicle_id', vehicleId);
+    // Defaults are scoped PER KIND since migration 046: a vehicle has both a
+    // default charging run (the fallback curve) and a default range test (rank 2
+    // of the range-source order). Clearing across both would make setting one
+    // silently unset the other.
+    const { data: target } = await getSupabase()
+      .from('runs').select('kind').eq('id', runId).single();
+    const kind = target?.kind ?? 'charging';
+
+    await getSupabase().from('runs')
+      .update({ is_default: false }).eq('vehicle_id', vehicleId).eq('kind', kind);
+    // Inherited runs are charging curves, so they only compete with that kind.
+    if (kind === 'charging') {
+      await getSupabase().from('spec_links')
+        .update({ is_default: false }).eq('target_vehicle_id', vehicleId);
+    }
     const { error } = await getSupabase().from('runs').update({ is_default: true }).eq('id', runId);
     if (error) throw error;
   }
@@ -1529,8 +1538,7 @@ class DataService {
   //
   // Deliberately separate from `runs`: a session yields ~8 launches in 90
   // seconds, and runs rows feed the charging/range selectors and vehicle-card
-  // counts (isChargingRun treats anything without has_charging=false as a
-  // charging run). See migration 036 for the full rationale.
+  // counts. See migration 036 for the full rationale.
 
   /**
    * Performance sessions with runs and split points nested, for one vehicle or
