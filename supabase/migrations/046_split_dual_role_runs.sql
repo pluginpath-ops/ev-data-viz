@@ -14,9 +14,16 @@
 -- and the charging curve is the time series those data points are. The range
 -- half is a new row. Nothing has to be re-pointed.
 --
--- Expected result on the live database (census taken 2026-08-05):
---     35 dual-role rows in  →  35 new range rows + 35 sessions
---     total runs 76 → 111,  range-bearing runs 57 → 57 (unchanged in meaning)
+-- The shape of the result, whatever the count: N dual-role rows in → N new
+-- range rows + N sessions out, total runs N higher.
+--
+-- Do not trust a remembered N. A census on 2026-08-05 found 35 dual-role rows;
+-- by 2026-08-08 it was 28, after duplicate charging tests were retired. Take the
+-- count immediately before running:
+--
+--     SELECT count(*) FILTER (WHERE has_charging AND has_range) AS dual_role,
+--            count(*)                                           AS total
+--     FROM runs;
 -- ============================================================
 
 BEGIN;
@@ -124,8 +131,8 @@ SELECT
     r.avg_wind_speed_mph, r.wind_direction_deg,
     r.trim_id, sm.session_id,
     -- The pairing arrives pre-made: these two halves were measured together, so
-    -- the range row names its charging partner outright. On the live database
-    -- that is ~35 correct pairings with no curation.
+    -- the range row names its charging partner outright — one correct pairing
+    -- per split, with no curation.
     r.id
 FROM runs r
 JOIN session_map sm ON sm.charging_run_id = r.id;
@@ -184,8 +191,8 @@ COMMIT;
 
 -- ── Verification ─────────────────────────────────────────────────────────────
 --
--- 1. The countable expectation — N dual rows in, 2N rows and N sessions out.
---    With the pre-split census of 35 dual of 76 total, expect 111 / 35 / 0:
+-- 1. The countable expectation, against the census taken just before running:
+--    total_runs should rise by exactly N, and sessions should equal N.
 --
 --      SELECT
 --        (SELECT count(*) FROM runs)                              AS total_runs,
