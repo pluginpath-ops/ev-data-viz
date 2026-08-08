@@ -78,7 +78,7 @@ One charging or range test session per vehicle.
 | `id` | `bigint` | auto | PK |
 | `vehicle_id` | `bigint` | — | FK → `vehicles.id` |
 | `name` | `text` | — | |
-| `date` | `text` | — | ISO date string. **NOT NULL** — inserts must supply it |
+| `date` | `date` | — | **NOT NULL** — inserts must supply it. (Documented as `text` until 2026-08-08; it is a real `date` column, which matters for casts in SQL) |
 | `color` | `text` | `'#3b82f6'` | Chart series color |
 | `is_default` | `boolean` | `false` | Scoped **per kind** since 046: a vehicle has one default charging run and one default range test |
 | `synthetic` | `boolean` | `false` | True for estimated/simulated data |

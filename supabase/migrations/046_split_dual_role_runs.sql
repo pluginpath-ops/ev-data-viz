@@ -90,8 +90,9 @@ CREATE TEMP TABLE session_map (
 WITH inserted AS (
     INSERT INTO test_sessions (name, tested_at, temperature_f, notes)
     SELECT r.name,
-           -- runs.date is text; only a parseable date becomes a timestamp.
-           CASE WHEN r.date ~ '^\d{4}-\d{2}-\d{2}' THEN r.date::timestamp ELSE NULL END,
+           -- runs.date is a DATE column (SCHEMA.md said text — it is not), so it
+           -- casts straight to the session's zone-less timestamp.
+           r.date::timestamp,
            r.temperature_f,
            'Created by migration 046 from a dual-role run.'
     FROM runs r
