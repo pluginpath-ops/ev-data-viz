@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Chart from 'chart.js/auto';
 import ZoomPlugin from 'chartjs-plugin-zoom';
 import { vehicleLabel } from '../utils/specHelpers';
@@ -7,7 +7,7 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
-import { resolveRangeSource, epaRangeOption, EPA_PARTNER_ID } from '../utils/rangeSource';
+import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
@@ -439,7 +439,7 @@ export default function RoadTripView({
                     const src = resolveRangeSource(chargingRun, {
                         vehicle,
                         batteryKwh: vehicle.battery,
-                        explicitPairing: rangeRun.id === EPA_PARTNER_ID ? EPA_PARTNER_ID : rangeRun,
+                        explicitPairing: isEpaPartnerId(rangeRun.id) ? EPA_PARTNER_ID : rangeRun,
                     });
 
                     const key = pairKey(rangeRun.id, partnerId);
@@ -476,12 +476,33 @@ export default function RoadTripView({
         () => [...allPairsInfo.values()].map(e => ({
             key: e.key,
             vehicleId: e.vehicle.id,
-            groupId: e.rangeRun.id,     // survives a repin, which changes the key
+            // Scoped to the vehicle: the EPA row's id is a shared sentinel, so a
+            // bare run id would make every vehicle's EPA row one group and the
+            // hook's carry rule would select them all together.
+            groupId: `${e.vehicle.id}:${e.rangeRun.id}`,
         })),
         [allPairsInfo]
     );
+
+    // One row per vehicle on arrival, not every range test. A car with a dozen
+    // range tests buries the chart otherwise, and the per-vehicle "all" link is
+    // there for when you want the rest.
+    //
+    // Prefers the vehicle's default range test, falling back to its first row:
+    // defaultRangeRun() requires measurable distance/SoC data, and a range test
+    // without it would otherwise leave the vehicle with nothing selected at all.
+    const bootstrapOneRow = useCallback((vehicleId, vehicleRows) => {
+        const vehicle = selectedVehicles.find(v => v.id === vehicleId);
+        const preferred = vehicle ? defaultRangeRun(vehicle) : null;
+        const match = preferred
+            ? vehicleRows.find(r => String(r.groupId) === `${vehicleId}:${preferred.id}`)
+            : null;
+        const pick = match ?? vehicleRows[0];
+        return pick ? [pick.key] : [];
+    }, [selectedVehicles]);
+
     const { selected: selectedRunIds, toggle: toggleRunId } = useRunSelection(
-        selectionRows, { initial: initialRunIds }
+        selectionRows, { initial: initialRunIds, shouldBootstrap: bootstrapOneRow }
     );
 
     // ── Active run entries — ordered by vehicle pill position ─────────────────

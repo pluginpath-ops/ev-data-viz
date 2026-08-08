@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
 import RunSelector from './RunSelector';
@@ -8,7 +8,7 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
-import { resolveRangeSource, epaRangeOption, EPA_PARTNER_ID } from '../utils/rangeSource';
+import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
@@ -347,7 +347,7 @@ export default function ChargeCompareView({
                     // matter when the chosen test carries no usable data.
                     const rangeSrc = resolveRangeSource(chargingRun, {
                         vehicle,
-                        explicitPairing: rangeRun.id === EPA_PARTNER_ID ? EPA_PARTNER_ID : rangeRun,
+                        explicitPairing: isEpaPartnerId(rangeRun.id) ? EPA_PARTNER_ID : rangeRun,
                     });
 
                     result.push({
@@ -423,11 +423,34 @@ export default function ChargeCompareView({
         () => resolvedPairs.map(p => ({
             key: p.key,
             vehicleId: p.rangeRun.vehicleId,
-            groupId: p.rangeRun.id,     // survives a repin, which changes the key
+            // Scoped to the vehicle: the EPA row's id is a shared sentinel, so a
+            // bare run id would make every vehicle's EPA row one group and the
+            // hook's carry rule would select them all together.
+            groupId: `${p.rangeRun.vehicleId}:${p.rangeRun.id}`,
         })),
         [resolvedPairs]
     );
-    const { selected: selectedRuns, toggle: toggleRun } = useRunSelection(selectionRows);
+
+    // One row per vehicle on arrival, not every range test. A car with a dozen
+    // range tests buries the chart otherwise, and the per-vehicle "all" link is
+    // there for when you want the rest.
+    //
+    // Prefers the vehicle's default range test, falling back to its first row:
+    // defaultRangeRun() requires measurable distance/SoC data, and a range test
+    // without it would otherwise leave the vehicle with nothing selected at all.
+    const bootstrapOneRow = useCallback((vehicleId, vehicleRows) => {
+        const vehicle = selectedVehicles.find(v => v.id === vehicleId);
+        const preferred = vehicle ? defaultRangeRun(vehicle) : null;
+        const match = preferred
+            ? vehicleRows.find(r => String(r.groupId) === `${vehicleId}:${preferred.id}`)
+            : null;
+        const pick = match ?? vehicleRows[0];
+        return pick ? [pick.key] : [];
+    }, [selectedVehicles]);
+
+    const { selected: selectedRuns, toggle: toggleRun } = useRunSelection(
+        selectionRows, { shouldBootstrap: bootstrapOneRow }
+    );
 
     const activePairs = resolvedPairs.filter(p => selectedRuns.includes(p.key));
 

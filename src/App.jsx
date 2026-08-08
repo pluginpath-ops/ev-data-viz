@@ -18,7 +18,7 @@ import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView from './components/AdminView';
 import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory } from './constants/chartNav';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
-import { EPA_PARTNER_ID } from './utils/rangeSource';
+import { isEpaPartnerId } from './utils/rangeSource';
 
 export default function App() {
     const {
@@ -423,9 +423,11 @@ export default function App() {
         const liveRunIds = vehicles
             .filter(v => selectedVehicles.includes(v.id))
             .flatMap(v => (v.runs || []).map(r => r.id));
-        // EPA rated range is a valid pairing side with no run behind it, so it
-        // would otherwise be pruned as an unknown id on every selection change.
-        liveRunIds.push(EPA_PARTNER_ID);
+        // EPA rated range is a valid pairing side with no run behind it, so its
+        // per-vehicle ids would otherwise be pruned as unknown on every change.
+        for (const v of vehicles) {
+            if (selectedVehicles.includes(v.id) && v.range > 0) liveRunIds.push(`epa:${v.id}`);
+        }
         setPairings(prev => {
             const pruned = prunePairings(prev, liveRunIds);
             // Same-value guard: returning a fresh object every time would retrigger

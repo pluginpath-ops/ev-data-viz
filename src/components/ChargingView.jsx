@@ -14,7 +14,7 @@ import { useTheme } from '../hooks/useTheme';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
 import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
-import { resolveRangeSource, epaRangeOption, EPA_PARTNER_ID } from '../utils/rangeSource';
+import { resolveRangeSource, epaRangeOption, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 import LoadingSpinner from './LoadingSpinner';
 import { resolveChartColors } from '../utils/colorUtils';
@@ -210,7 +210,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             const pairedRangeIds = rangePartnersOfCharging(pairings, runId);
                             const own = (parentVehicle?.runs || []).filter(r => !r._inherited && isRangeRun(r));
                             const pairedRange = pairedRangeIds.length
-                                ? (pairedRangeIds[0] === EPA_PARTNER_ID
+                                ? (isEpaPartnerId(pairedRangeIds[0])
                                     ? EPA_PARTNER_ID
                                     : own.find(r => String(r.id) === pairedRangeIds[0]) ?? null)
                                 : null;
@@ -228,7 +228,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                 // the real, non-linear shape; prefer it. Most range
                                 // tests are scalar (distance + SoC bounds), so the
                                 // linear miPerSoc model is the usual path.
-                                if (src.sourceRun?.id && src.sourceRun.id !== EPA_PARTNER_ID) {
+                                if (src.sourceRun?.id && !isEpaPartnerId(src.sourceRun.id)) {
                                     try {
                                         lookup = await dataService.buildRangePerSocLookup(src.sourceRun.id);
                                     } catch (_) { /* fall through to linear */ }

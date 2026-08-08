@@ -66,10 +66,28 @@ import { isRangeRun } from './runUtils';
  */
 export const EPA_PARTNER_ID = 'epa';
 
+/**
+ * The EPA row's id is scoped PER VEHICLE — 'epa:12', not a bare 'epa'.
+ *
+ * Selections and chart series are keyed by run id, so a sentinel shared across
+ * vehicles collides: every vehicle's EPA row computed the same key, so one
+ * selection rendered all of them as chosen, toggling one toggled all, and the
+ * chart plotted every vehicle's EPA bar at once.
+ */
+export function epaPartnerId(vehicle) {
+    return `${EPA_PARTNER_ID}:${vehicle?.id}`;
+}
+
+/** True for any EPA row id, scoped or bare. */
+export function isEpaPartnerId(id) {
+    const s = String(id ?? '');
+    return s === EPA_PARTNER_ID || s.startsWith(`${EPA_PARTNER_ID}:`);
+}
+
 /** The EPA option for a vehicle's partner dropdown, or null when it has no rated range. */
 export function epaRangeOption(vehicle) {
     return vehicle?.range > 0
-        ? { id: EPA_PARTNER_ID, name: 'EPA range', _synthetic: true }
+        ? { id: epaPartnerId(vehicle), name: 'EPA range', _synthetic: true }
         : null;
 }
 
@@ -192,7 +210,7 @@ export function resolveRangeSource(chargingRun, {
     // one percent of SoC buys one hundredth of it. Only ever reachable by
     // explicit choice — it is never resolved automatically, because a real
     // measured test on this vehicle is always the better default.
-    const wantsEpa = explicitPairing === EPA_PARTNER_ID || explicitPairing?.id === EPA_PARTNER_ID;
+    const wantsEpa = isEpaPartnerId(explicitPairing) || isEpaPartnerId(explicitPairing?.id);
     if (wantsEpa && vehicle?.range > 0) {
         return {
             source: 'epa',
