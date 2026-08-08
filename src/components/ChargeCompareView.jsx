@@ -9,7 +9,8 @@ import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, EPA_PARTNER_ID } from '../utils/rangeSource';
-import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
+import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
+import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 
@@ -288,7 +289,6 @@ export default function ChargeCompareView({
     const [loading,         setLoading]         = useState(false);
     const [copied,          setCopied]          = useState(false);
     const [orientation,     setOrientation]     = useState('horizontal');
-    const [selectedRuns,    setSelectedRuns]    = useState([]);
     const isHorizontal = orientation === 'horizontal';
 
     const chart1Ref      = useRef(null);
@@ -415,35 +415,19 @@ export default function ChargeCompareView({
     // changes its key ('70::' becomes '70::12'). Keying on the pair alone made
     // every deselected row spring back the moment any dropdown changed, and
     // meant a repinned row could not carry its selection across.
-    const seenPrimaries = useRef(new Set());
-    useEffect(() => {
-        const allKeys = resolvedPairs.map(p => p.key);
-        const live = new Set(allKeys);
-        const prev = selectedRuns;
-
-        const kept = prev.filter(k => live.has(k));
-        const keptSet = new Set(kept);
-        const selectedPrimaries = new Set(prev.map(k => parsePairKey(k).rangeRunId));
-
-        const added = allKeys.filter(k => {
-            if (keptSet.has(k)) return false;
-            const primary = parsePairKey(k).rangeRunId;
-            // A range test the user switched off stays off. A repinned row whose
-            // range test is still selected carries its selection to the new key.
-            // Anything genuinely new comes on.
-            return !seenPrimaries.current.has(primary) || selectedPrimaries.has(primary);
-        });
-
-        // Marked HERE and not inside the setState updater: React invokes updaters
-        // more than once in development, and a ref mutation in there ran twice —
-        // the second pass saw every primary as already seen, added nothing, and
-        // that empty result was the one kept, leaving the chart with no series.
-        allKeys.forEach(k => seenPrimaries.current.add(parsePairKey(k).rangeRunId));
-
-        const next = [...kept, ...added];
-        const unchanged = next.length === prev.length && next.every((k, i) => k === prev[i]);
-        if (!unchanged) setSelectedRuns(next);
-    }, [resolvedPairs, selectedRuns]);
+    // Selection lives in the shared hook (hooks/useRunSelection.js) so this chart,
+    // Road Trip and anything added later behave identically when the data shifts
+    // underneath them — pruning, repin carry-over and first-sighting bootstrap
+    // were three separate implementations that each got a different part wrong.
+    const selectionRows = useMemo(
+        () => resolvedPairs.map(p => ({
+            key: p.key,
+            vehicleId: p.rangeRun.vehicleId,
+            groupId: p.rangeRun.id,     // survives a repin, which changes the key
+        })),
+        [resolvedPairs]
+    );
+    const { selected: selectedRuns, toggle: toggleRun } = useRunSelection(selectionRows);
 
     const activePairs = resolvedPairs.filter(p => selectedRuns.includes(p.key));
 
@@ -755,9 +739,7 @@ export default function ChargeCompareView({
                     <RunSelector
                         vehicles={selectedVehicles}
                         selectedRunIds={selectedRuns}
-                        onToggleRun={runId => setSelectedRuns(prev =>
-                            prev.includes(runId) ? prev.filter(id => id !== runId) : [...prev, runId]
-                        )}
+                        onToggleRun={toggleRun}
                         onUpdateRunColor={onUpdateRunColor}
                         runFilter={(run, vehicle) =>
                             // A range test with no charging curve to pair against

@@ -8,7 +8,7 @@ import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, EPA_PARTNER_ID } from '../utils/rangeSource';
-import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
+import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import {
@@ -16,6 +16,7 @@ import {
     segmentsToChartPointsByTest,
     formatTime, speedCorrectionFactor,
 } from '../utils/roadTripSimulation';
+import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
 import { resolveChartColors } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
@@ -375,12 +376,12 @@ export default function RoadTripView({
 
     const [runDataCache, setRunDataCache] = useState({});
     const [loading, setLoading] = useState(false);
-    const [selectedRunIds, setSelectedRunIds] = useState(() => {
-        // Restore pair keys from the URL on first render (rt_r=70::12,71::13).
-        // Strings, not numbers: a pair key is 'rangeId::chargingId'.
-        const raw = new URLSearchParams(window.location.search).get('rt_r');
-        return raw ? raw.split(',').filter(Boolean) : [];
-    });
+    // Pair keys restored from the URL on first render (rt_r=70::12,71::13).
+    // Strings, not numbers: a pair key is 'rangeId::chargingId'.
+    const initialRunIds = useRef(
+        (new URLSearchParams(window.location.search).get('rt_r') || '')
+            .split(',').filter(Boolean)
+    ).current;
     const [axisScale, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
     const [copiedUrl, setCopiedUrl] = useState(false);
     const [imageCopied, setImageCopied] = useState(false);
@@ -467,48 +468,21 @@ export default function RoadTripView({
         return map;
     }, [selectedVehicles, colorMap, pairings]);
 
-    // ── Sync selection when vehicles or pairings change ──────────────────────
-    // Keyed by PAIR: this view enumerates range tests, because a charging curve
-    // is a property of the car while a range test is a property of the day, and
-    // each (range × charging) pair is its own trip simulation.
-    useEffect(() => {
-        setSelectedRunIds(prev => {
-            const live = new Set(allPairsInfo.keys());
-            const kept = prev.filter(k => live.has(k));
-            const keptSet = new Set(kept);
-
-            // Repinning a row changes its key ('70::' becomes '70::12'), so carry
-            // the selection across at the range-test level. Without this the old
-            // key is pruned, the new one is never added, and the row silently
-            // disappears from the simulation instead of updating.
-            const prevPrimaries = new Set(prev.map(k => parsePairKey(k).rangeRunId));
-            for (const [key, entry] of allPairsInfo) {
-                if (keptSet.has(key)) continue;
-                if (prevPrimaries.has(String(entry.rangeRun.id))) {
-                    kept.push(key);
-                    keptSet.add(key);
-                }
-            }
-
-            // A vehicle with nothing selected gets one row per range test. That
-            // is a lot on arrival; narrowing it to a sensible default is worth
-            // doing, but the obvious rule (defaultRangeRun) selects nothing at
-            // all on this data, so the per-vehicle "all"/"none" links carry it
-            // for now.
-            for (const vehicle of selectedVehicles) {
-                const hasAny = [...allPairsInfo.values()]
-                    .some(e => e.vehicle.id === vehicle.id && keptSet.has(e.key));
-                if (hasAny) continue;
-                for (const entry of allPairsInfo.values()) {
-                    if (entry.vehicle.id !== vehicle.id) continue;
-                    kept.push(entry.key);
-                    keptSet.add(entry.key);
-                }
-            }
-            const unchanged = kept.length === prev.length && kept.every((k, i) => k === prev[i]);
-            return unchanged ? prev : kept;
-        });
-    }, [allPairsInfo, selectedVehicles]);
+    // Selection lives in the shared hook (hooks/useRunSelection.js), the same one
+    // Charge Compare uses. Previously this view had its own copy, whose bootstrap
+    // refilled any vehicle that happened to be empty — so clearing one vehicle
+    // and then changing another vehicle's dropdown brought the first one back.
+    const selectionRows = useMemo(
+        () => [...allPairsInfo.values()].map(e => ({
+            key: e.key,
+            vehicleId: e.vehicle.id,
+            groupId: e.rangeRun.id,     // survives a repin, which changes the key
+        })),
+        [allPairsInfo]
+    );
+    const { selected: selectedRunIds, toggle: toggleRunId } = useRunSelection(
+        selectionRows, { initial: initialRunIds }
+    );
 
     // ── Active run entries — ordered by vehicle pill position ─────────────────
     const runEntries = useMemo(() => {
@@ -1452,11 +1426,7 @@ export default function RoadTripView({
                                 filterChargingRuns(v.runs).length > 0
                             )}
                             selectedRunIds={selectedRunIds}
-                            onToggleRun={key => setSelectedRunIds(prev =>
-                                prev.includes(key)
-                                    ? prev.filter(x => x !== key)
-                                    : [...prev, key]
-                            )}
+                            onToggleRun={toggleRunId}
                             onUpdateRunColor={onUpdateRunColor}
                             colorMap={colorMap}
                             runFilter={(run, vehicle) =>
