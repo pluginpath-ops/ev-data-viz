@@ -78,13 +78,11 @@ One charging or range test session per vehicle.
 | `id` | `bigint` | auto | PK |
 | `vehicle_id` | `bigint` | — | FK → `vehicles.id` |
 | `name` | `text` | — | |
-| `date` | `text` | — | ISO date string. **NOT NULL** — inserts must supply it |
+| `date` | `date` | — | **NOT NULL** — inserts must supply it. (Documented as `text` until 2026-08-08; it is a real `date` column, which matters for casts in SQL) |
 | `color` | `text` | `'#3b82f6'` | Chart series color |
-| `is_default` | `boolean` | `false` | |
+| `is_default` | `boolean` | `false` | Scoped **per kind** since 046: a vehicle has one default charging run and one default range test |
 | `synthetic` | `boolean` | `false` | True for estimated/simulated data |
-| `kind` | `text` | — | `'charging'` \| `'range'`. Test role discriminator. Derived from the two booleans below by trigger `trg_runs_sync_kind`; see migration 044 |
-| `has_charging` | `boolean` | `true` | **Superseded by `kind`** — still written, no longer read. Dropped in #155 |
-| `has_range` | `boolean` | `false` | **Superseded by `kind`** — still written, no longer read. Dropped in #155 |
+| `kind` | `text` | `'charging'` | `'charging'` \| `'range'`. Test role discriminator, authoritative since migration 046. CHECK constraints assert a charging row carries no range columns (`distance_miles`, `energy_kwh`, `speed_mph`, `url`, wind) and a range row carries no charging columns (`charging_url`, `charge_energy_kwh`) |
 | `session_id` | `bigint` | `NULL` | FK → `test_sessions.id` ON DELETE SET NULL. Advisory grouping; never required |
 | `paired_charging_run_id` | `bigint` | `NULL` | FK → `runs.id` ON DELETE SET NULL. Curator-set default charging test for a **range** test (migration 045). Overrides the automatic pick; a URL pairing still overrides this |
 | `software_version` | `text` | — | |

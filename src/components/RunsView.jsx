@@ -13,7 +13,7 @@ import { RunVoteButtons } from './VoteButtons';
 import EpaVehicleSection from './EpaVehicleSection';
 import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
-import { filterChargingRuns, defaultChargingRun } from '../utils/runUtils';
+import { filterChargingRuns, defaultChargingRun, isRangeRun } from '../utils/runUtils';
 import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
 
 // ── Data-type flag definitions ────────────────────────────────────────────────
@@ -24,13 +24,13 @@ const DATA_FLAGS = [
     { key: 'range',    label: '📏 Range',    pillStyle: 'bg-purple-100 text-purple-800 border-purple-300', desc: 'Range/efficiency test (distance, SoC, speed, efficiency)' },
 ];
 
-/** Infer the active data-type flags from a run's boolean columns. */
-const inferRunFlags = (run) => {
-    const flags = [];
-    if (run?.has_charging ?? true)  flags.push('charging');
-    if (run?.has_range    ?? false) flags.push('range');
-    return flags;
-};
+/**
+ * A run's role. Since migration 046 a run is a charging test OR a range test,
+ * never both — the dual-role rows were split, and the flag pair that expressed
+ * them is gone. Kept as a one-element array so the pill rendering below, which
+ * was written against a list, does not have to change.
+ */
+const inferRunFlags = (run) => [isRangeRun(run) ? 'range' : 'charging'];
 
 // ── Field tag metadata (ordered for display) ──────────────────────────────────
 const FIELD_META = [
@@ -725,8 +725,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         const { dataFlags, ...metaRest } = runMetadata;
         const run = {
             ...metaRest,
-            hasCharging: dataFlags.includes('charging'),
-            hasRange:    dataFlags.includes('range'),
+            kind: dataFlags.includes('range') ? 'range' : 'charging',
             data: [],
             uploadDate: new Date().toISOString()
         };
@@ -796,8 +795,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         const { dataFlags, ...metaRest } = runMetadata;
         const run = {
             ...metaRest,
-            hasCharging: dataFlags.includes('charging'),
-            hasRange:    dataFlags.includes('range'),
+            kind: dataFlags.includes('range') ? 'range' : 'charging',
             data: transformedData,
             fieldMapping,
             calculated_fields: calculatedFields,
@@ -909,8 +907,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             const { dataFlags, ...formRest } = editFormData;
             await onUpdateRun(runId, {
                 ...formRest,
-                hasCharging: dataFlags.includes('charging'),
-                hasRange:    dataFlags.includes('range'),
+                kind: dataFlags.includes('range') ? 'range' : 'charging',
                 calculated_fields: editCalculatedFields,
             });
             // Save table data only if the editor made changes
@@ -1178,10 +1175,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
     // ── Derived-column offer logic ────────────────────────────────────────────
     // Range test runs available for measured-range estimation.
-    // Requires has_range + distance_miles; start_soc/end_soc are optional —
+    // Requires a range run with distance_miles; start_soc/end_soc are optional —
     // if absent we treat the test as a full 0→100% run (a safe approximation).
     const rangeTestRuns = (vehicle?.runs ?? [])
-        .filter(r => r.has_range && r.distance_miles > 0
+        .filter(r => isRangeRun(r) && r.distance_miles > 0
             && (r.start_soc == null || r.end_soc == null || r.start_soc !== r.end_soc))
         .sort((a, b) => new Date(b.date) - new Date(a.date));
     const selectedRangeTestRun = rangeTestRuns.find(r => r.id === selectedRangeTestRunId) ?? rangeTestRuns[0] ?? null;
@@ -1412,9 +1409,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 {/* Only show metadata inputs in create mode */}
                                 {uploadMode === 'create' && (
                                     <>
-                                        {/* Data-type flags — multi-select, at least one must remain active */}
+                                        {/* Role — exactly one. A run is a charging test or a range test. */}
                                         <div>
-                                            <p className="text-xs text-muted mb-1">Data types (select all that apply)</p>
+                                            <p className="text-xs text-muted mb-1">Data type</p>
                                             <div className="data-type-flags">
                                                 {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
                                                     const active = runMetadata.dataFlags.includes(key);
@@ -1423,12 +1420,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             key={key}
                                                             type="button"
                                                             title={desc}
-                                                            onClick={() => setRunMetadata(m => {
-                                                                const next = active
-                                                                    ? m.dataFlags.filter(f => f !== key)
-                                                                    : [...m.dataFlags, key];
-                                                                return { ...m, dataFlags: next.length ? next : m.dataFlags };
-                                                            })}
+                                                            onClick={() => setRunMetadata(m => ({ ...m, dataFlags: [key] }))}
                                                             className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-faint border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
                                                         >
                                                             {label}
@@ -1852,9 +1844,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             <div>
                                 <h3 className="section-title mb-4">Edit Record</h3>
                                 <div className="space-y-3">
-                                    {/* Data-type flags — multi-select, at least one must remain active */}
+                                    {/* Role — exactly one. A run is a charging test or a range test. */}
                                     <div>
-                                        <p className="text-xs text-muted mb-1">Data types (select all that apply)</p>
+                                        <p className="text-xs text-muted mb-1">Data type</p>
                                         <div className="data-type-flags">
                                             {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
                                                 const active = (editFormData.dataFlags || ['charging']).includes(key);
@@ -1863,13 +1855,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         key={key}
                                                         type="button"
                                                         title={desc}
-                                                        onClick={() => setEditFormData(f => {
-                                                            const cur = f.dataFlags || ['charging'];
-                                                            const next = active
-                                                                ? cur.filter(x => x !== key)
-                                                                : [...cur, key];
-                                                            return { ...f, dataFlags: next.length ? next : cur };
-                                                        })}
+                                                        onClick={() => setEditFormData(f => ({ ...f, dataFlags: [key] }))}
                                                         className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-faint border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
                                                     >
                                                         {label}

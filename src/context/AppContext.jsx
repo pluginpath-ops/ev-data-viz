@@ -254,8 +254,7 @@ export function AppProvider({ children }) {
             const normalized = {};
             for (const [k, v] of Object.entries(updates)) {
                 switch (k) {
-                    case 'hasCharging':     normalized.has_charging       = v;         break;
-                    case 'hasRange':        normalized.has_range          = v;         break;
+                    case 'kind':            normalized.kind               = v;         break;
                     case 'softwareVersion': normalized.software_version   = v;         break;
                     case 'startSoc':        normalized.start_soc          = toNum(v);  break;
                     case 'endSoc':          normalized.end_soc            = toNum(v);  break;
