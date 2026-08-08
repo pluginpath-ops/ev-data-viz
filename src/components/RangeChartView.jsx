@@ -14,7 +14,7 @@ import {
 } from '../utils/unitConversions';
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { copyChartAsPng } from '../utils/chartUtils';
-import { resolveChartColors } from '../utils/colorUtils';
+import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
@@ -100,10 +100,13 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     // Perceptual color resolution.  In auto mode every run gets an Okabe-Ito
     // slot (with hue-family bias toward the stored color); in manual mode only
     // default-blue runs are nudged.
-    const colorMap = useMemo(
-        () => resolveChartColors(plottableRuns, {}, autoColor ? 'auto' : 'manual'),
-        [plottableRuns, autoColor]
-    );
+    // Sticky in auto mode — see hooks/useStickyChartColors. Colours are added as
+    // runs are selected and held until the vehicle set changes or Auto Color is
+    // cycled, so the chart you were reading does not recolour under you.
+    const colorMap = useStickyChartColors(plottableRuns, {
+        autoColor,
+        resetKey: selectedVehicles.map(v => v.id).join(','),
+    });
 
     // ── Run toggle ────────────────────────────────────────────────────────────
     const toggleRun = (runId) => {
