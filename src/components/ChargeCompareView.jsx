@@ -9,7 +9,7 @@ import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, EPA_PARTNER_ID } from '../utils/rangeSource';
-import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
+import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 
@@ -409,21 +409,41 @@ export default function ChargeCompareView({
     // Selection is by pair key, so adding a second range partner to a charging
     // test brings the new series in already selected rather than requiring a
     // second click in a different part of the UI.
-    // Stale keys are also dropped. Repinning a row changes its key (`70::` becomes
-    // `70::12`), so without pruning the old key lingers forever — and returning
-    // the row to Auto would then find its key already selected, leave the array
-    // untouched, and give the chart nothing to react to.
+    // Auto-select genuinely NEW rows, never re-select ones the user turned off.
+    //
+    // Tracked per range test rather than per pair key, because repinning a row
+    // changes its key ('70::' becomes '70::12'). Keying on the pair alone made
+    // every deselected row spring back the moment any dropdown changed, and
+    // meant a repinned row could not carry its selection across.
+    const seenPrimaries = useRef(new Set());
     useEffect(() => {
         const allKeys = resolvedPairs.map(p => p.key);
         const live = new Set(allKeys);
-        setSelectedRuns(prev => {
-            const kept = prev.filter(k => live.has(k));
-            const added = allKeys.filter(k => !prev.includes(k));
-            const next = [...kept, ...added];
-            const unchanged = next.length === prev.length && next.every((k, i) => k === prev[i]);
-            return unchanged ? prev : next;
+        const prev = selectedRuns;
+
+        const kept = prev.filter(k => live.has(k));
+        const keptSet = new Set(kept);
+        const selectedPrimaries = new Set(prev.map(k => parsePairKey(k).rangeRunId));
+
+        const added = allKeys.filter(k => {
+            if (keptSet.has(k)) return false;
+            const primary = parsePairKey(k).rangeRunId;
+            // A range test the user switched off stays off. A repinned row whose
+            // range test is still selected carries its selection to the new key.
+            // Anything genuinely new comes on.
+            return !seenPrimaries.current.has(primary) || selectedPrimaries.has(primary);
         });
-    }, [resolvedPairs]);
+
+        // Marked HERE and not inside the setState updater: React invokes updaters
+        // more than once in development, and a ref mutation in there ran twice —
+        // the second pass saw every primary as already seen, added nothing, and
+        // that empty result was the one kept, leaving the chart with no series.
+        allKeys.forEach(k => seenPrimaries.current.add(parsePairKey(k).rangeRunId));
+
+        const next = [...kept, ...added];
+        const unchanged = next.length === prev.length && next.every((k, i) => k === prev[i]);
+        if (!unchanged) setSelectedRuns(next);
+    }, [resolvedPairs, selectedRuns]);
 
     const activePairs = resolvedPairs.filter(p => selectedRuns.includes(p.key));
 

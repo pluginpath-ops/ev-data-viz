@@ -490,7 +490,11 @@ export default function RoadTripView({
                 }
             }
 
-            // Give any vehicle with nothing selected one row per range test.
+            // A vehicle with nothing selected gets one row per range test. That
+            // is a lot on arrival; narrowing it to a sensible default is worth
+            // doing, but the obvious rule (defaultRangeRun) selects nothing at
+            // all on this data, so the per-vehicle "all"/"none" links carry it
+            // for now.
             for (const vehicle of selectedVehicles) {
                 const hasAny = [...allPairsInfo.values()]
                     .some(e => e.vehicle.id === vehicle.id && keptSet.has(e.key));

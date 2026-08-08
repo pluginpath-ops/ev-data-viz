@@ -109,6 +109,21 @@ export default function RunSelector({
             : own;
     };
 
+    /**
+     * Select or clear every row for one vehicle. Emits the same toggle the rows
+     * do, so the parent's selection model — run ids or pair keys — stays the
+     * only thing that knows which is which.
+     */
+    const setVehicleSelection = (vehicle, wanted) => {
+        for (const run of primaryRunsFor(vehicle)) {
+            for (const partnerId of partnerRowsFor(run)) {
+                const key = pairMode && !singlePartner ? pairKey(run.id, partnerId) : run.id;
+                const isOn = selectedRunIds.some(id => String(id) === String(key));
+                if (isOn !== wanted) onToggleRun(key);
+            }
+        }
+    };
+
     const selectedCount = pairMode
         ? vehicles.reduce((n, v) => n + primaryRunsFor(v).reduce(
             (m, run) => m + (singlePartner
@@ -149,6 +164,23 @@ export default function RunSelector({
                                         >
                                             <span style={{ display: 'inline-block', transform: isVehicleExpanded(vehicle.id) ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} className="text-faint group-hover:text-secondary">&#9660;</span>
                                             <h4 className="text-sm font-semibold text-secondary">{vehicle.name}</h4>
+                                        </button>
+                                        {/* Bulk helpers — a vehicle can contribute a dozen rows,
+                                            and ticking them one at a time is the common complaint. */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setVehicleSelection(vehicle, true)}
+                                            className="run-bulk-link"
+                                        >
+                                            all
+                                        </button>
+                                        <span className="text-faint text-xs select-none">/</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setVehicleSelection(vehicle, false)}
+                                            className="run-bulk-link"
+                                        >
+                                            none
                                         </button>
                                     </div>
 

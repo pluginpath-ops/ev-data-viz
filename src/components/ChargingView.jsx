@@ -166,7 +166,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         });
     }, [pairings]);
 
-    // Lazy-load data_points for newly selected runs
+    // Lazy-load data_points for newly selected runs.
+    //
+    // Keyed on what is MISSING, not on the selection: a pairing change evicts
+    // cached runs (their derived range is stale), and keying on the selection
+    // alone meant nothing refetched them — the series vanished until some
+    // unrelated toggle changed the selection and happened to trigger this.
+    const missingRunIds = chartConfig.selectedRuns.filter(id => !(id in runDataCache));
     useEffect(() => {
         const fetchMissingData = async () => {
             const missingIds = chartConfig.selectedRuns.filter(id => !(id in runDataCache));
@@ -253,7 +259,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             setLoadingData(false);
         };
         fetchMissingData();
-    }, [chartConfig.selectedRuns]);
+    }, [missingRunIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const dl = distanceLabel(units);
     const axisOptions = [
