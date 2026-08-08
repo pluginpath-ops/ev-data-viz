@@ -112,41 +112,61 @@ JOIN numbered_sessions ns ON ns.rn = nr.rn;
 
 -- ── 2. The range half — a new row ────────────────────────────────────────────
 --
--- start_soc / end_soc are copied to BOTH halves: the charging side needs them
--- for its curve, the range side to price miles per %SoC. Shared context
--- (temperature, elevation, trim, conditions, colour) is copied so each half
--- stands alone in the charts that show it.
+-- Built from the table's ACTUAL columns rather than a hand-written list.
 --
--- is_default is NOT copied — it currently scopes the vehicle's default CHARGING
--- run, and handing that flag to a range row would make it the default for both
--- roles at once. Range defaults resolve by recency until a curator sets one.
+-- The hand-written version failed twice against the live database — once on a
+-- column the documentation described with the wrong type, once on a column the
+-- documentation still listed after migration 018 had dropped it. A list written
+-- from SCHEMA.md tests SCHEMA.md. Reading information_schema tests the database,
+-- copies any column added since, and cannot drift again.
+--
+-- Everything is copied EXCEPT:
+--   id, created_at            — the new row gets its own
+--   has_charging, has_range   — set below; the 044 trigger derives kind from them
+--   session_id, paired_…      — set below
+--   charging_url, charge_energy_kwh
+--                             — charging-only; the CHECK constraint forbids them
+--                               on a range row
+--   is_default                — scopes the default CHARGING run; handing it over
+--                               would make one row the default for both roles
+--   populated_fields, calculated_fields
+--                             — they describe the charging time series, which
+--                               stays with the charging half
+--
+-- start_soc / end_soc are copied by virtue of not being excluded: the charging
+-- side needs them for its curve, the range side to price miles per %SoC.
+DO $$
+DECLARE
+    col_list text;
+    sel_list text;
+BEGIN
+    SELECT string_agg(quote_ident(column_name), ', ' ORDER BY ordinal_position),
+           string_agg('r.' || quote_ident(column_name), ', ' ORDER BY ordinal_position)
+      INTO col_list, sel_list
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'runs'
+      AND column_name NOT IN (
+            'id', 'created_at',
+            'has_charging', 'has_range',
+            'session_id', 'paired_charging_run_id',
+            'charging_url', 'charge_energy_kwh',
+            'is_default',
+            'populated_fields', 'calculated_fields'
+      );
 
-INSERT INTO runs (
-    vehicle_id, name, date, color, synthetic,
-    has_charging, has_range,
-    software_version, conditions, source, url,
-    start_soc, end_soc, speed_mph,
-    distance_miles, energy_kwh,
-    temperature_f, elevation_gain_ft,
-    avg_wind_speed_mph, wind_direction_deg,
-    trim_id, session_id,
-    paired_charging_run_id
-)
-SELECT
-    r.vehicle_id, r.name, r.date, r.color, r.synthetic,
-    false, true,                       -- the trigger derives kind='range' from these
-    r.software_version, r.conditions, r.source, r.url,
-    r.start_soc, r.end_soc, r.speed_mph,
-    r.distance_miles, r.energy_kwh,
-    r.temperature_f, r.elevation_gain_ft,
-    r.avg_wind_speed_mph, r.wind_direction_deg,
-    r.trim_id, sm.session_id,
-    -- The pairing arrives pre-made: these two halves were measured together, so
-    -- the range row names its charging partner outright — one correct pairing
-    -- per split, with no curation.
-    r.id
-FROM runs r
-JOIN session_map sm ON sm.charging_run_id = r.id;
+    EXECUTE format($f$
+        INSERT INTO runs (%s, has_charging, has_range, session_id, paired_charging_run_id)
+        SELECT %s, false, true, sm.session_id,
+               -- The pairing arrives pre-made: these halves were measured
+               -- together, so the range row names its charging partner outright.
+               r.id
+        FROM runs r
+        JOIN session_map sm ON sm.charging_run_id = r.id
+    $f$, col_list, sel_list);
+
+    RAISE NOTICE 'Range halves created by copying columns: %', col_list;
+END $$;
 
 
 -- ── 3. The charging half — the original row, stripped of range columns ───────
