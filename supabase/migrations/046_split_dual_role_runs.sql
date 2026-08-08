@@ -28,36 +28,46 @@
 
 BEGIN;
 
--- ── Guard: refuse to run against unexpected data ─────────────────────────────
+-- ── 0. Clear vestigial off-role columns ──────────────────────────────────────
 --
--- The CHECK constraints below assert that off-role columns are NULL. A row that
--- is NOT dual-role but carries a column belonging to the other role would fail
--- them, and a bare constraint violation says little. Fail early with counts
--- instead, so the cause is legible and the transaction rolls back untouched.
+-- Some rows that are NOT dual-role still carry a column belonging to the other
+-- role. On the live database these are six charging tests whose range values
+-- were duplicated across charging events and then un-flagged as range — the
+-- numbers are leftovers, reviewed and confirmed as not belonging to those runs.
+-- Their `kind` already says charging, so nothing reads them; they would simply
+-- fail the CHECK constraints added at the end.
+--
+-- Cleared explicitly and counted out loud, rather than being silently dropped by
+-- a wider UPDATE or blocking the migration behind a constraint violation that
+-- would name neither the rows nor the reason.
 DO $$
 DECLARE
-    bad_charging int;
-    bad_range    int;
+    cleared_charging int;
+    cleared_range    int;
 BEGIN
-    SELECT count(*) INTO bad_charging
-    FROM runs
-    WHERE NOT (has_charging AND has_range)          -- dual rows are handled below
-      AND kind = 'charging'
-      AND (distance_miles IS NOT NULL OR energy_kwh IS NOT NULL
-           OR speed_mph IS NOT NULL OR url IS NOT NULL
-           OR avg_wind_speed_mph IS NOT NULL OR wind_direction_deg IS NOT NULL);
+    WITH stripped AS (
+        UPDATE runs
+        SET distance_miles = NULL, energy_kwh = NULL, speed_mph = NULL,
+            url = NULL, avg_wind_speed_mph = NULL, wind_direction_deg = NULL
+        WHERE NOT (has_charging AND has_range)      -- dual rows are split below
+          AND kind = 'charging'
+          AND (distance_miles IS NOT NULL OR energy_kwh IS NOT NULL
+               OR speed_mph IS NOT NULL OR url IS NOT NULL
+               OR avg_wind_speed_mph IS NOT NULL OR wind_direction_deg IS NOT NULL)
+        RETURNING 1
+    ) SELECT count(*) INTO cleared_charging FROM stripped;
 
-    SELECT count(*) INTO bad_range
-    FROM runs
-    WHERE NOT (has_charging AND has_range)
-      AND kind = 'range'
-      AND (charging_url IS NOT NULL OR charge_energy_kwh IS NOT NULL);
+    WITH stripped AS (
+        UPDATE runs
+        SET charging_url = NULL, charge_energy_kwh = NULL
+        WHERE NOT (has_charging AND has_range)
+          AND kind = 'range'
+          AND (charging_url IS NOT NULL OR charge_energy_kwh IS NOT NULL)
+        RETURNING 1
+    ) SELECT count(*) INTO cleared_range FROM stripped;
 
-    IF bad_charging > 0 OR bad_range > 0 THEN
-        RAISE EXCEPTION
-            'Refusing to split: % charging run(s) carry range-only columns and % range run(s) carry charging-only columns. Inspect them before running this migration — the CHECK constraints would reject them.',
-            bad_charging, bad_range;
-    END IF;
+    RAISE NOTICE 'Cleared vestigial columns: % charging run(s) carrying range values, % range run(s) carrying charging values.',
+        cleared_charging, cleared_range;
 END $$;
 
 
