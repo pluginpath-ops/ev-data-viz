@@ -10,6 +10,7 @@ import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../uti
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
+import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 
@@ -288,7 +289,6 @@ export default function ChargeCompareView({
     const [loading,         setLoading]         = useState(false);
     const [copied,          setCopied]          = useState(false);
     const [orientation,     setOrientation]     = useState('horizontal');
-    const [selectedRuns,    setSelectedRuns]    = useState([]);
     const isHorizontal = orientation === 'horizontal';
 
     const chart1Ref      = useRef(null);
@@ -409,13 +409,25 @@ export default function ChargeCompareView({
     // Selection is by pair key, so adding a second range partner to a charging
     // test brings the new series in already selected rather than requiring a
     // second click in a different part of the UI.
-    useEffect(() => {
-        const allKeys = resolvedPairs.map(p => p.key);
-        setSelectedRuns(prev => {
-            const newKeys = allKeys.filter(k => !prev.includes(k));
-            return newKeys.length ? [...prev, ...newKeys] : prev;
-        });
-    }, [resolvedPairs]);
+    // Auto-select genuinely NEW rows, never re-select ones the user turned off.
+    //
+    // Tracked per range test rather than per pair key, because repinning a row
+    // changes its key ('70::' becomes '70::12'). Keying on the pair alone made
+    // every deselected row spring back the moment any dropdown changed, and
+    // meant a repinned row could not carry its selection across.
+    // Selection lives in the shared hook (hooks/useRunSelection.js) so this chart,
+    // Road Trip and anything added later behave identically when the data shifts
+    // underneath them — pruning, repin carry-over and first-sighting bootstrap
+    // were three separate implementations that each got a different part wrong.
+    const selectionRows = useMemo(
+        () => resolvedPairs.map(p => ({
+            key: p.key,
+            vehicleId: p.rangeRun.vehicleId,
+            groupId: p.rangeRun.id,     // survives a repin, which changes the key
+        })),
+        [resolvedPairs]
+    );
+    const { selected: selectedRuns, toggle: toggleRun } = useRunSelection(selectionRows);
 
     const activePairs = resolvedPairs.filter(p => selectedRuns.includes(p.key));
 
@@ -501,7 +513,12 @@ export default function ChargeCompareView({
                 const targetTime  = Tz + xMinutes;
                 const lastTime    = byTime[byTime.length - 1].time;
                 const timeOvershoot = Math.max(0, targetTime - lastTime);
-                const SocEnd = interpolate(byTime, 'time', 'soc', targetTime, false, true);
+                const SocRaw = interpolate(byTime, 'time', 'soc', targetTime, false, true);
+                // A pack cannot exceed 100% SoC. Extrapolating forward past the end
+                // of a short run can produce SoC well above that, and the linear
+                // model has no ceiling of its own to catch it — unclamped, a run
+                // whose data spans a couple of minutes yielded 4800 mi added in 15.
+                const SocEnd = SocRaw != null ? Math.min(100, SocRaw) : null;
                 // Linear: the SoC gained over the window, priced at the paired
                 // test's miles-per-%SoC. Recorded: read the range column directly.
                 const Rend = useLinear
@@ -524,12 +541,16 @@ export default function ChargeCompareView({
                 // Linear: the miles asked for convert to a SoC target, and the
                 // charging curve is read on the SoC axis. Recorded: sort by the
                 // range column and read time off it, as before.
-                let Tend, SocEnd, rangeOvershoot;
+                let Tend, SocEnd, rangeOvershoot, unreachable = false;
                 if (useLinear) {
                     const targetSoc = startSoc + mMiles / miPerSoc;
                     const lastSoc   = bySoc[bySoc.length - 1].soc;
-                    Tend   = interpolate(bySoc, 'soc', 'time', targetSoc, false, true);
-                    SocEnd = targetSoc;
+                    // Asking for more miles than a full pack holds from this SoC is
+                    // not a long charge, it is impossible — report no data rather
+                    // than extrapolating past 100% into a fictional time.
+                    unreachable = targetSoc > 100;
+                    Tend   = unreachable ? null : interpolate(bySoc, 'soc', 'time', targetSoc, false, true);
+                    SocEnd = Math.min(100, targetSoc);
                     // Expressed in miles so it stays comparable with mMiles.
                     rangeOvershoot = Math.max(0, targetSoc - lastSoc) * miPerSoc;
                 } else {
@@ -651,7 +672,10 @@ export default function ChargeCompareView({
                 if (inst.current) { inst.current.destroy(); inst.current = null; }
             });
         };
-    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns, units, isDark]);
+    // resolvedPairs, not just selectedRuns: changing a row's partner can leave the
+    // selection array identical (same row, different pairing) while every bar's
+    // value changes, and the chart would keep the previous partner's numbers.
+    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns, resolvedPairs, units, isDark]);
 
     const hasRangeRuns = resolvedPairs.length > 0;
 
@@ -715,9 +739,7 @@ export default function ChargeCompareView({
                     <RunSelector
                         vehicles={selectedVehicles}
                         selectedRunIds={selectedRuns}
-                        onToggleRun={runId => setSelectedRuns(prev =>
-                            prev.includes(runId) ? prev.filter(id => id !== runId) : [...prev, runId]
-                        )}
+                        onToggleRun={toggleRun}
                         onUpdateRunColor={onUpdateRunColor}
                         runFilter={(run, vehicle) =>
                             // A range test with no charging curve to pair against

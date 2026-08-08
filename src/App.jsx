@@ -466,6 +466,7 @@ export default function App() {
                 compareConfig={compareConfig}
                 roadTripConfig={roadTripConfig}
                 epaConfig={epaConfig}
+                pairings={pairings}
                 onUpdateRunColor={updateRunColor}
             />
         );
@@ -807,6 +808,8 @@ export default function App() {
                             setChartConfig={setChartConfig}
                             onUpdateRunColor={updateRunColor}
                             chartMode={chartMode}
+                            pairings={pairings}
+                            setPairings={setPairings}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'roadtrip' && (
@@ -815,6 +818,8 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                             roadTripConfig={roadTripConfig}
                             setRoadTripConfig={setRoadTripConfig}
+                            pairings={pairings}
+                            setPairings={setPairings}
                             onUpdateRunColor={updateRunColor}
                             autoColor={chartConfig.autoColor ?? true}
                             setChartConfig={setChartConfig}

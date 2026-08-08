@@ -6,8 +6,9 @@ import { dataService } from '../services/DataService';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
-import { filterChargingRuns, isChargingRun } from '../utils/runUtils';
-import { resolveRangeSource } from '../utils/rangeSource';
+import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
+import { resolveRangeSource, epaRangeOption, EPA_PARTNER_ID } from '../utils/rangeSource';
+import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import {
@@ -15,6 +16,7 @@ import {
     segmentsToChartPointsByTest,
     formatTime, speedCorrectionFactor,
 } from '../utils/roadTripSimulation';
+import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
 import { resolveChartColors } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
@@ -357,6 +359,11 @@ export default function RoadTripView({
     selectedVehicleIds,
     roadTripConfig,
     setRoadTripConfig,
+    // Global chart-session pairings (utils/pairings.js). Read-only here: this
+    // view consumes a pairing chosen in Charge Compare but does not set one,
+    // because it is charging-primary and the pairing is keyed by range test.
+    pairings = {},
+    setPairings = () => {},
     onUpdateRunColor = null,
     presentationMode = false,
     autoColor = true,
@@ -369,11 +376,12 @@ export default function RoadTripView({
 
     const [runDataCache, setRunDataCache] = useState({});
     const [loading, setLoading] = useState(false);
-    const [selectedRunIds, setSelectedRunIds] = useState(() => {
-        // Restore run IDs from URL on first render (rt_r=id1,id2,…)
-        const raw = new URLSearchParams(window.location.search).get('rt_r');
-        return raw ? raw.split(',').map(Number).filter(Boolean) : [];
-    });
+    // Pair keys restored from the URL on first render (rt_r=70::12,71::13).
+    // Strings, not numbers: a pair key is 'rangeId::chargingId'.
+    const initialRunIds = useRef(
+        (new URLSearchParams(window.location.search).get('rt_r') || '')
+            .split(',').filter(Boolean)
+    ).current;
     const [axisScale, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
     const [copiedUrl, setCopiedUrl] = useState(false);
     const [imageCopied, setImageCopied] = useState(false);
@@ -391,75 +399,99 @@ export default function RoadTripView({
         [vehicles, selectedVehicleIds]
     );
 
-    // ── Sync selectedRunIds when vehicle selection changes ───────────────────
-    // Keep runs from still-selected vehicles; auto-add default run for new ones.
-    useEffect(() => {
-        setSelectedRunIds(prev => {
-            const allChargingRunIds = new Set(
-                selectedVehicles.flatMap(v =>
-                    filterChargingRuns(v.runs).map(r => r.id)
-                )
-            );
-            // Drop runs whose vehicle is no longer selected
-            const kept = prev.filter(id => allChargingRunIds.has(id));
-            const keptSet = new Set(kept);
-
-            // For each vehicle with no selected runs, add its default/most-recent charging run
-            for (const vehicle of selectedVehicles) {
-                const chargingRuns = filterChargingRuns(vehicle.runs);
-                if (chargingRuns.some(r => keptSet.has(r.id))) continue;
-                const def = chargingRuns.find(r => r.isDefault) ||
-                    [...chargingRuns].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-                if (def) { kept.push(def.id); keptSet.add(def.id); }
-            }
-            return kept;
-        });
-    }, [selectedVehicleIds]); // eslint-disable-line react-hooks/exhaustive-deps
-
     // ── Resolve chart colors for all charging runs ────────────────────────────
     const colorMap = useMemo(() => {
         const allRuns = selectedVehicles.flatMap(v => filterChargingRuns(v.runs));
         return resolveChartColors(allRuns, {}, autoColor ? 'auto' : 'manual');
     }, [selectedVehicles, autoColor]);
 
-    // ── Build efficiency info for every charging run in the selection ─────────
-    // Keyed by run.id. Derives mi/kWh from the run itself (if it has range data)
-    // or falls back to the vehicle's best range run.
-    const allChargingRunsInfo = useMemo(() => {
-        const map = {};
+    // ── One entry per (range test × charging test) pair ───────────────────────
+    // Range-primary, matching Charge Compare: a charging curve is a property of
+    // the car and varies little, while a range test is a property of the day —
+    // wind, temperature, HVAC, tyres, elevation, load. Each pair is its own trip
+    // simulation, so the same car under two conditions is two comparable rows.
+    //
+    // A Map, not an object: insertion order is the display order, and the keys
+    // are pair-key strings.
+    const allPairsInfo = useMemo(() => {
+        const map = new Map();
         let colorIdx = 0;
         for (const vehicle of selectedVehicles) {
-            for (const run of filterChargingRuns(vehicle.runs)) {
-                // Shared resolver (utils/rangeSource.js) — the same ranking Charge
-                // Compare uses, so the two views can no longer disagree about which
-                // range test a charging run's miles came from. It also supplies the
-                // provenance note this view used to assemble by hand.
-                const src = resolveRangeSource(run, { vehicle, batteryKwh: vehicle.battery });
+            const chargingRuns = filterChargingRuns(vehicle.runs);
+            if (!chargingRuns.length) continue;
 
-                map[run.id] = {
-                    vehicle,
-                    run,
-                    miPerKwh:       src.miPerKwh,
-                    // Assume 70 mph if not specified on the run or its range source
-                    testSpeedMph:   run.speed_mph ?? src.sourceRun?.speed_mph ?? null,
-                    batteryKwh:     vehicle.battery,
-                    color:          colorMap[run.id] || run.color || PALETTE[colorIdx % PALETTE.length],
-                    efficiencyNote: src.note,
-                };
-                colorIdx++;
+            const epa = epaRangeOption(vehicle);
+            const primaries = epa ? [...filterRangeRuns(vehicle.runs), epa] : filterRangeRuns(vehicle.runs);
+
+            for (const rangeRun of primaries) {
+                const pinned = partnersFor(pairings, rangeRun.id);
+                const rows   = pinned.length ? pinned : [null];
+
+                for (const partnerId of rows) {
+                    const chargingRun = partnerId
+                        ? chargingRuns.find(r => String(r.id) === String(partnerId)) ?? pairedChargingRun(rangeRun, vehicle)
+                        : pairedChargingRun(rangeRun, vehicle);
+                    if (!chargingRun) continue;
+
+                    // The range side is explicit — it is the row — so the resolver
+                    // enters at rank 1 and its fallbacks only matter when the chosen
+                    // test carries no usable data.
+                    const src = resolveRangeSource(chargingRun, {
+                        vehicle,
+                        batteryKwh: vehicle.battery,
+                        explicitPairing: rangeRun.id === EPA_PARTNER_ID ? EPA_PARTNER_ID : rangeRun,
+                    });
+
+                    const key = pairKey(rangeRun.id, partnerId);
+                    map.set(key, {
+                        key,
+                        vehicle,
+                        rangeRun,
+                        // `run` stays the CHARGING run: it is what supplies the
+                        // data points the simulation walks.
+                        run:            chargingRun,
+                        // Only disambiguate when a range test is shown more than once.
+                        label:          rows.length > 1
+                            ? `${rangeRun.name} × ${chargingRun.name}`
+                            : rangeRun.name,
+                        miPerKwh:       src.miPerKwh,
+                        // Assume 70 mph if neither the range test nor its source says
+                        testSpeedMph:   rangeRun.speed_mph ?? src.sourceRun?.speed_mph ?? null,
+                        batteryKwh:     vehicle.battery,
+                        color:          colorMap[chargingRun.id] || rangeRun.color || chargingRun.color || PALETTE[colorIdx % PALETTE.length],
+                        efficiencyNote: src.note,
+                    });
+                    colorIdx++;
+                }
             }
         }
         return map;
-    }, [selectedVehicles, colorMap]);
+    }, [selectedVehicles, colorMap, pairings]);
+
+    // Selection lives in the shared hook (hooks/useRunSelection.js), the same one
+    // Charge Compare uses. Previously this view had its own copy, whose bootstrap
+    // refilled any vehicle that happened to be empty — so clearing one vehicle
+    // and then changing another vehicle's dropdown brought the first one back.
+    const selectionRows = useMemo(
+        () => [...allPairsInfo.values()].map(e => ({
+            key: e.key,
+            vehicleId: e.vehicle.id,
+            groupId: e.rangeRun.id,     // survives a repin, which changes the key
+        })),
+        [allPairsInfo]
+    );
+    const { selected: selectedRunIds, toggle: toggleRunId } = useRunSelection(
+        selectionRows, { initial: initialRunIds }
+    );
 
     // ── Active run entries — ordered by vehicle pill position ─────────────────
     const runEntries = useMemo(() => {
         const vehicleOrder = new Map(selectedVehicles.map((v, i) => [v.id, i]));
         return selectedRunIds
-            .map(id => allChargingRunsInfo[id])
+            .map(k => allPairsInfo.get(k))
             .filter(Boolean)
             .sort((a, b) => (vehicleOrder.get(a.vehicle.id) ?? 999) - (vehicleOrder.get(b.vehicle.id) ?? 999));
-    }, [selectedRunIds, allChargingRunsInfo, selectedVehicles]);
+    }, [selectedRunIds, allPairsInfo, selectedVehicles]);
 
     const validEntries  = runEntries.filter(e => e.miPerKwh && e.batteryKwh);
     const skippedEntries = runEntries.filter(e => !e.miPerKwh || !e.batteryKwh);
@@ -633,7 +665,7 @@ export default function RoadTripView({
         }
         const entryLabel = e =>
             vehicleRunCount[e.vehicle.id] > 1
-                ? `${vehicleLabel(e.vehicle)} (${e.run.name})`
+                ? `${vehicleLabel(e.vehicle)} (${e.label})`
                 : vehicleLabel(e.vehicle);
 
         // ── Speed sweep chart ────────────────────────────────────────────────
@@ -1019,7 +1051,7 @@ export default function RoadTripView({
                                     if (idx >= 0 && idx < validEntries.length) {
                                         const e = validEntries[idx];
                                         return vehicleRunCount[e.vehicle.id] > 1
-                                            ? `${vehicleLabel(e.vehicle)} · ${e.run.name}`
+                                            ? `${vehicleLabel(e.vehicle)} · ${e.label}`
                                             : vehicleLabel(e.vehicle);
                                     }
                                     if (idx === validEntries.length) return 'ICE Reference';
@@ -1379,8 +1411,8 @@ export default function RoadTripView({
                                 const sim = simResults[i];
                                 if (!sim?.warnings?.length) return null;
                                 return sim.warnings.map((w, wi) => (
-                                    <p key={`${entry.run.id}-${wi}`} className="roadtrip-warning">
-                                        ⚠ {vehicleLabel(entry.vehicle)} – {entry.run.name}: {w}
+                                    <p key={`${entry.key}-${wi}`} className="roadtrip-warning">
+                                        ⚠ {vehicleLabel(entry.vehicle)} – {entry.label}: {w}
                                     </p>
                                 ));
                             })}
@@ -1394,29 +1426,46 @@ export default function RoadTripView({
                                 filterChargingRuns(v.runs).length > 0
                             )}
                             selectedRunIds={selectedRunIds}
-                            onToggleRun={runId => setSelectedRunIds(prev =>
-                                prev.includes(runId)
-                                    ? prev.filter(x => x !== runId)
-                                    : [...prev, runId]
-                            )}
+                            onToggleRun={toggleRunId}
                             onUpdateRunColor={onUpdateRunColor}
                             colorMap={colorMap}
-                            runFilter={isChargingRun}
-                            emptyMessage="No charging test data"
+                            runFilter={(run, vehicle) =>
+                                isRangeRun(run) && filterChargingRuns(vehicle.runs).length > 0}
+                            emptyMessage="No range test records"
+                            pairMode
+                            pairings={pairings}
+                            primaryLabel="Range:"
+                            partnerLabel="Charging:"
+                            partnerRunsFor={vehicle => filterChargingRuns(vehicle.runs)}
+                            extraPrimaryRunsFor={vehicle => {
+                                if (!filterChargingRuns(vehicle.runs).length) return [];
+                                const epa = epaRangeOption(vehicle);
+                                return epa ? [epa] : [];
+                            }}
+                            resolvePartner={(rangeRun, vehicle) => {
+                                const run = pairedChargingRun(rangeRun, vehicle);
+                                return run ? { sourceRun: run, note: null } : null;
+                            }}
+                            onSetPartner={(rangeId, oldChargingId, newChargingId) =>
+                                setPairings(prev => replacePartner(prev, rangeId, oldChargingId, newChargingId))}
+                            onAddPartner={(rangeId, chargingId) =>
+                                setPairings(prev => addPartner(prev, rangeId, chargingId))}
+                            onRemovePartner={(rangeId, chargingId) =>
+                                setPairings(prev => removePartner(prev, rangeId, chargingId))}
                             renderRunMeta={run => {
-                                const info = allChargingRunsInfo[run.id];
-                                if (!info) return null;
-                                if (!info.miPerKwh) {
+                                const entry = [...allPairsInfo.values()].find(e => e.rangeRun.id === run.id);
+                                if (!entry) return null;
+                                if (!entry.miPerKwh) {
                                     return <span className="text-xs text-red-400 ml-1">⚠ No range data</span>;
                                 }
-                                const eff = info.miPerKwh.toFixed(1);
-                                const spd = info.testSpeedMph
-                                    ? `${fmtSpeed(info.testSpeedMph, units)}`
+                                const eff = entry.miPerKwh.toFixed(1);
+                                const spd = entry.testSpeedMph
+                                    ? `${fmtSpeed(entry.testSpeedMph, units)}`
                                     : '70 mph (assumed)';
                                 return (
                                     <span className="text-xs text-faint ml-1">
                                         {eff} {units === 'metric' ? 'km/kWh' : 'mi/kWh'} @ {spd}
-                                        {info.efficiencyNote && ` · ${info.efficiencyNote}`}
+                                        {entry.efficiencyNote && ` · ${entry.efficiencyNote}`}
                                     </span>
                                 );
                             }}
@@ -1430,8 +1479,8 @@ export default function RoadTripView({
                                 <p key={v.id}>⚠ {v.name}: No charging test data</p>
                             ))}
                             {skippedEntries.map(e => (
-                                <p key={e.run.id}>
-                                    ⚠ {vehicleLabel(e.vehicle)} – {e.run.name}: {!e.miPerKwh ? 'No range data for efficiency' : 'No battery capacity'}
+                                <p key={e.key}>
+                                    ⚠ {vehicleLabel(e.vehicle)} – {e.label}: {!e.miPerKwh ? 'No range data for efficiency' : 'No battery capacity'}
                                 </p>
                             ))}
                         </div>
@@ -1581,8 +1630,8 @@ export default function RoadTripView({
                                     let av, bv;
                                     switch (sortCol) {
                                         case 'vehicle':
-                                            av = (a.entry.vehicle.name + a.entry.run.name).toLowerCase();
-                                            bv = (b.entry.vehicle.name + b.entry.run.name).toLowerCase();
+                                            av = (a.entry.vehicle.name + a.entry.label).toLowerCase();
+                                            bv = (b.entry.vehicle.name + b.entry.label).toLowerCase();
                                             return dir * av.localeCompare(bv);
                                         case 'totalTime':  av = a.sim.totalTimeMin;     bv = b.sim.totalTimeMin;     break;
                                         case 'stops':      av = a.sim.chargeStops;      bv = b.sim.chargeStops;      break;
@@ -1615,14 +1664,14 @@ export default function RoadTripView({
                                 {rows.map(({ entry, sim, avgChargeTime, speedDiff, adjPct, vsIce }) => {
 
                                     return (
-                                        <tr key={entry.run.id}>
+                                        <tr key={entry.key}>
                                             <td className="px-3 py-2">
                                                 <div className="flex items-start gap-2">
                                                     <span className="inline-block w-3 h-3 rounded-full mt-1 shrink-0"
                                                           style={{ backgroundColor: entry.color }} />
                                                     <div>
                                                         <div className="font-medium">{vehicleLabel(entry.vehicle)}</div>
-                                                        <div className="text-xs text-faint">{entry.run.name}</div>
+                                                        <div className="text-xs text-faint">{entry.label}</div>
                                                     </div>
                                                 </div>
                                             </td>
