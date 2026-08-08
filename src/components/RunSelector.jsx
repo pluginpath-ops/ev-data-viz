@@ -287,12 +287,12 @@ function PairRows({
                         this side of the row is about the charging curve. */}
                     {idx === 0 ? (
                         <span className="pair-charging-label">
-                            {onUpdateRunColor && (
-                                <span
-                                    className="w-3 h-5 rounded-sm shrink-0 border border-black/10"
-                                    style={{ backgroundColor: colorMap[run.id] || run.color || '#3b82f6' }}
-                                />
-                            )}
+                            <RunColorControl
+                                run={run}
+                                vehicleId={vehicle.id}
+                                onUpdateRunColor={onUpdateRunColor}
+                                colorMap={colorMap}
+                            />
                             {primaryLabel && <span className="text-label shrink-0">{primaryLabel}</span>}
                             <span className="truncate">{run.name}</span>
                             {renderRunMeta?.(run)}
@@ -363,34 +363,62 @@ function PairRows({
     );
 }
 
-function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunMeta, colorMap = {} }) {
-    // Local in-flight color so rapid picker drags don't fire a DB write on every
-    // pixel.  We only commit to the parent after a short debounce or on blur.
-    const storedColor  = run.color || '#3b82f6';
-    const [localColor, setLocalColor] = useState(storedColor);
-    const commitTimer  = useRef(null);
+/**
+ * Swatch + colour picker for one run.
+ *
+ * Extracted from RunRow so pair rows get the same control: they had a swatch
+ * that merely looked like a button, which left no way to change a colour once
+ * the pair charts stopped using the flat list.
+ *
+ * The local in-flight colour keeps a rapid picker drag from writing to the
+ * database on every pixel — it commits on a short debounce, or on blur.
+ */
+function RunColorControl({ run, vehicleId, onUpdateRunColor, colorMap = {} }) {
+    const [localColor, setLocalColor] = useState(run.color || '#3b82f6');
+    const commitTimer = useRef(null);
 
-    // Sync if run.color changes from outside (e.g. another run update propagates)
+    // Sync if the colour changes from outside (another update propagating in)
     useEffect(() => { setLocalColor(run.color || '#3b82f6'); }, [run.color]);
 
-    const handleColorChange = (e) => {
-        e.stopPropagation();
-        const val = e.target.value;
-        setLocalColor(val);
-        clearTimeout(commitTimer.current);
-        commitTimer.current = setTimeout(() => onUpdateRunColor(vehicle.id, run.id, val), 400);
+    if (!onUpdateRunColor) return null;
+    // Synthetic rows (the EPA range option) have no run behind them to colour.
+    if (run._synthetic) return null;
+
+    const commit = (value) => {
+        if (/^#[0-9A-Fa-f]{6}$/.test(value)) onUpdateRunColor(vehicleId, run.id, value);
     };
 
-    const handleColorCommit = () => {
-        clearTimeout(commitTimer.current);
-        if (/^#[0-9A-Fa-f]{6}$/.test(localColor)) {
-            onUpdateRunColor(vehicle.id, run.id, localColor);
-        }
-    };
-
-    // Resolved chart display color (Okabe-Ito in auto mode, stored color otherwise)
+    // Resolved chart colour (Okabe-Ito in auto mode, stored colour otherwise)
     const resolvedColor = colorMap[run.id] || localColor;
 
+    // One chip, not two. There used to be a read-only swatch showing the RESOLVED
+    // chart colour beside a picker showing the STORED preference — with Auto
+    // Color on those differ for most runs, so the row displayed two colour chips
+    // that disagreed and only one of which could be clicked. The picker stays,
+    // since it is the one you can act on, and the resolved colour moves into its
+    // tooltip so the difference is still discoverable rather than just gone.
+    return (
+        <input
+            type="color"
+            value={localColor}
+            onChange={e => {
+                e.stopPropagation();
+                const val = e.target.value;
+                setLocalColor(val);
+                clearTimeout(commitTimer.current);
+                commitTimer.current = setTimeout(() => commit(val), 400);
+            }}
+            onBlur={() => { clearTimeout(commitTimer.current); commit(localColor); }}
+            onClick={e => e.stopPropagation()}
+            className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
+            title={resolvedColor !== localColor
+                ? `Stored preference ${localColor} — plotted as ${resolvedColor} while Auto Color is on`
+                : `Color ${localColor}`}
+        />
+    );
+}
+
+function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunMeta, colorMap = {} }) {
     return (
         <label className={`flex items-center gap-2 cursor-pointer ${!isChecked ? 'opacity-60 hover:opacity-100' : ''}`}>
             <input
@@ -399,45 +427,12 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRun
                 onChange={onToggle}
                 className="w-4 h-4 shrink-0"
             />
-            {onUpdateRunColor && (
-                <>
-                    {/* Swatch: shows the resolved chart color (may differ from stored in auto mode) */}
-                    <span
-                        className="w-3 h-5 rounded-sm shrink-0 border border-black/10"
-                        style={{ backgroundColor: resolvedColor }}
-                        title={resolvedColor !== localColor
-                            ? `Chart color: ${resolvedColor} (stored: ${localColor})`
-                            : `Color: ${resolvedColor}`}
-                    />
-                    {/* Picker: edits the stored preference color, debounced */}
-                    <input
-                        type="color"
-                        value={localColor}
-                        onChange={handleColorChange}
-                        onBlur={handleColorCommit}
-                        onClick={e => e.stopPropagation()}
-                        className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
-                        title="Set color preference (influences auto-color hue family when Auto Color is on)"
-                    />
-                    <input
-                        type="text"
-                        value={localColor}
-                        onChange={e => { e.stopPropagation(); setLocalColor(e.target.value); }}
-                        onBlur={e => {
-                            e.stopPropagation();
-                            if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
-                                onUpdateRunColor(vehicle.id, run.id, e.target.value);
-                            } else {
-                                setLocalColor(run.color || '#3b82f6');
-                            }
-                        }}
-                        onClick={e => e.stopPropagation()}
-                        className="hidden w-20 px-2 py-0.5 border rounded text-xs font-mono shrink-0"
-                        placeholder="#3b82f6"
-                        maxLength={7}
-                    />
-                </>
-            )}
+            <RunColorControl
+                run={run}
+                vehicleId={vehicle.id}
+                onUpdateRunColor={onUpdateRunColor}
+                colorMap={colorMap}
+            />
             <span className="run-label">
                 <span>
                     {run.name}
