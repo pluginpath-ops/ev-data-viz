@@ -13,12 +13,14 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
+import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
+import { resolveRangeSource, epaRangeOption, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 import LoadingSpinner from './LoadingSpinner';
 import { resolveChartColors } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 
-export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, presentationMode = false }) {
+export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, pairings = {}, setPairings = () => {}, presentationMode = false }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
     const chartRef = useRef(null);
@@ -140,7 +142,37 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         }
     }, [selectedVehicleIds, chartConfig.selectedRuns, chartMode]);
 
-    // Lazy-load data_points for newly selected runs
+    // A pairing change invalidates cached range values: the derived range is
+    // baked into the cached points, so without this the axis would keep showing
+    // the previous partner's numbers until the run was reselected.
+    const prevPairingsRef = useRef(pairings);
+    useEffect(() => {
+        const prev = prevPairingsRef.current;
+        prevPairingsRef.current = pairings;
+        if (prev === pairings) return;
+        // Values are charging-run ids, which are exactly this cache's keys.
+        const affected = new Set(
+            [...Object.values(prev || {}).flat(), ...Object.values(pairings || {}).flat()].map(String)
+        );
+        if (!affected.size) return;
+        setRunDataCache(cache => {
+            const next = {};
+            let evicted = false;
+            for (const [id, data] of Object.entries(cache)) {
+                if (affected.has(String(id))) { evicted = true; continue; }
+                next[id] = data;
+            }
+            return evicted ? next : cache;
+        });
+    }, [pairings]);
+
+    // Lazy-load data_points for newly selected runs.
+    //
+    // Keyed on what is MISSING, not on the selection: a pairing change evicts
+    // cached runs (their derived range is stale), and keying on the selection
+    // alone meant nothing refetched them — the series vanished until some
+    // unrelated toggle changed the selection and happened to trigger this.
+    const missingRunIds = chartConfig.selectedRuns.filter(id => !(id in runDataCache));
     useEffect(() => {
         const fetchMissingData = async () => {
             const missingIds = chartConfig.selectedRuns.filter(id => !(id in runDataCache));
@@ -160,25 +192,54 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             runData = await dataService.getRunData(runId);
                         }
 
-                        // If this charging run has no range values at all, derive them
-                        // on the fly from the vehicle's range test via SoC interpolation.
-                        if (runData.length > 0 && !runData.some(p => p.range != null)) {
+                        // Range axis, resolved on the same ranking as every other
+                        // chart (utils/rangeSource.js):
+                        //
+                        //   pairing → default range test → recorded range column
+                        //
+                        // A range test now outranks the recorded column outright,
+                        // not just when one was explicitly paired. The recorded
+                        // values are themselves mostly estimates — usually the car's
+                        // guess-o-meter — so they carry no more authority than a
+                        // figure derived from a measured range test, and treating
+                        // them as more authoritative was the anomaly.
+                        if (runData.length > 0) {
                             const parentVehicle = vehicles.find(v =>
                                 v.runs?.some(r => String(r.id) === String(runId))
                             );
-                            const rangeRun =
-                                parentVehicle?.runs?.find(r => !r._inherited && r.has_range && r.isDefault) ??
-                                parentVehicle?.runs?.find(r => !r._inherited && r.has_range);
-                            if (rangeRun) {
-                                try {
-                                    const lookup = await dataService.buildRangePerSocLookup(rangeRun.id);
-                                    if (lookup) {
-                                        runData = runData.map(p => ({
-                                            ...p,
-                                            range: p.soc != null ? lookup(p.soc) : null,
-                                        }));
-                                    }
-                                } catch (_) { /* non-fatal — chart will just lack range axis */ }
+                            const pairedRangeIds = rangePartnersOfCharging(pairings, runId);
+                            const own = (parentVehicle?.runs || []).filter(r => !r._inherited && isRangeRun(r));
+                            const pairedRange = pairedRangeIds.length
+                                ? (pairedRangeIds[0] === EPA_PARTNER_ID
+                                    ? EPA_PARTNER_ID
+                                    : own.find(r => String(r.id) === pairedRangeIds[0]) ?? null)
+                                : null;
+
+                            const src = resolveRangeSource(run ?? { id: runId }, {
+                                vehicle: parentVehicle,
+                                explicitPairing: pairedRange,
+                            });
+
+                            // 'recorded' and 'none' mean no range test won — leave
+                            // the run's own column alone.
+                            if (src.miPerSoc != null) {
+                                let lookup = null;
+                                // A range test WITH its own SoC/range time series gives
+                                // the real, non-linear shape; prefer it. Most range
+                                // tests are scalar (distance + SoC bounds), so the
+                                // linear miPerSoc model is the usual path.
+                                if (src.sourceRun?.id && src.sourceRun.id !== EPA_PARTNER_ID) {
+                                    try {
+                                        lookup = await dataService.buildRangePerSocLookup(src.sourceRun.id);
+                                    } catch (_) { /* fall through to linear */ }
+                                }
+                                const rangeAt = lookup
+                                    ? (soc) => lookup(soc)
+                                    : (soc) => Math.round(soc * src.miPerSoc * 10) / 10;
+                                runData = runData.map(p => ({
+                                    ...p,
+                                    range: p.soc != null ? rangeAt(p.soc) : null,
+                                }));
                             }
                         }
                     } else {
@@ -198,7 +259,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             setLoadingData(false);
         };
         fetchMissingData();
-    }, [chartConfig.selectedRuns]);
+    }, [missingRunIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const dl = distanceLabel(units);
     const axisOptions = [
@@ -668,6 +729,20 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     runFilter={isChargingRun}
                     colorMap={colorMap}
                     emptyMessage="No charging test records"
+                    pairMode
+                    singlePartner
+                    pairings={pairings}
+                    primaryLabel="Charging:"
+                    partnerLabel="Range:"
+                    partnerRunsFor={vehicle => {
+                        const epa = epaRangeOption(vehicle);
+                        return epa ? [...filterRangeRuns(vehicle.runs), epa] : filterRangeRuns(vehicle.runs);
+                    }}
+                    partnerIdFor={run => rangePartnersOfCharging(pairings, run.id)[0] ?? null}
+                    resolvePartner={(chargingRun, vehicle) =>
+                        resolveRangeSource(chargingRun, { vehicle })}
+                    onSetPartner={(chargingId, _old, newRangeId) =>
+                        setPairings(prev => setChargingPartner(prev, chargingId, newRangeId))}
                     renderRunMeta={run => {
                         const exclusionReason = getRaceExclusionReason(run.id);
                         const offset = getRaceOffset(run.id);

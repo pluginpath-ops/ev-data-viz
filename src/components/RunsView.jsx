@@ -13,6 +13,7 @@ import { RunVoteButtons } from './VoteButtons';
 import EpaVehicleSection from './EpaVehicleSection';
 import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
+import { filterChargingRuns, defaultChargingRun } from '../utils/runUtils';
 import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
 
 // ── Data-type flag definitions ────────────────────────────────────────────────
@@ -47,6 +48,44 @@ const FIELD_META = [
  * Renders the 📏 Range pill followed by speed, distance, energy, efficiency,
  * temperature, SoC window, and source link.
  */
+/**
+ * Curator's default charging test for a range test (migration 045).
+ *
+ * A chart-session pairing lives only in the URL, so it is reproducible only by
+ * whoever holds the link. This is the published answer: what a visitor arriving
+ * without one sees. Leaving it on Auto keeps the vehicle-wide default, which is
+ * the right choice for most range tests — this exists for the range test that
+ * needs a different curve than its siblings.
+ */
+function PairedChargingControl({ run, vehicle, onSet }) {
+    const chargingRuns = filterChargingRuns(vehicle.runs);
+    if (chargingRuns.length === 0) return null;
+
+    const auto = defaultChargingRun(vehicle);
+    const isCurated = run.paired_charging_run_id != null;
+
+    return (
+        <div className="flex items-center gap-2 text-sm mt-1">
+            <span className="text-label shrink-0">Charging pair:</span>
+            <select
+                value={run.paired_charging_run_id ?? ''}
+                onChange={e => onSet(e.target.value || null)}
+                className="form-input text-sm py-0.5"
+            >
+                <option value="">Auto{auto ? ` — ${auto.name}` : ''}</option>
+                {chargingRuns.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+            </select>
+            {isCurated && (
+                <span className="text-xs text-indigo-500" title="Published pairing — everyone sees this, not just someone with a shared link">
+                    curated
+                </span>
+            )}
+        </div>
+    );
+}
+
 function RunRangeMetaLine({ run, units }) {
     const rangeFlag = DATA_FLAGS.find(f => f.key === 'range');
     const dot = <span className="mx-1.5 text-faint select-none">·</span>;
@@ -415,7 +454,7 @@ const DeriveAxisPanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, clearDefaultRun, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, setPairedChargingRun, clearDefaultRun, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
@@ -2303,6 +2342,13 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         )}
                                         {inferRunFlags(run).includes('charging') && (
                                             <RunChargingMetaLine run={run} calcKwhByRun={calcKwhByRun} onCheckKwh={handleCheckKwh} />
+                                        )}
+                                        {(inferRunFlags(run).includes('range') || run.distance_miles != null) && canEdit(vehicle) && (
+                                            <PairedChargingControl
+                                                run={run}
+                                                vehicle={vehicle}
+                                                onSet={chargingId => setPairedChargingRun(vehicle.id, run.id, chargingId)}
+                                            />
                                         )}
                                     </div>
                                 </div>

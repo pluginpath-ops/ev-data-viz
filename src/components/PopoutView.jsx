@@ -71,6 +71,7 @@ export default function PopoutView({
                     vehicles={vehicles}
                     selectedVehicleIds={selectedVehicles}
                     roadTripConfig={roadTripConfig}
+                    pairings={pairings}
                     setRoadTripConfig={() => {}}
                     presentationMode
                 />
@@ -87,6 +88,7 @@ export default function PopoutView({
                     setChartConfig={setChartConfig}
                     onUpdateRunColor={onUpdateRunColor}
                     chartMode={chartMode}
+                    pairings={pairings}
                     presentationMode
                 />
             )}

@@ -51,6 +51,30 @@ export function defaultChargingRun(vehicle) {
         ?? null;
 }
 
+/**
+ * The charging test for a given range test, absent an explicit chart-session
+ * pairing. Two ranks:
+ *
+ *   1. the curator's stored pairing (runs.paired_charging_run_id, migration 045)
+ *   2. the vehicle's default charging run
+ *
+ * The chart session's own pairing outranks both, but it lives only in the URL —
+ * this is what a visitor arriving without one sees, and the reason a non-default
+ * pairing can be published at all.
+ *
+ * Falls through to the default when the stored id points at a run that is gone
+ * or no longer charging, rather than silently rendering nothing.
+ */
+export function pairedChargingRun(rangeRun, vehicle) {
+    const storedId = rangeRun?.paired_charging_run_id;
+    if (storedId != null) {
+        const stored = filterChargingRuns(vehicle?.runs)
+            .find(r => String(r.id) === String(storedId));
+        if (stored) return stored;
+    }
+    return defaultChargingRun(vehicle);
+}
+
 // ── Populated-field detection ─────────────────────────────────────────────────
 
 /**

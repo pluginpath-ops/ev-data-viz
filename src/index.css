@@ -875,6 +875,15 @@ body {
     @apply flex-1 flex items-center gap-2 flex-wrap;
 }
 
+/* Per-vehicle "all / none" bulk selection links in the run selector */
+.run-bulk-link {
+    @apply text-xs underline transition;
+    color: var(--color-text-faint);
+}
+.run-bulk-link:hover {
+    color: var(--color-primary);
+}
+
 /* ── Pair mode (charging test × range test) ─────────────────────────────────── */
 
 /* One charging test and all of its range partners, kept visually together */
