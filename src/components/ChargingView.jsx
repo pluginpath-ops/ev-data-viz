@@ -17,7 +17,7 @@ import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
 import { resolveRangeSource, epaRangeOption, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 import LoadingSpinner from './LoadingSpinner';
-import { resolveChartColors } from '../utils/colorUtils';
+import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, pairings = {}, setPairings = () => {}, presentationMode = false }) {
@@ -41,12 +41,18 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // Resolve display colors for all selected runs.
     // In 'manual' mode only default-blue runs get nudged; in 'auto' mode all
     // runs get Okabe-Ito assignment with hue-family bias toward their stored color.
-    const colorMap = useMemo(() => {
-        const runs = selectedVehicles.flatMap(v =>
+    // Sticky in auto mode: toggling a run adds or removes ONE colour instead of
+    // re-solving the whole set and shuffling every series (hooks/useStickyChartColors).
+    const colorableRuns = useMemo(
+        () => selectedVehicles.flatMap(v =>
             (v.runs || []).filter(r => chartConfig.selectedRuns.includes(r.id))
-        );
-        return resolveChartColors(runs, {}, chartConfig.autoColor ? 'auto' : 'manual');
-    }, [selectedVehicles, chartConfig.selectedRuns, chartConfig.autoColor]);
+        ),
+        [selectedVehicles, chartConfig.selectedRuns]
+    );
+    const colorMap = useStickyChartColors(colorableRuns, {
+        autoColor: chartConfig.autoColor,
+        resetKey: selectedVehicleIds.join(','),
+    });
 
     // Ref so the auto-select effect can read chartMode without it being a dep
     // (avoids changing the deps array size, which React disallows mid-session).
