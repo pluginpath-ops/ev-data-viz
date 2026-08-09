@@ -7,6 +7,7 @@ import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 import EditVehicleForm from './EditVehicleForm';
+import SessionControl from './SessionControl';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 import { RunVoteButtons } from './VoteButtons';
@@ -454,7 +455,7 @@ const DeriveAxisPanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, setPairedChargingRun, clearDefaultRun, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, setPairedChargingRun, clearDefaultRun, testSessions, createTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
@@ -2328,6 +2329,16 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         )}
                                         {inferRunFlags(run).includes('charging') && (
                                             <RunChargingMetaLine run={run} calcKwhByRun={calcKwhByRun} onCheckKwh={handleCheckKwh} />
+                                        )}
+                                        {canEdit(vehicle) && (
+                                            <SessionControl
+                                                run={run}
+                                                vehicle={vehicle}
+                                                vehicles={vehicles}
+                                                sessions={testSessions}
+                                                onAssign={sessionId => setRunsSession([run.id], sessionId)}
+                                                onCreate={createTestSession}
+                                            />
                                         )}
                                         {(inferRunFlags(run).includes('range') || run.distance_miles != null) && canEdit(vehicle) && (
                                             <PairedChargingControl

@@ -18,6 +18,18 @@ import { resolvePairColors } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 
+
+/**
+ * A pair's session name, but only when both halves came from the same outing.
+ * One half's session says nothing about the pair, and #170's composer would
+ * then label the series after an event only part of it belongs to.
+ */
+function sharedSessionName(rangeRun, chargingRun, sessions) {
+    const id = rangeRun?.session_id;
+    if (id == null || String(id) !== String(chargingRun?.session_id)) return null;
+    return (sessions || []).find(s => String(s.id) === String(id))?.name?.trim() || null;
+}
+
 // ── Interpolation helper ──────────────────────────────────────────────────────
 // Returns the interpolated yField value at targetX, given points sorted by xField.
 // allowExtrapolateBefore — extends linearly backward past the first point (slope of first two).
@@ -288,7 +300,7 @@ export default function ChargeCompareView({
     verboseLabels = false,
     setChartConfig = null,
 }) {
-    const { units } = useAppContext();
+    const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const [runDataCache,    setRunDataCache]    = useState({});
     const [loading,         setLoading]         = useState(false);
@@ -358,6 +370,7 @@ export default function ChargeCompareView({
                     result.push({
                         key:         pairKey(rangeRun.id, partnerId),
                         vehicle,
+                        sessionName: sharedSessionName(rangeRun, chargingRun, testSessions),
                         rangeRun:    { ...rangeRun, vehicleName: vehicleLabel(vehicle), vehicleId: vehicle.id },
                         chargingRun,
                         rangeSrc,
@@ -367,7 +380,7 @@ export default function ChargeCompareView({
         }
 
         return result;
-    }, [selectedVehicles, pairings]);
+    }, [selectedVehicles, pairings, testSessions]);
 
     const neededRunIds = useMemo(
         () => [...new Set(resolvedPairs.map(p => p.chargingRun?.id).filter(Boolean))],

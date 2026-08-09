@@ -1,6 +1,7 @@
 import { getSupabase } from './supabase';
 import { vehicleLabel } from '../utils/specHelpers';
 import { roundTo, } from '../utils/unitConversions';
+import { toSessionRow } from '../utils/testSessions';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
 
 const roundField = roundTo;
@@ -184,6 +185,62 @@ class DataService {
     const { data, error } = await getSupabase().from('manufacturers').select('*').order('name');
     if (error) throw error;
     return data || [];
+  }
+
+  // ── Test sessions ──────────────────────────────────────────────────────────
+  //
+  // A session is one testing outing: same day, same road, same weather, same
+  // crew. It deliberately has NO vehicle_id (migration 044) because the outings
+  // worth recording are often side-by-side — four cars round one loop — and the
+  // shared conditions are the point.
+  //
+  // Fetched globally rather than per vehicle for the same reason: a session a
+  // vehicle belongs to may have been created while curating a different one.
+
+  async getTestSessions() {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase()
+      .from('test_sessions').select('*').order('tested_at', { ascending: false, nullsFirst: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async createTestSession(fields) {
+    const { data, error } = await getSupabase()
+      .from('test_sessions')
+      .insert(toSessionRow(fields))
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async updateTestSession(id, changes) {
+    const { error } = await getSupabase()
+      .from('test_sessions').update(toSessionRow(changes)).eq('id', id);
+    if (error) throw error;
+  }
+
+  async deleteTestSession(id) {
+    // runs.session_id is ON DELETE SET NULL, so the runs survive unattached.
+    const { error } = await getSupabase().from('test_sessions').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /**
+   * Attach runs to a session, or detach them with a null sessionId.
+   *
+   * Takes a LIST because a session is usually assigned to several runs at once —
+   * eight in a two-car speed sweep — and one round trip per run is the shape
+   * that makes bulk assignment feel like a chore.
+   */
+  async setRunsSession(runIds, sessionId) {
+    if (!this.useSupabase || !runIds?.length) return;
+    const real = runIds.filter(id => !isInheritedRunId(id)).map(Number);
+    if (!real.length) return;
+    const { error } = await getSupabase()
+      .from('runs').update({ session_id: sessionId ?? null }).in('id', real);
+    if (error) throw error;
   }
 
   async addManufacturer(name, country = null) {

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { dataService } from '../services/DataService';
 import { applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
+import { toSessionRow } from '../utils/testSessions';
 
 const AppContext = createContext(null);
 
@@ -18,6 +19,7 @@ export function AppProvider({ children }) {
     const [runVotes, setRunVotes] = useState({});          // { [runId]: { vouch, flag, myVote } }
     const [units, setUnits] = useState(() => localStorage.getItem('evbench_units') || 'imperial');
     const [manufacturers, setManufacturers] = useState([]);
+    const [testSessions, setTestSessions] = useState([]);
     const [chartHelp, setChartHelp] = useState({});        // { [chart_key]: row } — "About this chart" copy
     const [performanceCounts, setPerformanceCounts] = useState({}); // { [vehicleId]: {accel, braking} } — card badges
 
@@ -72,6 +74,7 @@ export function AppProvider({ children }) {
         const siteSettings = await dataService.getSiteSettings();
         const manufacturersData = dataService.useSupabase ? await dataService.getManufacturers() : [];
         const chartHelpData = dataService.useSupabase ? await dataService.getChartHelp() : {};
+        const sessionsData = dataService.useSupabase ? await dataService.getTestSessions() : [];
         // One extra query, kept out of getVehicles so a missing performance table
         // can never take the vehicles list down with it.
         const perfCounts = dataService.useSupabase ? await dataService.getPerformanceRunCounts() : {};
@@ -94,6 +97,7 @@ export function AppProvider({ children }) {
         setSelectedVehicles(selectedIds);
         setTags(tagsData);
         setManufacturers(manufacturersData);
+        setTestSessions(sessionsData);
         setChartHelp(chartHelpData);
         setPerformanceCounts(perfCounts);
         setHeaderImageUrl(siteSettings.header_image_url || '');
@@ -283,6 +287,66 @@ export function AppProvider({ children }) {
     // runId is the run whose default is being cleared. Without it this cleared
     // every run of the vehicle, so clearing the default range test also cleared
     // the default charging run — the two are independent since migration 046.
+    // ── Test sessions ─────────────────────────────────────────────────────────
+    //
+    // Assignment runs from the RUN's side: a run picks its session, exactly like
+    // it picks a manufacturer. The multi-vehicle case — four cars round one loop
+    // — then needs no multi-vehicle UI at all: it emerges when several runs
+    // choose the same session.
+
+    const createTestSession = async (fields) => {
+        try {
+            const row = await dataService.createTestSession(fields);
+            setTestSessions(prev => [row, ...prev]);
+            return row;
+        } catch (error) {
+            logIfUnauthorized('create_test_session', 'test_session', null, error);
+            showError('Error creating session: ' + error.message);
+            return null;
+        }
+    };
+
+    const updateTestSession = async (id, changes) => {
+        try {
+            await dataService.updateTestSession(id, changes);
+            setTestSessions(prev => prev.map(s => s.id === id ? { ...s, ...toSessionRow(changes) } : s));
+        } catch (error) {
+            logIfUnauthorized('update_test_session', 'test_session', id, error);
+            showError('Error updating session: ' + error.message);
+        }
+    };
+
+    const deleteTestSession = async (id) => {
+        try {
+            await dataService.deleteTestSession(id);
+            setTestSessions(prev => prev.filter(s => s.id !== id));
+            // runs.session_id is ON DELETE SET NULL; mirror that locally.
+            setVehicles(prev => prev.map(v => ({
+                ...v,
+                runs: (v.runs || []).map(r => r.session_id === id ? { ...r, session_id: null } : r),
+            })));
+        } catch (error) {
+            logIfUnauthorized('delete_test_session', 'test_session', id, error);
+            showError('Error deleting session: ' + error.message);
+        }
+    };
+
+    const setRunsSession = async (runIds, sessionId) => {
+        const ids = (Array.isArray(runIds) ? runIds : [runIds]).filter(Boolean);
+        try {
+            await dataService.setRunsSession(ids, sessionId);
+            const idSet = new Set(ids.map(String));
+            setVehicles(prev => prev.map(v => ({
+                ...v,
+                runs: (v.runs || []).map(r =>
+                    idSet.has(String(r.id)) ? { ...r, session_id: sessionId ?? null } : r),
+            })));
+        } catch (error) {
+            logIfUnauthorized('set_run_session', 'run', ids[0] ?? null, error);
+            showError('Error assigning session: ' + error.message);
+        }
+    };
+
     const clearDefaultRun = async (vehicleId, runId = null) => {
         try {
             await dataService.clearDefaultRun(vehicleId, runId);
@@ -1384,6 +1448,11 @@ export function AppProvider({ children }) {
         updateSpecLink,
         deleteSpecLink,
         clearDefaultRun,
+        testSessions,
+        createTestSession,
+        updateTestSession,
+        deleteTestSession,
+        setRunsSession,
         searchEpaTestGroups,
         linkEpaTestGroup,
         createAndLinkEpaTestGroup,
