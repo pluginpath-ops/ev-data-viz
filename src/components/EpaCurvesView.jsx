@@ -343,6 +343,20 @@ export default function EpaCurvesView({
     const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
 
     // ── Vehicle lists ─────────────────────────────────────────────────────────
+    // Show or hide every EPA configuration a vehicle contributes. Only mappings
+    // that actually render are touched — one with no epaGroup is skipped below,
+    // so hiding it would leave a phantom entry in the hidden set.
+    const setVehicleMappingsVisible = (vehicle, visible) => {
+        setHiddenMappings(prev => {
+            const next = new Set(prev);
+            for (const m of vehicle.epa_mappings ?? []) {
+                if (!m.epaGroup) continue;
+                visible ? next.delete(m.id) : next.add(m.id);
+            }
+            return next;
+        });
+    };
+
     const selectedVehicles = useMemo(() =>
         selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
     [vehicles, selectedVehicleIds]);
@@ -935,9 +949,29 @@ export default function EpaCurvesView({
                                             };
                                             return (
                                                 <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
-                                                    <h4 className="text-sm font-semibold text-secondary mb-2">
-                                                        {vehicleLabel(vehicle)}
-                                                    </h4>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <h4 className="text-sm font-semibold text-secondary">
+                                                            {vehicleLabel(vehicle)}
+                                                        </h4>
+                                                        {/* Bulk helpers, same as the shared run selector: a vehicle
+                                                            can carry a dozen EPA configurations, and ticking them
+                                                            one at a time is the common complaint. */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setVehicleMappingsVisible(vehicle, true)}
+                                                            className="run-bulk-link"
+                                                        >
+                                                            all
+                                                        </button>
+                                                        <span className="text-faint text-xs select-none">/</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setVehicleMappingsVisible(vehicle, false)}
+                                                            className="run-bulk-link"
+                                                        >
+                                                            none
+                                                        </button>
+                                                    </div>
                                                     <div className="run-items">
                                                         {vehicle.epa_mappings.map((mapping, mi) => {
                                                             const { epaGroup, confidence } = mapping;
