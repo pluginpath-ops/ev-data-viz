@@ -13,6 +13,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
 import { vehicleLabel } from '../utils/specHelpers';
+import { buildSeriesLabels } from '../utils/seriesLabel';
 import { useTheme } from '../hooks/useTheme';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
@@ -24,6 +25,16 @@ import ChartExportButtons from './ChartExportButtons';
 
 /** Okabe-Ito, matching the palette the other charts use for run colours. */
 const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
+
+// What distinguishes two curves beyond the vehicle: the drive mode, then which
+// run of that mode, then — for the dashed reconstructions — who published the
+// figures. Priority order, so a run number is only reached for once the mode
+// has failed to separate two lines.
+const CURVE_ATOMS = [
+    { key: 'mode',   of: s => s.mode },
+    { key: 'run',    of: s => s.seq },
+    { key: 'source', of: s => s.source },
+];
 
 export default function PerformanceCurveView({ vehicles, selectedVehicleIds, presentationMode }) {
     const { isDark } = useTheme();
@@ -135,7 +146,6 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         const quickest = (a, b) => (a?.zero_to_60_sec ?? Infinity) <= (b?.zero_to_60_sec ?? Infinity) ? a : b;
         const out = [];
         for (const v of selected) {
-            const name = vehicleLabel(v);
 
             // Runs across every accel session this vehicle has, since a vehicle's
             // quickest run isn't necessarily in its most recent session.
@@ -173,13 +183,11 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     out.push({
                         runId: run.id,
                         gSegments: segmentAccelerationG(run),
-                        // Year and trim are dropped: with one line per drive mode the
-                        // legend is already long, and the mode is what distinguishes them.
-                        // Best-per-vehicle needs no mode in the label — there's one line.
-                        label: grouping === 'vehicle'
-                            ? v.name
-                            : `${v.name} · ${run.drive_mode || 'Run'}${grouping === 'all' ? ` #${(run.sequence ?? 0) + 1}` : ''}`,
-                        fullLabel: `${name} · ${run.drive_mode || 'Run'}`,
+                        vehicle: v,
+                        mode: run.drive_mode || 'Run',
+                        // Only meaningful when several runs share a mode, which is
+                        // exactly when the composer will reach for it.
+                        seq: `#${(run.sequence ?? 0) + 1}`,
                         points,
                         zeroTo60: run.zero_to_60_sec,
                     });
@@ -195,8 +203,8 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     const synth = buildSyntheticCurve(summary);
                     if (!synth) continue;
                     out.push({
-                        label: `${v.name} · ${summary.source_name || 'published'}`,
-                        fullLabel: `${vehicleLabel(v)} · ${summary.source_name || 'published'}`,
+                        vehicle: v,
+                        source: summary.source_name || 'published',
                         points: synth.points,
                         synthetic: true,
                         basis: synth.basis,
@@ -205,7 +213,24 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                 }
             }
         }
-        return out;
+        // Name each curve by what tells it apart from the others plotted. This
+        // replaces a hand-rolled rule that always dropped the year and trim and
+        // always spelled out the drive mode: right for one car's drive modes,
+        // wrong the moment two model years of the same trim are compared, when
+        // the year was the only thing distinguishing the lines.
+        // The source is REQUIRED, not merely available: a dashed reconstruction
+        // off a spec sheet must say whose figures it is drawn from, even when the
+        // vehicle alone would tell it apart from every other line. Traced runs
+        // have no source and are unaffected.
+        const labels = buildSeriesLabels(
+            out.map((o, i) => ({ ...o, key: i })),
+            { atoms: CURVE_ATOMS, required: ['source'] },
+        );
+        return out.map((o, i) => ({
+            ...o,
+            label:     labels.get(i)?.short ?? vehicleLabel(o.vehicle),
+            fullLabel: labels.get(i)?.full  ?? vehicleLabel(o.vehicle),
+        }));
     }, [sessionsByVehicle, summariesByVehicle, selected, grouping, pickedRunIds, showPublished]);
 
     useEffect(() => {

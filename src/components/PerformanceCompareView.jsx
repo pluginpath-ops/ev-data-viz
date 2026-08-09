@@ -15,6 +15,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { dataService } from '../services/DataService';
 import { vehicleLabel } from '../utils/specHelpers';
+import { buildSeriesLabels } from '../utils/seriesLabel';
 import { useTheme } from '../hooks/useTheme';
 import { resolveChartColors } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
@@ -39,6 +40,11 @@ const SCALARS = {
         { key: 'sixty_ft_sec',     label: '60 ft',  unit: 's' },
     ],
 };
+
+// What distinguishes two performance bars beyond the vehicle itself: who
+// produced the figure. Same shape as the range/charging atoms the charging
+// charts pass — the composer does not care which subsystem they come from.
+const SOURCE_ATOMS = [{ key: 'source', of: s => s.sourceName }];
 
 const CATEGORIES = [
     {
@@ -198,7 +204,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
 
             if (origin !== 'all') entries = entries.filter(e => e.origin === origin);
             entries.sort((a, b) => a.value - b.value);
-            return { id: v.id, name: vehicleLabel(v), entries };
+            return { id: v.id, vehicle: v, name: vehicleLabel(v), entries };
         });
     };
 
@@ -229,29 +235,44 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
             if (origin !== 'all') entries = entries.filter(e => e.origin === origin);
             // Higher g is better here, unlike every other metric on this page.
             entries.sort((a, b) => b.value - a.value);
-            return { id: v.id, name: vehicleLabel(v), entries };
+            return { id: v.id, vehicle: v, name: vehicleLabel(v), entries };
         });
     };
 
     /** Flatten per-vehicle entries into bars, honouring bar mode and sort. */
     const rowsFrom = (byVehicle, lowerIsBest) => {
-        const out = [];
+        // Flatten first: a bar is a (vehicle, source) pair, and the labels can
+        // only be minimised once the full set of bars is known.
+        const flat = [];
         for (const v of byVehicle) {
-            if (v.entries.length === 0) { out.push({ id: v.id, name: v.name, value: null }); continue; }
-            const picked = barMode === 'source' ? v.entries : [v.entries[0]];
-            for (const e of picked) {
-                out.push({
-                    id: `${v.id}-${e.sourceName}-${e.origin}`,
-                    name: barMode === 'source' ? `${v.name} · ${e.sourceName}` : v.name,
-                    value: e.value, display: e.display, badge: e.badge,
-                    sub: barMode === 'source' ? null : e.sourceName,
-                    fullData: e.origin === 'session',
-                    sourceCount: v.entries.length,
-                    flags: e.flags || [], windowLabel: e.windowLabel,
-                    color: vehicleColors[v.id],
-                });
-            }
+            if (v.entries.length === 0) { flat.push({ v, e: null }); continue; }
+            for (const e of (barMode === 'source' ? v.entries : [v.entries[0]])) flat.push({ v, e });
         }
+
+        // "One per source" declares the source REQUIRED rather than letting
+        // minimality drop it: a vehicle with a single source would otherwise
+        // show no source at all, in the one mode whose whole point is to name it.
+        const labels = buildSeriesLabels(
+            flat.map((f, i) => ({ key: i, vehicle: f.v.vehicle, sourceName: f.e?.sourceName })),
+            { atoms: SOURCE_ATOMS, required: barMode === 'source' ? ['source'] : [] },
+        );
+
+        const out = [];
+        flat.forEach(({ v, e }, i) => {
+            const name = labels.get(i)?.short ?? v.name;
+            if (!e) { out.push({ id: v.id, name, value: null }); return; }
+            out.push({
+                id: `${v.id}-${e.sourceName}-${e.origin}`,
+                name,
+                fullName: labels.get(i)?.full ?? v.name,
+                value: e.value, display: e.display, badge: e.badge,
+                sub: barMode === 'source' ? null : e.sourceName,
+                fullData: e.origin === 'session',
+                sourceCount: v.entries.length,
+                flags: e.flags || [], windowLabel: e.windowLabel,
+                color: vehicleColors[v.id],
+            });
+        });
         const withValue = out.filter(r => r.value != null);
         const bestFirst = sortDir === 'best' ? lowerIsBest : !lowerIsBest;
         withValue.sort((a, b) => bestFirst ? a.value - b.value : b.value - a.value);
