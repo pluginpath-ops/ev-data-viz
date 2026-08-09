@@ -145,3 +145,50 @@ export function suggestedPairing(vehicles, sessionId, vehicleId) {
     if (charging.length !== 1 || range.length !== 1) return null;
     return { rangeRunId: range[0].id, chargingRunId: charging[0].id };
 }
+
+/**
+ * One row's worth of what a session IS, for browsing: when, how big, and — the
+ * part that actually identifies an outing — which cars were on it.
+ */
+export function sessionSummary(session, vehicles) {
+    const rows = runsInSession(vehicles, session.id);
+    return {
+        session,
+        runCount: rows.length,
+        vehicles: vehiclesInSession(vehicles, session.id),
+        date: session.tested_at ? String(session.tested_at).slice(0, 10) : null,
+    };
+}
+
+/**
+ * Search sessions by name OR by the vehicles taking part.
+ *
+ * Matching on vehicles matters more than it sounds: sessions inherit their names
+ * from whoever published the test ("OoS 10% Challenge" appears eight times), so
+ * the name alone often cannot tell two outings apart, while "the one with the
+ * R1S and the Model Y" always can.
+ *
+ * Terms are AND-ed, so "oos r1s" finds the OoS outing the R1S was on.
+ */
+export function filterSessions(summaries, query) {
+    const terms = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+    if (!terms.length) return summaries;
+
+    return summaries.filter(s => {
+        const haystack = [
+            s.session.name ?? '',
+            s.date ?? '',
+            s.session.location_name ?? '',
+            s.session.tester ?? '',
+            ...s.vehicles.flatMap(v => [v.name, v.make, v.model, v.trim, v.year].filter(Boolean)),
+        ].join(' ').toLowerCase();
+        return terms.every(t => haystack.includes(t));
+    });
+}
+
+/** Every session, summarised, newest first — the browser's backing list. */
+export function summariseSessions(sessions, vehicles) {
+    return (sessions || [])
+        .map(s => sessionSummary(s, vehicles))
+        .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
+}

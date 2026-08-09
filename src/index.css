@@ -1383,3 +1383,26 @@ body {
 .run-selector-actions {
     @apply flex items-center gap-4 shrink-0;
 }
+
+/* ── Session browser ────────────────────────────────────────────────────────── */
+.session-browser-list {
+    @apply flex flex-col gap-2;
+}
+.session-browser-row {
+    @apply flex items-center justify-between gap-4 rounded-lg px-3 py-2;
+    background-color: var(--color-surface-sunken);
+    border: 1px solid transparent;
+}
+.session-browser-row.is-current {
+    border-color: var(--color-primary);
+}
+.session-vehicle-chip {
+    @apply text-xs px-1.5 py-0.5 rounded;
+    background-color: var(--color-card);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+}
+.session-vehicle-chip.is-self {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}

@@ -4,6 +4,7 @@ import {
     sessionDateMismatch, runsInSession,
 } from '../utils/testSessions';
 import { vehicleLabel } from '../utils/specHelpers';
+import SessionBrowserModal from './SessionBrowserModal';
 
 /**
  * Assign a run to a testing session.
@@ -13,9 +14,11 @@ import { vehicleLabel } from '../utils/specHelpers';
  * UI: four cars round one loop become one session because four runs each picked
  * it, not because anything here knows how to select four cars.
  *
- * Sessions this vehicle already appears in are listed first — a curator adding
- * the fourth run of an outing should not hunt for the session the other three
- * are already in.
+ * The dropdown lists ONLY the sessions this vehicle already appears in. That is
+ * the right answer almost every time — a curator is usually adding another run
+ * to an outing this car was already on — and it keeps the list short. A flat
+ * list of every session was unreadable at 28 and only grows, so everything else
+ * lives behind the browser, where it can be searched rather than scrolled.
  */
 export default function SessionControl({
     run, vehicle, vehicles, sessions,
@@ -23,10 +26,11 @@ export default function SessionControl({
     onCreate,          // ({ name, testedAt }) => Promise<session | null>
 }) {
     const [creating, setCreating] = useState(false);
+    const [browsing, setBrowsing] = useState(false);
     const [draftName, setDraftName] = useState('');
     const [saving, setSaving] = useState(false);
 
-    const { used, others } = sessionsForPicker(sessions, vehicles, vehicle.id);
+    const { used } = sessionsForPicker(sessions, vehicles, vehicle.id);
     const current  = (sessions || []).find(s => String(s.id) === String(run.session_id)) ?? null;
     const mismatch = sessionDateMismatch(run, current);
 
@@ -38,7 +42,8 @@ export default function SessionControl({
     const runCount = current ? runsInSession(vehicles, current.id).length : 0;
 
     const handleChange = (value) => {
-        if (value === '__new__') { setCreating(true); setDraftName(''); return; }
+        if (value === '__new__')    { setCreating(true); setDraftName(''); return; }
+        if (value === '__browse__') { setBrowsing(true); return; }
         onAssign(value ? Number(value) : null);
     };
 
@@ -87,17 +92,15 @@ export default function SessionControl({
                 className="form-input text-sm py-0.5"
             >
                 <option value="">— None —</option>
-                {used.length > 0 && (
-                    <optgroup label="This vehicle's sessions">
-                        {used.map(s => <option key={s.id} value={s.id}>{sessionLabel(s)}</option>)}
-                    </optgroup>
-                )}
-                {others.length > 0 && (
-                    <optgroup label="Other sessions">
-                        {others.map(s => <option key={s.id} value={s.id}>{sessionLabel(s)}</option>)}
-                    </optgroup>
+                {/* Only this vehicle's sessions. Everything else is behind the
+                    browser, where it can be searched rather than scrolled. */}
+                {used.map(s => <option key={s.id} value={s.id}>{sessionLabel(s)}</option>)}
+                {/* A session picked from the browser may not be in `used` yet. */}
+                {current && !used.some(s => String(s.id) === String(current.id)) && (
+                    <option value={current.id}>{sessionLabel(current)}</option>
                 )}
                 <option value="__new__">+ New session…</option>
+                <option value="__browse__">🔍 All sessions…</option>
             </select>
 
             {current && runCount > 1 && (
@@ -116,6 +119,16 @@ export default function SessionControl({
                 >
                     ⚠ {mismatch} days from session date
                 </span>
+            )}
+            {browsing && (
+                <SessionBrowserModal
+                    vehicles={vehicles}
+                    sessions={sessions}
+                    currentSessionId={run.session_id}
+                    vehicleId={vehicle.id}
+                    onPick={onAssign}
+                    onClose={() => setBrowsing(false)}
+                />
             )}
         </div>
     );
