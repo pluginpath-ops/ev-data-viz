@@ -10,8 +10,11 @@ import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../uti
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
+import { buildSeriesLabels } from '../utils/seriesLabel';
+import VerboseLabelToggle from './VerboseLabelToggle';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
+import { resolvePairColors } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 
@@ -282,6 +285,8 @@ export default function ChargeCompareView({
     pairings = {},
     setPairings = () => {},
     presentationMode = false,
+    verboseLabels = false,
+    setChartConfig = null,
 }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
@@ -352,18 +357,15 @@ export default function ChargeCompareView({
 
                     result.push({
                         key:         pairKey(rangeRun.id, partnerId),
+                        vehicle,
                         rangeRun:    { ...rangeRun, vehicleName: vehicleLabel(vehicle), vehicleId: vehicle.id },
                         chargingRun,
-                        // Only disambiguate when a range test is shown more than
-                        // once — the 1:1 case keeps its own name.
-                        label:       rows.length > 1
-                            ? `${rangeRun.name} × ${chargingRun.name}`
-                            : rangeRun.name,
                         rangeSrc,
                     });
                 }
             }
         }
+
         return result;
     }, [selectedVehicles, pairings]);
 
@@ -463,21 +465,50 @@ export default function ChargeCompareView({
         selectionRows, { shouldBootstrap: bootstrapOneRow }
     );
 
-    const activePairs = resolvedPairs.filter(p => selectedRuns.includes(p.key));
+    // Name each bar by what distinguishes it from the OTHER BARS ON SCREEN, so
+    // the labels answer the comparison you are actually looking at. Minimising
+    // over every resolved pair instead would let a deselected run lengthen the
+    // labels of the ones you kept.
+    //
+    // The vehicle atoms are declared already-supplied: this chart groups bars by
+    // vehicle and prints that name under the axis, so repeating it in every bar
+    // label is what made these unreadably long.
+    const activePairs = useMemo(() => {
+        const active = resolvedPairs.filter(p => selectedRuns.includes(p.key));
+        const labels = buildSeriesLabels(active, { supplied: ['year', 'make', 'model', 'trim'] });
+        // One range test paired with two charging curves used to render two bars
+        // in the SAME colour, since colour came from the range test alone. Shade
+        // by partner within the range test's own hue so the rows still read as
+        // related — see resolvePairColors.
+        const pairColors = resolvePairColors(active.map(p => ({
+            key:        p.key,
+            primaryId:  p.rangeRun.id,
+            baseColor:  colorMap[p.rangeRun.id] || p.rangeRun.color || p.chargingRun.color,
+        })));
+
+        return active.map(p => ({
+            ...p,
+            label: (verboseLabels ? labels.get(p.key)?.full : labels.get(p.key)?.short) ?? p.rangeRun.name,
+            fullLabel: labels.get(p.key)?.full ?? p.rangeRun.name,
+            color: pairColors[p.key],
+        }));
+    }, [resolvedPairs, selectedRuns, verboseLabels, colorMap]);
 
     // ── Compute bars for one chart type ──────────────────────────────────────
     // chartType: 'range_added' | 'time_to_range'
     const buildBars = (chartType) => {
         const flatRuns = [];
 
-        for (const { key, rangeRun, chargingRun, label, rangeSrc } of activePairs) {
+        for (const { key, rangeRun, chargingRun, label, fullLabel, rangeSrc, color: pairColor } of activePairs) {
             const chargingRunId = chargingRun.id;
             const base = {
                 id:              key,
                 name:            label,
+                // Nothing the short label elided is lost — the tooltip says it all.
+                fullName:        fullLabel,
                 vehicleName:     rangeRun.vehicleName,
                 vehicleId:       rangeRun.vehicleId,
-                color:           colorMap[rangeRun.id] || rangeRun.color || chargingRun.color || '#3b82f6',
+                color:           pairColor || colorMap[rangeRun.id] || rangeRun.color || chargingRun.color || '#3b82f6',
                 // Each pill describes the half it came from: speed and conditions
                 // belong to the range test, which is what this row enumerates.
                 speed_mph:       rangeRun.speed_mph,
@@ -658,7 +689,7 @@ export default function ChargeCompareView({
                                 title(items) {
                                     if (!items.length) return;
                                     const run = built.flatRuns[items[0].dataIndex];
-                                    return run ? `${run.name} — ${run.vehicleName}` : undefined;
+                                    return run ? (run.fullName ?? `${run.name} — ${run.vehicleName}`) : undefined;
                                 },
                                 label(ctx) {
                                     const run = built.flatRuns[ctx.dataIndex];
@@ -706,10 +737,13 @@ export default function ChargeCompareView({
                 if (inst.current) { inst.current.destroy(); inst.current = null; }
             });
         };
-    // resolvedPairs, not just selectedRuns: changing a row's partner can leave the
+    // activePairs, not just selectedRuns: changing a row's partner can leave the
     // selection array identical (same row, different pairing) while every bar's
     // value changes, and the chart would keep the previous partner's numbers.
-    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns, resolvedPairs, units, isDark]);
+    // It also carries the labels and colours, so a Full Labels toggle redraws —
+    // depending on resolvedPairs alone left that toggle inert, since it changes
+    // neither the pairs nor the selection.
+    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, activePairs, units, isDark]);
 
     const hasRangeRuns = resolvedPairs.length > 0;
 
@@ -771,10 +805,17 @@ export default function ChargeCompareView({
 
                 <div className="mt-4">
                     <RunSelector
+                        headerActions={setChartConfig
+                            ? <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                            : null}
                         vehicles={selectedVehicles}
                         selectedRunIds={selectedRuns}
                         onToggleRun={toggleRun}
                         onUpdateRunColor={(_vehicleId, runId, color) => setColorOverride(runId, color)}
+                        // Without this the swatches showed each run's stored
+                        // colour while the bars showed the resolved one, so the
+                        // picker and the chart disagreed from the first render.
+                        colorMap={colorMap}
                         runFilter={(run, vehicle) =>
                             // A range test with no charging curve to pair against
                             // cannot produce a bar, so it is not offered.

@@ -1374,3 +1374,12 @@ body {
     @apply flex items-center justify-center min-h-screen text-lg;
     color: var(--color-text-faint);
 }
+
+/* Run-selector header row: the disclosure on the left, chart-session toggles
+   (Auto Color, Full Labels) on the right. One place on every chart. */
+.run-selector-bar {
+    @apply flex items-center gap-4 w-full;
+}
+.run-selector-actions {
+    @apply flex items-center gap-4 shrink-0;
+}

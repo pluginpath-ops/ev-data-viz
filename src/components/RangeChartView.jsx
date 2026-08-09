@@ -4,6 +4,9 @@ import AxisScaleControls from './AxisScaleControls';
 import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
+import { buildSeriesLabels } from '../utils/seriesLabel';
+import VerboseLabelToggle from './VerboseLabelToggle';
+import AutoColorToggle from './AutoColorToggle';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import {
@@ -53,7 +56,7 @@ const hasDataForType = (run, type) => {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, presentationMode = false, autoColor = false }) {
+export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, presentationMode = false, autoColor = false, verboseLabels = false }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
@@ -88,7 +91,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
 
     // ── Derived: all range runs across selected vehicles ──────────────────────
     const allRangeRuns = selectedVehicles.flatMap(v =>
-        filterRangeRuns(v.runs).map(r => ({ ...r, vehicleName: vehicleLabel(v), vehicleId: v.id }))
+        filterRangeRuns(v.runs).map(r => ({ ...r, vehicle: v, vehicleName: vehicleLabel(v), vehicleId: v.id }))
     );
 
     const selectedRangeRuns = allRangeRuns.filter(r =>
@@ -103,10 +106,18 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     // Sticky in auto mode — see hooks/useStickyChartColors. Colours are added as
     // runs are selected and held until the vehicle set changes or Auto Color is
     // cycled, so the chart you were reading does not recolour under you.
-    const { colorMap, setColorOverride } = useStickyChartColors(plottableRuns, {
+    // Every range run of every selected vehicle, NOT just the plotted ones.
+    // Feeding the filtered set meant unticking a run shrank the input, the
+    // palette re-solved across what was left, and unrelated runs changed colour
+    // — the shuffling that stickiness was meant to end. A stable input cannot
+    // shuffle, which is a stronger guarantee than remembering what it assigned.
+    const { colorMap, setColorOverride } = useStickyChartColors(allRangeRuns, {
         autoColor,
         resetKey: selectedVehicles.map(v => v.id).join(','),
     });
+
+    // Value-identity for the resolved colours — see the render effect's deps.
+    const colorSignature = allRangeRuns.map(r => `${r.id}:${colorMap[r.id] ?? ''}`).join(',');
 
     // ── Run toggle ────────────────────────────────────────────────────────────
     const toggleRun = (runId) => {
@@ -138,7 +149,18 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
         // ── Bar: flat single dataset — one bar per run, vehicle grouping via plugin ─
         if (typeInfo.kind === 'bar') {
             const yUnit  = isRange ? distanceLabel(units) : effLabelStr;
-            const labels = plottableRuns.map(r => r.name);
+            // Grouped by vehicle with the name drawn under the axis, so the bar
+            // labels declare the vehicle atoms supplied and name only the test.
+            const barLabels = buildSeriesLabels(
+                plottableRuns.map(r => ({ key: r.id, vehicle: r.vehicle, rangeRun: r })),
+                { supplied: ['year', 'make', 'model', 'trim'] },
+            );
+            const nameFor = r => {
+                const l = barLabels.get(r.id);
+                if (!l) return r.name;
+                return verboseLabels ? l.full : l.short;
+            };
+            const labels = plottableRuns.map(nameFor);
             const datasets = [{
                 label:           yLabel,
                 data:            plottableRuns.map(r => getY(r)),
@@ -152,15 +174,29 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 data:     { labels, datasets },
                 xLabel:   '',
                 yLabel,
-                flatRuns: plottableRuns.map(r => ({ ...r, _yValue: getY(r), _yUnit: yUnit })),
+                flatRuns: plottableRuns.map(r => ({
+                    ...r,
+                    name:     nameFor(r),
+                    fullName: barLabels.get(r.id)?.full ?? r.name,
+                    _yValue: getY(r), _yUnit: yUnit,
+                })),
             };
         }
 
         // ── Line: one series per vehicle, points sorted by x ─────────────────
         if (typeInfo.kind === 'line') {
             // Build an ordered map preserving selectedVehicles order
+            // One line per vehicle: the vehicle atoms are the whole label, and
+            // there is no single test to name — a line aggregates several.
+            const lineLabels = buildSeriesLabels(
+                selectedVehicles.map(v => ({ key: v.id, vehicle: v })),
+                { atoms: [] },
+            );
             const vehicleMap = new Map();
-            selectedVehicles.forEach(v => vehicleMap.set(v.id, { name: v.name, runs: [] }));
+            selectedVehicles.forEach(v => vehicleMap.set(v.id, {
+                name: (verboseLabels ? lineLabels.get(v.id)?.full : lineLabels.get(v.id)?.short) ?? v.name,
+                runs: [],
+            }));
             plottableRuns.forEach(run => vehicleMap.get(run.vehicleId)?.runs.push(run));
 
             const datasets = [];
@@ -448,7 +484,16 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 chartInstance.current = null;
             }
         };
-    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark]);
+    // The colours and Full Labels belong here: a colour picked in the selector
+    // and a label toggle both change what is drawn without changing the
+    // selection, and the chart used to keep the old canvas until some unrelated
+    // toggle forced it to redraw.
+    //
+    // A SIGNATURE, not colorMap itself. The arrays feeding the resolver are
+    // rebuilt every render, so the map is a new object each time while holding
+    // the same values — depending on its identity would redraw the chart on
+    // every render. Comparing the colours by value redraws only when one moves.
+    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, autoColor]);
 
     // ── Copy chart PNG ────────────────────────────────────────────────────────
     const handleCopyImage = async () => {
@@ -512,19 +557,14 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                             <span className="text-sm font-medium">Show points</span>
                         </label>
                     )}
-                    <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
-                        <input
-                            type="checkbox"
-                            checked={autoColor}
-                            onChange={e => setChartConfig(prev => ({ ...prev, autoColor: e.target.checked }))}
-                            className="w-4 h-4"
-                        />
-                        <span className="text-sm font-medium">Auto Color</span>
-                    </label>
                 </div>
 
                 {/* ── Run selector ── */}
                 <RunSelector
+                    headerActions={<>
+                        <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                        <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                    </>}
                     vehicles={selectedVehicles}
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}

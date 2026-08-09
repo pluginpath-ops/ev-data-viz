@@ -52,6 +52,8 @@ export default function RunSelector({
     emptyMessage = 'No runs',
     renderRunMeta = null,
     colorMap = {},
+    // Rendered to the right of the header — the chart-session toggles.
+    headerActions = null,
     // Pair mode
     pairMode = false,
     pairings = {},
@@ -136,6 +138,10 @@ export default function RunSelector({
 
     return (
         <div>
+            {/* Chart-session toggles live here rather than in each chart's own
+                controls card: they act on what this selector chooses, and every
+                chart had drifted into putting them somewhere different. */}
+            <div className="run-selector-bar">
             <button
                 onClick={() => setExpanded(prev => !prev)}
                 className="run-selector-header"
@@ -147,6 +153,8 @@ export default function RunSelector({
                     <span className="text-xs font-normal text-faint ml-2">· Drag the pills above to reorder</span>
                 )}
             </button>
+                {headerActions && <div className="run-selector-actions">{headerActions}</div>}
+            </div>
 
             {expanded && (
                 <div className="mt-3">
@@ -374,11 +382,22 @@ function PairRows({
  * database on every pixel — it commits on a short debounce, or on blur.
  */
 function RunColorControl({ run, vehicleId, onUpdateRunColor, colorMap = {} }) {
-    const [localColor, setLocalColor] = useState(run.color || '#3b82f6');
+    // The colour actually on the chart: an Okabe-Ito slot in auto mode, a session
+    // override if one was set, the stored preference otherwise.
+    const plotted = colorMap[run.id] || run.color || '#3b82f6';
+
+    const [localColor, setLocalColor] = useState(plotted);
     const commitTimer = useRef(null);
 
-    // Sync if the colour changes from outside (another update propagating in)
-    useEffect(() => { setLocalColor(run.color || '#3b82f6'); }, [run.color]);
+    // The swatch tracks what is PLOTTED, not what is stored. It used to show the
+    // stored preference and explain the difference in a tooltip, which meant that
+    // turning Auto Color off recoloured every line while every swatch sat still —
+    // the control and the thing it controls disagreeing, with the explanation
+    // hidden behind a hover. Following the plotted colour costs the stored value
+    // no visibility that matters here: this picker sets a session override, and
+    // the picker in Tests & Data (which passes no colorMap, so plotted falls
+    // through to run.color) is the one that owns the stored preference.
+    useEffect(() => { setLocalColor(plotted); }, [plotted]);
 
     if (!onUpdateRunColor) return null;
     // Synthetic rows (the EPA range option) have no run behind them to colour.
@@ -388,15 +407,10 @@ function RunColorControl({ run, vehicleId, onUpdateRunColor, colorMap = {} }) {
         if (/^#[0-9A-Fa-f]{6}$/.test(value)) onUpdateRunColor(vehicleId, run.id, value);
     };
 
-    // Resolved chart colour (Okabe-Ito in auto mode, stored colour otherwise)
-    const resolvedColor = colorMap[run.id] || localColor;
-
-    // One chip, not two. There used to be a read-only swatch showing the RESOLVED
-    // chart colour beside a picker showing the STORED preference — with Auto
+    // One chip, not two. There used to be a read-only swatch showing the resolved
+    // chart colour beside a picker showing the stored preference — with Auto
     // Color on those differ for most runs, so the row displayed two colour chips
-    // that disagreed and only one of which could be clicked. The picker stays,
-    // since it is the one you can act on, and the resolved colour moves into its
-    // tooltip so the difference is still discoverable rather than just gone.
+    // that disagreed and only one of which could be clicked.
     return (
         <input
             type="color"
@@ -411,8 +425,8 @@ function RunColorControl({ run, vehicleId, onUpdateRunColor, colorMap = {} }) {
             onBlur={() => { clearTimeout(commitTimer.current); commit(localColor); }}
             onClick={e => e.stopPropagation()}
             className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
-            title={resolvedColor !== localColor
-                ? `Stored preference ${localColor} — plotted as ${resolvedColor} while Auto Color is on`
+            title={run.color && run.color.toLowerCase() !== localColor.toLowerCase()
+                ? `Color ${localColor} — this run's saved colour is ${run.color}`
                 : `Color ${localColor}`}
         />
     );

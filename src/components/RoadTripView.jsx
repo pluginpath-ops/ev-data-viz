@@ -9,6 +9,9 @@ import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
+import { buildSeriesLabels } from '../utils/seriesLabel';
+import VerboseLabelToggle from './VerboseLabelToggle';
+import AutoColorToggle from './AutoColorToggle';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import {
@@ -19,6 +22,7 @@ import {
 import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
+import { resolvePairColors } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 
 Chart.register(ZoomPlugin);
@@ -366,6 +370,7 @@ export default function RoadTripView({
     setPairings = () => {},
     presentationMode = false,
     autoColor = true,
+    verboseLabels = false,
     setChartConfig = null,
 }) {
     const { units } = useAppContext();
@@ -398,9 +403,15 @@ export default function RoadTripView({
         [vehicles, selectedVehicleIds]
     );
 
-    // ── Resolve chart colors for all charging runs ────────────────────────────
+    // ── Resolve chart colors ─────────────────────────────────────────────────
+    // Keyed on the RANGE test, not the charging run. This view enumerates range
+    // tests and its selector lists them as the primary, so colouring by the
+    // charging half meant two range tests sharing one charging curve drew in the
+    // same colour, and the selector's colour picker recoloured a row other than
+    // the one it sat next to. Charge Compare already keys on the range test, so
+    // a given pair now reads the same colour on both charts.
     const colorableRuns = useMemo(
-        () => selectedVehicles.flatMap(v => filterChargingRuns(v.runs)),
+        () => selectedVehicles.flatMap(v => filterRangeRuns(v.runs)),
         [selectedVehicles]
     );
     const { colorMap, setColorOverride } = useStickyChartColors(colorableRuns, {
@@ -461,13 +472,21 @@ export default function RoadTripView({
                         // Assume 70 mph if neither the range test nor its source says
                         testSpeedMph:   rangeRun.speed_mph ?? src.sourceRun?.speed_mph ?? null,
                         batteryKwh:     vehicle.battery,
-                        color:          colorMap[chargingRun.id] || rangeRun.color || chargingRun.color || PALETTE[colorIdx % PALETTE.length],
+                        color:          colorMap[rangeRun.id] || rangeRun.color || chargingRun.color || PALETTE[colorIdx % PALETTE.length],
                         efficiencyNote: src.note,
                     });
                     colorIdx++;
                 }
             }
         }
+        // Shade successive partners of one range test within its own hue, so a
+        // range test paired with two charging curves gives two related lines
+        // rather than two identical ones.
+        const pairColors = resolvePairColors([...map.values()].map(e => ({
+            key: e.key, primaryId: e.rangeRun.id, baseColor: e.color,
+        })));
+        for (const entry of map.values()) entry.color = pairColors[entry.key] ?? entry.color;
+
         return map;
     }, [selectedVehicles, colorMap, pairings]);
 
@@ -682,15 +701,24 @@ export default function RoadTripView({
 
         const totalDistDisplay = convDistance(totalDistance, units);
 
-        // Label logic: include run name when multiple runs from same vehicle
-        const vehicleRunCount = {};
-        for (const e of validEntries) {
-            vehicleRunCount[e.vehicle.id] = (vehicleRunCount[e.vehicle.id] || 0) + 1;
-        }
-        const entryLabel = e =>
-            vehicleRunCount[e.vehicle.id] > 1
-                ? `${vehicleLabel(e.vehicle)} (${e.label})`
-                : vehicleLabel(e.vehicle);
+        // Name each line by what tells it apart from the others plotted. Nothing
+        // is supplied by the surface here — unlike Charge Compare, the lane label
+        // IS the series label, so the vehicle atoms are on the table.
+        //
+        // This replaces vehicleLabel(), which always prefixed the model year and
+        // was built from the vehicle's free-text name. Neither belongs on a graph:
+        // the year earns its place only when two series share a model, and the
+        // free-text name is a selection label, not an identity.
+        const seriesLabels = buildSeriesLabels(validEntries.map(e => ({
+            key:         e.key,
+            vehicle:     e.vehicle,
+            rangeRun:    e.rangeRun,
+            chargingRun: e.run,
+        })));
+        const entryLabelFull = e => seriesLabels.get(e.key)?.full ?? vehicleLabel(e.vehicle);
+        const entryLabel = e => verboseLabels
+            ? entryLabelFull(e)
+            : seriesLabels.get(e.key)?.short ?? vehicleLabel(e.vehicle);
 
         // ── Speed sweep chart ────────────────────────────────────────────────
         if (isSpeedMode) {
@@ -708,6 +736,7 @@ export default function RoadTripView({
                 }));
                 return {
                     label: entryLabel(entry),
+                    _fullLabel: entryLabelFull(entry),
                     data,
                     borderColor: entry.color,
                     backgroundColor: entry.color + '33',
@@ -770,7 +799,7 @@ export default function RoadTripView({
                         legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor } },
                         tooltip: {
                             callbacks: {
-                                title: items => items[0]?.dataset.label ?? '',
+                                title: items => items[0]?.dataset._fullLabel ?? items[0]?.dataset.label ?? '',
                                 label: ctx => [
                                     `Speed: ${ctx.parsed.x} ${sl}`,
                                     `${speedYLabel}: ${formatTime(ctx.parsed.y)}`,
@@ -805,6 +834,7 @@ export default function RoadTripView({
                 }));
                 return {
                     label: entryLabel(entry),
+                    _fullLabel: entryLabelFull(entry),
                     data,
                     borderColor: entry.color,
                     backgroundColor: entry.color + '33',
@@ -867,7 +897,7 @@ export default function RoadTripView({
                         legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor } },
                         tooltip: {
                             callbacks: {
-                                title: items => items[0]?.dataset.label ?? '',
+                                title: items => items[0]?.dataset._fullLabel ?? items[0]?.dataset.label ?? '',
                                 label: ctx => [
                                     `${dl} between charges: ${ctx.parsed.x} ${dl}`,
                                     `${sweepLabel}: ${formatTime(ctx.parsed.y)}`,
@@ -906,6 +936,7 @@ export default function RoadTripView({
 
             return {
                 label: entryLabel(entry),
+                _fullLabel: entryLabelFull(entry),
                 data: points,
                 borderColor: entry.color,
                 backgroundColor: entry.color + '33',
@@ -1073,10 +1104,7 @@ export default function RoadTripView({
                                 if (Math.abs(frac - 0.5) < 0.01) {
                                     const idx = Math.floor(val); // lane index
                                     if (idx >= 0 && idx < validEntries.length) {
-                                        const e = validEntries[idx];
-                                        return vehicleRunCount[e.vehicle.id] > 1
-                                            ? `${vehicleLabel(e.vehicle)} · ${e.label}`
-                                            : vehicleLabel(e.vehicle);
+                                        return entryLabel(validEntries[idx]);
                                     }
                                     if (idx === validEntries.length) return 'ICE Reference';
                                 }
@@ -1124,7 +1152,7 @@ export default function RoadTripView({
                         callbacks: {
                             title: (items) => {
                                 if (!items.length) return '';
-                                return items[0].dataset.label;
+                                return items[0].dataset._fullLabel ?? items[0].dataset.label;
                             },
                             label: (ctx) => {
                                 const dsIdx = ctx.datasetIndex;
@@ -1314,19 +1342,6 @@ export default function RoadTripView({
                                 🚐 Towing
                             </button>
                         </div>
-                        {setChartConfig && (
-                            <div className="flex items-end">
-                                <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
-                                    <input
-                                        type="checkbox"
-                                        checked={autoColor}
-                                        onChange={e => setChartConfig(prev => ({ ...prev, autoColor: e.target.checked }))}
-                                        className="w-4 h-4"
-                                    />
-                                    <span className="text-sm font-medium">Auto Color</span>
-                                </label>
-                            </div>
-                        )}
                     </div>
 
                     {/* Towing inputs — only visible when towing mode is on */}
@@ -1446,6 +1461,10 @@ export default function RoadTripView({
                     {/* Run selector */}
                     <div className="mt-4">
                         <RunSelector
+                            headerActions={setChartConfig ? <>
+                                <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                                <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                            </> : null}
                             vehicles={selectedVehicles.filter(v =>
                                 filterChargingRuns(v.runs).length > 0
                             )}

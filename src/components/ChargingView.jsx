@@ -9,6 +9,9 @@ import RangeChartView from './RangeChartView';
 import AxisScaleControls from './AxisScaleControls';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
+import { buildSeriesLabels } from '../utils/seriesLabel';
+import VerboseLabelToggle from './VerboseLabelToggle';
+import AutoColorToggle from './AutoColorToggle';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
@@ -19,6 +22,10 @@ import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
+
+// A charging line is told apart by its vehicle and its test. One atom, since a
+// series here is a single run rather than a pairing of two.
+const RUN_ATOMS = [{ key: 'test', of: s => s.run?.name }];
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, chartMode, pairings = {}, setPairings = () => {}, presentationMode = false }) {
     const { units } = useAppContext();
@@ -407,6 +414,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     if (chartConfig.selectedRuns.includes(run.id)) {
                         allSelectedRuns.push({
                             ...run,
+                            vehicle,
                             vehicleName: vehicleLabel(vehicle),
                             vehicleBattery: vehicle.battery ?? null,
                             vehicleRange: vehicle.range ?? null,
@@ -416,14 +424,18 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             }
         });
 
-        // Count active runs per vehicle to decide whether to include run name in label
-        const runsPerVehicle = {};
-        allSelectedRuns.forEach(r => {
-            runsPerVehicle[r.vehicleName] = (runsPerVehicle[r.vehicleName] || 0) + 1;
-        });
-        const runLabel = (run) => runsPerVehicle[run.vehicleName] > 1
-            ? `${run.vehicleName} - ${run.name}`
-            : run.vehicleName;
+        // Name each line by what tells it apart from the others plotted. This is
+        // the surface with the least context of any chart here — the legend is
+        // the only thing identifying a curve — so no atoms are declared supplied.
+        const seriesLabels = buildSeriesLabels(
+            allSelectedRuns.map(r => ({ key: r.id, vehicle: r.vehicle, run: r })),
+            { atoms: RUN_ATOMS },
+        );
+        const runLabel = (run) => {
+            const l = seriesLabels.get(run.id);
+            if (!l) return run.vehicleName;
+            return chartConfig.verboseLabels ? l.full : l.short;
+        };
 
         const datasets = allSelectedRuns.flatMap((run) => {
             const rawData = runDataCache[run.id] ?? run.data ?? [];
@@ -619,6 +631,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 setChartConfig={setChartConfig}
                 presentationMode={presentationMode}
                 autoColor={chartConfig.autoColor ?? false}
+                verboseLabels={chartConfig.verboseLabels ?? false}
             />
         );
     }
@@ -711,19 +724,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         />
                         <span className="text-sm font-medium">Show points</span>
                     </label>
-                    <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
-                        <input
-                            type="checkbox"
-                            checked={chartConfig.autoColor ?? false}
-                            onChange={e => setChartConfig({ ...chartConfig, autoColor: e.target.checked })}
-                            className="w-4 h-4"
-                        />
-                        <span className="text-sm font-medium">Auto Color</span>
-                    </label>
                 </div>
 
                 {/* ── Collapsible run selector ── */}
                 <RunSelector
+                    headerActions={<>
+                        <AutoColorToggle autoColor={chartConfig.autoColor ?? false} setChartConfig={setChartConfig} />
+                        <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
+                    </>}
                     vehicles={selectedVehicles}
                     selectedRunIds={chartConfig.selectedRuns}
                     onToggleRun={runId => setChartConfig(prev => ({

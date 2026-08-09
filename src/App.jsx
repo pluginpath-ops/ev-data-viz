@@ -821,6 +821,7 @@ export default function App() {
                             pairings={pairings}
                             setPairings={setPairings}
                             autoColor={chartConfig.autoColor ?? true}
+                            verboseLabels={chartConfig.verboseLabels ?? false}
                             setChartConfig={setChartConfig}
                         />
                     )}
@@ -836,6 +837,8 @@ export default function App() {
                             setStartSoc={v => setCompareConfig(p => ({ ...p, startSoc: v }))}
                             pairings={pairings}
                             setPairings={setPairings}
+                            verboseLabels={chartConfig.verboseLabels ?? false}
+                            setChartConfig={setChartConfig}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specs' && (
@@ -860,6 +863,7 @@ export default function App() {
                             epaConfig={epaConfig}
                             setEpaConfig={setEpaConfig}
                             autoColor={chartConfig.autoColor ?? true}
+                            verboseLabels={chartConfig.verboseLabels ?? false}
                             setChartConfig={setChartConfig}
                         />
                     )}
