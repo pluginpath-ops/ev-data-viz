@@ -2342,7 +2342,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <div className="run-actions-row">
                                         {/* Set Default — ghost text, green on hover, pale blue + × when active */}
                                         <button
-                                            onClick={() => run.isDefault ? clearDefaultRun(vehicle.id) : onSetDefaultRun(run.id)}
+                                            onClick={() => run.isDefault ? clearDefaultRun(vehicle.id, run.id) : onSetDefaultRun(run.id)}
                                             title={!canCreate ? 'Sign in to save changes' : run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
                                             className={`text-sm px-2 py-1 rounded transition-colors ${
                                                 run.isDefault

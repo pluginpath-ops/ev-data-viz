@@ -103,3 +103,35 @@ export const parseInheritedRunId = (id) => {
     const [, linkId, realRunId] = id.split('_');
     return { linkId: parseInt(linkId, 10), realRunId: parseInt(realRunId, 10) };
 };
+
+// ── Default runs ─────────────────────────────────────────────────────────────
+
+/**
+ * Mark `runId` as its vehicle's default, leaving the OTHER kind alone.
+ *
+ * A vehicle has two independent defaults since migration 046: a default charging
+ * run (the fallback curve) and a default range test (rank 2 of the range-source
+ * order). Marking one used to clear both, so setting a default range test
+ * silently dropped the default charging run.
+ *
+ * Pure, and shared by the optimistic update and the offline store so the two
+ * cannot drift — they already had, which is how this survived: the service
+ * scoped it per kind while the copy on screen did not, and they disagreed until
+ * a reload.
+ */
+export function applyDefaultRun(runs, runId) {
+    const target = (runs || []).find(r => r.id === runId);
+    if (!target) return runs || [];
+    const kind = runKindFrom(target);
+    return runs.map(r =>
+        runKindFrom(r) !== kind ? r : { ...r, isDefault: r.id === runId });
+}
+
+/**
+ * Clear the default flag on one run, or — with no runId — on every run of the
+ * vehicle, which is what discarding a vehicle's data wants.
+ */
+export function clearDefaultRuns(runs, runId = null) {
+    return (runs || []).map(r =>
+        (runId == null || r.id === runId) ? { ...r, isDefault: false } : r);
+}

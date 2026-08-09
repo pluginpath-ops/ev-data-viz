@@ -1,7 +1,7 @@
 import { getSupabase } from './supabase';
 import { vehicleLabel } from '../utils/specHelpers';
 import { roundTo, } from '../utils/unitConversions';
-import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom } from '../utils/runUtils';
+import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
 
 const roundField = roundTo;
 
@@ -271,7 +271,10 @@ class DataService {
     // When promoting an inherited run to default, first clear all existing
     // defaults for this vehicle so exactly one is ever marked at a time.
     if (changes.useAsDefault && targetVehicleId) {
-      await getSupabase().from('runs').update({ is_default: false }).eq('vehicle_id', targetVehicleId);
+      // Inherited runs are charging curves, so promoting one must not clear the
+      // vehicle's default RANGE test — see setDefaultRun.
+      await getSupabase().from('runs')
+        .update({ is_default: false }).eq('vehicle_id', targetVehicleId).eq('kind', 'charging');
       await getSupabase().from('spec_links').update({ is_default: false }).eq('target_vehicle_id', targetVehicleId);
     }
     const payload = {};
@@ -589,8 +592,28 @@ class DataService {
     if (error) throw error;
   }
 
-  async clearDefaultRun(vehicleId) {
-    if (!this.useSupabase || !this.user) return;
+  /**
+   * Clear a default. Pass the run being cleared: since migration 046 a vehicle
+   * holds a default charging run AND a default range test, so clearing every
+   * run of the vehicle meant clicking × on one silently dropped the other.
+   *
+   * With no runId this still clears the lot, which is what deleting a vehicle's
+   * data wants; nothing in the UI calls it that way.
+   */
+  async clearDefaultRun(vehicleId, runId = null) {
+    if (!this.useSupabase || !this.user) {
+      const saved = localStorage.getItem('evData');
+      const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
+      data.vehicles = data.vehicles.map(v =>
+        v.id === vehicleId ? { ...v, runs: clearDefaultRuns(v.runs, runId) } : v);
+      localStorage.setItem('evData', JSON.stringify(data));
+      return;
+    }
+    if (runId != null) {
+      const { error } = await getSupabase().from('runs').update({ is_default: false }).eq('id', runId);
+      if (error) throw error;
+      return;
+    }
     await getSupabase().from('runs').update({ is_default: false }).eq('vehicle_id', vehicleId);
     await getSupabase().from('spec_links').update({ is_default: false }).eq('target_vehicle_id', vehicleId);
   }
@@ -600,8 +623,7 @@ class DataService {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
       data.vehicles = data.vehicles.map(v =>
-        v.id === vehicleId ? { ...v, runs: v.runs.map(r => ({ ...r, isDefault: r.id === runId }))} : v
-      );
+        v.id === vehicleId ? { ...v, runs: applyDefaultRun(v.runs, runId) } : v);
       localStorage.setItem('evData', JSON.stringify(data));
       return;
     }
