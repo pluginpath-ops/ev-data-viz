@@ -457,7 +457,7 @@ const DeriveAxisPanel = ({
     );
 };
 
-export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle }) {
+export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle }) {
     const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, setPairedChargingRun, clearDefaultRun, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
@@ -1285,7 +1285,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     // Runs of one session sit together under a heading that names the outing.
     // A flat pile said nothing about which two runs were the same test event,
     // which is the entire reason sessions exist.
-    const groupedRuns = useMemo(() => groupRunsBySession(displayRuns), [displayRuns]);
+    const runGroups = useMemo(() => groupRunsBySession(displayRuns), [displayRuns]);
     const [collapsedSessions, setCollapsedSessions] = useState(() => new Set());
     const [editingSessionId, setEditingSessionId] = useState(null);
     const toggleSessionGroup = (key) => setCollapsedSessions(prev => {
@@ -1847,31 +1847,36 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             )}
 
             <div className="space-y-4">
-                {groupedRuns.map(({ run, sessionId, isGroupStart, groupSize }) => {
+                {runGroups.map(group => {
+                  const collapsed = collapsedSessions.has(String(group.key));
+                  const session   = group.sessionId != null
+                      ? (testSessions || []).find(x => String(x.id) === String(group.sessionId)) ?? null
+                      : null;
+                  return (
+                    <div
+                        key={group.key}
+                        className={`session-group${session ? '' : ' is-unassigned'}${collapsed ? ' is-collapsed' : ''}`}
+                    >
+                    <SessionGroupHeader
+                        session={session}
+                        vehicle={vehicle}
+                        vehicles={vehicles}
+                        runsHere={group.runs.length}
+                        collapsed={collapsed}
+                        onToggle={() => toggleSessionGroup(group.key)}
+                        onEdit={session && canEdit(vehicle) ? () => setEditingSessionId(session.id) : null}
+                        onViewVehicle={onViewVehicle}
+                    />
+                    {!collapsed && (
+                    <div className="session-group-body">
+                    {group.runs.map(run => {
                   // Ensure vote data is loaded for this run (no-op if already loaded)
                   if (!runVotes[run.id]) loadRunVotes([run.id]);
                   const votes = runVotes[run.id] ?? { vouch: 0, flag: 0, myVote: null };
                   const isPending = pendingDeletes.has(run.id);
-                  const groupKey  = sessionId ?? '__none__';
-                  const collapsed = collapsedSessions.has(String(groupKey));
-                  const session   = sessionId != null
-                      ? (testSessions || []).find(x => String(x.id) === String(sessionId)) ?? null
-                      : null;
                   return (
-                    <Fragment key={run.id}>
-                    {isGroupStart && (
-                        <SessionGroupHeader
-                            session={session}
-                            vehicle={vehicle}
-                            vehicles={vehicles}
-                            runsHere={groupSize}
-                            collapsed={collapsed}
-                            onToggle={() => toggleSessionGroup(groupKey)}
-                            onEdit={session && canEdit(vehicle) ? () => setEditingSessionId(session.id) : null}
-                        />
-                    )}
-                    {!collapsed && (
                     <div
+                        key={run.id}
                         className={`card${isPending ? ' opacity-60 border-2 border-red-200' : ''}`}
                     >
                         {editingRunId === run.id ? (
@@ -2491,8 +2496,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             </div>
                         )}
                     </div>
+                  );
+                    })}
+                    </div>
                     )}
-                    </Fragment>
+                    </div>
                   );
                 })}
             </div>

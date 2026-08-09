@@ -1,4 +1,5 @@
 import { sessionLabel, vehiclesInSession, runsInSession } from '../utils/testSessions';
+import { vehicleLabel } from '../utils/specHelpers';
 
 /**
  * The band above the runs of one session in a vehicle's Tests & Data list.
@@ -13,7 +14,7 @@ import { sessionLabel, vehiclesInSession, runsInSession } from '../utils/testSes
  * makes the comparison trustworthy — invisible from this page otherwise.
  */
 export default function SessionGroupHeader({
-    session, vehicle, vehicles, runsHere, collapsed, onToggle, onEdit,
+    session, vehicle, vehicles, runsHere, collapsed, onToggle, onEdit, onViewVehicle,
 }) {
     // Ungrouped runs get a plain divider — a heading would imply they belong to
     // something, and "no session" is an absence, not a group.
@@ -47,9 +48,26 @@ export default function SessionGroupHeader({
                 {total > runsHere && ` · ${total} in session`}
             </span>
 
+            {/* The other cars are links: a side-by-side is only worth recording
+                because the runs are comparable, and the natural next move on
+                seeing "with R2" is to go and look at the R2's half. */}
             {others.length > 0 && (
                 <span className="text-xs text-secondary">
-                    with {others.map(v => v.model || v.name).join(', ')}
+                    with{' '}
+                    {others.map((v, i) => (
+                        <span key={v.id}>
+                            {i > 0 && ', '}
+                            {onViewVehicle ? (
+                                <button
+                                    onClick={() => onViewVehicle(v)}
+                                    className="session-vehicle-link"
+                                    title={`View ${vehicleLabel(v)} tests & data`}
+                                >
+                                    {v.model || v.name}
+                                </button>
+                            ) : (v.model || v.name)}
+                        </span>
+                    ))}
                 </span>
             )}
 

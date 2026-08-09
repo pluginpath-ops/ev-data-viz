@@ -194,17 +194,17 @@ export function summariseSessions(sessions, vehicles) {
 }
 
 /**
- * Order a vehicle's runs so each session's runs sit together, and mark where
- * each group starts.
+ * Group a vehicle's runs by session, so each session can be rendered as one
+ * container holding its runs.
  *
  * Sessions appear in the order their first run does, so a curator's existing
  * sense of the list is preserved rather than resorted underneath them.
  * Unassigned runs collect at the end: they are an absence, not an outing, and
  * putting them first would bury the grouping under the ungrouped.
  *
- * Returns a flat list — [{ run, sessionId, isGroupStart, groupSize }] — because
- * the caller renders one card per run and only needs to know where to insert a
- * heading.
+ * Returns [{ key, sessionId, runs }] — a real nesting rather than a flat list
+ * with markers, because the session card CONTAINS its runs on screen and
+ * collapsing it should visibly fold them away.
  */
 export function groupRunsBySession(runs) {
     const order = [];
@@ -220,15 +220,9 @@ export function groupRunsBySession(runs) {
     const keys = order.filter(k => k !== '__none__');
     if (bySession.has('__none__')) keys.push('__none__');
 
-    const out = [];
-    for (const key of keys) {
-        const group = bySession.get(key);
-        group.forEach((run, i) => out.push({
-            run,
-            sessionId:    key === '__none__' ? null : key,
-            isGroupStart: i === 0,
-            groupSize:    group.length,
-        }));
-    }
-    return out;
+    return keys.map(key => ({
+        key,
+        sessionId: key === '__none__' ? null : key,
+        runs: bySession.get(key),
+    }));
 }

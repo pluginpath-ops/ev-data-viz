@@ -1409,12 +1409,8 @@ body {
 
 /* ── Session grouping in Tests & Data ───────────────────────────────────────── */
 .session-group-header {
-    @apply flex items-center gap-3 flex-wrap px-3 py-2 rounded-lg;
+    @apply flex items-center gap-3 flex-wrap px-3 py-2;
     background-color: var(--color-surface-sunken);
-    border-left: 3px solid var(--color-primary);
-}
-.session-group-header.is-unassigned {
-    border-left-color: var(--color-border);
 }
 .session-group-toggle {
     @apply flex items-center gap-2 text-left transition-colors;
@@ -1449,4 +1445,31 @@ body {
 }
 .session-edit-field.is-wide {
     grid-column: 1 / -1;
+}
+
+/* The session card CONTAINS its runs, so collapsing visibly folds them away
+   rather than making a band and some cards disappear independently. */
+.session-group {
+    @apply rounded-xl overflow-hidden;
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-primary);
+}
+.session-group.is-unassigned {
+    border-left-color: var(--color-border);
+}
+.session-group-body {
+    @apply flex flex-col gap-3 p-3;
+    background-color: var(--color-surface-sunken);
+}
+/* Nested cards sit on the sunken group background, so they lose the outer
+   border that would otherwise read as a second frame inside the first. */
+.session-group-body > .card {
+    @apply mb-0 shadow-none;
+}
+.session-vehicle-link {
+    @apply underline decoration-dotted underline-offset-2 transition-colors;
+    color: var(--color-text-secondary);
+}
+.session-vehicle-link:hover {
+    color: var(--color-primary);
 }
