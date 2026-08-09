@@ -11,6 +11,7 @@ import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EP
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import VerboseLabelToggle from './VerboseLabelToggle';
+import AutoColorToggle from './AutoColorToggle';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import {
@@ -1341,20 +1342,6 @@ export default function RoadTripView({
                                 🚐 Towing
                             </button>
                         </div>
-                        {setChartConfig && (
-                            <div className="flex items-end">
-                                <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
-                                    <input
-                                        type="checkbox"
-                                        checked={autoColor}
-                                        onChange={e => setChartConfig(prev => ({ ...prev, autoColor: e.target.checked }))}
-                                        className="w-4 h-4"
-                                    />
-                                    <span className="text-sm font-medium">Auto Color</span>
-                                </label>
-                                <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
-                            </div>
-                        )}
                     </div>
 
                     {/* Towing inputs — only visible when towing mode is on */}
@@ -1474,6 +1461,10 @@ export default function RoadTripView({
                     {/* Run selector */}
                     <div className="mt-4">
                         <RunSelector
+                            headerActions={setChartConfig ? <>
+                                <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                                <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                            </> : null}
                             vehicles={selectedVehicles.filter(v =>
                                 filterChargingRuns(v.runs).length > 0
                             )}

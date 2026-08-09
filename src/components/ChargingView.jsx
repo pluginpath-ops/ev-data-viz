@@ -11,6 +11,7 @@ import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import VerboseLabelToggle from './VerboseLabelToggle';
+import AutoColorToggle from './AutoColorToggle';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
@@ -723,20 +724,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         />
                         <span className="text-sm font-medium">Show points</span>
                     </label>
-                    <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
-                        <input
-                            type="checkbox"
-                            checked={chartConfig.autoColor ?? false}
-                            onChange={e => setChartConfig({ ...chartConfig, autoColor: e.target.checked })}
-                            className="w-4 h-4"
-                        />
-                        <span className="text-sm font-medium">Auto Color</span>
-                    </label>
-                    <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
                 </div>
 
                 {/* ── Collapsible run selector ── */}
                 <RunSelector
+                    headerActions={<>
+                        <AutoColorToggle autoColor={chartConfig.autoColor ?? false} setChartConfig={setChartConfig} />
+                        <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
+                    </>}
                     vehicles={selectedVehicles}
                     selectedRunIds={chartConfig.selectedRuns}
                     onToggleRun={runId => setChartConfig(prev => ({

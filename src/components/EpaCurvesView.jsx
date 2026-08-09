@@ -16,6 +16,7 @@ import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import ChartInfoBubble from './ChartInfoBubble';
+import AutoColorToggle from './AutoColorToggle';
 
 // Sane bounds for the ambient-temperature viewing condition; far outside this
 // the ideal-gas density approximation isn't meaningful anyway.
@@ -700,17 +701,6 @@ export default function EpaCurvesView({
                                 </button>
                             ))}
                         </div>
-                        {setChartConfig && (
-                            <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
-                                <input
-                                    type="checkbox"
-                                    checked={autoColor}
-                                    onChange={e => setChartConfig(prev => ({ ...prev, autoColor: e.target.checked }))}
-                                    className="w-4 h-4"
-                                />
-                                <span className="text-sm font-medium">Auto Color</span>
-                            </label>
-                        )}
                         <div className="flex items-center gap-1.5">
                             <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
                                 Overlay Real World Tests
@@ -930,6 +920,7 @@ export default function EpaCurvesView({
                     {/* Collapsible EPA test selector */}
                     {vehiclesWithEpa.length > 0 && (
                         <div className="mt-4">
+                            <div className="run-selector-bar">
                             <button
                                 onClick={() => setSelectorExpanded(p => !p)}
                                 className="run-selector-header"
@@ -938,6 +929,12 @@ export default function EpaCurvesView({
                                 Select Vehicle Tests to Display
                                 <span className="text-sm font-normal text-muted">({visibleCount} of {totalMappings} shown)</span>
                             </button>
+                            {setChartConfig && (
+                                <div className="run-selector-actions">
+                                    <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                                </div>
+                            )}
+                            </div>
 
                             {selectorExpanded && (
                                 <div className="mt-3">

@@ -751,7 +751,6 @@ export default function ChargeCompareView({
             {!presentationMode && <div className="card mb-6">
                 {loading && <LoadingSpinner message="Loading charging data…" />}
                 <div className="flex flex-wrap items-center gap-6">
-                    {setChartConfig && <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />}
                     <label className="flex items-center gap-2 text-sm font-medium text-secondary">
                         Starting SoC (%):
                         <input
@@ -803,6 +802,9 @@ export default function ChargeCompareView({
 
                 <div className="mt-4">
                     <RunSelector
+                        headerActions={setChartConfig
+                            ? <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                            : null}
                         vehicles={selectedVehicles}
                         selectedRunIds={selectedRuns}
                         onToggleRun={toggleRun}

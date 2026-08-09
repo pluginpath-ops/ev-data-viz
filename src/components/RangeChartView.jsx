@@ -6,6 +6,7 @@ import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import VerboseLabelToggle from './VerboseLabelToggle';
+import AutoColorToggle from './AutoColorToggle';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import {
@@ -539,20 +540,14 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                             <span className="text-sm font-medium">Show points</span>
                         </label>
                     )}
-                    <label className="toggle-label" title="Override stored colors with perceptually distinct Okabe-Ito palette colors">
-                        <input
-                            type="checkbox"
-                            checked={autoColor}
-                            onChange={e => setChartConfig(prev => ({ ...prev, autoColor: e.target.checked }))}
-                            className="w-4 h-4"
-                        />
-                        <span className="text-sm font-medium">Auto Color</span>
-                    </label>
-                    <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                 </div>
 
                 {/* ── Run selector ── */}
                 <RunSelector
+                    headerActions={<>
+                        <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                        <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                    </>}
                     vehicles={selectedVehicles}
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}

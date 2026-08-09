@@ -52,6 +52,8 @@ export default function RunSelector({
     emptyMessage = 'No runs',
     renderRunMeta = null,
     colorMap = {},
+    // Rendered to the right of the header — the chart-session toggles.
+    headerActions = null,
     // Pair mode
     pairMode = false,
     pairings = {},
@@ -136,6 +138,10 @@ export default function RunSelector({
 
     return (
         <div>
+            {/* Chart-session toggles live here rather than in each chart's own
+                controls card: they act on what this selector chooses, and every
+                chart had drifted into putting them somewhere different. */}
+            <div className="run-selector-bar">
             <button
                 onClick={() => setExpanded(prev => !prev)}
                 className="run-selector-header"
@@ -147,6 +153,8 @@ export default function RunSelector({
                     <span className="text-xs font-normal text-faint ml-2">· Drag the pills above to reorder</span>
                 )}
             </button>
+                {headerActions && <div className="run-selector-actions">{headerActions}</div>}
+            </div>
 
             {expanded && (
                 <div className="mt-3">
