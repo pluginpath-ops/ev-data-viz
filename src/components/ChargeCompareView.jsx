@@ -11,6 +11,7 @@ import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } fr
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels } from '../utils/seriesLabel';
+import VerboseLabelToggle from './VerboseLabelToggle';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import LoadingSpinner from './LoadingSpinner';
@@ -283,6 +284,8 @@ export default function ChargeCompareView({
     pairings = {},
     setPairings = () => {},
     presentationMode = false,
+    verboseLabels = false,
+    setChartConfig = null,
 }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
@@ -474,10 +477,10 @@ export default function ChargeCompareView({
         const labels = buildSeriesLabels(active, { supplied: ['year', 'make', 'model', 'trim'] });
         return active.map(p => ({
             ...p,
-            label:     labels.get(p.key)?.short ?? p.rangeRun.name,
-            fullLabel: labels.get(p.key)?.full  ?? p.rangeRun.name,
+            label: (verboseLabels ? labels.get(p.key)?.full : labels.get(p.key)?.short) ?? p.rangeRun.name,
+            fullLabel: labels.get(p.key)?.full ?? p.rangeRun.name,
         }));
-    }, [resolvedPairs, selectedRuns]);
+    }, [resolvedPairs, selectedRuns, verboseLabels]);
 
     // ── Compute bars for one chart type ──────────────────────────────────────
     // chartType: 'range_added' | 'time_to_range'
@@ -736,6 +739,7 @@ export default function ChargeCompareView({
             {!presentationMode && <div className="card mb-6">
                 {loading && <LoadingSpinner message="Loading charging data…" />}
                 <div className="flex flex-wrap items-center gap-6">
+                    {setChartConfig && <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />}
                     <label className="flex items-center gap-2 text-sm font-medium text-secondary">
                         Starting SoC (%):
                         <input

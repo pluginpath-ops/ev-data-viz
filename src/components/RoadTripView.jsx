@@ -10,6 +10,7 @@ import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } fr
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels } from '../utils/seriesLabel';
+import VerboseLabelToggle from './VerboseLabelToggle';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import {
@@ -367,6 +368,7 @@ export default function RoadTripView({
     setPairings = () => {},
     presentationMode = false,
     autoColor = true,
+    verboseLabels = false,
     setChartConfig = null,
 }) {
     const { units } = useAppContext();
@@ -697,8 +699,10 @@ export default function RoadTripView({
             rangeRun:    e.rangeRun,
             chargingRun: e.run,
         })));
-        const entryLabel = e => seriesLabels.get(e.key)?.short ?? vehicleLabel(e.vehicle);
         const entryLabelFull = e => seriesLabels.get(e.key)?.full ?? vehicleLabel(e.vehicle);
+        const entryLabel = e => verboseLabels
+            ? entryLabelFull(e)
+            : seriesLabels.get(e.key)?.short ?? vehicleLabel(e.vehicle);
 
         // ── Speed sweep chart ────────────────────────────────────────────────
         if (isSpeedMode) {
@@ -1333,6 +1337,7 @@ export default function RoadTripView({
                                     />
                                     <span className="text-sm font-medium">Auto Color</span>
                                 </label>
+                                <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                             </div>
                         )}
                     </div>

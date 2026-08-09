@@ -73,6 +73,7 @@ export default function PopoutView({
                     roadTripConfig={roadTripConfig}
                     pairings={pairings}
                     setRoadTripConfig={() => {}}
+                    verboseLabels={chartConfig?.verboseLabels ?? false}
                     presentationMode
                 />
             )}
@@ -100,6 +101,7 @@ export default function PopoutView({
                     mMiles={compareConfig.mMiles}
                     startSoc={compareConfig.startSoc}
                     pairings={pairings}
+                    verboseLabels={chartConfig?.verboseLabels ?? false}
                     presentationMode
                 />
             )}
