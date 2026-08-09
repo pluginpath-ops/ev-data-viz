@@ -737,10 +737,13 @@ export default function ChargeCompareView({
                 if (inst.current) { inst.current.destroy(); inst.current = null; }
             });
         };
-    // resolvedPairs, not just selectedRuns: changing a row's partner can leave the
+    // activePairs, not just selectedRuns: changing a row's partner can leave the
     // selection array identical (same row, different pairing) while every bar's
     // value changes, and the chart would keep the previous partner's numbers.
-    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, selectedRuns, resolvedPairs, units, isDark]);
+    // It also carries the labels and colours, so a Full Labels toggle redraws —
+    // depending on resolvedPairs alone left that toggle inert, since it changes
+    // neither the pairs nor the selection.
+    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, activePairs, units, isDark]);
 
     const hasRangeRuns = resolvedPairs.length > 0;
 
