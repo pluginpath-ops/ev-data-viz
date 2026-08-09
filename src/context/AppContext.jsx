@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { dataService } from '../services/DataService';
+import { applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
 
 const AppContext = createContext(null);
 
@@ -279,12 +280,15 @@ export function AppProvider({ children }) {
         }
     };
 
-    const clearDefaultRun = async (vehicleId) => {
+    // runId is the run whose default is being cleared. Without it this cleared
+    // every run of the vehicle, so clearing the default range test also cleared
+    // the default charging run — the two are independent since migration 046.
+    const clearDefaultRun = async (vehicleId, runId = null) => {
         try {
-            await dataService.clearDefaultRun(vehicleId);
+            await dataService.clearDefaultRun(vehicleId, runId);
             setVehicles(prev => prev.map(v =>
                 v.id === vehicleId
-                    ? { ...v, runs: v.runs.map(r => ({ ...r, isDefault: false })) }
+                    ? { ...v, runs: clearDefaultRuns(v.runs, runId) }
                     : v
             ));
         } catch (error) {
@@ -296,17 +300,12 @@ export function AppProvider({ children }) {
     const setDefaultRun = async (vehicleId, runId) => {
         try {
             await dataService.setDefaultRun(vehicleId, runId);
+            // Only the runs of the SAME KIND lose their default. The service has
+            // scoped this per kind since #177; the local copy had not, so setting
+            // a default range test cleared the default charging run on screen and
+            // the two disagreed until a reload.
             setVehicles(prev => prev.map(v =>
-                v.id === vehicleId
-                    ? {
-                        ...v,
-                        runs: v.runs.map(r => ({
-                            ...r,
-                            isDefault: r.id === runId
-                        }))
-                    }
-                    : v
-            ));
+                v.id === vehicleId ? { ...v, runs: applyDefaultRun(v.runs, runId) } : v));
         } catch (error) {
             logIfUnauthorized('set_default_run', 'run', runId, error);
             showError('Error setting default run: ' + error.message);
