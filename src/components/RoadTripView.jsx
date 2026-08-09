@@ -27,6 +27,18 @@ import ChartInfoBubble from './ChartInfoBubble';
 
 Chart.register(ZoomPlugin);
 
+/**
+ * A pair's session name, but only when both halves came from the same outing.
+ * One half's session says nothing about the pair, and #170's composer would
+ * then label the series after an event only part of it belongs to.
+ */
+function sharedSessionName(rangeRun, chargingRun, sessions) {
+    const id = rangeRun?.session_id;
+    if (id == null || String(id) !== String(chargingRun?.session_id)) return null;
+    return (sessions || []).find(s => String(s.id) === String(id))?.name?.trim() || null;
+}
+
+
 // ── Speed sweep constants ────────────────────────────────────────────────────
 const SPEED_SWEEP_MIN  = 45;   // mph
 const SPEED_SWEEP_MAX  = 100;  // mph
@@ -373,7 +385,7 @@ export default function RoadTripView({
     verboseLabels = false,
     setChartConfig = null,
 }) {
-    const { units } = useAppContext();
+    const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const canvasRef = useRef(null);
     const chartRef  = useRef(null);
@@ -714,6 +726,7 @@ export default function RoadTripView({
             vehicle:     e.vehicle,
             rangeRun:    e.rangeRun,
             chargingRun: e.run,
+            sessionName: sharedSessionName(e.rangeRun, e.run, testSessions),
         })));
         const entryLabelFull = e => seriesLabels.get(e.key)?.full ?? vehicleLabel(e.vehicle);
         const entryLabel = e => verboseLabels

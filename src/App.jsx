@@ -794,6 +794,7 @@ export default function App() {
                             onUpdateVehicleSpecs={updateVehicleSpecs}
                             specCustomFieldSuggestions={specCustomFieldSuggestions}
                             vehicles={vehicles}
+                            onViewVehicle={(v) => setActiveVehicle(v)}
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                         />
                     )}
