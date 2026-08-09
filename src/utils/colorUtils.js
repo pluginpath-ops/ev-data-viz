@@ -210,3 +210,53 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual')
 
     return result;
 }
+
+// ── Pair colours ─────────────────────────────────────────────────────────────
+
+/**
+ * Lightness offsets for the successive partners of one primary. The first
+ * partner keeps the primary's colour exactly, so a chart where nothing is
+ * paired more than once looks precisely as it did before.
+ */
+const PARTNER_SHADES = [0, 0.3, -0.26, 0.52, -0.44];
+
+/**
+ * Colour a set of paired series so related ones read as related.
+ *
+ * The pairing work let one range test appear several times, once per charging
+ * partner. Colour came from the range test alone, so those rows rendered in the
+ * SAME colour and only the label told them apart — on a bar chart, two identical
+ * bars side by side.
+ *
+ * Giving each row an unrelated palette slot would fix the collision and lose the
+ * relationship: the whole point is that these rows share a range basis. So the
+ * hue family comes from the primary and lightness varies by partner. Two shades
+ * of one blue read as "the same test, two charging curves" at a glance.
+ *
+ * Only primaries that actually appear more than once are shaded. A primary with
+ * one partner keeps its colour untouched, so this is invisible until it matters.
+ *
+ * @param {Array} rows  [{ key, primaryId, baseColor }] in display order
+ * @returns {Object} key → colour
+ */
+export function resolvePairColors(rows) {
+    const byPrimary = new Map();
+    for (const row of rows ?? []) {
+        const id = String(row.primaryId);
+        if (!byPrimary.has(id)) byPrimary.set(id, []);
+        byPrimary.get(id).push(row);
+    }
+
+    const out = {};
+    for (const group of byPrimary.values()) {
+        group.forEach((row, i) => {
+            const base = row.baseColor || DEFAULT_RUN_COLOR;
+            const shade = group.length > 1 ? PARTNER_SHADES[i % PARTNER_SHADES.length] : 0;
+            // Pass a zero offset straight through: shiftLightness would return
+            // the same colour lower-cased, and stored hexes get compared as
+            // strings elsewhere.
+            out[row.key] = shade === 0 ? base : shiftLightness(base, shade);
+        });
+    }
+    return out;
+}

@@ -14,6 +14,7 @@ import { buildSeriesLabels } from '../utils/seriesLabel';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
+import { resolvePairColors } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 
@@ -475,19 +476,30 @@ export default function ChargeCompareView({
     const activePairs = useMemo(() => {
         const active = resolvedPairs.filter(p => selectedRuns.includes(p.key));
         const labels = buildSeriesLabels(active, { supplied: ['year', 'make', 'model', 'trim'] });
+        // One range test paired with two charging curves used to render two bars
+        // in the SAME colour, since colour came from the range test alone. Shade
+        // by partner within the range test's own hue so the rows still read as
+        // related — see resolvePairColors.
+        const pairColors = resolvePairColors(active.map(p => ({
+            key:        p.key,
+            primaryId:  p.rangeRun.id,
+            baseColor:  colorMap[p.rangeRun.id] || p.rangeRun.color || p.chargingRun.color,
+        })));
+
         return active.map(p => ({
             ...p,
             label: (verboseLabels ? labels.get(p.key)?.full : labels.get(p.key)?.short) ?? p.rangeRun.name,
             fullLabel: labels.get(p.key)?.full ?? p.rangeRun.name,
+            color: pairColors[p.key],
         }));
-    }, [resolvedPairs, selectedRuns, verboseLabels]);
+    }, [resolvedPairs, selectedRuns, verboseLabels, colorMap]);
 
     // ── Compute bars for one chart type ──────────────────────────────────────
     // chartType: 'range_added' | 'time_to_range'
     const buildBars = (chartType) => {
         const flatRuns = [];
 
-        for (const { key, rangeRun, chargingRun, label, fullLabel, rangeSrc } of activePairs) {
+        for (const { key, rangeRun, chargingRun, label, fullLabel, rangeSrc, color: pairColor } of activePairs) {
             const chargingRunId = chargingRun.id;
             const base = {
                 id:              key,
@@ -496,7 +508,7 @@ export default function ChargeCompareView({
                 fullName:        fullLabel,
                 vehicleName:     rangeRun.vehicleName,
                 vehicleId:       rangeRun.vehicleId,
-                color:           colorMap[rangeRun.id] || rangeRun.color || chargingRun.color || '#3b82f6',
+                color:           pairColor || colorMap[rangeRun.id] || rangeRun.color || chargingRun.color || '#3b82f6',
                 // Each pill describes the half it came from: speed and conditions
                 // belong to the range test, which is what this row enumerates.
                 speed_mph:       rangeRun.speed_mph,

@@ -21,6 +21,7 @@ import {
 import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
+import { resolvePairColors } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 
 Chart.register(ZoomPlugin);
@@ -401,9 +402,15 @@ export default function RoadTripView({
         [vehicles, selectedVehicleIds]
     );
 
-    // ── Resolve chart colors for all charging runs ────────────────────────────
+    // ── Resolve chart colors ─────────────────────────────────────────────────
+    // Keyed on the RANGE test, not the charging run. This view enumerates range
+    // tests and its selector lists them as the primary, so colouring by the
+    // charging half meant two range tests sharing one charging curve drew in the
+    // same colour, and the selector's colour picker recoloured a row other than
+    // the one it sat next to. Charge Compare already keys on the range test, so
+    // a given pair now reads the same colour on both charts.
     const colorableRuns = useMemo(
-        () => selectedVehicles.flatMap(v => filterChargingRuns(v.runs)),
+        () => selectedVehicles.flatMap(v => filterRangeRuns(v.runs)),
         [selectedVehicles]
     );
     const { colorMap, setColorOverride } = useStickyChartColors(colorableRuns, {
@@ -464,13 +471,21 @@ export default function RoadTripView({
                         // Assume 70 mph if neither the range test nor its source says
                         testSpeedMph:   rangeRun.speed_mph ?? src.sourceRun?.speed_mph ?? null,
                         batteryKwh:     vehicle.battery,
-                        color:          colorMap[chargingRun.id] || rangeRun.color || chargingRun.color || PALETTE[colorIdx % PALETTE.length],
+                        color:          colorMap[rangeRun.id] || rangeRun.color || chargingRun.color || PALETTE[colorIdx % PALETTE.length],
                         efficiencyNote: src.note,
                     });
                     colorIdx++;
                 }
             }
         }
+        // Shade successive partners of one range test within its own hue, so a
+        // range test paired with two charging curves gives two related lines
+        // rather than two identical ones.
+        const pairColors = resolvePairColors([...map.values()].map(e => ({
+            key: e.key, primaryId: e.rangeRun.id, baseColor: e.color,
+        })));
+        for (const entry of map.values()) entry.color = pairColors[entry.key] ?? entry.color;
+
         return map;
     }, [selectedVehicles, colorMap, pairings]);
 
