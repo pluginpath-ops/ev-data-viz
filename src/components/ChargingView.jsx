@@ -20,7 +20,7 @@ import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
 
-export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, onUpdateRunColor, chartMode, pairings = {}, setPairings = () => {}, presentationMode = false }) {
+export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, chartMode, pairings = {}, setPairings = () => {}, presentationMode = false }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
     const chartRef = useRef(null);
@@ -34,9 +34,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // Preserve the user's pill order
     const selectedVehicles = selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean);
 
-    const handleColorChange = (vehicleId, runId, color) => {
-        onUpdateRunColor(vehicleId, runId, color);
-    };
+    // Chart-side colour edits are a SESSION OVERRIDE, never a database write.
+    // The durable colour is edited in Tests & Data; changing it while reading a
+    // chart would edit stored data for every visitor, and a stored value could
+    // not honour the reset rules the override follows.
+    const handleColorChange = (_vehicleId, runId, color) => setColorOverride(runId, color);
 
     // Resolve display colors for all selected runs.
     // In 'manual' mode only default-blue runs get nudged; in 'auto' mode all
@@ -49,7 +51,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         ),
         [selectedVehicles, chartConfig.selectedRuns]
     );
-    const colorMap = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride } = useStickyChartColors(colorableRuns, {
         autoColor: chartConfig.autoColor,
         resetKey: selectedVehicleIds.join(','),
     });
@@ -615,7 +617,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 selectedVehicles={selectedVehicles}
                 selectedRuns={chartConfig.selectedRuns}
                 setChartConfig={setChartConfig}
-                onUpdateRunColor={onUpdateRunColor}
                 presentationMode={presentationMode}
                 autoColor={chartConfig.autoColor ?? false}
             />

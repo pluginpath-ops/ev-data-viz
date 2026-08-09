@@ -86,7 +86,6 @@ export default function PopoutView({
                     selectedVehicleIds={selectedVehicles}
                     chartConfig={chartConfig}
                     setChartConfig={setChartConfig}
-                    onUpdateRunColor={onUpdateRunColor}
                     chartMode={chartMode}
                     pairings={pairings}
                     presentationMode

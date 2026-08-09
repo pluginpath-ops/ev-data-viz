@@ -18,7 +18,7 @@ import {
 } from '../utils/roadTripSimulation';
 import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
-import { resolveChartColors } from '../utils/colorUtils';
+import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
 
 Chart.register(ZoomPlugin);
@@ -364,7 +364,6 @@ export default function RoadTripView({
     // because it is charging-primary and the pairing is keyed by range test.
     pairings = {},
     setPairings = () => {},
-    onUpdateRunColor = null,
     presentationMode = false,
     autoColor = true,
     setChartConfig = null,
@@ -400,10 +399,14 @@ export default function RoadTripView({
     );
 
     // ── Resolve chart colors for all charging runs ────────────────────────────
-    const colorMap = useMemo(() => {
-        const allRuns = selectedVehicles.flatMap(v => filterChargingRuns(v.runs));
-        return resolveChartColors(allRuns, {}, autoColor ? 'auto' : 'manual');
-    }, [selectedVehicles, autoColor]);
+    const colorableRuns = useMemo(
+        () => selectedVehicles.flatMap(v => filterChargingRuns(v.runs)),
+        [selectedVehicles]
+    );
+    const { colorMap, setColorOverride } = useStickyChartColors(colorableRuns, {
+        autoColor,
+        resetKey: selectedVehicleIds.join(','),
+    });
 
     // ── One entry per (range test × charging test) pair ───────────────────────
     // Range-primary, matching Charge Compare: a charging curve is a property of
@@ -1448,7 +1451,7 @@ export default function RoadTripView({
                             )}
                             selectedRunIds={selectedRunIds}
                             onToggleRun={toggleRunId}
-                            onUpdateRunColor={onUpdateRunColor}
+                            onUpdateRunColor={(_vehicleId, runId, color) => setColorOverride(runId, color)}
                             colorMap={colorMap}
                             runFilter={(run, vehicle) =>
                                 isRangeRun(run) && filterChargingRuns(vehicle.runs).length > 0}

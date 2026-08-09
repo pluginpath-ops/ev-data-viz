@@ -53,7 +53,7 @@ const hasDataForType = (run, type) => {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, onUpdateRunColor, presentationMode = false, autoColor = false }) {
+export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, presentationMode = false, autoColor = false }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
@@ -103,7 +103,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     // Sticky in auto mode — see hooks/useStickyChartColors. Colours are added as
     // runs are selected and held until the vehicle set changes or Auto Color is
     // cycled, so the chart you were reading does not recolour under you.
-    const colorMap = useStickyChartColors(plottableRuns, {
+    const { colorMap, setColorOverride } = useStickyChartColors(plottableRuns, {
         autoColor,
         resetKey: selectedVehicles.map(v => v.id).join(','),
     });
@@ -528,7 +528,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     vehicles={selectedVehicles}
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}
-                    onUpdateRunColor={onUpdateRunColor}
+                    onUpdateRunColor={(_vehicleId, runId, color) => setColorOverride(runId, color)}
                     runFilter={isRangeRun}
                     colorMap={colorMap}
                     emptyMessage="No range test records"

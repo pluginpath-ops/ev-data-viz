@@ -11,6 +11,7 @@ import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } fr
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { useRunSelection } from '../hooks/useRunSelection';
+import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 
@@ -280,7 +281,6 @@ export default function ChargeCompareView({
     // pop-out, which receives them over BroadcastChannel and must not edit.
     pairings = {},
     setPairings = () => {},
-    onUpdateRunColor = null,
     presentationMode = false,
 }) {
     const { units } = useAppContext();
@@ -419,6 +419,17 @@ export default function ChargeCompareView({
     // Road Trip and anything added later behave identically when the data shifts
     // underneath them — pruning, repin carry-over and first-sighting bootstrap
     // were three separate implementations that each got a different part wrong.
+    // Bars are coloured by the range test (the row's subject). The hook gives the
+    // same session-override behaviour as the other charts without a DB write.
+    const colorableRuns = useMemo(
+        () => resolvedPairs.map(p => p.rangeRun),
+        [resolvedPairs]
+    );
+    const { colorMap, setColorOverride } = useStickyChartColors(colorableRuns, {
+        autoColor: false,   // this chart has no Auto Color toggle; overrides still apply
+        resetKey: selectedVehicleIds.join(','),
+    });
+
     const selectionRows = useMemo(
         () => resolvedPairs.map(p => ({
             key: p.key,
@@ -466,7 +477,7 @@ export default function ChargeCompareView({
                 name:            label,
                 vehicleName:     rangeRun.vehicleName,
                 vehicleId:       rangeRun.vehicleId,
-                color:           rangeRun.color || chargingRun.color || '#3b82f6',
+                color:           colorMap[rangeRun.id] || rangeRun.color || chargingRun.color || '#3b82f6',
                 // Each pill describes the half it came from: speed and conditions
                 // belong to the range test, which is what this row enumerates.
                 speed_mph:       rangeRun.speed_mph,
@@ -763,7 +774,7 @@ export default function ChargeCompareView({
                         vehicles={selectedVehicles}
                         selectedRunIds={selectedRuns}
                         onToggleRun={toggleRun}
-                        onUpdateRunColor={onUpdateRunColor}
+                        onUpdateRunColor={(_vehicleId, runId, color) => setColorOverride(runId, color)}
                         runFilter={(run, vehicle) =>
                             // A range test with no charging curve to pair against
                             // cannot produce a bar, so it is not offered.
