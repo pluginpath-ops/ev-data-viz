@@ -87,6 +87,12 @@ const clean = v => {
  *        needed to disambiguate. Minimality decides what is NECESSARY; a surface
  *        still gets to say what is always MEANINGFUL — "one bar per source"
  *        names the source on every bar, including a vehicle that only has one.
+ * @param {Object} [opts.overrides]  key → user-supplied name, winning outright.
+ *        The free-text override of #170 is shelved; this is the seam it needs.
+ *        An overridden series short-circuits BEFORE elision — manual must beat
+ *        auto — and is also excluded from the ambiguity computation, since a
+ *        hand-named series is already distinct and must not force its
+ *        neighbours to grow longer labels to differ from it.
  * @param {boolean} [opts.useSessionName]  when both halves of a pair come from
  *        one session, prefer that session's name as the short label: "Ottawa
  *        loop" beats "10→80% DC fast × 70 mph highway" at a quarter the width.
@@ -94,7 +100,7 @@ const clean = v => {
  */
 export function buildSeriesLabels(
     series,
-    { supplied = [], atoms = TEST_ATOMS, required = [], useSessionName = true } = {},
+    { supplied = [], atoms = TEST_ATOMS, required = [], overrides = {}, useSessionName = true } = {},
 ) {
     const out = new Map();
     if (!series?.length) return out;
@@ -131,8 +137,11 @@ export function buildSeriesLabels(
     // reader could not tell whether the two bars differ by car or by source, so
     // minimality is computed as if the required atoms were not there and they
     // are appended afterwards.
+    const overrideOf = s => clean(overrides?.[s.key]);
+
     const partitions = new Map();
-    series.forEach((_, i) => {
+    series.forEach((s, i) => {
+        if (overrideOf(s)) return;              // named by hand; not in the contest
         const k = supplied.map(key => values[i][key] ?? '').join(' | ');
         if (!partitions.has(k)) partitions.set(k, []);
         partitions.get(k).push(i);
@@ -193,6 +202,15 @@ export function buildSeriesLabels(
 
     series.forEach((s, i) => {
         const row = values[i];
+
+        // Manual wins outright, in both tiers: the user named this series
+        // something the data cannot express, and a tooltip that quietly
+        // reverted to the composed name would contradict the legend.
+        const manual = overrideOf(s);
+        if (manual) {
+            out.set(s.key, { short: manual, full: manual });
+            return;
+        }
 
         const full = compose(ATOMS, row);
 
