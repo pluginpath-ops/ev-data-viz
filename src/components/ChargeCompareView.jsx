@@ -10,6 +10,7 @@ import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../uti
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
+import { buildSeriesLabels } from '../utils/seriesLabel';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import LoadingSpinner from './LoadingSpinner';
@@ -352,18 +353,15 @@ export default function ChargeCompareView({
 
                     result.push({
                         key:         pairKey(rangeRun.id, partnerId),
+                        vehicle,
                         rangeRun:    { ...rangeRun, vehicleName: vehicleLabel(vehicle), vehicleId: vehicle.id },
                         chargingRun,
-                        // Only disambiguate when a range test is shown more than
-                        // once — the 1:1 case keeps its own name.
-                        label:       rows.length > 1
-                            ? `${rangeRun.name} × ${chargingRun.name}`
-                            : rangeRun.name,
                         rangeSrc,
                     });
                 }
             }
         }
+
         return result;
     }, [selectedVehicles, pairings]);
 
@@ -463,18 +461,36 @@ export default function ChargeCompareView({
         selectionRows, { shouldBootstrap: bootstrapOneRow }
     );
 
-    const activePairs = resolvedPairs.filter(p => selectedRuns.includes(p.key));
+    // Name each bar by what distinguishes it from the OTHER BARS ON SCREEN, so
+    // the labels answer the comparison you are actually looking at. Minimising
+    // over every resolved pair instead would let a deselected run lengthen the
+    // labels of the ones you kept.
+    //
+    // The vehicle atoms are declared already-supplied: this chart groups bars by
+    // vehicle and prints that name under the axis, so repeating it in every bar
+    // label is what made these unreadably long.
+    const activePairs = useMemo(() => {
+        const active = resolvedPairs.filter(p => selectedRuns.includes(p.key));
+        const labels = buildSeriesLabels(active, { supplied: ['year', 'make', 'model', 'trim'] });
+        return active.map(p => ({
+            ...p,
+            label:     labels.get(p.key)?.short ?? p.rangeRun.name,
+            fullLabel: labels.get(p.key)?.full  ?? p.rangeRun.name,
+        }));
+    }, [resolvedPairs, selectedRuns]);
 
     // ── Compute bars for one chart type ──────────────────────────────────────
     // chartType: 'range_added' | 'time_to_range'
     const buildBars = (chartType) => {
         const flatRuns = [];
 
-        for (const { key, rangeRun, chargingRun, label, rangeSrc } of activePairs) {
+        for (const { key, rangeRun, chargingRun, label, fullLabel, rangeSrc } of activePairs) {
             const chargingRunId = chargingRun.id;
             const base = {
                 id:              key,
                 name:            label,
+                // Nothing the short label elided is lost — the tooltip says it all.
+                fullName:        fullLabel,
                 vehicleName:     rangeRun.vehicleName,
                 vehicleId:       rangeRun.vehicleId,
                 color:           colorMap[rangeRun.id] || rangeRun.color || chargingRun.color || '#3b82f6',
@@ -658,7 +674,7 @@ export default function ChargeCompareView({
                                 title(items) {
                                     if (!items.length) return;
                                     const run = built.flatRuns[items[0].dataIndex];
-                                    return run ? `${run.name} — ${run.vehicleName}` : undefined;
+                                    return run ? (run.fullName ?? `${run.name} — ${run.vehicleName}`) : undefined;
                                 },
                                 label(ctx) {
                                     const run = built.flatRuns[ctx.dataIndex];
