@@ -5,6 +5,7 @@ import {
 } from '../utils/testSessions';
 import { vehicleLabel } from '../utils/specHelpers';
 import SessionBrowserModal from './SessionBrowserModal';
+import SessionEditModal from './SessionEditModal';
 
 /**
  * Assign a run to a testing session.
@@ -24,9 +25,14 @@ export default function SessionControl({
     run, vehicle, vehicles, sessions,
     onAssign,          // (sessionId | null) => void
     onCreate,          // ({ name, testedAt }) => Promise<session | null>
+    onUpdate,          // (id, changes) => void
+    onDelete,          // (id) => void
 }) {
     const [creating, setCreating] = useState(false);
     const [browsing, setBrowsing] = useState(false);
+    const [editing, setEditing] = useState(false);
+    // Editing a session reached from the browser, which need not be this run's.
+    const [browseEditId, setBrowseEditId] = useState(null);
     const [draftName, setDraftName] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -40,6 +46,12 @@ export default function SessionControl({
         ? vehiclesInSession(vehicles, current.id).filter(v => String(v.id) !== String(vehicle.id))
         : [];
     const runCount = current ? runsInSession(vehicles, current.id).length : 0;
+
+    // Edit reached from the browser may target a session this run is not in,
+    // so it wins over `current` while it is set.
+    const editTarget = browseEditId != null
+        ? (sessions || []).find(x => String(x.id) === String(browseEditId)) ?? null
+        : current;
 
     const handleChange = (value) => {
         if (value === '__new__')    { setCreating(true); setDraftName(''); return; }
@@ -103,6 +115,17 @@ export default function SessionControl({
                 <option value="__browse__">🔍 All sessions…</option>
             </select>
 
+            {/* Editable wherever it is named: noticing a session is misdated
+                happens while looking at a run, not at a management screen. */}
+            {current && onUpdate && (
+                <button onClick={() => setEditing(true)} className="session-group-edit" title="Edit session">✎</button>
+            )}
+
+            {current?.url && (
+                <a href={current.url} target="_blank" rel="noopener noreferrer"
+                   className="text-xs text-blue-500 hover:underline" title={current.url}>source ↗</a>
+            )}
+
             {current && runCount > 1 && (
                 <span className="text-xs text-secondary" title={others_in.map(vehicleLabel).join(', ') || undefined}>
                     {runCount} runs
@@ -120,6 +143,15 @@ export default function SessionControl({
                     ⚠ {mismatch} days from session date
                 </span>
             )}
+            {editing && editTarget && (
+                <SessionEditModal
+                    session={editTarget}
+                    vehicles={vehicles}
+                    onSave={onUpdate}
+                    onDelete={onDelete}
+                    onClose={() => { setEditing(false); setBrowseEditId(null); }}
+                />
+            )}
             {browsing && (
                 <SessionBrowserModal
                     vehicles={vehicles}
@@ -127,6 +159,7 @@ export default function SessionControl({
                     currentSessionId={run.session_id}
                     vehicleId={vehicle.id}
                     onPick={onAssign}
+                    onEdit={onUpdate ? (id) => { setBrowseEditId(id); setBrowsing(false); setEditing(true); } : null}
                     onClose={() => setBrowsing(false)}
                 />
             )}

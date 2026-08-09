@@ -192,3 +192,43 @@ export function summariseSessions(sessions, vehicles) {
         .map(s => sessionSummary(s, vehicles))
         .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
 }
+
+/**
+ * Order a vehicle's runs so each session's runs sit together, and mark where
+ * each group starts.
+ *
+ * Sessions appear in the order their first run does, so a curator's existing
+ * sense of the list is preserved rather than resorted underneath them.
+ * Unassigned runs collect at the end: they are an absence, not an outing, and
+ * putting them first would bury the grouping under the ungrouped.
+ *
+ * Returns a flat list — [{ run, sessionId, isGroupStart, groupSize }] — because
+ * the caller renders one card per run and only needs to know where to insert a
+ * heading.
+ */
+export function groupRunsBySession(runs) {
+    const order = [];
+    const bySession = new Map();
+
+    for (const run of runs || []) {
+        const key = run.session_id == null ? '__none__' : String(run.session_id);
+        if (!bySession.has(key)) { bySession.set(key, []); order.push(key); }
+        bySession.get(key).push(run);
+    }
+
+    // The absence goes last, however early its first run appeared.
+    const keys = order.filter(k => k !== '__none__');
+    if (bySession.has('__none__')) keys.push('__none__');
+
+    const out = [];
+    for (const key of keys) {
+        const group = bySession.get(key);
+        group.forEach((run, i) => out.push({
+            run,
+            sessionId:    key === '__none__' ? null : key,
+            isGroupStart: i === 0,
+            groupSize:    group.length,
+        }));
+    }
+    return out;
+}

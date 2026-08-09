@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { fmtSpeed, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
@@ -7,7 +7,10 @@ import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 import EditVehicleForm from './EditVehicleForm';
+import { groupRunsBySession } from '../utils/testSessions';
 import SessionControl from './SessionControl';
+import SessionGroupHeader from './SessionGroupHeader';
+import SessionEditModal from './SessionEditModal';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 import { RunVoteButtons } from './VoteButtons';
@@ -455,7 +458,7 @@ const DeriveAxisPanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, setPairedChargingRun, clearDefaultRun, testSessions, createTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, setPairedChargingRun, clearDefaultRun, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     const [showEditVehicle, setShowEditVehicle] = useState(false);
@@ -1278,6 +1281,19 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const availableFields  = csvData?.meta.fields || [];
     const allDisplayRuns   = (vehicle.runs || []).filter(r => !committedDeletes.has(r.id));
     const displayRuns      = allDisplayRuns.filter(r => !r._inherited);
+
+    // Runs of one session sit together under a heading that names the outing.
+    // A flat pile said nothing about which two runs were the same test event,
+    // which is the entire reason sessions exist.
+    const groupedRuns = useMemo(() => groupRunsBySession(displayRuns), [displayRuns]);
+    const [collapsedSessions, setCollapsedSessions] = useState(() => new Set());
+    const [editingSessionId, setEditingSessionId] = useState(null);
+    const toggleSessionGroup = (key) => setCollapsedSessions(prev => {
+        const next = new Set(prev);
+        const k = String(key);
+        next.has(k) ? next.delete(k) : next.add(k);
+        return next;
+    });
     const inheritedRuns    = allDisplayRuns.filter(r => r._inherited);
     const barVisible       = pendingDeletes.size > 0 || !!undoState;
 
@@ -1831,14 +1847,31 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             )}
 
             <div className="space-y-4">
-                {displayRuns.map(run => {
+                {groupedRuns.map(({ run, sessionId, isGroupStart, groupSize }) => {
                   // Ensure vote data is loaded for this run (no-op if already loaded)
                   if (!runVotes[run.id]) loadRunVotes([run.id]);
                   const votes = runVotes[run.id] ?? { vouch: 0, flag: 0, myVote: null };
                   const isPending = pendingDeletes.has(run.id);
+                  const groupKey  = sessionId ?? '__none__';
+                  const collapsed = collapsedSessions.has(String(groupKey));
+                  const session   = sessionId != null
+                      ? (testSessions || []).find(x => String(x.id) === String(sessionId)) ?? null
+                      : null;
                   return (
+                    <Fragment key={run.id}>
+                    {isGroupStart && (
+                        <SessionGroupHeader
+                            session={session}
+                            vehicle={vehicle}
+                            vehicles={vehicles}
+                            runsHere={groupSize}
+                            collapsed={collapsed}
+                            onToggle={() => toggleSessionGroup(groupKey)}
+                            onEdit={session && canEdit(vehicle) ? () => setEditingSessionId(session.id) : null}
+                        />
+                    )}
+                    {!collapsed && (
                     <div
-                        key={run.id}
                         className={`card${isPending ? ' opacity-60 border-2 border-red-200' : ''}`}
                     >
                         {editingRunId === run.id ? (
@@ -2338,6 +2371,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 sessions={testSessions}
                                                 onAssign={sessionId => setRunsSession([run.id], sessionId)}
                                                 onCreate={createTestSession}
+                                                onUpdate={updateTestSession}
+                                                onDelete={deleteTestSession}
                                             />
                                         )}
                                         {(inferRunFlags(run).includes('range') || run.distance_miles != null) && canEdit(vehicle) && (
@@ -2456,9 +2491,21 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             </div>
                         )}
                     </div>
+                    )}
+                    </Fragment>
                   );
                 })}
             </div>
+
+            {editingSessionId != null && (
+                <SessionEditModal
+                    session={(testSessions || []).find(x => String(x.id) === String(editingSessionId))}
+                    vehicles={vehicles}
+                    onSave={updateTestSession}
+                    onDelete={deleteTestSession}
+                    onClose={() => setEditingSessionId(null)}
+                />
+            )}
 
             {displayRuns.length === 0 && !showUpload && inheritedRuns.length === 0 && (
                 <div className="empty-state">

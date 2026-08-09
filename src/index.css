@@ -1406,3 +1406,47 @@ body {
     border-color: var(--color-primary);
     color: var(--color-primary);
 }
+
+/* ── Session grouping in Tests & Data ───────────────────────────────────────── */
+.session-group-header {
+    @apply flex items-center gap-3 flex-wrap px-3 py-2 rounded-lg;
+    background-color: var(--color-surface-sunken);
+    border-left: 3px solid var(--color-primary);
+}
+.session-group-header.is-unassigned {
+    border-left-color: var(--color-border);
+}
+.session-group-toggle {
+    @apply flex items-center gap-2 text-left transition-colors;
+    color: var(--color-text-primary);
+}
+.session-group-toggle:hover {
+    color: var(--color-text-secondary);
+}
+.session-group-chevron {
+    @apply inline-block text-xs transition-transform;
+    color: var(--color-text-faint);
+}
+.session-group-chevron.is-open {
+    transform: rotate(90deg);
+}
+.session-group-edit {
+    @apply ml-auto text-xs px-2 py-0.5 rounded transition-colors;
+    color: var(--color-text-faint);
+}
+.session-group-edit:hover {
+    color: var(--color-primary);
+    background-color: var(--color-card);
+}
+
+/* ── Session edit form ──────────────────────────────────────────────────────── */
+.session-edit-grid {
+    @apply grid gap-3;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.session-edit-field {
+    @apply flex flex-col gap-1;
+}
+.session-edit-field.is-wide {
+    grid-column: 1 / -1;
+}

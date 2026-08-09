@@ -23,6 +23,7 @@ import { vehicleLabel } from '../utils/specHelpers';
 export default function SessionBrowserModal({
     vehicles, sessions, currentSessionId, vehicleId,
     onPick,          // (sessionId | null) => void
+    onEdit,          // (sessionId) => void
     onClose,
 }) {
     const [query, setQuery] = useState('');
@@ -102,12 +103,21 @@ export default function SessionBrowserModal({
                                             )}
                                         </div>
 
-                                        <button
-                                            onClick={() => { onPick(isCurrent ? null : session.id); onClose(); }}
-                                            className={`btn text-sm shrink-0 ${isCurrent ? 'btn-secondary' : 'btn-primary'}`}
-                                        >
-                                            {isCurrent ? 'Detach' : 'Use'}
-                                        </button>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {onEdit && (
+                                                <button
+                                                    onClick={() => onEdit(session.id)}
+                                                    className="session-group-edit"
+                                                    title="Edit session"
+                                                >✎</button>
+                                            )}
+                                            <button
+                                                onClick={() => { onPick(isCurrent ? null : session.id); onClose(); }}
+                                                className={`btn text-sm ${isCurrent ? 'btn-secondary' : 'btn-primary'}`}
+                                            >
+                                                {isCurrent ? 'Detach' : 'Use'}
+                                            </button>
+                                        </div>
                                     </div>
                                 );
                             })}
