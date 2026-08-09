@@ -812,6 +812,10 @@ export default function ChargeCompareView({
                         selectedRunIds={selectedRuns}
                         onToggleRun={toggleRun}
                         onUpdateRunColor={(_vehicleId, runId, color) => setColorOverride(runId, color)}
+                        // Without this the swatches showed each run's stored
+                        // colour while the bars showed the resolved one, so the
+                        // picker and the chart disagreed from the first render.
+                        colorMap={colorMap}
                         runFilter={(run, vehicle) =>
                             // A range test with no charging curve to pair against
                             // cannot produce a bar, so it is not offered.

@@ -106,10 +106,18 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     // Sticky in auto mode — see hooks/useStickyChartColors. Colours are added as
     // runs are selected and held until the vehicle set changes or Auto Color is
     // cycled, so the chart you were reading does not recolour under you.
-    const { colorMap, setColorOverride } = useStickyChartColors(plottableRuns, {
+    // Every range run of every selected vehicle, NOT just the plotted ones.
+    // Feeding the filtered set meant unticking a run shrank the input, the
+    // palette re-solved across what was left, and unrelated runs changed colour
+    // — the shuffling that stickiness was meant to end. A stable input cannot
+    // shuffle, which is a stronger guarantee than remembering what it assigned.
+    const { colorMap, setColorOverride } = useStickyChartColors(allRangeRuns, {
         autoColor,
         resetKey: selectedVehicles.map(v => v.id).join(','),
     });
+
+    // Value-identity for the resolved colours — see the render effect's deps.
+    const colorSignature = allRangeRuns.map(r => `${r.id}:${colorMap[r.id] ?? ''}`).join(',');
 
     // ── Run toggle ────────────────────────────────────────────────────────────
     const toggleRun = (runId) => {
@@ -476,7 +484,16 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 chartInstance.current = null;
             }
         };
-    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark]);
+    // The colours and Full Labels belong here: a colour picked in the selector
+    // and a label toggle both change what is drawn without changing the
+    // selection, and the chart used to keep the old canvas until some unrelated
+    // toggle forced it to redraw.
+    //
+    // A SIGNATURE, not colorMap itself. The arrays feeding the resolver are
+    // rebuilt every render, so the map is a new object each time while holding
+    // the same values — depending on its identity would redraw the chart on
+    // every render. Comparing the colours by value redraws only when one moves.
+    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, autoColor]);
 
     // ── Copy chart PNG ────────────────────────────────────────────────────────
     const handleCopyImage = async () => {
