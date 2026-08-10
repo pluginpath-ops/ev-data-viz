@@ -472,11 +472,18 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                     if (!run) return [];
                                     return runTooltipLines(run, [
                                         run._yValue != null ? `${built.yLabel}: ${run._yValue}` : null,
+                                        // What was done to this figure, and what could
+                                        // not be. A corrected number that cannot say
+                                        // which axes moved it leaves the reader to
+                                        // infer it from the size of the change.
+                                        run._correction?.note ?? null,
                                     ].filter(Boolean), units);
                                 }
                                 // Line charts: run objects are stored parallel to points
                                 const run = ctx.dataset?.runMetas?.[ctx.dataIndex];
-                                return run ? runTooltipLines(run, [], units) : [];
+                                return run
+                                    ? runTooltipLines(run, [run._correction?.note ?? null].filter(Boolean), units)
+                                    : [];
                             },
                         },
                     },
