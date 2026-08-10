@@ -365,8 +365,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const CORRECTABLE_AXES = new Set(['range', 'deltaRange']);
 
     /** Scale a value only when the axis is a measured range figure. */
+    // Rounded to one decimal, matching the precision the uncorrected path always
+    // produced (Math.round(soc * miPerSoc * 10) / 10). Multiplying by the factor
+    // otherwise turns a clean 202.4 into 202.71828…, which the axis and tooltip
+    // both then display in full — precision the measurement never had.
     const scaleRange = (value, axis, k) =>
-        (k !== 1 && value != null && CORRECTABLE_AXES.has(axis)) ? value * k : value;
+        (k !== 1 && value != null && CORRECTABLE_AXES.has(axis))
+            ? Math.round(value * k * 10) / 10
+            : value;
 
     const getFieldValue = (point, fieldKey, vehicleBattery, vehicleRange) => {
         if (fieldKey === 'cRate') {
