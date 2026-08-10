@@ -1523,3 +1523,24 @@ body {
     @apply mt-1 text-xs;
     color: var(--color-text-faint);
 }
+
+/* ── Sub-tab section headers ────────────────────────────────────────────────── */
+/* One header shape for all four Tests & Data tabs. Actions are boxed rather
+   than bare text links: on a long tab a coloured word reads as prose until you
+   hover it, and a box says "control" before anyone tries. */
+.section-header {
+    @apply flex items-center gap-3 flex-wrap mb-3;
+}
+.section-header-title {
+    @apply flex items-center shrink-0;
+}
+.section-header-actions {
+    @apply flex items-center gap-2 flex-wrap;
+}
+.section-header-trailing {
+    @apply ml-auto flex items-center gap-2;
+}
+.section-action {
+    @apply text-xs px-2 py-1 rounded whitespace-nowrap transition;
+    @apply bg-indigo-50 text-indigo-700 hover:bg-indigo-100;
+}

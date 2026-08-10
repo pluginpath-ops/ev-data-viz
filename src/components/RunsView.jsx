@@ -10,6 +10,8 @@ import EditVehicleForm from './EditVehicleForm';
 import { groupRunsBySession } from '../utils/testSessions';
 import SessionControl from './SessionControl';
 import RunSpecRows from './RunSpecRows';
+import SectionHeader, { SectionAction } from './SectionHeader';
+import InfoIcon from './InfoIcon';
 import SessionGroupHeader from './SessionGroupHeader';
 import SessionEditModal from './SessionEditModal';
 import EditSpecsForm from './EditSpecsForm';
@@ -36,6 +38,19 @@ const DATA_FLAGS = [
  * was written against a list, does not have to change.
  */
 const inferRunFlags = (run) => [isRangeRun(run) ? 'range' : 'charging'];
+
+const INHERITED_SECTION_HELP =
+    'Tests borrowed from another vehicle that shares this one\'s hardware — a ' +
+    'trim with the same battery can inherit its charging curves, a battery ' +
+    'variant of the same body can inherit its range tests. Linked per test, ' +
+    'with a scaling factor where the two differ.';
+
+const TESTS_SECTION_HELP =
+    'Measured charging and range tests for this vehicle. A charging test is a ' +
+    'time-series of SoC against charge rate; a range test is a distance driven ' +
+    'against energy used. Since the two were split they are separate records, ' +
+    'paired to each other so a charging curve can be priced in miles — the ' +
+    'pairing is set per test, and grouped by the session they were driven in.';
 
 // ── Sub-tabs ─────────────────────────────────────────────────────────────────
 // Counts are computed from data the view already has, so a tab can say how much
@@ -1330,39 +1345,29 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 })}
             </div>
 
-            <div className="runs-view-header">
-                <div>
-                    <h2 className="page-title">{vehicle.name} - Tests &amp; Data</h2>
-                    <p className="text-secondary">Manage charging test data for this vehicle</p>
-                </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => {
-                            if (showUpload && uploadMode === 'create') {
-                                resetUploadState();
-                            } else {
-                                setUploadMode('create');
-                                setMergeTargetRun(null);
-                                setShowUpload(true); setSubtab('tests');
-                                setUploadStep('file');
-                                setCsvData(null);
-                                setFieldMapping({});
-                            }
-                        }}
-                        className="btn btn-primary"
-                    >
+            {subtab === 'tests' && (<>
+            <SectionHeader
+                title="Charging & Range Tests"
+                info={<InfoIcon text={TESTS_SECTION_HELP} position="right" className="ml-1" />}
+                actions={canCreate && (
+                    <SectionAction onClick={() => {
+                        // Toggles, as it always has: a second click cancels
+                        // rather than reopening a wizard that is already open.
+                        if (showUpload && uploadMode === 'create') {
+                            resetUploadState();
+                        } else {
+                            setUploadMode('create');
+                            setMergeTargetRun(null);
+                            setShowUpload(true);
+                            setUploadStep('file');
+                            setCsvData(null);
+                            setFieldMapping({});
+                        }
+                    }}>
                         {showUpload && uploadMode === 'create' ? 'Cancel' : '+ Add new record'}
-                    </button>
-                    {allDisplayRuns.length > 0 && (
-                        <button
-                            onClick={onViewChart}
-                            className="btn btn-primary"
-                        >
-                            View Charts
-                        </button>
-                    )}
-                </div>
-            </div>
+                    </SectionAction>
+                )}
+            />
 
             {showUpload && (
                 <div className="card mb-6">
@@ -1827,7 +1832,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 </div>
             )}
 
-            {subtab === 'tests' && (<>
             <div className="space-y-4">
                 {runGroups.map(group => {
                   const collapsed = collapsedSessions.has(String(group.key));
@@ -2541,6 +2545,19 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
             {/* ── Inherited Tests ───────────────────────────────────────────── */}
             {/* A tab that renders nothing reads as broken rather than empty. */}
+            {subtab === 'inherited' && (
+                <div className="mt-6">
+                    <SectionHeader
+                        title="Inherited Tests"
+                        info={<InfoIcon text={INHERITED_SECTION_HELP} position="right" className="ml-1" />}
+                        actions={isContributor && canEdit(vehicle) && !showAddLink && (
+                            <SectionAction onClick={() => setShowAddLink(true)}>
+                                + Add Inherited Link
+                            </SectionAction>
+                        )}
+                    />
+                </div>
+            )}
             {subtab === 'inherited' && inheritedRuns.length === 0 && !(isContributor && canEdit(vehicle)) && (
                 <div className="empty-state">
                     <p className="text-lg">No inherited tests.</p>
@@ -2551,19 +2568,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             )}
             {subtab === 'inherited' && (inheritedRuns.length > 0 || (isContributor && canEdit(vehicle))) && (
                 <div className="mt-6">
-                    <div className="flex items-center gap-3 mb-3">
-                        <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">
-                            Inherited Tests
-                        </h3>
-                        {isContributor && canEdit(vehicle) && !showAddLink && (
-                            <button
-                                onClick={() => setShowAddLink(true)}
-                                className="text-xs px-2 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition"
-                            >
-                                + Add Inherited Link
-                            </button>
-                        )}
-                    </div>
 
                     {/* Existing inherited runs */}
                     {inheritedRuns.length > 0 && (

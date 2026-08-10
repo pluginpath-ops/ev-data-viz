@@ -8,6 +8,7 @@
  */
 import { useState, useRef } from 'react';
 import InfoIcon from './InfoIcon';
+import SectionHeader, { SectionAction } from './SectionHeader';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import DerivedValues from './epa/DerivedValues';
 import EpaCuratorEditor from './epa/EpaCuratorEditor';
@@ -358,43 +359,32 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
 
     return (
         <div className="mt-6">
-            <div className="flex items-center justify-between gap-2 mb-3">
-                <h3 className="section-title">
-                    EPA Testing Data
-                    <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" className="ml-1" />
-                </h3>
-                <a
-                    href={EPA_SOURCE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap"
-                    title="EPA Annual Certification Data — look up Test Groups, coefficients, and lab reports"
-                >
-                    EPA source data ↗
-                </a>
-            </div>
+            <SectionHeader
+                title="EPA Testing Data"
+                info={<InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" className="ml-1" />}
+                actions={canEdit && (
+                    <>
+                        <SectionAction onClick={() => setShowPdfModal(true)}>📑 Import from EPA lab PDF</SectionAction>
+                        <SectionAction onClick={() => { setShowCreate(true); setCreateError(null); }}>
+                            + Create EPA test group from scratch
+                        </SectionAction>
+                    </>
+                )}
+                trailing={
+                    <a
+                        href={EPA_SOURCE_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap"
+                        title="EPA Annual Certification Data — look up Test Groups, coefficients, and lab reports"
+                    >
+                        EPA source data ↗
+                    </a>
+                }
+            />
 
-            {/* Existing mappings */}
-            {mappings.length === 0 ? (
-                <p className="text-sm text-muted mb-3">
-                    No EPA test group linked yet.
-                    {canEdit && ' Use the search below to assign one.'}
-                </p>
-            ) : (
-                mappings.map(m => (
-                    <EpaGroupCard
-                        key={m.id}
-                        mapping={m}
-                        canEdit={canEdit}
-                        onUnlink={onUnlink}
-                        onDelete={deleteEpaTestGroup}
-                        onUpdateConfidence={onUpdateConfidence}
-                        onUpdateDisplayName={onUpdateDisplayName}
-                    />
-                ))
-            )}
-
-            {/* Link combobox — contributors only */}
+            {/* Linking is the first thing a curator wants here, so it leads rather
+                than trailing the list it adds to. Contributors only. */}
             {canEdit && (
                 <div className="mt-2">
                     <div className="relative">
@@ -535,6 +525,27 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                     )}
                 </div>
             )}
+
+            {/* Existing mappings */}
+            {mappings.length === 0 ? (
+                <p className="text-sm text-muted mb-3">
+                    No EPA test group linked yet.
+                    {canEdit && ' Use the search below to assign one.'}
+                </p>
+            ) : (
+                mappings.map(m => (
+                    <EpaGroupCard
+                        key={m.id}
+                        mapping={m}
+                        canEdit={canEdit}
+                        onUnlink={onUnlink}
+                        onDelete={deleteEpaTestGroup}
+                        onUpdateConfidence={onUpdateConfidence}
+                        onUpdateDisplayName={onUpdateDisplayName}
+                    />
+                ))
+            )}
+
         </div>
     );
 }
