@@ -1473,3 +1473,23 @@ body {
 .session-vehicle-link:hover {
     color: var(--color-primary);
 }
+
+/* ── Run spec rows ──────────────────────────────────────────────────────────── */
+/* Grouped by meaning — design / conditions / results — with each row wrapping
+   inside its own band. The old single dot-separated line wrapped wherever the
+   card ended, so a temperature could start a line on its own and speed could
+   sit beside efficiency. A fixed label column gives the eye an anchor. */
+.run-spec-rows {
+    @apply flex flex-col gap-1 mt-1.5;
+}
+.run-spec-row {
+    @apply flex items-baseline gap-2 text-sm;
+}
+.run-spec-label {
+    @apply text-xs uppercase tracking-wide shrink-0;
+    width: 5.5rem;
+    color: var(--color-text-faint);
+}
+.run-spec-items {
+    @apply flex flex-wrap items-baseline gap-x-3 gap-y-0.5 min-w-0;
+}
