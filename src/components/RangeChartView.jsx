@@ -16,7 +16,7 @@ import {
     convDistance, convSpeed, convTemp,
     distanceLabel, speedLabel, tempLabel,
     calcEff, effOptions, effLabel as getEffLabel,
-    fmtSpeed, fmtTemp,
+    fmtSpeed, speedBasisNote, fmtTemp,
 } from '../utils/unitConversions';
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { copyChartAsPng } from '../utils/chartUtils';
@@ -317,6 +317,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     const badges = [];
                     if (run._yValue != null) badges.push({ text: `${run._yValue} ${run._yUnit}`, primary: true });
                     if (run.speed_mph     != null) badges.push({ text: fmtSpeed(run.speed_mph, units) });
+                    if (speedBasisNote(run))       badges.push({ text: speedBasisNote(run) });
                     if (run.temperature_f != null) badges.push({ text: fmtTemp(run.temperature_f, units) });
                     if (run.avg_wind_speed_mph != null) {
                         const dir = run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : '';
@@ -610,6 +611,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                             <>
                                 {run.speed_mph != null && (
                                     <span className="text-xs bg-[var(--color-surface-sunken)] text-secondary px-1.5 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
+                                )}
+                                {speedBasisNote(run) && (
+                                    <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded" title="Average over a varying-speed cycle. Not directly comparable to a steady-state test; speed correction is skipped.">{speedBasisNote(run)}</span>
                                 )}
                                 {run.temperature_f != null && (
                                     <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>

@@ -13,6 +13,7 @@ import { buildSeriesLabels } from '../utils/seriesLabel';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import CorrectionControl from './CorrectionControl';
 import { sessionFor } from '../utils/testSessions';
+import { correctionFactor } from '../utils/conditionCorrection';
 import AutoColorToggle from './AutoColorToggle';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -232,11 +233,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                     : own.find(r => String(r.id) === pairedRangeIds[0]) ?? null)
                                 : null;
 
+                            // Deliberately UNCORRECTED here. This runs once per
+                            // run, when its data points are fetched, so a
+                            // correction baked in now would never respond to the
+                            // dropdown and toggling a run would reuse the cache.
+                            // Correction is a single multiplier, so it is applied
+                            // at render time instead — see rangeFactorFor.
                             const src = resolveRangeSource(run ?? { id: runId }, {
                                 vehicle: parentVehicle,
                                 explicitPairing: pairedRange,
-                                correction: { mode: chartConfig.correctionMode ?? 'none' },
-                                session: sessionFor(testSessions, pairedRange),
                             });
 
                             // 'recorded' and 'none' mean no range test won — leave
@@ -318,6 +323,51 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
      * on-the-fly from stored chargeRate + vehicle metadata.
      * vehicleBattery = kWh, vehicleRange = rated miles
      */
+    // The correction factor for a run's RANGE axis, recomputed on every render so
+    // the dropdown takes effect immediately. Cheap and synchronous: the pairing
+    // resolution it repeats is plain object lookups.
+    //
+    // Applied as a multiplier rather than by re-deriving the points, which also
+    // makes it reach the buildRangePerSocLookup path — that returns a range test's
+    // own measured curve and never passes through miPerSoc, so a correction
+    // applied there would have been silently skipped.
+    const rangeFactorFor = (runId) => {
+        const mode = chartConfig.correctionMode ?? 'none';
+        if (mode === 'none') return 1;
+        const parentVehicle = vehicles.find(v => v.runs?.some(r => String(r.id) === String(runId)));
+        if (!parentVehicle) return 1;
+        const own = (parentVehicle.runs || []).filter(r => !r._inherited && isRangeRun(r));
+        const pairedIds = rangePartnersOfCharging(pairings, runId);
+        const pairedRange = pairedIds.length
+            ? (isEpaPartnerId(pairedIds[0]) ? EPA_PARTNER_ID : own.find(r => String(r.id) === pairedIds[0]) ?? null)
+            : null;
+        const run = (parentVehicle.runs || []).find(r => String(r.id) === String(runId));
+        // Resolve first to learn WHICH range test supplied the miles, then price
+        // that test's own conditions — the charging run's conditions are
+        // irrelevant, it did not measure any distance.
+        const src = resolveRangeSource(run ?? { id: runId }, {
+            vehicle: parentVehicle,
+            explicitPairing: pairedRange,
+        });
+        const sourceRun = src.sourceRun;
+        if (!sourceRun) return 1;
+        const session = sessionFor(testSessions, sourceRun);
+        return correctionFactor({
+            speedMph:     sourceRun.speed_mph,
+            speedBasis:   sourceRun.speed_basis,
+            altitudeFt:   sourceRun.altitude_ft   ?? session?.altitude_ft,
+            temperatureF: sourceRun.temperature_f ?? session?.temperature_f,
+        }, { mode }).factor;
+    };
+
+    // Range-derived axes only. EPA axes are a published spec, not a measurement,
+    // so correcting them would be inventing a figure nobody measured.
+    const CORRECTABLE_AXES = new Set(['range', 'deltaRange']);
+
+    /** Scale a value only when the axis is a measured range figure. */
+    const scaleRange = (value, axis, k) =>
+        (k !== 1 && value != null && CORRECTABLE_AXES.has(axis)) ? value * k : value;
+
     const getFieldValue = (point, fieldKey, vehicleBattery, vehicleRange) => {
         if (fieldKey === 'cRate') {
             return (point.chargeRate != null && vehicleBattery)
@@ -444,6 +494,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         const datasets = allSelectedRuns.flatMap((run) => {
             const rawData = runDataCache[run.id] ?? run.data ?? [];
             const { vehicleBattery, vehicleRange } = run;
+            // One multiplier for this run's range axes, so the dropdown takes
+            // effect without refetching. Declared before getX and the point
+            // mapping that read it.
+            const rangeK = rangeFactorFor(run.id);
             const color = colorMap[run.id] || run.color || '#3b82f6';
 
             // 1. Apply race-mode trim (slice from anchor; exclude if ineligible)
@@ -464,11 +518,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // 3. X value mapper
             const getX = raceActive
                 ? (d) => (d.time != null ? Math.round((d.time - timeOffset) * 10) / 10 : null)
-                : (d) => convertAxisValue(getFieldValue(d, chartConfig.xAxis, vehicleBattery, vehicleRange), chartConfig.xAxis);
+                : (d) => convertAxisValue(scaleRange(getFieldValue(d, chartConfig.xAxis, vehicleBattery, vehicleRange), chartConfig.xAxis, rangeK), chartConfig.xAxis);
 
             // 4. Y1 dataset
             const y1Points = workingData
-                .map(d => ({ x: getX(d), y: convertAxisValue(getFieldValue(d, chartConfig.yAxis, vehicleBattery, vehicleRange), chartConfig.yAxis) }))
+                .map(d => ({ x: getX(d), y: convertAxisValue(scaleRange(getFieldValue(d, chartConfig.yAxis, vehicleBattery, vehicleRange), chartConfig.yAxis, rangeK), chartConfig.yAxis) }))
                 .filter(p => p.x != null && p.y != null);
             if (y1Points.length === 0) return [];
 
@@ -490,7 +544,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // 5. Y2 dataset (hidden from legend; dashed line + triangle points)
             if (chartConfig.y2Axis) {
                 const y2Points = workingData
-                    .map(d => ({ x: getX(d), y: convertAxisValue(getFieldValue(d, chartConfig.y2Axis, vehicleBattery, vehicleRange), chartConfig.y2Axis) }))
+                    .map(d => ({ x: getX(d), y: convertAxisValue(scaleRange(getFieldValue(d, chartConfig.y2Axis, vehicleBattery, vehicleRange), chartConfig.y2Axis, rangeK), chartConfig.y2Axis) }))
                     .filter(p => p.x != null && p.y != null);
                 if (y2Points.length > 0) {
                     result.push({

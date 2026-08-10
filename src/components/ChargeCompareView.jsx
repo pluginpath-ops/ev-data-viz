@@ -6,7 +6,7 @@ import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
-import { convDistance, distanceLabel, fmtSpeed, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
+import { convDistance, distanceLabel, fmtSpeed, speedBasisNote, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
@@ -107,6 +107,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units, isDark) {
                     }
                     if (run._startRange != null) badges.push({ text: run._endRange != null ? `${run._startRange}→${run._endRange} ${run._rangeUnit}` : `${run._startRange} ${run._rangeUnit}`, alertAmt: 0 });
                     if (run.speed_mph   != null) badges.push({ text: fmtSpeed(run.speed_mph, units), alertAmt: 0, type: 'speed' });
+                    if (speedBasisNote(run))     badges.push({ text: speedBasisNote(run), alertAmt: 0, type: 'speed' });
                     if (run.temperature_f != null) badges.push({ text: fmtTemp(run.temperature_f, units), alertAmt: 0 });
                 }
                 if (badges.length === 0) return;
@@ -869,6 +870,9 @@ export default function ChargeCompareView({
                             <>
                                 {run.speed_mph != null && (
                                     <span className="text-xs bg-[var(--color-surface-sunken)] text-secondary px-1.5 py-0.5 rounded shrink-0">{fmtSpeed(run.speed_mph, units)}</span>
+                                )}
+                                {speedBasisNote(run) && (
+                                    <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded shrink-0" title="Average over a varying-speed cycle. Not directly comparable to a steady-state test; speed correction is skipped.">{speedBasisNote(run)}</span>
                                 )}
                                 {run.temperature_f != null && (
                                     <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200 shrink-0">{fmtTemp(run.temperature_f, units)}</span>

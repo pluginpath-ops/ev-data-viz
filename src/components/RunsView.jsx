@@ -1,6 +1,6 @@
 import { useState, useMemo, Fragment } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { fmtSpeed, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
+import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
 import { dataService } from '../services/DataService';
@@ -98,13 +98,22 @@ function RunRangeMetaLine({ run, units }) {
         // A mixed-cycle average is marked wherever the speed appears. The
         // figure is not comparable to a steady-state test of the same number,
         // and that is true before any correction is switched on.
-        items.push(run.speed_basis === 'mixed'
-            ? (
-                <span key="spd" className="text-amber-600" title="Average over a varying-speed cycle, not a held setpoint. Not directly comparable to a steady-state test, and speed correction is skipped for it.">
-                    {fmtSpeed(run.speed_mph, units)} avg · mixed cycle
-                </span>
-              )
-            : <span key="spd" className="text-secondary">{fmtSpeed(run.speed_mph, units)}</span>);
+        items.push(
+            <span
+                key="spd"
+                className={run.speed_basis === 'mixed' ? 'text-amber-600' : 'text-secondary'}
+                title={run.speed_basis === 'mixed'
+                    ? 'Average over a varying-speed cycle, not a held setpoint. Not directly comparable to a steady-state test, and speed correction is skipped for it.'
+                    : undefined}
+            >
+                {fmtSpeed(run.speed_mph, units)}
+            </span>);
+    if (speedBasisNote(run)) {
+        items.push(
+            <span key="basis" className="text-amber-600" title="Average over a varying-speed cycle. Not directly comparable to a steady-state test; speed correction is skipped.">
+                {speedBasisNote(run)}
+            </span>);
+    }
     } else {
         items.push(<span key="spd" className="text-amber-600" title="Set Speed (mph) in run metadata for accurate efficiency">{fmtSpeed(70, units)} (est.)</span>);
     }
