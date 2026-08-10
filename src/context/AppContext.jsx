@@ -776,13 +776,12 @@ export function AppProvider({ children }) {
     };
 
     const importTableauSessions = async (sessions, vehicleMap) => {
-        try {
-            const result = await dataService.importTableauSessions(sessions, vehicleMap);
-            await initializeApp();
-            return result;
-        } catch (error) {
-            throw error;
-        }
+        // Deliberately not caught here: the import modal shows the failure, and
+        // swallowing it would leave the user staring at a dialog that never
+        // finished. The try/catch that only rethrew said nothing.
+        const result = await dataService.importTableauSessions(sessions, vehicleMap);
+        await initializeApp();
+        return result;
     };
 
     // ── Chart help ("About this chart" copy) ──────────────────────────────────

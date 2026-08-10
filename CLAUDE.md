@@ -60,6 +60,21 @@ Side-by-side structured spec comparison for selected vehicles. Specs are stored 
 **Admin** *(admin role only)*
 User management — view registered users, assign roles (`admin`, `contributor`, `viewer`).
 
+## Linting
+
+`npm run lint` (ESLint 9, flat config in `eslint.config.js`). **Zero errors is the
+bar**; warnings are a visible backlog.
+
+It exists for one bug in particular: a helper used in JSX without being imported
+is a runtime `ReferenceError` that no build step catches, because Vite
+transpiles rather than resolves. That blanked the app three times in one day.
+`no-undef` catches it before the page renders.
+
+The React Compiler rules shipped with eslint-plugin-react-hooks v6 are set to
+`warn`, not `off` — 33 places would need a refactor, and a lint that fails on
+arrival is one nobody runs. `react-hooks/set-state-in-effect` in particular is
+worth working through; it is the shape of a bug this project has already hit.
+
 ## Testing
 
 `npm test` (vitest, `npm run test:watch` to iterate). Suites live in
