@@ -22,7 +22,7 @@ import { runKindFrom } from './runUtils';
 /** camelCase field → database column. One definition, so the writer and the
  *  optimistic update cannot drift — which is how the per-kind default bug
  *  survived a fix. */
-export const SESSION_COLUMNS = {
+const SESSION_COLUMNS = {
     name:         'name',
     testedAt:     'tested_at',
     tester:       'tester',
@@ -151,7 +151,7 @@ export function suggestedPairing(vehicles, sessionId, vehicleId) {
  * One row's worth of what a session IS, for browsing: when, how big, and — the
  * part that actually identifies an outing — which cars were on it.
  */
-export function sessionSummary(session, vehicles) {
+function sessionSummary(session, vehicles) {
     const rows = runsInSession(vehicles, session.id);
     return {
         session,

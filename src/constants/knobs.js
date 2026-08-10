@@ -28,6 +28,36 @@ export const KNOB_GROUPS = [
         ],
     },
     {
+        title: 'Condition correction',
+        blurb: 'How a measured range or efficiency figure is re-priced to a common basis. The aero fraction drives every correction magnitude: at 0.70 a 70→80 mph correction is +21%, at 0.60 it is ~18%.',
+        knobs: [
+            { key: 'AERO_FRACTION', label: 'Aero fraction at reference speed', kind: 'number',
+              min: 0.30, max: 0.95, step: 0.01, unit: '',
+              help: 'Share of energy spent on aerodynamic drag at the reference speed, unladen. One value for every vehicle — a slippery sedan and a boxy SUV genuinely differ, so this is an average rather than a truth.' },
+            { key: 'TOWING_AERO_FRACTION', label: 'Aero fraction when towing', kind: 'number',
+              min: 0.30, max: 0.99, step: 0.01, unit: '',
+              help: 'A trailer roughly doubles Cd×A, so aero dominates further. Used by the road-trip simulator.' },
+            { key: 'REFERENCE_SPEED_MPH', label: 'Reference speed', kind: 'number',
+              min: 30, max: 100, step: 1, unit: 'mph',
+              help: 'The speed the aero fraction is quoted at. Changing it rescales what that fraction means.' },
+        ],
+    },
+    {
+        title: 'Standard conditions',
+        blurb: 'The basis every corrected figure is re-priced TO. Not the same as the ISA 59°F reference the density formula is built on, which is physics rather than a choice.',
+        knobs: [
+            { key: 'STD_SPEED_MPH', label: 'Standard speed', kind: 'number',
+              min: 30, max: 100, step: 1, unit: 'mph',
+              help: 'Corrected figures are stated as though driven at this speed.' },
+            { key: 'STD_ALTITUDE_FT', label: 'Standard altitude', kind: 'number',
+              min: -500, max: 10000, step: 100, unit: 'ft',
+              help: 'Corrected figures are stated as though at this elevation.' },
+            { key: 'STD_TEMP_F', label: 'Standard temperature', kind: 'number',
+              min: -20, max: 120, step: 1, unit: '°F',
+              help: 'Corrected figures are stated as though at this ambient temperature. Only the AIR-DENSITY effect of temperature is modelled — cabin heating and battery conditioning are not.' },
+        ],
+    },
+    {
         title: 'Sanity bands & curve extent',
         blurb: 'Bounds for the Section-8 "out of band" flags and the speed range the curve is plotted over.',
         knobs: [
