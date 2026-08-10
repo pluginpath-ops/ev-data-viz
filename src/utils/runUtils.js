@@ -135,3 +135,42 @@ export function clearDefaultRuns(runs, runId = null) {
     return (runs || []).map(r =>
         (runId == null || r.id === runId) ? { ...r, isDefault: false } : r);
 }
+
+// ── Inheritance ──────────────────────────────────────────────────────────────
+
+/**
+ * The runs of `sourceVehicle` that could be inherited by a target vehicle.
+ *
+ * Inheritance has always been per-run in the database — spec_links names a
+ * single source_run_id — but the add form linked EVERY unlinked run of the
+ * source at once. That made the common cases impossible to express without
+ * linking the lot and removing what you did not want:
+ *
+ *   a meaningful trim sharing the battery  → inherit CHARGING only
+ *   a battery variant of the same car      → inherit RANGE only
+ *   a trim differing in neither            → inherit everything
+ *
+ * `kind` has existed on every run since migration 046, so the first two are a
+ * filter rather than new data.
+ *
+ * Inherited runs are excluded: a link to a link would make the chain's meaning
+ * depend on the order the links were created.
+ */
+export function linkableRuns(sourceVehicle, alreadyLinkedRunIds = new Set(), kindFilter = 'all') {
+    return (sourceVehicle?.runs || []).filter(r => {
+        if (r._inherited) return false;
+        if (alreadyLinkedRunIds.has(Number(r.id))) return false;
+        if (kindFilter === 'all') return true;
+        return runKindFrom(r) === kindFilter;
+    });
+}
+
+/** How many runs of each kind a vehicle could contribute, for the filter's counts. */
+export function linkableCounts(sourceVehicle, alreadyLinkedRunIds = new Set()) {
+    const all = linkableRuns(sourceVehicle, alreadyLinkedRunIds, 'all');
+    return {
+        all:      all.length,
+        charging: all.filter(r => runKindFrom(r) === 'charging').length,
+        range:    all.filter(r => runKindFrom(r) === 'range').length,
+    };
+}
