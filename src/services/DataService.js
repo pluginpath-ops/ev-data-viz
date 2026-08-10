@@ -779,6 +779,43 @@ class DataService {
     localStorage.setItem('selectedVehicles', JSON.stringify(vehicleIds));
   }
 
+  /**
+   * The real SoC span of each run, from its data points.
+   *
+   * runs.start_soc / end_soc cannot be trusted for a charging test. The 046
+   * split copied them from the original dual-role row, where they described the
+   * DISCHARGE, so a charging run reads 78→10 for a session its points show as
+   * 10→78 — and sometimes worse: one run stores 100→1 against points spanning
+   * 0→80. The points are the measurement; the columns are a leftover.
+   *
+   * One request for every run rather than one each: PostgREST has aggregate
+   * functions disabled, so the min/max is computed here, but ~60 rows per run
+   * of a single column is a small price for a figure that is actually correct.
+   */
+  async getSocRanges(runIds) {
+    if (!this.useSupabase || !runIds?.length) return {};
+    const real = runIds.filter(id => !isInheritedRunId(id)).map(Number);
+    if (!real.length) return {};
+
+    const { data, error } = await getSupabase()
+      .from('data_points')
+      .select('run_id, soc')
+      .in('run_id', real)
+      .not('soc', 'is', null);
+    if (error) throw error;
+
+    const out = {};
+    for (const { run_id, soc } of data || []) {
+      const cur = out[run_id];
+      if (!cur) out[run_id] = { min: soc, max: soc };
+      else {
+        if (soc < cur.min) cur.min = soc;
+        if (soc > cur.max) cur.max = soc;
+      }
+    }
+    return out;
+  }
+
   async getRunData(runId, scalingFactor = 1) {
     // Inherited runs carry synthetic string ids like "inherited_<linkId>_<realRunId>".
     const actualId = isInheritedRunId(runId)

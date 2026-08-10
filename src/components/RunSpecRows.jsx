@@ -40,7 +40,7 @@ function Row({ label, items }) {
     );
 }
 
-export default function RunSpecRows({ run, units, fieldMeta = [], calcKwhByRun, onCheckKwh }) {
+export default function RunSpecRows({ run, units, socRange, fieldMeta = [], calcKwhByRun, onCheckKwh }) {
     const kind = runKindFrom(run);
     const isRange = kind === 'range';
 
@@ -63,15 +63,38 @@ export default function RunSpecRows({ run, units, fieldMeta = [], calcKwhByRun, 
                 </Item>);
         }
     }
-    if (run.start_soc != null && run.end_soc != null) {
-        design.push(<Item key="soc">SoC {run.start_soc}→{run.end_soc}%</Item>);
+    // A charging run's stored start_soc/end_soc came from the 046 split and
+    // describe the DISCHARGE, so they read backwards and sometimes disagree with
+    // the run entirely. Its data points are the measurement; prefer them.
+    if (!isRange && socRange) {
+        design.push(
+            <Item key="soc" title="Measured from this run's data points">
+                SoC {Math.round(socRange.min)}→{Math.round(socRange.max)}%
+            </Item>);
+    } else if (run.start_soc != null && run.end_soc != null) {
+        design.push(
+            <Item key="soc"
+                  title={isRange ? undefined : 'From the run record — its data points have not loaded yet'}>
+                SoC {run.start_soc}→{run.end_soc}%
+            </Item>);
     }
 
     // ── Conditions: what the day imposed ─────────────────────────────────────
     const conditions = [];
+
+    // A missing condition is shown as a gap rather than omitted, so the row keeps
+    // its shape from card to card and an unrecorded figure is visibly unrecorded
+    // — the correction skips exactly these, and silence looked like zero.
+    const Missing = ({ what }) => (
+        <span className="text-faint" title={`No ${what} recorded — correction skips this axis`}>—</span>
+    );
+
     if (run.temperature_f != null) {
         conditions.push(<Item key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</Item>);
+    } else if (isRange) {
+        conditions.push(<span key="tmp">🌡 <Missing what="temperature" /></span>);
     }
+
     if (run.avg_wind_speed_mph != null) {
         conditions.push(
             <Item key="wind" className="text-cyan-700"
@@ -81,7 +104,10 @@ export default function RunSpecRows({ run, units, fieldMeta = [], calcKwhByRun, 
                 💨 {fmtSpeed(run.avg_wind_speed_mph, units)}
                 {run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : ''}
             </Item>);
+    } else if (isRange) {
+        conditions.push(<span key="wind">💨 <Missing what="wind" /></span>);
     }
+
     // Altitude and elevation gain are both in feet and mean different things, so
     // each says which it is rather than relying on the reader to infer it.
     if (run.altitude_ft != null) {
@@ -90,13 +116,19 @@ export default function RunSpecRows({ run, units, fieldMeta = [], calcKwhByRun, 
                   title="Elevation the test was run at — drives air density, and so aero drag.">
                 ⛰ {Math.round(run.altitude_ft)} ft
             </Item>);
+    } else if (isRange) {
+        conditions.push(<span key="alt">⛰ <Missing what="altitude" /></span>);
     }
-    if (run.elevation_gain_ft != null) {
-        conditions.push(
-            <Item key="gain" className="text-secondary"
-                  title="Net climb over the route — drives the potential-energy term.">
-                ↗ {Math.round(run.elevation_gain_ft)} ft gain
-            </Item>);
+
+    // Elevation gain is a property of a ROUTE. A charging test does not drive
+    // one, so the field is meaningless there however it got populated.
+    if (isRange) {
+        conditions.push(run.elevation_gain_ft != null
+            ? <Item key="gain" className="text-secondary"
+                    title="Net climb over the route — drives the potential-energy term.">
+                  ↗ {Math.round(run.elevation_gain_ft)} ft gain
+              </Item>
+            : <span key="gain">↗ <Missing what="elevation gain" /> gain</span>);
     }
     // The notes field is literally called `conditions` in the schema, and that is
     // what it holds — "overnight, 20in AT tyres", "lots of elevation gain/loss".

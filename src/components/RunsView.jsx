@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
@@ -1189,6 +1189,24 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     // A flat pile said nothing about which two runs were the same test event,
     // which is the entire reason sessions exist.
     const runGroups = useMemo(() => groupRunsBySession(displayRuns), [displayRuns]);
+
+    // The real SoC span of each charging run, from its data points. The stored
+    // start_soc/end_soc are a leftover of the 046 split and describe the
+    // discharge, so a charging card would otherwise read its own session
+    // backwards — see DataService.getSocRanges.
+    const [socRanges, setSocRanges] = useState({});
+    const chargingRunKey = displayRuns
+        .filter(r => runKindFrom(r) === 'charging')
+        .map(r => r.id).join(',');
+    useEffect(() => {
+        const ids = chargingRunKey ? chargingRunKey.split(',') : [];
+        if (!ids.length) return;
+        let cancelled = false;
+        dataService.getSocRanges(ids)
+            .then(ranges => { if (!cancelled) setSocRanges(prev => ({ ...prev, ...ranges })); })
+            .catch(() => { /* the card falls back to its stored fields */ });
+        return () => { cancelled = true; };
+    }, [chargingRunKey]);
     const [collapsedSessions, setCollapsedSessions] = useState(() => new Set());
     const [editingSessionId, setEditingSessionId] = useState(null);
     const toggleSessionGroup = (key) => setCollapsedSessions(prev => {
@@ -2320,6 +2338,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <RunSpecRows
                                             run={run}
                                             units={units}
+                                            socRange={socRanges[run.id]}
                                             fieldMeta={FIELD_META}
                                             calcKwhByRun={calcKwhByRun}
                                             onCheckKwh={handleCheckKwh}
