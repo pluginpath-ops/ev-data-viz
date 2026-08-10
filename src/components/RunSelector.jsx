@@ -147,7 +147,7 @@ export default function RunSelector({
                 className="run-selector-header"
             >
                 <span style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                Select Vehicle Tests to Display
+                Select vehicles &amp; tests
                 <span className="text-sm font-normal text-muted">({selectedCount} selected)</span>
                 {expanded && (
                     <span className="text-xs font-normal text-faint ml-2">· Drag the pills above to reorder</span>
