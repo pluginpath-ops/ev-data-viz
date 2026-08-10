@@ -37,6 +37,19 @@ const DATA_FLAGS = [
  */
 const inferRunFlags = (run) => [isRangeRun(run) ? 'range' : 'charging'];
 
+// ── Sub-tabs ─────────────────────────────────────────────────────────────────
+// Counts are computed from data the view already has, so a tab can say how much
+// is behind it without fetching anything to find out.
+const SUBTABS = [
+    { id: 'tests',       label: '📏 Tests & Runs',  count: d => d.displayRuns.length },
+    { id: 'inherited',   label: '🔗 Inherited',     count: d => d.inheritedRuns.length },
+    { id: 'performance', label: '⚡ Performance',   count: d => {
+        const c = d.performanceCounts?.[d.vehicle.id];
+        return c ? (c.accel ?? 0) + (c.braking ?? 0) : null;
+    } },
+    { id: 'epa',         label: '🏛 EPA',           count: d => d.vehicle.epa_mappings?.length || null },
+];
+
 // ── Field tag metadata (ordered for display) ──────────────────────────────────
 const FIELD_META = [
     { key: 'soc',         label: 'SoC',   title: 'State of Charge (%)' },
@@ -357,9 +370,15 @@ const DeriveAxisPanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, setPairedChargingRun, clearDefaultRun, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
+    // ── Sub-tabs ──────────────────────────────────────────────────────────────
+    // Four independent bodies of data hung off one vehicle, previously stacked
+    // into one very long page: a curator scrolled past every charging run to
+    // reach EPA. Only the active one mounts, so the Performance and EPA sections
+    // no longer fetch on every visit to a vehicle's runs.
+    const [subtab, setSubtab] = useState('tests');
     const [showEditVehicle, setShowEditVehicle] = useState(false);
     const [showEditSpecs, setShowEditSpecs] = useState(false);
     const [showViewSpecs, setShowViewSpecs] = useState(false);
@@ -864,7 +883,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const handleUpdateData = (run) => {
         setMergeTargetRun(run);
         setUploadMode('merge');
-        setShowUpload(true);
+        setShowUpload(true); setSubtab('tests');
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
@@ -1295,6 +1314,22 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 </div>
             </div>
 
+            <div className="admin-subtabs mb-4">
+                {SUBTABS.map(t => {
+                    const count = t.count?.({ displayRuns, inheritedRuns, vehicle, performanceCounts });
+                    return (
+                        <button
+                            key={t.id}
+                            className={`btn-chart-mode ${subtab === t.id ? 'active' : ''}`}
+                            onClick={() => setSubtab(t.id)}
+                        >
+                            {t.label}
+                            {count != null && <span className="text-xs text-muted ml-1.5">{count}</span>}
+                        </button>
+                    );
+                })}
+            </div>
+
             <div className="runs-view-header">
                 <div>
                     <h2 className="page-title">{vehicle.name} - Tests &amp; Data</h2>
@@ -1308,7 +1343,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             } else {
                                 setUploadMode('create');
                                 setMergeTargetRun(null);
-                                setShowUpload(true);
+                                setShowUpload(true); setSubtab('tests');
                                 setUploadStep('file');
                                 setCsvData(null);
                                 setFieldMapping({});
@@ -1792,6 +1827,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 </div>
             )}
 
+            {subtab === 'tests' && (<>
             <div className="space-y-4">
                 {runGroups.map(group => {
                   const collapsed = collapsedSessions.has(String(group.key));
@@ -2496,14 +2532,24 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 />
             )}
 
-            {displayRuns.length === 0 && !showUpload && inheritedRuns.length === 0 && (
+            {displayRuns.length === 0 && !showUpload && (
                 <div className="empty-state">
                     <p className="text-lg">No tests yet. Add a record to get started!</p>
                 </div>
             )}
+            </>)}
 
             {/* ── Inherited Tests ───────────────────────────────────────────── */}
-            {(inheritedRuns.length > 0 || (isContributor && canEdit(vehicle))) && (
+            {/* A tab that renders nothing reads as broken rather than empty. */}
+            {subtab === 'inherited' && inheritedRuns.length === 0 && !(isContributor && canEdit(vehicle)) && (
+                <div className="empty-state">
+                    <p className="text-lg">No inherited tests.</p>
+                    <p className="text-sm text-muted mt-1">
+                        A vehicle can borrow another's tests when they share a battery or a body — sign in as a contributor to link some.
+                    </p>
+                </div>
+            )}
+            {subtab === 'inherited' && (inheritedRuns.length > 0 || (isContributor && canEdit(vehicle))) && (
                 <div className="mt-6">
                     <div className="flex items-center gap-3 mb-3">
                         <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">
@@ -2948,24 +2994,28 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             {/* Above EPA: both are independently-measured test data, so they sit
                 next to the charging/range runs, while EPA is certification
                 reference data and reads last. */}
-            <PerformanceVehicleSection
-                vehicle={vehicle}
-                canEdit={isContributor && canEdit(vehicle)}
-            />
+            {subtab === 'performance' && (
+                <PerformanceVehicleSection
+                    vehicle={vehicle}
+                    canEdit={isContributor && canEdit(vehicle)}
+                />
+            )}
 
             {/* ── EPA Testing Data ──────────────────────────────────────────── */}
-            <EpaVehicleSection
-                vehicle={vehicle}
-                canEdit={isContributor && canEdit(vehicle)}
-                searchEpaTestGroups={searchEpaTestGroups}
-                onLink={linkEpaTestGroup}
-                onCreate={createAndLinkEpaTestGroup}
-                onUnlink={unlinkEpaTestGroup}
-                onUpdateConfidence={updateEpaMapping}
-                onUpdateDisplayName={(testGroupId, name) =>
-                    updateEpaTestGroup(testGroupId, { display_name: name || null })
-                }
-            />
+            {subtab === 'epa' && (
+                <EpaVehicleSection
+                    vehicle={vehicle}
+                    canEdit={isContributor && canEdit(vehicle)}
+                    searchEpaTestGroups={searchEpaTestGroups}
+                    onLink={linkEpaTestGroup}
+                    onCreate={createAndLinkEpaTestGroup}
+                    onUnlink={unlinkEpaTestGroup}
+                    onUpdateConfidence={updateEpaMapping}
+                    onUpdateDisplayName={(testGroupId, name) =>
+                        updateEpaTestGroup(testGroupId, { display_name: name || null })
+                    }
+                />
+            )}
         </div>
     );
 }

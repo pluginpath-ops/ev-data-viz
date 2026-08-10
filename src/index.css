@@ -1507,3 +1507,19 @@ body {
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
+
+/* ── Site footer ────────────────────────────────────────────────────────────── */
+/* The height matters as much as the content: bottom-anchored bars (delete/undo,
+   reorder, the notification banner) are fixed to the viewport and land on
+   whatever the page ends with. Reserving space here means nothing actionable is
+   ever underneath one, so a banner can be ignored rather than dismissed. */
+.site-footer {
+    @apply mt-12 pt-6 text-center text-sm;
+    padding-bottom: 100px;
+    color: var(--color-text-muted);
+    border-top: 1px solid var(--color-border);
+}
+.site-footer p + p {
+    @apply mt-1 text-xs;
+    color: var(--color-text-faint);
+}
