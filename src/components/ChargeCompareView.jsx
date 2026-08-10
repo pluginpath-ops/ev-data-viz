@@ -11,6 +11,8 @@ import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } fr
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels } from '../utils/seriesLabel';
+import { sessionFor } from '../utils/testSessions';
+import CorrectionControl from './CorrectionControl';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
@@ -298,6 +300,7 @@ export default function ChargeCompareView({
     setPairings = () => {},
     presentationMode = false,
     verboseLabels = false,
+    correctionMode = 'none',
     setChartConfig = null,
 }) {
     const { units, testSessions } = useAppContext();
@@ -365,6 +368,8 @@ export default function ChargeCompareView({
                     const rangeSrc = resolveRangeSource(chargingRun, {
                         vehicle,
                         explicitPairing: isEpaPartnerId(rangeRun.id) ? EPA_PARTNER_ID : rangeRun,
+                        correction: { mode: correctionMode },
+                        session: sessionFor(testSessions, rangeRun),
                     });
 
                     result.push({
@@ -380,7 +385,7 @@ export default function ChargeCompareView({
         }
 
         return result;
-    }, [selectedVehicles, pairings, testSessions]);
+    }, [selectedVehicles, pairings, testSessions, correctionMode]);
 
     const neededRunIds = useMemo(
         () => [...new Set(resolvedPairs.map(p => p.chargingRun?.id).filter(Boolean))],
@@ -818,9 +823,10 @@ export default function ChargeCompareView({
 
                 <div className="mt-4">
                     <RunSelector
-                        headerActions={setChartConfig
-                            ? <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
-                            : null}
+                        headerActions={setChartConfig ? <>
+                            <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
+                            <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                        </> : null}
                         vehicles={selectedVehicles}
                         selectedRunIds={selectedRuns}
                         onToggleRun={toggleRun}

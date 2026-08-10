@@ -227,3 +227,10 @@ export function groupRunsBySession(runs) {
         runs: bySession.get(key),
     }));
 }
+
+/** The session a run belongs to, or null. Used to fill in conditions the run
+ *  itself does not state — see resolveRangeSource's correction path. */
+export function sessionFor(sessions, run) {
+    if (run?.session_id == null) return null;
+    return (sessions || []).find(s => String(s.id) === String(run.session_id)) ?? null;
+}

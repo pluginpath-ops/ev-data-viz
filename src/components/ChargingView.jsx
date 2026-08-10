@@ -11,6 +11,8 @@ import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import VerboseLabelToggle from './VerboseLabelToggle';
+import CorrectionControl from './CorrectionControl';
+import { sessionFor } from '../utils/testSessions';
 import AutoColorToggle from './AutoColorToggle';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -28,7 +30,7 @@ import ChartInfoBubble from './ChartInfoBubble';
 const RUN_ATOMS = [{ key: 'test', of: s => s.run?.name }];
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, chartMode, pairings = {}, setPairings = () => {}, presentationMode = false }) {
-    const { units } = useAppContext();
+    const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
@@ -233,6 +235,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             const src = resolveRangeSource(run ?? { id: runId }, {
                                 vehicle: parentVehicle,
                                 explicitPairing: pairedRange,
+                                correction: { mode: chartConfig.correctionMode ?? 'none' },
+                                session: sessionFor(testSessions, pairedRange),
                             });
 
                             // 'recorded' and 'none' mean no range test won — leave
@@ -632,6 +636,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 presentationMode={presentationMode}
                 autoColor={chartConfig.autoColor ?? false}
                 verboseLabels={chartConfig.verboseLabels ?? false}
+                correctionMode={chartConfig.correctionMode ?? 'none'}
             />
         );
     }
@@ -729,6 +734,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 {/* ── Collapsible run selector ── */}
                 <RunSelector
                     headerActions={<>
+                        <CorrectionControl mode={chartConfig.correctionMode ?? 'none'} setChartConfig={setChartConfig} />
                         <AutoColorToggle autoColor={chartConfig.autoColor ?? false} setChartConfig={setChartConfig} />
                         <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
                     </>}

@@ -5,6 +5,9 @@ import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
+import { correctionFactor, correctionNote } from '../utils/conditionCorrection';
+import { sessionFor } from '../utils/testSessions';
+import CorrectionControl from './CorrectionControl';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import AutoColorToggle from './AutoColorToggle';
 import { useAppContext } from '../context/AppContext';
@@ -56,8 +59,8 @@ const hasDataForType = (run, type) => {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, presentationMode = false, autoColor = false, verboseLabels = false }) {
-    const { units } = useAppContext();
+export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, presentationMode = false, autoColor = false, verboseLabels = false, correctionMode = 'none' }) {
+    const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
     const chartInstance = useRef(null);
@@ -90,8 +93,27 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     };
 
     // ── Derived: all range runs across selected vehicles ──────────────────────
+    // Correction is applied to distance_miles rather than to the outputs.
+    // calcRange and calcEff both scale linearly with distance, so one
+    // multiplication corrects range AND efficiency in every unit — including
+    // Wh/mi, which inverts correctly because it is energy over distance.
+    // Correcting the two outputs separately would let them drift apart.
     const allRangeRuns = selectedVehicles.flatMap(v =>
-        filterRangeRuns(v.runs).map(r => ({ ...r, vehicle: v, vehicleName: vehicleLabel(v), vehicleId: v.id }))
+        filterRangeRuns(v.runs).map(r => {
+            const session = sessionFor(testSessions, r);
+            const result = correctionFactor({
+                speedMph:     r.speed_mph,
+                altitudeFt:   r.altitude_ft   ?? session?.altitude_ft,
+                temperatureF: r.temperature_f ?? session?.temperature_f,
+            }, { mode: correctionMode });
+            const base = { ...r, vehicle: v, vehicleName: vehicleLabel(v), vehicleId: v.id };
+            if (result.factor === 1) return base;
+            return {
+                ...base,
+                distance_miles: base.distance_miles != null ? base.distance_miles * result.factor : null,
+                _correction: { ...result, note: correctionNote(result) },
+            };
+        })
     );
 
     const selectedRangeRuns = allRangeRuns.filter(r =>
@@ -493,7 +515,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     // rebuilt every render, so the map is a new object each time while holding
     // the same values — depending on its identity would redraw the chart on
     // every render. Comparing the colours by value redraws only when one moves.
-    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, autoColor]);
+    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, autoColor, correctionMode]);
 
     // ── Copy chart PNG ────────────────────────────────────────────────────────
     const handleCopyImage = async () => {
@@ -562,6 +584,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 {/* ── Run selector ── */}
                 <RunSelector
                     headerActions={<>
+                        <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                         <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
                         <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                     </>}

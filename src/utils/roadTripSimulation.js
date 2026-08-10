@@ -2,9 +2,10 @@ import { interpolate } from './interpolate';
 import { convDistance, roundTo } from './unitConversions';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const AERO_FRACTION        = 0.70; // fraction of energy from aero drag at ref speed (unladen EV)
-const TOWING_AERO_FRACTION = 0.85; // higher aero fraction when towing — trailer roughly doubles Cd×A
-const REFERENCE_SPEED      = 70;   // mph
+// Moved to constants/epa.js when condition correction (#188) became a second
+// consumer: two modules disagreeing about the aero share would make the same
+// test read differently on two charts.
+import { AERO_FRACTION, TOWING_AERO_FRACTION, REFERENCE_SPEED_MPH as REFERENCE_SPEED } from '../constants/epa';
 const MAX_ITERATIONS       = 200;  // safety guard against infinite loops (≈ enough stops for any trip)
 const MIN_DRIVE_MI         = 0.1;  // minimum driveable distance before bailing
 const TAIL_END_KW          = 5;    // assumed charging power at 100% SoC for the synthetic tail
