@@ -103,6 +103,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
             const session = sessionFor(testSessions, r);
             const result = correctionFactor({
                 speedMph:     r.speed_mph,
+                speedBasis:   r.speed_basis,
                 altitudeFt:   r.altitude_ft   ?? session?.altitude_ft,
                 temperatureF: r.temperature_f ?? session?.temperature_f,
             }, { mode: correctionMode });

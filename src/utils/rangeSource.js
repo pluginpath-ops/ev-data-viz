@@ -208,6 +208,7 @@ function correctBasis(basis, run, correction, session) {
     }
     const conditions = {
         speedMph:     run?.speed_mph,
+        speedBasis:   run?.speed_basis,
         altitudeFt:   run?.altitude_ft    ?? session?.altitude_ft,
         temperatureF: run?.temperature_f  ?? session?.temperature_f,
     };

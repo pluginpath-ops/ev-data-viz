@@ -95,7 +95,16 @@ function RunRangeMetaLine({ run, units }) {
     const dot = <span className="mx-1.5 text-faint select-none">·</span>;
     const items = [];
     if (run.speed_mph != null) {
-        items.push(<span key="spd" className="text-secondary">{fmtSpeed(run.speed_mph, units)}</span>);
+        // A mixed-cycle average is marked wherever the speed appears. The
+        // figure is not comparable to a steady-state test of the same number,
+        // and that is true before any correction is switched on.
+        items.push(run.speed_basis === 'mixed'
+            ? (
+                <span key="spd" className="text-amber-600" title="Average over a varying-speed cycle, not a held setpoint. Not directly comparable to a steady-state test, and speed correction is skipped for it.">
+                    {fmtSpeed(run.speed_mph, units)} avg · mixed cycle
+                </span>
+              )
+            : <span key="spd" className="text-secondary">{fmtSpeed(run.speed_mph, units)}</span>);
     } else {
         items.push(<span key="spd" className="text-amber-600" title="Set Speed (mph) in run metadata for accurate efficiency">{fmtSpeed(70, units)} (est.)</span>);
     }
@@ -528,6 +537,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         energyKwh: '',
         chargeEnergyKwh: '',
         temperatureF: '',
+        speedBasis: '',
         altitudeFt: '',
         elevationGainFt: '',
         windSpeedMph: '',
@@ -607,7 +617,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', url: '', chargingUrl: '' });
+        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', url: '', chargingUrl: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: null });
@@ -896,6 +906,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             energyKwh: run.energy_kwh ?? '',
             chargeEnergyKwh: run.charge_energy_kwh ?? '',
             temperatureF: run.temperature_f ?? '',
+            speedBasis: run.speed_basis ?? '',
             altitudeFt: run.altitude_ft ?? '',
             elevationGainFt: run.elevation_gain_ft ?? '',
             windSpeedMph: run.avg_wind_speed_mph ?? '',
@@ -1563,6 +1574,16 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         onChange={(e) => setRunMetadata({...runMetadata, temperatureF: e.target.value})}
                                                         className="form-input"
                                                     />
+                                                    <select
+                                                        value={runMetadata.speedBasis || ''}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, speedBasis: e.target.value})}
+                                                        className="form-input"
+                                                        title="Steady: the car was held at this speed. Mixed: this is an average over a varying-speed cycle, so speed correction is skipped — aero energy goes as the mean of v², not the square of the mean."
+                                                    >
+                                                        <option value="">Speed basis: unknown</option>
+                                                        <option value="steady">Steady — held at setpoint</option>
+                                                        <option value="mixed">Mixed cycle — average speed</option>
+                                                    </select>
                                                     <input
                                                         type="number"
                                                         placeholder="Test altitude (ft)"
@@ -2000,6 +2021,16 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     onChange={(e) => setEditFormData({...editFormData, temperatureF: e.target.value})}
                                                     className="form-input"
                                                 />
+                                                <select
+                                                    value={editFormData.speedBasis || ''}
+                                                    onChange={(e) => setEditFormData({...editFormData, speedBasis: e.target.value})}
+                                                    className="form-input"
+                                                    title="Steady: the car was held at this speed. Mixed: this is an average over a varying-speed cycle, so speed correction is skipped — aero energy goes as the mean of v², not the square of the mean."
+                                                >
+                                                    <option value="">Speed basis: unknown</option>
+                                                    <option value="steady">Steady — held at setpoint</option>
+                                                    <option value="mixed">Mixed cycle — average speed</option>
+                                                </select>
                                                 <input
                                                     type="number"
                                                     placeholder="Test altitude (ft)"

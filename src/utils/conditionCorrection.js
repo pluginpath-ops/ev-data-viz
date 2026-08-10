@@ -92,7 +92,7 @@ function loadTerm(speedMph, densityRatio, aeroFraction) {
  * @param {string} [opts.mode]         a CORRECTION_MODES key
  * @param {Object} [opts.target]       standard conditions to correct TO
  * @param {number} [opts.aeroFraction] override, e.g. towing
- * @returns {{ factor: number, applied: string[], missing: string[] }}
+ * @returns {{ factor: number, applied: string[], missing: string[], skipped: Array }}
  */
 export function correctionFactor(conditions, {
     mode = DEFAULT_CORRECTION_MODE,
@@ -100,10 +100,19 @@ export function correctionFactor(conditions, {
     aeroFraction = AERO_FRACTION,
 } = {}) {
     const axes = modeAxes(mode);
-    if (!axes.length) return { factor: 1, applied: [], missing: [] };
+    if (!axes.length) return { factor: 1, applied: [], missing: [], skipped: [] };
 
     const applied = [];
     const missing = [];
+    const skipped = [];
+
+    // Correcting for speed assumes the test held one. Aero energy goes as the
+    // MEAN OF v², while an average speed supplies the SQUARE OF THE MEAN, and
+    // ⟨v²⟩ > ⟨v⟩² for any varying speed — so a mixed cycle reads as a gentle
+    // steady cruise and gets over-penalised on the way to the reference speed.
+    // Air density does not care what the speed trace looked like, so altitude
+    // and temperature still apply.
+    const mixedCycle = conditions?.speedBasis === 'mixed';
 
     // An axis is only corrected when the test SAYS what it was. Assuming a
     // default would silently invent a correction — the opposite of the point.
@@ -114,7 +123,12 @@ export function correctionFactor(conditions, {
         return true;
     };
 
-    const useSpeed = has('speed', conditions?.speedMph);
+    let useSpeed = false;
+    if (mixedCycle && axes.includes('speed')) {
+        skipped.push({ axis: 'speed', reason: 'mixed cycle' });
+    } else {
+        useSpeed = has('speed', conditions?.speedMph);
+    }
     const useAlt   = has('altitude', conditions?.altitudeFt);
     const useTemp  = has('temperature', conditions?.temperatureF);
 
@@ -126,11 +140,11 @@ export function correctionFactor(conditions, {
 
     const atRun    = loadTerm(runSpeed,        runDensity,    aeroFraction);
     const atTarget = loadTerm(target.speedMph, targetDensity, aeroFraction);
-    if (!atRun || atRun <= 0) return { factor: 1, applied: [], missing };
+    if (!atRun || atRun <= 0) return { factor: 1, applied: [], missing, skipped };
 
     // Consumption ratio inverted: a harder test (higher load) means the car
     // deserves a BETTER corrected efficiency than it measured.
-    return { factor: atRun / atTarget, applied, missing };
+    return { factor: atRun / atTarget, applied, missing, skipped };
 }
 
 /**
@@ -151,11 +165,17 @@ export function applyCorrection({ miPerKwh, miPerSoc }, factor) {
  * A short human note for a corrected series — what moved it, and by how much.
  * Charts show this so a corrected number never passes for a measured one.
  */
-export function correctionNote({ factor, applied, missing }) {
-    if (!applied?.length) return null;
-    const pct = (factor - 1) * 100;
-    const dir = pct >= 0 ? '+' : '';
-    const what = applied.join(', ');
-    const gap  = missing?.length ? ` · no ${missing.join('/')} recorded` : '';
-    return `corrected ${dir}${pct.toFixed(1)}% for ${what}${gap}`;
+export function correctionNote({ factor, applied, missing, skipped }) {
+    // A skipped axis is worth saying even when nothing was corrected: "not
+    // corrected because we cannot" is a different claim from "not corrected".
+    if (!applied?.length && !skipped?.length) return null;
+
+    const parts = [];
+    if (applied?.length) {
+        const pct = (factor - 1) * 100;
+        parts.push(`corrected ${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% for ${applied.join(', ')}`);
+    }
+    for (const s of skipped ?? []) parts.push(`${s.axis} not corrected (${s.reason})`);
+    if (missing?.length) parts.push(`no ${missing.join('/')} recorded`);
+    return parts.join(' · ');
 }
