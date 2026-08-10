@@ -823,6 +823,7 @@ export default function App() {
                             setPairings={setPairings}
                             autoColor={chartConfig.autoColor ?? true}
                             verboseLabels={chartConfig.verboseLabels ?? false}
+                            correctionMode={chartConfig.correctionMode ?? 'none'}
                             setChartConfig={setChartConfig}
                         />
                     )}
@@ -839,6 +840,7 @@ export default function App() {
                             pairings={pairings}
                             setPairings={setPairings}
                             verboseLabels={chartConfig.verboseLabels ?? false}
+                            correctionMode={chartConfig.correctionMode ?? 'none'}
                             setChartConfig={setChartConfig}
                         />
                     )}
@@ -865,6 +867,7 @@ export default function App() {
                             setEpaConfig={setEpaConfig}
                             autoColor={chartConfig.autoColor ?? true}
                             verboseLabels={chartConfig.verboseLabels ?? false}
+                            correctionMode={chartConfig.correctionMode ?? 'none'}
                             setChartConfig={setChartConfig}
                         />
                     )}

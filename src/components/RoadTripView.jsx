@@ -11,6 +11,8 @@ import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EP
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import VerboseLabelToggle from './VerboseLabelToggle';
+import CorrectionControl from './CorrectionControl';
+import { sessionFor } from '../utils/testSessions';
 import AutoColorToggle from './AutoColorToggle';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
@@ -383,6 +385,7 @@ export default function RoadTripView({
     presentationMode = false,
     autoColor = true,
     verboseLabels = false,
+    correctionMode = 'none',
     setChartConfig = null,
 }) {
     const { units, testSessions } = useAppContext();
@@ -466,6 +469,8 @@ export default function RoadTripView({
                         vehicle,
                         batteryKwh: vehicle.battery,
                         explicitPairing: isEpaPartnerId(rangeRun.id) ? EPA_PARTNER_ID : rangeRun,
+                        correction: { mode: correctionMode },
+                        session: sessionFor(testSessions, rangeRun),
                     });
 
                     const key = pairKey(rangeRun.id, partnerId);
@@ -500,7 +505,7 @@ export default function RoadTripView({
         for (const entry of map.values()) entry.color = pairColors[entry.key] ?? entry.color;
 
         return map;
-    }, [selectedVehicles, colorMap, pairings]);
+    }, [selectedVehicles, colorMap, pairings, correctionMode, testSessions]);
 
     // Selection lives in the shared hook (hooks/useRunSelection.js), the same one
     // Charge Compare uses. Previously this view had its own copy, whose bootstrap
@@ -1475,6 +1480,7 @@ export default function RoadTripView({
                     <div className="mt-4">
                         <RunSelector
                             headerActions={setChartConfig ? <>
+                                <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                                 <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
                                 <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                             </> : null}

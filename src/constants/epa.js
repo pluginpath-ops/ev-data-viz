@@ -28,6 +28,21 @@ export const EPA_DEFAULTS = {
     DEFAULT_ETA:         0.88,        // fallback drivetrain efficiency
     DEFAULT_ACCESSORY_W: 300,         // constant accessory draw, watts
     ASSUMED_CHARGER_EFF: 0.88,        // when AC recharge is unavailable (CSI obs ~0.87–0.89)
+    // Condition correction (#188). The aero/rolling split is what lets a
+    // measurement be re-priced for speed and air density without per-vehicle
+    // road-load coefficients — see utils/conditionCorrection.js. These moved
+    // here from roadTripSimulation.js when a second consumer appeared.
+    AERO_FRACTION:        0.70,   // energy share from aero at the reference speed, unladen
+    TOWING_AERO_FRACTION: 0.85,   // a trailer roughly doubles Cd×A
+    REFERENCE_SPEED_MPH:  70,     // the speed the aero fraction is quoted at
+
+    // What "standard conditions" means when correcting. NOT the same as
+    // STANDARD_TEMP_F (59°F), which is the ISA sea-level reference the density
+    // formula itself is built on and is not a product choice.
+    STD_SPEED_MPH:   70,
+    STD_ALTITUDE_FT: 0,
+    STD_TEMP_F:      70,
+
     // sanity bands (Section-8 flags) + curve extent
     ETA_BAND:          [0.75, 0.92],
     CHARGER_EFF_BAND:  [0.80, 0.92],
@@ -40,6 +55,17 @@ export const DEFAULT_ETA         = resolve('DEFAULT_ETA',         EPA_DEFAULTS.D
 export const DEFAULT_ACCESSORY_W = resolve('DEFAULT_ACCESSORY_W', EPA_DEFAULTS.DEFAULT_ACCESSORY_W);
 export const ACCESSORY_LOAD_KW   = DEFAULT_ACCESSORY_W / 1000;  // derived (kW)
 export const ASSUMED_CHARGER_EFF = resolve('ASSUMED_CHARGER_EFF', EPA_DEFAULTS.ASSUMED_CHARGER_EFF);
+export const AERO_FRACTION        = resolve('AERO_FRACTION',        EPA_DEFAULTS.AERO_FRACTION);
+export const TOWING_AERO_FRACTION = resolve('TOWING_AERO_FRACTION', EPA_DEFAULTS.TOWING_AERO_FRACTION);
+export const REFERENCE_SPEED_MPH  = resolve('REFERENCE_SPEED_MPH',  EPA_DEFAULTS.REFERENCE_SPEED_MPH);
+
+/** The basis every corrected figure is re-priced to. */
+export const STANDARD_CONDITIONS = {
+    speedMph:     resolve('STD_SPEED_MPH',   EPA_DEFAULTS.STD_SPEED_MPH),
+    altitudeFt:   resolve('STD_ALTITUDE_FT', EPA_DEFAULTS.STD_ALTITUDE_FT),
+    temperatureF: resolve('STD_TEMP_F',      EPA_DEFAULTS.STD_TEMP_F),
+};
+
 export const ETA_BAND          = resolve('ETA_BAND',          EPA_DEFAULTS.ETA_BAND);
 export const CHARGER_EFF_BAND  = resolve('CHARGER_EFF_BAND',  EPA_DEFAULTS.CHARGER_EFF_BAND);
 export const SS_SPEED_BAND     = resolve('SS_SPEED_BAND',     EPA_DEFAULTS.SS_SPEED_BAND);

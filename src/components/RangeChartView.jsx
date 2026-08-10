@@ -5,6 +5,9 @@ import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
+import { correctionFactor, correctionNote } from '../utils/conditionCorrection';
+import { sessionFor } from '../utils/testSessions';
+import CorrectionControl from './CorrectionControl';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import AutoColorToggle from './AutoColorToggle';
 import { useAppContext } from '../context/AppContext';
@@ -13,7 +16,7 @@ import {
     convDistance, convSpeed, convTemp,
     distanceLabel, speedLabel, tempLabel,
     calcEff, effOptions, effLabel as getEffLabel,
-    fmtSpeed, fmtTemp,
+    fmtSpeed, speedBasisNote, fmtTemp,
 } from '../utils/unitConversions';
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { copyChartAsPng } from '../utils/chartUtils';
@@ -56,8 +59,8 @@ const hasDataForType = (run, type) => {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, presentationMode = false, autoColor = false, verboseLabels = false }) {
-    const { units } = useAppContext();
+export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, presentationMode = false, autoColor = false, verboseLabels = false, correctionMode = 'none' }) {
+    const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
     const chartInstance = useRef(null);
@@ -90,8 +93,28 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     };
 
     // ── Derived: all range runs across selected vehicles ──────────────────────
+    // Correction is applied to distance_miles rather than to the outputs.
+    // calcRange and calcEff both scale linearly with distance, so one
+    // multiplication corrects range AND efficiency in every unit — including
+    // Wh/mi, which inverts correctly because it is energy over distance.
+    // Correcting the two outputs separately would let them drift apart.
     const allRangeRuns = selectedVehicles.flatMap(v =>
-        filterRangeRuns(v.runs).map(r => ({ ...r, vehicle: v, vehicleName: vehicleLabel(v), vehicleId: v.id }))
+        filterRangeRuns(v.runs).map(r => {
+            const session = sessionFor(testSessions, r);
+            const result = correctionFactor({
+                speedMph:     r.speed_mph,
+                speedBasis:   r.speed_basis,
+                altitudeFt:   r.altitude_ft   ?? session?.altitude_ft,
+                temperatureF: r.temperature_f ?? session?.temperature_f,
+            }, { mode: correctionMode });
+            const base = { ...r, vehicle: v, vehicleName: vehicleLabel(v), vehicleId: v.id };
+            if (result.factor === 1) return base;
+            return {
+                ...base,
+                distance_miles: base.distance_miles != null ? base.distance_miles * result.factor : null,
+                _correction: { ...result, note: correctionNote(result) },
+            };
+        })
     );
 
     const selectedRangeRuns = allRangeRuns.filter(r =>
@@ -294,6 +317,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                     const badges = [];
                     if (run._yValue != null) badges.push({ text: `${run._yValue} ${run._yUnit}`, primary: true });
                     if (run.speed_mph     != null) badges.push({ text: fmtSpeed(run.speed_mph, units) });
+                    if (speedBasisNote(run))       badges.push({ text: speedBasisNote(run) });
                     if (run.temperature_f != null) badges.push({ text: fmtTemp(run.temperature_f, units) });
                     if (run.avg_wind_speed_mph != null) {
                         const dir = run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : '';
@@ -448,11 +472,18 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                                     if (!run) return [];
                                     return runTooltipLines(run, [
                                         run._yValue != null ? `${built.yLabel}: ${run._yValue}` : null,
+                                        // What was done to this figure, and what could
+                                        // not be. A corrected number that cannot say
+                                        // which axes moved it leaves the reader to
+                                        // infer it from the size of the change.
+                                        run._correction?.note ?? null,
                                     ].filter(Boolean), units);
                                 }
                                 // Line charts: run objects are stored parallel to points
                                 const run = ctx.dataset?.runMetas?.[ctx.dataIndex];
-                                return run ? runTooltipLines(run, [], units) : [];
+                                return run
+                                    ? runTooltipLines(run, [run._correction?.note ?? null].filter(Boolean), units)
+                                    : [];
                             },
                         },
                     },
@@ -493,7 +524,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     // rebuilt every render, so the map is a new object each time while holding
     // the same values — depending on its identity would redraw the chart on
     // every render. Comparing the colours by value redraws only when one moves.
-    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, autoColor]);
+    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, autoColor, correctionMode]);
 
     // ── Copy chart PNG ────────────────────────────────────────────────────────
     const handleCopyImage = async () => {
@@ -562,6 +593,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                 {/* ── Run selector ── */}
                 <RunSelector
                     headerActions={<>
+                        <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                         <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
                         <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                     </>}
@@ -586,6 +618,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
                             <>
                                 {run.speed_mph != null && (
                                     <span className="text-xs bg-[var(--color-surface-sunken)] text-secondary px-1.5 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
+                                )}
+                                {speedBasisNote(run) && (
+                                    <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded" title="Average over a varying-speed cycle. Not directly comparable to a steady-state test; speed correction is skipped.">{speedBasisNote(run)}</span>
                                 )}
                                 {run.temperature_f != null && (
                                     <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>

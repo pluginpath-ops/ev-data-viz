@@ -14,6 +14,18 @@ export {
 
 export const fmtDistance  = (mi,   sys) => sys === 'metric' ? `${r1(mi * MI_TO_KM)} km`           : `${mi} mi`;
 export const fmtSpeed     = (mph,  sys) => sys === 'metric' ? `${r1(mph * MI_TO_KM)} kph`          : `${mph} mph`;
+/**
+ * A run's speed basis, when it needs one: an average over a varying-speed cycle
+ * rather than a held setpoint.
+ *
+ * Deliberately its OWN string rather than a suffix on the speed. Chart bar
+ * pills are dropped WITHOUT TRACE when wider than the bar, so lengthening the
+ * speed made the whole pill vanish on a narrow bar — the marker cost the reader
+ * the number it was meant to qualify. A separate short pill cannot do that.
+ */
+export const speedBasisNote = (run) =>
+    run?.speed_basis === 'mixed' ? 'mixed cycle' : null;
+
 export const fmtTemp      = (degF, sys) => sys === 'metric' ? `${r1((degF - 32) * 5 / 9)}°C`       : `${degF}°F`;
 export const fmtWeight    = (lbs,  sys) => sys === 'metric' ? `${r1(lbs * LBS_TO_KG)} kg`          : `${lbs} lbs`;
 export const fmtVolume    = (cuft, sys) => sys === 'metric' ? `${r1(cuft * CUFT_TO_L)} L`          : `${cuft} cu ft`;

@@ -50,6 +50,7 @@
  * and computed by the caller, which is the side that holds the time series.
  */
 
+import { correctionFactor, applyCorrection, correctionNote } from './conditionCorrection';
 import { isRangeRun } from './runUtils';
 
 /**
@@ -194,11 +195,42 @@ function buildNote(source, sourceRun, energyMethod) {
  *   note: string|null,
  * }}
  */
+/**
+ * Re-price a resolved basis for the conditions its range test was run under.
+ *
+ * A run's own value wins over its session's: the session reading is the shared
+ * context of the outing, and a run that states its own knows better. Same rule
+ * migration 044 already documents for temperature.
+ */
+function correctBasis(basis, run, correction, session) {
+    if (!correction || correction.mode === 'none' || !correction.mode) {
+        return { ...basis, correction: null };
+    }
+    const conditions = {
+        speedMph:     run?.speed_mph,
+        speedBasis:   run?.speed_basis,
+        altitudeFt:   run?.altitude_ft    ?? session?.altitude_ft,
+        temperatureF: run?.temperature_f  ?? session?.temperature_f,
+    };
+    const result = correctionFactor(conditions, correction);
+    return {
+        ...applyCorrection(basis, result.factor),
+        correction: { ...result, note: correctionNote(result) },
+    };
+}
+
 export function resolveRangeSource(chargingRun, {
     vehicle,
     explicitPairing = null,
     batteryKwh = vehicle?.battery,
     hasRecordedRange = false,
+    // Condition correction (#188). Applied HERE because this is the single
+    // place a series' range basis is decided, so every chart corrects
+    // identically instead of each deciding for itself — which is how Road Trip
+    // came to correct for speed while Charge Compare did not, and the same test
+    // read differently on the two.
+    correction = null,          // { mode, target, aeroFraction } | null
+    session = null,             // supplies altitude/temperature the run omits
 } = {}) {
     const none = {
         source: 'none', sourceRun: null,
@@ -237,13 +269,17 @@ export function resolveRangeSource(chargingRun, {
         if (source === 'default-range' && run.id === chargingRun.id) continue;
 
         const { miPerKwh, method } = miPerKwhFrom(run, batteryKwh);
+        // The conditions belong to the RANGE test, which is what measured the
+        // miles — not to the charging run being priced.
+        const corrected = correctBasis({ miPerSoc: miPerSocFrom(run), miPerKwh }, run, correction, session);
         return {
             source,
             sourceRun: run,
-            miPerSoc: miPerSocFrom(run),
-            miPerKwh,
+            miPerSoc: corrected.miPerSoc,
+            miPerKwh: corrected.miPerKwh,
             energyMethod: method,
             note: buildNote(source, run, method),
+            correction: corrected.correction,
         };
     }
 
