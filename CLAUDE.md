@@ -59,3 +59,20 @@ Side-by-side structured spec comparison for selected vehicles. Specs are stored 
 
 **Admin** *(admin role only)*
 User management — view registered users, assign roles (`admin`, `contributor`, `viewer`).
+
+## Testing
+
+`npm test` (vitest, `npm run test:watch` to iterate). Suites live in
+`src/utils/__tests__/` for pure modules, plus `src/__tests__/wiring.test.js`.
+
+The wiring suite is the unusual one and worth keeping. Every other test checks
+that a function returns the right answer; none of them can tell you **nobody
+calls it**. That is the failure mode this project keeps hitting — three defects
+found by hand in one week were all "built, unit-tested, never connected". The
+wiring suite reads source text to assert the seams hold: that a note written to
+every run is read somewhere, that every chart showing a test speed also marks a
+mixed cycle, that a tunable constant reaches the Admin knobs.
+
+When adding a utility for the UI, expect the wiring suite to fail until
+something consumes it. If it is deliberately unused, add it to `ALLOWED_UNUSED`
+with the reason — an entry there is a decision on record, not an oversight.
