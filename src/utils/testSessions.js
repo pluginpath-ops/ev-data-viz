@@ -28,12 +28,13 @@ export const SESSION_COLUMNS = {
     tester:       'tester',
     locationName: 'location_name',
     temperatureF: 'temperature_f',
+    altitudeFt:   'altitude_ft',
     sourceName:   'source_name',
     url:          'url',
     notes:        'notes',
 };
 
-const NUMERIC = new Set(['temperatureF']);
+const NUMERIC = new Set(['temperatureF', 'altitudeFt']);
 
 /** Translate a partial camelCase change set into a database payload. */
 export function toSessionRow(changes = {}) {

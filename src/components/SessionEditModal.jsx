@@ -21,6 +21,7 @@ const FIELDS = [
     { key: 'tester',       label: 'Tester',      type: 'text',   placeholder: 'e.g. Out of Spec' },
     { key: 'locationName', label: 'Location',    type: 'text',   placeholder: 'e.g. I-70 loop, Denver' },
     { key: 'temperatureF', label: 'Temp (°F)',   type: 'number', placeholder: 'Session-level reading' },
+    { key: 'altitudeFt',   label: 'Altitude (ft)', type: 'number', placeholder: 'Session-level elevation' },
     { key: 'sourceName',   label: 'Source',      type: 'text',   placeholder: 'Who published it' },
     { key: 'url',          label: 'URL',         type: 'url',    placeholder: 'https://…', wide: true },
 ];
@@ -33,6 +34,7 @@ function toDraft(session) {
         tester:       session?.tester ?? '',
         locationName: session?.location_name ?? '',
         temperatureF: session?.temperature_f ?? '',
+        altitudeFt:   session?.altitude_ft ?? '',
         sourceName:   session?.source_name ?? '',
         url:          session?.url ?? '',
         notes:        session?.notes ?? '',

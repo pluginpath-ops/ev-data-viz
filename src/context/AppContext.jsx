@@ -268,6 +268,7 @@ export function AppProvider({ children }) {
                     case 'energyKwh':       normalized.energy_kwh         = toNum(v);  break;
                     case 'chargeEnergyKwh': normalized.charge_energy_kwh  = toNum(v);  break;
                     case 'temperatureF':    normalized.temperature_f      = toNum(v);  break;
+                    case 'altitudeFt':      normalized.altitude_ft       = toNum(v);  break;
                     case 'elevationGainFt': normalized.elevation_gain_ft  = toNum(v);  break;
                     case 'chargingUrl':     normalized.charging_url       = v;         break;
                     default:                normalized[k] = v;                         break;
