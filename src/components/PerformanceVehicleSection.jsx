@@ -15,6 +15,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import InfoIcon from './InfoIcon';
+import SectionHeader, { SectionAction } from './SectionHeader';
 import TestedResults from './performance/TestedResults';
 import PerformanceSessionCard from './performance/PerformanceSessionCard';
 import PerformanceSummaryCard from './performance/PerformanceSummaryCard';
@@ -156,12 +157,20 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
 
     return (
         <div className="mt-6">
-            <div className="flex items-center justify-between gap-2 mb-3">
-                <h3 className="section-title">
-                    Performance Testing
-                    <InfoIcon text={SECTION_HELP} position="right" className="ml-1" />
-                </h3>
-            </div>
+            {/* The same three actions appear further down, beside the sections
+                they belong to. Duplicated rather than moved because those
+                sections run long: an action is worth having at both ends. */}
+            <SectionHeader
+                title="Performance Testing"
+                info={<InfoIcon text={SECTION_HELP} position="right" className="ml-1" />}
+                actions={canEdit && (
+                    <>
+                        <SectionAction onClick={() => setShowImport(true)}>📄 Import testing CSV</SectionAction>
+                        <SectionAction onClick={() => setShowPaste(true)}>📋 Paste a result block</SectionAction>
+                        <SectionAction onClick={() => setAddingResult(true)}>+ Add reported result</SectionAction>
+                    </>
+                )}
+            />
 
             <TestedResults sessions={sessions} summaries={summaries} />
 

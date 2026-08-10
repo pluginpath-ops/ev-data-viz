@@ -897,6 +897,22 @@ export default function App() {
                         />
                     )}
                 </main>
+
+                {/* Footer, and the ~100px of clear space below it.
+                    Every bottom-anchored panel here — the delete/undo bar, the
+                    reorder bar, the notification banner — is fixed to the
+                    viewport, so it lands on top of whatever the page ends with.
+                    Individual views padded themselves only while their own bar
+                    was showing; the notification banner belongs to no view and
+                    covered actionable controls with nothing to be done but
+                    dismiss it. Reserving the space site-wide costs one screen of
+                    scroll and means nothing actionable is ever underneath. */}
+                <footer className="site-footer">
+                    <p>EVBench — real-world EV charging and range comparisons.</p>
+                    <p>
+                        © {new Date().getFullYear()} · Test data belongs to the testers credited on each run.
+                    </p>
+                </footer>
             </div>
 
             {/* ── Global notification banner ──────────────────────────────── */}
