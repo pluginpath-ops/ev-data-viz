@@ -18,7 +18,7 @@ import { RunVoteButtons } from './VoteButtons';
 import EpaVehicleSection from './EpaVehicleSection';
 import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
-import { filterChargingRuns, defaultChargingRun, isRangeRun, runKindFrom } from '../utils/runUtils';
+import { filterChargingRuns, defaultChargingRun, isRangeRun, runKindFrom, linkableRuns, linkableCounts } from '../utils/runUtils';
 import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
 
 // ── Data-type flag definitions ────────────────────────────────────────────────
@@ -456,7 +456,13 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
     // ── Inherited test link form state ────────────────────────────────────────
     const [showAddLink, setShowAddLink]     = useState(false);
-    const [newLinkSourceId, setNewLinkSourceId] = useState(''); // source vehicle id
+    const [newLinkSourceId, setNewLinkSourceId] = useState('');
+    // Which of the source vehicle's runs to inherit, and of which kind. The
+    // form used to link every unlinked run at once, so "inherit the charging
+    // tests but not the range tests" could only be done by linking the lot and
+    // removing what you did not want.
+    const [newLinkKind, setNewLinkKind] = useState('all');
+    const [newLinkRunIds, setNewLinkRunIds] = useState(null);   // null = all matching // source vehicle id
     const [newLinkScaling, setNewLinkScaling]   = useState('');
     const [newLinkNotes, setNewLinkNotes]       = useState('');
     const [linkSaving, setLinkSaving]           = useState(false);
@@ -2657,9 +2663,19 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         const selectedSrc = newLinkSourceId
                             ? (vehicles || []).find(v => Number(v.id) === parseInt(newLinkSourceId, 10))
                             : null;
-                        const runsToLink = selectedSrc
-                            ? (selectedSrc.runs || []).filter(r => !r._inherited && !alreadyLinkedRunIds.has(Number(r.id)))
+                        const candidates = selectedSrc
+                            ? linkableRuns(selectedSrc, alreadyLinkedRunIds, newLinkKind)
                             : [];
+                        const counts = selectedSrc ? linkableCounts(selectedSrc, alreadyLinkedRunIds) : { all: 0, charging: 0, range: 0 };
+                        // null means "everything matching the filter", so the
+                        // default behaviour is unchanged until a box is unticked.
+                        const isPicked = (id) => newLinkRunIds === null || newLinkRunIds.includes(Number(id));
+                        const runsToLink = candidates.filter(r => isPicked(r.id));
+                        const togglePick = (id) => setNewLinkRunIds(prev => {
+                            const base = prev === null ? candidates.map(r => Number(r.id)) : prev;
+                            const n = Number(id);
+                            return base.includes(n) ? base.filter(x => x !== n) : [...base, n];
+                        });
 
                         const suggestEpaRatio = () => {
                             if (!selectedSrc) return;
@@ -2683,6 +2699,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 setNewLinkSourceId('');
                                 setNewLinkScaling('');
                                 setNewLinkNotes('');
+                                setNewLinkKind('all');
+                                setNewLinkRunIds(null);
                                 setShowAddLink(false);
                             } finally {
                                 setLinkSaving(false);
@@ -2694,7 +2712,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 <div className="flex gap-2 flex-wrap">
                                     <select
                                         value={newLinkSourceId}
-                                        onChange={e => { setNewLinkSourceId(e.target.value); setNewLinkScaling(''); }}
+                                        onChange={e => { setNewLinkSourceId(e.target.value); setNewLinkScaling(''); setNewLinkRunIds(null); setNewLinkKind('all'); }}
                                         className="form-input text-sm flex-1 min-w-48"
                                     >
                                         <option value="">Source vehicle…</option>
@@ -2713,10 +2731,65 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         All tests from {selectedSrc.name} are already linked.
                                     </p>
                                 )}
-                                {selectedSrc && runsToLink.length > 0 && (
-                                    <p className="text-xs text-muted mt-1">
-                                        Will link {runsToLink.length} test{runsToLink.length !== 1 ? 's' : ''}: {runsToLink.map(r => r.name).join(', ')}
-                                    </p>
+                                {selectedSrc && counts.all > 0 && (
+                                    <div className="spec-link-picker">
+                                        {/* Kind first: it answers the question the
+                                            curator actually has — does this trim
+                                            share the battery, or the body? */}
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-label">Inherit:</span>
+                                            {[
+                                                { key: 'all',      label: `All (${counts.all})` },
+                                                { key: 'charging', label: `Charging only (${counts.charging})` },
+                                                { key: 'range',    label: `Range only (${counts.range})` },
+                                            ].map(opt => (
+                                                <button
+                                                    key={opt.key}
+                                                    type="button"
+                                                    onClick={() => { setNewLinkKind(opt.key); setNewLinkRunIds(null); }}
+                                                    className={`btn text-xs ${newLinkKind === opt.key ? 'btn-primary' : 'btn-secondary'}`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                            <span className="text-faint text-xs select-none">·</span>
+                                            <button type="button" className="run-bulk-link"
+                                                onClick={() => setNewLinkRunIds(null)}>all</button>
+                                            <span className="text-faint text-xs select-none">/</span>
+                                            <button type="button" className="run-bulk-link"
+                                                onClick={() => setNewLinkRunIds([])}>none</button>
+                                        </div>
+
+                                        {candidates.length === 0 ? (
+                                            <p className="text-xs text-faint mt-1 italic">
+                                                No {newLinkKind === 'all' ? '' : `${newLinkKind} `}tests left to link from {selectedSrc.name}.
+                                            </p>
+                                        ) : (
+                                            <div className="spec-link-run-list">
+                                                {candidates.map(r => (
+                                                    <label key={r.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isPicked(r.id)}
+                                                            onChange={() => togglePick(r.id)}
+                                                            className="w-4 h-4 shrink-0"
+                                                        />
+                                                        <span className={`spec-link-kind-pill is-${runKindFrom(r)}`}>
+                                                            {runKindFrom(r) === 'charging' ? '⚡' : '📏'}
+                                                        </span>
+                                                        <span className="truncate">{r.name}</span>
+                                                        {r.date && <span className="text-xs text-faint shrink-0">{r.date}</span>}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        <p className="text-xs text-muted mt-1">
+                                            {runsToLink.length === 0
+                                                ? 'Nothing selected — pick at least one test.'
+                                                : `Will link ${runsToLink.length} test${runsToLink.length !== 1 ? 's' : ''}.`}
+                                        </p>
+                                    </div>
                                 )}
                                 <div className="flex gap-2 mt-2 flex-wrap items-center">
                                     <input
