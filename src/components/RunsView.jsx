@@ -528,6 +528,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         energyKwh: '',
         chargeEnergyKwh: '',
         temperatureF: '',
+        altitudeFt: '',
         elevationGainFt: '',
         windSpeedMph: '',
         windDirectionDeg: '',
@@ -606,7 +607,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', url: '', chargingUrl: '' });
+        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', url: '', chargingUrl: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: null });
@@ -895,6 +896,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             energyKwh: run.energy_kwh ?? '',
             chargeEnergyKwh: run.charge_energy_kwh ?? '',
             temperatureF: run.temperature_f ?? '',
+            altitudeFt: run.altitude_ft ?? '',
             elevationGainFt: run.elevation_gain_ft ?? '',
             windSpeedMph: run.avg_wind_speed_mph ?? '',
             windDirectionDeg: run.wind_direction_deg ?? '',
@@ -1563,10 +1565,19 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     />
                                                     <input
                                                         type="number"
+                                                        placeholder="Test altitude (ft)"
+                                                        title="Elevation the test was run at — drives air density and so aero drag. Not the same as elevation gain."
+                                                        value={runMetadata.altitudeFt}
+                                                        onChange={(e) => setRunMetadata({...runMetadata, altitudeFt: e.target.value})}
+                                                        className="form-input"
+                                                    />
+                                                    <input
+                                                        type="number"
                                                         placeholder="Elevation gain (ft)"
+                                                        title="Net climb over the route — drives the potential-energy term. Not the same as test altitude."
                                                         value={runMetadata.elevationGainFt}
                                                         onChange={(e) => setRunMetadata({...runMetadata, elevationGainFt: e.target.value})}
-                                                        className="form-input col-span-2"
+                                                        className="form-input"
                                                     />
                                                     <input
                                                         type="number"
@@ -1991,10 +2002,19 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 />
                                                 <input
                                                     type="number"
+                                                    placeholder="Test altitude (ft)"
+                                                    title="Elevation the test was run at — drives air density and so aero drag. Not the same as elevation gain."
+                                                    value={editFormData.altitudeFt}
+                                                    onChange={(e) => setEditFormData({...editFormData, altitudeFt: e.target.value})}
+                                                    className="form-input"
+                                                />
+                                                <input
+                                                    type="number"
                                                     placeholder="Elevation gain (ft)"
+                                                    title="Net climb over the route — drives the potential-energy term. Not the same as test altitude."
                                                     value={editFormData.elevationGainFt}
                                                     onChange={(e) => setEditFormData({...editFormData, elevationGainFt: e.target.value})}
-                                                    className="form-input col-span-2"
+                                                    className="form-input"
                                                 />
                                                 <input
                                                     type="number"

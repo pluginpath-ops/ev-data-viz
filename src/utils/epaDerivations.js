@@ -463,7 +463,7 @@ export function gradeEnergyKwh100mi(weightLbs, elevationGainFt, distanceMiles, e
  * @param {object} group             — EPA group (coefficients + tests), same as buildEpaCurveFromModel
  * @param {number} speedMph          — the run's recorded test speed
  * @param {number} measuredKwh100mi  — the run's measured consumption (kWh/100mi)
- * @param {object} runConditions     — { temperatureF, windSpeedMph, windDirectionDeg, elevationGainFt, distanceMiles } as recorded on the run
+ * @param {object} runConditions     — { temperatureF, altitudeFt, windSpeedMph, windDirectionDeg, elevationGainFt, distanceMiles } as recorded on the run
  * @param {object} viewConditions    — { densityRatio, accessoryOverrideW, windSpeedMph, windDirectionDeg, elevationGainFt, elevationDistanceMiles } — the SAME values driving the curve
  * @returns {number|null} corrected kWh/100mi, or null if the model can't be evaluated
  */
@@ -475,7 +475,13 @@ export function correctMeasuredConsumption(group, speedMph, measuredKwh100mi, ru
     const accKw = viewConditions.accessoryOverrideW != null ? viewConditions.accessoryOverrideW / 1000 : accessoryKw(group);
     const { a, b, c, equivTestWeightLbs } = coeffs;
 
-    const runDensityRatio = temperatureDensityRatio(runConditions.temperatureF ?? null);
+    // Altitude AND temperature, matching how the view side builds its ratio.
+    // This was temperature alone, so a measurement was always priced as though
+    // taken at sea level: correcting a Denver test to sea level left the whole
+    // thin-air benefit in the number. Half a correction is worse than none,
+    // because the result still looks corrected.
+    const runDensityRatio = airDensityRatio(runConditions.altitudeFt ?? 0)
+        * temperatureDensityRatio(runConditions.temperatureF ?? null);
     const cAtRun  = c * runDensityRatio;
     const cAtView = c * viewConditions.densityRatio;
 

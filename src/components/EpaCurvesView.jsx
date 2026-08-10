@@ -460,6 +460,7 @@ export default function EpaCurvesView({
                             if (overlayMode === 'corrected') {
                                 const runConditions = {
                                     temperatureF:     run.temperature_f,
+                                    altitudeFt:       run.altitude_ft,
                                     windSpeedMph:     run.avg_wind_speed_mph,
                                     windDirectionDeg: run.wind_direction_deg,
                                     elevationGainFt:  run.elevation_gain_ft,
