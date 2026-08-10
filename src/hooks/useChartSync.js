@@ -74,7 +74,7 @@ export function useChartSync({
             };
             return () => channel.close();
         }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentionally one-time setup
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally one-time setup
 
     /** Called by App.jsx whenever chart state changes (main tab only). */
     const sendState = useCallback(() => {

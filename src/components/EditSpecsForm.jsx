@@ -500,7 +500,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                         </div>
 
                                         {/* Custom fields */}
-                                        {(customEntries.length > 0 || true) && (
+                                        {(
                                             <div className="mt-3 pt-2 border-t">
                                                 <p className="text-xs text-faint mb-1.5">Custom fields</p>
                                                 {customEntries.map(([key, val]) => (

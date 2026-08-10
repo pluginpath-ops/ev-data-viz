@@ -127,7 +127,7 @@ function deriveCycleCategory(row, get) {
  * @returns {Array<Object>}  Group objects (see file header for shape)
  */
 export function parseEpaTestCarSheet(text, sourceFileName = null) {
-    const cleanText = text.replace(/^﻿/, ''); // strip UTF-8 BOM (MEL files)
+    const cleanText = text.replace(/^/, ''); // strip UTF-8 BOM (MEL files)
     const lines = cleanText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
     if (lines.length < 2) return [];
 
