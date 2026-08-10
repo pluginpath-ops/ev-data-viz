@@ -111,8 +111,16 @@ const PALETTE = [
     '#3b82f6', '#a855f7', '#ec4899', '#14b8a6',
 ];
 
-// ── Per-run routing overrides panel ───────────────────────────────────────────
-// Dedicated collapsible section listing the selected runs with per-run overrides
+// ── Per-row routing overrides panel ───────────────────────────────────────────
+//
+// Keyed by PAIR KEY, not charging-run id. When this was written a road-trip row
+// was a charging run, so the run's id identified it. Since the pairing epic a
+// row is a (range test × charging test) pair, and one charging run can appear in
+// several rows against different range tests — so a run id would have made two
+// distinct simulations share one override, and collide as React keys besides.
+// Every other per-row thing here (colour, label, selection) is already keyed
+// this way.
+// Dedicated collapsible section listing the selected rows with per-row overrides
 // of the charging strategy: en-route Charger Arrival SoC (minSoc) and the
 // mode-dependent charge amount (leg distance / charge time). Blank shows the
 // global value greyed as a placeholder; typing overrides just that run.
@@ -120,7 +128,7 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
     const [open, setOpen] = useState(false);
     if (!entries.length) return null;
 
-    const customized  = entries.filter(e => Object.keys(perRun[e.run.id] || {}).length).length;
+    const customized  = entries.filter(e => Object.keys(perRun[e.key] || {}).length).length;
     const legGlobal   = units === 'metric' ? Math.round(global.legDistance * MI_TO_KM) : global.legDistance;
     const amountLabel = mode === 'distance' ? `Leg Distance (${dl})` : 'Charge Time (min)';
 
@@ -149,17 +157,20 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
                         </thead>
                         <tbody className="divide-y dark:divide-slate-700">
                             {entries.map(e => {
-                                const ov = perRun[e.run.id] || {};
+                                const ov = perRun[e.key] || {};
                                 const legValue = ov.legDistance != null
                                     ? (units === 'metric' ? Math.round(ov.legDistance * MI_TO_KM) : ov.legDistance)
                                     : '';
                                 return (
-                                    <tr key={e.run.id}>
+                                    <tr key={e.key}>
                                         <td className="px-3 py-2">
                                             <span className="flex items-center gap-2">
                                                 <span className="inline-block w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
                                                 <span className="text-secondary">{vehicleLabel(e.vehicle)}</span>
-                                                <span className="text-muted">· {e.run.name}</span>
+                                                <span className="text-muted">· {e.rangeRun?.name ?? e.run.name}</span>
+                                                {e.rangeRun && e.run?.name && (
+                                                    <span className="text-faint">· {e.run.name}</span>
+                                                )}
                                             </span>
                                         </td>
                                         <td className="px-3 py-2">
@@ -168,7 +179,7 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
                                                 className={inputCls}
                                                 placeholder={`${global.minSoc}`}
                                                 value={ov.minSoc ?? ''}
-                                                onChange={ev => onChange(e.run.id, 'minSoc', ev.target.value)}
+                                                onChange={ev => onChange(e.key, 'minSoc', ev.target.value)}
                                             />
                                         </td>
                                         <td className="px-3 py-2">
@@ -180,7 +191,7 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
                                                     value={legValue}
                                                     onChange={ev => {
                                                         const v = ev.target.value;
-                                                        onChange(e.run.id, 'legDistance', v === '' ? '' : (units === 'metric' ? Number(v) / MI_TO_KM : Number(v)));
+                                                        onChange(e.key, 'legDistance', v === '' ? '' : (units === 'metric' ? Number(v) / MI_TO_KM : Number(v)));
                                                     }}
                                                 />
                                             ) : (
@@ -189,7 +200,7 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
                                                     className={inputCls}
                                                     placeholder={`${global.chargeTime}`}
                                                     value={ov.chargeTime ?? ''}
-                                                    onChange={ev => onChange(e.run.id, 'chargeTime', ev.target.value)}
+                                                    onChange={ev => onChange(e.key, 'chargeTime', ev.target.value)}
                                                 />
                                             )}
                                         </td>
@@ -706,7 +717,7 @@ export default function RoadTripView({
             const chargingData = runDataCache[entry.run.id];
             if (!chargingData || chargingData.length === 0) return null;
 
-            const ov = perRun[entry.run.id] || {};
+            const ov = perRun[entry.key] || {};
             const result = simulateRoadTrip({
                 batteryKwh:        entry.batteryKwh,
                 // Towing: all vehicles share the same system efficiency; battery still varies per vehicle
@@ -743,7 +754,7 @@ export default function RoadTripView({
         const perRun = roadTripConfig.perRun || {};
         return validEntries.map(entry => {
             const chargingData = runDataCache[entry.run.id] ?? [];
-            const ov = perRun[entry.run.id] || {};
+            const ov = perRun[entry.key] || {};
             return SPEED_SWEEP_MPH.map(speedMph => simulateRoadTrip({
                 batteryKwh:        entry.batteryKwh,
                 miPerKwh:          towingMode ? towingEfficiency : entry.miPerKwh,
@@ -771,7 +782,7 @@ export default function RoadTripView({
         const perRun = roadTripConfig.perRun || {};
         return validEntries.map(entry => {
             const chargingData = runDataCache[entry.run.id] ?? [];
-            const ov = perRun[entry.run.id] || {};
+            const ov = perRun[entry.key] || {};
             // Leg distance is the swept axis here, so a per-run leg override doesn't apply.
             return LEG_SWEEP_MI.map(legMi => simulateRoadTrip({
                 batteryKwh:        entry.batteryKwh,
@@ -1337,8 +1348,9 @@ export default function RoadTripView({
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
 
-    // Per-run override setter. Empty/invalid clears the override (falls back to global);
-    // prunes empty run entries so unset runs use globals cleanly.
+    // Per-row override setter, keyed by pair key. Empty/invalid clears the
+    // override (falls back to global); prunes empty entries so unset rows use
+    // globals cleanly.
     const setRunOverride = (runId, key, rawVal) => setRoadTripConfig(prev => {
         const perRun = { ...(prev.perRun || {}) };
         const cur = { ...(perRun[runId] || {}) };
