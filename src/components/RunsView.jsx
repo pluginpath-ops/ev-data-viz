@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
@@ -9,6 +9,7 @@ import DeleteQueueBar from './DeleteQueueBar';
 import EditVehicleForm from './EditVehicleForm';
 import { groupRunsBySession } from '../utils/testSessions';
 import SessionControl from './SessionControl';
+import RunSpecRows from './RunSpecRows';
 import SessionGroupHeader from './SessionGroupHeader';
 import SessionEditModal from './SessionEditModal';
 import EditSpecsForm from './EditSpecsForm';
@@ -17,7 +18,7 @@ import { RunVoteButtons } from './VoteButtons';
 import EpaVehicleSection from './EpaVehicleSection';
 import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
-import { filterChargingRuns, defaultChargingRun, isRangeRun } from '../utils/runUtils';
+import { filterChargingRuns, defaultChargingRun, isRangeRun, runKindFrom } from '../utils/runUtils';
 import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
 
 // ── Data-type flag definitions ────────────────────────────────────────────────
@@ -90,127 +91,7 @@ function PairedChargingControl({ run, vehicle, onSet }) {
     );
 }
 
-function RunRangeMetaLine({ run, units }) {
-    const rangeFlag = DATA_FLAGS.find(f => f.key === 'range');
-    const dot = <span className="mx-1.5 text-faint select-none">·</span>;
-    const items = [];
-    if (run.speed_mph != null) {
-        // A mixed-cycle average is marked wherever the speed appears. The
-        // figure is not comparable to a steady-state test of the same number,
-        // and that is true before any correction is switched on.
-        items.push(
-            <span
-                key="spd"
-                className={run.speed_basis === 'mixed' ? 'text-amber-600' : 'text-secondary'}
-                title={run.speed_basis === 'mixed'
-                    ? 'Average over a varying-speed cycle, not a held setpoint. Not directly comparable to a steady-state test, and speed correction is skipped for it.'
-                    : undefined}
-            >
-                {fmtSpeed(run.speed_mph, units)}
-            </span>);
-    if (speedBasisNote(run)) {
-        items.push(
-            <span key="basis" className="text-amber-600" title="Average over a varying-speed cycle. Not directly comparable to a steady-state test; speed correction is skipped.">
-                {speedBasisNote(run)}
-            </span>);
-    }
-    } else {
-        items.push(<span key="spd" className="text-amber-600" title="Set Speed (mph) in run metadata for accurate efficiency">{fmtSpeed(70, units)} (est.)</span>);
-    }
-    if (run.distance_miles  != null) items.push(<span key="dist" className="text-green-700">{fmtDistance(run.distance_miles, units)}</span>);
-    if (run.energy_kwh      != null) items.push(<span key="kwh"  className="text-blue-700" title="Energy out (measured at vehicle)">{run.energy_kwh} kWh out</span>);
-    if (run.energy_kwh != null && run.distance_miles != null)
-        items.push(<span key="eff" className="text-blue-700">{calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}</span>);
-    if (run.temperature_f != null) items.push(<span key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</span>);
-    if (run.avg_wind_speed_mph != null) {
-        const dirTitle = run.wind_direction_deg != null
-            ? `${run.wind_direction_deg}° vs travel (0°=tailwind, 180°=headwind)`
-            : 'Direction not recorded';
-        items.push(
-            <span key="wind" className="text-cyan-700" title={dirTitle}>
-                💨 {fmtSpeed(run.avg_wind_speed_mph, units)}{run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : ''}
-            </span>
-        );
-    }
-    if (run.start_soc != null && run.end_soc != null)
-        items.push(<span key="soc" className="text-secondary">SoC {run.start_soc}→{run.end_soc}%</span>);
-    if (run.url)
-        items.push(<a key="url" href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{run.name} ↗</a>);
-    return (
-        <div className="flex items-center gap-2 text-sm mt-1 flex-wrap">
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${rangeFlag.pillStyle} shrink-0`}>{rangeFlag.label}</span>
-            <span className="flex flex-wrap items-baseline">
-                {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
-            </span>
-        </div>
-    );
-}
 
-/**
- * Charging metadata pill row — shown on both regular and inherited run cards.
- * Renders the ⚡ Charging pill followed by data-point count, energy, field
- * tags, charging source link, and (for editable cards) a kWh compare button.
- *
- * @param {Object}   props.run            Run record
- * @param {Object}   [props.calcKwhByRun] Per-run kWh calculation cache (editable cards only)
- * @param {Function} [props.onCheckKwh]   Callback to trigger kWh calculation (editable cards only)
- */
-function RunChargingMetaLine({ run, calcKwhByRun, onCheckKwh }) {
-    const chargingFlag = DATA_FLAGS.find(f => f.key === 'charging');
-    const dot        = <span className="mx-1.5 text-faint select-none">·</span>;
-    const fields     = run.populated_fields  || [];
-    const calcFields = run.calculated_fields || [];
-    const items = [];
-
-    items.push(<span key="pts" className="text-secondary">Data Points: {run.dataPointCount ?? run.data?.length ?? 0}</span>);
-    if (run.charge_energy_kwh != null)
-        items.push(<span key="kwh" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.charge_energy_kwh} kWh in</span>);
-
-    FIELD_META.filter(f => fields.includes(f.key)).forEach(f => {
-        const isCalc = calcFields.includes(f.key);
-        items.push(
-            <span key={`field-${f.key}`}
-                title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
-                className={`px-2 py-0.5 text-xs rounded-full font-medium border ${isCalc ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                {isCalc ? `~${f.label}` : f.label}
-            </span>
-        );
-    });
-
-    if (run.charging_url)
-        items.push(<a key="curl" href={run.charging_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Source ↗</a>);
-
-    // kWh compare button — only on editable (non-inherited) cards
-    if (onCheckKwh && run.charge_energy_kwh != null && (run.dataPointCount ?? 0) > 1) {
-        const check = calcKwhByRun?.[run.id];
-        if (!check) {
-            items.push(
-                <button key="cmp" onClick={() => onCheckKwh(run)}
-                    className="text-faint hover:text-secondary border border-[var(--color-border)] rounded px-1.5 py-0.5 transition-colors text-xs"
-                    title="Calculate kWh from data points and compare">Compare ↔</button>
-            );
-        } else if (check.loading) {
-            items.push(<span key="cmp" className="text-faint text-xs">Calculating…</span>);
-        } else if (check.kwh != null) {
-            const pct = Math.abs(run.charge_energy_kwh - check.kwh) / Math.max(run.charge_energy_kwh, check.kwh) * 100;
-            items.push(
-                <span key="cmp" title={`Calculated from data points: ${check.kwh} kWh`}
-                    className={`text-xs px-1.5 py-0.5 rounded border font-medium ${pct > 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                    {pct > 5 ? '⚠️ ' : '✓ '}data: {check.kwh} kWh ({pct.toFixed(1)}%)
-                </span>
-            );
-        }
-    }
-
-    return (
-        <div className="flex items-center gap-2 text-sm mt-1 flex-wrap gap-y-1">
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${chargingFlag.pillStyle} shrink-0`}>{chargingFlag.label}</span>
-            <span className="flex flex-wrap items-baseline gap-y-1">
-                {items.map((item, i) => <span key={i}>{i > 0 && dot}{item}</span>)}
-            </span>
-        </div>
-    );
-}
 
 // ── Derive-charging-axis panel ────────────────────────────────────────────────
 // Three modes share one engine (src/utils/deriveChargingAxis.js):
@@ -1308,6 +1189,24 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     // A flat pile said nothing about which two runs were the same test event,
     // which is the entire reason sessions exist.
     const runGroups = useMemo(() => groupRunsBySession(displayRuns), [displayRuns]);
+
+    // The real SoC span of each charging run, from its data points. The stored
+    // start_soc/end_soc are a leftover of the 046 split and describe the
+    // discharge, so a charging card would otherwise read its own session
+    // backwards — see DataService.getSocRanges.
+    const [socRanges, setSocRanges] = useState({});
+    const chargingRunKey = displayRuns
+        .filter(r => runKindFrom(r) === 'charging')
+        .map(r => r.id).join(',');
+    useEffect(() => {
+        const ids = chargingRunKey ? chargingRunKey.split(',') : [];
+        if (!ids.length) return;
+        let cancelled = false;
+        dataService.getSocRanges(ids)
+            .then(ranges => { if (!cancelled) setSocRanges(prev => ({ ...prev, ...ranges })); })
+            .catch(() => { /* the card falls back to its stored fields */ });
+        return () => { cancelled = true; };
+    }, [chargingRunKey]);
     const [collapsedSessions, setCollapsedSessions] = useState(() => new Set());
     const [editingSessionId, setEditingSessionId] = useState(null);
     const toggleSessionGroup = (key) => setCollapsedSessions(prev => {
@@ -2384,6 +2283,17 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             <div className="run-card-header">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 flex-wrap">
+                                        {/* The kind belongs on the title line: it is
+                                            the first thing that decides how to read
+                                            every number below it. */}
+                                        {(() => {
+                                            const flag = DATA_FLAGS.find(f => f.key === runKindFrom(run));
+                                            return flag ? (
+                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${flag.pillStyle} shrink-0`}>
+                                                    {flag.label}
+                                                </span>
+                                            ) : null;
+                                        })()}
                                         <h3 className="section-title">
                                             {run.name}
                                             {run.isHidden && (
@@ -2411,6 +2321,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 </a>
                                             )}
                                         </h3>
+                                        {/* The session heading already carries the
+                                            date for a grouped run; repeating it puts
+                                            the same fact on screen twice. */}
+                                        {run.date && run.session_id == null && (
+                                            <span className="text-sm text-faint">{run.date}</span>
+                                        )}
                                         <RunVoteButtons
                                             vouch={votes.vouch}
                                             flag={votes.flag}
@@ -2419,15 +2335,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         />
                                     </div>
                                     <div className="run-meta">
-                                        <p>Date: {run.date}</p>
-                                        {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
-                                        {run.conditions && <p>Notes: {run.conditions}</p>}
-                                        {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (
-                                            <RunRangeMetaLine run={run} units={units} />
-                                        )}
-                                        {inferRunFlags(run).includes('charging') && (
-                                            <RunChargingMetaLine run={run} calcKwhByRun={calcKwhByRun} onCheckKwh={handleCheckKwh} />
-                                        )}
+                                        <RunSpecRows
+                                            run={run}
+                                            units={units}
+                                            socRange={socRanges[run.id]}
+                                            fieldMeta={FIELD_META}
+                                            calcKwhByRun={calcKwhByRun}
+                                            onCheckKwh={handleCheckKwh}
+                                        />
                                         {canEdit(vehicle) && (
                                             <SessionControl
                                                 run={run}
@@ -2646,12 +2561,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     <p>Date: {run.date}</p>
                                                     {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
                                                     {run.conditions && <p>Notes: {run.conditions}</p>}
-                                                    {(inferRunFlags(run).includes('range') || run.distance_miles != null) && (
-                                                        <RunRangeMetaLine run={run} units={units} />
-                                                    )}
-                                                    {inferRunFlags(run).includes('charging') && (
-                                                        <RunChargingMetaLine run={run} />
-                                                    )}
+                                                    <RunSpecRows run={run} units={units} fieldMeta={FIELD_META} />
                                                 </div>
                                             </div>
                                             <div className="run-actions">

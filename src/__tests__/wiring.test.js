@@ -140,3 +140,26 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
         }
     });
 });
+
+describe('components import what they use', () => {
+    // Twice now a helper has been used in JSX without being imported — a runtime
+    // ReferenceError no build step catches, because Vite does not resolve
+    // identifiers. ESLint's no-undef is the real answer; this pins the specific
+    // module that keeps biting until that exists.
+    const RUN_UTIL_NAMES = [
+        'runKindFrom', 'isRangeRun', 'isChargingRun', 'filterRangeRuns', 'filterChargingRuns',
+        'defaultChargingRun', 'pairedChargingRun', 'applyDefaultRun', 'clearDefaultRuns',
+        'linkableRuns', 'linkableCounts',
+    ];
+
+    for (const { file, text } of ALL.filter(x => /\.jsx$/.test(x.file))) {
+        const used = RUN_UTIL_NAMES.filter(n => new RegExp(`[^.\\w]${n}\\s*\\(`).test(text));
+        if (!used.length) continue;
+
+        it(`${file.split('/').pop()} imports the runUtils helpers it calls`, () => {
+            const importLines = (text.match(/^import .*runUtils.*$/gm) ?? []).join(' ');
+            const missing = used.filter(n => !new RegExp(`\\b${n}\\b`).test(importLines));
+            expect(missing).toEqual([]);
+        });
+    }
+});
