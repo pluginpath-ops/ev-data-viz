@@ -323,27 +323,12 @@ body {
 .text-hint        { @apply text-xs;  font-size: var(--fs-hint, 0.75rem);   color: var(--color-text-faint); }
 .text-data        { @apply text-sm font-mono tabular-nums; font-size: var(--fs-data, 0.875rem); }
 
-/* — Color tiers (compose with a role) ——————————————————————————————————————— */
-.text-secondary { color: var(--color-text-secondary); }
-.text-muted     { color: var(--color-text-muted); }
-.text-faint     { color: var(--color-text-faint); }
-
-/* Inline info/notice banner (theme-aware) */
-.notice-info {
-    background-color: var(--color-primary-light);
-    border: 1px solid var(--color-primary);
-    color: var(--color-text-primary);
-}
-
-/* Smaller heading for a group within a card (h4) */
-.subsection-title {
-    @apply text-sm font-semibold;
-    color: var(--color-text-primary);
-}
-
-/* Theme-aware text-color helpers. Headings/body inherit --color-text-primary
-   from <body>; these set the dimmer tiers. Prefer these over Tailwind text-gray-*
-   so text adapts to dark mode. */
+/* — Color tiers (compose with a role) ———————————————————————————————————————
+   Prefer these over Tailwind's text-gray-* so text follows the theme. They live
+   HERE, inside the typography system, because a second copy further down the
+   file used to shadow this one — harmlessly for the colours, but its
+   .subsection-title came with it and overrode the variable-driven one, killing
+   that knob. */
 .text-secondary { color: var(--color-text-secondary); }
 .text-muted     { color: var(--color-text-muted); }
 .text-faint     { color: var(--color-text-faint); }
