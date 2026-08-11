@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import TypographyKnobs from './TypographyKnobs';
+import ImageMaintenance from './ImageMaintenance';
 
 /**
  * Admin sub-tab: site-wide interface settings.
@@ -54,6 +55,8 @@ export default function InterfaceSettings() {
                     />
                 </label>
             </div>
+
+            <ImageMaintenance />
 
             <TypographyKnobs />
 

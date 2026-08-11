@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { DATA_CATEGORIES, vehicleDataCategories, hasDataCategory, filterByDataCategories } from '../utils/vehicleDataCategories';
 import { fmtDistance } from '../utils/unitConversions';
+import { displayImageUrl } from '../utils/imageRenditions';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
-import EditVehicleForm from './EditVehicleForm';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
-import ImportVehiclesModal from './ImportVehiclesModal';
+import LazyBoundary from './LazyBoundary';
+import { EditVehicleForm, ImportVehiclesModal } from './lazyComponents';
 
 // ── Test-count row ────────────────────────────────────────────────────────────
 
@@ -196,10 +197,10 @@ export default function VehiclesView({
         setNewTagName('');
     };
 
-    const handleImageReady = async (blob) => {
-        if (!blob || !editingId) return;
+    const handleImageReady = async (renditions) => {
+        if (!renditions || !editingId) return;
         setImageUploading(true);
-        await onUploadVehicleImage(editingId, blob);
+        await onUploadVehicleImage(editingId, renditions);
         setImageUploading(false);
     };
 
@@ -790,12 +791,12 @@ export default function VehiclesView({
                                     }}
                                 >
                                     {/* Background image + overlay — purely decorative, must not intercept clicks */}
-                                    {vehicle.image_url && (
+                                    {displayImageUrl(vehicle) && (
                                         <>
                                             <div
                                                 className="absolute inset-0 pointer-events-none"
                                                 style={{
-                                                    backgroundImage: `url(${vehicle.image_url})`,
+                                                    backgroundImage: `url(${displayImageUrl(vehicle)})`,
                                                     backgroundSize: 'cover',
                                                     backgroundPosition: 'center',
                                                 }}
@@ -937,8 +938,8 @@ export default function VehiclesView({
 
                                     {/* Thumbnail */}
                                     <div className="list-thumbnail">
-                                        {vehicle.image_url
-                                            ? <img src={vehicle.image_url} alt={vehicle.name} className="w-full h-full object-cover" />
+                                        {displayImageUrl(vehicle)
+                                            ? <img src={displayImageUrl(vehicle)} alt={vehicle.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                             : <span>🚗</span>
                                         }
                                     </div>
@@ -1037,7 +1038,7 @@ export default function VehiclesView({
             {showForm && (
                 <div className="modal-overlay" onClick={handleCancel}>
                     <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                        <EditVehicleForm {...editFormProps} />
+                        <LazyBoundary><EditVehicleForm {...editFormProps} /></LazyBoundary>
                     </div>
                 </div>
             )}
@@ -1062,7 +1063,9 @@ export default function VehiclesView({
 
             {/* Bulk import modal (contributors/owners) */}
             {showImportModal && (
-                <ImportVehiclesModal onClose={() => setShowImportModal(false)} />
+                <LazyBoundary>
+                    <ImportVehiclesModal onClose={() => setShowImportModal(false)} />
+                </LazyBoundary>
             )}
         </div>
     );

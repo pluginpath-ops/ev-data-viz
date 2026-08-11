@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import ImportTableauModal from './ImportTableauModal';
-import EpaImportModal from './EpaImportModal';
-import EpaPdfImportModal from './EpaPdfImportModal';
+import LazyBoundary from './LazyBoundary';
+import { ImportTableauModal, EpaImportModal, EpaPdfImportModal } from './lazyComponents';
 import EpaDataCard from './EpaDataCard';
 import RolesPermissions from './admin/RolesPermissions';
 import ConstantsKnobs from './admin/ConstantsKnobs';
@@ -72,25 +71,31 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
     return (
         <div>
             {showTableauModal && (
-                <ImportTableauModal
-                    vehicles={vehicles}
-                    onImport={importTableauSessions}
-                    onClose={() => setShowTableauModal(false)}
-                />
+                <LazyBoundary>
+                    <ImportTableauModal
+                        vehicles={vehicles}
+                        onImport={importTableauSessions}
+                        onClose={() => setShowTableauModal(false)}
+                    />
+                </LazyBoundary>
             )}
             {showEpaModal && (
-                <EpaImportModal
-                    vehicles={vehicles}
-                    onImport={importEpaTestGroups}
-                    onClose={() => setShowEpaModal(false)}
-                />
+                <LazyBoundary>
+                    <EpaImportModal
+                        vehicles={vehicles}
+                        onImport={importEpaTestGroups}
+                        onClose={() => setShowEpaModal(false)}
+                    />
+                </LazyBoundary>
             )}
             {showEpaPdfModal && (
-                <EpaPdfImportModal
-                    onImport={importEpaCsiGroups}
-                    getExistingIds={getExistingEpaTestGroupIds}
-                    onClose={() => setShowEpaPdfModal(false)}
-                />
+                <LazyBoundary>
+                    <EpaPdfImportModal
+                        onImport={importEpaCsiGroups}
+                        getExistingIds={getExistingEpaTestGroupIds}
+                        onClose={() => setShowEpaPdfModal(false)}
+                    />
+                </LazyBoundary>
             )}
 
             <div className="flex justify-between items-center mb-4">

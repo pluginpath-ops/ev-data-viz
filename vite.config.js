@@ -7,6 +7,33 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Split the three large dependencies out of the app chunk. This does not
+        // reduce first-load bytes — every one of them is needed to render the
+        // first screen — it changes how they are CACHED. With /assets/* now
+        // served immutable, a deploy that only touches app code leaves these
+        // three URLs unchanged, so returning visitors re-download ~180KB of app
+        // instead of the whole 400KB bundle.
+        //
+        // Deliberately NOT split by view: tab switching must never wait on a
+        // fetch, so all views and charts stay in the eager app chunk. The
+        // deferred set is utilities only — see components/lazyComponents.js.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          // pdfjs-dist is already dynamically imported by utils/extractPdfText.
+          // Naming a chunk here would pull it back into the static graph.
+          if (id.includes('pdfjs-dist')) return;
+          if (id.includes('chart.js') || id.includes('chartjs')) return 'vendor-charts';
+          if (id.includes('@supabase') || id.includes('realtime-js')) return 'vendor-supabase';
+          if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('/scheduler/')) {
+            return 'vendor-react';
+          }
+        },
+      },
+    },
+  },
   test: {
     // Pure modules only for now: no jsdom, so the suite stays fast enough to
     // run on every save. The wiring suite reads source text rather than

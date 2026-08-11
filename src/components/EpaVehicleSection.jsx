@@ -12,7 +12,8 @@ import SectionHeader, { SectionAction } from './SectionHeader';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import DerivedValues from './epa/DerivedValues';
 import EpaCuratorEditor from './epa/EpaCuratorEditor';
-import EpaPdfImportModal from './EpaPdfImportModal';
+import LazyBoundary from './LazyBoundary';
+import { EpaPdfImportModal } from './lazyComponents';
 import { useAppContext } from '../context/AppContext';
 
 const CONFIDENCE_COLORS = {
@@ -440,12 +441,14 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                         📑 Import from EPA lab PDF
                     </button>
                     {showPdfModal && (
-                        <EpaPdfImportModal
-                            targetVehicle={vehicle}
-                            onImport={importEpaCsiGroups}
-                            getExistingIds={getExistingEpaTestGroupIds}
-                            onClose={() => setShowPdfModal(false)}
-                        />
+                        <LazyBoundary>
+                            <EpaPdfImportModal
+                                targetVehicle={vehicle}
+                                onImport={importEpaCsiGroups}
+                                getExistingIds={getExistingEpaTestGroupIds}
+                                onClose={() => setShowPdfModal(false)}
+                            />
+                        </LazyBoundary>
                     )}
 
                     {/* Create from scratch — for vehicles with only a lab-submission PDF */}

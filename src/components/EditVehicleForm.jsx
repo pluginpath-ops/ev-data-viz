@@ -4,43 +4,39 @@
 import { useState, useRef, useCallback } from 'react';
 import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
+import { FULL_MAX, buildRenditions, displayImageUrl } from '../utils/imageRenditions';
 
 const ASPECT = 16 / 9;
-const MAX_W = 1600;
-const MAX_H = 900;
 
-// Render the completed crop region to a canvas and return a JPEG blob,
-// scaled down to fit within MAX_W × MAX_H if needed.
-function getCroppedBlob(imgEl, completedCrop) {
-    return new Promise((resolve, reject) => {
-        const canvas = document.createElement('canvas');
-        const scaleX = imgEl.naturalWidth / imgEl.width;
-        const scaleY = imgEl.naturalHeight / imgEl.height;
+// Extract the completed crop region into an offscreen canvas at full rendition
+// resolution. Encoding is left to buildRenditions, which needs one shared source
+// to derive the full and thumbnail JPEGs from.
+function getCroppedCanvas(imgEl, completedCrop) {
+    const scaleX = imgEl.naturalWidth / imgEl.width;
+    const scaleY = imgEl.naturalHeight / imgEl.height;
 
-        const naturalW = completedCrop.width * scaleX;
-        const naturalH = completedCrop.height * scaleY;
-        const scale = Math.min(1, MAX_W / naturalW, MAX_H / naturalH);
+    const naturalW = completedCrop.width * scaleX;
+    const naturalH = completedCrop.height * scaleY;
+    const scale = Math.min(1, FULL_MAX.width / naturalW, FULL_MAX.height / naturalH);
 
-        canvas.width = Math.round(naturalW * scale);
-        canvas.height = Math.round(naturalH * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(naturalW * scale);
+    canvas.height = Math.round(naturalH * scale);
 
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(
-            imgEl,
-            completedCrop.x * scaleX,
-            completedCrop.y * scaleY,
-            naturalW,
-            naturalH,
-            0, 0,
-            canvas.width,
-            canvas.height,
-        );
-        canvas.toBlob(
-            blob => blob ? resolve(blob) : reject(new Error('Canvas toBlob failed')),
-            'image/jpeg',
-            0.92,
-        );
-    });
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(
+        imgEl,
+        completedCrop.x * scaleX,
+        completedCrop.y * scaleY,
+        naturalW,
+        naturalH,
+        0, 0,
+        canvas.width,
+        canvas.height,
+    );
+    return canvas;
 }
 
 export default function EditVehicleForm({
@@ -96,11 +92,11 @@ export default function EditVehicleForm({
 
     const handleCropConfirm = async () => {
         if (!completedCrop || !imgRef.current) return;
-        const blob = await getCroppedBlob(imgRef.current, completedCrop);
+        const renditions = await buildRenditions(getCroppedCanvas(imgRef.current, completedCrop));
         setImgSrc('');
         setCrop(undefined);
         setCompletedCrop(null);
-        onImageReady(blob);
+        onImageReady(renditions);
     };
 
     const handleCropCancel = () => {
@@ -279,10 +275,11 @@ export default function EditVehicleForm({
                 {editingId && (
                     <div className="form-section mt-4">
                         <label className="block font-medium mb-2">Card Background Image</label>
-                        {editingVehicle?.image_url && (
+                        {displayImageUrl(editingVehicle) && (
                             <img
-                                src={editingVehicle.image_url}
+                                src={displayImageUrl(editingVehicle)}
                                 alt="Current"
+                                decoding="async"
                                 className="h-24 w-full object-cover rounded mb-2 border"
                             />
                         )}

@@ -112,6 +112,40 @@ describe('the seams that broke before', () => {
         }
     });
 
+    it('renders vehicle images through the thumbnail resolver', () => {
+        // image_url is the FULL-resolution original — 1600x900, ~210KB each, and
+        // 91% of a cold first load when 23 of them render at once. Displaying it
+        // directly is the regression: every surface must go through
+        // displayImageUrl so it gets the card-sized rendition with a fallback.
+        //
+        // Presence checks (`vehicle.image_url ? 'Replace' : 'Upload'`) are fine
+        // and deliberately not matched here — only uses that put the URL on the
+        // wire are.
+        const rendersRaw = ALL.filter(({ file, text }) =>
+            /\.jsx$/.test(file) && (
+                /src=\{[^}]*\.image_url/.test(text) ||
+                /url\(\$\{[^}]*\.image_url/.test(text)
+            ));
+        expect(rendersRaw.map(x => x.file)).toEqual([]);
+    });
+
+    it('loads the startup queries in parallel', () => {
+        // Seven independent queries were awaited one after another, six of them
+        // returning under 4KB. That was ~900ms of blank screen spent purely on
+        // round trips. An eighth query appended below the Promise.all rather
+        // than inside it silently restores the waterfall.
+        const ctx = read('src/context/AppContext.jsx');
+        const init = ctx.slice(ctx.indexOf('async function initializeApp'));
+        const body = init.slice(0, init.indexOf('\n    }'));
+
+        expect(body, 'initializeApp no longer batches its startup queries')
+            .toMatch(/await Promise\.all\(\[/);
+
+        const serialAwaits = body.match(/(?:const|let)\s+\w+\s*=\s*await\s+dataService\./g) ?? [];
+        expect(serialAwaits, 'a startup query is awaited outside the Promise.all')
+            .toEqual([]);
+    });
+
     it('keeps vehicleLabel out of graph labelling', () => {
         // The vehicle's free-text name is a SELECTION label. Charts must compose
         // from atoms instead — see #170.
