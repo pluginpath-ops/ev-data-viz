@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
     minimumCommonSoc, alignmentExclusion, alignmentOffset, alignSeries,
-    overExtrapolated, clampSoc, rampLength, trimRamp, extrapolationSlope, RAMP_MAX_TRIM,
+    overExtrapolated, clampSoc, rampLength, trimRamp, extrapolationSlope,
+    RAMP_MAX_TRIM, RAMP_TRIM_MIN_MINUTES,
 } from '../socAlignment';
 
 const pts = (...pairs) => pairs.map(([soc, time]) => ({ soc, time }));
@@ -221,19 +222,34 @@ describe('the opening ramp is kept out of the slope', () => {
         expect(socPerMin).toBeCloseTo(3.75, 6);
     });
 
-    it('does not fabricate the extra minute the ramp used to buy', () => {
+    it('takes the ramp out when the projection reaches back a long way', () => {
         const r = alignSeries(R2, 4);
         expect(r.extrapolated).toBe(true);
         expect(r.rampTrimmed).toBe(2);
-        // Projects from the first SETTLED point — 12% at t=0.9 — back 8 points
-        // of SoC at 3.75 %/min, so 2.13 min before it.
+        expect(r.back).toBeGreaterThan(RAMP_TRIM_MIN_MINUTES);
+        // From the first SETTLED point — 12% at t=0.9 — back 8 points of SoC at
+        // 3.75 %/min. Left ramped it reaches 6 points at 2.73 %/min from t=0.1,
+        // which lands t=0 nearly a minute earlier.
+        expect(r.back).toBeCloseTo(2.133, 3);
         expect(r.points[0].time).toBeCloseTo(-1.233, 3);
+        expect(alignSeries(R2.slice(2), 4).points[0].time).toBeCloseTo(-1.233, 3);
     });
 
-    it('takes the ramp off the plot, not just out of the slope', () => {
+    it('leaves the ramp alone when the projection barely reaches at all', () => {
+        // 11% is one point of SoC below the R2's first sample: well under a
+        // minute, so the correction is worth less than the samples it costs.
+        const r = alignSeries(R2, 9);
+        expect(r.extrapolated).toBe(true);
+        expect(r.back).toBeLessThan(RAMP_TRIM_MIN_MINUTES);
+        expect(r.rampTrimmed).toBe(0);
+        expect(r.points[1].chargeRate).toBe(93);
+    });
+
+    it('takes the ramp off the plot when it takes it out of the slope', () => {
+        // Leaving those samples visible inside the projected span would put a
+        // measured 93 kW on top of a line asserting 220.
         const r = alignSeries(R2, 4);
         expect(r.points.slice(1)).toHaveLength(R2.length - 2);
-        // The 93 kW handshake sample is gone; the curve opens on settled data.
         expect(r.points.map(p => p.chargeRate)).not.toContain(93);
         expect(r.points[1].chargeRate).toBe(214);
     });
@@ -244,6 +260,19 @@ describe('the opening ramp is kept out of the slope', () => {
         // — a number the estimate itself contradicts.
         const r = alignSeries(R2, 4);
         expect(r.points[0]).toEqual({ soc: 4, time: expect.any(Number), _extrapolatedStart: true });
+    });
+
+    it('never trims for a start inside the data, however ramped the opening', () => {
+        // A curve that begins inside its own data leans on no slope at all, so
+        // there is nothing for trimming to protect.
+        const between = alignSeries(R2, 14.5);       // between two samples
+        expect(between.interpolated).toBe(true);
+        expect(between.rampTrimmed).toBeUndefined();
+
+        const exact = alignSeries(R2, 15);           // straight onto a sample
+        expect(exact.interpolated).toBe(false);
+        expect(exact.extrapolated).toBeUndefined();
+        expect(exact.rampTrimmed).toBeUndefined();
     });
 
     it('interpolates the other channels for a start INSIDE the data', () => {
@@ -257,10 +286,18 @@ describe('the opening ramp is kept out of the slope', () => {
         expect(r.points[0].chargeRate).toBeCloseTo(150, 6);
     });
 
-    it('trims the ramp out of the automatic threshold too', () => {
-        // Otherwise the threshold lands on a SoC one run only reaches while its
-        // charger is still negotiating, and then has to extrapolate back to it.
-        expect(minimumCommonSoc([R2])).toBe(12);
+    it('leaves the automatic threshold on the measured minimum', () => {
+        // The threshold should land on a SoC the run reported reaching. Pushing
+        // it to 12% would trim on behalf of a run that then keeps its ramp.
+        expect(minimumCommonSoc([R2])).toBe(10);
+    });
+
+    it('measures a slope with the ramp in when asked to', () => {
+        expect(extrapolationSlope(R2, { skipRamp: false }).trimmed).toBe(0);
+        // 10% at t=0.1 to 13% at t=1.2 — the 3-point span still applies, which
+        // is why this is 2.73 rather than the first segment's raw 2.5.
+        expect(extrapolationSlope(R2, { skipRamp: false }).socPerMin).toBeCloseTo(3 / 1.1, 6);
+        expect(extrapolationSlope(R2).socPerMin).toBeCloseTo(3.75, 6);
     });
 
     it('is idempotent — settled data has no ramp to find', () => {

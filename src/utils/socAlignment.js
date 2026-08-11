@@ -27,13 +27,11 @@
 export function minimumCommonSoc(series) {
     let highestMin = null;
 
-    for (const raw of series ?? []) {
-        if (!raw?.length) continue;
-        // Ramp points are dropped here too, so the automatic threshold lands
-        // where every run has SETTLED data. Choosing it from the untrimmed
-        // minimum would pick a SoC one of the runs only reaches while its
-        // charger is still negotiating, and then extrapolate to get back to it.
-        const points = trimRamp(raw);
+    for (const points of series ?? []) {
+        if (!points?.length) continue;
+        // Measured minima, ramp included: the threshold should land on a SoC the
+        // runs actually reported reaching. Trimming here would push it upward on
+        // behalf of a run that is about to keep its ramp anyway.
         let runMin = null;
         for (const p of points) {
             if (p?.soc == null || p?.time == null) continue;
@@ -91,13 +89,8 @@ export function alignmentOffset(points, thresholdSoc) {
  *
  * Returns null when the run cannot be aligned at all.
  */
-export function alignSeries(raw, thresholdSoc) {
-    if (!raw?.length) return null;
-
-    // The opening ramp comes off before anything else, so it is out of the
-    // slope, out of the interpolation, and off the chart — see trimRamp.
-    const points = trimRamp(raw);
-    const rampTrimmed = raw.length - points.length;
+export function alignSeries(points, thresholdSoc) {
+    if (!points?.length) return null;
 
     const usable = points.filter(p => p.soc != null && p.time != null);
     if (!usable.length) return null;
@@ -110,7 +103,7 @@ export function alignSeries(raw, thresholdSoc) {
         .find(p => p.soc != null && p.time != null && p.soc < thresholdSoc);
 
     if (at.soc === thresholdSoc) {
-        return { offset: at.time, points: points.slice(idx), interpolated: false, rampTrimmed };
+        return { offset: at.time, points: points.slice(idx), interpolated: false };
     }
 
     // No bracketing sample means the run BEGAN above the threshold. Aligning it
@@ -122,29 +115,25 @@ export function alignSeries(raw, thresholdSoc) {
     // visited — so the caller is told how far it reached beyond the data, and
     // anything past EXTRAPOLATION_SOC_LIMIT is worth saying out loud.
     if (!before) {
-        const first = usable[0];
-        const slope = extrapolationSlope(usable);
-        if (!slope) return { offset: at.time, points: points.slice(idx), interpolated: false, rampTrimmed };
+        // Try it exactly as measured first, ramp and all.
+        const asMeasured = backProject(points, usable, thresholdSoc, { skipRamp: false });
+        if (!asMeasured) return { offset: at.time, points: points.slice(idx), interpolated: false };
 
-        const gap  = first.soc - thresholdSoc;               // SoC being invented
-        const back = gap / slope.socPerMin;                  // minutes before the data
-        // ONLY when and at what SoC — nothing else. Carrying the first point's
-        // other channels forward would put a measured charge rate, range and
-        // temperature at a moment the run never recorded, and they would be
-        // wrong in a way that reads as data: the old version inherited the
-        // ramp's 93 kW and drew it flat across the invented minute, so a chart
-        // of charge rate opened on a number the estimate itself contradicts.
-        // The plotting path drops null-y points, so each channel simply begins
-        // at its first real sample.
-        const start = { soc: thresholdSoc, time: first.time - back, _extrapolatedStart: true };
-        return {
-            offset: start.time,
-            points: [start, ...points],
-            interpolated: false,
-            extrapolated: true,
-            gap,
-            rampTrimmed,
-        };
+        // A short reach does not need the ramp taken out. The correction is
+        // real but small against a projection of well under a minute, and it
+        // costs the run its opening samples to get it — a bad trade for a curve
+        // that was very nearly measured where it was asked to start.
+        if (asMeasured.back < RAMP_TRIM_MIN_MINUTES) return asMeasured;
+
+        // A long reach is the other way round: the slope is being asked to
+        // carry the answer, so it had better be the car's and not the plug's.
+        // Deciding on the as-measured projection means the contaminated slope
+        // only ever errs toward trimming — it reads slow, so it overstates the
+        // reach — and the choice cannot oscillate.
+        const settled = trimRamp(points);
+        const settledUsable = settled.filter(p => p.soc != null && p.time != null);
+        return backProject(settled, settledUsable, thresholdSoc, { skipRamp: true },
+                           points.length - settled.length) ?? asMeasured;
     }
 
     const span = at.soc - before.soc;
@@ -161,7 +150,38 @@ export function alignSeries(raw, thresholdSoc) {
         time: crossTime,
         _interpolatedStart: true,
     };
-    return { offset: crossTime, points: [start, ...points.slice(idx)], interpolated: true, rampTrimmed };
+    return { offset: crossTime, points: [start, ...points.slice(idx)], interpolated: true };
+}
+
+/**
+ * Extend `points` back to `thresholdSoc` and package the result, or null if it
+ * cannot be done. `rampTrimmed` counts what the caller already removed.
+ */
+function backProject(points, usable, thresholdSoc, { skipRamp }, rampTrimmed = 0) {
+    const first = usable[0];
+    const slope = extrapolationSlope(usable, { skipRamp });
+    if (!first || !slope) return null;
+
+    const gap  = first.soc - thresholdSoc;               // SoC being invented
+    const back = gap / slope.socPerMin;                  // minutes before the data
+
+    // The invented point gets a SoC and a time and NOTHING else. Carrying the
+    // first sample's other channels forward would put a measured charge rate,
+    // range and temperature at a moment the run never recorded — and they read
+    // as data: an earlier version inherited the ramp's 93 kW and drew it flat
+    // across the invented minute, a number the projection itself contradicts.
+    // The plotting path drops null-y points, so each channel simply begins at
+    // its first real sample.
+    const start = { soc: thresholdSoc, time: first.time - back, _extrapolatedStart: true };
+    return {
+        offset: start.time,
+        points: [start, ...points],
+        interpolated: false,
+        extrapolated: true,
+        gap,
+        back,
+        rampTrimmed,
+    };
 }
 
 /** Every numeric channel the two samples share, read at `frac` between them. */
@@ -193,16 +213,33 @@ function interpolateChannels(before, at, frac) {
  * 2.5 %/min when it gains 3.9, and back-projecting on that invented an extra
  * 0.8 minutes of fabricated slowness before its data even started.
  *
- * So when a chart aligns runs to a common SoC, the ramp comes off first: out of
- * the slope, out of the interpolation, and off the plot. Nothing is deleted —
- * the data is untouched and raw time shows every sample — but a comparison of
- * how fast cars charge should not open with a minute of handshake, and it is
- * unfair besides, since it only penalises the runs whose logging happened to
- * start at plug-in.
+ * So the ramp comes off — but ONLY where it does damage, which is a long
+ * backward projection. There the slope is carrying the whole answer, and it had
+ * better be the car's rather than the plug's. Everywhere else the measured
+ * points stand: a curve that starts inside its own data is not relying on a
+ * slope at all, and a short reach barely is.
+ *
+ * When it does come off it comes off the plot too, not just the arithmetic.
+ * Leaving those samples visible inside a span the projection has just drawn
+ * through would put a measured 93 kW on top of a line asserting 220. Nothing is
+ * deleted — the data is untouched, and raw test time shows every sample.
  */
 
 /** Share of the opening plateau below which a point is still ramping up. */
 export const RAMP_PLATEAU_FRACTION = 0.9;
+
+/**
+ * How far back a projection has to reach before the ramp is worth removing.
+ *
+ * Under a minute, the run very nearly starts where it was asked to and the
+ * slope barely matters: the ramp correction moves the answer by seconds, and
+ * paying for it with the run's opening samples is a bad trade. Past a minute
+ * the slope IS the answer, and it had better be the car's rather than the
+ * plug's — asked back to 4%, the R2 reaches 2.2 minutes on its ramped slope
+ * and 2.13 on its settled one, but from a point 0.8 minutes later, so its t=0
+ * moves by nearly a minute.
+ */
+export const RAMP_TRIM_MIN_MINUTES = 1;
 
 /** Never treat more than this many leading points as ramp. A run whose power
  *  climbs for its whole opening is tapering oddly or badly logged; trimming it
@@ -278,11 +315,11 @@ export function trimRamp(points) {
  * not a slow charge, it is a discharge or a stall, and running it backwards
  * would draw a rising curve out of a falling one.
  */
-export function extrapolationSlope(points) {
+export function extrapolationSlope(points, { skipRamp = true } = {}) {
     const usable = (points ?? []).filter(p => p?.soc != null && p?.time != null);
     if (usable.length < 2) return null;
 
-    const trimmed = rampLength(usable);
+    const trimmed = skipRamp ? rampLength(usable) : 0;
     const from = usable[trimmed];
     if (!from) return null;
 

@@ -54,6 +54,8 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The limit itself, consumed inside the module by overExtrapolated — which the chart does call.',
         'socAlignment.RAMP_PLATEAU_FRACTION':
             'Tuning constant for rampLength, exported to be named and testable rather than to be called.',
+        'socAlignment.RAMP_TRIM_MIN_MINUTES':
+            'The threshold that decides whether alignSeries trims at all; consumed inside the module and asserted by name.',
         'socAlignment.RAMP_MAX_TRIM':
             'As above — the cap on ramp trimming, asserted by name in the tests.',
         'socAlignment.trimRamp':
