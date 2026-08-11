@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     minimumCommonSoc, alignmentExclusion, alignmentOffset, alignSeries,
-    overExtrapolated, clampSoc, rampLength, extrapolationSlope, RAMP_MAX_TRIM,
+    overExtrapolated, clampSoc, rampLength, trimRamp, extrapolationSlope, RAMP_MAX_TRIM,
 } from '../socAlignment';
 
 const pts = (...pairs) => pairs.map(([soc, time]) => ({ soc, time }));
@@ -225,16 +225,54 @@ describe('the opening ramp is kept out of the slope', () => {
         const r = alignSeries(R2, 4);
         expect(r.extrapolated).toBe(true);
         expect(r.rampTrimmed).toBe(2);
-        // 6 points of SoC at 3.75 %/min = 1.6 min before the data, from t=0.1.
-        expect(r.points[0].time).toBeCloseTo(-1.5, 6);
-        // The naive first-segment slope of 2.5 %/min would have put it at -2.3.
-        expect(r.points[0].time).toBeGreaterThan(-2.3);
+        // Projects from the first SETTLED point — 12% at t=0.9 — back 8 points
+        // of SoC at 3.75 %/min, so 2.13 min before it.
+        expect(r.points[0].time).toBeCloseTo(-1.233, 3);
     });
 
-    it('leaves every measured point on the chart — only the slope is affected', () => {
+    it('takes the ramp off the plot, not just out of the slope', () => {
         const r = alignSeries(R2, 4);
-        expect(r.points.slice(1)).toHaveLength(R2.length);
-        expect(r.points[1].chargeRate).toBe(93);
+        expect(r.points.slice(1)).toHaveLength(R2.length - 2);
+        // The 93 kW handshake sample is gone; the curve opens on settled data.
+        expect(r.points.map(p => p.chargeRate)).not.toContain(93);
+        expect(r.points[1].chargeRate).toBe(214);
+    });
+
+    it('gives the invented start a SoC and a time and nothing else', () => {
+        // Inheriting the first point's channels put a measured 93 kW at a
+        // moment the run never recorded, drawn flat across the invented minute
+        // — a number the estimate itself contradicts.
+        const r = alignSeries(R2, 4);
+        expect(r.points[0]).toEqual({ soc: 4, time: expect.any(Number), _extrapolatedStart: true });
+    });
+
+    it('interpolates the other channels for a start INSIDE the data', () => {
+        // Interior, so a charge rate partway between two real samples is a
+        // reading of the data rather than an invention.
+        const r = alignSeries([
+            { time: 0, soc: 10, chargeRate: 200 },
+            { time: 2, soc: 20, chargeRate: 100 },
+        ], 15);
+        expect(r.interpolated).toBe(true);
+        expect(r.points[0].chargeRate).toBeCloseTo(150, 6);
+    });
+
+    it('trims the ramp out of the automatic threshold too', () => {
+        // Otherwise the threshold lands on a SoC one run only reaches while its
+        // charger is still negotiating, and then has to extrapolate back to it.
+        expect(minimumCommonSoc([R2])).toBe(12);
+    });
+
+    it('is idempotent — settled data has no ramp to find', () => {
+        const once = trimRamp(R2);
+        expect(once).toHaveLength(R2.length - 2);
+        expect(trimRamp(once)).toHaveLength(once.length);
+    });
+
+    it('leaves a series alone when there is no ramp to trim', () => {
+        const flat = pts([25, 0], [30, 5]);
+        expect(trimRamp(flat)).toBe(flat);
+        expect(trimRamp(null)).toEqual([]);
     });
 
     it('trims nothing from a run whose power is already tapering', () => {

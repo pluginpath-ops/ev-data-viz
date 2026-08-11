@@ -56,6 +56,8 @@ describe('utilities built for the UI are reached by the UI', () => {
             'Tuning constant for rampLength, exported to be named and testable rather than to be called.',
         'socAlignment.RAMP_MAX_TRIM':
             'As above — the cap on ramp trimming, asserted by name in the tests.',
+        'socAlignment.trimRamp':
+            'Called by alignSeries and minimumCommonSoc, both of which the chart calls. Exported so the trim can be asserted on its own.',
         'socAlignment.rampLength':
             'The ramp detector. Called by extrapolationSlope; exported so its behaviour is pinned directly against real R2 data.',
         'socAlignment.extrapolationSlope':

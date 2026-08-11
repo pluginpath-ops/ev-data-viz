@@ -423,13 +423,20 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             for (const run of vehicle.runs || []) {
                 if (!chartConfig.selectedRuns.includes(run.id)) continue;
                 const aligned = alignSeries(runDataCache[run.id], raceThreshold);
-                if (overExtrapolated(aligned)) {
-                    out.push({
-                        name: run.name,
-                        gap: Math.round(aligned.gap),
-                        rampTrimmed: aligned.rampTrimmed ?? 0,
-                    });
-                }
+                if (overExtrapolated(aligned)) out.push({ name: run.name, gap: Math.round(aligned.gap) });
+            }
+        }
+        return out;
+    }, [raceActive, raceThreshold, selectedVehicles, chartConfig.selectedRuns, runDataCache]);
+
+    const trimmedRuns = useMemo(() => {
+        if (!raceActive) return [];
+        const out = [];
+        for (const vehicle of selectedVehicles) {
+            for (const run of vehicle.runs || []) {
+                if (!chartConfig.selectedRuns.includes(run.id)) continue;
+                const aligned = alignSeries(runDataCache[run.id], raceThreshold);
+                if (aligned?.rampTrimmed > 0) out.push({ name: run.name, n: aligned.rampTrimmed });
             }
         }
         return out;
@@ -956,14 +963,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     {excludedRuns.map(({ name, reason }) => (
                         <p key={name}>⚠ {name}: not aligned — {reason}</p>
                     ))}
-                    {stretchedRuns.map(({ name, gap, rampTrimmed }) => (
+                    {stretchedRuns.map(({ name, gap }) => (
                         <p key={name}>
                             ⚠ {name}: estimated {gap}% of SoC below its own data to reach {raceThreshold}%
-                            {rampTrimmed > 0 && (
-                                <span title="A session opens with the charger and the BMS negotiating upward, well under the car's capability. Those points stay on the chart; they are just not what the estimate is drawn from.">
-                                    {' '}(rate taken after the charge ramp)
-                                </span>
-                            )}
                         </p>
                     ))}
                     {excludedRuns.length > 0 && (
@@ -977,6 +979,18 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         </p>
                     )}
                 </div>
+            )}
+
+            {/* Points held back from the plot, said plainly. A chart quietly
+                missing its first samples is the same failure as one quietly
+                missing a car. */}
+            {raceActive && trimmedRuns.length > 0 && (
+                <p className="text-xs text-faint mb-2"
+                   title="A session opens with the charger and the BMS negotiating power upward, below what the car can take. Those samples describe the plug rather than the car, and they only appear in runs whose logging started at plug-in — so comparing with them in place penalises exactly those runs.">
+                    Opening charge ramp excluded from{' '}
+                    {trimmedRuns.map(t => `${t.name} (${t.n} point${t.n === 1 ? '' : 's'})`).join(', ')}
+                    {' '}· switch to raw test time to see every sample
+                </p>
             )}
 
             {/* ── Chart canvas ── */}
