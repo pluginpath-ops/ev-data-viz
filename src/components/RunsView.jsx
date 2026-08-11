@@ -56,7 +56,7 @@ const TESTS_SECTION_HELP =
 // Counts are computed from data the view already has, so a tab can say how much
 // is behind it without fetching anything to find out.
 const SUBTABS = [
-    { id: 'tests',       label: '📏 Tests & Runs',  count: d => d.displayRuns.length },
+    { id: 'tests',       label: '📏 Charging & Range', count: d => d.displayRuns.length },
     { id: 'inherited',   label: '🔗 Inherited',     count: d => d.inheritedRuns.length },
     { id: 'performance', label: '⚡ Performance',   count: d => {
         const c = d.performanceCounts?.[d.vehicle.id];
