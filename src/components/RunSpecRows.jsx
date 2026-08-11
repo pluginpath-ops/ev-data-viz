@@ -28,6 +28,13 @@ const Item = ({ children, title, className = 'text-secondary' }) => (
     <span className={className} title={title}>{children}</span>
 );
 
+// A missing condition is shown as a gap rather than omitted, so the row keeps
+// its shape from card to card and an unrecorded figure is visibly unrecorded
+// — the correction skips exactly these, and silence looked like zero.
+const Missing = ({ what }) => (
+    <span className="text-faint" title={`No ${what} recorded — correction skips this axis`}>—</span>
+);
+
 function Row({ label, items }) {
     if (!items.length) return null;
     return (
@@ -81,13 +88,6 @@ export default function RunSpecRows({ run, units, socRange, fieldMeta = [], calc
 
     // ── Conditions: what the day imposed ─────────────────────────────────────
     const conditions = [];
-
-    // A missing condition is shown as a gap rather than omitted, so the row keeps
-    // its shape from card to card and an unrecorded figure is visibly unrecorded
-    // — the correction skips exactly these, and silence looked like zero.
-    const Missing = ({ what }) => (
-        <span className="text-faint" title={`No ${what} recorded — correction skips this axis`}>—</span>
-    );
 
     if (run.temperature_f != null) {
         conditions.push(<Item key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</Item>);
