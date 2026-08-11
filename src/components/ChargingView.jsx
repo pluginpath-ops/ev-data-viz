@@ -762,11 +762,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 {/* Axis selectors */}
                 <div className="axis-selectors">
                     <div>
-                        <label className="block font-medium mb-2">X-Axis:</label>
+                        <label className="axis-label">X-Axis:</label>
                         <select
                             value={chartConfig.xAxis}
                             onChange={(e) => setChartConfig({ ...chartConfig, xAxis: e.target.value })}
-                            className="border p-2 rounded w-full"
+                            className="axis-select"
                         >
                             {axisOptions.map(opt => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -774,11 +774,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         </select>
                     </div>
                     <div>
-                        <label className="block font-medium mb-2">Left Axis (Y):</label>
+                        <label className="axis-label">Left Axis (Y):</label>
                         <select
                             value={chartConfig.yAxis}
                             onChange={(e) => setChartConfig({ ...chartConfig, yAxis: e.target.value })}
-                            className="border p-2 rounded w-full"
+                            className="axis-select"
                         >
                             {axisOptions.map(opt => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -786,11 +786,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         </select>
                     </div>
                     <div>
-                        <label className="block font-medium mb-2">Right Axis (Y2):</label>
+                        <label className="axis-label">Right Axis (Y2):</label>
                         <select
                             value={chartConfig.y2Axis ?? ''}
                             onChange={(e) => setChartConfig({ ...chartConfig, y2Axis: e.target.value || null })}
-                            className="border p-2 rounded w-full"
+                            className="axis-select"
                         >
                             <option value="">— None —</option>
                             {axisOptions.map(opt => (
@@ -798,47 +798,51 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             ))}
                         </select>
                     </div>
-
-                    {/* Alignment is a property of the time axis, so it belongs
-                        with the axis selectors rather than in a panel below the
-                        chart that had to be found and switched on. */}
-                    {isTimeAxis && (
-                        <div>
-                            <label className="block font-medium mb-2">Align start at:</label>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="number"
-                                    min="0" max="100"
-                                    value={chartConfig.raceThreshold ?? (commonSoc ?? '')}
-                                    placeholder={commonSoc != null ? String(commonSoc) : '10'}
-                                    onChange={e => setChartConfig({
-                                        ...chartConfig,
-                                        raceThreshold: e.target.value === '' ? null : clampSoc(e.target.value, commonSoc ?? 10),
-                                    })}
-                                    disabled={chartConfig.alignRaw}
-                                    className="border p-2 rounded w-20 disabled:opacity-50"
-                                />
-                                <span className="text-sm text-secondary">% SoC</span>
-                                {commonSoc != null && chartConfig.raceThreshold == null && (
-                                    <span className="text-xs text-faint" title="The lowest SoC every selected run actually reaches — no run is dropped at this value.">
-                                        lowest common
-                                    </span>
-                                )}
-                            </div>
-                            <label className="toggle-label mt-2">
-                                <input
-                                    type="checkbox"
-                                    checked={!!chartConfig.alignRaw}
-                                    onChange={e => setChartConfig({ ...chartConfig, alignRaw: e.target.checked })}
-                                    className="w-4 h-4"
-                                />
-                                <span className="text-xs text-secondary" title="Show each run's own logger time. Runs will start at zero regardless of the SoC they began at, so the curves are not comparable.">
-                                    Raw logger time (not comparable)
-                                </span>
-                            </label>
-                        </div>
-                    )}
                 </div>
+
+                {/* Alignment is a property of the time axis, so it belongs with
+                    the axis selectors rather than in a panel below the chart
+                    that had to be found and switched on. It sits under them and
+                    indented: it modifies X, it is not a fourth axis. */}
+                {isTimeAxis && (
+                    <div className="axis-align-row">
+                        <label className="text-sm font-medium text-secondary" htmlFor="align-soc">
+                            Align start at:
+                        </label>
+                        <span className="flex items-center gap-1.5">
+                            <input
+                                id="align-soc"
+                                type="number"
+                                min="0" max="100"
+                                value={chartConfig.raceThreshold ?? (commonSoc ?? '')}
+                                placeholder={commonSoc != null ? String(commonSoc) : '10'}
+                                onChange={e => setChartConfig({
+                                    ...chartConfig,
+                                    raceThreshold: e.target.value === '' ? null : clampSoc(e.target.value, commonSoc ?? 10),
+                                })}
+                                disabled={chartConfig.alignRaw}
+                                className="form-input text-sm py-0.5 w-16 disabled:opacity-50"
+                            />
+                            <span className="text-sm text-secondary">% SoC</span>
+                        </span>
+                        {commonSoc != null && chartConfig.raceThreshold == null && (
+                            <span className="text-xs text-faint" title="The lowest SoC every selected run actually reaches — no run is dropped at this value.">
+                                lowest common
+                            </span>
+                        )}
+                        <label className="toggle-label">
+                            <input
+                                type="checkbox"
+                                checked={!!chartConfig.alignRaw}
+                                onChange={e => setChartConfig({ ...chartConfig, alignRaw: e.target.checked })}
+                                className="w-4 h-4"
+                            />
+                            <span className="text-sm text-secondary" title="Show each run's own elapsed time from the start of the test. Runs will start at zero regardless of the SoC they began at, so the curves are not comparable.">
+                                Raw test time (not comparable)
+                            </span>
+                        </label>
+                    </div>
+                )}
 
                 {/* ── Line / points toggles ── */}
                 <div className="chart-toggles">
@@ -937,6 +941,33 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 />
             </div>}
 
+            {/* Runs the alignment could not include, named on the chart itself.
+                The selector carries a badge, but that only helps someone who
+                opens the selector — and a screenshot shows neither. A chart
+                silently missing a car is the failure worth designing against. */}
+            {raceActive && (excludedRuns.length > 0 || stretchedRuns.length > 0) && (
+                <div className="roadtrip-warning mb-3">
+                    {excludedRuns.map(({ name, reason }) => (
+                        <p key={name}>⚠ {name}: not aligned — {reason}</p>
+                    ))}
+                    {stretchedRuns.map(({ name, gap }) => (
+                        <p key={name}>
+                            ⚠ {name}: estimated {gap}% of SoC below its own data to reach {raceThreshold}%
+                        </p>
+                    ))}
+                    {excludedRuns.length > 0 && (
+                        <p className="text-xs mt-1">
+                            Lower “Align start at” to include them, or switch to raw test time.
+                        </p>
+                    )}
+                    {stretchedRuns.length > 0 && (
+                        <p className="text-xs mt-1">
+                            Raise “Align start at” to stay inside the measured data.
+                        </p>
+                    )}
+                </div>
+            )}
+
             {/* ── Chart canvas ── */}
             <div className="card mb-4">
                 {loadingData && (
@@ -998,33 +1029,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     </div>
                 )}
             </div>
-
-            {/* Runs the alignment could not include, named on the chart itself.
-                The selector carries a badge, but that only helps someone who
-                opens the selector — and a screenshot shows neither. A chart
-                silently missing a car is the failure worth designing against. */}
-            {raceActive && (excludedRuns.length > 0 || stretchedRuns.length > 0) && (
-                <div className="roadtrip-warning mb-3">
-                    {excludedRuns.map(({ name, reason }) => (
-                        <p key={name}>⚠ {name}: not aligned — {reason}</p>
-                    ))}
-                    {stretchedRuns.map(({ name, gap }) => (
-                        <p key={name}>
-                            ⚠ {name}: estimated {gap}% of SoC below its own data to reach {raceThreshold}%
-                        </p>
-                    ))}
-                    {excludedRuns.length > 0 && (
-                        <p className="text-xs mt-1">
-                            Lower “Align start at” to include them, or switch to raw logger time.
-                        </p>
-                    )}
-                    {stretchedRuns.length > 0 && (
-                        <p className="text-xs mt-1">
-                            Raise “Align start at” to stay inside the measured data.
-                        </p>
-                    )}
-                </div>
-            )}
 
             {/* ── Controls below chart: scale inputs + line toggle + race mode — hidden in presentation mode ── */}
             {!presentationMode && <div className="card mb-6">
