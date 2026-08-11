@@ -1411,6 +1411,13 @@ body {
 .session-group-header {
     @apply flex items-center gap-3 flex-wrap px-3 py-2;
     background-color: var(--color-surface-sunken);
+    border-top-left-radius: calc(0.75rem - 1px);
+    border-top-right-radius: calc(0.75rem - 1px);
+}
+/* Collapsed, the header is the whole card and rounds at the bottom too. */
+.session-group-header:last-child {
+    border-bottom-left-radius: calc(0.75rem - 1px);
+    border-bottom-right-radius: calc(0.75rem - 1px);
 }
 .session-group-toggle {
     @apply flex items-center gap-2 text-left transition-colors;
@@ -1450,16 +1457,23 @@ body {
 /* The session card CONTAINS its runs, so collapsing visibly folds them away
    rather than making a band and some cards disappear independently. */
 .session-group {
-    @apply rounded-xl overflow-hidden;
+    @apply rounded-xl;
     border: 1px solid var(--color-border);
     border-left: 3px solid var(--color-primary);
 }
+/* Deliberately NOT overflow-hidden. It was, to keep the nested header and body
+   inside the rounded corner — and it also clipped the run cards' "More ▾"
+   menu, which is absolutely positioned and drops below its card. The children
+   carry the radius instead, which contains them just as well and clips
+   nothing. */
 .session-group.is-unassigned {
     border-left-color: var(--color-border);
 }
 .session-group-body {
     @apply flex flex-col gap-3 p-3;
     background-color: var(--color-surface-sunken);
+    border-bottom-left-radius: calc(0.75rem - 1px);
+    border-bottom-right-radius: calc(0.75rem - 1px);
 }
 /* Nested cards sit on the sunken group background, so they lose the outer
    border that would otherwise read as a second frame inside the first. */
