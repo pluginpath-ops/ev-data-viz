@@ -6,7 +6,8 @@ import { parseCSV, parseCSVText } from '../utils/parseCSV';
 import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
-import EditVehicleForm from './EditVehicleForm';
+import LazyBoundary from './LazyBoundary';
+import { EditVehicleForm } from './lazyComponents';
 import { groupRunsBySession } from '../utils/testSessions';
 import SessionControl from './SessionControl';
 import RunSpecRows from './RunSpecRows';
@@ -20,6 +21,7 @@ import { RunVoteButtons } from './VoteButtons';
 import EpaVehicleSection from './EpaVehicleSection';
 import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
+import { displayImageUrl } from '../utils/imageRenditions';
 import { filterChargingRuns, defaultChargingRun, isRangeRun, runKindFrom, linkableRuns, linkableCounts } from '../utils/runUtils';
 import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
 
@@ -433,10 +435,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         closeEditVehicle();
     };
 
-    const handleVehicleImageReady = async (blob) => {
-        if (!blob) return;
+    const handleVehicleImageReady = async (renditions) => {
+        if (!renditions) return;
         setVehicleImageUploading(true);
-        await onUploadVehicleImage(blob);
+        await onUploadVehicleImage(renditions);
         setVehicleImageUploading(false);
     };
 
@@ -1265,8 +1267,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             {/* Vehicle summary header */}
             <div className="card py-3 px-4 flex items-center gap-4 mb-6">
                 <div className="list-thumbnail">
-                    {vehicle.image_url
-                        ? <img src={vehicle.image_url} alt={vehicle.name} className="w-full h-full object-cover" />
+                    {displayImageUrl(vehicle)
+                        ? <img src={displayImageUrl(vehicle)} alt={vehicle.name} decoding="async" className="w-full h-full object-cover" />
                         : <span>🚗</span>
                     }
                 </div>
@@ -2921,33 +2923,35 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             {showEditVehicle && (
                 <div className="modal-overlay" onClick={closeEditVehicle}>
                     <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                        <EditVehicleForm
-                            formData={vehicleFormData}
-                            onFormChange={setVehicleFormData}
-                            editingId={vehicle.id}
-                            formTags={vehicleFormTags}
-                            onAddTag={(tag) => { if (!vehicleFormTags.some(t => t.id === tag.id)) setVehicleFormTags(prev => [...prev, tag]); }}
-                            onRemoveTag={(tagId) => setVehicleFormTags(prev => prev.filter(t => t.id !== tagId))}
-                            newTagName={vehicleNewTagName}
-                            onNewTagNameChange={setVehicleNewTagName}
-                            onCreateTag={async () => {
-                                const trimmed = vehicleNewTagName.trim();
-                                if (!trimmed) return;
-                                const existing = (tags || []).find(t => t.name.toLowerCase() === trimmed.toLowerCase());
-                                const tag = existing || await onCreateTag(trimmed);
-                                if (tag && !vehicleFormTags.some(t => t.id === tag.id)) setVehicleFormTags(prev => [...prev, tag]);
-                                setVehicleNewTagName('');
-                            }}
-                            tags={tags || []}
-                            availableTagsForForm={vehicleAvailableTags}
-                            editingVehicle={vehicle}
-                            imageUploading={vehicleImageUploading}
-                            onImageReady={handleVehicleImageReady}
-                            onSubmit={handleVehicleSubmit}
-                            onCancel={closeEditVehicle}
-                            manufacturers={manufacturers}
-                            onAddManufacturer={addManufacturer}
-                        />
+                        <LazyBoundary>
+                            <EditVehicleForm
+                                formData={vehicleFormData}
+                                onFormChange={setVehicleFormData}
+                                editingId={vehicle.id}
+                                formTags={vehicleFormTags}
+                                onAddTag={(tag) => { if (!vehicleFormTags.some(t => t.id === tag.id)) setVehicleFormTags(prev => [...prev, tag]); }}
+                                onRemoveTag={(tagId) => setVehicleFormTags(prev => prev.filter(t => t.id !== tagId))}
+                                newTagName={vehicleNewTagName}
+                                onNewTagNameChange={setVehicleNewTagName}
+                                onCreateTag={async () => {
+                                    const trimmed = vehicleNewTagName.trim();
+                                    if (!trimmed) return;
+                                    const existing = (tags || []).find(t => t.name.toLowerCase() === trimmed.toLowerCase());
+                                    const tag = existing || await onCreateTag(trimmed);
+                                    if (tag && !vehicleFormTags.some(t => t.id === tag.id)) setVehicleFormTags(prev => [...prev, tag]);
+                                    setVehicleNewTagName('');
+                                }}
+                                tags={tags || []}
+                                availableTagsForForm={vehicleAvailableTags}
+                                editingVehicle={vehicle}
+                                imageUploading={vehicleImageUploading}
+                                onImageReady={handleVehicleImageReady}
+                                onSubmit={handleVehicleSubmit}
+                                onCancel={closeEditVehicle}
+                                manufacturers={manufacturers}
+                                onAddManufacturer={addManufacturer}
+                            />
+                        </LazyBoundary>
                     </div>
                 </div>
             )}

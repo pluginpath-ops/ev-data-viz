@@ -19,8 +19,8 @@ import SectionHeader, { SectionAction } from './SectionHeader';
 import TestedResults from './performance/TestedResults';
 import PerformanceSessionCard from './performance/PerformanceSessionCard';
 import PerformanceSummaryCard from './performance/PerformanceSummaryCard';
-import PerformanceImportModal from './PerformanceImportModal';
-import PastePublishedResultsModal from './PastePublishedResultsModal';
+import LazyBoundary from './LazyBoundary';
+import { PerformanceImportModal, PastePublishedResultsModal } from './lazyComponents';
 
 const SECTION_HELP =
     'Independently-tested acceleration and braking results. Separate from the ' +
@@ -289,20 +289,24 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
             )}
 
             {showPaste && (
-                <PastePublishedResultsModal
-                    vehicle={vehicle}
-                    onImport={handlePasteImport}
-                    onClose={() => setShowPaste(false)}
-                />
+                <LazyBoundary>
+                    <PastePublishedResultsModal
+                        vehicle={vehicle}
+                        onImport={handlePasteImport}
+                        onClose={() => setShowPaste(false)}
+                    />
+                </LazyBoundary>
             )}
 
             {showImport && (
-                <PerformanceImportModal
-                    vehicle={vehicle}
-                    onImport={handleImport}
-                    onMerge={handleMerge}
-                    onClose={() => setShowImport(false)}
-                />
+                <LazyBoundary>
+                    <PerformanceImportModal
+                        vehicle={vehicle}
+                        onImport={handleImport}
+                        onMerge={handleMerge}
+                        onClose={() => setShowImport(false)}
+                    />
+                </LazyBoundary>
             )}
         </div>
     );
