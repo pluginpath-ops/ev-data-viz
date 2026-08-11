@@ -117,8 +117,15 @@ export default function App() {
         yAxis: 'chargeRate',
         y2Axis: null,
         selectedRuns: [],
-        raceMode: false,
-        raceThreshold: 10,  // % SoC at which all runs are normalised to t = 0
+        // Time-axis alignment is on by default (#195): unaligned, every run
+        // starts at zero whatever SoC it began at, which compares nothing.
+        // alignRaw is the opt-out.
+        alignRaw: false,
+        // null means "follow the data" — the lowest SoC every selected run
+        // actually reaches. A fixed 10 looked like a default and behaved like a
+        // decision, drawing a run that began at 25% from t=0 alongside runs that
+        // began at 10%.
+        raceThreshold: null,
         xMin: null,
         xMax: null,
         yMin: 0,
@@ -222,8 +229,8 @@ export default function App() {
             xAxis:         p.get('x')  || null,
             yAxis:         p.get('y')  || null,
             y2Axis:        p.get('y2') || null,
-            raceMode:      p.get('race') === '1',
-            raceThreshold: p.get('rt')  ? Number(p.get('rt'))  : 10,
+            alignRaw:      p.get('raw') === '1',
+            raceThreshold: p.get('rt')  ? Number(p.get('rt'))  : null,
             xMin:  p.get('xn')  !== null && p.get('xn')  !== '' ? Number(p.get('xn'))  : null,
             xMax:  p.get('xx')  !== null && p.get('xx')  !== '' ? Number(p.get('xx'))  : null,
             yMin:  p.get('yn')  !== null && p.get('yn')  !== '' ? Number(p.get('yn'))  : 0,
@@ -319,7 +326,7 @@ export default function App() {
             ...(s.yAxis         && { yAxis: s.yAxis }),
             ...(s.y2Axis        && { y2Axis: s.y2Axis }),
             ...(s.runIds.length  > 0 && s.chartMode === 'charging' && { selectedRuns: s.runIds }),
-            raceMode:      s.raceMode,
+            alignRaw:      s.alignRaw,
             raceThreshold: s.raceThreshold,
             xMin:          s.xMin,
             xMax:          s.xMax,
@@ -354,8 +361,8 @@ export default function App() {
         p.set('x', chartConfig.xAxis);
         p.set('y', chartConfig.yAxis);
         if (chartConfig.y2Axis)                   p.set('y2',   chartConfig.y2Axis);
-        if (chartConfig.raceMode)                 p.set('race', '1');
-        if (chartConfig.raceThreshold !== 10)     p.set('rt',   String(chartConfig.raceThreshold));
+        if (chartConfig.alignRaw)                 p.set('raw', '1');
+        if (chartConfig.raceThreshold != null)    p.set('rt',   String(chartConfig.raceThreshold));
         if (chartConfig.xMin != null)             p.set('xn',   String(chartConfig.xMin));
         if (chartConfig.xMax != null)             p.set('xx',   String(chartConfig.xMax));
         if (chartConfig.yMin != null && chartConfig.yMin !== 0) p.set('yn', String(chartConfig.yMin));

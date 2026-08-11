@@ -323,27 +323,12 @@ body {
 .text-hint        { @apply text-xs;  font-size: var(--fs-hint, 0.75rem);   color: var(--color-text-faint); }
 .text-data        { @apply text-sm font-mono tabular-nums; font-size: var(--fs-data, 0.875rem); }
 
-/* — Color tiers (compose with a role) ——————————————————————————————————————— */
-.text-secondary { color: var(--color-text-secondary); }
-.text-muted     { color: var(--color-text-muted); }
-.text-faint     { color: var(--color-text-faint); }
-
-/* Inline info/notice banner (theme-aware) */
-.notice-info {
-    background-color: var(--color-primary-light);
-    border: 1px solid var(--color-primary);
-    color: var(--color-text-primary);
-}
-
-/* Smaller heading for a group within a card (h4) */
-.subsection-title {
-    @apply text-sm font-semibold;
-    color: var(--color-text-primary);
-}
-
-/* Theme-aware text-color helpers. Headings/body inherit --color-text-primary
-   from <body>; these set the dimmer tiers. Prefer these over Tailwind text-gray-*
-   so text adapts to dark mode. */
+/* — Color tiers (compose with a role) ———————————————————————————————————————
+   Prefer these over Tailwind's text-gray-* so text follows the theme. They live
+   HERE, inside the typography system, because a second copy further down the
+   file used to shadow this one — harmlessly for the colours, but its
+   .subsection-title came with it and overrode the variable-driven one, killing
+   that knob. */
 .text-secondary { color: var(--color-text-secondary); }
 .text-muted     { color: var(--color-text-muted); }
 .text-faint     { color: var(--color-text-faint); }
@@ -803,6 +788,53 @@ body {
 /* X / Y / Y2 axis dropdown grid */
 .axis-selectors {
     @apply grid grid-cols-3 gap-4 mb-6;
+}
+
+/* Axis picker label + control. Sized to match the Correction dropdown in the
+   run-selector header: these are the same kind of thing — a small named choice —
+   and at base size four of them crowded the chart off the screen. */
+.axis-label {
+    @apply block text-sm font-medium mb-1;
+    color: var(--color-text-secondary);
+}
+.axis-select {
+    @apply px-2 py-0.5 rounded text-sm w-full;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+}
+.axis-select:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -1px;
+    border-color: var(--color-primary);
+}
+
+/* The alignment threshold: a percentage, so one or two digits and never more.
+   Sized to the number rather than to the form, and the browser's spin buttons
+   dropped — they steal half the box for an affordance the arrow keys already
+   provide. */
+.soc-input {
+    @apply px-1 py-0 rounded text-sm w-10 text-center;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+    appearance: textfield;
+}
+.soc-input::-webkit-inner-spin-button,
+.soc-input::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+}
+.soc-input:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -1px;
+    border-color: var(--color-primary);
+}
+
+/* Alignment sits UNDER the three axis pickers, indented, because it modifies the
+   X axis rather than standing beside it as a fourth axis. */
+.axis-align-row {
+    @apply flex flex-wrap items-center gap-x-3 gap-y-2 pl-6 -mt-3 mb-6;
 }
 
 /* Chart type / preset button row; mb added inline */
