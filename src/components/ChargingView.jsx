@@ -821,7 +821,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                     raceThreshold: e.target.value === '' ? null : clampSoc(e.target.value, commonSoc ?? 10),
                                 })}
                                 disabled={chartConfig.alignRaw}
-                                className="form-input text-sm py-0.5 w-16 disabled:opacity-50"
+                                className="soc-input disabled:opacity-50"
                             />
                             <span className="text-sm text-secondary">% SoC</span>
                         </span>
