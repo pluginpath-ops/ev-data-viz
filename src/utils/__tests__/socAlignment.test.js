@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { minimumCommonSoc, alignmentExclusion, alignmentOffset, alignSeries, overExtrapolated, clampSoc } from '../socAlignment';
+import {
+    minimumCommonSoc, alignmentExclusion, alignmentOffset, alignSeries,
+    overExtrapolated, clampSoc, rampLength, extrapolationSlope, RAMP_MAX_TRIM,
+} from '../socAlignment';
 
 const pts = (...pairs) => pairs.map(([soc, time]) => ({ soc, time }));
 
@@ -186,5 +189,90 @@ describe('back-extrapolation below the first measured point', () => {
     it('reports no gap for an unextrapolated alignment', () => {
         expect(overExtrapolated(alignSeries(pts3([5, 0], [25, 10]), 10))).toBe(false);
         expect(overExtrapolated(null)).toBe(false);
+    });
+});
+
+describe('the opening ramp is kept out of the slope', () => {
+    // A real R2 session, verbatim: 93 kW at the first sample, settled near 220
+    // by the third. Whole-percent SoC, so the settled rate reads as an
+    // alternating 3.33 / 5.0 sawtooth and only a multi-point span recovers it.
+    const R2 = [
+        { time: 0.1, soc: 10, chargeRate: 93 },
+        { time: 0.5, soc: 11, chargeRate: 195 },
+        { time: 0.9, soc: 12, chargeRate: 214 },
+        { time: 1.2, soc: 13, chargeRate: 215 },
+        { time: 1.4, soc: 14, chargeRate: 216 },
+        { time: 1.7, soc: 15, chargeRate: 217 },
+        { time: 1.9, soc: 16, chargeRate: 218 },
+        { time: 2.2, soc: 17, chargeRate: 219 },
+        { time: 2.5, soc: 18, chargeRate: 219 },
+        { time: 2.7, soc: 19, chargeRate: 220 },
+    ];
+
+    it('counts the handshake points as ramp and the settled ones as not', () => {
+        expect(rampLength(R2)).toBe(2);
+    });
+
+    it('measures the rate the car actually charges at, not the plug warming up', () => {
+        const { socPerMin, trimmed } = extrapolationSlope(R2);
+        expect(trimmed).toBe(2);
+        // From 12% at t=0.9 to 15% at t=1.7 — 3.75 %/min, against the 2.5 %/min
+        // the first segment alone would have claimed.
+        expect(socPerMin).toBeCloseTo(3.75, 6);
+    });
+
+    it('does not fabricate the extra minute the ramp used to buy', () => {
+        const r = alignSeries(R2, 4);
+        expect(r.extrapolated).toBe(true);
+        expect(r.rampTrimmed).toBe(2);
+        // 6 points of SoC at 3.75 %/min = 1.6 min before the data, from t=0.1.
+        expect(r.points[0].time).toBeCloseTo(-1.5, 6);
+        // The naive first-segment slope of 2.5 %/min would have put it at -2.3.
+        expect(r.points[0].time).toBeGreaterThan(-2.3);
+    });
+
+    it('leaves every measured point on the chart — only the slope is affected', () => {
+        const r = alignSeries(R2, 4);
+        expect(r.points.slice(1)).toHaveLength(R2.length);
+        expect(r.points[1].chargeRate).toBe(93);
+    });
+
+    it('trims nothing from a run whose power is already tapering', () => {
+        // Starts high and falls away: the first point IS the plateau.
+        const taper = [
+            { time: 0, soc: 55, chargeRate: 120 },
+            { time: 5, soc: 62, chargeRate: 95 },
+            { time: 10, soc: 68, chargeRate: 70 },
+        ];
+        expect(rampLength(taper)).toBe(0);
+        expect(extrapolationSlope(taper).trimmed).toBe(0);
+    });
+
+    it('trims nothing when power was never logged', () => {
+        // The SoC slope alone cannot tell a ramp from coarse sampling, and
+        // guessing would penalise every run that simply logs sparsely.
+        expect(rampLength(pts([25, 0], [26, 1], [40, 10]))).toBe(0);
+    });
+
+    it('refuses to trim so far that there is nothing left to measure', () => {
+        const stub = [
+            { time: 0, soc: 10, chargeRate: 20 },
+            { time: 1, soc: 12, chargeRate: 400 },
+        ];
+        expect(rampLength(stub)).toBe(0);
+        expect(extrapolationSlope(stub).socPerMin).toBeCloseTo(2, 6);
+    });
+
+    it('never trims more than the cap, however long power keeps climbing', () => {
+        const climbing = Array.from({ length: 10 }, (_, i) => ({
+            time: i, soc: 10 + i, chargeRate: 20 + i * 20,
+        }));
+        expect(rampLength(climbing)).toBe(RAMP_MAX_TRIM);
+    });
+
+    it('returns no slope for a trace that is not gaining', () => {
+        expect(extrapolationSlope(pts([60, 0], [40, 10]))).toBeNull();
+        expect(extrapolationSlope([{ soc: 10, time: 0 }])).toBeNull();
+        expect(extrapolationSlope(null)).toBeNull();
     });
 });

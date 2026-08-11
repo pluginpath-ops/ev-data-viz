@@ -111,17 +111,12 @@ export function alignSeries(points, thresholdSoc) {
     // visited — so the caller is told how far it reached beyond the data, and
     // anything past EXTRAPOLATION_SOC_LIMIT is worth saying out loud.
     if (!before) {
-        const first  = usable[0];
-        const second = usable.find(p => p.time > first.time && p.soc !== first.soc);
-        if (!second) return { offset: at.time, points: points.slice(idx), interpolated: false };
+        const first = usable[0];
+        const slope = extrapolationSlope(usable);
+        if (!slope) return { offset: at.time, points: points.slice(idx), interpolated: false };
 
-        const socPerMin = (second.soc - first.soc) / (second.time - first.time);
-        if (!Number.isFinite(socPerMin) || socPerMin <= 0) {
-            return { offset: at.time, points: points.slice(idx), interpolated: false };
-        }
-
-        const gap  = first.soc - thresholdSoc;              // SoC being invented
-        const back = gap / socPerMin;                        // minutes before the data
+        const gap  = first.soc - thresholdSoc;               // SoC being invented
+        const back = gap / slope.socPerMin;                  // minutes before the data
         const start = {
             ...first,
             soc: thresholdSoc,
@@ -134,6 +129,7 @@ export function alignSeries(points, thresholdSoc) {
             interpolated: false,
             extrapolated: true,
             gap,
+            rampTrimmed: slope.trimmed,
         };
     }
 
@@ -144,6 +140,101 @@ export function alignSeries(points, thresholdSoc) {
     // A synthetic point AT the threshold, so the curve literally begins there.
     const start = { ...before, soc: thresholdSoc, time: crossTime, _interpolatedStart: true };
     return { offset: crossTime, points: [start, ...points.slice(idx)], interpolated: true };
+}
+
+/* ── The opening ramp ───────────────────────────────────────────────────────
+ *
+ * A charging session does not begin at the car's capability. The charger and
+ * the BMS negotiate upward — voltage, then current — until one of them is at
+ * its limit, which takes something under a minute. A real R2 session opens at
+ * 93 kW, is at 195 kW twenty-four seconds later, and settles near 220:
+ *
+ *     t=0.1  10%   93 kW      ← handshake, not capability
+ *     t=0.5  11%  195 kW      ← still climbing
+ *     t=0.9  12%  214 kW      ← settled
+ *     t=1.4  14%  216 kW
+ *
+ * Those points are true — the car really was at 10% drawing 93 kW — but they
+ * describe the plug, not the car. Reading a slope across them says the R2 gains
+ * 2.5 %/min when it gains 3.9, and back-projecting on that invented an extra
+ * 0.8 minutes of fabricated slowness before its data even started.
+ *
+ * So the ramp is excluded from the SLOPE BASIS ONLY. The measured points stay on
+ * the chart, because they happened. What changes is the rate we are willing to
+ * attribute to the car when extending it past what was measured.
+ */
+
+/** Share of the opening plateau below which a point is still ramping up. */
+export const RAMP_PLATEAU_FRACTION = 0.9;
+
+/** Never treat more than this many leading points as ramp. A run whose power
+ *  climbs for its whole opening is tapering oddly or badly logged; trimming it
+ *  wholesale would be a bigger guess than the one being avoided. */
+export const RAMP_MAX_TRIM = 3;
+
+const LEAD_WINDOW_POINTS = 10;   // what counts as "the opening"
+const SLOPE_SPAN_SOC     = 3;    // measure the rate over at least this much SoC
+
+/**
+ * How many leading points are still ramping up.
+ *
+ * Uses recorded power when there is any, because the ramp is a fact about power
+ * and reads directly: below `RAMP_PLATEAU_FRACTION` of the opening plateau is
+ * still climbing. A tapering run — power highest at its first point — trims
+ * nothing, which is the behaviour that matters for a run that starts high.
+ *
+ * Falls back to nothing when power was not logged. The SoC slope alone cannot
+ * tell a ramp from coarse sampling: this data is quantised to whole percent, so
+ * the settled R2 alternates 3.33 and 5.0 %/min, and any rule sensitive enough
+ * to catch a real ramp would also catch that sawtooth.
+ */
+export function rampLength(points) {
+    const window = (points ?? []).slice(0, LEAD_WINDOW_POINTS);
+    const powers = window.map(p => p?.chargeRate);
+    if (!powers.some(w => w != null && Number.isFinite(w) && w > 0)) return 0;
+
+    const plateau = Math.max(...powers.filter(w => w != null && Number.isFinite(w)));
+    if (!(plateau > 0)) return 0;
+
+    let n = 0;
+    while (n < window.length && n < RAMP_MAX_TRIM) {
+        const w = powers[n];
+        if (w == null || !Number.isFinite(w)) break;
+        if (w >= plateau * RAMP_PLATEAU_FRACTION) break;
+        n++;
+    }
+    // Leaving nothing to measure a slope with is worse than keeping the ramp.
+    return Math.min(n, Math.max(0, (points?.length ?? 0) - 2));
+}
+
+/**
+ * The rate to extend a run backwards at, in % SoC per minute.
+ *
+ * Measured after the ramp, and over at least `SLOPE_SPAN_SOC` of SoC — a single
+ * segment of whole-percent data is 1% wide, so its rate carries the sampling
+ * interval's error rather than the car's behaviour.
+ *
+ * Returns null when no positive rate can be measured. A flat or falling trace is
+ * not a slow charge, it is a discharge or a stall, and running it backwards
+ * would draw a rising curve out of a falling one.
+ */
+export function extrapolationSlope(points) {
+    const usable = (points ?? []).filter(p => p?.soc != null && p?.time != null);
+    if (usable.length < 2) return null;
+
+    const trimmed = rampLength(usable);
+    const from = usable[trimmed];
+    if (!from) return null;
+
+    const to = usable.slice(trimmed + 1).find(p => p.soc - from.soc >= SLOPE_SPAN_SOC)
+        ?? usable[usable.length - 1];
+
+    const dt = to.time - from.time;
+    const ds = to.soc - from.soc;
+    if (!(dt > 0) || !(ds > 0)) return null;
+
+    const socPerMin = ds / dt;
+    return Number.isFinite(socPerMin) && socPerMin > 0 ? { socPerMin, trimmed } : null;
 }
 
 /**

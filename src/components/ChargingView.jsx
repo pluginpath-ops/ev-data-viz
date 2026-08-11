@@ -423,7 +423,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             for (const run of vehicle.runs || []) {
                 if (!chartConfig.selectedRuns.includes(run.id)) continue;
                 const aligned = alignSeries(runDataCache[run.id], raceThreshold);
-                if (overExtrapolated(aligned)) out.push({ name: run.name, gap: Math.round(aligned.gap) });
+                if (overExtrapolated(aligned)) {
+                    out.push({
+                        name: run.name,
+                        gap: Math.round(aligned.gap),
+                        rampTrimmed: aligned.rampTrimmed ?? 0,
+                    });
+                }
             }
         }
         return out;
@@ -950,9 +956,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     {excludedRuns.map(({ name, reason }) => (
                         <p key={name}>⚠ {name}: not aligned — {reason}</p>
                     ))}
-                    {stretchedRuns.map(({ name, gap }) => (
+                    {stretchedRuns.map(({ name, gap, rampTrimmed }) => (
                         <p key={name}>
                             ⚠ {name}: estimated {gap}% of SoC below its own data to reach {raceThreshold}%
+                            {rampTrimmed > 0 && (
+                                <span title="A session opens with the charger and the BMS negotiating upward, well under the car's capability. Those points stay on the chart; they are just not what the estimate is drawn from.">
+                                    {' '}(rate taken after the charge ramp)
+                                </span>
+                            )}
                         </p>
                     ))}
                     {excludedRuns.length > 0 && (
