@@ -40,7 +40,7 @@ describe('utilities built for the UI are reached by the UI', () => {
     // Scoped to the modules built recently rather than the whole codebase: 48
     // exports are unused project-wide, nearly all pre-existing in the EPA and
     // parser modules. Widening this wants a cleanup first, not an allowlist.
-    const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js'];
+    const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -50,6 +50,20 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The default value itself, consumed inside the module and by the chartConfig fallback literal.',
         'conditionCorrection.CORRECTION_MODES':
             'Consumed by CorrectionControl to render the picker.',
+        'socAlignment.EXTRAPOLATION_SOC_LIMIT':
+            'The limit itself, consumed inside the module by overExtrapolated — which the chart does call.',
+        'socAlignment.RAMP_PLATEAU_FRACTION':
+            'Tuning constant for rampLength, exported to be named and testable rather than to be called.',
+        'socAlignment.RAMP_TRIM_MIN_MINUTES':
+            'The threshold that decides whether alignSeries trims at all; consumed inside the module and asserted by name.',
+        'socAlignment.RAMP_MAX_TRIM':
+            'As above — the cap on ramp trimming, asserted by name in the tests.',
+        'socAlignment.trimRamp':
+            'Called by alignSeries and minimumCommonSoc, both of which the chart calls. Exported so the trim can be asserted on its own.',
+        'socAlignment.rampLength':
+            'The ramp detector. Called by extrapolationSlope; exported so its behaviour is pinned directly against real R2 data.',
+        'socAlignment.extrapolationSlope':
+            'Called by alignSeries, which the chart calls. Exported so the slope basis can be asserted without going through alignment.',
     };
 
     for (const mod of WATCHED) {
@@ -110,6 +124,40 @@ describe('the seams that broke before', () => {
         for (const f of charts) {
             expect(read(f), `${f} does not use the shared label composer`).toMatch(/buildSeriesLabels/);
         }
+    });
+
+    it('renders vehicle images through the thumbnail resolver', () => {
+        // image_url is the FULL-resolution original — 1600x900, ~210KB each, and
+        // 91% of a cold first load when 23 of them render at once. Displaying it
+        // directly is the regression: every surface must go through
+        // displayImageUrl so it gets the card-sized rendition with a fallback.
+        //
+        // Presence checks (`vehicle.image_url ? 'Replace' : 'Upload'`) are fine
+        // and deliberately not matched here — only uses that put the URL on the
+        // wire are.
+        const rendersRaw = ALL.filter(({ file, text }) =>
+            /\.jsx$/.test(file) && (
+                /src=\{[^}]*\.image_url/.test(text) ||
+                /url\(\$\{[^}]*\.image_url/.test(text)
+            ));
+        expect(rendersRaw.map(x => x.file)).toEqual([]);
+    });
+
+    it('loads the startup queries in parallel', () => {
+        // Seven independent queries were awaited one after another, six of them
+        // returning under 4KB. That was ~900ms of blank screen spent purely on
+        // round trips. An eighth query appended below the Promise.all rather
+        // than inside it silently restores the waterfall.
+        const ctx = read('src/context/AppContext.jsx');
+        const init = ctx.slice(ctx.indexOf('async function initializeApp'));
+        const body = init.slice(0, init.indexOf('\n    }'));
+
+        expect(body, 'initializeApp no longer batches its startup queries')
+            .toMatch(/await Promise\.all\(\[/);
+
+        const serialAwaits = body.match(/(?:const|let)\s+\w+\s*=\s*await\s+dataService\./g) ?? [];
+        expect(serialAwaits, 'a startup query is awaited outside the Promise.all')
+            .toEqual([]);
     });
 
     it('keeps vehicleLabel out of graph labelling', () => {

@@ -68,16 +68,32 @@ export function AppProvider({ children }) {
         setUser(dataService.user);
         setUserRole(dataService.role);
 
-        const vehiclesData = await dataService.getVehicles();
-        const selectedIds = await dataService.getSelectedVehicles();
-        const tagsData = dataService.useSupabase ? await dataService.getTags() : [];
-        const siteSettings = await dataService.getSiteSettings();
-        const manufacturersData = dataService.useSupabase ? await dataService.getManufacturers() : [];
-        const chartHelpData = dataService.useSupabase ? await dataService.getChartHelp() : {};
-        const sessionsData = dataService.useSupabase ? await dataService.getTestSessions() : [];
-        // One extra query, kept out of getVehicles so a missing performance table
-        // can never take the vehicles list down with it.
-        const perfCounts = dataService.useSupabase ? await dataService.getPerformanceRunCounts() : {};
+        // These queries are independent of one another. Awaiting them in sequence
+        // cost ~900ms of round-trip latency on a warm load — six of the seven
+        // return under 4KB, so the time was almost entirely waiting, not transfer.
+        // Keep them in one Promise.all; adding a new startup query below this line
+        // rather than inside it silently reintroduces the waterfall.
+        const [
+            vehiclesData,
+            selectedIds,
+            tagsData,
+            siteSettings,
+            manufacturersData,
+            chartHelpData,
+            sessionsData,
+            perfCounts,
+        ] = await Promise.all([
+            dataService.getVehicles(),
+            dataService.getSelectedVehicles(),
+            dataService.useSupabase ? dataService.getTags() : [],
+            dataService.getSiteSettings(),
+            dataService.useSupabase ? dataService.getManufacturers() : [],
+            dataService.useSupabase ? dataService.getChartHelp() : {},
+            dataService.useSupabase ? dataService.getTestSessions() : [],
+            // One extra query, kept out of getVehicles so a missing performance table
+            // can never take the vehicles list down with it.
+            dataService.useSupabase ? dataService.getPerformanceRunCounts() : {},
+        ]);
 
         // Derive custom field name suggestions from all vehicles' specs._custom objects
         const suggestions = {};
@@ -742,14 +758,23 @@ export function AppProvider({ children }) {
         return { created, updated, failures };
     };
 
-    const uploadVehicleImage = async (vehicleId, file) => {
+    const uploadVehicleImage = async (vehicleId, renditions) => {
         try {
-            const imageUrl = await dataService.uploadVehicleImage(vehicleId, file);
-            setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, image_url: imageUrl } : v));
-            return imageUrl;
+            const urls = await dataService.uploadVehicleImage(vehicleId, renditions);
+            setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, ...urls } : v));
+            return urls;
         } catch (error) {
             showError('Error uploading image: ' + error.message);
         }
+    };
+
+    const backfillVehicleThumbnails = async (onProgress) => {
+        const result = await dataService.backfillVehicleThumbnails(onProgress);
+        // Re-read rather than patching locally: the backfill writes rows this
+        // context did not touch, and a partial run must not leave the grid
+        // claiming thumbnails that were not written.
+        if (result.updated > 0) await softRefreshVehicles();
+        return result;
     };
 
     const toggleVehicleVisibility = async (vehicleId, newVisibility) => {
@@ -1417,6 +1442,7 @@ export function AppProvider({ children }) {
         createTag,
         syncVehicleTags,
         uploadVehicleImage,
+        backfillVehicleThumbnails,
         toggleVehicleVisibility,
         replaceRunData,
         mergeRunData,

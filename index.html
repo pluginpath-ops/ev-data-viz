@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EVBench</title>
+    <!-- Supabase origin, substituted from env at build time. Warms DNS+TLS, which
+         otherwise landed on the critical path at ~1.2s because the browser cannot
+         discover this origin until the bundle has parsed and run. crossorigin is
+         required for the connection to be reused by supabase-js's cors fetches. -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin>
+    <link rel="dns-prefetch" href="%VITE_SUPABASE_URL%">
 </head>
 <body class="bg-gray-50">
     <div id="root"></div>

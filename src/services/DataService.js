@@ -3,8 +3,17 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { roundTo, } from '../utils/unitConversions';
 import { toSessionRow } from '../utils/testSessions';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
+import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
 const roundField = roundTo;
+
+/**
+ * How long a stored image object may be cached. Safe at a year only because
+ * every stored URL carries a ?v= stamp written at upload time — see
+ * #putVehicleImageObject. Objects predating that carry Supabase Storage's
+ * default of no-cache and revalidate on every page load.
+ */
+const IMAGE_CACHE_SECONDS = 31536000;
 
 /** Normalise a raw data-point object into a clean DB row shape. */
 function normalisePoint(point, runId, frame) {
@@ -403,18 +412,102 @@ class DataService {
     }
   }
 
-  async uploadVehicleImage(vehicleId, blob) {
-    // Always store as JPEG — the blob is produced by the crop/resize canvas step
-    const path = `${vehicleId}.jpg`;
-    const { error: uploadError } = await getSupabase().storage
-      .from('vehicle-images')
-      .upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
-    if (uploadError) throw uploadError;
-    const { data } = getSupabase().storage.from('vehicle-images').getPublicUrl(path);
+  /**
+   * Store both renditions of a vehicle image and point the row at them.
+   *
+   * @param {number} vehicleId
+   * @param {{ full: Blob, thumb: Blob }} renditions from utils/imageRenditions
+   * @returns {Promise<{ image_url: string, image_thumb_url: string }>}
+   */
+  async uploadVehicleImage(vehicleId, renditions) {
+    // Always store as JPEG — both blobs are produced by the crop/resize canvas step
+    const fullPath = `${vehicleId}.jpg`;
+    const thumbPath = thumbPathFor(fullPath);
+
+    const [fullResult, thumbResult] = await Promise.all([
+      this.#putVehicleImageObject(fullPath, renditions.full),
+      this.#putVehicleImageObject(thumbPath, renditions.thumb),
+    ]);
+
+    const patch = { image_url: fullResult, image_thumb_url: thumbResult };
     const { error: updateError } = await getSupabase()
-      .from('vehicles').update({ image_url: data.publicUrl }).eq('id', vehicleId);
+      .from('vehicles').update(patch).eq('id', vehicleId);
     if (updateError) throw updateError;
-    return data.publicUrl;
+    return patch;
+  }
+
+  /**
+   * Upload one image object and return its public URL with a version query.
+   *
+   * The storage path is derived from the vehicle id, so replacing an image
+   * reuses the same key. That is what makes the long cacheControl safe to set:
+   * the ?v= stamp changes on every write, so a replaced image is a new URL to
+   * every cache while the object itself can be held for a year. Without the
+   * stamp a long max-age would pin the old picture in browsers indefinitely.
+   */
+  async #putVehicleImageObject(path, blob) {
+    const { error } = await getSupabase().storage
+      .from('vehicle-images')
+      .upload(path, blob, {
+        upsert: true,
+        contentType: 'image/jpeg',
+        cacheControl: String(IMAGE_CACHE_SECONDS),
+      });
+    if (error) throw error;
+    const { data } = getSupabase().storage.from('vehicle-images').getPublicUrl(path);
+    return `${data.publicUrl}?v=${Date.now()}`;
+  }
+
+  /**
+   * Generate the missing card-sized rendition for vehicles that only have a
+   * full-resolution image — the one-time catch-up for everything uploaded
+   * before migration 051.
+   *
+   * Deliberately leaves image_url alone: the original is the copy we cannot
+   * regenerate, and re-encoding it here would degrade it for no gain.
+   *
+   * @param {(done:number, total:number, label:string) => void} [onProgress]
+   * @returns {Promise<{ updated:number, failures:Array<{id:number,name:string,error:string}> }>}
+   */
+  async backfillVehicleThumbnails(onProgress) {
+    const { data, error } = await getSupabase()
+      .from('vehicles')
+      .select('id, name, image_url, image_thumb_url')
+      .not('image_url', 'is', null)
+      .is('image_thumb_url', null)
+      .order('id');
+    if (error) throw error;
+
+    const pending = data || [];
+    const failures = [];
+    let updated = 0;
+
+    // Sequential on purpose. This runs a handful of times in the life of the
+    // project against ~25 rows; decoding several 1600x900 images at once is a
+    // real memory spike in a browser tab, and a slow correct pass beats a fast
+    // one that dies halfway with no record of where it stopped.
+    for (const [index, vehicle] of pending.entries()) {
+      onProgress?.(index, pending.length, vehicle.name || `#${vehicle.id}`);
+      let bitmap;
+      try {
+        bitmap = await loadBitmapFromUrl(vehicle.image_url);
+        const thumb = await renderToJpegBlob(bitmap, THUMB_MAX, THUMB_QUALITY);
+        const thumbUrl = await this.#putVehicleImageObject(
+          thumbPathFor(`${vehicle.id}.jpg`), thumb,
+        );
+        const { error: updateError } = await getSupabase()
+          .from('vehicles').update({ image_thumb_url: thumbUrl }).eq('id', vehicle.id);
+        if (updateError) throw updateError;
+        updated++;
+      } catch (err) {
+        failures.push({ id: vehicle.id, name: vehicle.name, error: err.message });
+      } finally {
+        bitmap?.close();
+      }
+    }
+
+    onProgress?.(pending.length, pending.length, '');
+    return { updated, failures };
   }
 
   async addVehicle(vehicle) {
