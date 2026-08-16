@@ -160,7 +160,18 @@ export default function App() {
         lastModeByCategory.current[categoryKey] = newMode;
         setView(categoryKey);
         setChartMode(newMode);
-        setChartConfig(prev => ({ ...prev, selectedRuns: [] }));
+        // Only on an actual mode change. Clearing unconditionally emptied the
+        // chart when you clicked the sub-tab you were already on, and nothing
+        // refilled it — the charts re-bootstrap on a mode CHANGE, which this was
+        // not. One click on the active tab left you with no series and no way
+        // back but reselecting by hand.
+        //
+        // Not an early return from this function: the top nav calls it with the
+        // category's remembered mode, which is frequently the current one, and
+        // bailing there stops the view switching at all.
+        if (newMode !== chartMode) {
+            setChartConfig(prev => ({ ...prev, selectedRuns: [] }));
+        }
     };
 
     /** Enter a chart category tab, restoring whichever mode you last used in it. */

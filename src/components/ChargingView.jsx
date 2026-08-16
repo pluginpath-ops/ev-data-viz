@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Chart from 'chart.js/auto';
 import ZoomPlugin from 'chartjs-plugin-zoom';
 Chart.defaults.font.size = 13;
@@ -18,6 +18,7 @@ import { correctionFactor } from '../utils/conditionCorrection';
 import AutoColorToggle from './AutoColorToggle';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
+import { useRunSelection } from '../hooks/useRunSelection';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
 import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
@@ -51,6 +52,48 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // not honour the reset rules the override follows.
     const handleColorChange = (_vehicleId, runId, color) => setColorOverride(runId, color);
 
+    // ── Which runs are plotted ────────────────────────────────────────────────
+    //
+    // Selection behaviour is the shared hook (hooks/useRunSelection.js), the same
+    // one Charge Compare and Road Trip use. This view had its own copy — prune,
+    // bootstrap-once and mode-reset written again by hand — which is the
+    // duplication #176 exists to end.
+    //
+    // CONTROLLED, unlike the other two: this selection is URL-synced through
+    // `chartConfig.selectedRuns` in App, so App stays the owner and the hook only
+    // decides what the next value should be.
+    const selectionRows = useMemo(
+        () => selectedVehicles.flatMap(v =>
+            (chartMode === 'range' ? filterRangeRuns(v.runs) : filterChargingRuns(v.runs))
+                .map(run => ({ key: run.id, vehicleId: v.id, groupId: run.id, run }))
+        ),
+        [selectedVehicles, chartMode]
+    );
+
+    // Charging arrives with ONE curve per vehicle — its default test, else its
+    // most recent. A dozen overlapping curves is not a chart, and the per-vehicle
+    // "all" link is there for when you want the rest.
+    //
+    // Range arrives with all of them: those are bars, not curves, and a vehicle's
+    // own tests are usually the comparison being made.
+    const bootstrapRuns = useCallback((vehicleId, vehicleRows) => {
+        if (chartMode === 'range') return vehicleRows.map(r => r.key);
+        const pick = vehicleRows.find(r => r.run.isDefault)
+            ?? [...vehicleRows].sort((a, b) => new Date(b.run.date) - new Date(a.run.date))[0];
+        return pick ? [pick.key] : [];
+    }, [chartMode]);
+
+    // Charging and Range are different populations, not the same rows filtered:
+    // a charging run has no counterpart in range mode. `resetKey` is what tells
+    // the hook to treat every vehicle as new on the switch, which is the job the
+    // hand-rolled `autoSelectedRef.current.clear()` used to do.
+    const { selected: selectedRuns, toggle: toggleRun } = useRunSelection(selectionRows, {
+        value:    chartConfig.selectedRuns,
+        onChange: next => setChartConfig(prev => ({ ...prev, selectedRuns: next })),
+        shouldBootstrap: bootstrapRuns,
+        resetKey: chartMode,
+    });
+
     // Resolve display colors for all selected runs.
     // In 'manual' mode only default-blue runs get nudged; in 'auto' mode all
     // runs get Okabe-Ito assignment with hue-family bias toward their stored color.
@@ -58,108 +101,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // re-solving the whole set and shuffling every series (hooks/useStickyChartColors).
     const colorableRuns = useMemo(
         () => selectedVehicles.flatMap(v =>
-            (v.runs || []).filter(r => chartConfig.selectedRuns.includes(r.id))
+            (v.runs || []).filter(r => selectedRuns.includes(r.id))
         ),
-        [selectedVehicles, chartConfig.selectedRuns]
+        [selectedVehicles, selectedRuns]
     );
     const { colorMap, setColorOverride } = useStickyChartColors(colorableRuns, {
         autoColor: chartConfig.autoColor,
         resetKey: selectedVehicleIds.join(','),
     });
-
-    // Ref so the auto-select effect can read chartMode without it being a dep
-    // (avoids changing the deps array size, which React disallows mid-session).
-    const chartModeRef = useRef(chartMode);
-    chartModeRef.current = chartMode;
-
-    // Tracks which vehicle IDs have already had auto-selection applied IN THE
-    // CURRENT MODE. Cleared on mode switch so entering Range (or Charging) always
-    // triggers a fresh auto-select — the old mode's runs may be entirely invalid here.
-    // - Empty on mount/mode-change → all vehicles treated as new.
-    // - Vehicle removed → evicted → re-adding it auto-selects again.
-    // - Vehicle initialized + user deselects within same mode → no forced re-add.
-    const autoSelectedRef = useRef(new Set());
-    const lastModeRef     = useRef(chartMode);
-
-    // Auto-select runs when vehicle selection, run list, or chart mode changes.
-    // chartMode is in deps so the effect fires on Charging ↔ Range tab switch.
-    // Safe against infinite loops: state update only fires when newRuns !== currentRuns.
-    useEffect(() => {
-        const mode        = chartModeRef.current;
-        const currentRuns = chartConfig.selectedRuns;
-        const currentVehicleIdSet = new Set(selectedVehicleIds.map(String));
-
-        // Mode switch → wipe initialized set so each vehicle gets a fresh auto-select.
-        // (Runs valid in charging mode may not exist in range mode and vice-versa.)
-        if (mode !== lastModeRef.current) {
-            autoSelectedRef.current.clear();
-            lastModeRef.current = mode;
-        }
-
-        // Evict any vehicle that left the selection so re-adding it auto-selects fresh.
-        autoSelectedRef.current.forEach(id => {
-            if (!currentVehicleIdSet.has(id)) autoSelectedRef.current.delete(id);
-        });
-
-        if (mode === 'charging') {
-            const chargingRuns = selectedVehicles.flatMap(v => filterChargingRuns(v.runs));
-            const validRunIds  = new Set(chargingRuns.map(r => String(r.id)));
-            const kept         = currentRuns.filter(id => validRunIds.has(String(id)));
-            const added        = [];
-
-            selectedVehicles.forEach(vehicle => {
-                const vid           = String(vehicle.id);
-                const vChargingRuns = filterChargingRuns(vehicle.runs);
-                if (!vChargingRuns.length) { autoSelectedRef.current.add(vid); return; }
-
-                const hasRun = kept.some(id => vChargingRuns.some(r => String(r.id) === String(id)));
-                if (hasRun) {
-                    // Valid run already selected (e.g. URL-restored) — mark done, keep it.
-                    autoSelectedRef.current.add(vid);
-                } else if (!autoSelectedRef.current.has(vid)) {
-                    // First time we see this vehicle with nothing selected — auto-pick default.
-                    const defaultRun = vChargingRuns.find(r => r.isDefault);
-                    const pick = defaultRun || [...vChargingRuns].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-                    if (pick) added.push(pick.id);
-                    autoSelectedRef.current.add(vid); // mark done (attempt made)
-                }
-                // else: vehicle already initialized, user deliberately has nothing selected — leave it.
-            });
-
-            const newRuns = [...kept, ...added];
-            if (newRuns.join(',') !== currentRuns.join(',')) {
-                setChartConfig(prev => ({ ...prev, selectedRuns: newRuns }));
-            }
-
-        } else if (mode === 'range') {
-            const allRangeIds = selectedVehicles.flatMap(v =>
-                filterRangeRuns(v.runs).map(r => r.id)
-            );
-            const validSet = new Set(allRangeIds.map(String));
-            const kept     = currentRuns.filter(id => validSet.has(String(id)));
-            const keptSet  = new Set(kept.map(String));
-            const added    = [];
-
-            selectedVehicles.forEach(vehicle => {
-                const vid        = String(vehicle.id);
-                const vRangeRuns = filterRangeRuns(vehicle.runs);
-                if (!vRangeRuns.length) { autoSelectedRef.current.add(vid); return; }
-
-                const hasAny = vRangeRuns.some(r => keptSet.has(String(r.id)));
-                if (hasAny) {
-                    autoSelectedRef.current.add(vid);
-                } else if (!autoSelectedRef.current.has(vid)) {
-                    vRangeRuns.forEach(r => added.push(r.id));
-                    autoSelectedRef.current.add(vid);
-                }
-            });
-
-            const newRuns = [...kept, ...added];
-            if (newRuns.join(',') !== currentRuns.join(',')) {
-                setChartConfig(prev => ({ ...prev, selectedRuns: newRuns }));
-            }
-        }
-    }, [selectedVehicleIds, chartConfig.selectedRuns, chartMode]);
 
     // A pairing change invalidates cached range values: the derived range is
     // baked into the cached points, so without this the axis would keep showing
@@ -191,10 +140,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // cached runs (their derived range is stale), and keying on the selection
     // alone meant nothing refetched them — the series vanished until some
     // unrelated toggle changed the selection and happened to trigger this.
-    const missingRunIds = chartConfig.selectedRuns.filter(id => !(id in runDataCache));
+    const missingRunIds = selectedRuns.filter(id => !(id in runDataCache));
     useEffect(() => {
         const fetchMissingData = async () => {
-            const missingIds = chartConfig.selectedRuns.filter(id => !(id in runDataCache));
+            const missingIds = selectedRuns.filter(id => !(id in runDataCache));
             if (missingIds.length === 0) return;
             setLoadingData(true);
             const updates = {};
@@ -404,11 +353,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // 10% for a long time here — silently drops every run that started above
     // it; this drops none, because by construction they all reach it.
     const commonSoc = useMemo(() => {
-        const series = (chartConfig.selectedRuns || [])
+        const series = (selectedRuns || [])
             .map(id => runDataCache[id])
             .filter(Boolean);
         return minimumCommonSoc(series);
-    }, [chartConfig.selectedRuns, runDataCache]);
+    }, [selectedRuns, runDataCache]);
 
     // An explicit choice wins; otherwise follow the data as the selection changes.
     const raceThreshold = chartConfig.raceThreshold ?? commonSoc ?? 10;
@@ -421,39 +370,39 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         const out = [];
         for (const vehicle of selectedVehicles) {
             for (const run of vehicle.runs || []) {
-                if (!chartConfig.selectedRuns.includes(run.id)) continue;
+                if (!selectedRuns.includes(run.id)) continue;
                 const aligned = alignSeries(runDataCache[run.id], raceThreshold);
                 if (overExtrapolated(aligned)) out.push({ name: run.name, gap: Math.round(aligned.gap) });
             }
         }
         return out;
-    }, [raceActive, raceThreshold, selectedVehicles, chartConfig.selectedRuns, runDataCache]);
+    }, [raceActive, raceThreshold, selectedVehicles, selectedRuns, runDataCache]);
 
     const trimmedRuns = useMemo(() => {
         if (!raceActive) return [];
         const out = [];
         for (const vehicle of selectedVehicles) {
             for (const run of vehicle.runs || []) {
-                if (!chartConfig.selectedRuns.includes(run.id)) continue;
+                if (!selectedRuns.includes(run.id)) continue;
                 const aligned = alignSeries(runDataCache[run.id], raceThreshold);
                 if (aligned?.rampTrimmed > 0) out.push({ name: run.name, n: aligned.rampTrimmed });
             }
         }
         return out;
-    }, [raceActive, raceThreshold, selectedVehicles, chartConfig.selectedRuns, runDataCache]);
+    }, [raceActive, raceThreshold, selectedVehicles, selectedRuns, runDataCache]);
 
     const excludedRuns = useMemo(() => {
         if (!raceActive) return [];
         const out = [];
         for (const vehicle of selectedVehicles) {
             for (const run of vehicle.runs || []) {
-                if (!chartConfig.selectedRuns.includes(run.id)) continue;
+                if (!selectedRuns.includes(run.id)) continue;
                 const reason = alignmentExclusion(runDataCache[run.id], raceThreshold);
                 if (reason) out.push({ name: run.name, reason });
             }
         }
         return out;
-    }, [raceActive, raceThreshold, selectedVehicles, chartConfig.selectedRuns, runDataCache]);
+    }, [raceActive, raceThreshold, selectedVehicles, selectedRuns, runDataCache]);
 
     /**
      * Returns null if the run can participate in race mode, or a short reason
@@ -522,7 +471,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         selectedVehicles.forEach(vehicle => {
             if (vehicle.runs) {
                 vehicle.runs.forEach(run => {
-                    if (chartConfig.selectedRuns.includes(run.id)) {
+                    if (selectedRuns.includes(run.id)) {
                         allSelectedRuns.push({
                             ...run,
                             vehicle,
@@ -743,7 +692,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         return (
             <RangeChartView
                 selectedVehicles={selectedVehicles}
-                selectedRuns={chartConfig.selectedRuns}
+                selectedRuns={selectedRuns}
+                toggleRun={toggleRun}
                 setChartConfig={setChartConfig}
                 presentationMode={presentationMode}
                 autoColor={chartConfig.autoColor ?? false}
@@ -895,13 +845,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
                     </>}
                     vehicles={selectedVehicles}
-                    selectedRunIds={chartConfig.selectedRuns}
-                    onToggleRun={runId => setChartConfig(prev => ({
-                        ...prev,
-                        selectedRuns: prev.selectedRuns.includes(runId)
-                            ? prev.selectedRuns.filter(id => id !== runId)
-                            : [...prev.selectedRuns, runId],
-                    }))}
+                    selectedRunIds={selectedRuns}
+                    onToggleRun={toggleRun}
                     onUpdateRunColor={handleColorChange}
                     runFilter={isChargingRun}
                     colorMap={colorMap}
@@ -1083,7 +1028,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 )}
             </div>}
 
-            {!presentationMode && chartConfig.selectedRuns.length === 0 && (
+            {!presentationMode && selectedRuns.length === 0 && (
                 <div className="text-center py-12 text-secondary">
                     <p className="text-lg">Select runs to display on the chart</p>
                 </div>
