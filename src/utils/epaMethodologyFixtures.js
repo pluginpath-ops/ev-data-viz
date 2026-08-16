@@ -21,7 +21,18 @@ export const R2_MCT = {
     modelYear:       2027,
     configuration:   'Dual Motor · Large Pack · 20" AT · All-Purpose',
     testMethod:      'mct',
-    adjustmentMethod: 'fixed_07',
+    // EPA's own MY27 Fuel Economy Guide records this configuration's label as
+    // "Electric Vehicle 5-cycle label" — NOT the fixed 0.7 factor originally
+    // assumed here. Corrected, and worth the note: #206 models
+    // adjustment_method as DETERMINED BY test_method, and this record is a
+    // counter-example. It was multi-cycle tested (the CSI PDF this fixture was
+    // transcribed from) and 5-cycle labelled. The two axes are more independent
+    // than the issue assumes.
+    //
+    // Nothing downstream changes: applying x0.7 still reproduces the 307 label
+    // to 0.3%, because on the 152 five-cycle-labelled EVs in the MY26 guide the
+    // effective adjusted/unadjusted ratio has a median of exactly 0.700.
+    adjustmentMethod: 'five_cycle_label',
     labeledRangeMi:  307,
     totalDcWh:       89549.27,
     rechargeAcWh:    104689,
@@ -50,6 +61,9 @@ export const LIGHTNING_SCT = {
     modelYear:       2026,
     configuration:   'Extended Range · NWA00042 / 0',
     testMethod:      'sct',
+    // Unconfirmed: the F-150 Lightning appears in neither the MY26 nor the MY27
+    // Fuel Economy Guide, so unlike the R2 there is no published statement of
+    // which label method it used. Left as originally transcribed.
     adjustmentMethod: 'fixed_07',
     labeledRangeMi:  320,
     // No DC-side energy in an SCT record, so vehicle-side efficiency and the
