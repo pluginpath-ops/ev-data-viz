@@ -1779,34 +1779,28 @@ body {
 }
 
 /* ── Certification paths (#206) ──────────────────────────────────────────────
-   A table, not a flow chart: labelled rows of equal-height cells so the eye can
-   compare across a row instead of tracing connectors. The 5-cycle path skips
-   the adjustment row entirely, which the right-hand rail shows. */
+   One grid, two labelled rows of equal cells. The 5-cycle cell spans both rows
+   because it has no adjustment step — the geometry is the statement, which is
+   why there is no longer a rail with a caption explaining itself. */
 
 .cert-paths {
     @apply w-full;
 }
 
-.cert-row {
-    @apply relative grid gap-3 items-stretch mb-3;
-    grid-template-columns: 9rem minmax(0, 1fr);
+.cert-grid {
+    @apply grid gap-3 items-stretch;
+    grid-template-columns: 9rem repeat(3, minmax(0, 1fr));
 }
 
-.cert-row-label {
+.cert-grid-label {
     @apply flex items-center text-sm font-semibold;
     color: var(--color-text-secondary);
 }
 
-/* Equal cells across a row — the fixed geometry that makes it read as a table */
-.cert-row-cells {
-    @apply grid gap-3;
-}
-.cert-row-cells-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.cert-row-cells-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
-/* Chips sit above their cell without changing the cell's own height */
-.cert-cell-stack {
-    @apply flex flex-col gap-1.5 justify-end;
+/* Chips sit in their own grid row so they never change a cell's height */
+.cert-chips {
+    @apply flex flex-wrap items-end justify-center gap-1;
+    min-height: 1.25rem;
 }
 
 .cert-cell {
@@ -1816,17 +1810,15 @@ body {
     min-height: 5.5rem;
 }
 
+/* Reaches past the adjustment row: no adjustment step to take */
+.cert-cell-span {
+    grid-row: span 2;
+}
+
 /* A path something on screen actually took */
 .cert-cell-active {
     border-color: var(--color-primary);
     background-color: var(--color-primary-light);
-}
-
-.cert-cell-result {
-    @apply text-center items-center justify-center;
-    border-color: var(--color-primary);
-    border-width: 2px;
-    min-height: 4rem;
 }
 
 .cert-cell-effort {
@@ -1834,29 +1826,16 @@ body {
     color: var(--color-text-secondary);
 }
 
-/* The lane a 5-cycle test takes past the adjustment row */
-.cert-row-adjust {
-    padding-right: 8.5rem;
+.cert-result {
+    @apply mt-3;
 }
 
-.cert-bypass {
-    @apply absolute top-0 bottom-0 right-0 flex items-center justify-center border-l border-y rounded-r-lg;
-    width: 8rem;
-    border-color: var(--color-border);
-}
-
-.cert-bypass-note {
-    @apply text-xs text-center px-2 leading-tight;
-    color: var(--color-text-faint);
-}
-
-.cert-row-result .cert-cell-result {
-    @apply mx-auto w-full;
+.cert-cell-result {
+    @apply text-center items-center justify-center mx-auto;
+    border-color: var(--color-primary);
+    border-width: 2px;
+    min-height: 4rem;
     max-width: 26rem;
-}
-
-.path-taken {
-    @apply flex flex-wrap justify-center gap-1 min-h-5;
 }
 
 .path-chip {
@@ -1866,6 +1845,42 @@ body {
     color: var(--color-primary-text);
 }
 
+/* ── Collapsible section ─────────────────────────────────────────────────── */
+
+.collapsible-section {
+    @apply border-t;
+    border-color: var(--color-border);
+}
+.collapsible-section:first-child {
+    @apply border-t-0;
+}
+
+.collapsible-header {
+    @apply w-full flex items-center gap-2 py-3 text-left transition-colors;
+    color: var(--color-text-secondary);
+}
+.collapsible-header:hover {
+    color: var(--color-text-primary);
+}
+
+.collapsible-caret {
+    @apply inline-block text-xs transition-transform;
+    color: var(--color-text-faint);
+}
+
+.collapsible-title {
+    @apply text-base font-semibold;
+}
+
+.collapsible-subtitle {
+    @apply text-xs;
+    color: var(--color-text-faint);
+}
+
+.collapsible-body {
+    @apply pb-5;
+}
+
 .epa-methodology-cycles {
     @apply mt-5 pt-4 border-t;
     border-color: var(--color-border);
@@ -1873,10 +1888,9 @@ body {
 
 @media (max-width: 640px) {
     .cycle-row { grid-template-columns: minmax(0, 1fr); }
-    .cert-row  { grid-template-columns: minmax(0, 1fr); }
-    .cert-row-cells-3,
-    .cert-row-cells-2 { grid-template-columns: minmax(0, 1fr); }
-    /* The bypass rail is a spatial argument; it has nowhere to go in one column */
-    .cert-row-adjust { padding-right: 0; }
-    .cert-bypass { @apply static w-full h-auto py-1 border-l-0 border-y-0 border-t; }
+    /* One column: the row span carries no meaning without columns to span
+       across, so cells simply stack in reading order. */
+    .cert-grid { grid-template-columns: minmax(0, 1fr); }
+    .cert-cell-span { grid-row: auto; }
+    .cert-grid-label { @apply pt-2; }
 }

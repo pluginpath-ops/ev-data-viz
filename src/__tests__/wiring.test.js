@@ -182,6 +182,28 @@ describe('the seams that broke before', () => {
         expect(handRolled.map(x => x.file)).toEqual([]);
     });
 
+    it('keeps the "About this chart" bubble last on every page', () => {
+        // A convention all eight chart views already followed, and which held
+        // only because nobody had appended anything after it. The first thing
+        // added below the bubble (the EPA methodology card) broke it silently —
+        // the help text ended up mid-page with a card after it.
+        //
+        // Anchored on JSX, not on line count: what matters is that no element
+        // is rendered after the bubble in the returned tree.
+        const views = ALL.filter(({ file, text }) =>
+            /\.jsx$/.test(file) && /<ChartInfoBubble/.test(text));
+        expect(views.length).toBeGreaterThan(5);
+
+        for (const { file, text } of views) {
+            const after = text.slice(text.lastIndexOf('<ChartInfoBubble'));
+            // Only closing tags, braces and whitespace may follow it.
+            const stray = after
+                .replace(/<ChartInfoBubble[^/]*\/>/, '')
+                .match(/<[A-Za-z][^>]*>/g) ?? [];
+            expect(stray, `${file} renders ${stray[0]} after the info bubble`).toEqual([]);
+        }
+    });
+
     it('loads the startup queries in parallel', () => {
         // Seven independent queries were awaited one after another, six of them
         // returning under 4KB. That was ~900ms of blank screen spent purely on

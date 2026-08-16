@@ -19,6 +19,7 @@ import ChartInfoBubble from './ChartInfoBubble';
 import EpaMethodologyDiagram from './epa/EpaMethodologyDiagram';
 import EpaCertificationPaths from './epa/EpaCertificationPaths';
 import EpaCycleSpeedChart from './epa/EpaCycleSpeedChart';
+import CollapsibleSection from './CollapsibleSection';
 import { TWO_CYCLE_KEYS } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { METHODOLOGY_FIXTURES } from '../utils/epaMethodologyFixtures';
@@ -1141,60 +1142,64 @@ export default function EpaCurvesView({
                 />
             )}
 
-            {!presentationMode && <ChartInfoBubble chartKey="epacurves" />}
-
             {/* Where the label range comes from (#206).
                 ⚠ SAMPLE DATA. This is phase B1 of the epic: the diagram is built
                 and reviewed against two transcribed cert records while the ingest
                 and derivation phases (A1–A3) are still to come. B2 swaps
                 METHODOLOGY_FIXTURES for the derived row of the selected vehicle
-                and this banner goes with it. */}
+                and this banner goes with it.
+
+                Sections start collapsed: this is reference material a reader
+                opens on purpose, and expanded by default it buried the chart
+                above it. */}
             {!presentationMode && (
                 <div className="card mt-6">
-                    <h3 className="text-lg font-semibold mb-1">How the EPA range is produced</h3>
-                    <p className="text-sm text-faint mb-4">
+                    <h3 className="text-lg font-semibold mb-1">EPA range methodology</h3>
+                    <p className="text-sm text-faint mb-2">
                         Sample records — not yet wired to the selected vehicles (#206, phase B1).
                     </p>
-                    {/* The routes to a label, and which one each vehicle took —
-                        above the per-vehicle walk-through, because it frames it. */}
-                    <EpaCertificationPaths
-                        models={METHODOLOGY_FIXTURES.map(buildMethodologyModel).filter(Boolean)}
-                    />
 
-                    {/* What the factor stands in for. Sits with the paths table
-                        because it explains the ADJUSTMENT, not any one vehicle —
-                        so it is stated once rather than repeated per car. */}
-                    <div className="epa-methodology-cycles">
-                        <h4 className="text-sm font-semibold text-secondary mb-1">
-                            What the adjustment factor replaces
-                        </h4>
-                        <p className="text-xs text-muted mb-3">
-                            A two-cycle test drives the top two. The other three are the conditions
-                            EPA would otherwise measure directly — the factor is a blanket 30%
-                            reduction standing in for all of them, the same number for every vehicle.
-                        </p>
-                        <EpaCycleSpeedChart ranCycleKeys={TWO_CYCLE_KEYS} />
-                    </div>
+                    <CollapsibleSection title="How the EPA range is produced">
+                        <EpaCertificationPaths
+                            models={METHODOLOGY_FIXTURES.map(buildMethodologyModel).filter(Boolean)}
+                        />
 
-                    <div className="space-y-8 mt-8">
-                        {METHODOLOGY_FIXTURES.map(fixture => {
-                            const model = buildMethodologyModel(fixture);
-                            if (!model) return null;
-                            return (
-                                <div key={fixture.vehicleName}>
-                                    <div className="mb-2">
-                                        <span className="font-semibold text-secondary">
-                                            {model.modelYear} {model.vehicleName}
-                                        </span>
-                                        <span className="text-xs text-faint"> · {fixture.configuration}</span>
-                                    </div>
-                                    <EpaMethodologyDiagram model={model} />
-                                </div>
-                            );
-                        })}
-                    </div>
+                        {/* What the factor stands in for. Lives with the paths
+                            table because it explains the ADJUSTMENT, not any one
+                            vehicle — so it is stated once rather than per car. */}
+                        <div className="epa-methodology-cycles">
+                            <h4 className="text-sm font-semibold text-secondary mb-1">
+                                What the adjustment factor replaces
+                            </h4>
+                            <p className="text-xs text-muted mb-3">
+                                A two-cycle test drives the top two. The other three are the
+                                conditions EPA would otherwise measure directly — the factor is a
+                                blanket 30% reduction standing in for all of them, the same number
+                                for every vehicle.
+                            </p>
+                            <EpaCycleSpeedChart ranCycleKeys={TWO_CYCLE_KEYS} />
+                        </div>
+                    </CollapsibleSection>
+
+                    {METHODOLOGY_FIXTURES.map(fixture => {
+                        const model = buildMethodologyModel(fixture);
+                        if (!model) return null;
+                        return (
+                            <CollapsibleSection
+                                key={fixture.vehicleName}
+                                title={`${model.vehicleName} EPA Range Assessment`}
+                                subtitle={fixture.configuration}
+                            >
+                                <EpaMethodologyDiagram model={model} />
+                            </CollapsibleSection>
+                        );
+                    })}
                 </div>
             )}
+
+            {/* Always last on the page — the convention every other chart view
+                already follows. */}
+            {!presentationMode && <ChartInfoBubble chartKey="epacurves" />}
         </div>
     );
 }
