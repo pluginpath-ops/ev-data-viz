@@ -14,9 +14,10 @@
  * which modes and which attempts within them.
  */
 import { useState } from 'react';
+import RunSourceLinks from '../RunSourceLinks';
 
 export default function PerformanceRunSelector({
-    vehicles,          // [{ id, name, runs: [{ id, name, driveMode, zeroTo60, color }] }]
+    vehicles,          // [{ id, name, runs: [{ id, name, driveMode, zeroTo60, color, sourceUrl }] }]
     selectedRunIds,     // array of ids, or null meaning "everything"
     onChange,           // (nextIds: array) => void
     colorMap = {},      // resolved colour per run id, for the swatch
@@ -124,6 +125,7 @@ export default function PerformanceRunSelector({
                                                                 />
                                                             )}
                                                             <span className="text-secondary">{run.name}</span>
+                                                            <RunSourceLinks run={run} />
                                                             {run.zeroTo60 != null && (
                                                                 <span className="font-mono text-faint">
                                                                     {Number(run.zeroTo60).toFixed(3)} s
