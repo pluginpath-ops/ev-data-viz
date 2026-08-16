@@ -18,6 +18,8 @@ import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import ChartInfoBubble from './ChartInfoBubble';
 import EpaMethodologyDiagram from './epa/EpaMethodologyDiagram';
 import EpaCertificationPaths from './epa/EpaCertificationPaths';
+import EpaCycleSpeedChart from './epa/EpaCycleSpeedChart';
+import { TWO_CYCLE_KEYS } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { METHODOLOGY_FIXTURES } from '../utils/epaMethodologyFixtures';
 import AutoColorToggle from './AutoColorToggle';
@@ -1158,6 +1160,21 @@ export default function EpaCurvesView({
                     <EpaCertificationPaths
                         models={METHODOLOGY_FIXTURES.map(buildMethodologyModel).filter(Boolean)}
                     />
+
+                    {/* What the factor stands in for. Sits with the paths table
+                        because it explains the ADJUSTMENT, not any one vehicle —
+                        so it is stated once rather than repeated per car. */}
+                    <div className="epa-methodology-cycles">
+                        <h4 className="text-sm font-semibold text-secondary mb-1">
+                            What the adjustment factor replaces
+                        </h4>
+                        <p className="text-xs text-muted mb-3">
+                            A two-cycle test drives the top two. The other three are the conditions
+                            EPA would otherwise measure directly — the factor is a blanket 30%
+                            reduction standing in for all of them, the same number for every vehicle.
+                        </p>
+                        <EpaCycleSpeedChart ranCycleKeys={TWO_CYCLE_KEYS} />
+                    </div>
 
                     <div className="space-y-8 mt-8">
                         {METHODOLOGY_FIXTURES.map(fixture => {

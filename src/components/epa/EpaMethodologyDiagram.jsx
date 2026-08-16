@@ -16,7 +16,6 @@
  * driven anywhere near highway speed.
  */
 import { useState } from 'react';
-import EpaCycleSpeedChart from './EpaCycleSpeedChart';
 
 const mi   = (v) => v == null ? '—' : `${v.toFixed(1)} mi`;
 const whmi = (v) => v == null ? '—' : `${v.toFixed(1)} Wh/mi`;
@@ -52,8 +51,7 @@ export default function EpaMethodologyDiagram({ model }) {
     if (!model) return null;
 
     const { cycles, weights, adjustment, cycleSpeeds, combinedMi, combinedMpge,
-            labeledMi, deratePct, chargeEfficiency, testMethod, phases, runs,
-            ranCycleKeys } = model;
+            labeledMi, deratePct, chargeEfficiency, testMethod, phases, runs } = model;
 
     const basisNote = testMethod === 'sct'
         ? 'measured — driven to depletion'
@@ -131,19 +129,6 @@ export default function EpaMethodologyDiagram({ model }) {
                 conditions that were never driven: sustained high speed and hard acceleration,
                 air conditioning in hot weather, and cold-weather operation.
             </p>
-
-            <div className="epa-methodology-cycles">
-                <h4 className="text-sm font-semibold text-secondary mb-1">
-                    What was driven, and what the {adjustment} factor replaces
-                </h4>
-                <p className="text-xs text-muted mb-3">
-                    A two-cycle test drives the top two. The other three are the conditions EPA
-                    would otherwise measure directly — the factor is a blanket{' '}
-                    {Math.round((1 - adjustment) * 100)}% reduction standing in for all of them,
-                    the same number for every vehicle.
-                </p>
-                <EpaCycleSpeedChart ranCycleKeys={ranCycleKeys} />
-            </div>
 
             <div className="epa-methodology-footer">
                 <span>

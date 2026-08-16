@@ -1735,10 +1735,10 @@ body {
     min-width: 2px;
 }
 
-/* Driven in this test */
+/* Driven in this test — the app's primary blue, not a bespoke green */
 .cycle-bar-run {
-    background-color: rgb(6, 78, 59);          /* emerald-900 */
-    border-color: rgb(16, 122, 92);
+    background-color: rgb(30, 58, 138);        /* blue-900 */
+    border-color: var(--color-primary);
 }
 
 /* Not driven — what the 0.7 factor is standing in for */
@@ -1751,7 +1751,7 @@ body {
     @apply absolute top-0 bottom-0 w-0.5;
     background-color: rgba(255, 255, 255, 0.85);
 }
-.cycle-bar-run > .cycle-bar-tick     { background-color: rgb(52, 211, 153); }
+.cycle-bar-run > .cycle-bar-tick     { background-color: rgb(147, 197, 253); }
 .cycle-bar-substituted > .cycle-bar-tick { background-color: rgb(251, 146, 60); }
 
 .cycle-axis {
@@ -1779,62 +1779,84 @@ body {
 }
 
 /* ── Certification paths (#206) ──────────────────────────────────────────────
-   Three test methods into two adjustment methods. The effort line is why the
-   short path exists; the warning under the regression is why an efficient EV
-   would decline it. */
+   A table, not a flow chart: labelled rows of equal-height cells so the eye can
+   compare across a row instead of tracing connectors. The 5-cycle path skips
+   the adjustment row entirely, which the right-hand rail shows. */
 
 .cert-paths {
     @apply w-full;
 }
 
-.cert-paths-methods {
-    @apply grid gap-3 items-end;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+.cert-row {
+    @apply relative grid gap-3 items-stretch mb-3;
+    grid-template-columns: 9rem minmax(0, 1fr);
 }
 
-.cert-path-col {
-    @apply flex flex-col gap-2;
+.cert-row-label {
+    @apply flex items-center text-sm font-semibold;
+    color: var(--color-text-secondary);
 }
 
-.cert-path-card {
+/* Equal cells across a row — the fixed geometry that makes it read as a table */
+.cert-row-cells {
+    @apply grid gap-3;
+}
+.cert-row-cells-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cert-row-cells-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Chips sit above their cell without changing the cell's own height */
+.cert-cell-stack {
+    @apply flex flex-col gap-1.5 justify-end;
+}
+
+.cert-cell {
     @apply flex flex-col gap-1 rounded-lg border px-3 py-2 h-full;
     border-color: var(--color-border);
     background-color: var(--color-card);
+    min-height: 5.5rem;
 }
 
 /* A path something on screen actually took */
-.cert-path-card-active {
+.cert-cell-active {
     border-color: var(--color-primary);
     background-color: var(--color-primary-light);
 }
 
-.cert-path-card-wide {
-    @apply mx-auto text-center items-center;
-    max-width: 26rem;
-}
-
-.cert-path-card-result {
+.cert-cell-result {
+    @apply text-center items-center justify-center;
     border-color: var(--color-primary);
     border-width: 2px;
+    min-height: 4rem;
 }
 
-.cert-path-effort {
-    @apply text-xs font-medium mt-0.5;
+.cert-cell-effort {
+    @apply text-xs font-medium mt-auto pt-1;
     color: var(--color-text-secondary);
 }
 
-.cert-path-warn {
-    @apply text-xs mt-1 pt-1 border-t;
+/* The lane a 5-cycle test takes past the adjustment row */
+.cert-row-adjust {
+    padding-right: 8.5rem;
+}
+
+.cert-bypass {
+    @apply absolute top-0 bottom-0 right-0 flex items-center justify-center border-l border-y rounded-r-lg;
+    width: 8rem;
     border-color: var(--color-border);
-    color: var(--color-warning);
+}
+
+.cert-bypass-note {
+    @apply text-xs text-center px-2 leading-tight;
+    color: var(--color-text-faint);
+}
+
+.cert-row-result .cert-cell-result {
+    @apply mx-auto w-full;
+    max-width: 26rem;
 }
 
 .path-taken {
-    @apply flex flex-wrap justify-center gap-1;
-}
-/* Keeps the three cards bottom-aligned when only some paths are taken */
-.path-taken-empty {
-    @apply h-0;
+    @apply flex flex-wrap justify-center gap-1 min-h-5;
 }
 
 .path-chip {
@@ -1844,17 +1866,6 @@ body {
     color: var(--color-primary-text);
 }
 
-.cert-paths-merge {
-    @apply mx-auto my-2 w-2/3 h-4 border-t border-x rounded-t-lg;
-    border-color: var(--color-border);
-}
-
-.cert-paths-adjust {
-    @apply grid gap-3 mx-auto mt-2;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    max-width: 34rem;
-}
-
 .epa-methodology-cycles {
     @apply mt-5 pt-4 border-t;
     border-color: var(--color-border);
@@ -1862,7 +1873,10 @@ body {
 
 @media (max-width: 640px) {
     .cycle-row { grid-template-columns: minmax(0, 1fr); }
-    .cert-paths-methods,
-    .cert-paths-adjust { grid-template-columns: minmax(0, 1fr); }
-    .cert-paths-merge { display: none; }
+    .cert-row  { grid-template-columns: minmax(0, 1fr); }
+    .cert-row-cells-3,
+    .cert-row-cells-2 { grid-template-columns: minmax(0, 1fr); }
+    /* The bypass rail is a spatial argument; it has nowhere to go in one column */
+    .cert-row-adjust { padding-right: 0; }
+    .cert-bypass { @apply static w-full h-auto py-1 border-l-0 border-y-0 border-t; }
 }

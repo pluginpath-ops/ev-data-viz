@@ -40,7 +40,7 @@
 import {
     LABEL_ADJUSTMENT, LABEL_WEIGHT_CITY, LABEL_WEIGHT_HWY,
     UDDS_AVG_MPH, HWFET_AVG_MPH, MPG_E_CONVERSION, ASSUMED_CHARGER_EFF,
-    DERIVED_5CYCLE, TWO_CYCLE_KEYS, FIVE_CYCLE_KEYS,
+    DERIVED_5CYCLE,
 } from '../constants/epa';
 
 const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -221,11 +221,6 @@ export function buildMethodologyModel(record) {
         adjustment:  LABEL_ADJUSTMENT,
         weights:     { city: LABEL_WEIGHT_CITY, hwy: LABEL_WEIGHT_HWY },
         cycleSpeeds: { city: UDDS_AVG_MPH, hwy: HWFET_AVG_MPH },
-        // Which of the five cycles this record actually drove. A five-cycle
-        // test drove all of them and needs no adjustment; everything else drove
-        // two and had the rest priced by the factor. Carried on the model so the
-        // chart reads the record rather than assuming the common case.
-        ranCycleKeys: record.testMethod === 'five_cycle' ? FIVE_CYCLE_KEYS : TWO_CYCLE_KEYS,
         adjustmentMethod: record.adjustmentMethod ?? null,
         cycles,
         combinedMi,
