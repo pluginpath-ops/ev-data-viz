@@ -29,21 +29,89 @@ import { useEffect, useRef, useState } from 'react';
  * twice — the second pass saw everything as already seen, added nothing, and
  * that empty result was the one kept, leaving the chart with no series at all.
  *
+ * ── Controlled mode ──────────────────────────────────────────────────────────
+ *
+ * Pass `value`/`onChange` and the selection lives outside the hook. The charting
+ * view needs this: its selection is URL-synced through `chartConfig.selectedRuns`
+ * in App, so the hook cannot be the owner without the URL and the chart keeping
+ * two answers. Uncontrolled callers (Charge Compare, Road Trip) are unaffected —
+ * their selection is local by design and does not survive a reload.
+ *
  * @param {Array}  rows            [{ key, vehicleId, groupId }] every selectable row
- * @param {Array}  [initial]       keys to start selected (e.g. restored from a URL)
+ * @param {Array}  [initial]       keys to start selected, uncontrolled mode only
  * @param {Function} [shouldBootstrap] (vehicleId, rowsForVehicle) => keys to auto-select;
  *                                  defaults to all of them
+ * @param {Array}  [value]         controlled selection — the hook stops owning state
+ * @param {Function} [onChange]    (nextKeys) => void, required with `value`
+ * @param {*}       [resetKey]     change it and every vehicle counts as unseen again,
+ *                                 so BOOTSTRAP re-runs. For a view whose rows are a
+ *                                 different population per mode — see below.
  */
-export function useRunSelection(rows, { initial = [], shouldBootstrap = null } = {}) {
-    const [selected, setSelected] = useState(initial);
+export function useRunSelection(rows, {
+    initial = [],
+    shouldBootstrap = null,
+    value = null,
+    onChange = null,
+    resetKey = null,
+} = {}) {
+    const [internal, setInternal] = useState(initial);
+    const controlled = value != null;
+    const selected   = controlled ? value : internal;
+
+    // Controlled mode has to chain updaters the way `setState` does, and cannot
+    // simply resolve them against this render's `value`.
+    //
+    // The run selector's per-vehicle "all / none" links are why: they call
+    // `toggle` once PER ROW in a loop, all within one tick and all before the
+    // parent re-renders. Resolved against the render value, every call in that
+    // loop starts from the same base and the last one wins — clicking "none" on
+    // a two-row vehicle switched off the second row and put the first back.
+    //
+    // So the pending value is threaded through a ref: each call reads what the
+    // previous call in this tick decided, and the effect below resyncs it to the
+    // authoritative value once the parent has actually re-rendered.
+    const pending = useRef(selected);
+    useEffect(() => { pending.current = selected; }, [selected]);
+
+    const setSelected = (next) => {
+        if (!controlled) { setInternal(next); return; }   // real updater semantics
+        const resolved = typeof next === 'function' ? next(pending.current) : next;
+        pending.current = resolved;
+        onChange(resolved);
+    };
+
     const seenVehicles = useRef(new Set());
     // key → groupId for every row ever seen, so a key that has since disappeared
     // can still be traced back to its group. Repinning depends on this.
     const knownGroups  = useRef(new Map());
+    const lastResetKey = useRef(resetKey);
 
     useEffect(() => {
         const live = new Set(rows.map(r => r.key));
         const prev = selected;
+
+        // 0a. RESET — the rows are a different population now, not the same rows
+        //     changed. Charging ↔ Range is the case: a charging run has no
+        //     counterpart in range mode, so PRUNE drops everything and BOOTSTRAP
+        //     would decline to refill a vehicle it has already seen, leaving the
+        //     chart empty. Forgetting them is the explicit answer to that.
+        if (resetKey !== lastResetKey.current) {
+            lastResetKey.current = resetKey;
+            seenVehicles.current.clear();
+        }
+
+        // 0b. FORGET — a vehicle that has left the selection is unseen again, so
+        //     re-adding it bootstraps rather than returning empty. Without this,
+        //     removing a car and putting it back gives you a car with no series
+        //     and no way to tell why.
+        //
+        //     Safe when `rows` is briefly empty (before vehicles load): everything
+        //     is forgotten, but nothing is selected either, so the first real
+        //     render is a genuine first sighting.
+        const liveVehicles = new Set(rows.map(r => String(r.vehicleId)));
+        for (const id of seenVehicles.current) {
+            if (!liveVehicles.has(id)) seenVehicles.current.delete(id);
+        }
 
         // 1. PRUNE
         const kept = prev.filter(k => live.has(k));
@@ -69,14 +137,31 @@ export function useRunSelection(rows, { initial = [], shouldBootstrap = null } =
             }
         }
 
-        // 3. BOOTSTRAP — first sighting of a vehicle only.
+        // 3. BOOTSTRAP — first sighting of a vehicle, and only when it arrives
+        //    with nothing selected.
+        //
+        //    The second half carries over the `hasRun` check in the hand-rolled
+        //    charting-view code this replaced, and is kept deliberately rather
+        //    than dropped as redundant. "Seen" is a ref, so it does not survive a
+        //    remount — leave the tab and come back and every vehicle is a first
+        //    sighting again. A vehicle that arrives already holding a row (a URL
+        //    restore, state that outlived the unmount) has been chosen for, and
+        //    adding its default on top would override that choice.
+        //
+        //    Defensive rather than demonstrable today: App re-derives the chart
+        //    config on view change, so the selection is currently rebuilt before
+        //    this can bite. It stops that from becoming a bug if that changes.
         const byVehicle = new Map();
         for (const row of rows) {
             if (!byVehicle.has(row.vehicleId)) byVehicle.set(row.vehicleId, []);
             byVehicle.get(row.vehicleId).push(row);
         }
+        const vehiclesWithSelection = new Set(
+            rows.filter(r => keptSet.has(r.key)).map(r => String(r.vehicleId))
+        );
         for (const [vehicleId, vehicleRows] of byVehicle) {
             if (seenVehicles.current.has(String(vehicleId))) continue;
+            if (vehiclesWithSelection.has(String(vehicleId))) continue;
             const auto = shouldBootstrap
                 ? shouldBootstrap(vehicleId, vehicleRows)
                 : vehicleRows.map(r => r.key);
@@ -96,7 +181,7 @@ export function useRunSelection(rows, { initial = [], shouldBootstrap = null } =
         // 4. QUIET
         const unchanged = kept.length === prev.length && kept.every((k, i) => k === prev[i]);
         if (!unchanged) setSelected(kept);
-    }, [rows, selected]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [rows, selected, resetKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /** Toggle one row. */
     const toggle = (key) => setSelected(prev =>

@@ -59,7 +59,11 @@ const hasDataForType = (run, type) => {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function RangeChartView({ selectedVehicles, selectedRuns, setChartConfig, presentationMode = false, autoColor = false, verboseLabels = false, correctionMode = 'none' }) {
+// `selectedRuns` and `toggleRun` both come from ChargingView, which owns this
+// view's selection through the shared useRunSelection hook (#176). This file
+// used to roll its own toggle against chartConfig — one more copy of the
+// behaviour, and the reason a run could be switched off here and come back.
+export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, autoColor = false, verboseLabels = false, correctionMode = 'none' }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
@@ -142,19 +146,6 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, setChar
     // Value-identity for the resolved colours — see the render effect's deps.
     const colorSignature = allRangeRuns.map(r => `${r.id}:${colorMap[r.id] ?? ''}`).join(',');
 
-    // ── Run toggle ────────────────────────────────────────────────────────────
-    const toggleRun = (runId) => {
-        const strId = String(runId);
-        setChartConfig(prev => {
-            const isSelected = prev.selectedRuns.some(id => String(id) === strId);
-            return {
-                ...prev,
-                selectedRuns: isSelected
-                    ? prev.selectedRuns.filter(id => String(id) !== strId)
-                    : [...prev.selectedRuns, runId],
-            };
-        });
-    };
 
     // ── Build Chart.js datasets ───────────────────────────────────────────────
     const buildChart = () => {
