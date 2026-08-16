@@ -19,6 +19,7 @@ export default function CuratorField({
     step,
     placeholder,
     overrideSource,        // 'csv' | 'manual' | undefined
+    flag,                  // { text, title } — advisory badge beside the label
     used = false,          // true ⇒ feeds a derived calculation (highlighted)
     canEdit = true,
     onSave,                // (newValue) => Promise|void
@@ -60,6 +61,12 @@ export default function CuratorField({
                 )}
                 {overrideSource === 'csv' && (
                     <span title="Imported from CSV" className="text-faint text-[9px]">csv</span>
+                )}
+                {/* Advisory only. Sits with the provenance badges because it is
+                    the same kind of thing — something to know about this value,
+                    not something wrong with it. */}
+                {flag && (
+                    <span title={flag.title} className="curator-field-flag">{flag.text}</span>
                 )}
             </span>
             {/* Fixed-width input + always-present unit column so right edges align
