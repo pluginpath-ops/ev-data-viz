@@ -1665,8 +1665,13 @@ body {
     color: var(--color-text-muted);
 }
 
+/* Two columns joining into one result.
+   Legs UP to the city and highway columns, closed along the BOTTOM where they
+   meet — border-b + rounded-b. It was border-t + rounded-t, which draws the
+   same bracket inverted: a cap with its legs pointing down, reading as one
+   value splitting into two rather than two combining into one. */
 .epa-flow-merge {
-    @apply mx-auto my-2 w-1/2 h-4 border-t border-x rounded-t-lg;
+    @apply mx-auto my-2 w-1/2 h-4 border-b border-x rounded-b-lg;
     border-color: var(--color-border);
 }
 
