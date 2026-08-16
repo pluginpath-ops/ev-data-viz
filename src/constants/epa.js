@@ -14,8 +14,17 @@ export { MPG_E_CONVERSION };
 /** lbf·mile → kWh: 4.44822 N/lbf × 1609.34 m/mi ÷ 3.6e6 J/kWh. */
 export const LBF_MILE_TO_KWH  = 0.001989;
 export const HWFET_AVG_MPH    = 48.3;        // HWFET cycle average speed (η anchor)
+export const UDDS_AVG_MPH     = 19.6;        // UDDS cycle average speed
 export const US06_AVG_MPH     = 48.4;
 export const HIGHWAY_BAND_MPH = [65, 75];    // reference band drawn on the curve
+
+// EPA label arithmetic (#206). Regulatory definitions, so they live up here with
+// the physical facts rather than in the tunable block below — changing them does
+// not model the world differently, it computes a different number than the one
+// on the window sticker.
+export const LABEL_ADJUSTMENT   = 0.7;       // fixed adjustment applied to unadjusted range
+export const LABEL_WEIGHT_CITY  = 0.55;
+export const LABEL_WEIGHT_HWY   = 0.45;
 
 // ── Tunable knobs: pristine defaults ────────────────────────────────────────
 // Single source of truth for the adjustable model assumptions and sanity bands.

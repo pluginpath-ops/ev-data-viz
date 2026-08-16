@@ -16,6 +16,9 @@ import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import ChartInfoBubble from './ChartInfoBubble';
+import EpaMethodologyDiagram from './epa/EpaMethodologyDiagram';
+import { buildMethodologyModel } from '../utils/epaMethodology';
+import { METHODOLOGY_FIXTURES } from '../utils/epaMethodologyFixtures';
 import AutoColorToggle from './AutoColorToggle';
 
 // Sane bounds for the ambient-temperature viewing condition; far outside this
@@ -1136,6 +1139,38 @@ export default function EpaCurvesView({
             )}
 
             {!presentationMode && <ChartInfoBubble chartKey="epacurves" />}
+
+            {/* Where the label range comes from (#206).
+                ⚠ SAMPLE DATA. This is phase B1 of the epic: the diagram is built
+                and reviewed against two transcribed cert records while the ingest
+                and derivation phases (A1–A3) are still to come. B2 swaps
+                METHODOLOGY_FIXTURES for the derived row of the selected vehicle
+                and this banner goes with it. */}
+            {!presentationMode && (
+                <div className="card mt-6">
+                    <h3 className="text-lg font-semibold mb-1">How the EPA range is produced</h3>
+                    <p className="text-sm text-faint mb-4">
+                        Sample records — not yet wired to the selected vehicles (#206, phase B1).
+                    </p>
+                    <div className="space-y-8">
+                        {METHODOLOGY_FIXTURES.map(fixture => {
+                            const model = buildMethodologyModel(fixture);
+                            if (!model) return null;
+                            return (
+                                <div key={fixture.vehicleName}>
+                                    <div className="mb-2">
+                                        <span className="font-semibold text-secondary">
+                                            {model.modelYear} {model.vehicleName}
+                                        </span>
+                                        <span className="text-xs text-faint"> · {fixture.configuration}</span>
+                                    </div>
+                                    <EpaMethodologyDiagram model={model} />
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

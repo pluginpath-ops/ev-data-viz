@@ -1600,3 +1600,111 @@ body {
     @apply text-xs px-2 py-1 rounded whitespace-nowrap transition;
     @apply bg-indigo-50 text-indigo-700 hover:bg-indigo-100;
 }
+
+/* ── EPA methodology diagram (#206) ──────────────────────────────────────────
+   A flow, not a chart: two cycle columns merging into the label. Sized in rem
+   so it holds together from the vehicle card up to a presentation window. */
+
+.epa-methodology {
+    @apply w-full;
+}
+
+.epa-flow-columns {
+    @apply grid gap-4;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.epa-flow-column {
+    @apply flex flex-col items-center gap-0;
+}
+
+.epa-flow-head {
+    @apply flex flex-col items-center gap-0.5 mb-2 text-center;
+}
+
+.epa-flow-box {
+    @apply w-full flex flex-col items-center gap-0.5 rounded-lg px-3 py-2 text-center border;
+    border-color: var(--color-border);
+    background-color: var(--color-card);
+}
+
+/* The adjusted figures and the computed combined — what the argument rests on */
+.epa-flow-box-strong {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary-light);
+}
+
+/* The number on the window sticker: the end of the chain, styled as the answer */
+.epa-flow-box-label {
+    border-color: var(--color-primary);
+    border-width: 2px;
+    background-color: var(--color-card);
+}
+
+.epa-flow-value {
+    @apply text-lg font-semibold tabular-nums;
+    color: var(--color-text-primary);
+}
+
+.epa-flow-arrow {
+    @apply flex items-center gap-1.5 h-7;
+}
+
+.epa-flow-arrow-line {
+    @apply block w-px h-full;
+    background-color: var(--color-border);
+}
+
+.epa-flow-arrow-note {
+    @apply text-xs font-medium tabular-nums;
+    color: var(--color-text-muted);
+}
+
+.epa-flow-weight {
+    @apply text-xs font-medium mt-1.5;
+    color: var(--color-text-muted);
+}
+
+.epa-flow-merge {
+    @apply mx-auto my-2 w-1/2 h-4 border-t border-x rounded-t-lg;
+    border-color: var(--color-border);
+}
+
+.epa-flow-result {
+    @apply flex flex-col items-center mx-auto;
+    max-width: 22rem;
+}
+
+/* The sentence the diagram exists to make unavoidable */
+.epa-methodology-callout {
+    @apply mt-5 rounded-lg px-3 py-2 text-sm border-l-4;
+    border-color: var(--color-primary);
+    background-color: var(--color-surface-muted);
+    color: var(--color-text-secondary);
+}
+
+.epa-methodology-footer {
+    @apply mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm;
+    color: var(--color-text-muted);
+}
+
+.epa-phase-table {
+    @apply mt-2 overflow-x-auto;
+}
+.epa-phase-table table {
+    @apply w-full text-sm;
+}
+.epa-phase-table th {
+    @apply text-left font-medium py-1 pr-4 border-b;
+    border-color: var(--color-border);
+    color: var(--color-text-muted);
+}
+.epa-phase-table td {
+    @apply py-1 pr-4;
+    color: var(--color-text-secondary);
+}
+
+@media (max-width: 640px) {
+    .epa-flow-columns { grid-template-columns: minmax(0, 1fr); }
+    .epa-flow-merge   { display: none; }
+}
