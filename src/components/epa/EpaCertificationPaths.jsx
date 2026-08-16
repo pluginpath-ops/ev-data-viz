@@ -125,9 +125,10 @@ export default function EpaCertificationPaths({ models = [] }) {
                         unadjusted city
                     </span>
                 </div>
-            </div>
 
-            <div className="cert-result">
+                {/* Inside the grid, spanning the three method columns — the
+                    result of all of them, so it should sit under all of them. */}
+                <div />
                 <div className="cert-cell cert-cell-result">
                     <span className="font-semibold text-secondary">Combined label range</span>
                     <span className="text-xs text-muted">
@@ -135,6 +136,12 @@ export default function EpaCertificationPaths({ models = [] }) {
                     </span>
                 </div>
             </div>
+
+            <p className="text-xs text-faint mt-3">
+                Lab times are approximate and <strong>per configuration</strong>, not per model —
+                certification is keyed to a test group and vehicle configuration, so a model line
+                with several packs, drive layouts and wheel sizes multiplies every figure above.
+            </p>
         </div>
     );
 }

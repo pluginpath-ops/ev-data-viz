@@ -1710,15 +1710,12 @@ body {
 }
 
 /* ── Drive-cycle speed ranges (#206) ─────────────────────────────────────────
-   Each bar spans 0 → that cycle's peak, tick at its average. The distance
-   between the two is the argument: even the highway cycle averages 48.3. */
+   One grid so the 65-75 mph band can span every row as a single element rather
+   than five segments kept in alignment by hand. Each bar runs 0 → that cycle's
+   peak, tick at its average; the distance between the two is the argument. */
 
 .cycle-chart {
-    @apply w-full;
-}
-
-.cycle-row {
-    @apply grid items-center gap-3 mb-2.5;
+    @apply grid items-center gap-x-3 gap-y-2.5;
     grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
 }
 
@@ -1754,6 +1751,20 @@ body {
 .cycle-bar-run > .cycle-bar-tick     { background-color: rgb(147, 197, 253); }
 .cycle-bar-substituted > .cycle-bar-tick { background-color: rgb(251, 146, 60); }
 
+/* The 65-75 mph reference, matching the band on the EPA curve chart. Spans the
+   five cycle rows in the track column; dashed edges so it reads as a reference
+   laid over the data rather than as data. */
+.cycle-band {
+    @apply relative border-l border-r border-dashed pointer-events-none;
+    grid-column: 2;
+    grid-row: 1 / span 5;
+    height: 100%;
+    margin-left: 0;
+    border-color: var(--color-primary);
+    background-color: rgba(59, 130, 246, 0.10);
+    z-index: 1;
+}
+
 .cycle-axis {
     @apply h-6 border-t;
     border-color: var(--color-border);
@@ -1764,8 +1775,15 @@ body {
     color: var(--color-text-muted);
 }
 
+.cycle-axis-title {
+    @apply text-xs font-medium text-center -mt-1;
+    color: var(--color-text-muted);
+}
+
 .cycle-legend {
-    @apply flex flex-wrap gap-x-5 gap-y-1 mt-2 text-xs;
+    @apply flex flex-wrap gap-x-5 gap-y-1 mt-1 text-xs;
+    grid-column: 1 / -1;
+    grid-row: 8;
     color: var(--color-text-muted);
 }
 .cycle-legend span { @apply inline-flex items-center gap-1.5; }
@@ -1776,6 +1794,11 @@ body {
 .cycle-swatch-tick {
     @apply inline-block w-0.5 h-3.5 not-italic;
     background-color: var(--color-text-muted);
+}
+.cycle-swatch-band {
+    @apply inline-block w-4 h-3 border-l border-r border-dashed not-italic;
+    border-color: var(--color-primary);
+    background-color: rgba(59, 130, 246, 0.10);
 }
 
 /* ── Certification paths (#206) ──────────────────────────────────────────────
@@ -1826,16 +1849,14 @@ body {
     color: var(--color-text-secondary);
 }
 
-.cert-result {
-    @apply mt-3;
-}
-
 .cert-cell-result {
-    @apply text-center items-center justify-center mx-auto;
+    @apply text-center items-center justify-center mt-3;
+    /* Columns 2-4: the three method columns, and nothing under the label
+       gutter. Centring on the full grid put it visibly left of the data. */
+    grid-column: 2 / -1;
     border-color: var(--color-primary);
     border-width: 2px;
     min-height: 4rem;
-    max-width: 26rem;
 }
 
 .path-chip {
@@ -1892,5 +1913,8 @@ body {
        across, so cells simply stack in reading order. */
     .cert-grid { grid-template-columns: minmax(0, 1fr); }
     .cert-cell-span { grid-row: auto; }
+    .cert-cell-result { grid-column: 1; }
+    /* The band spans rows that no longer sit side by side */
+    .cycle-band { display: none; }
     .cert-grid-label { @apply pt-2; }
 }

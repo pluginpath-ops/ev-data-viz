@@ -83,8 +83,28 @@ export const DERIVED_5CYCLE = {
 };
 
 /**
- * Roughly what each certification path costs in lab time, for the diagram that
- * explains why a manufacturer picks one. Order-of-magnitude, not quotes.
+ * Roughly what each certification path costs in lab time.
+ *
+ * ⚠ PROVENANCE: these are curator estimates (#206), NOT sourced from EPA
+ * documentation, and they are presented as relative magnitudes for that reason.
+ * What can be checked is the SHAPE, and it holds:
+ *
+ *   • SCT ≈ 2 × MCT because it is literally two depletion runs where MCT is
+ *     one — each needing its own soak, full depletion and full recharge
+ *     measurement.
+ *   • 5-cycle is much larger than either because US06, SC03 and cold FTP each
+ *     need the vehicle thermally conditioned to a different cell — 20°F for the
+ *     cold FTP, 95°F with solar load for SC03 — and conditioning a pack to
+ *     soak temperature dominates the clock, not the driving.
+ *
+ * The absolute figures are unverified. Treat them as "one day / a couple of
+ * days / most of a week", which is the comparison the diagram needs anyway.
+ *
+ * PER CONFIGURATION, which is the multiplier that matters: certification is per
+ * test group and vehicle configuration, not per model. Our own schema says so —
+ * epa_test_groups is keyed by test_group_id + vehicle_config_number, and the R2
+ * fixture is specifically the 20" AT variant. A model line with several packs,
+ * drive layouts and wheel sizes multiplies every figure below.
  */
 export const PATH_EFFORT = {
     mct:        '~1 day',
