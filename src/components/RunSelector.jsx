@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { pairKey, partnersFor } from '../utils/pairings';
+import RunSourceLinks from './RunSourceLinks';
 
 /**
  * Shared collapsible run selector used by ChargingView, RangeChartView,
@@ -272,6 +273,14 @@ function PairRows({
     if (!partnerIds.some(Boolean) && auto?.sourceRun) used.add(String(auto.sourceRun.id));
     const unused = partnerRuns.filter(r => !used.has(String(r.id)));
 
+    // The run behind a partner row: what was pinned, or whatever the resolver
+    // chose when nothing is. A pair row names two tests from two sources — a
+    // run holds at most one url since migration 046 — so crediting the partner
+    // means finding its row and asking it, not reading a field off this one.
+    const partnerRunFor = (partnerId) => partnerId
+        ? (partnerRuns.find(r => String(r.id) === String(partnerId)) ?? null)
+        : (auto?.sourceRun ?? null);
+
     const rowKey = (partnerId) => singlePartner ? String(run.id) : pairKey(run.id, partnerId);
     const isSelected = (partnerId) =>
         selectedRunIds.some(id => String(id) === rowKey(partnerId));
@@ -303,6 +312,9 @@ function PairRows({
                             />
                             {primaryLabel && <span className="text-label shrink-0">{primaryLabel}</span>}
                             <span className="truncate">{run.name}</span>
+                            {/* Outside the truncate, so a long name never clips
+                                the credit off the end of the row. */}
+                            <RunSourceLinks run={run} className="shrink-0" />
                             {renderRunMeta?.(run)}
                         </span>
                     ) : (
@@ -326,6 +338,16 @@ function PairRows({
                                 <option key={r.id} value={r.id}>{r.name}</option>
                             ))}
                         </select>
+
+                        {/* The partner's own source. An <option> cannot hold a
+                            link, so without this the range test on every pair
+                            row went uncredited (#205).
+
+                            Relies on RunSourceLinks stopping propagation: this
+                            span preventDefaults the click to keep the dropdown
+                            from toggling the row, and a preventDefault anywhere
+                            on the path would cancel the link's navigation. */}
+                        <RunSourceLinks run={partnerRunFor(partnerId)} />
 
                         {/* Discovery: how many other range tests could go here */}
                         {!singlePartner && idx === 0 && unused.length > 0 && (
@@ -450,18 +472,7 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRun
             <span className="run-label">
                 <span>
                     {run.name}
-                    {run.url && (
-                        <a href={run.url} target="_blank" rel="noopener noreferrer"
-                            title="Range test source"
-                            onClick={e => e.stopPropagation()}
-                            className="text-blue-400 hover:text-blue-600 transition-colors ml-0.5">↗</a>
-                    )}
-                    {run.charging_url && (
-                        <a href={run.charging_url} target="_blank" rel="noopener noreferrer"
-                            title="Charging test source"
-                            onClick={e => e.stopPropagation()}
-                            className="text-blue-400 hover:text-blue-600 transition-colors ml-0.5">↗</a>
-                    )}
+                    <RunSourceLinks run={run} />
                     <span className="text-sm text-muted"> ({run.date})</span>
                 </span>
                 {renderRunMeta?.(run)}

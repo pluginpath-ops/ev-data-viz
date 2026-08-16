@@ -907,6 +907,16 @@ body {
     @apply flex-1 flex items-center gap-2 flex-wrap;
 }
 
+/* ↗ to the video/article a test came from. Attribution, so it is deliberately
+   a link colour that stands out against the row rather than a muted icon. */
+.run-source-link {
+    @apply ml-1 transition-colors;
+    color: var(--color-primary);
+}
+.run-source-link:hover {
+    color: var(--color-primary-hover);
+}
+
 /* Per-vehicle "all / none" bulk selection links in the run selector */
 .run-bulk-link {
     @apply text-xs underline transition;

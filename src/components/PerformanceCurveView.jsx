@@ -107,6 +107,10 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                         name: `Run #${(r.sequence ?? 0) + 1}`,
                         driveMode: r.drive_mode,
                         zeroTo60: r.zero_to_60_sec,
+                        // Attribution is a property of the SESSION — every run
+                        // in it came from the same video — so it is carried
+                        // down onto the row that the selector can credit.
+                        sourceUrl: s.source_url || s.spreadsheet_url || null,
                     }))),
         })).filter(v => v.runs.length > 0);
     }, [sessionsByVehicle, selected]);

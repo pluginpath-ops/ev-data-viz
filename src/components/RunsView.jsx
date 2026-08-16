@@ -18,6 +18,7 @@ import SessionEditModal from './SessionEditModal';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 import { RunVoteButtons } from './VoteButtons';
+import RunSourceLinks from './RunSourceLinks';
 import EpaVehicleSection from './EpaVehicleSection';
 import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
@@ -2352,22 +2353,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     Hidden
                                                 </span>
                                             )}
-                                            {run.url && (
-                                                <a href={run.url} target="_blank" rel="noopener noreferrer"
-                                                    title="Range test source"
-                                                    onClick={e => e.stopPropagation()}
-                                                    className="text-blue-400 hover:text-blue-600 transition-colors ml-1 text-sm font-normal">
-                                                    ↗
-                                                </a>
-                                            )}
-                                            {run.charging_url && (
-                                                <a href={run.charging_url} target="_blank" rel="noopener noreferrer"
-                                                    title="Charging test source"
-                                                    onClick={e => e.stopPropagation()}
-                                                    className="text-blue-400 hover:text-blue-600 transition-colors ml-1 text-sm font-normal">
-                                                    ↗
-                                                </a>
-                                            )}
+                                            <RunSourceLinks run={run} className="text-sm font-normal" />
                                         </h3>
                                         {/* The session heading already carries the
                                             date for a grouped run; repeating it puts
@@ -2596,18 +2582,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <h3 className="section-title">
                                                         {run.name}
-                                                        {run.url && (
-                                                            <a href={run.url} target="_blank" rel="noopener noreferrer"
-                                                                title="Range test source"
-                                                                onClick={e => e.stopPropagation()}
-                                                                className="text-blue-400 hover:text-blue-600 transition-colors ml-1 text-sm font-normal">↗</a>
-                                                        )}
-                                                        {run.charging_url && (
-                                                            <a href={run.charging_url} target="_blank" rel="noopener noreferrer"
-                                                                title="Charging test source"
-                                                                onClick={e => e.stopPropagation()}
-                                                                className="text-blue-400 hover:text-blue-600 transition-colors ml-1 text-sm font-normal">↗</a>
-                                                        )}
+                                                        <RunSourceLinks run={run} className="text-sm font-normal" />
                                                     </h3>
                                                     {run.isDefault && (
                                                         <span className="text-xs px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>Default</span>

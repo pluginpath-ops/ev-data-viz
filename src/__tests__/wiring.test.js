@@ -143,6 +143,45 @@ describe('the seams that broke before', () => {
         expect(rendersRaw.map(x => x.file)).toEqual([]);
     });
 
+    it('credits the source on every run-selector row', () => {
+        // #205: RunSelector has two row renderers and only one of them carried
+        // the ↗ links. Turning on pairMode swapped RunRow for PairRows, and the
+        // Charging, Charge Compare and Road Trip selectors quietly stopped
+        // crediting anybody — for over a year, in the three most-used views.
+        //
+        // These links are the attribution owed to the people who collected the
+        // data, so a row that names a test must offer that test's source. The
+        // count is the assertion a reviewer cannot eyeball: a new row renderer
+        // arrives with a name and no link, and this fails.
+        const selectors = [
+            'src/components/RunSelector.jsx',
+            'src/components/performance/PerformanceRunSelector.jsx',
+        ];
+        for (const f of selectors) {
+            const text = read(f);
+            expect(text, `${f} does not import the shared source-link component`)
+                .toMatch(/import RunSourceLinks/);
+
+            const names = (text.match(/\{run\.name\}/g) ?? []).length;
+            const links = (text.match(/<RunSourceLinks/g) ?? []).length;
+            expect(names, `${f} renders no run name — has the row renderer moved?`)
+                .toBeGreaterThan(0);
+            expect(links, `${f} names ${names} test(s) but renders only ${links} source link(s)`)
+                .toBeGreaterThanOrEqual(names);
+        }
+    });
+
+    it('keeps the source-link markup in one component', () => {
+        // Four hand-rolled copies of the same <a> is how one of them came to be
+        // missing. Anything rendering a run's source URL goes through
+        // RunSourceLinks so there is a single place left to omit it.
+        const handRolled = ALL.filter(({ file, text }) =>
+            /\.jsx$/.test(file)
+            && !/RunSourceLinks\.jsx$/.test(file)
+            && /href=\{run\.(charging_url|url|sourceUrl)\}/.test(text));
+        expect(handRolled.map(x => x.file)).toEqual([]);
+    });
+
     it('loads the startup queries in parallel', () => {
         // Seven independent queries were awaited one after another, six of them
         // returning under 4KB. That was ~900ms of blank screen spent purely on
