@@ -26,6 +26,72 @@ export const LABEL_ADJUSTMENT   = 0.7;       // fixed adjustment applied to unad
 export const LABEL_WEIGHT_CITY  = 0.55;
 export const LABEL_WEIGHT_HWY   = 0.45;
 
+/**
+ * The five EPA drive cycles, and what each one exists to capture.
+ *
+ * Two of them — FTP-75 and HWFET — are what a two-cycle test actually drives.
+ * The other three are the conditions the 0.7 factor stands in for when they are
+ * NOT driven: hard acceleration and sustained high speed (US06), air
+ * conditioning against a hot ambient and solar load (SC03), and cold-weather
+ * operation (Cold FTP). That is what the factor means, and it is why it is a
+ * blanket 30% haircut rather than a measurement.
+ *
+ * `schedule` names the underlying driving trace, which is where the vocabulary
+ * gets confusing: a BEV multi-cycle test reports UDDS and HWY phases, and those
+ * are the same traces as the FTP-75 city and HWFET highway tests. UDDS is one
+ * run of the city trace (19.6 mph average); FTP-75 is the label test built from
+ * it, which repeats the first segment hot and averages 21.2 mph as a result.
+ */
+export const DRIVE_CYCLES = {
+    ftp75: {
+        label: 'FTP-75 city', schedule: 'UDDS trace, cold + hot start',
+        avgMph: 21.2, maxMph: 56.7, tempF: 75, condition: 'cold start',
+    },
+    hwfet: {
+        label: 'HWFET highway', schedule: 'HWY phases',
+        avgMph: 48.3, maxMph: 59.9, tempF: 75, condition: 'warm',
+    },
+    us06: {
+        label: 'US06', schedule: 'aggressive supplemental',
+        avgMph: 48.4, maxMph: 80.3, tempF: 75, condition: 'hard acceleration, high speed',
+    },
+    sc03: {
+        label: 'SC03', schedule: 'air-conditioning supplemental',
+        avgMph: 21.6, maxMph: 54.8, tempF: 95, condition: 'A/C + solar load',
+    },
+    coldFtp: {
+        label: 'Cold FTP', schedule: 'UDDS trace at 20°F',
+        avgMph: 21.2, maxMph: 56.7, tempF: 20, condition: 'cold start',
+    },
+};
+
+/** The two a two-cycle test drives; the rest are priced by LABEL_ADJUSTMENT. */
+export const TWO_CYCLE_KEYS = ['ftp75', 'hwfet'];
+export const FIVE_CYCLE_KEYS = ['ftp75', 'hwfet', 'us06', 'sc03', 'coldFtp'];
+
+/**
+ * Derived-5-cycle regression, the alternative to the flat 0.7 factor.
+ *
+ * Fitted on gasoline vehicles. The intercept is a fixed cost in the INVERSE
+ * domain, so it does not scale with efficiency — see utils/epaMethodology.js
+ * for what that does to an efficient EV. Encoded, and flagged unvalidated
+ * against any real EV record (#206).
+ */
+export const DERIVED_5CYCLE = {
+    city: { intercept: 0.003259, slope: 1.1805 },
+    hwy:  { intercept: 0.001376, slope: 1.3466 },
+};
+
+/**
+ * Roughly what each certification path costs in lab time, for the diagram that
+ * explains why a manufacturer picks one. Order-of-magnitude, not quotes.
+ */
+export const PATH_EFFORT = {
+    mct:        '~1 day',
+    sct:        '~2 days',
+    five_cycle: '~1 week',
+};
+
 // ── Tunable knobs: pristine defaults ────────────────────────────────────────
 // Single source of truth for the adjustable model assumptions and sanity bands.
 // The Admin "Model Constants" panel (src/components/admin/ConstantsKnobs.jsx)

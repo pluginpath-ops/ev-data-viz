@@ -17,12 +17,12 @@
  * Dual Motor, Large Pack, 20" AT, All-Purpose. 8 phases.
  */
 export const R2_MCT = {
-    vehicleName:     'Rivian R2',
+    vehicleName:     'Rivian R2 Performance',
     modelYear:       2027,
     configuration:   'Dual Motor · Large Pack · 20" AT · All-Purpose',
     testMethod:      'mct',
     adjustmentMethod: 'fixed_07',
-    labeledRangeMi:  306,
+    labeledRangeMi:  307,
     totalDcWh:       89549.27,
     rechargeAcWh:    104689,
     // Phase order is the procedure's, not sorted by value: the first UDDS is

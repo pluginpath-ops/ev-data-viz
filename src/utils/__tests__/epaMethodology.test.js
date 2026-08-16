@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildMethodologyModel, cityConsumptionFromPhases } from '../epaMethodology';
+import {
+    buildMethodologyModel, cityConsumptionFromPhases,
+    derived5CycleFe, derived5CycleCrossoverFe, adjustmentComparison,
+} from '../epaMethodology';
 import { R2_MCT, LIGHTNING_SCT } from '../epaMethodologyFixtures';
 
 /**
@@ -43,7 +46,7 @@ describe('MCT — Rivian R2', () => {
     it('combines range arithmetically, 55/45, and lands on the label', () => {
         close(m.combinedMi, 307.92, 0.02);
         expect(m.combinedMi).toBeGreaterThanOrEqual(m.labeledMi);
-        close(m.deratePct, 0.62, 0.02);
+        close(m.deratePct, 0.30, 0.02);
     });
 
     it('measures charge efficiency when both sides are reported', () => {
@@ -67,7 +70,7 @@ describe('MCT — Rivian R2', () => {
 
     it('is mostly a city number — which is why a highway test disagrees', () => {
         // The whole point of the diagram: adjusted highway is 274 mi, the label
-        // says 306. Someone testing at 70 mph is comparing against neither.
+        // says 307. Someone testing at 70 mph is comparing against neither.
         expect(m.cycles.hwy.rangeAdjMi).toBeLessThan(m.labeledMi);
         expect(m.cycles.city.rangeAdjMi).toBeGreaterThan(m.labeledMi);
     });
@@ -128,5 +131,47 @@ describe('degenerate records', () => {
         expect(cityConsumptionFromPhases([{ whPerMi: 200, wh: 1000 }], 50000)).toBe(200);
         expect(cityConsumptionFromPhases([], 50000)).toBeNull();
         expect(cityConsumptionFromPhases([{ whPerMi: 200, wh: 1000 }], 0)).toBeNull();
+    });
+});
+
+describe('derived 5-cycle vs the flat 0.7 factor', () => {
+    // The claim being checked: the regression penalises efficient vehicles and
+    // the flat factor does not, because the regression's intercept is a fixed
+    // cost in the inverse domain and so does not scale with efficiency.
+    //
+    // Everything here is arithmetic on the published equations. It corroborates
+    // the MECHANISM, not the practice — the equations are gasoline-fitted and
+    // unvalidated against a real EV record (#206).
+
+    it('agrees with the flat factor around 76 MPGe unadjusted city', () => {
+        const x = derived5CycleCrossoverFe('city');
+        close(x, 76.1, 0.2);
+        const at = adjustmentComparison(x, 'city');
+        close(at.penaltyPct, 0, 0.01);
+    });
+
+    it('is harsher above the crossover and kinder below it', () => {
+        // An efficient EV: the R2 sits near 154 MPGe unadjusted city.
+        const efficient = adjustmentComparison(154.2, 'city');
+        expect(efficient.penaltyPct).toBeGreaterThan(10);
+
+        // A thirstier vehicle gets the better of the regression.
+        const thirsty = adjustmentComparison(50, 'city');
+        expect(thirsty.penaltyPct).toBeLessThan(0);
+    });
+
+    it('caps adjusted economy at 1/intercept however efficient the vehicle', () => {
+        // The ceiling is the whole mechanism: no vehicle, at any efficiency,
+        // can be adjusted above it. The flat factor has no such ceiling.
+        const ceiling = 1 / 0.003259;
+        expect(derived5CycleFe(1e9, 'city')).toBeLessThan(ceiling);
+        expect(derived5CycleFe(1e9, 'city')).toBeGreaterThan(ceiling * 0.999);
+        expect(derived5CycleFe(500, 'city')).toBeLessThan(500 * 0.7);
+    });
+
+    it('guards bad input', () => {
+        expect(derived5CycleFe(0, 'city')).toBeNull();
+        expect(derived5CycleFe(100, 'nope')).toBeNull();
+        expect(adjustmentComparison(-5, 'city')).toBeNull();
     });
 });

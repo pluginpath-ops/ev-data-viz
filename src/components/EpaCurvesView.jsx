@@ -17,6 +17,7 @@ import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import ChartInfoBubble from './ChartInfoBubble';
 import EpaMethodologyDiagram from './epa/EpaMethodologyDiagram';
+import EpaCertificationPaths from './epa/EpaCertificationPaths';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { METHODOLOGY_FIXTURES } from '../utils/epaMethodologyFixtures';
 import AutoColorToggle from './AutoColorToggle';
@@ -1152,7 +1153,13 @@ export default function EpaCurvesView({
                     <p className="text-sm text-faint mb-4">
                         Sample records — not yet wired to the selected vehicles (#206, phase B1).
                     </p>
-                    <div className="space-y-8">
+                    {/* The routes to a label, and which one each vehicle took —
+                        above the per-vehicle walk-through, because it frames it. */}
+                    <EpaCertificationPaths
+                        models={METHODOLOGY_FIXTURES.map(buildMethodologyModel).filter(Boolean)}
+                    />
+
+                    <div className="space-y-8 mt-8">
                         {METHODOLOGY_FIXTURES.map(fixture => {
                             const model = buildMethodologyModel(fixture);
                             if (!model) return null;

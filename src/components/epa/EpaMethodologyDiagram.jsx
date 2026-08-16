@@ -16,6 +16,7 @@
  * driven anywhere near highway speed.
  */
 import { useState } from 'react';
+import EpaCycleSpeedChart from './EpaCycleSpeedChart';
 
 const mi   = (v) => v == null ? '—' : `${v.toFixed(1)} mi`;
 const whmi = (v) => v == null ? '—' : `${v.toFixed(1)} Wh/mi`;
@@ -51,7 +52,8 @@ export default function EpaMethodologyDiagram({ model }) {
     if (!model) return null;
 
     const { cycles, weights, adjustment, cycleSpeeds, combinedMi, combinedMpge,
-            labeledMi, deratePct, chargeEfficiency, testMethod, phases, runs } = model;
+            labeledMi, deratePct, chargeEfficiency, testMethod, phases, runs,
+            ranCycleKeys } = model;
 
     const basisNote = testMethod === 'sct'
         ? 'measured — driven to depletion'
@@ -62,8 +64,14 @@ export default function EpaMethodologyDiagram({ model }) {
             <p className="text-sm text-muted mb-4">{METHOD_LABEL[testMethod]}</p>
 
             <div className="epa-flow-columns">
-                {[['city', 'City', 'UDDS'], ['hwy', 'Highway', testMethod === 'sct' ? 'HWFET' : 'HWFET']]
-                    .map(([key, title, cycleName]) => (
+                {[
+                    // Both names, every time. A certification record labels these
+                    // phases UDDS and HWY; the window sticker calls the same
+                    // driving FTP-75 city and HWFET highway. Showing one and not
+                    // the other is how the two vocabularies stay disconnected.
+                    ['city', 'City', 'UDDS phases · FTP-75 city trace'],
+                    ['hwy',  'Highway', 'HWY phases · HWFET trace'],
+                ].map(([key, title, cycleName]) => (
                     <div key={key} className="epa-flow-column">
                         <div className="epa-flow-head">
                             <span className="font-semibold text-secondary">{title}</span>
@@ -78,7 +86,12 @@ export default function EpaMethodologyDiagram({ model }) {
                         <Arrow />
                         <Box label="Range" value={mi(cycles[key].rangeUnadjMi)} note={basisNote} />
                         <Arrow annotation={`× ${adjustment}`} />
-                        <Box label="Adjusted range" value={mi(cycles[key].rangeAdjMi)} tone="strong" />
+                        <Box
+                            label="Adjusted range"
+                            value={mi(cycles[key].rangeAdjMi)}
+                            note="stands in for untested conditions"
+                            tone="strong"
+                        />
                         <span className="epa-flow-weight">
                             {Math.round(weights[key] * 100)}% of the label
                         </span>
@@ -105,15 +118,32 @@ export default function EpaMethodologyDiagram({ model }) {
             </div>
 
             {/* The point of the whole diagram, said once, in the one place a
-                reader is already looking at both numbers. */}
-            {cycles.hwy.rangeAdjMi != null && labeledMi != null && (
-                <p className="epa-methodology-callout">
-                    An independent highway test is measuring against{' '}
-                    <strong>{mi(cycles.hwy.rangeAdjMi)}</strong>, not the{' '}
-                    <strong>{mi(labeledMi)}</strong> label — and even that column comes from a
-                    cycle averaging {cycleSpeeds.hwy} mph.
+                reader is already looking at every number it refers to.
+                Deliberately NOT "compare your test to the highway column" — the
+                adjusted highway figure is not a 70 mph range either, and
+                offering it as the fair comparison would swap one wrong
+                benchmark for another. */}
+            <p className="epa-methodology-callout">
+                An independent highway test should not be compared against any range above —
+                city or highway, adjusted or unadjusted. These come from variable-speed cycles
+                averaging <strong>{cycleSpeeds.city} mph</strong> and{' '}
+                <strong>{cycleSpeeds.hwy} mph</strong>, then adjusted downward to stand in for
+                conditions that were never driven: sustained high speed and hard acceleration,
+                air conditioning in hot weather, and cold-weather operation.
+            </p>
+
+            <div className="epa-methodology-cycles">
+                <h4 className="text-sm font-semibold text-secondary mb-1">
+                    What was driven, and what the {adjustment} factor replaces
+                </h4>
+                <p className="text-xs text-muted mb-3">
+                    A two-cycle test drives the top two. The other three are the conditions EPA
+                    would otherwise measure directly — the factor is a blanket{' '}
+                    {Math.round((1 - adjustment) * 100)}% reduction standing in for all of them,
+                    the same number for every vehicle.
                 </p>
-            )}
+                <EpaCycleSpeedChart ranCycleKeys={ranCycleKeys} />
+            </div>
 
             <div className="epa-methodology-footer">
                 <span>

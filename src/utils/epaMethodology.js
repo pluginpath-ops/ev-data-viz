@@ -40,9 +40,72 @@
 import {
     LABEL_ADJUSTMENT, LABEL_WEIGHT_CITY, LABEL_WEIGHT_HWY,
     UDDS_AVG_MPH, HWFET_AVG_MPH, MPG_E_CONVERSION, ASSUMED_CHARGER_EFF,
+    DERIVED_5CYCLE, TWO_CYCLE_KEYS, FIVE_CYCLE_KEYS,
 } from '../constants/epa';
 
 const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+/**
+ * The derived-5-cycle regression — the alternative to the flat 0.7 factor.
+ *
+ *     1/FE_adj = intercept + slope / FE_unadj
+ *
+ * @param {number} feUnadj   unadjusted fuel economy (MPGe here)
+ * @param {'city'|'hwy'} cycle
+ */
+export function derived5CycleFe(feUnadj, cycle) {
+    const c = DERIVED_5CYCLE[cycle];
+    if (!c || !(feUnadj > 0)) return null;
+    return 1 / (c.intercept + c.slope / feUnadj);
+}
+
+/**
+ * The unadjusted efficiency at which the two adjustment methods agree.
+ *
+ * Solving 0.7·x = 1/(a + b/x) gives x = (1 − 0.7b) / (0.7a). Above it the
+ * regression is harsher than the flat factor; below it, kinder.
+ */
+export function derived5CycleCrossoverFe(cycle) {
+    const c = DERIVED_5CYCLE[cycle];
+    if (!c) return null;
+    return (1 - LABEL_ADJUSTMENT * c.slope) / (LABEL_ADJUSTMENT * c.intercept);
+}
+
+/**
+ * How the two adjustment methods compare at a given unadjusted efficiency.
+ *
+ * ── Why this matters, and it is not a rounding difference ────────────────────
+ *
+ * The regression's intercept is a fixed cost in the INVERSE domain, so it does
+ * not scale with efficiency. As FE_unadj rises, `slope/FE_unadj` shrinks toward
+ * nothing and the intercept comes to dominate, capping adjusted economy at
+ * 1/intercept — about 307 MPGe city — no matter how efficient the vehicle is.
+ * The flat 0.7 factor has no such ceiling.
+ *
+ * The consequence is that the regression penalises efficient vehicles and the
+ * flat factor does not. They agree around 76 MPGe unadjusted city; by 154 —
+ * roughly where the R2 sits — the regression is ~15% harsher. A manufacturer
+ * with an efficient BEV therefore has a real reason to prefer the two-cycle
+ * test and take the flat 0.7.
+ *
+ * ⚠ The equations are fitted on GASOLINE vehicles and are unvalidated against
+ * any real EV certification record (#206). This function computes what they
+ * would do, which is not the same as evidence that they are applied this way.
+ *
+ * @returns {{ fixed, derived, penaltyPct, crossoverFe }|null}
+ *          penaltyPct > 0 means the regression is harsher than the flat factor
+ */
+export function adjustmentComparison(feUnadj, cycle) {
+    const derived = derived5CycleFe(feUnadj, cycle);
+    if (derived == null) return null;
+    const fixed = feUnadj * LABEL_ADJUSTMENT;
+    return {
+        fixed,
+        derived,
+        penaltyPct: ((fixed - derived) / fixed) * 100,
+        crossoverFe: derived5CycleCrossoverFe(cycle),
+    };
+}
 
 /**
  * City consumption from MCT phases, with the cold start weighted by its share
@@ -158,6 +221,12 @@ export function buildMethodologyModel(record) {
         adjustment:  LABEL_ADJUSTMENT,
         weights:     { city: LABEL_WEIGHT_CITY, hwy: LABEL_WEIGHT_HWY },
         cycleSpeeds: { city: UDDS_AVG_MPH, hwy: HWFET_AVG_MPH },
+        // Which of the five cycles this record actually drove. A five-cycle
+        // test drove all of them and needs no adjustment; everything else drove
+        // two and had the rest priced by the factor. Carried on the model so the
+        // chart reads the record rather than assuming the common case.
+        ranCycleKeys: record.testMethod === 'five_cycle' ? FIVE_CYCLE_KEYS : TWO_CYCLE_KEYS,
+        adjustmentMethod: record.adjustmentMethod ?? null,
         cycles,
         combinedMi,
         combinedMpge,
