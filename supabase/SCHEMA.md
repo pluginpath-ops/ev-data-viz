@@ -82,14 +82,13 @@ One charging or range test session per vehicle.
 | `color` | `text` | `'#3b82f6'` | Chart series color |
 | `is_default` | `boolean` | `false` | Scoped **per kind** since 046: a vehicle has one default charging run and one default range test |
 | `synthetic` | `boolean` | `false` | True for estimated/simulated data |
-| `kind` | `text` | `'charging'` | `'charging'` \| `'range'`. Test role discriminator, authoritative since migration 046. CHECK constraints assert a charging row carries no range columns (`distance_miles`, `energy_kwh`, `speed_mph`, `url`, wind) and a range row carries no charging columns (`charging_url`, `charge_energy_kwh`) |
+| `kind` | `text` | `'charging'` | `'charging'` \| `'range'`. Test role discriminator, authoritative since migration 046. CHECK constraints assert a charging row carries no range columns (`distance_miles`, `energy_kwh`, `speed_mph`, wind) and a range row carries no charging columns (`charge_energy_kwh`). `source_url` is deliberately in neither — it is legal on both kinds (migration 052) |
 | `session_id` | `bigint` | `NULL` | FK → `test_sessions.id` ON DELETE SET NULL. Advisory grouping; never required |
 | `paired_charging_run_id` | `bigint` | `NULL` | FK → `runs.id` ON DELETE SET NULL. Curator-set default charging test for a **range** test (migration 045). Overrides the automatic pick; a URL pairing still overrides this |
 | `software_version` | `text` | — | |
 | `conditions` | `text` | — | Freeform notes |
-| `source` | `text` | — | URL to source video/post |
-| `url` | `text` | — | Range test source link |
-| `charging_url` | `text` | — | Charging test source link |
+| `source` | `text` | — | Who published it, e.g. "Out of Spec" (a name, despite the historical description) |
+| `source_url` | `text` | — | Where this test was published. One column for both kinds since migration 052 replaced `url` + `charging_url`; `kind` says which kind of test it documents |
 | `start_soc` | `numeric` | — | % |
 | `end_soc` | `numeric` | — | % |
 | `speed_mph` | `numeric` | — | |

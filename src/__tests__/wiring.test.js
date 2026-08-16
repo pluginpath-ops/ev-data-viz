@@ -178,7 +178,7 @@ describe('the seams that broke before', () => {
         const handRolled = ALL.filter(({ file, text }) =>
             /\.jsx$/.test(file)
             && !/RunSourceLinks\.jsx$/.test(file)
-            && /href=\{run\.(charging_url|url|sourceUrl)\}/.test(text));
+            && /href=\{run\.(source_url|sourceUrl)\}/.test(text));
         expect(handRolled.map(x => x.file)).toEqual([]);
     });
 

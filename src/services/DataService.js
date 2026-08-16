@@ -684,8 +684,7 @@ class DataService {
       elevation_gain_ft: numField(run.elevationGainFt, run.elevation_gain_ft),
       avg_wind_speed_mph: numField(run.windSpeedMph,     run.avg_wind_speed_mph),
       wind_direction_deg: numField(run.windDirectionDeg, run.wind_direction_deg),
-      url: run.url || null,
-      charging_url: coalesce(run.chargingUrl, run.charging_url) || null,
+      source_url: coalesce(run.sourceUrl, run.source_url) || null,
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
@@ -739,8 +738,7 @@ class DataService {
       ...(updates.elevationGainFt !== undefined ? { elevation_gain_ft: updates.elevationGainFt !== '' ? Number(updates.elevationGainFt) : null } : {}),
       ...(updates.windSpeedMph !== undefined ? { avg_wind_speed_mph: updates.windSpeedMph !== '' ? Number(updates.windSpeedMph) : null } : {}),
       ...(updates.windDirectionDeg !== undefined ? { wind_direction_deg: updates.windDirectionDeg !== '' ? Number(updates.windDirectionDeg) : null } : {}),
-      ...(updates.url !== undefined ? { url: updates.url || null } : {}),
-      ...(updates.chargingUrl !== undefined ? { charging_url: updates.chargingUrl || null } : {}),
+      ...(updates.sourceUrl !== undefined ? { source_url: updates.sourceUrl || null } : {}),
       ...(updates.isHidden !== undefined ? { is_hidden: updates.isHidden } : {}),
     }).eq('id', runId);
     if (error) throw error;
