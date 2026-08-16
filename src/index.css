@@ -1600,3 +1600,326 @@ body {
     @apply text-xs px-2 py-1 rounded whitespace-nowrap transition;
     @apply bg-indigo-50 text-indigo-700 hover:bg-indigo-100;
 }
+
+/* ── EPA methodology diagram (#206) ──────────────────────────────────────────
+   A flow, not a chart: two cycle columns merging into the label. Sized in rem
+   so it holds together from the vehicle card up to a presentation window. */
+
+.epa-methodology {
+    @apply w-full;
+}
+
+.epa-flow-columns {
+    @apply grid gap-4;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.epa-flow-column {
+    @apply flex flex-col items-center gap-0;
+}
+
+.epa-flow-head {
+    @apply flex flex-col items-center gap-0.5 mb-2 text-center;
+}
+
+.epa-flow-box {
+    @apply w-full flex flex-col items-center gap-0.5 rounded-lg px-3 py-2 text-center border;
+    border-color: var(--color-border);
+    background-color: var(--color-card);
+}
+
+/* The adjusted figures and the computed combined — what the argument rests on */
+.epa-flow-box-strong {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary-light);
+}
+
+/* The number on the window sticker: the end of the chain, styled as the answer */
+.epa-flow-box-label {
+    border-color: var(--color-primary);
+    border-width: 2px;
+    background-color: var(--color-card);
+}
+
+.epa-flow-value {
+    @apply text-lg font-semibold tabular-nums;
+    color: var(--color-text-primary);
+}
+
+.epa-flow-arrow {
+    @apply flex items-center gap-1.5 h-7;
+}
+
+.epa-flow-arrow-line {
+    @apply block w-px h-full;
+    background-color: var(--color-border);
+}
+
+.epa-flow-arrow-note {
+    @apply text-xs font-medium tabular-nums;
+    color: var(--color-text-muted);
+}
+
+.epa-flow-weight {
+    @apply text-xs font-medium mt-1.5;
+    color: var(--color-text-muted);
+}
+
+/* Two columns joining into one result.
+   Legs UP to the city and highway columns, closed along the BOTTOM where they
+   meet — border-b + rounded-b. It was border-t + rounded-t, which draws the
+   same bracket inverted: a cap with its legs pointing down, reading as one
+   value splitting into two rather than two combining into one. */
+.epa-flow-merge {
+    @apply mx-auto my-2 w-1/2 h-4 border-b border-x rounded-b-lg;
+    border-color: var(--color-border);
+}
+
+.epa-flow-result {
+    @apply flex flex-col items-center mx-auto;
+    max-width: 22rem;
+}
+
+/* The sentence the diagram exists to make unavoidable */
+.epa-methodology-callout {
+    @apply mt-5 rounded-lg px-3 py-2 text-sm border-l-4;
+    border-color: var(--color-primary);
+    background-color: var(--color-surface-muted);
+    color: var(--color-text-secondary);
+}
+
+.epa-methodology-footer {
+    @apply mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm;
+    color: var(--color-text-muted);
+}
+
+.epa-phase-table {
+    @apply mt-2 overflow-x-auto;
+}
+.epa-phase-table table {
+    @apply w-full text-sm;
+}
+.epa-phase-table th {
+    @apply text-left font-medium py-1 pr-4 border-b;
+    border-color: var(--color-border);
+    color: var(--color-text-muted);
+}
+.epa-phase-table td {
+    @apply py-1 pr-4;
+    color: var(--color-text-secondary);
+}
+
+@media (max-width: 640px) {
+    .epa-flow-columns { grid-template-columns: minmax(0, 1fr); }
+    .epa-flow-merge   { display: none; }
+}
+
+/* ── Drive-cycle speed ranges (#206) ─────────────────────────────────────────
+   One grid so the 65-75 mph band can span every row as a single element rather
+   than five segments kept in alignment by hand. Each bar runs 0 → that cycle's
+   peak, tick at its average; the distance between the two is the argument. */
+
+.cycle-chart {
+    @apply grid items-center gap-x-3 gap-y-2.5;
+    grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+}
+
+.cycle-row-label {
+    @apply flex flex-col leading-tight;
+}
+
+.cycle-row-track {
+    @apply relative h-8;
+}
+
+.cycle-bar {
+    @apply relative h-full rounded border;
+    min-width: 2px;
+}
+
+/* Driven in this test — the app's primary blue, not a bespoke green */
+.cycle-bar-run {
+    background-color: rgb(30, 58, 138);        /* blue-900 */
+    border-color: var(--color-primary);
+}
+
+/* Not driven — what the 0.7 factor is standing in for */
+.cycle-bar-substituted {
+    background-color: rgb(124, 45, 18);        /* orange-900 */
+    border-color: rgb(168, 68, 34);
+}
+
+.cycle-bar-tick {
+    @apply absolute top-0 bottom-0 w-0.5;
+    background-color: rgba(255, 255, 255, 0.85);
+}
+.cycle-bar-run > .cycle-bar-tick     { background-color: rgb(147, 197, 253); }
+.cycle-bar-substituted > .cycle-bar-tick { background-color: rgb(251, 146, 60); }
+
+/* The 65-75 mph reference, matching the band on the EPA curve chart. Spans the
+   five cycle rows in the track column; dashed edges so it reads as a reference
+   laid over the data rather than as data. */
+.cycle-band {
+    @apply relative border-l border-r border-dashed pointer-events-none;
+    grid-column: 2;
+    grid-row: 1 / span 5;
+    height: 100%;
+    margin-left: 0;
+    border-color: var(--color-primary);
+    background-color: rgba(59, 130, 246, 0.10);
+    z-index: 1;
+}
+
+.cycle-axis {
+    @apply h-6 border-t;
+    border-color: var(--color-border);
+}
+
+.cycle-axis-tick {
+    @apply absolute top-1 text-xs -translate-x-1/2 whitespace-nowrap;
+    color: var(--color-text-muted);
+}
+
+.cycle-axis-title {
+    @apply text-xs font-medium text-center -mt-1;
+    color: var(--color-text-muted);
+}
+
+.cycle-legend {
+    @apply flex flex-wrap gap-x-5 gap-y-1 mt-1 text-xs;
+    grid-column: 1 / -1;
+    grid-row: 8;
+    color: var(--color-text-muted);
+}
+.cycle-legend span { @apply inline-flex items-center gap-1.5; }
+
+.cycle-swatch {
+    @apply inline-block w-4 h-3 rounded-sm border not-italic;
+}
+.cycle-swatch-tick {
+    @apply inline-block w-0.5 h-3.5 not-italic;
+    background-color: var(--color-text-muted);
+}
+.cycle-swatch-band {
+    @apply inline-block w-4 h-3 border-l border-r border-dashed not-italic;
+    border-color: var(--color-primary);
+    background-color: rgba(59, 130, 246, 0.10);
+}
+
+/* ── Certification paths (#206) ──────────────────────────────────────────────
+   One grid, two labelled rows of equal cells. The 5-cycle cell spans both rows
+   because it has no adjustment step — the geometry is the statement, which is
+   why there is no longer a rail with a caption explaining itself. */
+
+.cert-paths {
+    @apply w-full;
+}
+
+.cert-grid {
+    @apply grid gap-3 items-stretch;
+    grid-template-columns: 9rem repeat(3, minmax(0, 1fr));
+}
+
+.cert-grid-label {
+    @apply flex items-center text-sm font-semibold;
+    color: var(--color-text-secondary);
+}
+
+/* Chips sit in their own grid row so they never change a cell's height */
+.cert-chips {
+    @apply flex flex-wrap items-end justify-center gap-1;
+    min-height: 1.25rem;
+}
+
+.cert-cell {
+    @apply flex flex-col gap-1 rounded-lg border px-3 py-2 h-full;
+    border-color: var(--color-border);
+    background-color: var(--color-card);
+    min-height: 5.5rem;
+}
+
+/* Reaches past the adjustment row: no adjustment step to take */
+.cert-cell-span {
+    grid-row: span 2;
+}
+
+/* A path something on screen actually took */
+.cert-cell-active {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary-light);
+}
+
+.cert-cell-effort {
+    @apply text-xs font-medium mt-auto pt-1;
+    color: var(--color-text-secondary);
+}
+
+.cert-cell-result {
+    @apply text-center items-center justify-center mt-3;
+    /* Columns 2-4: the three method columns, and nothing under the label
+       gutter. Centring on the full grid put it visibly left of the data. */
+    grid-column: 2 / -1;
+    border-color: var(--color-primary);
+    border-width: 2px;
+    min-height: 4rem;
+}
+
+.path-chip {
+    @apply text-xs font-medium rounded-full px-2 py-0.5 border;
+    border-color: var(--color-primary);
+    background-color: var(--color-primary-light);
+    color: var(--color-primary-text);
+}
+
+/* ── Collapsible section ─────────────────────────────────────────────────── */
+
+.collapsible-section {
+    @apply border-t;
+    border-color: var(--color-border);
+}
+.collapsible-section:first-child {
+    @apply border-t-0;
+}
+
+.collapsible-header {
+    @apply w-full flex items-center gap-2 py-3 text-left transition-colors;
+    color: var(--color-text-secondary);
+}
+.collapsible-header:hover {
+    color: var(--color-text-primary);
+}
+
+.collapsible-caret {
+    @apply inline-block text-xs transition-transform;
+    color: var(--color-text-faint);
+}
+
+.collapsible-title {
+    @apply text-base font-semibold;
+}
+
+.collapsible-subtitle {
+    @apply text-xs;
+    color: var(--color-text-faint);
+}
+
+.collapsible-body {
+    @apply pb-5;
+}
+
+.epa-methodology-cycles {
+    @apply mt-5 pt-4 border-t;
+    border-color: var(--color-border);
+}
+
+@media (max-width: 640px) {
+    .cycle-row { grid-template-columns: minmax(0, 1fr); }
+    /* One column: the row span carries no meaning without columns to span
+       across, so cells simply stack in reading order. */
+    .cert-grid { grid-template-columns: minmax(0, 1fr); }
+    .cert-cell-span { grid-row: auto; }
+    .cert-cell-result { grid-column: 1; }
+    /* The band spans rows that no longer sit side by side */
+    .cycle-band { display: none; }
+    .cert-grid-label { @apply pt-2; }
+}
