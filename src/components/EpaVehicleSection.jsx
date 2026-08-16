@@ -42,7 +42,7 @@ function DataRow({ label, value, muted }) {
 }
 
 /** Card displaying the data for one EPA test group mapping. */
-function EpaGroupCard({ mapping, canEdit, onUnlink, onDelete, onUpdateConfidence, onUpdateDisplayName }) {
+function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateConfidence, onUpdateDisplayName }) {
     const [unlinking,    setUnlinking]    = useState(false);
     const [deleting,     setDeleting]     = useState(false);
     const [updatingConf, setUpdatingConf] = useState(false);
@@ -271,6 +271,7 @@ function EpaGroupCard({ mapping, canEdit, onUnlink, onDelete, onUpdateConfidence
                             testGroupId={g.test_group_id}
                             canEdit={canEdit}
                             onDirtyChange={setCuratorDirty}
+                            vehicle={vehicle}
                         />
                     )}
                 </>
@@ -540,6 +541,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                     <EpaGroupCard
                         key={m.id}
                         mapping={m}
+                        vehicle={vehicle}
                         canEdit={canEdit}
                         onUnlink={onUnlink}
                         onDelete={deleteEpaTestGroup}
