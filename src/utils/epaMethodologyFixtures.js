@@ -29,9 +29,16 @@ export const R2_MCT = {
     // transcribed from) and 5-cycle labelled. The two axes are more independent
     // than the issue assumes.
     //
-    // Nothing downstream changes: applying x0.7 still reproduces the 307 label
-    // to 0.3%, because on the 152 five-cycle-labelled EVs in the MY26 guide the
-    // effective adjusted/unadjusted ratio has a median of exactly 0.700.
+    // EPA's factor for THIS configuration is 0.7051, not 0.700, applied
+    // identically to city and highway. Our flat 0.700 is why the model computes
+    // 307.92 against a 307 label; with 0.7051 it computes 310.16, and the city
+    // and highway ranges then round to 338 and 276 — exactly what the guide
+    // publishes. The adjustment is per-vehicle, which #206 does not yet model.
+    //
+    // The derivation feeding it is confirmed correct by the same source: our
+    // unadjusted MPGe of 154.214 city / 126.243 highway against EPA's published
+    // 154.200 / 126.200 — 0.009% and 0.034%. That validates the cold-start
+    // energy-share weighting and the DC-to-AC charging correction end to end.
     adjustmentMethod: 'five_cycle_label',
     labeledRangeMi:  307,
     totalDcWh:       89549.27,
