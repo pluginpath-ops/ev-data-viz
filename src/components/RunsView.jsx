@@ -469,8 +469,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         elevationGainFt: '',
         windSpeedMph: '',
         windDirectionDeg: '',
-        url: '',
-        chargingUrl: '',
+        sourceUrl: '',
     });
     // uploadMode: 'create' (new run) | 'merge' (patch fields into existing rows)
     const [uploadMode, setUploadMode] = useState('create');
@@ -550,7 +549,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', url: '', chargingUrl: '' });
+        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: null });
@@ -844,8 +843,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             elevationGainFt: run.elevation_gain_ft ?? '',
             windSpeedMph: run.avg_wind_speed_mph ?? '',
             windDirectionDeg: run.wind_direction_deg ?? '',
-            url: run.url || '',
-            chargingUrl: run.charging_url || '',
+            sourceUrl: run.source_url || '',
         });
         setEditCalculatedFields(run.calculated_fields || []);
     };
@@ -1443,6 +1441,17 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
                                             className="form-input w-full"
                                         />
+                                        {/* Attribution belongs to the test, not to one of its roles.
+                                            It used to be two fields inside the role panels — a
+                                            charging URL and a range URL — because the schema had two
+                                            columns. Migration 052 made it one. */}
+                                        <input
+                                            type="url"
+                                            placeholder="Source URL (where this test was published)"
+                                            value={runMetadata.sourceUrl}
+                                            onChange={(e) => setRunMetadata({...runMetadata, sourceUrl: e.target.value})}
+                                            className="form-input w-full"
+                                        />
 
                                         {/* Charging energy field (create mode) */}
                                         {runMetadata.dataFlags.includes('charging') && (
@@ -1459,13 +1468,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 <p className="text-xs text-faint mt-1">
                                                     Energy measured at charger or vehicle — <em>energy in</em>
                                                 </p>
-                                                <input
-                                                    type="url"
-                                                    placeholder="Charging source URL (optional)"
-                                                    value={runMetadata.chargingUrl}
-                                                    onChange={(e) => setRunMetadata({...runMetadata, chargingUrl: e.target.value})}
-                                                    className="form-input w-full mt-2"
-                                                />
                                             </div>
                                         )}
 
@@ -1572,13 +1574,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         onChange={(e) => setRunMetadata({...runMetadata, windDirectionDeg: e.target.value})}
                                                         className="form-input"
                                                         min="0" max="360"
-                                                    />
-                                                    <input
-                                                        type="url"
-                                                        placeholder="Source URL"
-                                                        value={runMetadata.url}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, url: e.target.value})}
-                                                        className="form-input col-span-2"
                                                     />
                                                 </div>
                                             </div>
@@ -1916,6 +1911,15 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         onChange={(e) => setEditFormData({...editFormData, conditions: e.target.value})}
                                         className="form-input w-full"
                                     />
+                                    {/* One field for both roles since migration 052 — see the
+                                        matching note on the create form. */}
+                                    <input
+                                        type="url"
+                                        placeholder="Source URL (where this test was published)"
+                                        value={editFormData.sourceUrl ?? ''}
+                                        onChange={(e) => setEditFormData({...editFormData, sourceUrl: e.target.value})}
+                                        className="form-input w-full"
+                                    />
                                     {/* Range test fields */}
                                     {(editFormData.dataFlags || ['charging']).includes('range') && (
                                         <div className="data-subpanel p-4 space-y-3">
@@ -2020,13 +2024,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     className="form-input"
                                                     min="0" max="360"
                                                 />
-                                                <input
-                                                    type="url"
-                                                    placeholder="Source URL"
-                                                    value={editFormData.url}
-                                                    onChange={(e) => setEditFormData({...editFormData, url: e.target.value})}
-                                                    className="form-input col-span-2"
-                                                />
                                             </div>
                                         </div>
                                     )}
@@ -2045,13 +2042,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             <p className="text-xs text-faint mt-1">
                                                 Energy measured at charger or vehicle — <em>energy in</em> (not equal to energy used driving due to charging losses)
                                             </p>
-                                            <input
-                                                type="url"
-                                                placeholder="Charging source URL (optional)"
-                                                value={editFormData.chargingUrl ?? ''}
-                                                onChange={(e) => setEditFormData({...editFormData, chargingUrl: e.target.value})}
-                                                className="form-input w-full mt-2"
-                                            />
                                         </div>
                                     )}
                                 </div>
