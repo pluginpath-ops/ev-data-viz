@@ -27,7 +27,13 @@ export const EPA_DEFAULTS = {
     // assumptions
     DEFAULT_ETA:         0.88,        // fallback drivetrain efficiency
     DEFAULT_ACCESSORY_W: 300,         // constant accessory draw, watts
-    ASSUMED_CHARGER_EFF: 0.88,        // when AC recharge is unavailable (CSI obs ~0.87–0.89)
+    // Used when AC recharge energy is unavailable. Was 0.88 from a read of CSI
+    // observations (~0.87–0.89); now 0.855, from the two cert records where BOTH
+    // sides are reported and the ratio is measured rather than inferred:
+    //   Rivian R2 (MCT)        89,549.27 DC / 104,689 AC = 85.5%
+    //   Ford Lightning ER (SCT) ~131 kWh usable / 152.974 = 85.6%
+    // Refine as more MCT records with real DC energy accumulate (#206).
+    ASSUMED_CHARGER_EFF: 0.855,
     // Condition correction (#188). The aero/rolling split is what lets a
     // measurement be re-priced for speed and air density without per-vehicle
     // road-load coefficients — see utils/conditionCorrection.js. These moved
