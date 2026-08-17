@@ -204,6 +204,31 @@ describe('the seams that broke before', () => {
         }
     });
 
+    it('sends only columns the FE guide migration actually creates', () => {
+        // The importer builds its payload in JS and the table is defined in SQL,
+        // and nothing checks that the two agree. A mistyped column does not
+        // throw at build or lint: Postgres rejects the row, or the value simply
+        // never lands and the import reports success.
+        //
+        // Reading both and comparing is the only place that mismatch is visible
+        // before it reaches a curator with a file to import.
+        const svc = read('src/services/DataService.js');
+        const body = svc.slice(svc.indexOf('export function feGuidePayload'));
+        const payloadKeys = [...body.slice(0, body.indexOf('\n}')).matchAll(/^\s{4}([a-z_]+):/gm)]
+            .map(m => m[1]);
+        expect(payloadKeys.length).toBeGreaterThan(20);
+
+        const sql = read('supabase/migrations/053_epa_fe_guide.sql');
+        const create = sql.slice(sql.indexOf('CREATE TABLE epa_fe_guide'));
+        const columns = new Set(
+            [...create.slice(0, create.indexOf(');')).matchAll(/^\s{4}([a-z_]+)\s+[a-z]/gm)].map(m => m[1]),
+        );
+
+        const unknown = payloadKeys.filter(k => !columns.has(k));
+        expect(unknown, `columns sent by the importer but absent from migration 053: ${unknown.join(', ')}`)
+            .toEqual([]);
+    });
+
     it('loads the startup queries in parallel', () => {
         // Seven independent queries were awaited one after another, six of them
         // returning under 4KB. That was ~900ms of blank screen spent purely on

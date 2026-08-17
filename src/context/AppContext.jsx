@@ -1065,6 +1065,30 @@ export function AppProvider({ children }) {
      * to a vehicle, then refresh. Used by the PDF import modal from both Admin
      * and the per-vehicle curator section.
      */
+    /**
+     * Bulk-import a parsed EPA Fuel Economy Guide (#206).
+     *
+     * Staged rows only — nothing is written to epa_test_groups here. Promotion
+     * onto a group is a separate, curator-driven step, because no key joins the
+     * two automatically.
+     */
+    const importFeGuide = async (rows, sourceFile = null) => {
+        try {
+            const res = await dataService.importFeGuideRows(rows, sourceFile);
+            const parts = [];
+            if (res.imported) parts.push(`${res.imported} new`);
+            if (res.updated)  parts.push(`${res.updated} updated`);
+            if (res.failed)   parts.push(`${res.failed} failed`);
+            showSuccess(`Fuel Economy Guide: ${parts.join(', ') || 'nothing to import'}.`);
+            return res;
+        } catch (error) {
+            showError('Guide import failed: ' + error.message);
+            throw error;
+        }
+    };
+
+    const getFeGuideSummary = () => dataService.getFeGuideSummary();
+
     const importEpaCsiGroups = async (groups, { linkVehicleId, linkTestGroupIds = [] } = {}) => {
         try {
             for (const g of groups) await dataService.importEpaGroupFull(g);
@@ -1484,6 +1508,8 @@ export function AppProvider({ children }) {
         linkEpaTestGroup,
         createAndLinkEpaTestGroup,
         importEpaCsiGroups,
+        importFeGuide,
+        getFeGuideSummary,
         getExistingEpaTestGroupIds,
         updateEpaMapping,
         unlinkEpaTestGroup,

@@ -1595,6 +1595,81 @@ class DataService {
     if (error) throw error;
   }
 
+  // ── EPA Fuel Economy Guide (published labels, #206) ───────────────────────
+
+  /**
+   * Bulk-import parsed Fuel Economy Guide rows.
+   *
+   * Upserts on the natural key (model year, division, carline, model type
+   * index) — NOT on the test group, which matches almost nothing of ours and is
+   * not unique per configuration anyway. The index is part of the key because
+   * carline alone is not unique: Audi lists one carline three times at three
+   * different ranges. Re-importing the same guide is therefore idempotent,
+   * and re-importing a revised one updates in place, which is the whole reason
+   * these rows are kept rather than promoted and discarded.
+   *
+   * @param {Array}  rows        output of parseFeGuide().rows
+   * @param {string} [sourceFile] filename, for provenance
+   * @returns {{ imported: number, updated: number, failed: number, errors: string[] }}
+   */
+  async importFeGuideRows(rows, sourceFile = null) {
+    const result = { imported: 0, updated: 0, failed: 0, errors: [] };
+    if (!this.useSupabase || !rows?.length) return result;
+    const supabase = getSupabase();
+
+    // Which keys already exist, so the report can distinguish new from revised.
+    // Read before writing: after the upsert everything looks like it was there.
+    const years = [...new Set(rows.map(r => r.modelYear))];
+    const { data: existing } = await supabase
+      .from('epa_fe_guide')
+      .select('model_year, division, carline, model_type_index')
+      .in('model_year', years);
+    const seen = new Set((existing || []).map(e =>
+      `${e.model_year}|${e.division}|${e.carline}|${e.model_type_index}`));
+
+    // Chunked: a full guide year is ~320 rows, and one oversized request that
+    // fails tells you nothing about which row was the problem.
+    const CHUNK = 100;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const slice = rows.slice(i, i + CHUNK);
+      const payload = slice.map(r => feGuidePayload(r, sourceFile));
+
+      const { error } = await supabase
+        .from('epa_fe_guide')
+        .upsert(payload, { onConflict: 'model_year,division,carline,model_type_index', ignoreDuplicates: false });
+
+      if (error) {
+        result.failed += slice.length;
+        result.errors.push(`Rows ${i + 1}-${i + slice.length}: ${error.message}`);
+        continue;
+      }
+      for (const r of slice) {
+        if (seen.has(`${r.modelYear}|${r.division}|${r.carline}|${r.modelTypeIndex}`)) result.updated++;
+        else result.imported++;
+      }
+    }
+    return result;
+  }
+
+  /** Staged guide rows, newest model year first. Used by the import summary. */
+  async getFeGuideSummary() {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase()
+      .from('epa_fe_guide')
+      .select('model_year, division')
+      .order('model_year', { ascending: false });
+    if (error) throw error;
+
+    const byYear = new Map();
+    for (const r of data || []) {
+      if (!byYear.has(r.model_year)) byYear.set(r.model_year, { modelYear: r.model_year, rows: 0, divisions: new Set() });
+      const y = byYear.get(r.model_year);
+      y.rows++;
+      y.divisions.add(r.division);
+    }
+    return [...byYear.values()].map(y => ({ ...y, divisions: y.divisions.size }));
+  }
+
   // ── EPA curator model: coefficient sets, tests, phases, audit ─────────────────
 
   /**
@@ -2142,6 +2217,57 @@ class DataService {
       // Intentionally swallowed — logging failures are invisible to the user.
     }
   }
+}
+
+
+/**
+ * One parsed Fuel Economy Guide row → its `epa_fe_guide` shape.
+ *
+ * Exported and separated from the request that sends it so the column names can
+ * be tested: a mistyped key here does not throw, it silently drops a field or
+ * writes it somewhere unintended, and the row still imports looking healthy.
+ */
+export function feGuidePayload(r, sourceFile = null) {
+  return {
+    model_year: r.modelYear,
+    division:   r.division,
+    carline:    r.carline,
+    smog_test_group:  r.smogTestGroup,
+    model_type_index: r.modelTypeIndex,
+
+    label_comb_range_mi: r.labelCombRangeMi,
+    label_city_range_mi: r.labelCityRangeMi,
+    label_hwy_range_mi:  r.labelHwyRangeMi,
+    label_comb_mpge:     r.labelCombMpge,
+    label_city_mpge:     r.labelCityMpge,
+    label_hwy_mpge:      r.labelHwyMpge,
+
+    unadj_city_mpge: r.unadjCityMpge,
+    unadj_hwy_mpge:  r.unadjHwyMpge,
+    unadj_comb_mpge: r.unadjCombMpge,
+    adj_city_mpge:   r.adjCityMpge,
+    adj_hwy_mpge:    r.adjHwyMpge,
+    adj_comb_mpge:   r.adjCombMpge,
+
+    label_adjustment_factor: r.labelAdjustmentFactor,
+    calc_approach:           r.calcApproach,
+    adjustment_signature:    r.adjustmentSignature,
+
+    total_voltage_v:            r.totalVoltageV,
+    batt_capacity_ah:           r.battCapacityAh,
+    nominal_pack_kwh:           r.nominalPackKwh,
+    batt_specific_energy_wh_kg: r.battSpecificEnergyWhKg,
+
+    motor_power_kw:     r.motorPowerKw,
+    motor_count:        r.motorCount,
+    charge_time_240v_h: r.chargeTime240vH,
+    drive_desc:    r.driveDesc,
+    carline_class: r.carlineClass,
+
+    raw: r.raw ?? null,
+    source_file: sourceFile,
+    imported_at: new Date().toISOString(),
+  };
 }
 
 export const dataService = new DataService();

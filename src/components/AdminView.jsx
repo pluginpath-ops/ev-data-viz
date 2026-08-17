@@ -6,10 +6,12 @@ import EpaDataCard from './EpaDataCard';
 import RolesPermissions from './admin/RolesPermissions';
 import ConstantsKnobs from './admin/ConstantsKnobs';
 import InterfaceSettings from './admin/InterfaceSettings';
+import FeGuideImport from './admin/FeGuideImport';
 
 const SUBTABS = [
     { id: 'roles',     label: 'Roles & Permissions' },
     { id: 'epa',       label: 'EPA Data' },
+    { id: 'feguide',   label: 'Fuel Economy Guide' },
     { id: 'constants', label: 'Model Constants' },
     { id: 'interface', label: 'Interface Settings' },
 ];
@@ -17,6 +19,7 @@ const SUBTABS = [
 const SUBTITLES = {
     roles:     'Manage registered users and their roles.',
     epa:       'Browse, edit, link, and delete imported EPA test groups.',
+    feguide:   'Import EPA\'s published label figures, one guide per model year.',
     constants: 'Tune the EPA model math (local sandbox).',
     interface: 'Site-wide appearance settings.',
 };
@@ -179,6 +182,8 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                     updateEpaTestGroup={updateEpaTestGroup}
                 />
             )}
+
+            {subtab === 'feguide' && <FeGuideImport />}
 
             {subtab === 'constants' && <ConstantsKnobs />}
 

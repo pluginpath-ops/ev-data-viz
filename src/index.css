@@ -1931,3 +1931,45 @@ body {
     color: var(--color-warning);
     background-color: rgba(245, 158, 11, 0.12);
 }
+
+/* ── Fuel Economy Guide import (#206) ───────────────────────────────────────── */
+
+.fe-dropzone {
+    @apply flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed py-8 px-4 cursor-pointer transition-colors text-center;
+    border-color: var(--color-border-strong);
+    background-color: var(--color-surface-muted);
+}
+.fe-dropzone:hover,
+.fe-dropzone-active {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary-light);
+}
+
+.fe-stat-row {
+    @apply flex flex-wrap gap-6;
+}
+
+.fe-stat {
+    @apply flex flex-col;
+}
+
+.fe-stat-value {
+    @apply text-lg font-semibold tabular-nums;
+    color: var(--color-text-secondary);
+}
+.fe-stat-value-strong {
+    color: var(--color-primary);
+}
+
+.fe-summary-table {
+    @apply text-sm;
+}
+.fe-summary-table th {
+    @apply text-left font-medium py-1 pr-6 border-b;
+    border-color: var(--color-border);
+    color: var(--color-text-muted);
+}
+.fe-summary-table td {
+    @apply py-1 pr-6;
+    color: var(--color-text-secondary);
+}
