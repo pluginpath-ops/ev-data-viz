@@ -271,7 +271,14 @@ export function parseFeGuide(csvText) {
         // A row missing any part of the key, or its range, cannot be stored or
         // linked. modelTypeIndex counts: without it two Audi configurations at
         // different ranges collapse into one.
-        if (!row.carline || !row.modelYear || !row.modelTypeIndex || row.labelCombRangeMi == null) {
+        //
+        // `division` counts for a harsher reason. It is NOT NULL in the table,
+        // and the upsert sends up to 100 rows per statement — so one blank
+        // Division makes Postgres reject the whole batch, not the row. In the
+        // MY22 guide a single Lucid entry has no Division, and it cost the other
+        // 86 rows their import.
+        if (!row.carline || !row.modelYear || !row.modelTypeIndex
+            || !row.division || row.labelCombRangeMi == null) {
             skipped.unusable++;
             continue;
         }

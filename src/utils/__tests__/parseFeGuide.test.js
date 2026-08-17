@@ -209,6 +209,18 @@ describe('parseFeGuide — the natural key', () => {
         expect(r).toEqual([]);
     });
 
+    it('drops a row with no division rather than letting it poison the batch', () => {
+        // division is NOT NULL in the table and the upsert sends up to 100 rows
+        // per statement, so one blank cell makes Postgres reject every row in
+        // the batch. The MY22 guide has exactly one such row — a Lucid entry
+        // with no Division — and it cost the other 86 rows their import.
+        const noDivision = CSV.replace(/^(2027),Rivian,/m, '$1,,');
+        const { rows, skipped } = parseFeGuide(noDivision);
+
+        expect(rows.every(r => r.division)).toBe(true);
+        expect(skipped.unusable).toBeGreaterThan(0);
+    });
+
     it('makes every row in the sample uniquely keyed', () => {
         const keys = rows.map(r => `${r.modelYear}|${r.division}|${r.carline}|${r.modelTypeIndex}`);
         expect(new Set(keys).size).toBe(rows.length);
