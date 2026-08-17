@@ -10,6 +10,42 @@ import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFro
 const roundField = roundTo;
 
 /**
+ * How many rows PostgREST will return for one request.
+ *
+ * Supabase caps a response at `db-max-rows` (1000 by default) and says nothing
+ * about it — no error, no flag, just a short array. A query that reads whole
+ * tables and aggregates in JS therefore returns a confidently wrong answer once
+ * the table outgrows the cap. That is exactly how the Fuel Economy Guide import
+ * summary came to show 2024-2027 and silently omit 2022 and 2023: the four
+ * visible years summed to precisely 1000 rows.
+ */
+const PAGE_SIZE = 1000;
+
+/**
+ * Read every row a query matches, a page at a time.
+ *
+ * `builder` must be a function returning a FRESH PostgREST query, not a query
+ * object — a builder is single-use, and calling `.range()` on one twice mutates
+ * the same request rather than producing two.
+ *
+ * The caller's ordering must be unique for paging to be sound: with a
+ * non-unique sort key, rows tie and Postgres may order them differently between
+ * requests, which drops some and repeats others across the page boundary.
+ * Order by `id`, or add it as a tiebreaker.
+ */
+export async function fetchAllRows(builder) {
+  const out = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await builder().range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    out.push(...(data || []));
+    // A short page means the end. A full one is ambiguous, so it costs one more
+    // request that comes back empty.
+    if (!data || data.length < PAGE_SIZE) return out;
+  }
+}
+
+/**
  * How long a stored image object may be cached. Safe at a year only because
  * every stored URL carries a ?v= stamp written at upload time — see
  * #putVehicleImageObject. Objects predating that carry Supabase Storage's
@@ -890,12 +926,16 @@ class DataService {
     const real = runIds.filter(id => !isInheritedRunId(id)).map(Number);
     if (!real.length) return {};
 
-    const { data, error } = await getSupabase()
+    // Paged: this reads every SoC sample for every selected run at once, so
+    // ~60 rows per run means the 1000-row cap arrives around 17 runs — well
+    // inside normal use. Truncated, it silently returns a min/max computed from
+    // some of the data, which is worse than failing.
+    const data = await fetchAllRows(() => getSupabase()
       .from('data_points')
       .select('run_id, soc')
       .in('run_id', real)
-      .not('soc', 'is', null);
-    if (error) throw error;
+      .not('soc', 'is', null)
+      .order('id', { ascending: true }));
 
     const out = {};
     for (const { run_id, soc } of data || []) {
@@ -914,12 +954,15 @@ class DataService {
     const actualId = isInheritedRunId(runId)
       ? parseInheritedRunId(runId).realRunId
       : runId;
-    const { data, error } = await getSupabase()
+    // Paged: a long run exceeds the 1000-row cap on its own, and the insert
+    // path batches at 1000 precisely because runs that size exist. Unpaged, the
+    // chart just stops early with no indication the tail is missing.
+    const data = await fetchAllRows(() => getSupabase()
       .from('data_points')
       .select('*')
       .eq('run_id', actualId)
-      .order('frame', { ascending: true });
-    if (error) throw error;
+      .order('frame', { ascending: true })
+      .order('id', { ascending: true }));
     return (data || []).map(p => ({
       frame:       p.frame,
       timestamp:   p.timestamp,
@@ -1747,14 +1790,24 @@ class DataService {
     return { restored };
   }
 
-  /** Staged guide rows, newest model year first. Used by the import summary. */
+  /**
+   * Staged guide rows, newest model year first. Used by the import summary.
+   *
+   * Paged, because this counts every staged row and the table is already past
+   * a single response: six guide years is ~1600 rows against a 1000-row cap.
+   * Unpaged, the oldest years fell off the end and the summary reported them
+   * as simply not imported.
+   *
+   * `id` is the tiebreaker, not decoration — model_year alone ties several
+   * hundred ways per page and rows would move between pages.
+   */
   async getFeGuideSummary() {
     if (!this.useSupabase) return [];
-    const { data, error } = await getSupabase()
+    const data = await fetchAllRows(() => getSupabase()
       .from('epa_fe_guide')
       .select('model_year, division')
-      .order('model_year', { ascending: false });
-    if (error) throw error;
+      .order('model_year', { ascending: false })
+      .order('id', { ascending: true }));
 
     const byYear = new Map();
     for (const r of data || []) {
