@@ -1973,3 +1973,45 @@ body {
     @apply py-1 pr-6;
     color: var(--color-text-secondary);
 }
+
+/* ── Fuel Economy Guide picker (#206) ───────────────────────────────────────── */
+
+.fe-picker {
+    @apply flex flex-col gap-1.5 rounded-lg border px-3 py-2 mb-4;
+    border-color: var(--color-border);
+    background-color: var(--color-surface-muted);
+}
+
+.fe-picker-head {
+    @apply flex items-center gap-2;
+}
+
+.fe-picker-badge {
+    @apply text-[10px] font-semibold px-1.5 rounded-full;
+    background-color: var(--color-primary-light);
+    color: var(--color-primary-text);
+}
+
+.fe-picker-link-btn {
+    @apply text-xs font-medium self-start transition-colors;
+    color: var(--color-primary);
+}
+.fe-picker-link-btn:hover { color: var(--color-primary-hover); }
+
+.fe-candidate {
+    @apply flex items-center justify-between gap-3 rounded px-2 py-1.5;
+}
+
+/* The proposal. Distinguished because it is the one the curator confirms. */
+.fe-candidate-best {
+    @apply border;
+    border-color: var(--color-primary);
+    background-color: var(--color-card);
+}
+
+.fe-candidate-list {
+    @apply flex flex-col max-h-56 overflow-y-auto;
+}
+.fe-candidate-list > .fe-candidate:nth-child(odd) {
+    background-color: var(--color-card);
+}

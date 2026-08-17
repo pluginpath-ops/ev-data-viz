@@ -2,6 +2,8 @@ import { getSupabase } from './supabase';
 import { vehicleLabel } from '../utils/specHelpers';
 import { roundTo, } from '../utils/unitConversions';
 import { toSessionRow } from '../utils/testSessions';
+import { rankFeCandidates } from '../utils/feGuideMatch';
+import { promotionUpdates, demotionUpdates } from '../utils/feGuidePromotion';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
@@ -1649,6 +1651,66 @@ class DataService {
       }
     }
     return result;
+  }
+
+  /**
+   * Staged guide rows that could belong to this group — ranked candidates for
+   * the link picker.
+   *
+   * Filtered server-side by model year only; make matching happens in JS because
+   * it needs containment either way (`Lucid` against `Lucid USA Inc.`), which
+   * SQL would need a custom function to express.
+   */
+  async getFeGuideCandidates(group) {
+    if (!this.useSupabase || !group) return [];
+    let query = getSupabase().from('epa_fe_guide').select('*');
+    if (group.model_year) query = query.eq('model_year', group.model_year);
+    const { data, error } = await query;
+    if (error) throw error;
+    return rankFeCandidates(group, data || []);
+  }
+
+  /**
+   * Link a guide row to a test group and copy its figures across.
+   *
+   * The write is a single update so the values, their provenance and the link
+   * land together — a partial promotion would leave fields the curator cannot
+   * attribute and unlink cannot undo.
+   */
+  async linkFeGuideRow(testGroupId, feRowId) {
+    if (!this.useSupabase) return { promoted: [], skipped: [] };
+    const supabase = getSupabase();
+
+    const [{ data: group, error: gErr }, { data: feRow, error: fErr }] = await Promise.all([
+      supabase.from('epa_test_groups').select('*').eq('test_group_id', testGroupId).single(),
+      supabase.from('epa_fe_guide').select('*').eq('id', feRowId).single(),
+    ]);
+    if (gErr) throw gErr;
+    if (fErr) throw fErr;
+
+    const { updates, promoted, skipped } = promotionUpdates(group, feRow);
+    if (!promoted.length) return { promoted, skipped };
+
+    const { error } = await supabase
+      .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
+    if (error) throw error;
+    return { promoted, skipped };
+  }
+
+  /** Unlink, restoring every value the promotion displaced. */
+  async unlinkFeGuideRow(testGroupId) {
+    if (!this.useSupabase) return { restored: [] };
+    const supabase = getSupabase();
+
+    const { data: group, error: gErr } = await supabase
+      .from('epa_test_groups').select('*').eq('test_group_id', testGroupId).single();
+    if (gErr) throw gErr;
+
+    const { updates, restored } = demotionUpdates(group);
+    const { error } = await supabase
+      .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
+    if (error) throw error;
+    return { restored };
   }
 
   /** Staged guide rows, newest model year first. Used by the import summary. */
