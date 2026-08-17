@@ -80,6 +80,12 @@ export default function App() {
     const [activeVehicle, setActiveVehicle] = useState(null);
     const [view, setView] = useState('vehicles');
 
+    // Keep activeVehicle in sync with vehicles state. Computed early (rather
+    // than just before render) so the URL-sync effects below can depend on it.
+    const currentActiveVehicle = activeVehicle
+        ? vehicles.find(v => v.id === activeVehicle.id) || activeVehicle
+        : null;
+
     // Persist Vehicles tab UI state across tab switches so filters/sort/page
     // are restored when the user returns.
     const [vehiclesViewState, setVehiclesViewState] = useState(() => ({
@@ -208,6 +214,8 @@ export default function App() {
     const [showAuthModal, setShowAuthModal] = useState(false);
     const pendingUrlState = useRef(null);
     const urlApplied = useRef(false);
+    // Vehicle id to restore on the Runs tab (?tab=runs&vid=…) once vehicles load.
+    const pendingRunsVehicleId = useRef(null);
 
     // ── Parse URL on mount ──────────────────────────────────────────────────
     useEffect(() => {
@@ -233,6 +241,11 @@ export default function App() {
         }
 
         const tab = p.get('tab');
+        if (tab === 'runs') {
+            const vid = p.get('vid');
+            if (vid) pendingRunsVehicleId.current = isNaN(Number(vid)) ? vid : Number(vid);
+            return;
+        }
         if (!isChartCategory(tab)) return;
         pendingUrlState.current = {
             vehicleIds:    (p.get('v')?.split(',').filter(Boolean) || []).map(id => isNaN(Number(id)) ? id : Number(id)),
@@ -310,10 +323,14 @@ export default function App() {
             // Restore chart mode without clearing runs — auto-select re-initialises
             // them for the restored mode automatically.
             if (e.state.chartMode) setChartMode(e.state.chartMode);
+            if (e.state.view === 'runs' && e.state.vehicleId != null) {
+                const v = vehicles.find(v => v.id === e.state.vehicleId);
+                if (v) setActiveVehicle(v);
+            }
         };
         window.addEventListener('popstate', onPopState);
         return () => window.removeEventListener('popstate', onPopState);
-    }, []); // setState setters are stable — no deps needed
+    }, [vehicles]); // vehicles needed to resolve vehicleId back to a vehicle object
 
     // ── Apply pending URL state once data has loaded ────────────────────────
     useEffect(() => {
@@ -353,6 +370,18 @@ export default function App() {
         // Land on the category that owns the restored mode.
         setView(categoryForMode(s.chartMode).key);
     }, [loading]);
+
+    // ── Restore the active vehicle on the Runs tab from ?vid= ───────────────
+    useEffect(() => {
+        if (loading || pendingRunsVehicleId.current == null) return;
+        const id = pendingRunsVehicleId.current;
+        pendingRunsVehicleId.current = null;
+        const v = vehicles.find(v => v.id === id);
+        if (v) {
+            setActiveVehicle(v);
+            setView('runs');
+        }
+    }, [loading, vehicles]);
 
     // ── Keep URL in sync while on a chart category tab ──────────────────────
     useEffect(() => {
@@ -432,6 +461,20 @@ export default function App() {
         history.replaceState({ view, chartMode }, '', '?' + p.toString());
     }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings]);
 
+    // ── Keep URL in sync while on the Runs tab ──────────────────────────────
+    // Mirrors the chart-tab sync above: a refresh or shared link on ?tab=runs
+    // needs the vehicle id to know which vehicle's tests to show, since
+    // activeVehicle otherwise lives only in React state.
+    useEffect(() => {
+        if (isPopout) return;
+        if (view !== 'runs' || !currentActiveVehicle) return;
+        history.replaceState(
+            { view: 'runs', vehicleId: currentActiveVehicle.id },
+            '',
+            `?tab=runs&vid=${currentActiveVehicle.id}`,
+        );
+    }, [isPopout, view, currentActiveVehicle]);
+
     // ── Drop pairings for runs that are no longer on screen ─────────────────
     // A pairing referencing a deselected vehicle's run would otherwise ride along
     // in the URL forever and silently resurrect if that vehicle came back.
@@ -459,11 +502,6 @@ export default function App() {
     useEffect(() => {
         sendState();
     }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, sendState]);
-
-    // Keep activeVehicle in sync with vehicles state
-    const currentActiveVehicle = activeVehicle
-        ? vehicles.find(v => v.id === activeVehicle.id) || activeVehicle
-        : null;
 
     if (loading) {
         return (
