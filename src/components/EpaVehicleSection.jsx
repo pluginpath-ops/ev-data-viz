@@ -265,8 +265,17 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
 
             {/* The link that fills Label Results, beside the figures it fills —
                 it was behind the curator disclosure, which is two clicks from
-                the only place its effect is visible. */}
-            <FeGuidePicker group={g} canEdit={canEdit} onChanged={onGroupChanged} />
+                the only place its effect is visible.
+
+                Curators only. It is a curation tool: a reader gets nothing from
+                a list of candidate guide rows, and rendering it for everyone
+                also ran a candidate query on every anonymous card view. Same
+                gate as the curator form below, because the writes behind it are
+                contributor-only at the RLS layer anyway — showing the controls
+                to anyone else offers buttons that would be refused. */}
+            {canEdit && (
+                <FeGuidePicker group={g} canEdit={canEdit} onChanged={onGroupChanged} />
+            )}
 
             {mapping.notes && (
                 <p className="mt-2 text-xs text-muted italic border-t pt-2">{mapping.notes}</p>
