@@ -10,6 +10,45 @@ import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFro
 const roundField = roundTo;
 
 /**
+ * How many rows PostgREST will return for one request.
+ *
+ * Supabase caps a response at `db-max-rows` (1000 by default) and says nothing
+ * about it — no error, no flag, just a short array. A read that outgrows the
+ * cap therefore returns a confidently wrong answer. That is how the Fuel
+ * Economy Guide import summary came to show 2024-2027 and silently omit 2022
+ * and 2023: the four visible years summed to precisely 1000 rows.
+ *
+ * Where the answer is an aggregate, the fix is to aggregate in Postgres — see
+ * migration 054 — because that returns one row per group and never approaches
+ * the cap. Paging is for the reads that genuinely want every row.
+ */
+const PAGE_SIZE = 1000;
+
+/**
+ * Read every row a query matches, a page at a time.
+ *
+ * `builder` must be a function returning a FRESH PostgREST query, not a query
+ * object — a builder is single-use, and calling `.range()` on one twice mutates
+ * the same request rather than producing two.
+ *
+ * The caller's ordering must be unique for paging to be sound: with a
+ * non-unique sort key, rows tie and Postgres may order them differently between
+ * requests, which drops some and repeats others across the page boundary.
+ * Order by `id`, or add it as a tiebreaker.
+ */
+export async function fetchAllRows(builder) {
+  const out = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await builder().range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    out.push(...(data || []));
+    // A short page means the end. A full one is ambiguous, so it costs one more
+    // request that comes back empty.
+    if (!data || data.length < PAGE_SIZE) return out;
+  }
+}
+
+/**
  * How long a stored image object may be cached. Safe at a year only because
  * every stored URL carries a ?v= stamp written at upload time — see
  * #putVehicleImageObject. Objects predating that carry Supabase Storage's
@@ -881,9 +920,10 @@ class DataService {
    * 10→78 — and sometimes worse: one run stores 100→1 against points spanning
    * 0→80. The points are the measurement; the columns are a leftover.
    *
-   * One request for every run rather than one each: PostgREST has aggregate
-   * functions disabled, so the min/max is computed here, but ~60 rows per run
-   * of a single column is a small price for a figure that is actually correct.
+   * Aggregated in Postgres (migration 054), one row per run rather than every
+   * sample. It used to reduce client-side, which was wasteful and also wrong:
+   * PostgREST truncates a response at 1000 rows silently, so at ~200 points per
+   * run the span went quietly partial at about FIVE selected runs.
    */
   async getSocRanges(runIds) {
     if (!this.useSupabase || !runIds?.length) return {};
@@ -891,20 +931,16 @@ class DataService {
     if (!real.length) return {};
 
     const { data, error } = await getSupabase()
-      .from('data_points')
-      .select('run_id, soc')
-      .in('run_id', real)
-      .not('soc', 'is', null);
+      .rpc('run_soc_ranges', { p_run_ids: real });
     if (error) throw error;
 
     const out = {};
-    for (const { run_id, soc } of data || []) {
-      const cur = out[run_id];
-      if (!cur) out[run_id] = { min: soc, max: soc };
-      else {
-        if (soc < cur.min) cur.min = soc;
-        if (soc > cur.max) cur.max = soc;
-      }
+    // A run with no non-null SoC sample is absent from the result rather than
+    // present with nulls, which the caller already reads as "no span known".
+    for (const r of data || []) {
+      // Coerced because PostgREST may serialise a numeric column as a string,
+      // and these are compared and scaled downstream.
+      out[r.run_id] = { min: Number(r.min_soc), max: Number(r.max_soc) };
     }
     return out;
   }
@@ -914,12 +950,15 @@ class DataService {
     const actualId = isInheritedRunId(runId)
       ? parseInheritedRunId(runId).realRunId
       : runId;
-    const { data, error } = await getSupabase()
+    // Paged: a long run exceeds the 1000-row cap on its own, and the insert
+    // path batches at 1000 precisely because runs that size exist. Unpaged, the
+    // chart just stops early with no indication the tail is missing.
+    const data = await fetchAllRows(() => getSupabase()
       .from('data_points')
       .select('*')
       .eq('run_id', actualId)
-      .order('frame', { ascending: true });
-    if (error) throw error;
+      .order('frame', { ascending: true })
+      .order('id', { ascending: true }));
     return (data || []).map(p => ({
       frame:       p.frame,
       timestamp:   p.timestamp,
@@ -1657,17 +1696,30 @@ class DataService {
    * Staged guide rows that could belong to this group — ranked candidates for
    * the link picker.
    *
-   * Filtered server-side by model year only; make matching happens in JS because
-   * it needs containment either way (`Lucid` against `Lucid USA Inc.`), which
-   * SQL would need a custom function to express.
+   * EVERY YEAR, not just the group's. This used to filter server-side on the
+   * exact model year, which contradicted both the picker's own copy ("no staged
+   * rows in any imported year") and the ranker: `rankFeCandidates` treats the
+   * year as a SORT key rather than a filter, and `bestFeCandidate` has a
+   * dedicated wrong-year path that declines to auto-propose a borrowed row. All
+   * of that was unreachable, and a 2027 ID. Buzz found nothing because VW has
+   * only filed through 2026 — the rows were staged and never queried.
+   *
+   * Make matching stays in JS: it needs containment either way (`Lucid` against
+   * `Lucid USA Inc.`), which SQL would need a custom function to express.
+   *
+   * Only the columns the picker ranks and displays are fetched. The full row is
+   * re-read by id when one is actually linked, so pulling ~140 columns for
+   * every staged row of every year to show a carline and a range was waste that
+   * grew with each import. Paged, because all years together is past the
+   * 1000-row cap; `id` orders it since nothing else here is unique.
    */
   async getFeGuideCandidates(group) {
     if (!this.useSupabase || !group) return [];
-    let query = getSupabase().from('epa_fe_guide').select('*');
-    if (group.model_year) query = query.eq('model_year', group.model_year);
-    const { data, error } = await query;
-    if (error) throw error;
-    return rankFeCandidates(group, data || []);
+    const rows = await fetchAllRows(() => getSupabase()
+      .from('epa_fe_guide')
+      .select('id, model_year, division, carline, label_comb_range_mi, label_comb_mpge, motor_count')
+      .order('id', { ascending: true }));
+    return rankFeCandidates(group, rows);
   }
 
   /**
@@ -1747,23 +1799,28 @@ class DataService {
     return { restored };
   }
 
-  /** Staged guide rows, newest model year first. Used by the import summary. */
+  /**
+   * Staged guide rows, newest model year first. Used by the import summary.
+   *
+   * Aggregated in Postgres (migration 054) — six rows back, not ~1600.
+   *
+   * This is the read that exposed the row cap. It used to fetch every staged
+   * row and count them in JS, and PostgREST silently returns at most 1000, so
+   * with six guide years imported the summary listed 2024-2027, omitted 2022
+   * and 2023, and reported them as never imported. The four years it did show
+   * summed to exactly 1000.
+   */
   async getFeGuideSummary() {
     if (!this.useSupabase) return [];
-    const { data, error } = await getSupabase()
-      .from('epa_fe_guide')
-      .select('model_year, division')
-      .order('model_year', { ascending: false });
+    const { data, error } = await getSupabase().rpc('fe_guide_summary');
     if (error) throw error;
 
-    const byYear = new Map();
-    for (const r of data || []) {
-      if (!byYear.has(r.model_year)) byYear.set(r.model_year, { modelYear: r.model_year, rows: 0, divisions: new Set() });
-      const y = byYear.get(r.model_year);
-      y.rows++;
-      y.divisions.add(r.division);
-    }
-    return [...byYear.values()].map(y => ({ ...y, divisions: y.divisions.size }));
+    // count() returns bigint, which PostgREST may serialise as a string.
+    return (data || []).map(r => ({
+      modelYear: r.model_year,
+      rows:      Number(r.row_count),
+      divisions: Number(r.divisions),
+    }));
   }
 
   // ── EPA curator model: coefficient sets, tests, phases, audit ─────────────────

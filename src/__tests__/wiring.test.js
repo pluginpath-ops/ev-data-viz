@@ -229,6 +229,40 @@ describe('the seams that broke before', () => {
             .toEqual([]);
     });
 
+    it('lets the FE guide ranker see every year, and fetches what it ranks on', () => {
+        // rankFeCandidates treats the model year as a SORT key and
+        // bestFeCandidate has a dedicated wrong-year path — both written for
+        // candidates spanning years. The query filtered to the group's exact
+        // year, so neither could ever fire, and a 2027 ID. Buzz reported no
+        // staged rows while its 2025 and 2026 rows sat in the table. Two modules
+        // disagreeing about whether year filters or sorts is invisible unless
+        // something reads them together.
+        const svc = read('src/services/DataService.js');
+        const body = svc.slice(svc.indexOf('async getFeGuideCandidates'));
+        const fn = body.slice(0, body.indexOf('\n  }'));
+
+        expect(fn, 'getFeGuideCandidates must not pre-filter the year the ranker sorts on')
+            .not.toMatch(/eq\(\s*['"]model_year['"]/);
+
+        // The select is narrowed, so anything the ranker or picker reads off a
+        // candidate has to be named in it or it arrives undefined.
+        const selected = new Set(
+            (fn.match(/\.select\(\s*['"]([^'"]+)['"]/)?.[1] ?? '').split(',').map(s => s.trim()),
+        );
+        const match = read('src/utils/feGuideMatch.js');
+        const picker = read('src/components/epa/FeGuidePicker.jsx');
+        const needed = new Set([
+            ...[...match.matchAll(/\br(?:ow)?\.([a-z_]{3,})/g)].map(m => m[1]),
+            // `\brow\.` rather than `best.row.` / `c.row.`, so columns read
+            // inside CandidateFacts count too. It does not catch `linkedRow.`,
+            // which is a different, fully-fetched row.
+            ...[...picker.matchAll(/\brow\.([a-z_]+)/g)].map(m => m[1]),
+        ]);
+
+        const missing = [...needed].filter(k => !selected.has(k));
+        expect(missing, `candidate columns read but not selected: ${missing.join(', ')}`).toEqual([]);
+    });
+
     it('fetches every EPA column the vehicle card reads', () => {
         // getVehicles names its columns explicitly, and migration 053 added
         // eleven more that nothing widened the list for. Promotion wrote them

@@ -273,6 +273,20 @@ Deletes all existing data points for a run and inserts the new set. Used when re
 
 ---
 
+### `fe_guide_summary() → table(model_year, row_count, divisions)`
+
+One row per staged Fuel Economy Guide model year, for the Admin import summary. `divisions` is a DISTINCT count — how many makes are represented, not how many rows they occupy.
+
+---
+
+### `run_soc_ranges(p_run_ids bigint[]) → table(run_id, min_soc, max_soc)`
+
+The real SoC span of each run, computed from its data points, since `runs.start_soc`/`end_soc` cannot be trusted for a charging test (see migration 046). Runs with no non-null SoC sample are absent from the result rather than present with nulls.
+
+Both of the above are `SECURITY INVOKER`, so RLS still applies and neither can see a row its caller could not read directly. They exist because PostgREST has aggregate functions disabled on this project, so these reads previously fetched whole result sets and reduced them in JS — which silently truncated at the 1000-row cap. See migration 054.
+
+---
+
 ## Row-Level Security
 
 RLS is enabled on `vehicles`, `runs`, `trims`, `votes`, and `site_settings`.
