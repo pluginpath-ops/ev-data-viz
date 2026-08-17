@@ -144,6 +144,18 @@ export const EPA_DEFAULTS = {
     STD_ALTITUDE_FT: 0,
     STD_TEMP_F:      70,
 
+    // How far the EPA label range may sit from the vehicle's spec range before
+    // the curator form flags it. NOT a tie between the fields: one vehicle trim
+    // legitimately maps to several EPA configurations — different wheels, tyres
+    // or a carry-over year — and those differ by a few miles without either
+    // number being wrong.
+    //
+    // 5% tolerates that (a few miles on a 300-mile car) while still catching the
+    // failure worth catching: a link to the wrong pack or a mistyped figure,
+    // which are usually tens of miles out. Tunable because the right threshold
+    // is a curation judgement, not a fact.
+    LABEL_RANGE_TOLERANCE_PCT: 5,
+
     // sanity bands (Section-8 flags) + curve extent
     ETA_BAND:          [0.75, 0.92],
     CHARGER_EFF_BAND:  [0.80, 0.92],
@@ -167,6 +179,7 @@ export const STANDARD_CONDITIONS = {
     temperatureF: resolve('STD_TEMP_F',      EPA_DEFAULTS.STD_TEMP_F),
 };
 
+export const LABEL_RANGE_TOLERANCE_PCT = resolve('LABEL_RANGE_TOLERANCE_PCT', EPA_DEFAULTS.LABEL_RANGE_TOLERANCE_PCT);
 export const ETA_BAND          = resolve('ETA_BAND',          EPA_DEFAULTS.ETA_BAND);
 export const CHARGER_EFF_BAND  = resolve('CHARGER_EFF_BAND',  EPA_DEFAULTS.CHARGER_EFF_BAND);
 export const SS_SPEED_BAND     = resolve('SS_SPEED_BAND',     EPA_DEFAULTS.SS_SPEED_BAND);

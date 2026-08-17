@@ -11,10 +11,41 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import CuratorField from './CuratorField';
+import { fuelEconomySearchUrl, baseModelFor } from '../../utils/fuelEconomyLink';
+import { labelRangeCheck, labelRangeCheckNote } from '../../utils/labelRangeCheck';
 import DerivedValues from './DerivedValues';
 import TestPhaseEditor from './TestPhaseEditor';
 import AuditHistory from './AuditHistory';
 import { ASSUMED_CHARGER_EFF, DEFAULT_ACCESSORY_W } from '../../constants/epa';
+
+/**
+ * "Look it up ↗" beside the label fields.
+ *
+ * Prefers the vehicle's curated make/model/year; falls back to the EPA group's
+ * own make and model year, dropping the model rather than slicing one out of a
+ * carline string. See utils/fuelEconomyLink.js for why a broad search beats a
+ * wrong one.
+ */
+function FuelEconomyLookup({ group, vehicle }) {
+    const url = fuelEconomySearchUrl({
+        year:  vehicle?.year ?? group?.model_year,
+        make:  vehicle?.make ?? group?.make,
+        model: baseModelFor(vehicle),
+    });
+    if (!url) return null;
+
+    return (
+        <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-2 normal-case tracking-normal font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+            title="Opens a fueleconomy.gov search for this year, make and model. It returns a results page even when the combination matches nothing, so check the listing names before trusting it."
+        >
+            look up on fueleconomy.gov ↗
+        </a>
+    );
+}
 
 function Section({ title, children }) {
     return (
@@ -52,7 +83,7 @@ const TIP = {
     charger_override:  `Default derived from Total DC ÷ AC Recharge (≈0.84 measured for R2). Falls back to ${ASSUMED_CHARGER_EFF} when AC recharge is unavailable. Override to pin a known value.`,
 };
 
-export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }) {
+export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange, vehicle = null }) {
     const {
         getEpaTestGroupFull, updateEpaTestGroup,
         saveEpaCoefficientSet, saveEpaTest, deleteEpaTest,
@@ -117,6 +148,15 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
         }));
         return { ...dbGroup, ...edits.group, epa_coefficient_sets: sets, epa_tests: tests };
     }, [dbGroup, edits]);
+
+    // Cross-check against the curated spec range. Declared AFTER `group`: a
+    // useMemo dependency array is evaluated eagerly, so referencing `group`
+    // above its own const is a TDZ ReferenceError rather than a lazy read.
+    // Advisory only — see the note at the field for why these are not tied.
+    const rangeCheck = useMemo(
+        () => labelRangeCheck(group?.label_range_published, vehicle?.range),
+        [group?.label_range_published, vehicle?.range],
+    );
 
     if (loading) return <p className="text-xs text-faint italic py-2">Loading curator data…</p>;
     if (error)   return <p className="text-xs text-red-500 py-2">Error: {error}</p>;
@@ -332,10 +372,25 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange }
             </div>
 
             {/* Section 6: Range & label (CD combined + published feed the adj factor) */}
-            <Section title="Range & Label Values">
+            <Section
+                title={<>
+                    Range &amp; Label Values
+                    {/* The label figures are the one part of the model with no
+                        ingest path — a certification record carries what the lab
+                        measured, not what reached the window sticker (#206 A1:
+                        set on 7 of 87 linked groups). They are typed in by hand,
+                        so the least this can do is remove the navigation. */}
+                    <FuelEconomyLookup group={group} vehicle={vehicle} />
+                </>}
+            >
                 <CuratorField label="CD range combined (calc)" used type="number" step="0.1" unit="mi" tooltip={TIP.cd_range_combined} value={group.cd_range_combined_calc} canEdit={canEdit} overrideSource={gOv('cd_range_combined_calc')} onSave={v => saveGroup('cd_range_combined_calc', v)} />
                 <CuratorField label="CD range highway (calc)" type="number" step="0.1" unit="mi" tooltip={TIP.cd_range_hwy} value={group.cd_range_hwy_calc} canEdit={canEdit} overrideSource={gOv('cd_range_hwy_calc')} onSave={v => saveGroup('cd_range_hwy_calc', v)} />
-                <CuratorField label="Label range (published)" used type="number" step="0.1" unit="mi" tooltip={TIP.label_range} value={group.label_range_published} canEdit={canEdit} overrideSource={gOv('label_range_published')} onSave={v => saveGroup('label_range_published', v)} />
+                {/* Flagged, never tied: one trim can map to several EPA
+                    configurations a few miles apart, and forcing them equal
+                    would throw away a real distinction. See
+                    utils/labelRangeCheck.js. */}
+                <CuratorField label="Label range (published)" used type="number" step="0.1" unit="mi" tooltip={TIP.label_range} value={group.label_range_published} canEdit={canEdit} overrideSource={gOv('label_range_published')} onSave={v => saveGroup('label_range_published', v)}
+                    flag={rangeCheck?.mismatch ? { text: '≠ specs', title: labelRangeCheckNote(rangeCheck) } : undefined} />
                 <CuratorField label="Label combined MPGe" type="number" step="0.1" tooltip={TIP.label_combined} value={group.label_combined_mpge} canEdit={canEdit} overrideSource={gOv('label_combined_mpge')} onSave={v => saveGroup('label_combined_mpge', v)} />
                 <CuratorField label="Label highway MPGe" type="number" step="0.1" tooltip={TIP.label_hwy} value={group.label_hwy_mpge} canEdit={canEdit} overrideSource={gOv('label_hwy_mpge')} onSave={v => saveGroup('label_hwy_mpge', v)} />
                 <CuratorField label="Derived 5-cycle coeff." type="number" step="0.0001" tooltip={TIP.derived_5cycle} value={group.derived_5cycle_coefficient} canEdit={canEdit} overrideSource={gOv('derived_5cycle_coefficient')} onSave={v => saveGroup('derived_5cycle_coefficient', v)} />

@@ -1923,3 +1923,11 @@ body {
     .cycle-band { display: none; }
     .cert-grid-label { @apply pt-2; }
 }
+
+/* Advisory badge on a curator field — e.g. an EPA label range that disagrees
+   with the vehicle's spec range (#206). Amber: worth a look, not an error. */
+.curator-field-flag {
+    @apply text-[9px] font-bold px-1 rounded cursor-help;
+    color: var(--color-warning);
+    background-color: rgba(245, 158, 11, 0.12);
+}
