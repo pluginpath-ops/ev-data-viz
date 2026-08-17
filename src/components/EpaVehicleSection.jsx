@@ -32,12 +32,43 @@ function ConfidenceBadge({ confidence }) {
 }
 
 /** One row of a label/value table inside the card. */
-function DataRow({ label, value, muted }) {
-    if (value == null) return null;
+/** Figures the card prints, or a dash. Nulls read as "not known", not as zero. */
+const mpge  = (v) => (v != null && v < 500) ? v.toFixed(0) : null;
+const miles = (v) => v != null ? `${v.toFixed(0)} mi` : null;
+
+/**
+ * Which EPA cycles this group's stored tests actually drove.
+ *
+ * From the phases, not from the label's declared method: `Calc Approach Desc`
+ * says "5-cycle label" on records whose adjustment is exactly the flat 0.7
+ * factor, so it does not describe what was driven (#206).
+ */
+function cyclesTested(group) {
+    const phases = (group?.epa_tests ?? []).flatMap(t => t.epa_test_phases ?? []);
+    const counts = new Map();
+    for (const p of phases) {
+        if (!p.phase_type) continue;
+        counts.set(p.phase_type, (counts.get(p.phase_type) ?? 0) + 1);
+    }
+    if (counts.size) {
+        return [...counts.entries()].map(([type, n]) => n > 1 ? `${type}x${n}` : type).join(' · ');
+    }
+    // No phases stored: fall back to naming the procedures that ran.
+    const procs = [...new Set((group?.epa_tests ?? []).map(t => t.procedure_code).filter(Boolean))];
+    return procs.length ? procs.map(c => `proc ${c}`).join(' · ') : null;
+}
+
+function DataRow({ label, value, muted, always = false }) {
+    // `always` holds the row when the figure is absent, so a column keeps the
+    // shape it was specified with. Without it a group with no label data showed
+    // two bare headings and read as broken rather than as empty.
+    if (value == null && !always) return null;
     return (
         <div className="flex justify-between gap-4 py-0.5">
             <span className="text-muted shrink-0">{label}</span>
-            <span className={`font-mono text-right ${muted ? 'text-faint' : ''}`}>{value}</span>
+            <span className={`font-mono text-right ${muted || value == null ? 'text-faint' : ''}`}>
+                {value ?? '—'}
+            </span>
         </div>
     );
 }
@@ -193,52 +224,43 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-1 text-xs">
 
-                {/* Physical */}
                 <div>
                     <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
                         Test Setup
                     </div>
-                    <DataRow label="Test weight" value={coeff.equiv_test_weight_lbs != null ? coeff.equiv_test_weight_lbs.toLocaleString() + ' lbs' : null} />
-                    <DataRow label="Fuel type" value={g.fuel_type} />
-                    <DataRow label="Config #" value={g.vehicle_config_number} />
+                    <DataRow always label="Test weight" value={coeff.equiv_test_weight_lbs != null ? coeff.equiv_test_weight_lbs.toLocaleString() + ' lbs' : null} />
+                    <DataRow always label="Config" value={g.vehicle_config_number} />
+                    {/* What was actually driven. Read from the stored phases
+                        rather than from the label's declared method, which says
+                        "5-cycle" on records whose adjustment is the flat 0.7
+                        factor and cannot be trusted (#206). */}
+                    <DataRow always label="Cycles tested" value={cyclesTested(g)} />
                 </div>
 
-                {/* Label results + live derivations */}
-                <div className="space-y-2">
-                    <div>
-                        <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
-                            Label Results
-                        </div>
-                        {/* City, highway and combined for both measures. The
-                            guide carries all six and the card showed two, so the
-                            asymmetry the whole methodology turns on — city range
-                            far above highway — was invisible here. */}
-                        {g.label_range_published != null && (
-                            <DataRow label="Range combined" value={g.label_range_published.toFixed(0) + ' mi'} />
-                        )}
-                        {g.label_city_range_mi != null && (
-                            <DataRow label="Range city" value={g.label_city_range_mi.toFixed(0) + ' mi'} />
-                        )}
-                        {g.label_hwy_range_mi != null && (
-                            <DataRow label="Range highway" value={g.label_hwy_range_mi.toFixed(0) + ' mi'} />
-                        )}
-                        {g.label_combined_mpge != null && g.label_combined_mpge < 500 && (
-                            <DataRow label="MPGe combined" value={g.label_combined_mpge.toFixed(0)} />
-                        )}
-                        {g.label_city_mpge != null && g.label_city_mpge < 500 && (
-                            <DataRow label="MPGe city" value={g.label_city_mpge.toFixed(0)} />
-                        )}
-                        {g.label_hwy_mpge != null && g.label_hwy_mpge < 500 && (
-                            <DataRow label="MPGe highway" value={g.label_hwy_mpge.toFixed(0)} />
-                        )}
-                        {g.label_range_published == null && g.label_combined_mpge == null && (
-                            <p className="text-faint text-[10px] italic">No label data</p>
-                        )}
+                <div>
+                    <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
+                        Label Efficiency
                     </div>
-                    <DerivedValues group={g} />
+                    <DataRow always label="MPGe combined" value={mpge(g.label_combined_mpge)} />
+                    <DataRow always label="MPGe city"     value={mpge(g.label_city_mpge)} />
+                    <DataRow always label="MPGe highway"  value={mpge(g.label_hwy_mpge)} />
                 </div>
+
+                <div>
+                    <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
+                        Label Range
+                    </div>
+                    {/* Combined above city and highway, matching the efficiency
+                        column: it is the headline figure, and seeing city sit
+                        well above it is the point. */}
+                    <DataRow always label="Range combined" value={miles(g.label_range_published)} />
+                    <DataRow always label="Range city"     value={miles(g.label_city_range_mi)} />
+                    <DataRow always label="Range highway"  value={miles(g.label_hwy_range_mi)} />
+                </div>
+
+                <DerivedValues group={g} vehicle={vehicle} />
             </div>
 
             {/* The link that fills Label Results, beside the figures it fills —
