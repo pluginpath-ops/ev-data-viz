@@ -23,6 +23,37 @@ import { guideConflicts } from '../../utils/feGuidePromotion';
  * sort first and any other year is badged in warning colour, here and in the
  * list below.
  */
+/**
+ * The facts that tell two candidates apart.
+ *
+ * Carlines repeat verbatim inside a single year at real differences. MY25 lists
+ * `HUMMER EV SUV` twice, and the rows are the 2X and the 3X — two motors at
+ * 315 mi / 53 MPGe against three at 312 / 52. The names are identical, so the
+ * similarity scores are identical too: neither the name nor the score can
+ * separate them, and the year cannot either. Motor count does, immediately.
+ *
+ * Rendered the same way in both places on purpose. A tie at the top puts one of
+ * the pair in the proposal and the other in the list, so the curator is reading
+ * across the two — and facts that appear in one and not the other are facts
+ * they have to hold in their head.
+ */
+function CandidateFacts({ row, exactYear, score }) {
+    return (
+        <div className="text-xs text-faint">
+            {row.label_comb_range_mi} mi
+            {row.label_comb_mpge != null && ` · ${row.label_comb_mpge} MPGe`}
+            {row.motor_count != null && ` · ${row.motor_count} motor${row.motor_count === 1 ? '' : 's'}`}
+            {' · '}
+            {/* Warning colour marks a borrowed year: a real difference, not a
+                weaker match. The year shows either way — see above. */}
+            <span style={exactYear ? undefined : { color: 'var(--color-warning)' }}>
+                {row.model_year}
+            </span>
+            {' · '}{Math.round(score * 100)}%
+        </div>
+    );
+}
+
 /** Curator-facing names for the promoted columns. */
 const FIELD_LABELS = {
     label_range_published: 'Label range',
@@ -230,22 +261,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                 <div className="fe-candidate fe-candidate-best">
                     <div className="min-w-0">
                         <div className="text-sm font-medium text-secondary truncate">{best.row.carline}</div>
-                        <div className="text-xs text-faint">
-                            {best.row.label_comb_range_mi} mi combined
-                            {best.row.label_comb_mpge != null && ` · ${best.row.label_comb_mpge} MPGe`}
-                            {' · '}{Math.round(best.score * 100)}% name match
-                            {/* Load-bearing on the proposal, not decoration. Candidates
-                                now span every imported year, so the top match can be a
-                                borrowed one — a 2027 group offered the 2026 row because
-                                VW has filed no 2027 configurations. EPA figures move
-                                between years, so the curator has to see which year they
-                                are about to promote. */}
-                            {!best.exactYear && (
-                                <span style={{ color: 'var(--color-warning)' }}>
-                                    {' · '}{best.row.model_year} guide
-                                </span>
-                            )}
-                        </div>
+                        <CandidateFacts row={best.row} exactYear={best.exactYear} score={best.score} />
                     </div>
                     {canEdit && (
                         <button
@@ -284,17 +300,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                                     <div key={c.row.id} className="fe-candidate">
                                         <div className="min-w-0">
                                             <div className="text-xs text-secondary truncate">{c.row.carline}</div>
-                                            <div className="text-xs text-faint">
-                                                {c.row.label_comb_range_mi} mi
-                                                {' · '}{Math.round(c.score * 100)}%
-                                                {/* A different guide year is a real
-                                                    difference, not a weaker match. */}
-                                                {!c.exactYear && (
-                                                    <span style={{ color: 'var(--color-warning)' }}>
-                                                        {' · '}{c.row.model_year}
-                                                    </span>
-                                                )}
-                                            </div>
+                                            <CandidateFacts row={c.row} exactYear={c.exactYear} score={c.score} />
                                         </div>
                                         {canEdit && (
                                             <button

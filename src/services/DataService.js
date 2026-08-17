@@ -1717,7 +1717,7 @@ class DataService {
     if (!this.useSupabase || !group) return [];
     const rows = await fetchAllRows(() => getSupabase()
       .from('epa_fe_guide')
-      .select('id, model_year, division, carline, label_comb_range_mi, label_comb_mpge')
+      .select('id, model_year, division, carline, label_comb_range_mi, label_comb_mpge, motor_count')
       .order('id', { ascending: true }));
     return rankFeCandidates(group, rows);
   }

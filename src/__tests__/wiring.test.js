@@ -253,7 +253,10 @@ describe('the seams that broke before', () => {
         const picker = read('src/components/epa/FeGuidePicker.jsx');
         const needed = new Set([
             ...[...match.matchAll(/\br(?:ow)?\.([a-z_]{3,})/g)].map(m => m[1]),
-            ...[...picker.matchAll(/\b(?:best|c)\.row\.([a-z_]+)/g)].map(m => m[1]),
+            // `\brow\.` rather than `best.row.` / `c.row.`, so columns read
+            // inside CandidateFacts count too. It does not catch `linkedRow.`,
+            // which is a different, fully-fetched row.
+            ...[...picker.matchAll(/\brow\.([a-z_]+)/g)].map(m => m[1]),
         ]);
 
         const missing = [...needed].filter(k => !selected.has(k));
