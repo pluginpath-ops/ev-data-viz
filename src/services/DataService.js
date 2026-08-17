@@ -13,11 +13,14 @@ const roundField = roundTo;
  * How many rows PostgREST will return for one request.
  *
  * Supabase caps a response at `db-max-rows` (1000 by default) and says nothing
- * about it — no error, no flag, just a short array. A query that reads whole
- * tables and aggregates in JS therefore returns a confidently wrong answer once
- * the table outgrows the cap. That is exactly how the Fuel Economy Guide import
- * summary came to show 2024-2027 and silently omit 2022 and 2023: the four
- * visible years summed to precisely 1000 rows.
+ * about it — no error, no flag, just a short array. A read that outgrows the
+ * cap therefore returns a confidently wrong answer. That is how the Fuel
+ * Economy Guide import summary came to show 2024-2027 and silently omit 2022
+ * and 2023: the four visible years summed to precisely 1000 rows.
+ *
+ * Where the answer is an aggregate, the fix is to aggregate in Postgres — see
+ * migration 054 — because that returns one row per group and never approaches
+ * the cap. Paging is for the reads that genuinely want every row.
  */
 const PAGE_SIZE = 1000;
 
@@ -917,34 +920,27 @@ class DataService {
    * 10→78 — and sometimes worse: one run stores 100→1 against points spanning
    * 0→80. The points are the measurement; the columns are a leftover.
    *
-   * One request for every run rather than one each: PostgREST has aggregate
-   * functions disabled, so the min/max is computed here, but ~60 rows per run
-   * of a single column is a small price for a figure that is actually correct.
+   * Aggregated in Postgres (migration 054), one row per run rather than every
+   * sample. It used to reduce client-side, which was wasteful and also wrong:
+   * PostgREST truncates a response at 1000 rows silently, so at ~200 points per
+   * run the span went quietly partial at about FIVE selected runs.
    */
   async getSocRanges(runIds) {
     if (!this.useSupabase || !runIds?.length) return {};
     const real = runIds.filter(id => !isInheritedRunId(id)).map(Number);
     if (!real.length) return {};
 
-    // Paged: this reads every SoC sample for every selected run at once, so
-    // ~60 rows per run means the 1000-row cap arrives around 17 runs — well
-    // inside normal use. Truncated, it silently returns a min/max computed from
-    // some of the data, which is worse than failing.
-    const data = await fetchAllRows(() => getSupabase()
-      .from('data_points')
-      .select('run_id, soc')
-      .in('run_id', real)
-      .not('soc', 'is', null)
-      .order('id', { ascending: true }));
+    const { data, error } = await getSupabase()
+      .rpc('run_soc_ranges', { p_run_ids: real });
+    if (error) throw error;
 
     const out = {};
-    for (const { run_id, soc } of data || []) {
-      const cur = out[run_id];
-      if (!cur) out[run_id] = { min: soc, max: soc };
-      else {
-        if (soc < cur.min) cur.min = soc;
-        if (soc > cur.max) cur.max = soc;
-      }
+    // A run with no non-null SoC sample is absent from the result rather than
+    // present with nulls, which the caller already reads as "no span known".
+    for (const r of data || []) {
+      // Coerced because PostgREST may serialise a numeric column as a string,
+      // and these are compared and scaled downstream.
+      out[r.run_id] = { min: Number(r.min_soc), max: Number(r.max_soc) };
     }
     return out;
   }
@@ -1793,30 +1789,25 @@ class DataService {
   /**
    * Staged guide rows, newest model year first. Used by the import summary.
    *
-   * Paged, because this counts every staged row and the table is already past
-   * a single response: six guide years is ~1600 rows against a 1000-row cap.
-   * Unpaged, the oldest years fell off the end and the summary reported them
-   * as simply not imported.
+   * Aggregated in Postgres (migration 054) — six rows back, not ~1600.
    *
-   * `id` is the tiebreaker, not decoration — model_year alone ties several
-   * hundred ways per page and rows would move between pages.
+   * This is the read that exposed the row cap. It used to fetch every staged
+   * row and count them in JS, and PostgREST silently returns at most 1000, so
+   * with six guide years imported the summary listed 2024-2027, omitted 2022
+   * and 2023, and reported them as never imported. The four years it did show
+   * summed to exactly 1000.
    */
   async getFeGuideSummary() {
     if (!this.useSupabase) return [];
-    const data = await fetchAllRows(() => getSupabase()
-      .from('epa_fe_guide')
-      .select('model_year, division')
-      .order('model_year', { ascending: false })
-      .order('id', { ascending: true }));
+    const { data, error } = await getSupabase().rpc('fe_guide_summary');
+    if (error) throw error;
 
-    const byYear = new Map();
-    for (const r of data || []) {
-      if (!byYear.has(r.model_year)) byYear.set(r.model_year, { modelYear: r.model_year, rows: 0, divisions: new Set() });
-      const y = byYear.get(r.model_year);
-      y.rows++;
-      y.divisions.add(r.division);
-    }
-    return [...byYear.values()].map(y => ({ ...y, divisions: y.divisions.size }));
+    // count() returns bigint, which PostgREST may serialise as a string.
+    return (data || []).map(r => ({
+      modelYear: r.model_year,
+      rows:      Number(r.row_count),
+      divisions: Number(r.divisions),
+    }));
   }
 
   // ── EPA curator model: coefficient sets, tests, phases, audit ─────────────────
