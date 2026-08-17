@@ -4,7 +4,7 @@ import { useChartSync } from './hooks/useChartSync';
 import { useTheme } from './hooks/useTheme';
 import AuthModal from './components/AuthModal';
 import VehiclesView from './components/VehiclesView';
-import RunsView from './components/RunsView';
+import RunsView, { RUNS_SUBTAB_IDS, DEFAULT_RUNS_SUBTAB } from './components/RunsView';
 import ChargingView from './components/ChargingView';
 import ChargeCompareView from './components/ChargeCompareView';
 import RoadTripView from './components/RoadTripView';
@@ -15,7 +15,7 @@ import SpecsScatterView from './components/SpecsScatterView';
 import EpaCurvesView from './components/EpaCurvesView';
 import PerformanceCompareView from './components/PerformanceCompareView';
 import PerformanceCurveView from './components/PerformanceCurveView';
-import AdminView from './components/AdminView';
+import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/AdminView';
 import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory } from './constants/chartNav';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
@@ -79,6 +79,13 @@ export default function App() {
 
     const [activeVehicle, setActiveVehicle] = useState(null);
     const [view, setView] = useState('vehicles');
+    // Which Runs-tab sub-tab is showing (Charging & Range / Inherited /
+    // Performance / EPA). Lifted out of RunsView so it can be persisted in the
+    // URL the same way activeVehicle is.
+    const [runsSubtab, setRunsSubtab] = useState(DEFAULT_RUNS_SUBTAB);
+    // Same lift for the Admin tab's sub-tabs (Roles / EPA Data / Fuel Economy
+    // Guide / Model Constants / Interface Settings).
+    const [adminSubtab, setAdminSubtab] = useState(DEFAULT_ADMIN_SUBTAB);
 
     // Keep activeVehicle in sync with vehicles state. Computed early (rather
     // than just before render) so the URL-sync effects below can depend on it.
@@ -214,8 +221,14 @@ export default function App() {
     const [showAuthModal, setShowAuthModal] = useState(false);
     const pendingUrlState = useRef(null);
     const urlApplied = useRef(false);
-    // Vehicle id to restore on the Runs tab (?tab=runs&vid=…) once vehicles load.
+    // Vehicle id / sub-tab to restore on the Runs tab (?tab=runs&vid=…&sub=…)
+    // once vehicles load.
     const pendingRunsVehicleId = useRef(null);
+    const pendingRunsSubtab = useRef(null);
+    // Whether to land on the Admin tab (?tab=admin&sub=…) once the user's role
+    // has loaded, and which sub-tab to restore.
+    const pendingAdminView = useRef(false);
+    const pendingAdminSubtab = useRef(null);
 
     // ── Parse URL on mount ──────────────────────────────────────────────────
     useEffect(() => {
@@ -244,6 +257,14 @@ export default function App() {
         if (tab === 'runs') {
             const vid = p.get('vid');
             if (vid) pendingRunsVehicleId.current = isNaN(Number(vid)) ? vid : Number(vid);
+            const sub = p.get('sub');
+            if (RUNS_SUBTAB_IDS.includes(sub)) pendingRunsSubtab.current = sub;
+            return;
+        }
+        if (tab === 'admin') {
+            pendingAdminView.current = true;
+            const sub = p.get('sub');
+            if (ADMIN_SUBTAB_IDS.includes(sub)) pendingAdminSubtab.current = sub;
             return;
         }
         if (!isChartCategory(tab)) return;
@@ -326,6 +347,10 @@ export default function App() {
             if (e.state.view === 'runs' && e.state.vehicleId != null) {
                 const v = vehicles.find(v => v.id === e.state.vehicleId);
                 if (v) setActiveVehicle(v);
+                if (RUNS_SUBTAB_IDS.includes(e.state.subtab)) setRunsSubtab(e.state.subtab);
+            }
+            if (e.state.view === 'admin' && ADMIN_SUBTAB_IDS.includes(e.state.subtab)) {
+                setAdminSubtab(e.state.subtab);
             }
         };
         window.addEventListener('popstate', onPopState);
@@ -371,17 +396,34 @@ export default function App() {
         setView(categoryForMode(s.chartMode).key);
     }, [loading]);
 
-    // ── Restore the active vehicle on the Runs tab from ?vid= ───────────────
+    // ── Restore the active vehicle + sub-tab on the Runs tab from ?vid=&sub= ──
     useEffect(() => {
         if (loading || pendingRunsVehicleId.current == null) return;
         const id = pendingRunsVehicleId.current;
         pendingRunsVehicleId.current = null;
+        const sub = pendingRunsSubtab.current;
+        pendingRunsSubtab.current = null;
         const v = vehicles.find(v => v.id === id);
         if (v) {
             setActiveVehicle(v);
             setView('runs');
+            if (RUNS_SUBTAB_IDS.includes(sub)) setRunsSubtab(sub);
         }
     }, [loading, vehicles]);
+
+    // ── Restore the Admin tab + sub-tab from ?tab=admin&sub= ────────────────
+    // Gated on isAdmin rather than a lookup, since there's no per-item id here
+    // — just a permission check that resolves once the user's role has loaded.
+    useEffect(() => {
+        if (loading || !pendingAdminView.current) return;
+        pendingAdminView.current = false;
+        const sub = pendingAdminSubtab.current;
+        pendingAdminSubtab.current = null;
+        if (isAdmin) {
+            setView('admin');
+            if (ADMIN_SUBTAB_IDS.includes(sub)) setAdminSubtab(sub);
+        }
+    }, [loading, isAdmin]);
 
     // ── Keep URL in sync while on a chart category tab ──────────────────────
     useEffect(() => {
@@ -463,17 +505,35 @@ export default function App() {
 
     // ── Keep URL in sync while on the Runs tab ──────────────────────────────
     // Mirrors the chart-tab sync above: a refresh or shared link on ?tab=runs
-    // needs the vehicle id to know which vehicle's tests to show, since
-    // activeVehicle otherwise lives only in React state.
+    // needs the vehicle id (and sub-tab) to know what to show, since both
+    // otherwise live only in React state.
     useEffect(() => {
         if (isPopout) return;
         if (view !== 'runs' || !currentActiveVehicle) return;
+        const p = new URLSearchParams();
+        p.set('tab', 'runs');
+        p.set('vid', currentActiveVehicle.id);
+        if (runsSubtab !== DEFAULT_RUNS_SUBTAB) p.set('sub', runsSubtab);
         history.replaceState(
-            { view: 'runs', vehicleId: currentActiveVehicle.id },
+            { view: 'runs', vehicleId: currentActiveVehicle.id, subtab: runsSubtab },
             '',
-            `?tab=runs&vid=${currentActiveVehicle.id}`,
+            '?' + p.toString(),
         );
-    }, [isPopout, view, currentActiveVehicle]);
+    }, [isPopout, view, currentActiveVehicle, runsSubtab]);
+
+    // ── Keep URL in sync while on the Admin tab ─────────────────────────────
+    useEffect(() => {
+        if (isPopout) return;
+        if (view !== 'admin' || !isAdmin) return;
+        const p = new URLSearchParams();
+        p.set('tab', 'admin');
+        if (adminSubtab !== DEFAULT_ADMIN_SUBTAB) p.set('sub', adminSubtab);
+        history.replaceState(
+            { view: 'admin', subtab: adminSubtab },
+            '',
+            '?' + p.toString(),
+        );
+    }, [isPopout, view, isAdmin, adminSubtab]);
 
     // ── Drop pairings for runs that are no longer on screen ─────────────────
     // A pairing referencing a deselected vehicle's run would otherwise ride along
@@ -802,7 +862,7 @@ export default function App() {
                             onAdd={addVehicle}
                             onUpdate={updateVehicle}
                             onDelete={deleteVehicle}
-                            onViewRuns={(v) => { setActiveVehicle(v); navigateTo('runs'); }}
+                            onViewRuns={(v) => { setActiveVehicle(v); setRunsSubtab(DEFAULT_RUNS_SUBTAB); navigateTo('runs'); }}
                             canCreate={canCreate}
                             canEdit={canEdit}
                             canDelete={canDelete}
@@ -853,6 +913,8 @@ export default function App() {
                             vehicles={vehicles}
                             onViewVehicle={(v) => setActiveVehicle(v)}
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
+                            subtab={runsSubtab}
+                            onSubtabChange={setRunsSubtab}
                         />
                     )}
                     {/* ChargingView is the fall-through: it renders for any mode NOT
@@ -950,6 +1012,8 @@ export default function App() {
                             getUsersForAdmin={getUsersForAdmin}
                             setUserRole={setUserRole}
                             currentUserId={user?.id}
+                            subtab={adminSubtab}
+                            onSubtabChange={setAdminSubtab}
                         />
                     )}
                 </main>

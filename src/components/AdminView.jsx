@@ -16,6 +16,12 @@ const SUBTABS = [
     { id: 'interface', label: 'Interface Settings' },
 ];
 
+/** Valid sub-tab ids, for App.jsx to validate the ?sub= URL param against. */
+export const ADMIN_SUBTAB_IDS = SUBTABS.map(t => t.id);
+
+/** Sub-tab shown when none is specified, and the fallback for an unknown `?sub=`. */
+export const DEFAULT_ADMIN_SUBTAB = 'roles';
+
 const SUBTITLES = {
     roles:     'Manage registered users and their roles.',
     epa:       'Browse, edit, link, and delete imported EPA test groups.',
@@ -24,14 +30,13 @@ const SUBTITLES = {
     interface: 'Site-wide appearance settings.',
 };
 
-export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId }) {
+export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId, subtab, onSubtabChange }) {
     const {
         exportData, importData, importTableauSessions,
         importEpaTestGroups, getEpaTestGroupsAdmin, deleteEpaTestGroup, updateEpaTestGroup,
         importEpaCsiGroups, getExistingEpaTestGroupIds,
         vehicles,
     } = useAppContext();
-    const [subtab, setSubtab]         = useState('roles');
     const [users, setUsers]           = useState([]);
     const [loading, setLoading]       = useState(true);
     const [saving, setSaving]         = useState(null);
@@ -152,7 +157,7 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                     <button
                         key={t.id}
                         className={`btn-chart-mode ${subtab === t.id ? 'active' : ''}`}
-                        onClick={() => setSubtab(t.id)}
+                        onClick={() => onSubtabChange(t.id)}
                     >
                         {t.label}
                     </button>

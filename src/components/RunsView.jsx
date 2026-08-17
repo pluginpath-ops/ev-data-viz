@@ -68,6 +68,12 @@ const SUBTABS = [
     { id: 'epa',         label: '🏛 EPA',           count: d => d.vehicle.epa_mappings?.length || null },
 ];
 
+/** Valid sub-tab ids, for App.jsx to validate the ?sub= URL param against. */
+export const RUNS_SUBTAB_IDS = SUBTABS.map(t => t.id);
+
+/** Sub-tab shown when none is specified, and the fallback for an unknown `?sub=`. */
+export const DEFAULT_RUNS_SUBTAB = 'tests';
+
 // ── Field tag metadata (ordered for display) ──────────────────────────────────
 const FIELD_META = [
     { key: 'soc',         label: 'SoC',   title: 'State of Charge (%)' },
@@ -387,7 +393,7 @@ const DeriveAxisPanel = ({
     );
 };
 
-export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle }) {
+export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange }) {
     const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
@@ -395,8 +401,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     // Four independent bodies of data hung off one vehicle, previously stacked
     // into one very long page: a curator scrolled past every charging run to
     // reach EPA. Only the active one mounts, so the Performance and EPA sections
-    // no longer fetch on every visit to a vehicle's runs.
-    const [subtab, setSubtab] = useState('tests');
+    // no longer fetch on every visit to a vehicle's runs. Lifted to App.jsx
+    // (subtab/onSubtabChange props) so it can be persisted in the URL.
     const [showEditVehicle, setShowEditVehicle] = useState(false);
     const [showEditSpecs, setShowEditSpecs] = useState(false);
     const [showViewSpecs, setShowViewSpecs] = useState(false);
@@ -899,7 +905,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const handleUpdateData = (run) => {
         setMergeTargetRun(run);
         setUploadMode('merge');
-        setShowUpload(true); setSubtab('tests');
+        setShowUpload(true); onSubtabChange('tests');
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
@@ -1337,7 +1343,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         <button
                             key={t.id}
                             className={`btn-chart-mode ${subtab === t.id ? 'active' : ''}`}
-                            onClick={() => setSubtab(t.id)}
+                            onClick={() => onSubtabChange(t.id)}
                         >
                             {t.label}
                             {count != null && <span className="text-xs text-muted ml-1.5">{count}</span>}
