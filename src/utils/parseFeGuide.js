@@ -47,6 +47,8 @@ export const REQUIRED_COLUMNS = [
     'Fuel Usage Desc - Conventional Fuel',
     'Fuel Unit Desc - Conventional Fuel',
     'Comb Range as shown on FE Label (miles)',
+    // Part of the natural key since carline alone proved not to be unique.
+    'Index (Model Type Index)',
 ];
 
 /**
@@ -63,7 +65,6 @@ export const REQUIRED_COLUMNS = [
  */
 export const OPTIONAL_COLUMNS = [
     '#1 Smog Rating Test Group',
-    'Index (Model Type Index)',
     'Calc Approach Desc',
     'City Range (miles)',
     'Hwy Range (miles)',
@@ -205,6 +206,17 @@ function mapRow(row) {
 
         driveDesc:    str(row, 'Drive Desc'),
         carlineClass: str(row, 'Carline Class Desc'),
+
+        // The source row, so a question nobody has thought of yet does not need
+        // a re-import to answer — and, more to the point, survives EPA revising
+        // or withdrawing a guide year.
+        //
+        // Empty values are dropped: roughly half the 168 columns are blank on
+        // any given row, and a blank answers no question. What is kept is every
+        // value the row actually carried.
+        raw: Object.fromEntries(
+            Object.entries(row).filter(([k, v]) => k && String(v ?? '').trim() !== ''),
+        ),
     };
 }
 
@@ -256,8 +268,10 @@ export function parseFeGuide(csvText) {
         if (unit !== MPGE_UNIT) { skipped.duplicateUnit++; continue; }
 
         const row = mapRow(raw);
-        // A row with no key and no range cannot be linked or used.
-        if (!row.carline || !row.modelYear || row.labelCombRangeMi == null) {
+        // A row missing any part of the key, or its range, cannot be stored or
+        // linked. modelTypeIndex counts: without it two Audi configurations at
+        // different ranges collapse into one.
+        if (!row.carline || !row.modelYear || !row.modelTypeIndex || row.labelCombRangeMi == null) {
             skipped.unusable++;
             continue;
         }

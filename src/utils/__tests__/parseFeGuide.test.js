@@ -168,6 +168,53 @@ describe('parseFeGuide — warning on survivable absences', () => {
     });
 });
 
+describe('parseFeGuide — the raw source row', () => {
+    const r = parseFeGuide(CSV).rows.find(x => x.carline === 'R2 Performance AWD (20in AT)');
+
+    it('keeps the source row, which the staging column exists to hold', () => {
+        // The column was documented as the escape hatch and shipped 100% empty:
+        // the mapper wrote `r.raw ?? null` and nothing ever set `raw`. It is
+        // what survives EPA revising or withdrawing a guide year.
+        expect(r.raw).toBeTruthy();
+        expect(r.raw['Carline']).toBe('R2 Performance AWD (20in AT)');
+        expect(r.raw['Comb Range as shown on FE Label (miles)']).toBe('307');
+    });
+
+    it('drops blanks, which answer no question', () => {
+        const values = Object.values(r.raw);
+        expect(values.every(v => String(v).trim() !== '')).toBe(true);
+        // And still carries columns the parser itself does not map.
+        expect(Object.keys(r.raw).length).toBeGreaterThan(20);
+    });
+});
+
+describe('parseFeGuide — the natural key', () => {
+    const rows = parseFeGuide(CSV).rows;
+
+    it('keeps the model type index, because carline alone is not unique', () => {
+        // Audi lists "Q6 e-tron quattro" three times in MY27 at 325, 301 and
+        // 301 miles — wheel and tyre variants it does not name, where BMW writes
+        // them out. Keying on (year, division, carline) silently kept the last
+        // row of each group: 9 configurations lost across the two guide years,
+        // with nothing in the import report to show it.
+        expect(rows.every(r => r.modelTypeIndex)).toBe(true);
+    });
+
+    it('drops a row that cannot be keyed rather than storing a collision', () => {
+        const noIndex = CSV.replace('Index (Model Type Index)', 'Renamed');
+        const { rows: r, missingColumns } = parseFeGuide(noIndex);
+        // The index is required, so its absence is a hard failure — the file
+        // cannot be stored without a key.
+        expect(missingColumns).toContain('Index (Model Type Index)');
+        expect(r).toEqual([]);
+    });
+
+    it('makes every row in the sample uniquely keyed', () => {
+        const keys = rows.map(r => `${r.modelYear}|${r.division}|${r.carline}|${r.modelTypeIndex}`);
+        expect(new Set(keys).size).toBe(rows.length);
+    });
+});
+
 describe('parseMotorPowerKw', () => {
     it('sums the per-motor figures in one cell', () => {
         expect(parseMotorPowerKw('225, 270')).toBe(495);
