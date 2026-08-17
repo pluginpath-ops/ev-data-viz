@@ -2015,3 +2015,14 @@ body {
 .fe-candidate-list > .fe-candidate:nth-child(odd) {
     background-color: var(--color-card);
 }
+
+/* Fields the guide was not allowed to fill, and the action to take them */
+.fe-conflicts {
+    @apply flex flex-col gap-1 mt-1 pt-2 border-t;
+    border-color: var(--color-border);
+}
+
+.fe-conflict-row {
+    @apply grid items-center gap-2;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+}

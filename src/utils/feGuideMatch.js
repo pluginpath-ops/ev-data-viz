@@ -65,10 +65,15 @@ export function carlineScore(ours, theirs) {
 /**
  * Rank staged guide rows as candidates for one test group.
  *
- * Filtered by make and, when the group states one, by model year — a guide is
- * published per year, so a year mismatch is a different record rather than a
- * weaker match. Everything surviving that is returned ranked, because the
- * curator confirms rather than trusts: the top row is a proposal.
+ * Filtered by make only. Model year ORDERS rather than excludes: a vehicle that
+ * carries over spans two guide years, and our group's year need not be the year
+ * that happens to be staged. Excluding on it told a 2026 Model Y group there
+ * were "no staged rows for Tesla in 2026" while sixteen Tesla rows sat in the
+ * 2025 guide — technically true and useless.
+ *
+ * Exact-year rows sort above the rest, and a cross-year row is never proposed
+ * automatically (see bestFeCandidate) — EPA figures move between years, so
+ * borrowing one is a decision the curator makes with the year in front of them.
  *
  * @param {Object} group    epa_test_groups row (make, model_year, epa_carline_name)
  * @param {Array}  feRows   staged epa_fe_guide rows
@@ -80,16 +85,16 @@ export function rankFeCandidates(group, feRows = []) {
 
     return feRows
         .filter(r => sameMake(group.make, r.division))
-        .filter(r => !groupYear || Number(r.model_year) === groupYear)
         .map(row => ({
             row,
             score: carlineScore(group.epa_carline_name, row.carline),
-            exactYear: Number(row.model_year) === groupYear,
+            exactYear: !groupYear || Number(row.model_year) === groupYear,
         }))
-        // Score first, then the shorter name. This orders the LIST only — a tie
-        // at the top disqualifies a proposal entirely (see bestFeCandidate),
-        // because picking between equals is arbitrary, not a judgement.
-        .sort((a, b) => b.score - a.score
+        // Exact year first, then score, then the shorter name. This orders the
+        // LIST only — a tie at the top disqualifies a proposal entirely (see
+        // bestFeCandidate), because picking between equals is arbitrary.
+        .sort((a, b) => (b.exactYear - a.exactYear)
+            || b.score - a.score
             || String(a.row.carline ?? '').length - String(b.row.carline ?? '').length);
 }
 
@@ -100,6 +105,9 @@ export function rankFeCandidates(group, feRows = []) {
  *
  * TOO WEAK. Below the floor the make matched but the car did not, and a group
  * would otherwise arrive pre-filled with a confident-looking wrong answer.
+ *
+ * WRONG YEAR. A cross-year row can be linked, but not without being looked at:
+ * EPA figures move between years, so borrowing one is the curator's call.
  *
  * TIED. A clear winner means strictly better than the runner-up. Our
  * `epa_carline_name` is often just `Ioniq 5`, which scores identically against
@@ -117,6 +125,7 @@ export function bestFeCandidate(group, feRows = []) {
     const ranked = rankFeCandidates(group, feRows);
     const [top, next] = ranked;
     if (!top || top.score < MATCH_FLOOR) return null;
-    if (next && Math.abs(next.score - top.score) < 1e-9) return null;
+    if (!top.exactYear) return null;
+    if (next && next.exactYear && Math.abs(next.score - top.score) < 1e-9) return null;
     return top;
 }

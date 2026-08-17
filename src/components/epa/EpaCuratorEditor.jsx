@@ -13,7 +13,6 @@ import { useAppContext } from '../../context/AppContext';
 import CuratorField from './CuratorField';
 import { fuelEconomySearchUrl, baseModelFor } from '../../utils/fuelEconomyLink';
 import { labelRangeCheck, labelRangeCheckNote } from '../../utils/labelRangeCheck';
-import FeGuidePicker from './FeGuidePicker';
 import DerivedValues from './DerivedValues';
 import TestPhaseEditor from './TestPhaseEditor';
 import AuditHistory from './AuditHistory';
@@ -373,11 +372,6 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange, 
             </div>
 
             {/* Section 6: Range & label (CD combined + published feed the adj factor) */}
-            {/* The guide is the published figure and beats the cert record, so
-                the picker sits with the fields it fills rather than in a
-                separate panel. */}
-            <FeGuidePicker group={group} canEdit={canEdit} onChanged={reload} />
-
             <Section
                 title={<>
                     Range &amp; Label Values

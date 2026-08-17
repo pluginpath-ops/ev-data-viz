@@ -55,19 +55,11 @@ export default function DerivedValues({ group }) {
                 label="Charger eff." result={d.chargerEfficiency}
                 format={v => `${(v * 100).toFixed(1)}%`}
             />
-            <DerivedRow
-                label="Adj. factor" result={d.effectiveAdjustmentFactor}
-                format={v => v.toFixed(3)}
-            />
-            <DerivedRow
-                label="Implied SS speed" result={d.impliedSsSpeed}
-                format={v => `${v.toFixed(0)} mph`}
-            />
-            {d.effectiveAdjustmentFactor?.basis?.method && (
-                <p className="text-[10px] text-faint italic mt-1">
-                    Method: {d.effectiveAdjustmentFactor.basis.method}
-                </p>
-            )}
+            {/* Adjusted factor and implied steady-state speed were here and are
+                not: both are internal to the derivation and nobody reading a
+                vehicle card has a use for either. epaDerivations still computes
+                them — the curve and the sanity flags need them — they are simply
+                not shown. */}
         </div>
     );
 }

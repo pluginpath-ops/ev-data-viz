@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { MATCH_FLOOR } from '../../utils/feGuideMatch';
+import { guideConflicts } from '../../utils/feGuidePromotion';
 
 /**
  * Attach a staged Fuel Economy Guide row to this EPA test group (#206, phase 3).
@@ -15,10 +16,29 @@ import { MATCH_FLOOR } from '../../utils/feGuideMatch';
  * in all 41 cases measured, so the top one is offered as a proposal and the rest
  * stay one click away. A proposal, not an answer: the curator confirms.
  */
+/** Curator-facing names for the promoted columns. */
+const FIELD_LABELS = {
+    label_range_published: 'Label range',
+    label_city_range_mi:   'City range',
+    label_hwy_range_mi:    'Highway range',
+    label_combined_mpge:   'Combined MPGe',
+    label_city_mpge:       'City MPGe',
+    label_hwy_mpge:        'Highway MPGe',
+    unadj_city_mpge:       'Unadjusted city MPGe',
+    unadj_hwy_mpge:        'Unadjusted highway MPGe',
+    total_voltage:         'Pack voltage',
+    nominal_pack_kwh:      'Pack energy (gross)',
+    battery_specific_energy: 'Specific energy',
+    label_adjustment_factor: 'Adjustment factor',
+    label_calc_approach:     'Label method',
+};
+
 export default function FeGuidePicker({ group, canEdit, onChanged }) {
-    const { getFeGuideCandidates, linkFeGuideRow, unlinkFeGuideRow } = useAppContext();
+    const { getFeGuideCandidates, linkFeGuideRow, unlinkFeGuideRow,
+            getFeGuideRow, acceptFeGuideValues } = useAppContext();
 
     const [candidates, setCandidates] = useState(null);
+    const [linkedRow, setLinkedRow] = useState(null);
     const [busy, setBusy]         = useState(false);
     const [showAll, setShowAll]   = useState(false);
     const [query, setQuery]       = useState('');
@@ -55,6 +75,30 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tgid, make, modelYear, carline, linked]);
 
+    // The linked row itself, so the fields it was not allowed to fill can be
+    // named. Promotion reports them once and forgets; the disagreement does not
+    // go away, and the published figure may well be the one wanted.
+    const feRowId = group?.fe_guide_row_id;
+    useEffect(() => {
+        // Only the async path sets state. Clearing synchronously on unlink is
+        // the same cascading-render shape the loading flag had; deriving it from
+        // feRowId instead means there is nothing to clear.
+        if (feRowId == null) return;
+        let cancelled = false;
+        getFeGuideRow(feRowId)
+            .then(r => { if (!cancelled) setLinkedRow(r); })
+            .catch(() => { /* the conflict list is advisory; its absence is not an error */ });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [feRowId]);
+
+    // Derived, so an unlinked group shows nothing without a state write: a
+    // stale linkedRow from a previous link is simply not consulted.
+    const conflicts = useMemo(
+        () => (feRowId != null && linkedRow?.id === feRowId ? guideConflicts(group, linkedRow) : []),
+        [group, linkedRow, feRowId],
+    );
+
     const filtered = useMemo(() => {
         const all = candidates ?? [];
         if (!query.trim()) return all;
@@ -70,6 +114,16 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
         setError(null);
         try {
             await linkFeGuideRow(group.test_group_id, feRowId);
+            onChanged?.();
+        } catch (e) { setError(e.message); }
+        finally { setBusy(false); }
+    }
+
+    async function handleAccept(columns) {
+        setBusy(true);
+        setError(null);
+        try {
+            await acceptFeGuideValues(group.test_group_id, columns);
             onChanged?.();
         } catch (e) { setError(e.message); }
         finally { setBusy(false); }
@@ -95,9 +149,47 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                     <span className="fe-picker-badge">linked</span>
                 </div>
                 <p className="text-xs text-muted">
-                    Label figures on this group come from EPA&apos;s published guide. Unlinking
-                    restores whatever each field held before.
+                    {linkedRow?.id === feRowId ? linkedRow.carline : 'Linked to the published guide.'}
+                    {linkedRow?.id === feRowId && linkedRow.model_year != null && ` · ${linkedRow.model_year}`}
                 </p>
+
+                {conflicts.length > 0 && (
+                    <div className="fe-conflicts">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-medium" style={{ color: 'var(--color-warning)' }}>
+                                {conflicts.length} field(s) kept your value over the guide&apos;s
+                            </span>
+                            {canEdit && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleAccept(conflicts.map(c => c.column))}
+                                    disabled={busy}
+                                    className="fe-picker-link-btn disabled:opacity-60"
+                                >
+                                    Use all published
+                                </button>
+                            )}
+                        </div>
+                        {conflicts.map(c => (
+                            <div key={c.column} className="fe-conflict-row">
+                                <span className="text-xs text-muted truncate">{FIELD_LABELS[c.column] ?? c.column}</span>
+                                <span className="text-xs font-mono text-secondary whitespace-nowrap">
+                                    {String(c.ours ?? '—')} → {String(c.theirs)}
+                                </span>
+                                {canEdit && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleAccept([c.column])}
+                                        disabled={busy}
+                                        className="fe-picker-link-btn disabled:opacity-60"
+                                    >
+                                        use
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
                 {canEdit && (
                     <button
                         type="button"
@@ -122,8 +214,8 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
 
             {!loading && candidates?.length === 0 && (
                 <p className="text-xs text-muted">
-                    No staged guide rows for {group.make || 'this make'} in {group.model_year || 'this year'}.
-                    Import that model year under Admin → Fuel Economy Guide.
+                    No staged guide rows for {group.make || 'this make'} in any imported year.
+                    Import a guide under Admin → Fuel Economy Guide.
                 </p>
             )}
 
@@ -177,6 +269,13 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                                             <div className="text-xs text-faint">
                                                 {c.row.label_comb_range_mi} mi
                                                 {' · '}{Math.round(c.score * 100)}%
+                                                {/* A different guide year is a real
+                                                    difference, not a weaker match. */}
+                                                {!c.exactYear && (
+                                                    <span style={{ color: 'var(--color-warning)' }}>
+                                                        {' · '}{c.row.model_year}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                         {canEdit && (

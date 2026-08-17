@@ -1112,6 +1112,20 @@ export function AppProvider({ children }) {
         }
     };
 
+    const getFeGuideRow = (id) => dataService.getFeGuideRow(id);
+
+    /** Take the published value for fields the curator had been holding. */
+    const acceptFeGuideValues = async (testGroupId, columns) => {
+        try {
+            const res = await dataService.acceptFeGuideValues(testGroupId, columns);
+            showSuccess(`${res.accepted.length} field(s) now use the published value.`);
+            return res;
+        } catch (error) {
+            showError('Could not apply the guide value: ' + error.message);
+            throw error;
+        }
+    };
+
     const unlinkFeGuideRow = async (testGroupId) => {
         try {
             const res = await dataService.unlinkFeGuideRow(testGroupId);
@@ -1547,6 +1561,8 @@ export function AppProvider({ children }) {
         getFeGuideCandidates,
         linkFeGuideRow,
         unlinkFeGuideRow,
+        getFeGuideRow,
+        acceptFeGuideValues,
         getExistingEpaTestGroupIds,
         updateEpaMapping,
         unlinkEpaTestGroup,

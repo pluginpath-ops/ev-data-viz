@@ -3,7 +3,7 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { roundTo, } from '../utils/unitConversions';
 import { toSessionRow } from '../utils/testSessions';
 import { rankFeCandidates } from '../utils/feGuideMatch';
-import { promotionUpdates, demotionUpdates } from '../utils/feGuidePromotion';
+import { promotionUpdates, demotionUpdates, acceptGuideUpdates } from '../utils/feGuidePromotion';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
@@ -1695,6 +1695,40 @@ class DataService {
       .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
     if (error) throw error;
     return { promoted, skipped };
+  }
+
+  /** One staged guide row by id — the linked row, for showing what it holds. */
+  async getFeGuideRow(id) {
+    if (!this.useSupabase || id == null) return null;
+    const { data, error } = await getSupabase()
+      .from('epa_fe_guide').select('*').eq('id', id).single();
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Take the guide's value for fields the curator had been holding.
+   *
+   * Deliberately overriding an override, so it is an explicit action rather than
+   * something the link does on its own.
+   */
+  async acceptFeGuideValues(testGroupId, columns) {
+    if (!this.useSupabase || !columns?.length) return { accepted: [] };
+    const supabase = getSupabase();
+
+    const { data: group, error: gErr } = await supabase
+      .from('epa_test_groups').select('*').eq('test_group_id', testGroupId).single();
+    if (gErr) throw gErr;
+    const feRow = await this.getFeGuideRow(group.fe_guide_row_id);
+    if (!feRow) return { accepted: [] };
+
+    const { updates, accepted } = acceptGuideUpdates(group, feRow, columns);
+    if (!accepted.length) return { accepted };
+
+    const { error } = await supabase
+      .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
+    if (error) throw error;
+    return { accepted };
   }
 
   /** Unlink, restoring every value the promotion displaced. */

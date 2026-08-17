@@ -131,3 +131,67 @@ export function demotionUpdates(group) {
     updates.fe_guide_row_id = null;
     return { updates, restored };
 }
+
+/**
+ * Fields the guide would fill differently from what is stored, and was not
+ * allowed to.
+ *
+ * Promotion reports `skipped` at the moment it runs and then that knowledge is
+ * gone — but the disagreement persists, and the curator may well want the
+ * published figure after all. A value protected from an import is not the same
+ * as a value the curator has re-examined since.
+ *
+ * Only curator-owned fields appear: anything else was already overwritten.
+ *
+ * @returns {Array<{ column, guideColumn, ours, theirs }>}
+ */
+export function guideConflicts(group, feRow) {
+    if (!group || !feRow) return [];
+    const out = [];
+
+    for (const [from, to] of Object.entries(PROMOTION_MAP)) {
+        const theirs = feRow[from];
+        if (theirs == null) continue;
+        if (!isCuratorOwned(group.overrides, to)) continue;
+
+        const ours = group[to] ?? null;
+        // Numbers compared loosely: 307 and "307.00" out of a numeric column
+        // are the same figure, and flagging that as a disagreement would train
+        // the curator to ignore the flag.
+        const same = ours != null && Number.isFinite(Number(ours)) && Number.isFinite(Number(theirs))
+            ? Math.abs(Number(ours) - Number(theirs)) < 1e-6
+            : String(ours ?? '') === String(theirs ?? '');
+        if (same) continue;
+
+        out.push({ column: to, guideColumn: from, ours, theirs });
+    }
+    return out;
+}
+
+/**
+ * Take the guide's value for specific fields the curator had been holding.
+ *
+ * A deliberate override of an override: the previous value is recorded the same
+ * way promotion records it, so unlinking still restores what was there before.
+ */
+export function acceptGuideUpdates(group, feRow, columns = []) {
+    if (!group || !feRow || !columns.length) return { updates: {}, accepted: [] };
+
+    const overrides = { ...(group.overrides ?? {}) };
+    const updates = {};
+    const accepted = [];
+    const wanted = new Set(columns);
+
+    for (const [from, to] of Object.entries(PROMOTION_MAP)) {
+        if (!wanted.has(to)) continue;
+        const value = feRow[from];
+        if (value == null) continue;
+
+        updates[to] = value;
+        overrides[to] = { source: PROMOTION_SOURCE, previous: group[to] ?? null };
+        accepted.push(to);
+    }
+
+    if (accepted.length) updates.overrides = overrides;
+    return { updates, accepted };
+}

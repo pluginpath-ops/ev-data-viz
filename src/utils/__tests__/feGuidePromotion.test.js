@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-    promotionUpdates, demotionUpdates, PROMOTION_MAP, PROMOTION_SOURCE,
+    promotionUpdates, demotionUpdates, guideConflicts, acceptGuideUpdates,
+    PROMOTION_MAP, PROMOTION_SOURCE,
 } from '../feGuidePromotion';
 
 const feRow = {
@@ -154,5 +155,74 @@ describe('demotionUpdates', () => {
         expect(back.label_combined_mpge).toBe(97);
         expect(back.total_voltage).toBe(350);
         expect(back.fe_guide_row_id).toBeNull();
+    });
+});
+
+describe('guideConflicts', () => {
+    const held = {
+        label_range_published: 306,
+        label_combined_mpge: 99,
+        overrides: {
+            label_range_published: { source: 'manual' },
+            label_combined_mpge:   { source: 'manual' },
+        },
+    };
+
+    it('names the fields the guide was not allowed to fill', () => {
+        // Promotion reports these once and then forgets; the disagreement does
+        // not go away, and the curator may want the published figure after all.
+        const conflicts = guideConflicts(held, feRow);
+        expect(conflicts.map(c => c.column)).toEqual(['label_range_published']);
+        expect(conflicts[0]).toMatchObject({ ours: 306, theirs: 307 });
+    });
+
+    it('stays quiet when the held value already agrees', () => {
+        // label_combined_mpge is 99 on both sides — flagging that would train
+        // the curator to ignore the flag.
+        expect(guideConflicts(held, feRow).some(c => c.column === 'label_combined_mpge')).toBe(false);
+    });
+
+    it('compares numbers as numbers', () => {
+        const stringy = {
+            label_range_published: '307.00',
+            overrides: { label_range_published: { source: 'manual' } },
+        };
+        expect(guideConflicts(stringy, feRow)).toEqual([]);
+    });
+
+    it('ignores fields that were not curator-held', () => {
+        const promoted = {
+            label_range_published: 999,
+            overrides: { label_range_published: { source: 'fe_guide', previous: null } },
+        };
+        expect(guideConflicts(promoted, feRow)).toEqual([]);
+    });
+});
+
+describe('acceptGuideUpdates', () => {
+    const held = {
+        label_range_published: 306,
+        overrides: { label_range_published: { source: 'manual' } },
+    };
+
+    it('takes the guide value for the named field only', () => {
+        const { updates, accepted } = acceptGuideUpdates(held, feRow, ['label_range_published']);
+        expect(updates.label_range_published).toBe(307);
+        expect(accepted).toEqual(['label_range_published']);
+        expect(updates.label_city_range_mi).toBeUndefined();
+    });
+
+    it('records the displaced value, so unlink still restores it', () => {
+        const { updates } = acceptGuideUpdates(held, feRow, ['label_range_published']);
+        expect(updates.overrides.label_range_published)
+            .toEqual({ source: PROMOTION_SOURCE, previous: 306 });
+
+        const back = demotionUpdates({ ...held, ...updates });
+        expect(back.updates.label_range_published).toBe(306);
+    });
+
+    it('does nothing when asked for nothing', () => {
+        expect(acceptGuideUpdates(held, feRow, []).accepted).toEqual([]);
+        expect(acceptGuideUpdates(held, feRow, ['not_a_column']).accepted).toEqual([]);
     });
 });

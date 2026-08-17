@@ -12,6 +12,7 @@ import SectionHeader, { SectionAction } from './SectionHeader';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import DerivedValues from './epa/DerivedValues';
 import EpaCuratorEditor from './epa/EpaCuratorEditor';
+import FeGuidePicker from './epa/FeGuidePicker';
 import LazyBoundary from './LazyBoundary';
 import { EpaPdfImportModal } from './lazyComponents';
 import { useAppContext } from '../context/AppContext';
@@ -42,7 +43,7 @@ function DataRow({ label, value, muted }) {
 }
 
 /** Card displaying the data for one EPA test group mapping. */
-function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateConfidence, onUpdateDisplayName }) {
+function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateConfidence, onUpdateDisplayName, onGroupChanged }) {
     const [unlinking,    setUnlinking]    = useState(false);
     const [deleting,     setDeleting]     = useState(false);
     const [updatingConf, setUpdatingConf] = useState(false);
@@ -65,7 +66,6 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
         }
     };
 
-    const fmt = (n, dp = 4) => n != null ? n.toFixed(dp) : null;
     // Coefficients now live on the primary coefficient set, not flat columns.
     const coeff = (g.epa_coefficient_sets || []).find(s => s.is_primary)
         || (g.epa_coefficient_sets || [])[0] || {};
@@ -205,51 +205,46 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                     <DataRow label="Config #" value={g.vehicle_config_number} />
                 </div>
 
-                {/* Road-load coefficients (primary set) */}
-                <div>
-                    <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold flex items-center gap-1">
-                        Road-Load Coefficients
-                        <InfoIcon text={EPA_EXPLAINERS.roadLoad} position="right" />
-                    </div>
-                    {coeff.target_a != null ? (
-                        <>
-                            <DataRow label="Target A" value={fmt(coeff.target_a, 3) + ' lbf'} />
-                            <DataRow label="Target B" value={fmt(coeff.target_b, 5) + ' lbf/mph'} />
-                            <DataRow label="Target C" value={fmt(coeff.target_c, 6) + ' lbf/mph²'} />
-                        </>
-                    ) : coeff.set_a != null ? (
-                        <>
-                            <DataRow label="Set A" value={fmt(coeff.set_a, 3) + ' lbf'} muted />
-                            <DataRow label="Set B" value={fmt(coeff.set_b, 5) + ' lbf/mph'} muted />
-                            <DataRow label="Set C" value={fmt(coeff.set_c, 6) + ' lbf/mph²'} muted />
-                        </>
-                    ) : (
-                        <p className="text-faint text-[10px] italic">No coefficients yet</p>
-                    )}
-                </div>
-
                 {/* Label results + live derivations */}
                 <div className="space-y-2">
                     <div>
                         <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
                             Label Results
                         </div>
+                        {/* City, highway and combined for both measures. The
+                            guide carries all six and the card showed two, so the
+                            asymmetry the whole methodology turns on — city range
+                            far above highway — was invisible here. */}
+                        {g.label_range_published != null && (
+                            <DataRow label="Range combined" value={g.label_range_published.toFixed(0) + ' mi'} />
+                        )}
+                        {g.label_city_range_mi != null && (
+                            <DataRow label="Range city" value={g.label_city_range_mi.toFixed(0) + ' mi'} />
+                        )}
+                        {g.label_hwy_range_mi != null && (
+                            <DataRow label="Range highway" value={g.label_hwy_range_mi.toFixed(0) + ' mi'} />
+                        )}
                         {g.label_combined_mpge != null && g.label_combined_mpge < 500 && (
-                            <DataRow label="Label combined" value={g.label_combined_mpge.toFixed(1) + ' MPGe'} />
+                            <DataRow label="MPGe combined" value={g.label_combined_mpge.toFixed(0)} />
+                        )}
+                        {g.label_city_mpge != null && g.label_city_mpge < 500 && (
+                            <DataRow label="MPGe city" value={g.label_city_mpge.toFixed(0)} />
                         )}
                         {g.label_hwy_mpge != null && g.label_hwy_mpge < 500 && (
-                            <DataRow label="Label highway" value={g.label_hwy_mpge.toFixed(1) + ' MPGe'} />
+                            <DataRow label="MPGe highway" value={g.label_hwy_mpge.toFixed(0)} />
                         )}
-                        {g.label_range_published != null && (
-                            <DataRow label="Label range" value={g.label_range_published.toFixed(0) + ' mi'} />
-                        )}
-                        {g.label_combined_mpge == null && g.label_hwy_mpge == null && (
+                        {g.label_range_published == null && g.label_combined_mpge == null && (
                             <p className="text-faint text-[10px] italic">No label data</p>
                         )}
                     </div>
                     <DerivedValues group={g} />
                 </div>
             </div>
+
+            {/* The link that fills Label Results, beside the figures it fills —
+                it was behind the curator disclosure, which is two clicks from
+                the only place its effect is visible. */}
+            <FeGuidePicker group={g} canEdit={canEdit} onChanged={onGroupChanged} />
 
             {mapping.notes && (
                 <p className="mt-2 text-xs text-muted italic border-t pt-2">{mapping.notes}</p>
@@ -284,7 +279,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
 
 const EPA_SOURCE_URL = 'https://dis.epa.gov/otaqpub/publist1.jsp';
 
-export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroups, onLink, onCreate, onUnlink, onUpdateConfidence, onUpdateDisplayName }) {
+export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroups, onLink, onCreate, onUnlink, onUpdateConfidence, onUpdateDisplayName, onGroupChanged }) {
     const [query, setQuery]               = useState('');
     const [results, setResults]           = useState([]);
     const [searching, setSearching]       = useState(false);
@@ -543,6 +538,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                         mapping={m}
                         vehicle={vehicle}
                         canEdit={canEdit}
+                        onGroupChanged={onGroupChanged}
                         onUnlink={onUnlink}
                         onDelete={deleteEpaTestGroup}
                         onUpdateConfidence={onUpdateConfidence}

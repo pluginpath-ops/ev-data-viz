@@ -78,11 +78,23 @@ describe('rankFeCandidates', () => {
         expect(rankFeCandidates(group, rows).some(c => c.row.division === 'Ford')).toBe(false);
     });
 
-    it('excludes other model years, which are different records', () => {
-        // A guide is published per year, so a year mismatch is not a weaker
-        // match — it is the wrong document.
-        const years = rankFeCandidates(group, rows).map(c => c.row.model_year);
-        expect(new Set(years)).toEqual(new Set([2025]));
+    it('keeps other model years but sorts them below', () => {
+        // Excluding them told a 2026 Model Y group there were "no staged rows
+        // for Tesla in 2026" while sixteen Tesla rows sat in the 2025 guide.
+        // A vehicle that carries over spans two guide years.
+        const ranked = rankFeCandidates(group, rows);
+        expect(ranked.some(c => c.row.model_year === 2026)).toBe(true);
+        expect(ranked[0].exactYear).toBe(true);
+        expect(ranked[ranked.length - 1].exactYear).toBe(false);
+    });
+
+    it('never proposes a cross-year row on its own', () => {
+        // EPA figures move between years, so borrowing one is a decision the
+        // curator makes with the year in front of them.
+        const only2025 = [fe('Tesla Motors', 'Model Y Long Range AWD', 2025)];
+        const group2026 = { make: 'Tesla', model_year: 2026, epa_carline_name: 'Model Y Long Range AWD' };
+        expect(rankFeCandidates(group2026, only2025)).toHaveLength(1);
+        expect(bestFeCandidate(group2026, only2025)).toBeNull();
     });
 
     it('breaks a score tie toward the shorter name', () => {
