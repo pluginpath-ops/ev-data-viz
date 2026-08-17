@@ -168,6 +168,26 @@ describe('parseFeGuide — warning on survivable absences', () => {
     });
 });
 
+describe('parseFeGuide — the raw source row', () => {
+    const r = parseFeGuide(CSV).rows.find(x => x.carline === 'R2 Performance AWD (20in AT)');
+
+    it('keeps the source row, which the staging column exists to hold', () => {
+        // The column was documented as the escape hatch and shipped 100% empty:
+        // the mapper wrote `r.raw ?? null` and nothing ever set `raw`. It is
+        // what survives EPA revising or withdrawing a guide year.
+        expect(r.raw).toBeTruthy();
+        expect(r.raw['Carline']).toBe('R2 Performance AWD (20in AT)');
+        expect(r.raw['Comb Range as shown on FE Label (miles)']).toBe('307');
+    });
+
+    it('drops blanks, which answer no question', () => {
+        const values = Object.values(r.raw);
+        expect(values.every(v => String(v).trim() !== '')).toBe(true);
+        // And still carries columns the parser itself does not map.
+        expect(Object.keys(r.raw).length).toBeGreaterThan(20);
+    });
+});
+
 describe('parseFeGuide — the natural key', () => {
     const rows = parseFeGuide(CSV).rows;
 

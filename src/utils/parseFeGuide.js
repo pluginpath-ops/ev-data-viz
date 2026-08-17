@@ -206,6 +206,17 @@ function mapRow(row) {
 
         driveDesc:    str(row, 'Drive Desc'),
         carlineClass: str(row, 'Carline Class Desc'),
+
+        // The source row, so a question nobody has thought of yet does not need
+        // a re-import to answer — and, more to the point, survives EPA revising
+        // or withdrawing a guide year.
+        //
+        // Empty values are dropped: roughly half the 168 columns are blank on
+        // any given row, and a blank answers no question. What is kept is every
+        // value the row actually carried.
+        raw: Object.fromEntries(
+            Object.entries(row).filter(([k, v]) => k && String(v ?? '').trim() !== ''),
+        ),
     };
 }
 
