@@ -11,10 +11,17 @@ import { guideConflicts } from '../../utils/feGuidePromotion';
  * configuration — so a human decides, and this exists to make that decision a
  * confirmation rather than a search.
  *
- * Filtering by make and year still leaves ~19 candidates on the real data, which
+ * Filtering by make still leaves ~19 candidates per year on the real data, which
  * is too many to read. Ranked by carline similarity the correct row came first
  * in all 41 cases measured, so the top one is offered as a proposal and the rest
  * stay one click away. A proposal, not an answer: the curator confirms.
+ *
+ * Candidates span EVERY imported year, not just the group's. A configuration
+ * often has no row in its own model year — VW has filed nothing for 2027, so a
+ * 2027 ID. Buzz has only 2025 and 2026 to draw on — and a borrowed year is a
+ * legitimate link, just one the curator has to make knowingly. Same-year rows
+ * sort first and any other year is badged in warning colour, here and in the
+ * list below.
  */
 /** Curator-facing names for the promoted columns. */
 const FIELD_LABELS = {
@@ -227,6 +234,17 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                             {best.row.label_comb_range_mi} mi combined
                             {best.row.label_comb_mpge != null && ` · ${best.row.label_comb_mpge} MPGe`}
                             {' · '}{Math.round(best.score * 100)}% name match
+                            {/* Load-bearing on the proposal, not decoration. Candidates
+                                now span every imported year, so the top match can be a
+                                borrowed one — a 2027 group offered the 2026 row because
+                                VW has filed no 2027 configurations. EPA figures move
+                                between years, so the curator has to see which year they
+                                are about to promote. */}
+                            {!best.exactYear && (
+                                <span style={{ color: 'var(--color-warning)' }}>
+                                    {' · '}{best.row.model_year} guide
+                                </span>
+                            )}
                         </div>
                     </div>
                     {canEdit && (

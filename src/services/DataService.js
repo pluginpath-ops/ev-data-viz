@@ -1696,17 +1696,30 @@ class DataService {
    * Staged guide rows that could belong to this group — ranked candidates for
    * the link picker.
    *
-   * Filtered server-side by model year only; make matching happens in JS because
-   * it needs containment either way (`Lucid` against `Lucid USA Inc.`), which
-   * SQL would need a custom function to express.
+   * EVERY YEAR, not just the group's. This used to filter server-side on the
+   * exact model year, which contradicted both the picker's own copy ("no staged
+   * rows in any imported year") and the ranker: `rankFeCandidates` treats the
+   * year as a SORT key rather than a filter, and `bestFeCandidate` has a
+   * dedicated wrong-year path that declines to auto-propose a borrowed row. All
+   * of that was unreachable, and a 2027 ID. Buzz found nothing because VW has
+   * only filed through 2026 — the rows were staged and never queried.
+   *
+   * Make matching stays in JS: it needs containment either way (`Lucid` against
+   * `Lucid USA Inc.`), which SQL would need a custom function to express.
+   *
+   * Only the columns the picker ranks and displays are fetched. The full row is
+   * re-read by id when one is actually linked, so pulling ~140 columns for
+   * every staged row of every year to show a carline and a range was waste that
+   * grew with each import. Paged, because all years together is past the
+   * 1000-row cap; `id` orders it since nothing else here is unique.
    */
   async getFeGuideCandidates(group) {
     if (!this.useSupabase || !group) return [];
-    let query = getSupabase().from('epa_fe_guide').select('*');
-    if (group.model_year) query = query.eq('model_year', group.model_year);
-    const { data, error } = await query;
-    if (error) throw error;
-    return rankFeCandidates(group, data || []);
+    const rows = await fetchAllRows(() => getSupabase()
+      .from('epa_fe_guide')
+      .select('id, model_year, division, carline, label_comb_range_mi, label_comb_mpge')
+      .order('id', { ascending: true }));
+    return rankFeCandidates(group, rows);
   }
 
   /**
