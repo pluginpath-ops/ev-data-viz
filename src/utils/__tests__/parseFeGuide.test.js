@@ -3,7 +3,8 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import {
-    parseFeGuide, parseMotorPowerKw, adjustmentSignature, REQUIRED_COLUMNS,
+    parseFeGuide, parseMotorPowerKw, adjustmentSignature,
+    REQUIRED_COLUMNS, OPTIONAL_COLUMNS,
 } from '../parseFeGuide';
 
 /**
@@ -128,6 +129,42 @@ describe('parseFeGuide — refusing a file it cannot read', () => {
     it('names every column it requires', () => {
         expect(REQUIRED_COLUMNS).toContain('Fuel Unit Desc - Conventional Fuel');
         expect(REQUIRED_COLUMNS.length).toBeGreaterThan(3);
+    });
+});
+
+describe('parseFeGuide — warning on survivable absences', () => {
+    it('says nothing when the file carries every column it reads', () => {
+        expect(parseFeGuide(CSV).warnings).toEqual([]);
+    });
+
+    it('warns, but still imports, when an optional column is absent', () => {
+        // A guide without City Unadj FE imports fine and quietly loses the
+        // figure our own derivation is validated against. Worth saying at
+        // import time rather than as a column of nulls discovered later.
+        const stripped = CSV
+            .replace('City Unadj FE - Conventional Fuel', 'Renamed By EPA')
+            .replace('Batt Energy Capacity (Amp-hrs)', 'Also Renamed');
+        const { rows, warnings, missingColumns } = parseFeGuide(stripped);
+
+        expect(missingColumns).toEqual([]);
+        expect(rows).toHaveLength(4);
+        expect(warnings).toHaveLength(2);
+        expect(warnings.join(' ')).toContain('City Unadj FE');
+        expect(warnings.join(' ')).toContain('Batt Energy Capacity');
+
+        // And the dependent derivations degrade to null rather than to a number.
+        const r = byCarline(rows, 'R2 Performance AWD (20in AT)');
+        expect(r.unadjCityMpge).toBeNull();
+        expect(r.labelAdjustmentFactor).toBeNull();
+        expect(r.nominalPackKwh).toBeNull();
+        expect(r.labelCombRangeMi).toBe(307);   // unaffected
+    });
+
+    it('does not warn about the ~140 columns it never reads', () => {
+        // Listing those would be noise, and noise trains people to ignore
+        // warnings. Only expected-but-absent columns are named.
+        expect(OPTIONAL_COLUMNS).not.toContain('Annual Fuel1 Cost - Conventional Fuel');
+        expect(OPTIONAL_COLUMNS.every(c => !REQUIRED_COLUMNS.includes(c))).toBe(true);
     });
 });
 

@@ -39,7 +39,7 @@
 
 import Papa from 'papaparse';
 
-/** Columns without which a row cannot be interpreted at all. */
+/** Columns without which a row cannot be interpreted at all — a hard failure. */
 export const REQUIRED_COLUMNS = [
     'Model Year',
     'Division',
@@ -47,6 +47,43 @@ export const REQUIRED_COLUMNS = [
     'Fuel Usage Desc - Conventional Fuel',
     'Fuel Unit Desc - Conventional Fuel',
     'Comb Range as shown on FE Label (miles)',
+];
+
+/**
+ * Columns that are read but survivable — their absence warns rather than fails.
+ *
+ * The warning is the point: a guide missing `City Unadj FE` still imports, but
+ * every row silently loses the figure our own derivation is validated against.
+ * That is worth saying out loud at import time rather than discovering later
+ * as a column of nulls.
+ *
+ * Note this warns on columns we EXPECT and did not find — not on the ~140
+ * columns in the file we never read. Listing those would be noise that trains
+ * people to ignore the warnings.
+ */
+export const OPTIONAL_COLUMNS = [
+    '#1 Smog Rating Test Group',
+    'Index (Model Type Index)',
+    'Calc Approach Desc',
+    'City Range (miles)',
+    'Hwy Range (miles)',
+    'City FE (Guide) - Conventional Fuel',
+    'Hwy FE (Guide) - Conventional Fuel',
+    'Comb FE (Guide) - Conventional Fuel',
+    'City Unadj FE - Conventional Fuel',
+    'Hwy Unadj FE - Conventional Fuel',
+    'Comb Unadj FE - Conventional Fuel',
+    'City Unrd Adj FE - Conventional Fuel',
+    'Hwy Unrd Adj FE - Conventional Fuel',
+    'Comb Unrd Adj FE - Conventional Fuel',
+    'Total Voltage for Battery Pack(s)',
+    'Batt Energy Capacity (Amp-hrs)',
+    'Batt Specific Energy (Watt-hr/kg)',
+    'Rated Motor Gen Power (kW)',
+    '# Drive Motor Gen',
+    '240V Charge Time at 240 volts (hours)',
+    'Drive Desc',
+    'Carline Class Desc',
 ];
 
 const EV_FUEL   = 'electricity';
@@ -176,7 +213,9 @@ function mapRow(row) {
  *
  * @param {string} csvText
  * @returns {{ rows: Array, skipped: { nonEv: number, duplicateUnit: number, unusable: number },
- *             missingColumns: string[], errors: string[] }}
+ *             missingColumns: string[], warnings: string[], errors: string[] }}
+ *          `missingColumns` is fatal and leaves `rows` empty; `warnings` names
+ *          optional columns this file lacks, which import fine but arrive null.
  *          `rows` is empty when required columns are absent — a file whose
  *          headers we do not recognise is reported, never partially imported.
  */
@@ -197,8 +236,14 @@ export function parseFeGuide(csvText) {
         // Hard fail rather than import what is recognisable: a guide missing
         // its range column would import as a list of names with no figures,
         // which looks like a successful import of useless data.
-        return { ...empty, missingColumns, errors: [] };
+        return { ...empty, missingColumns, warnings: [], errors: [] };
     }
+
+    // Survivable absences, named so the import can say what this file will not
+    // carry instead of leaving a column of nulls to be discovered later.
+    const warnings = OPTIONAL_COLUMNS
+        .filter(c => !headers.includes(c))
+        .map(c => `Column not found, values will be empty: "${c}"`);
 
     const rows = [];
     const skipped = { nonEv: 0, duplicateUnit: 0, unusable: 0 };
@@ -219,5 +264,5 @@ export function parseFeGuide(csvText) {
         rows.push(row);
     }
 
-    return { rows, skipped, missingColumns: [], errors: parsed.errors?.map(e => e.message) ?? [] };
+    return { rows, skipped, missingColumns: [], warnings, errors: parsed.errors?.map(e => e.message) ?? [] };
 }
