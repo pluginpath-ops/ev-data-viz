@@ -6,6 +6,7 @@
  * assumed on the same record.
  */
 import { deriveAll } from '../../utils/epaDerivations';
+import { resolveUseableKwh, resolveUseableKwhSource } from '../../utils/epaPhysics';
 import InfoIcon from '../InfoIcon';
 import { EPA_EXPLAINERS } from '../../utils/epaExplainers';
 
@@ -40,7 +41,7 @@ function DerivedRow({ label, tooltip, result, format }) {
     );
 }
 
-export default function DerivedValues({ group }) {
+export default function DerivedValues({ group, vehicle = null }) {
     const d = deriveAll(group);
     return (
         <div>
@@ -52,22 +53,28 @@ export default function DerivedValues({ group }) {
                 result={d.eta} format={v => `${(v * 100).toFixed(1)}%`}
             />
             <DerivedRow
-                label="Charger eff." result={d.chargerEfficiency}
+                label="Charging efficiency" result={d.chargerEfficiency}
                 format={v => `${(v * 100).toFixed(1)}%`}
             />
+            {/* Usable, not gross. The guide's voltage x amp-hours is the pack's
+                gross capacity and is promoted to nominal_pack_kwh; what the
+                range math needs is what the pack delivers, which the resolver
+                picks from the EPA figure, the spec, or the vehicle in that
+                order — and names its source. */}
             <DerivedRow
-                label="Adj. factor" result={d.effectiveAdjustmentFactor}
-                format={v => v.toFixed(3)}
+                label="Battery kWh"
+                result={{
+                    value: resolveUseableKwh(group, vehicle),
+                    source: resolveUseableKwhSource(group, vehicle),
+                    certain: resolveUseableKwhSource(group, vehicle) === 'EPA',
+                }}
+                format={v => `${v.toFixed(1)} kWh`}
             />
-            <DerivedRow
-                label="Implied SS speed" result={d.impliedSsSpeed}
-                format={v => `${v.toFixed(0)} mph`}
-            />
-            {d.effectiveAdjustmentFactor?.basis?.method && (
-                <p className="text-[10px] text-faint italic mt-1">
-                    Method: {d.effectiveAdjustmentFactor.basis.method}
-                </p>
-            )}
+            {/* Adjusted factor and implied steady-state speed were here and are
+                not: both are internal to the derivation and nobody reading a
+                vehicle card has a use for either. epaDerivations still computes
+                them — the curve and the sanity flags need them — they are simply
+                not shown. */}
         </div>
     );
 }

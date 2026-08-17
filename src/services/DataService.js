@@ -2,6 +2,8 @@ import { getSupabase } from './supabase';
 import { vehicleLabel } from '../utils/specHelpers';
 import { roundTo, } from '../utils/unitConversions';
 import { toSessionRow } from '../utils/testSessions';
+import { rankFeCandidates } from '../utils/feGuideMatch';
+import { promotionUpdates, demotionUpdates, acceptGuideUpdates } from '../utils/feGuidePromotion';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
@@ -120,7 +122,7 @@ class DataService {
     // table degrades to "no performance data" instead of "no vehicles".
     const { data, error } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
       .order('created_at', { ascending: false });
 
     // Never swallow this. Destructuring only `data` made a failed query look
@@ -1649,6 +1651,100 @@ class DataService {
       }
     }
     return result;
+  }
+
+  /**
+   * Staged guide rows that could belong to this group — ranked candidates for
+   * the link picker.
+   *
+   * Filtered server-side by model year only; make matching happens in JS because
+   * it needs containment either way (`Lucid` against `Lucid USA Inc.`), which
+   * SQL would need a custom function to express.
+   */
+  async getFeGuideCandidates(group) {
+    if (!this.useSupabase || !group) return [];
+    let query = getSupabase().from('epa_fe_guide').select('*');
+    if (group.model_year) query = query.eq('model_year', group.model_year);
+    const { data, error } = await query;
+    if (error) throw error;
+    return rankFeCandidates(group, data || []);
+  }
+
+  /**
+   * Link a guide row to a test group and copy its figures across.
+   *
+   * The write is a single update so the values, their provenance and the link
+   * land together — a partial promotion would leave fields the curator cannot
+   * attribute and unlink cannot undo.
+   */
+  async linkFeGuideRow(testGroupId, feRowId) {
+    if (!this.useSupabase) return { promoted: [], skipped: [] };
+    const supabase = getSupabase();
+
+    const [{ data: group, error: gErr }, { data: feRow, error: fErr }] = await Promise.all([
+      supabase.from('epa_test_groups').select('*').eq('test_group_id', testGroupId).single(),
+      supabase.from('epa_fe_guide').select('*').eq('id', feRowId).single(),
+    ]);
+    if (gErr) throw gErr;
+    if (fErr) throw fErr;
+
+    const { updates, promoted, skipped } = promotionUpdates(group, feRow);
+    if (!promoted.length) return { promoted, skipped };
+
+    const { error } = await supabase
+      .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
+    if (error) throw error;
+    return { promoted, skipped };
+  }
+
+  /** One staged guide row by id — the linked row, for showing what it holds. */
+  async getFeGuideRow(id) {
+    if (!this.useSupabase || id == null) return null;
+    const { data, error } = await getSupabase()
+      .from('epa_fe_guide').select('*').eq('id', id).single();
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Take the guide's value for fields the curator had been holding.
+   *
+   * Deliberately overriding an override, so it is an explicit action rather than
+   * something the link does on its own.
+   */
+  async acceptFeGuideValues(testGroupId, columns) {
+    if (!this.useSupabase || !columns?.length) return { accepted: [] };
+    const supabase = getSupabase();
+
+    const { data: group, error: gErr } = await supabase
+      .from('epa_test_groups').select('*').eq('test_group_id', testGroupId).single();
+    if (gErr) throw gErr;
+    const feRow = await this.getFeGuideRow(group.fe_guide_row_id);
+    if (!feRow) return { accepted: [] };
+
+    const { updates, accepted } = acceptGuideUpdates(group, feRow, columns);
+    if (!accepted.length) return { accepted };
+
+    const { error } = await supabase
+      .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
+    if (error) throw error;
+    return { accepted };
+  }
+
+  /** Unlink, restoring every value the promotion displaced. */
+  async unlinkFeGuideRow(testGroupId) {
+    if (!this.useSupabase) return { restored: [] };
+    const supabase = getSupabase();
+
+    const { data: group, error: gErr } = await supabase
+      .from('epa_test_groups').select('*').eq('test_group_id', testGroupId).single();
+    if (gErr) throw gErr;
+
+    const { updates, restored } = demotionUpdates(group);
+    const { error } = await supabase
+      .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
+    if (error) throw error;
+    return { restored };
   }
 
   /** Staged guide rows, newest model year first. Used by the import summary. */

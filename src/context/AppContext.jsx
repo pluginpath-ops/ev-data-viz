@@ -1089,6 +1089,54 @@ export function AppProvider({ children }) {
 
     const getFeGuideSummary = () => dataService.getFeGuideSummary();
 
+    const getFeGuideCandidates = (group) => dataService.getFeGuideCandidates(group);
+
+    /**
+     * Attach a guide row to a test group and copy its figures across (#206).
+     *
+     * Reports what was skipped as well as what landed: a field the curator has
+     * overridden by hand is deliberately left alone, and a silent skip reads as
+     * a bug rather than as the rule working.
+     */
+    const linkFeGuideRow = async (testGroupId, feRowId) => {
+        try {
+            const res = await dataService.linkFeGuideRow(testGroupId, feRowId);
+            const note = res.skipped.length
+                ? `${res.promoted.length} field(s) filled, ${res.skipped.length} left as curator-set.`
+                : `${res.promoted.length} field(s) filled from the guide.`;
+            showSuccess(note);
+            return res;
+        } catch (error) {
+            showError('Could not link the guide row: ' + error.message);
+            throw error;
+        }
+    };
+
+    const getFeGuideRow = (id) => dataService.getFeGuideRow(id);
+
+    /** Take the published value for fields the curator had been holding. */
+    const acceptFeGuideValues = async (testGroupId, columns) => {
+        try {
+            const res = await dataService.acceptFeGuideValues(testGroupId, columns);
+            showSuccess(`${res.accepted.length} field(s) now use the published value.`);
+            return res;
+        } catch (error) {
+            showError('Could not apply the guide value: ' + error.message);
+            throw error;
+        }
+    };
+
+    const unlinkFeGuideRow = async (testGroupId) => {
+        try {
+            const res = await dataService.unlinkFeGuideRow(testGroupId);
+            showSuccess(`Unlinked; ${res.restored.length} field(s) restored.`);
+            return res;
+        } catch (error) {
+            showError('Could not unlink: ' + error.message);
+            throw error;
+        }
+    };
+
     const importEpaCsiGroups = async (groups, { linkVehicleId, linkTestGroupIds = [] } = {}) => {
         try {
             for (const g of groups) await dataService.importEpaGroupFull(g);
@@ -1510,6 +1558,11 @@ export function AppProvider({ children }) {
         importEpaCsiGroups,
         importFeGuide,
         getFeGuideSummary,
+        getFeGuideCandidates,
+        linkFeGuideRow,
+        unlinkFeGuideRow,
+        getFeGuideRow,
+        acceptFeGuideValues,
         getExistingEpaTestGroupIds,
         updateEpaMapping,
         unlinkEpaTestGroup,

@@ -229,6 +229,30 @@ describe('the seams that broke before', () => {
             .toEqual([]);
     });
 
+    it('fetches every EPA column the vehicle card reads', () => {
+        // getVehicles names its columns explicitly, and migration 053 added
+        // eleven more that nothing widened the list for. Promotion wrote them
+        // correctly and the card read them as null: six label figures blank on
+        // screen while sitting in the database, and `fe_guide_row_id` missing
+        // meant a linked group still rendered the "link me" picker.
+        //
+        // Nothing fails loudly when a column is absent from a Supabase select —
+        // the field is simply undefined — so this is the only place the two
+        // lists can be held together.
+        const svc = read('src/services/DataService.js');
+        const select = svc.slice(svc.indexOf('epa_test_groups('));
+        const columns = select.slice(0, select.indexOf('epa_coefficient_sets'));
+
+        const promo = read('src/utils/feGuidePromotion.js');
+        const targets = [...promo.matchAll(/^\s+\w+:\s+'(\w+)',/gm)].map(m => m[1]);
+        expect(targets.length).toBeGreaterThan(10);
+
+        // Everything promotion writes, plus the two the UI needs to interpret it.
+        const needed = [...new Set([...targets, 'fe_guide_row_id', 'overrides'])];
+        const missing = needed.filter(c => !new RegExp(`\\b${c}\\b`).test(columns));
+        expect(missing, `getVehicles does not fetch: ${missing.join(', ')}`).toEqual([]);
+    });
+
     it('loads the startup queries in parallel', () => {
         // Seven independent queries were awaited one after another, six of them
         // returning under 4KB. That was ~900ms of blank screen spent purely on
