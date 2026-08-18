@@ -6,13 +6,17 @@
  *   • An "Assign EPA Testing Data" combobox for linking additional test groups
  *   • Unlink controls (contributor+)
  */
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import InfoIcon from './InfoIcon';
 import SectionHeader, { SectionAction } from './SectionHeader';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import DerivedValues from './epa/DerivedValues';
+import EpaDerivationChecks from './epa/EpaDerivationChecks';
 import EpaCuratorEditor from './epa/EpaCuratorEditor';
 import FeGuidePicker from './epa/FeGuidePicker';
+import { epaRecordFromGroup } from '../utils/epaRecordFromGroup';
+import { buildMethodologyModel } from '../utils/epaMethodology';
+import { checkUnadjustedMpge, checkStatedRanges, checkLabelInvariant } from '../utils/epaDerivationCheck';
 import LazyBoundary from './LazyBoundary';
 import { EpaPdfImportModal } from './lazyComponents';
 import { useAppContext } from '../context/AppContext';
@@ -83,6 +87,27 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
     const [curating,     setCurating]     = useState(false);
     const [curatorDirty, setCuratorDirty] = useState(false);
     const g = mapping.epaGroup;
+
+    // Recomputed on render like every other derived figure here — nothing is
+    // stored, so a corrected phase shows its effect immediately.
+    const derivationChecks = useMemo(() => {
+        const { record, inferredPhaseTypes, competingMctTests } = epaRecordFromGroup(g);
+        const model = record ? buildMethodologyModel(record) : null;
+        const rangeCheck = checkStatedRanges(model, {
+            cityMi: g?.cd_range_combined_calc,
+            hwyMi:  g?.cd_range_hwy_calc,
+        });
+        return {
+            check: checkUnadjustedMpge(model, { city: g?.unadj_city_mpge, hwy: g?.unadj_hwy_mpge }),
+            rangeCheck,
+            invariant: checkLabelInvariant(model, {
+                bagsReconcile: rangeCheck.checked ? rangeCheck.worst === 'agrees' : null,
+            }),
+            adjustmentFixed: model?.adjustmentFixed ?? 0.7,
+            inferredPhaseTypes,
+            competingMctTests,
+        };
+    }, [g]);
     if (!g) return null;
 
     // Guard collapse: confirm before discarding unsaved buffered curator edits.
@@ -261,6 +286,10 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                 </div>
 
                 <DerivedValues group={g} vehicle={vehicle} />
+
+                {/* Does this record reconcile? Beside the data it judges, so a
+                    phase can be corrected in the same view it is questioned in. */}
+                <EpaDerivationChecks {...derivationChecks} />
             </div>
 
             {/* The link that fills Label Results, beside the figures it fills —

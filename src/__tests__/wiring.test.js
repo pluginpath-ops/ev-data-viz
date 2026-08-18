@@ -279,31 +279,29 @@ describe('the seams that broke before', () => {
         expect(missing, `candidate columns read but not selected: ${missing.join(', ')}`).toEqual([]);
     });
 
-    it('shows both range checks, not only the efficiency one', () => {
-        // The stated-range check and the label invariant each catch a class the
-        // MPGe comparison cannot, and both were added because a real record slipped
-        // through. Computing them without rendering would restore that blind spot.
-        const view = read('src/components/EpaCurvesView.jsx');
+    it('puts the derivation checks with the data, not on the public chart', () => {
+        // They started on the Charts tab, which was the wrong home: that diagram
+        // answers a reader's question about the CAR, and "the bags do not
+        // reconcile" is a fact about our RECORD of it — useful to a curator and
+        // noise to everyone else.
+        //
+        // Both halves asserted, because either alone passes while broken: the
+        // curator view must run and render them, and the chart must not.
+        const curator = read('src/components/EpaVehicleSection.jsx');
+        const checks  = read('src/components/epa/EpaDerivationChecks.jsx');
+        const chart   = read('src/components/EpaCurvesView.jsx');
         const diagram = read('src/components/epa/EpaMethodologyDiagram.jsx');
 
-        expect(view, 'the view must recompute range against the record').toMatch(/checkStatedRanges\(/);
-        expect(view, 'the view must test the label invariant').toMatch(/checkLabelInvariant\(/);
-        expect(view, 'both must reach the diagram').toMatch(/rangeCheck=\{/);
-        expect(diagram, 'the diagram must render the recomputed range').toMatch(/rangeCheck\?\.checked/);
-        expect(diagram, 'the diagram must render an impossible label').toMatch(/invariant\?\.violated/);
-    });
+        expect(curator, 'the curator view must run all three checks').toMatch(/checkStatedRanges\(/);
+        expect(curator, 'the curator view must test the label invariant').toMatch(/checkLabelInvariant\(/);
+        expect(curator, 'the checks must be rendered').toMatch(/<EpaDerivationChecks/);
+        expect(checks, 'the verdicts must reach the page').toMatch(/rangeCheck\?\.checked/);
+        expect(checks, 'an impossible label must be shown').toMatch(/invariant\?\.violated/);
 
-    it('shows the derivation check rather than only computing it', () => {
-        // The check is worthless if it runs and nothing renders the verdict —
-        // which is the exact "built, unit-tested, never connected" shape this
-        // suite exists for. Both ends asserted: the view must compute it and
-        // hand it over, and the diagram must render it.
-        const view = read('src/components/EpaCurvesView.jsx');
-        const diagram = read('src/components/epa/EpaMethodologyDiagram.jsx');
-
-        expect(view, 'the view must run the check').toMatch(/checkUnadjustedMpge\(/);
-        expect(view, 'the check must reach the diagram').toMatch(/check=\{/);
-        expect(diagram, 'the diagram must render the verdict').toMatch(/check\?\.checked/);
+        for (const [name, text] of [['EpaCurvesView', chart], ['EpaMethodologyDiagram', diagram]]) {
+            expect(text, `${name} must not carry curator diagnostics`)
+                .not.toMatch(/checkStatedRanges|checkLabelInvariant|checkUnadjustedMpge/);
+        }
     });
 
     it('builds the methodology diagram from selected vehicles, not sample records', () => {

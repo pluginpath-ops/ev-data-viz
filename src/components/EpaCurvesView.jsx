@@ -23,7 +23,6 @@ import CollapsibleSection from './CollapsibleSection';
 import { TWO_CYCLE_KEYS } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
-import { checkUnadjustedMpge, checkStatedRanges, checkLabelInvariant } from '../utils/epaDerivationCheck';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
 import AutoColorToggle from './AutoColorToggle';
 
@@ -693,7 +692,7 @@ export default function EpaCurvesView({
 
                 const vehicleName = vehicleLabel(vehicle);
                 const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name || null;
-                const { record, reason, inferredPhaseTypes, competingMctTests } =
+                const { record, reason } =
                     epaRecordFromGroup(epaGroup, { vehicleName, configuration: epaLabel });
 
                 // A record can still fail the model — the adapter checks its
@@ -711,30 +710,7 @@ export default function EpaCurvesView({
                     configCount: (vehicle.epa_mappings ?? []).filter(m => m.epaGroup).length,
                     model,
                     reason: model ? null : (reason ?? 'no-derivation'),
-                    inferredPhaseTypes,
-                    competingMctTests,
-                    // EPA's own unadjusted figures, promoted from the guide when
-                    // one is linked. Absent means unverified, not agreed.
-                    check: checkUnadjustedMpge(model, {
-                        city: epaGroup.unadj_city_mpge,
-                        hwy:  epaGroup.unadj_hwy_mpge,
-                    }),
-                    // The record against itself — no guide link needed, so this
-                    // covers every imported group. cd_range_combined_calc is the
-                    // CITY figure on an MCT record despite the name.
-                    rangeCheck: checkStatedRanges(model, {
-                        cityMi: epaGroup.cd_range_combined_calc,
-                        hwyMi:  epaGroup.cd_range_hwy_calc,
-                    }),
-                    invariant: null,   // filled below, once the bag check is known
-                });
-                // The invariant reads the bag check to tell an adjustment-factor
-                // fault from a phase-data one, so it is resolved after both.
-                const entry = out[out.length - 1];
-                entry.invariant = checkLabelInvariant(model, {
-                    bagsReconcile: entry.rangeCheck.checked
-                        ? entry.rangeCheck.worst === 'agrees'
-                        : null,
+
                 });
             }
         }
@@ -1265,28 +1241,7 @@ export default function EpaCurvesView({
                                 weaker claim than one built on curated types, and
                                 the reader is entitled to know which they have.
                                 Fixable, too: the types are editable in Tests & Data. */}
-                            {entry.inferredPhaseTypes > 0 && (
-                                <p className="text-xs mb-2" style={{ color: 'var(--color-warning)' }}>
-                                    {entry.inferredPhaseTypes} phase{entry.inferredPhaseTypes === 1 ? '' : 's'} had no
-                                    recorded cycle — inferred from distance. Set them in Tests &amp; Data
-                                    to make this derivation certain.
-                                </p>
-                            )}
-                            {entry.competingMctTests > 1 && (
-                                <p className="text-xs mb-2" style={{ color: 'var(--color-warning)' }}>
-                                    This group holds {entry.competingMctTests} multi-cycle tests and the most
-                                    recent was used. Both may be valid — the R2 21&quot; was tested at two
-                                    laboratories — so this is a choice, not a fault, and every figure below
-                                    depends on it. The stated ranges compared above belong to whichever test
-                                    was imported first, so they may not be this one&apos;s.
-                                </p>
-                            )}
-                            <EpaMethodologyDiagram
-                                model={entry.model}
-                                check={entry.check}
-                                rangeCheck={entry.rangeCheck}
-                                invariant={entry.invariant}
-                            />
+                            <EpaMethodologyDiagram model={entry.model} />
                         </CollapsibleSection>
                     ))}
 

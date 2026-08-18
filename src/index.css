@@ -1646,6 +1646,12 @@ body {
     color: var(--color-text-primary);
 }
 
+/* The curator's block of reconciliation checks in Tests & Data. Stacked, with
+   each check keeping its own status edge. */
+.epa-checks {
+    @apply flex flex-col gap-2 mt-3;
+}
+
 /* Our derivation measured against EPA's published unadjusted MPGe. Bordered on
    the leading edge in the status colour so agreement and disagreement are
    distinguishable before any number is read. */
