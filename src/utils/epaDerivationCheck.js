@@ -157,3 +157,105 @@ export function checkUnadjustedMpge(model, published = {}) {
     );
     return out;
 }
+
+// ── Check 2: computed range against the record's OWN stated range ───────────
+
+/**
+ * Rounding slack when comparing our recomputed range to the record's stated one.
+ *
+ * These are the same quantity computed the same way from the same test, so they
+ * should agree to a fraction of a percent, not merely be close. The R2 agrees to
+ * better than 0.1%. 1% is generous.
+ */
+export const RANGE_AGREEMENT_TOLERANCE = 0.01;
+
+/**
+ * Recompute each cycle's unadjusted range and compare it to what the
+ * certification record itself reports.
+ *
+ * **This is the strongest check available**, and it should have been the first.
+ * The MPGe comparison needs a linked Fuel Economy Guide row, so it only covers
+ * curated vehicles and it compares against a different document. This compares
+ * a record against itself: EPA states `Charge Depleting Range (Calculated)` and
+ * `…Highway (Calculated)`, we recompute both from the phase bags, and any
+ * disagreement is unambiguously our phase data. No link, no second source, and
+ * it works on every imported group.
+ *
+ * It is the epic's validation gate #1 — "recompute from bags, must match
+ * reported" — and it localises a fault to one cycle. The Model Y Performance
+ * record states a 412.88 mi highway range; we derived ~378 from its bags, and
+ * that 8% gap was diagnosed only after working backwards from MPGe.
+ *
+ * ⚠ `cd_range_combined_calc` is the CITY range on an MCT record despite its
+ * name — see epaRecordFromGroup. Passing it as the highway figure would compare
+ * two different cycles and report a fault in a correct record.
+ *
+ * @param {Object} model   output of buildMethodologyModel
+ * @param {Object} stated  { cityMi, hwyMi } from cd_range_combined_calc / cd_range_hwy_calc
+ */
+export function checkStatedRanges(model, stated = {}) {
+    const out = { cycles: [], worst: null, checked: false };
+    if (!model?.cycles) return out;
+
+    const pairs = [
+        ['city', 'City', num(stated.cityMi)],
+        ['hwy',  'Highway', num(stated.hwyMi)],
+    ];
+
+    for (const [key, label, statedMi] of pairs) {
+        const ours = num(model.cycles[key]?.rangeUnadjMi);
+        if (ours == null || statedMi == null || statedMi <= 0) continue;
+
+        const deltaFraction = (ours - statedMi) / statedMi;
+        out.cycles.push({
+            cycle: key,
+            label,
+            ours,
+            stated: statedMi,
+            deltaFraction,
+            deltaPct: deltaFraction * 100,
+            status: Math.abs(deltaFraction) <= RANGE_AGREEMENT_TOLERANCE ? 'agrees' : 'disagrees',
+        });
+    }
+
+    if (!out.cycles.length) return out;
+    out.checked = true;
+    out.worst = out.cycles.some(c => c.status === 'disagrees') ? 'disagrees' : 'agrees';
+    return out;
+}
+
+// ── Check 3: the regulatory invariant ───────────────────────────────────────
+
+/** Slack in miles: the label is published as a whole number. */
+export const LABEL_INVARIANT_TOLERANCE_MI = 1;
+
+/**
+ * A manufacturer may label at or below the computed range, never above.
+ *
+ * This is a hard regulatory invariant rather than a quality signal, so a
+ * violation is not "these numbers disagree" — it is proof that our computed
+ * range is too low, because the alternative is that EPA certified an illegal
+ * label. It catches a class the MPGe check cannot: a derivation can be wrong in
+ * a way that still reconciles with published efficiency.
+ *
+ * The ARITHMETIC blend is used deliberately, and it is the conservative choice:
+ * the arithmetic mean is always ≥ the harmonic, so if even that sits below the
+ * label the invariant is violated on any blend. Testing the smaller one would
+ * flag records that are merely blended the other way.
+ */
+export function checkLabelInvariant(model) {
+    const computedMi = num(model?.combinedMi);
+    const labeledMi  = num(model?.labeledMi);
+    if (computedMi == null || labeledMi == null || computedMi <= 0 || labeledMi <= 0) {
+        return { checked: false, violated: false, computedMi: null, labeledMi: null, shortfallMi: 0 };
+    }
+
+    const shortfallMi = labeledMi - computedMi;
+    return {
+        checked: true,
+        violated: shortfallMi > LABEL_INVARIANT_TOLERANCE_MI,
+        computedMi,
+        labeledMi,
+        shortfallMi,
+    };
+}

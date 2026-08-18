@@ -52,7 +52,7 @@ function Arrow({ annotation }) {
     );
 }
 
-export default function EpaMethodologyDiagram({ model, check = null }) {
+export default function EpaMethodologyDiagram({ model, check = null, rangeCheck = null, invariant = null }) {
     const [showDetail, setShowDetail] = useState(false);
     if (!model) return null;
 
@@ -192,6 +192,61 @@ export default function EpaMethodologyDiagram({ model, check = null }) {
                     </span>
                 </span>
             </div>
+
+            {/* The regulatory invariant, first because it is not a matter of
+                degree. A maker may label at or below the computed range and
+                never above, so a label ABOVE it proves our derivation is too
+                low — the alternative being that EPA certified an illegal label.
+                It catches what the efficiency comparison cannot: a derivation
+                wrong in a way that still reconciles with published MPGe. */}
+            {invariant?.violated && (
+                <div className="epa-check epa-check-disagrees">
+                    <span className="text-label">Impossible label</span>
+                    <span className="epa-check-row">
+                        Computed
+                        <strong className="text-secondary">{mi(invariant.computedMi)}</strong>
+                        <span className="text-faint">below the {mi(invariant.labeledMi)} label</span>
+                        <span className="epa-check-delta">
+                            −{invariant.shortfallMi.toFixed(1)} mi
+                        </span>
+                    </span>
+                    <span className="text-xs text-faint">
+                        A label may never exceed the computed range, so this derivation is too low
+                        rather than merely disagreeing.
+                    </span>
+                </div>
+            )}
+
+            {/* Recomputed range against the range the record itself states.
+                The strongest check here and the one that needs no external
+                source: same test, same quantity, so a gap is our phase data and
+                nothing else. It also names the cycle at fault. */}
+            {rangeCheck?.checked && (
+                <div className={`epa-check epa-check-${rangeCheck.worst}`}>
+                    <span className="text-label">
+                        Recomputed range vs this record
+                        <span className="epa-check-verdict">
+                            {rangeCheck.worst === 'agrees' ? 'bags reconcile' : 'bags do not reconcile'}
+                        </span>
+                    </span>
+                    {rangeCheck.cycles.map(c => (
+                        <span key={c.cycle} className="epa-check-row">
+                            {c.label}
+                            <strong className="text-secondary">{mi(c.ours)}</strong>
+                            <span className="text-faint">vs {mi(c.stated)} stated</span>
+                            <span className="epa-check-delta">
+                                {c.deltaPct >= 0 ? '+' : ''}{c.deltaPct.toFixed(2)}%
+                            </span>
+                        </span>
+                    ))}
+                    {rangeCheck.worst !== 'agrees' && (
+                        <span className="text-xs text-faint">
+                            The record states its own range, so a gap is in the phase bags we
+                            imported for that cycle \u2014 a wrong distance, a mistyped type, or one missing.
+                        </span>
+                    )}
+                </div>
+            )}
 
             {/* Our derivation against EPA's own published unadjusted figures.
                 Shown for every configuration with a linked guide row, because

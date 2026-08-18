@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import {
     checkUnadjustedMpge, CHECK_STATUS_LABELS, CHECK_SHAPE_ADVICE,
     AGREEMENT_TOLERANCE, DIVERGENCE_TOLERANCE,
+    checkStatedRanges, checkLabelInvariant, LABEL_INVARIANT_TOLERANCE_MI,
 } from '../epaDerivationCheck';
 import { buildMethodologyModel } from '../epaMethodology';
 import { R2_MCT, R2_GUIDE_ADJUSTMENT } from '../epaMethodologyFixtures';
@@ -161,5 +162,85 @@ describe('checkUnadjustedMpge — nothing to check is not a pass', () => {
         for (const status of ['agrees', 'close', 'disagrees']) {
             expect(CHECK_STATUS_LABELS[status], status).toBeTruthy();
         }
+    });
+});
+
+
+describe('checkStatedRanges — a record against itself', () => {
+    const model = buildMethodologyModel(R2_MCT);
+
+    it('agrees when the bags reproduce the stated ranges', () => {
+        const out = checkStatedRanges(model, {
+            cityMi: model.cycles.city.rangeUnadjMi,
+            hwyMi:  model.cycles.hwy.rangeUnadjMi,
+        });
+        expect(out.checked).toBe(true);
+        expect(out.worst).toBe('agrees');
+    });
+
+    it('localises the real Model Y Performance fault to one cycle', () => {
+        // The record states 457.261 city and 412.88 highway. Its bags derive
+        // city correctly and highway around 378 — an 8% gap that took working
+        // backwards from MPGe to find. This check names it directly.
+        const faulty = { cycles: { city: { rangeUnadjMi: 457.3 }, hwy: { rangeUnadjMi: 378.4 } } };
+        const out = checkStatedRanges(faulty, { cityMi: 457.261, hwyMi: 412.88 });
+
+        expect(out.worst).toBe('disagrees');
+        expect(out.cycles.map(c => c.status)).toEqual(['agrees', 'disagrees']);
+        expect(out.cycles[1].deltaPct).toBeLessThan(-8);
+    });
+
+    it('needs no Fuel Economy Guide link', () => {
+        // The point of it: the MPGe check only covers linked groups and compares
+        // against a different document. This works on every imported record.
+        const out = checkStatedRanges(model, { cityMi: 100, hwyMi: 100 });
+        expect(out.checked).toBe(true);
+    });
+
+    it('reports unchecked when the record states no ranges', () => {
+        for (const stated of [{}, undefined, { cityMi: null, hwyMi: 0 }]) {
+            expect(checkStatedRanges(model, stated).checked, JSON.stringify(stated)).toBe(false);
+        }
+    });
+});
+
+describe('checkLabelInvariant — a label may never exceed the computed range', () => {
+    it('flags the record whose computed range sits below its label', () => {
+        // The live YD226-00180 case: 295.2 computed against a 306 label. Not a
+        // disagreement — proof our derivation is too low, since the alternative
+        // is that EPA certified an illegal label.
+        const out = checkLabelInvariant({ combinedMi: 295.2, labeledMi: 306 });
+        expect(out.violated).toBe(true);
+        expect(out.shortfallMi).toBeCloseTo(10.8, 1);
+    });
+
+    it('flags the smaller live violation too', () => {
+        expect(checkLabelInvariant({ combinedMi: 431.0, labeledMi: 434.0 }).violated).toBe(true);
+    });
+
+    it('accepts labelling below the computed value, which is the normal case', () => {
+        // A 2.7% derate is permitted and common — the Model Y Premium does it.
+        expect(checkLabelInvariant({ combinedMi: 329.9, labeledMi: 321 }).violated).toBe(false);
+    });
+
+    it('tolerates the label being a whole number', () => {
+        expect(checkLabelInvariant({ combinedMi: 306.9, labeledMi: 307 }).violated).toBe(false);
+        expect(checkLabelInvariant({ combinedMi: 307.0, labeledMi: 307 + LABEL_INVARIANT_TOLERANCE_MI }).violated)
+            .toBe(false);
+    });
+
+    it('tests the arithmetic blend, the larger of the two', () => {
+        // Conservative on purpose: the arithmetic mean is always at least the
+        // harmonic, so a violation here holds on either blend. Testing the
+        // smaller would flag records merely blended the other way.
+        const model = buildMethodologyModel({ ...R2_MCT, labeledRangeMi: 307 });
+        expect(model.combinedHarmMi).toBeLessThan(model.combinedMi);
+        expect(checkLabelInvariant(model).computedMi).toBe(model.combinedMi);
+    });
+
+    it('reports unchecked without both figures', () => {
+        expect(checkLabelInvariant({ combinedMi: 300 }).checked).toBe(false);
+        expect(checkLabelInvariant({ labeledMi: 300 }).checked).toBe(false);
+        expect(checkLabelInvariant(null).checked).toBe(false);
     });
 });

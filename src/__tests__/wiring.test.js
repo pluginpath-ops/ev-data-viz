@@ -68,6 +68,10 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The bound itself, consumed inside the module by rangePlausibility and asserted by name against the observed real spread.',
         'feGuidePlausibility.HWY_CITY_RATIO_MAX':
             'As above — the upper bound, pinned by name so widening it is a deliberate edit.',
+        'epaDerivationCheck.RANGE_AGREEMENT_TOLERANCE':
+            'The slack allowed when a record is recomputed against its own stated range; consumed inside the module by checkStatedRanges and asserted by name.',
+        'epaDerivationCheck.LABEL_INVARIANT_TOLERANCE_MI':
+            'Rounding slack for a whole-number label; consumed inside the module by checkLabelInvariant and asserted by name.',
         'epaDerivationCheck.AGREEMENT_TOLERANCE':
             'The band itself, consumed inside the module by statusFor and asserted by name so moving it is a deliberate edit.',
         'epaDerivationCheck.DIVERGENCE_TOLERANCE':
@@ -273,6 +277,20 @@ describe('the seams that broke before', () => {
 
         const missing = [...needed].filter(k => !selected.has(k));
         expect(missing, `candidate columns read but not selected: ${missing.join(', ')}`).toEqual([]);
+    });
+
+    it('shows both range checks, not only the efficiency one', () => {
+        // The stated-range check and the label invariant each catch a class the
+        // MPGe comparison cannot, and both were added because a real record slipped
+        // through. Computing them without rendering would restore that blind spot.
+        const view = read('src/components/EpaCurvesView.jsx');
+        const diagram = read('src/components/epa/EpaMethodologyDiagram.jsx');
+
+        expect(view, 'the view must recompute range against the record').toMatch(/checkStatedRanges\(/);
+        expect(view, 'the view must test the label invariant').toMatch(/checkLabelInvariant\(/);
+        expect(view, 'both must reach the diagram').toMatch(/rangeCheck=\{/);
+        expect(diagram, 'the diagram must render the recomputed range').toMatch(/rangeCheck\?\.checked/);
+        expect(diagram, 'the diagram must render an impossible label').toMatch(/invariant\?\.violated/);
     });
 
     it('shows the derivation check rather than only computing it', () => {

@@ -23,7 +23,7 @@ import CollapsibleSection from './CollapsibleSection';
 import { TWO_CYCLE_KEYS } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
-import { checkUnadjustedMpge } from '../utils/epaDerivationCheck';
+import { checkUnadjustedMpge, checkStatedRanges, checkLabelInvariant } from '../utils/epaDerivationCheck';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
 import AutoColorToggle from './AutoColorToggle';
 
@@ -718,6 +718,14 @@ export default function EpaCurvesView({
                         city: epaGroup.unadj_city_mpge,
                         hwy:  epaGroup.unadj_hwy_mpge,
                     }),
+                    // The record against itself — no guide link needed, so this
+                    // covers every imported group. cd_range_combined_calc is the
+                    // CITY figure on an MCT record despite the name.
+                    rangeCheck: checkStatedRanges(model, {
+                        cityMi: epaGroup.cd_range_combined_calc,
+                        hwyMi:  epaGroup.cd_range_hwy_calc,
+                    }),
+                    invariant: checkLabelInvariant(model),
                 });
             }
         }
@@ -1255,7 +1263,12 @@ export default function EpaCurvesView({
                                     to make this derivation certain.
                                 </p>
                             )}
-                            <EpaMethodologyDiagram model={entry.model} check={entry.check} />
+                            <EpaMethodologyDiagram
+                                model={entry.model}
+                                check={entry.check}
+                                rangeCheck={entry.rangeCheck}
+                                invariant={entry.invariant}
+                            />
                         </CollapsibleSection>
                     ))}
 
