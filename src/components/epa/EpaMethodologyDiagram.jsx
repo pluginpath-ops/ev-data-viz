@@ -126,10 +126,14 @@ export default function EpaMethodologyDiagram({ model }) {
                     // reproduces EPA's published combined on 72% of the rows
                     // where the two differ and harmonic on the rest, and nothing
                     // in a record says which a configuration uses.
+                    //
+                    // 'neither' is NOT reported as a discrepancy. A maker may
+                    // label below the computed range and most do, so neither
+                    // blend lands on a derated label — saying so here read as a
+                    // fault in the derivation when it is the derate, which the
+                    // next arrow already states as a percentage.
                     note={`${Math.round(weights.city * 100)}/${Math.round(weights.hwy * 100)} blend, ${
-                        blendAgreeing === 'harmonic' ? 'harmonic' :
-                        blendAgreeing === 'neither'  ? 'arithmetic — neither blend reproduces the label' :
-                        'arithmetic'}`}
+                        blendAgreeing === 'harmonic' ? 'harmonic' : 'arithmetic'}`}
                     tone="strong"
                 />
                 <Arrow annotation={deratePct != null ? `− ${pct(deratePct)}` : null} />
