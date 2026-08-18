@@ -40,7 +40,8 @@ describe('utilities built for the UI are reached by the UI', () => {
     // Scoped to the modules built recently rather than the whole codebase: 48
     // exports are unused project-wide, nearly all pre-existing in the EPA and
     // parser modules. Widening this wants a cleanup first, not an allowlist.
-    const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js', 'feGuidePlausibility.js'];
+    const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js',
+                     'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromGroup.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -66,6 +67,12 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The bound itself, consumed inside the module by rangePlausibility and asserted by name against the observed real spread.',
         'feGuidePlausibility.HWY_CITY_RATIO_MAX':
             'As above — the upper bound, pinned by name so widening it is a deliberate edit.',
+        'phaseTypes.SS_NEIGHBOUR_MULTIPLE':
+            'The multiple itself, consumed inside the module by suggestPhaseType and asserted by name so changing it is deliberate.',
+        'epaRecordFromGroup.epaRecordFromGroup':
+            'Built and tested against the real database shape; the diagram that consumes it is the next step of #222. Remove this entry when EpaCurvesView calls it.',
+        'epaRecordFromGroup.NO_RECORD_REASONS':
+            'The curator-facing wording for each failure. Surfaced by the same step of #222 that consumes the adapter.',
         'socAlignment.extrapolationSlope':
             'Called by alignSeries, which the chart calls. Exported so the slope basis can be asserted without going through alignment.',
     };
