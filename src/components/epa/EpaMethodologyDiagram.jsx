@@ -211,8 +211,11 @@ export default function EpaMethodologyDiagram({ model, check = null, rangeCheck 
                         </span>
                     </span>
                     <span className="text-xs text-faint">
-                        A label may never exceed the computed range, so this derivation is too low
-                        rather than merely disagreeing.
+                        {invariant.cause === 'adjustment'
+                            ? `The bags reproduce this record\u2019s own stated ranges, so the phase data is sound \u2014 the adjustment factor is too low. This label implies ${invariant.impliedAdjustment?.toFixed(4)}, not the ${adjustmentFixed} being applied. Link its Fuel Economy Guide row.`
+                            : invariant.cause === 'phases'
+                                ? 'The bags do not reproduce this record\u2019s own stated ranges either, so the phase data is what is too low.'
+                                : 'A label may never exceed the computed range, so something feeding this derivation is too low.'}
                     </span>
                 </div>
             )}

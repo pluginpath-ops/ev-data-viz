@@ -80,6 +80,11 @@ function phasesFor(test) {
                 typeSource: p.typeSource,
                 index: num(p.phase_index),
                 wh,
+                // Carried through, because a bag's LENGTH decides whether its
+                // consumption is usable: the final bag of a depletion run ends
+                // mid-cycle and its Wh/mi is not a cycle's Wh/mi. See
+                // isCompleteCycle in epaMethodology.
+                distanceMi: dist,
                 whPerMi: (wh != null && dist > 0) ? wh / dist : null,
             };
         })

@@ -4,6 +4,7 @@ import {
     derived5CycleFe, derived5CycleCrossoverFe, adjustmentComparison,
 } from '../epaMethodology';
 import { R2_MCT, LIGHTNING_SCT, R2_GUIDE_ADJUSTMENT } from '../epaMethodologyFixtures';
+import { isCompleteCycle, highwayConsumptionFromPhases } from '../epaMethodology';
 
 /**
  * The expected values are from the certification records themselves, not from
@@ -235,5 +236,67 @@ describe('derived 5-cycle vs the flat 0.7 factor', () => {
         expect(derived5CycleFe(0, 'city')).toBeNull();
         expect(derived5CycleFe(100, 'nope')).toBeNull();
         expect(adjustmentComparison(-5, 'city')).toBeNull();
+    });
+});
+
+
+describe('incomplete bags (#222)', () => {
+    // The 2026 Model Y Performance highway bags, exactly as the record reports
+    // them. The third is 9.96 mi against the HWFET's fixed 10.26 — the depletion
+    // run ended mid-cycle — and reads 29% higher because the pack is flat by
+    // then and the bag's fixed costs spread over fewer miles.
+    const MODEL_Y_HWY = [
+        { cycle: 'HWY', distanceMi: 10.265, wh: 2055.6, whPerMi: 2055.6 / 10.265 },
+        { cycle: 'HWY', distanceMi: 10.266, wh: 1998.6, whPerMi: 1998.6 / 10.266 },
+        { cycle: 'HWY', distanceMi: 9.960,  wh: 2506.5, whPerMi: 2506.5 / 9.960 },
+    ];
+    const TOTAL_DC_WH = 81528;
+    const STATED_HWY_MI = 412.88;
+
+    it('reproduces the range the record states, which averaging all three does not', () => {
+        // The whole case for the exclusion: 412.87 against a stated 412.88.
+        const ec = highwayConsumptionFromPhases(MODEL_Y_HWY);
+        expect(TOTAL_DC_WH / ec).toBeCloseTo(STATED_HWY_MI, 1);
+
+        // What it used to do, for contrast — 34 miles short.
+        const naive = MODEL_Y_HWY.reduce((a, p) => a + p.whPerMi, 0) / MODEL_Y_HWY.length;
+        expect(TOTAL_DC_WH / naive).toBeLessThan(380);
+    });
+
+    it('is not explained by a transcription error in the short bag', () => {
+        // The alternative reading was a typo, 2.5065 kWh for 2.0565. That lands
+        // 6 miles short of the stated range; exclusion lands within 0.01.
+        const corrected = [...MODEL_Y_HWY.slice(0, 2),
+            { cycle: 'HWY', distanceMi: 9.96, wh: 2056.5, whPerMi: 2056.5 / 9.96 }];
+        const ec = corrected.reduce((a, p) => a + p.whPerMi, 0) / 3;
+        expect(Math.abs(TOTAL_DC_WH / ec - STATED_HWY_MI)).toBeGreaterThan(5);
+    });
+
+    it('keeps bags that landed on their cycle', () => {
+        expect(isCompleteCycle({ cycle: 'HWY', distanceMi: 10.265 })).toBe(true);
+        expect(isCompleteCycle({ cycle: 'HWY', distanceMi: 10.266 })).toBe(true);
+        expect(isCompleteCycle({ cycle: 'UDDS', distanceMi: 7.45 })).toBe(true);
+    });
+
+    it('drops one that stopped short', () => {
+        expect(isCompleteCycle({ cycle: 'HWY', distanceMi: 9.96 })).toBe(false);
+        expect(isCompleteCycle({ cycle: 'UDDS', distanceMi: 6.9 })).toBe(false);
+    });
+
+    it('treats an unmeasured bag as complete rather than discarding it', () => {
+        // A record that never reported distances cannot be judged, and excluding
+        // everything would be worse than including it. This is also why the
+        // existing fixtures, which carry no distances, are unaffected.
+        for (const d of [null, undefined, 0, 'x']) {
+            expect(isCompleteCycle({ cycle: 'HWY', distanceMi: d }), String(d)).toBe(true);
+        }
+        expect(isCompleteCycle({ cycle: 'SS', distanceMi: 200 })).toBe(true);
+    });
+
+    it('leaves a record whose bags all completed exactly as it was', () => {
+        // The regression guard: this correction must move only the records with
+        // a partial bag. The R2 reconciled before and must still.
+        const m = buildMethodologyModel(R2_MCT);
+        expect(Math.round(m.cycles.hwy.rangeUnadjMi)).toBe(392);
     });
 });

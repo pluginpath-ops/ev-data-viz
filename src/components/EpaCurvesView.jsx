@@ -725,7 +725,15 @@ export default function EpaCurvesView({
                         cityMi: epaGroup.cd_range_combined_calc,
                         hwyMi:  epaGroup.cd_range_hwy_calc,
                     }),
-                    invariant: checkLabelInvariant(model),
+                    invariant: null,   // filled below, once the bag check is known
+                });
+                // The invariant reads the bag check to tell an adjustment-factor
+                // fault from a phase-data one, so it is resolved after both.
+                const entry = out[out.length - 1];
+                entry.invariant = checkLabelInvariant(model, {
+                    bagsReconcile: entry.rangeCheck.checked
+                        ? entry.rangeCheck.worst === 'agrees'
+                        : null,
                 });
             }
         }

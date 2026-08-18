@@ -238,6 +238,33 @@ describe('checkLabelInvariant — a label may never exceed the computed range', 
         expect(checkLabelInvariant(model).computedMi).toBe(model.combinedMi);
     });
 
+    it('blames the adjustment factor when the bags already reconcile', () => {
+        // A live record: bags match its own stated ranges to 0.01%, yet the
+        // label exceeds the computed range by 3 mi because the flat 0.700 was
+        // applied to a vehicle EPA adjusted by 0.7048. Sending a curator to
+        // check phase data here would waste their time on correct data.
+        const out = checkLabelInvariant(
+            { combinedMi: 431.0, labeledMi: 434.0, adjustment: 0.7 },
+            { bagsReconcile: true },
+        );
+        expect(out.violated).toBe(true);
+        expect(out.cause).toBe('adjustment');
+        expect(out.impliedAdjustment).toBeCloseTo(0.7049, 3);
+    });
+
+    it('blames the phase data when the bags do not reconcile either', () => {
+        const out = checkLabelInvariant(
+            { combinedMi: 295.2, labeledMi: 306, adjustment: 0.7 },
+            { bagsReconcile: false },
+        );
+        expect(out.cause).toBe('phases');
+    });
+
+    it('names no cause without bag evidence', () => {
+        expect(checkLabelInvariant({ combinedMi: 295.2, labeledMi: 306, adjustment: 0.7 }).cause)
+            .toBeNull();
+    });
+
     it('reports unchecked without both figures', () => {
         expect(checkLabelInvariant({ combinedMi: 300 }).checked).toBe(false);
         expect(checkLabelInvariant({ labeledMi: 300 }).checked).toBe(false);

@@ -243,19 +243,42 @@ export const LABEL_INVARIANT_TOLERANCE_MI = 1;
  * label the invariant is violated on any blend. Testing the smaller one would
  * flag records that are merely blended the other way.
  */
-export function checkLabelInvariant(model) {
+export function checkLabelInvariant(model, { bagsReconcile = null } = {}) {
     const computedMi = num(model?.combinedMi);
     const labeledMi  = num(model?.labeledMi);
-    if (computedMi == null || labeledMi == null || computedMi <= 0 || labeledMi <= 0) {
-        return { checked: false, violated: false, computedMi: null, labeledMi: null, shortfallMi: 0 };
-    }
+    const none = {
+        checked: false, violated: false, computedMi: null, labeledMi: null,
+        shortfallMi: 0, cause: null, impliedAdjustment: null,
+    };
+    if (computedMi == null || labeledMi == null || computedMi <= 0 || labeledMi <= 0) return none;
 
     const shortfallMi = labeledMi - computedMi;
+    const violated = shortfallMi > LABEL_INVARIANT_TOLERANCE_MI;
+
+    // Which of the two inputs is too low, decided by evidence rather than
+    // guessed. The computed range is (unadjusted range x adjustment factor), so
+    // a label above it means one of the pair is wrong -- and the bag check
+    // already settles the first: if the recomputed ranges reproduce what the
+    // record itself states, the unadjusted side is right and the factor is not.
+    //
+    // A live record makes the case. Its bags reconcile to 0.01% and its label
+    // still exceeds the computed range by 3 mi, because we applied the flat
+    // 0.700 to a vehicle EPA adjusted by 0.7048. Reporting "this derivation is
+    // too low" there would send a curator to phase data that is already correct.
+    const adjustment = num(model?.adjustment);
+    const impliedAdjustment = (violated && adjustment > 0 && computedMi > 0)
+        ? (labeledMi * adjustment) / computedMi
+        : null;
+
     return {
         checked: true,
-        violated: shortfallMi > LABEL_INVARIANT_TOLERANCE_MI,
+        violated,
         computedMi,
         labeledMi,
         shortfallMi,
+        // 'adjustment' | 'phases' | null when there is no bag evidence either way
+        cause: !violated ? null : (bagsReconcile === true ? 'adjustment'
+            : bagsReconcile === false ? 'phases' : null),
+        impliedAdjustment,
     };
 }
