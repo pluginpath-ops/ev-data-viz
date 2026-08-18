@@ -12,8 +12,12 @@
  * 48.3 mph despite touching 60.
  *
  * The 65–75 mph band is the same reference the EPA curve chart draws, and it is
- * what makes the speed argument land — it falls outside every cycle but US06,
- * and US06 is one of the three that was never driven.
+ * what makes the speed argument land — it falls outside every cycle but US06.
+ *
+ * Whether US06 was driven is per-vehicle and NOT assumable: a two-cycle vehicle
+ * never sees it, while the R2 ran all five and its factor is measured rather
+ * than defaulted. `ranCycleKeys` is the caller's answer to that, and callers
+ * currently pass a constant — see #232.
  *
  * One grid, so the band can be a single element spanning every row rather than
  * five segments that have to be kept in alignment by hand.
