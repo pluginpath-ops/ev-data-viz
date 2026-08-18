@@ -100,8 +100,18 @@ export default function EpaCycleSpeedChart({ ranCycleKeys = [] }) {
             </div>
 
             <div className="cycle-legend">
-                <span><i className="cycle-swatch cycle-bar-run" /> Driven in this test</span>
-                <span><i className="cycle-swatch cycle-bar-substituted" /> Not driven — replaced by the 0.7 factor</span>
+                {/* The split is "drives the RANGE" against "drives the FACTOR", not
+                    driven against not-driven. The top two are the depletion test and
+                    are always run; the other three generate the adjustment factor
+                    where they were run, and are stood in for by the flat 0.7 where
+                    they were not.
+
+                    The second label states both cases at once because which applies
+                    is per-vehicle and this chart is still handed a constant. Once it
+                    is fed the record's own procedure codes the label can say which
+                    one is true for the car on screen — #232. */}
+                <span><i className="cycle-swatch cycle-bar-run" /> Driven in the MCT/SCT</span>
+                <span><i className="cycle-swatch cycle-bar-substituted" /> Driven to derive range factor, else 0.7 is used</span>
                 <span><i className="cycle-swatch-tick" /> Average speed</span>
                 <span>
                     <i className="cycle-swatch-band" /> {bandLo}–{bandHi} mph — where an independent
