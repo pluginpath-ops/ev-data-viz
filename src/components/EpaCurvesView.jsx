@@ -1274,9 +1274,11 @@ export default function EpaCurvesView({
                             )}
                             {entry.competingMctTests > 1 && (
                                 <p className="text-xs mb-2" style={{ color: 'var(--color-warning)' }}>
-                                    This group holds {entry.competingMctTests} multi-cycle tests. The most
-                                    recent was used and the others ignored — every figure below depends on
-                                    that choice. Delete or reconcile the superseded run in Tests &amp; Data.
+                                    This group holds {entry.competingMctTests} multi-cycle tests and the most
+                                    recent was used. Both may be valid — the R2 21&quot; was tested at two
+                                    laboratories — so this is a choice, not a fault, and every figure below
+                                    depends on it. The stated ranges compared above belong to whichever test
+                                    was imported first, so they may not be this one&apos;s.
                                 </p>
                             )}
                             <EpaMethodologyDiagram

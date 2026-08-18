@@ -59,16 +59,22 @@ function mctTestsOf(tests) {
 /**
  * The multi-cycle test to derive from, when a group holds more than one.
  *
- * A group SHOULD hold one. Where it holds two, they are different runs of the
- * same procedure and they do not agree — an R2 configuration carried a pair
- * whose recharge energies differed by ~5%, and picking silently between them
- * put the derived MPGe 5.15% out while every bag still reconciled, which is a
- * confusing place to be sent looking.
+ * Two is not a data error. The R2 21" was tested at two laboratories — FEV
+ * Michigan and Ann Arbor — and both runs are legitimate. They simply do not
+ * agree: their recharge energies differ by about 5%, so choosing silently put
+ * the derived MPGe 5.15% out while every bag still reconciled. Deriving from
+ * the other run brings it to +0.01%.
  *
- * Picking the most recent is a defensible default and NOT a resolution: only a
- * curator knows whether the older run was superseded or the newer one is a
- * retest of a different build. So the count is reported alongside and the UI
- * says so, rather than the choice being invisible.
+ * Picking the most recent is a defensible default and NOT a resolution. Which
+ * run represents the vehicle is a curator's judgement, and the wrong reading of
+ * this — that one must be deleted — would destroy a valid test. So the count is
+ * carried out and the UI states that a choice was made.
+ *
+ * ⚠ `cd_range_*` is stored on the GROUP, set at import from whichever proc-77
+ * test was seen first. When a group holds two, the stated ranges the bag check
+ * compares against may belong to the OTHER test — which reads as a ~0.6%
+ * disagreement that is really two labs, not an error. Per-test CD ranges would
+ * be needed to compare like with like.
  *
  * Ordering falls back to test_number, then position, so the same group always
  * derives the same way — an arbitrary pick that changes between loads is worse
