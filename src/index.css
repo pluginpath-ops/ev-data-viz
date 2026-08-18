@@ -1878,11 +1878,6 @@ body {
     min-height: 5.5rem;
 }
 
-/* Reaches past the adjustment row: no adjustment step to take */
-.cert-cell-span {
-    grid-row: span 2;
-}
-
 /* A path something on screen actually took */
 .cert-cell-active {
     border-color: var(--color-primary);
@@ -1957,7 +1952,6 @@ body {
     /* One column: the row span carries no meaning without columns to span
        across, so cells simply stack in reading order. */
     .cert-grid { grid-template-columns: minmax(0, 1fr); }
-    .cert-cell-span { grid-row: auto; }
     .cert-cell-result { grid-column: 1; }
     /* The band spans rows that no longer sit side by side */
     .cycle-band { display: none; }
