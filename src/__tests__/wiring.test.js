@@ -41,7 +41,8 @@ describe('utilities built for the UI are reached by the UI', () => {
     // exports are unused project-wide, nearly all pre-existing in the EPA and
     // parser modules. Widening this wants a cleanup first, not an allowlist.
     const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js',
-                     'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromGroup.js'];
+                     'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromGroup.js',
+                     'epaDerivationCheck.js', 'epaSectionLabels.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -67,6 +68,10 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The bound itself, consumed inside the module by rangePlausibility and asserted by name against the observed real spread.',
         'feGuidePlausibility.HWY_CITY_RATIO_MAX':
             'As above — the upper bound, pinned by name so widening it is a deliberate edit.',
+        'epaDerivationCheck.AGREEMENT_TOLERANCE':
+            'The band itself, consumed inside the module by statusFor and asserted by name so moving it is a deliberate edit.',
+        'epaDerivationCheck.DIVERGENCE_TOLERANCE':
+            'As above — the boundary beyond which a difference is larger than any plausible rounding.',
         'phaseTypes.SS_NEIGHBOUR_MULTIPLE':
             'The multiple itself, consumed inside the module by suggestPhaseType and asserted by name so changing it is deliberate.',
         'socAlignment.extrapolationSlope':
@@ -268,6 +273,19 @@ describe('the seams that broke before', () => {
 
         const missing = [...needed].filter(k => !selected.has(k));
         expect(missing, `candidate columns read but not selected: ${missing.join(', ')}`).toEqual([]);
+    });
+
+    it('shows the derivation check rather than only computing it', () => {
+        // The check is worthless if it runs and nothing renders the verdict —
+        // which is the exact "built, unit-tested, never connected" shape this
+        // suite exists for. Both ends asserted: the view must compute it and
+        // hand it over, and the diagram must render it.
+        const view = read('src/components/EpaCurvesView.jsx');
+        const diagram = read('src/components/epa/EpaMethodologyDiagram.jsx');
+
+        expect(view, 'the view must run the check').toMatch(/checkUnadjustedMpge\(/);
+        expect(view, 'the check must reach the diagram').toMatch(/check=\{/);
+        expect(diagram, 'the diagram must render the verdict').toMatch(/check\?\.checked/);
     });
 
     it('builds the methodology diagram from selected vehicles, not sample records', () => {

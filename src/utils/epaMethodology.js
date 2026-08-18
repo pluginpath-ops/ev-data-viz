@@ -169,6 +169,12 @@ function cycleFrom({ whPerMi, rangeUnadjMi, energyBasis, chargeEff, adjustment }
         rangeUnadjMi,
         rangeAdjMi: rangeUnadjMi * adjustment,
         mpge: mpgeFrom(whPerMi, { energyBasis, chargeEff, adjustment }),
+        // The same figure before the adjustment, which is what EPA publishes as
+        // "Unadj FE" and therefore the only one our derivation can be checked
+        // against. The adjusted value cannot serve: it embeds the factor, so
+        // comparing it would test the factor and the derivation together and
+        // pass whenever their errors happened to cancel.
+        mpgeUnadj: mpgeFrom(whPerMi, { energyBasis, chargeEff, adjustment: 1 }),
         // What the flat shortcut would have produced, so the diagram can show
         // the two side by side. Identical for the 57% of configurations whose
         // published factor IS 0.700, which is the point: it degenerates.

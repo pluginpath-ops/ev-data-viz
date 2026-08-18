@@ -1646,6 +1646,31 @@ body {
     color: var(--color-text-primary);
 }
 
+/* Our derivation measured against EPA's published unadjusted MPGe. Bordered on
+   the leading edge in the status colour so agreement and disagreement are
+   distinguishable before any number is read. */
+.epa-check {
+    @apply flex flex-col gap-0.5 mt-3 p-2 rounded;
+    border-left: 3px solid var(--color-border);
+    background: var(--color-surface-2, transparent);
+}
+.epa-check-agrees    { border-left-color: var(--color-success); }
+.epa-check-close     { border-left-color: var(--color-warning); }
+.epa-check-disagrees { border-left-color: var(--color-danger); }
+
+.epa-check-verdict {
+    @apply text-xs font-medium ml-2 normal-case;
+}
+
+.epa-check-row {
+    @apply flex items-baseline gap-2 text-xs tabular-nums;
+}
+
+.epa-check-delta {
+    @apply text-xs tabular-nums ml-auto;
+    color: var(--color-text-muted);
+}
+
 /* The flat-0.700 counterfactual shown beside a vehicle's real adjusted figure.
    Deliberately quieter than the value it sits under: it is the road not taken,
    not a second answer. */

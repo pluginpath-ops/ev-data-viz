@@ -16,6 +16,7 @@
  * driven anywhere near highway speed.
  */
 import { useState } from 'react';
+import { CHECK_STATUS_LABELS, CHECK_SHAPE_ADVICE } from '../../utils/epaDerivationCheck';
 
 const mi   = (v) => v == null ? '—' : `${v.toFixed(1)} mi`;
 const whmi = (v) => v == null ? '—' : `${v.toFixed(1)} Wh/mi`;
@@ -51,7 +52,7 @@ function Arrow({ annotation }) {
     );
 }
 
-export default function EpaMethodologyDiagram({ model }) {
+export default function EpaMethodologyDiagram({ model, check = null }) {
     const [showDetail, setShowDetail] = useState(false);
     if (!model) return null;
 
@@ -191,6 +192,41 @@ export default function EpaMethodologyDiagram({ model }) {
                     </span>
                 </span>
             </div>
+
+            {/* Our derivation against EPA's own published unadjusted figures.
+                Shown for every configuration with a linked guide row, because
+                until now the chain was verified against exactly one vehicle by
+                hand — and two groups for the same car currently derive charging
+                efficiencies 7 points apart, so at least one reading in the fleet
+                is wrong and nothing said which.
+
+                The UNADJUSTED figure is the one compared: the adjusted value
+                embeds the adjustment factor, so a wrong factor and a wrong
+                efficiency could cancel and pass. */}
+            {check?.checked && (
+                <div className={`epa-check epa-check-${check.worst}`}>
+                    <span className="text-label">
+                        Unadjusted MPGe vs EPA
+                        <span className="epa-check-verdict">{CHECK_STATUS_LABELS[check.worst]}</span>
+                    </span>
+                    {check.cycles.map(c => (
+                        <span key={c.cycle} className="epa-check-row">
+                            {c.label}
+                            <strong className="text-secondary">{c.ours.toFixed(1)}</strong>
+                            <span className="text-faint">vs {c.epa.toFixed(1)}</span>
+                            <span className="epa-check-delta">
+                                {c.deltaPct >= 0 ? '+' : ''}{c.deltaPct.toFixed(2)}%
+                            </span>
+                        </span>
+                    ))}
+                    <span className="text-xs text-faint">
+                        {check.worst === 'agrees'
+                            ? 'The derivation reproduces EPA\u2019s published figures.'
+                            : (CHECK_SHAPE_ADVICE[check.shape]
+                                ?? 'Outside rounding, and the two cycles do not agree on how.')}
+                    </span>
+                </div>
+            )}
 
             <button
                 type="button"

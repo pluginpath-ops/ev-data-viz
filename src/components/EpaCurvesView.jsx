@@ -23,6 +23,8 @@ import CollapsibleSection from './CollapsibleSection';
 import { TWO_CYCLE_KEYS } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
+import { checkUnadjustedMpge } from '../utils/epaDerivationCheck';
+import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
 import AutoColorToggle from './AutoColorToggle';
 
 // Sane bounds for the ambient-temperature viewing condition; far outside this
@@ -702,9 +704,20 @@ export default function EpaCurvesView({
                     key: mapping.id,
                     vehicleName,
                     epaLabel,
+                    // Always carried, because it is the only identifier that
+                    // cannot degrade — see methodologyTitle.
+                    testGroupId: epaGroup.test_group_id ?? null,
+                    modelYear: epaGroup.model_year ?? null,
+                    configCount: (vehicle.epa_mappings ?? []).filter(m => m.epaGroup).length,
                     model,
                     reason: model ? null : (reason ?? 'no-derivation'),
                     inferredPhaseTypes,
+                    // EPA's own unadjusted figures, promoted from the guide when
+                    // one is linked. Absent means unverified, not agreed.
+                    check: checkUnadjustedMpge(model, {
+                        city: epaGroup.unadj_city_mpge,
+                        hwy:  epaGroup.unadj_hwy_mpge,
+                    }),
                 });
             }
         }
@@ -1225,24 +1238,24 @@ export default function EpaCurvesView({
                         </div>
                     </CollapsibleSection>
 
-                    {methodologyModels.map(({ key, model, vehicleName, epaLabel, inferredPhaseTypes }) => (
+                    {methodologyModels.map((entry) => (
                         <CollapsibleSection
-                            key={key}
-                            title={`${vehicleName} EPA Range Assessment`}
-                            subtitle={epaLabel}
+                            key={entry.key}
+                            title={methodologyTitle(entry)}
+                            subtitle={methodologySubtitle(entry)}
                         >
                             {/* A derivation built on inferred phase types is a
                                 weaker claim than one built on curated types, and
                                 the reader is entitled to know which they have.
                                 Fixable, too: the types are editable in Tests & Data. */}
-                            {inferredPhaseTypes > 0 && (
+                            {entry.inferredPhaseTypes > 0 && (
                                 <p className="text-xs mb-2" style={{ color: 'var(--color-warning)' }}>
-                                    {inferredPhaseTypes} phase{inferredPhaseTypes === 1 ? '' : 's'} had no
+                                    {entry.inferredPhaseTypes} phase{entry.inferredPhaseTypes === 1 ? '' : 's'} had no
                                     recorded cycle — inferred from distance. Set them in Tests &amp; Data
                                     to make this derivation certain.
                                 </p>
                             )}
-                            <EpaMethodologyDiagram model={model} />
+                            <EpaMethodologyDiagram model={entry.model} check={entry.check} />
                         </CollapsibleSection>
                     ))}
 
