@@ -22,7 +22,7 @@ import EpaCycleSpeedChart from './epa/EpaCycleSpeedChart';
 import CollapsibleSection from './CollapsibleSection';
 import { TWO_CYCLE_KEYS } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
-import { METHODOLOGY_FIXTURES } from '../utils/epaMethodologyFixtures';
+import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
 import AutoColorToggle from './AutoColorToggle';
 
 // Sane bounds for the ambient-temperature viewing condition; far outside this
@@ -671,6 +671,49 @@ export default function EpaCurvesView({
     };
 
     // ── Total visible mapping count (for selector badge) ──────────────────────
+    /**
+     * The methodology diagram, per visible EPA configuration of the selected
+     * vehicles — the same set the chart above plots, so the two never disagree
+     * about which configurations are on screen.
+     *
+     * Entries with no model are KEPT and carry their reason. Most linked groups
+     * cannot produce a derivation yet, and dropping them silently would leave a
+     * curator with a shorter list than they selected and no idea why — which is
+     * the state this section was in when it ran on sample records.
+     */
+    const methodologyEntries = useMemo(() => {
+        const out = [];
+        for (const vehicle of vehiclesWithEpa) {
+            for (const mapping of vehicle.epa_mappings ?? []) {
+                const { epaGroup } = mapping;
+                if (!epaGroup) continue;
+                if (hiddenMappings.has(mapping.id)) continue;
+
+                const vehicleName = vehicleLabel(vehicle);
+                const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name || null;
+                const { record, reason, inferredPhaseTypes } =
+                    epaRecordFromGroup(epaGroup, { vehicleName, configuration: epaLabel });
+
+                // A record can still fail the model — the adapter checks its
+                // inputs are present, not that they resolve to a consumption.
+                const model = record ? buildMethodologyModel(record) : null;
+
+                out.push({
+                    key: mapping.id,
+                    vehicleName,
+                    epaLabel,
+                    model,
+                    reason: model ? null : (reason ?? 'no-derivation'),
+                    inferredPhaseTypes,
+                });
+            }
+        }
+        return out;
+    }, [vehiclesWithEpa, hiddenMappings]);
+
+    const methodologyModels = methodologyEntries.filter(e => e.model);
+    const methodologyGaps   = methodologyEntries.filter(e => !e.model);
+
     const totalMappings = vehiclesWithEpa.reduce((n, v) => n + (v.epa_mappings?.length ?? 0), 0);
     const visibleCount  = totalMappings - hiddenMappings.size;
 
@@ -1142,12 +1185,10 @@ export default function EpaCurvesView({
                 />
             )}
 
-            {/* Where the label range comes from (#206).
-                ⚠ SAMPLE DATA. This is phase B1 of the epic: the diagram is built
-                and reviewed against two transcribed cert records while the ingest
-                and derivation phases (A1–A3) are still to come. B2 swaps
-                METHODOLOGY_FIXTURES for the derived row of the selected vehicle
-                and this banner goes with it.
+            {/* Where the label range comes from (#206, connected in #222).
+                One section per EPA configuration of the selected vehicles, built
+                from the stored cert records rather than the two transcribed
+                samples this was reviewed against.
 
                 Sections start collapsed: this is reference material a reader
                 opens on purpose, and expanded by default it buried the chart
@@ -1156,15 +1197,15 @@ export default function EpaCurvesView({
                 <div className="card mt-6">
                     <h3 className="text-lg font-semibold mb-1">EPA range methodology</h3>
                     <p className="text-sm text-faint mb-2">
-                        Sample records — not yet wired to the selected vehicles (#222).
-                        Where a vehicle&apos;s Fuel Economy Guide row is linked, the diagram uses
-                        EPA&apos;s own adjustment factor for that configuration and shows the flat
+                        How each selected vehicle&apos;s label range was produced, from its own
+                        certification record. Where a Fuel Economy Guide row is linked, this uses
+                        EPA&apos;s adjustment factor for that configuration and shows the flat
                         0.7 shortcut beside it.
                     </p>
 
                     <CollapsibleSection title="How the EPA range is produced">
                         <EpaCertificationPaths
-                            models={METHODOLOGY_FIXTURES.map(buildMethodologyModel).filter(Boolean)}
+                            models={methodologyModels.map(e => e.model)}
                         />
 
                         {/* What the factor stands in for. Lives with the paths
@@ -1184,19 +1225,57 @@ export default function EpaCurvesView({
                         </div>
                     </CollapsibleSection>
 
-                    {METHODOLOGY_FIXTURES.map(fixture => {
-                        const model = buildMethodologyModel(fixture);
-                        if (!model) return null;
-                        return (
-                            <CollapsibleSection
-                                key={fixture.vehicleName}
-                                title={`${model.vehicleName} EPA Range Assessment`}
-                                subtitle={fixture.configuration}
-                            >
-                                <EpaMethodologyDiagram model={model} />
-                            </CollapsibleSection>
-                        );
-                    })}
+                    {methodologyModels.map(({ key, model, vehicleName, epaLabel, inferredPhaseTypes }) => (
+                        <CollapsibleSection
+                            key={key}
+                            title={`${vehicleName} EPA Range Assessment`}
+                            subtitle={epaLabel}
+                        >
+                            {/* A derivation built on inferred phase types is a
+                                weaker claim than one built on curated types, and
+                                the reader is entitled to know which they have.
+                                Fixable, too: the types are editable in Tests & Data. */}
+                            {inferredPhaseTypes > 0 && (
+                                <p className="text-xs mb-2" style={{ color: 'var(--color-warning)' }}>
+                                    {inferredPhaseTypes} phase{inferredPhaseTypes === 1 ? '' : 's'} had no
+                                    recorded cycle — inferred from distance. Set them in Tests &amp; Data
+                                    to make this derivation certain.
+                                </p>
+                            )}
+                            <EpaMethodologyDiagram model={model} />
+                        </CollapsibleSection>
+                    ))}
+
+                    {/* Named, not hidden. A configuration that cannot be derived
+                        is a gap in the data with a specific cause, and most of
+                        these are one curator action away from resolving. */}
+                    {methodologyGaps.length > 0 && (
+                        <div className="mt-3">
+                            <p className="text-xs font-medium text-secondary mb-1">
+                                No derivation for {methodologyGaps.length} configuration
+                                {methodologyGaps.length === 1 ? '' : 's'}:
+                            </p>
+                            <ul className="text-xs text-muted list-disc pl-5">
+                                {methodologyGaps.map(({ key, vehicleName, epaLabel, reason }) => (
+                                    <li key={key}>
+                                        <span className="text-secondary">
+                                            {vehicleName}{epaLabel ? ` · ${epaLabel}` : ''}
+                                        </span>
+                                        {' — '}
+                                        {NO_RECORD_REASONS[reason]
+                                            ?? 'Its figures do not resolve into a complete label derivation.'}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {methodologyEntries.length === 0 && (
+                        <p className="text-sm text-muted">
+                            None of the selected vehicles has an EPA test group linked. Link one from
+                            Tests &amp; Data to see how its label range was produced.
+                        </p>
+                    )}
                 </div>
             )}
 

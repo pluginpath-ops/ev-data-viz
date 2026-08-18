@@ -69,10 +69,6 @@ describe('utilities built for the UI are reached by the UI', () => {
             'As above — the upper bound, pinned by name so widening it is a deliberate edit.',
         'phaseTypes.SS_NEIGHBOUR_MULTIPLE':
             'The multiple itself, consumed inside the module by suggestPhaseType and asserted by name so changing it is deliberate.',
-        'epaRecordFromGroup.epaRecordFromGroup':
-            'Built and tested against the real database shape; the diagram that consumes it is the next step of #222. Remove this entry when EpaCurvesView calls it.',
-        'epaRecordFromGroup.NO_RECORD_REASONS':
-            'The curator-facing wording for each failure. Surfaced by the same step of #222 that consumes the adapter.',
         'socAlignment.extrapolationSlope':
             'Called by alignSeries, which the chart calls. Exported so the slope basis can be asserted without going through alignment.',
     };
@@ -272,6 +268,28 @@ describe('the seams that broke before', () => {
 
         const missing = [...needed].filter(k => !selected.has(k));
         expect(missing, `candidate columns read but not selected: ${missing.join(', ')}`).toEqual([]);
+    });
+
+    it('builds the methodology diagram from selected vehicles, not sample records', () => {
+        // The diagram ran on two transcribed fixtures for three phases while
+        // reading as though it described the car on screen. It was correct and
+        // it was not about your vehicle, and nothing in the code said so except
+        // a banner that had to be remembered.
+        //
+        // Both halves are asserted because either alone passes while broken:
+        // importing the adapter proves nothing if the render still maps
+        // fixtures, and dropping the fixtures proves nothing if no real group
+        // reaches the model.
+        const view = read('src/components/EpaCurvesView.jsx');
+
+        expect(view, 'the diagram must go through the group adapter')
+            .toMatch(/epaRecordFromGroup\(/);
+        expect(view, 'sample records must not feed the rendered diagram')
+            .not.toMatch(/METHODOLOGY_FIXTURES/);
+        // The adapter's reasons exist to be shown; computing them and dropping
+        // them on the floor is the same silence in a different place.
+        expect(view, 'a configuration with no derivation must say why')
+            .toMatch(/NO_RECORD_REASONS/);
     });
 
     it('fetches every EPA column the vehicle card reads', () => {
