@@ -52,7 +52,38 @@ const kwhToWh = (v) => { const n = num(v); return n == null ? null : n * 1000; }
  * phases and still not be an MCT, and the epic is explicit that the code is the
  * only reliable discriminator.
  */
-const mctTestOf = (tests) => tests.find(t => num(t.procedure_code) === PROC_MCT) ?? null;
+function mctTestsOf(tests) {
+    return tests.filter(t => num(t.procedure_code) === PROC_MCT);
+}
+
+/**
+ * The multi-cycle test to derive from, when a group holds more than one.
+ *
+ * A group SHOULD hold one. Where it holds two, they are different runs of the
+ * same procedure and they do not agree — an R2 configuration carried a pair
+ * whose recharge energies differed by ~5%, and picking silently between them
+ * put the derived MPGe 5.15% out while every bag still reconciled, which is a
+ * confusing place to be sent looking.
+ *
+ * Picking the most recent is a defensible default and NOT a resolution: only a
+ * curator knows whether the older run was superseded or the newer one is a
+ * retest of a different build. So the count is reported alongside and the UI
+ * says so, rather than the choice being invisible.
+ *
+ * Ordering falls back to test_number, then position, so the same group always
+ * derives the same way — an arbitrary pick that changes between loads is worse
+ * than a wrong one that holds still.
+ */
+function preferredMctTest(tests) {
+    const mcts = mctTestsOf(tests);
+    if (mcts.length <= 1) return mcts[0] ?? null;
+
+    return [...mcts].sort((a, b) => {
+        const date = String(b.test_date ?? '').localeCompare(String(a.test_date ?? ''));
+        if (date !== 0) return date;
+        return (num(b.test_number) ?? 0) - (num(a.test_number) ?? 0);
+    })[0];
+}
 
 const sctTestsOf = (tests) => tests.filter(t => {
     const code = num(t.procedure_code);
@@ -102,7 +133,7 @@ function phasesFor(test) {
  * @returns {{ record: Object|null, reason: string|null, inferredPhaseTypes: number }}
  */
 export function epaRecordFromGroup(group, meta = {}) {
-    const fail = (reason) => ({ record: null, reason, inferredPhaseTypes: 0 });
+    const fail = (reason) => ({ record: null, reason, inferredPhaseTypes: 0, competingMctTests: 0 });
 
     if (!group) return fail('no-group');
     const tests = group.epa_tests ?? [];
@@ -122,7 +153,8 @@ export function epaRecordFromGroup(group, meta = {}) {
         adjustmentMethod: group.label_calc_approach ?? null,
     };
 
-    const mct = mctTestOf(tests);
+    const mct = preferredMctTest(tests);
+    const competingMctTests = mctTestsOf(tests).length;
     if (mct) {
         const totalDcWh = kwhToWh(mct.total_dc_energy_kwh);
         if (!(totalDcWh > 0)) return fail('no-energy');
@@ -145,6 +177,9 @@ export function epaRecordFromGroup(group, meta = {}) {
             },
             reason: null,
             inferredPhaseTypes: phases.filter(p => p.typeSource === 'inferred').length,
+            // >1 means the derivation used one of several and the others were
+            // ignored. Surfaced, because that choice changes every figure.
+            competingMctTests,
         };
     }
 
@@ -188,5 +223,6 @@ export function epaRecordFromGroup(group, meta = {}) {
         },
         reason: null,
         inferredPhaseTypes: 0,
+        competingMctTests: 0,
     };
 }

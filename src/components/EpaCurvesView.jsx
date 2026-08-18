@@ -693,7 +693,7 @@ export default function EpaCurvesView({
 
                 const vehicleName = vehicleLabel(vehicle);
                 const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name || null;
-                const { record, reason, inferredPhaseTypes } =
+                const { record, reason, inferredPhaseTypes, competingMctTests } =
                     epaRecordFromGroup(epaGroup, { vehicleName, configuration: epaLabel });
 
                 // A record can still fail the model — the adapter checks its
@@ -712,6 +712,7 @@ export default function EpaCurvesView({
                     model,
                     reason: model ? null : (reason ?? 'no-derivation'),
                     inferredPhaseTypes,
+                    competingMctTests,
                     // EPA's own unadjusted figures, promoted from the guide when
                     // one is linked. Absent means unverified, not agreed.
                     check: checkUnadjustedMpge(model, {
@@ -1269,6 +1270,13 @@ export default function EpaCurvesView({
                                     {entry.inferredPhaseTypes} phase{entry.inferredPhaseTypes === 1 ? '' : 's'} had no
                                     recorded cycle — inferred from distance. Set them in Tests &amp; Data
                                     to make this derivation certain.
+                                </p>
+                            )}
+                            {entry.competingMctTests > 1 && (
+                                <p className="text-xs mb-2" style={{ color: 'var(--color-warning)' }}>
+                                    This group holds {entry.competingMctTests} multi-cycle tests. The most
+                                    recent was used and the others ignored — every figure below depends on
+                                    that choice. Delete or reconcile the superseded run in Tests &amp; Data.
                                 </p>
                             )}
                             <EpaMethodologyDiagram
