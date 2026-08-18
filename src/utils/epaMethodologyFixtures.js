@@ -84,4 +84,24 @@ export const LIGHTNING_SCT = {
     ],
 };
 
-export const METHODOLOGY_FIXTURES = [R2_MCT, LIGHTNING_SCT];
+/**
+ * EPA's published adjustment factor for the R2 20in AT, from the MY27 Fuel
+ * Economy Guide. Not 0.700: substituting it reproduces all three published
+ * figures (338 city, 276 highway, 307 combined) where the flat factor
+ * reproduces none of them.
+ *
+ * Deliberately NOT on `R2_MCT`. That fixture is the certification record on its
+ * own — a group with no guide row linked — which is the fallback case the
+ * derivation still has to handle, and the case most existing tests assert
+ * against. The linked variant is composed here instead.
+ */
+export const R2_GUIDE_ADJUSTMENT = 0.7051;
+
+export const METHODOLOGY_FIXTURES = [
+    {
+        ...R2_MCT,
+        adjustmentFactor: R2_GUIDE_ADJUSTMENT,
+        calcApproach: 'Electric Vehicle 5-cycle label',
+    },
+    LIGHTNING_SCT,
+];

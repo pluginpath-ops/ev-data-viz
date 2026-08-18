@@ -27,11 +27,16 @@ const METHOD_LABEL = {
 };
 
 /** One value in the flow: a number, what it is, and where it came from. */
-function Box({ label, value, note, tone = 'plain' }) {
+function Box({ label, value, note, tone = 'plain', ghost = null }) {
     return (
         <div className={`epa-flow-box epa-flow-box-${tone}`}>
             <span className="text-label">{label}</span>
             <span className="epa-flow-value">{value}</span>
+            {/* The flat-0.700 counterfactual, drawn beside the real figure rather
+                than instead of it. Rendered only when the two differ, which is
+                why the common case stays uncluttered: 57% of configurations are
+                published at exactly 0.700 and the ghost never appears. */}
+            {ghost && <span className="epa-flow-ghost">{ghost}</span>}
             {note && <span className="text-xs text-faint">{note}</span>}
         </div>
     );
@@ -51,7 +56,15 @@ export default function EpaMethodologyDiagram({ model }) {
     if (!model) return null;
 
     const { cycles, weights, adjustment, cycleSpeeds, combinedMi, combinedMpge,
-            labeledMi, deratePct, chargeEfficiency, testMethod, phases, runs } = model;
+            labeledMi, deratePct, chargeEfficiency, testMethod, phases, runs,
+            adjustmentSource, adjustmentFixed, adjustmentDeclared,
+            combinedFixedMi, combinedHarmMi, blendAgreeing } = model;
+
+    // Whether this vehicle's real factor differs from the flat shortcut at all.
+    // Everything counterfactual below hangs off this, so a 0.700 vehicle renders
+    // exactly as it did before.
+    const showsFixed = adjustmentSource === 'guide'
+        && Math.abs(adjustment - adjustmentFixed) > 1e-6;
 
     const basisNote = testMethod === 'sct'
         ? 'measured — driven to depletion'
@@ -83,10 +96,15 @@ export default function EpaMethodologyDiagram({ model }) {
                         <Box label="Consumption" value={whmi(cycles[key].whPerMi)} />
                         <Arrow />
                         <Box label="Range" value={mi(cycles[key].rangeUnadjMi)} note={basisNote} />
-                        <Arrow annotation={`× ${adjustment}`} />
+                        <Arrow annotation={showsFixed
+                            ? `× ${adjustment.toFixed(4)} (this vehicle)`
+                            : `× ${adjustment}`} />
                         <Box
                             label="Adjusted range"
                             value={mi(cycles[key].rangeAdjMi)}
+                            ghost={showsFixed
+                                ? `${mi(cycles[key].rangeAdjFixedMi)} at the flat ${adjustmentFixed}`
+                                : null}
                             note="stands in for untested conditions"
                             tone="strong"
                         />
@@ -102,8 +120,16 @@ export default function EpaMethodologyDiagram({ model }) {
             <div className="epa-flow-result">
                 <Box
                     label="Computed combined"
-                    value={mi(combinedMi)}
-                    note={`${Math.round(weights.city * 100)}/${Math.round(weights.hwy * 100)} blend, arithmetic`}
+                    value={mi(blendAgreeing === 'harmonic' ? combinedHarmMi : combinedMi)}
+                    ghost={showsFixed ? `${mi(combinedFixedMi)} at the flat ${adjustmentFixed}` : null}
+                    // Which blend, stated rather than assumed. Arithmetic
+                    // reproduces EPA's published combined on 72% of the rows
+                    // where the two differ and harmonic on the rest, and nothing
+                    // in a record says which a configuration uses.
+                    note={`${Math.round(weights.city * 100)}/${Math.round(weights.hwy * 100)} blend, ${
+                        blendAgreeing === 'harmonic' ? 'harmonic' :
+                        blendAgreeing === 'neither'  ? 'arithmetic — neither blend reproduces the label' :
+                        'arithmetic'}`}
                     tone="strong"
                 />
                 <Arrow annotation={deratePct != null ? `− ${pct(deratePct)}` : null} />

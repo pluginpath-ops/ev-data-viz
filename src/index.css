@@ -1646,6 +1646,15 @@ body {
     color: var(--color-text-primary);
 }
 
+/* The flat-0.700 counterfactual shown beside a vehicle's real adjusted figure.
+   Deliberately quieter than the value it sits under: it is the road not taken,
+   not a second answer. */
+.epa-flow-ghost {
+    @apply text-xs tabular-nums;
+    color: var(--color-warning);
+    opacity: 0.85;
+}
+
 .epa-flow-arrow {
     @apply flex items-center gap-1.5 h-7;
 }

@@ -38,6 +38,7 @@
  */
 
 import Papa from 'papaparse';
+import { rangePlausibility } from './feGuidePlausibility';
 
 /** Columns without which a row cannot be interpreted at all — a hard failure. */
 export const REQUIRED_COLUMNS = [
@@ -232,7 +233,7 @@ function mapRow(row) {
  *          headers we do not recognise is reported, never partially imported.
  */
 export function parseFeGuide(csvText) {
-    const empty = { rows: [], skipped: { nonEv: 0, duplicateUnit: 0, unusable: 0 } };
+    const empty = { rows: [], skipped: { nonEv: 0, duplicateUnit: 0, unusable: 0 }, flagged: [] };
 
     const parsed = Papa.parse(String(csvText ?? ''), {
         header: true,
@@ -259,6 +260,8 @@ export function parseFeGuide(csvText) {
 
     const rows = [];
     const skipped = { nonEv: 0, duplicateUnit: 0, unusable: 0 };
+    // Rows that import but look wrong -- see feGuidePlausibility.
+    const flagged = [];
 
     for (const raw of parsed.data) {
         const fuel = (str(raw, 'Fuel Usage Desc - Conventional Fuel') ?? '').toLowerCase();
@@ -282,8 +285,25 @@ export function parseFeGuide(csvText) {
             skipped.unusable++;
             continue;
         }
+        // Flagged, never dropped. The row is EPA's published record, so a
+        // curator should be told it looks wrong rather than find it missing --
+        // and the flags are recomputed at read time from the stored figures, so
+        // rows already imported are covered without a re-import.
+        row.plausibilityFlags = rangePlausibility({
+            cityMi: row.labelCityRangeMi,
+            hwyMi:  row.labelHwyRangeMi,
+            combMi: row.labelCombRangeMi,
+        });
+        if (row.plausibilityFlags.length) {
+            flagged.push({
+                modelYear: row.modelYear,
+                division:  row.division,
+                carline:   row.carline,
+                flags:     row.plausibilityFlags,
+            });
+        }
         rows.push(row);
     }
 
-    return { rows, skipped, missingColumns: [], warnings, errors: parsed.errors?.map(e => e.message) ?? [] };
+    return { rows, skipped, flagged, missingColumns: [], warnings, errors: parsed.errors?.map(e => e.message) ?? [] };
 }
