@@ -57,8 +57,25 @@ const METHODS = [
     },
 ];
 
+/**
+ * Per-vehicle attribution — the chips naming who took each path, and the
+ * highlight on the cells they took. OFF until #232.
+ *
+ * TEMPORARY, and left in place rather than deleted. The mechanism is right;
+ * its input is not. Attribution keys off `model.testMethod`, which is only ever
+ * 'mct' or 'sct', so the "+ 3 more cycles" column can never be credited even to
+ * a vehicle that plainly ran them — the R2 has US06, SC03 and cold FTP in its
+ * record. Showing chips on two of three columns states that the R2 took the
+ * multi-cycle path and stopped there, which is exactly the false claim the rest
+ * of this table was just corrected to stop making.
+ *
+ * Silence is the honest position until the table can read the record's own
+ * procedure codes. #232 supplies that; flip this to true in the same change.
+ */
+const PATH_ATTRIBUTION_ENABLED = false;
+
 export default function EpaCertificationPaths({ models = [] }) {
-    const namesFor = (methodKey) => models
+    const namesFor = (methodKey) => (PATH_ATTRIBUTION_ENABLED ? models : [])
         .filter(m => m.testMethod === methodKey)
         .map(m => m.vehicleName)
         .filter(Boolean);
@@ -68,13 +85,20 @@ export default function EpaCertificationPaths({ models = [] }) {
     return (
         <div className="cert-paths">
             <div className="cert-grid">
-                {/* Row 0 — who took which path */}
-                <div />
-                {METHODS.map(m => (
-                    <div key={`chips-${m.key}`} className="cert-chips">
-                        {namesFor(m.key).map(n => <span key={n} className="path-chip">{n}</span>)}
-                    </div>
-                ))}
+                {/* Row 0 — who took which path. Omitted entirely while attribution
+                    is off: .cert-chips reserves a min-height so the table does not
+                    jump as chips come and go, which with no chips at all is just a
+                    dead band above the grid. */}
+                {PATH_ATTRIBUTION_ENABLED && (
+                    <>
+                        <div />
+                        {METHODS.map(m => (
+                            <div key={`chips-${m.key}`} className="cert-chips">
+                                {namesFor(m.key).map(n => <span key={n} className="path-chip">{n}</span>)}
+                            </div>
+                        ))}
+                    </>
+                )}
 
                 {/* Row 1 — the test */}
                 <div className="cert-grid-label">Test cycle options</div>
