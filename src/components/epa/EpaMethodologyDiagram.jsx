@@ -57,7 +57,7 @@ export default function EpaMethodologyDiagram({ model }) {
 
     const { cycles, weights, adjustment, cycleSpeeds, combinedMi, combinedMpge,
             labeledMi, deratePct, chargeEfficiency, testMethod, phases, runs,
-            adjustmentSource, adjustmentFixed, adjustmentDeclared,
+            adjustmentSource, adjustmentFixed,
             combinedFixedMi, combinedHarmMi, blendAgreeing } = model;
 
     // Whether this vehicle's real factor differs from the flat shortcut at all.
@@ -156,7 +156,7 @@ export default function EpaMethodologyDiagram({ model }) {
                 city or highway, adjusted or unadjusted. These come from variable-speed cycles
                 averaging <strong>{cycleSpeeds.city} mph</strong> and{' '}
                 <strong>{cycleSpeeds.hwy} mph</strong>, then adjusted downward to stand in for
-                conditions that were never driven: sustained high speed and hard acceleration,
+                adverse driving conditions: sustained high speed and hard acceleration,
                 air conditioning in hot weather, and cold-weather operation.
             </p>
 

@@ -52,7 +52,44 @@ const kwhToWh = (v) => { const n = num(v); return n == null ? null : n * 1000; }
  * phases and still not be an MCT, and the epic is explicit that the code is the
  * only reliable discriminator.
  */
-const mctTestOf = (tests) => tests.find(t => num(t.procedure_code) === PROC_MCT) ?? null;
+function mctTestsOf(tests) {
+    return tests.filter(t => num(t.procedure_code) === PROC_MCT);
+}
+
+/**
+ * The multi-cycle test to derive from, when a group holds more than one.
+ *
+ * Two is not a data error. The R2 21" was tested at two laboratories — FEV
+ * Michigan and Ann Arbor — and both runs are legitimate. They simply do not
+ * agree: their recharge energies differ by about 5%, so choosing silently put
+ * the derived MPGe 5.15% out while every bag still reconciled. Deriving from
+ * the other run brings it to +0.01%.
+ *
+ * Picking the most recent is a defensible default and NOT a resolution. Which
+ * run represents the vehicle is a curator's judgement, and the wrong reading of
+ * this — that one must be deleted — would destroy a valid test. So the count is
+ * carried out and the UI states that a choice was made.
+ *
+ * ⚠ `cd_range_*` is stored on the GROUP, set at import from whichever proc-77
+ * test was seen first. When a group holds two, the stated ranges the bag check
+ * compares against may belong to the OTHER test — which reads as a ~0.6%
+ * disagreement that is really two labs, not an error. Per-test CD ranges would
+ * be needed to compare like with like.
+ *
+ * Ordering falls back to test_number, then position, so the same group always
+ * derives the same way — an arbitrary pick that changes between loads is worse
+ * than a wrong one that holds still.
+ */
+function preferredMctTest(tests) {
+    const mcts = mctTestsOf(tests);
+    if (mcts.length <= 1) return mcts[0] ?? null;
+
+    return [...mcts].sort((a, b) => {
+        const date = String(b.test_date ?? '').localeCompare(String(a.test_date ?? ''));
+        if (date !== 0) return date;
+        return (num(b.test_number) ?? 0) - (num(a.test_number) ?? 0);
+    })[0];
+}
 
 const sctTestsOf = (tests) => tests.filter(t => {
     const code = num(t.procedure_code);
@@ -80,6 +117,11 @@ function phasesFor(test) {
                 typeSource: p.typeSource,
                 index: num(p.phase_index),
                 wh,
+                // Carried through, because a bag's LENGTH decides whether its
+                // consumption is usable: the final bag of a depletion run ends
+                // mid-cycle and its Wh/mi is not a cycle's Wh/mi. See
+                // isCompleteCycle in epaMethodology.
+                distanceMi: dist,
                 whPerMi: (wh != null && dist > 0) ? wh / dist : null,
             };
         })
@@ -97,7 +139,7 @@ function phasesFor(test) {
  * @returns {{ record: Object|null, reason: string|null, inferredPhaseTypes: number }}
  */
 export function epaRecordFromGroup(group, meta = {}) {
-    const fail = (reason) => ({ record: null, reason, inferredPhaseTypes: 0 });
+    const fail = (reason) => ({ record: null, reason, inferredPhaseTypes: 0, competingMctTests: 0 });
 
     if (!group) return fail('no-group');
     const tests = group.epa_tests ?? [];
@@ -117,7 +159,8 @@ export function epaRecordFromGroup(group, meta = {}) {
         adjustmentMethod: group.label_calc_approach ?? null,
     };
 
-    const mct = mctTestOf(tests);
+    const mct = preferredMctTest(tests);
+    const competingMctTests = mctTestsOf(tests).length;
     if (mct) {
         const totalDcWh = kwhToWh(mct.total_dc_energy_kwh);
         if (!(totalDcWh > 0)) return fail('no-energy');
@@ -140,6 +183,9 @@ export function epaRecordFromGroup(group, meta = {}) {
             },
             reason: null,
             inferredPhaseTypes: phases.filter(p => p.typeSource === 'inferred').length,
+            // >1 means the derivation used one of several and the others were
+            // ignored. Surfaced, because that choice changes every figure.
+            competingMctTests,
         };
     }
 
@@ -183,5 +229,6 @@ export function epaRecordFromGroup(group, meta = {}) {
         },
         reason: null,
         inferredPhaseTypes: 0,
+        competingMctTests: 0,
     };
 }

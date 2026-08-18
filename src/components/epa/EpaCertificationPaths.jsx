@@ -8,10 +8,17 @@
  * first row, not a stage of its own, and drawing it added a box that explained
  * nothing.
  *
- * The 5-cycle cell spans BOTH rows. That is the whole statement about it — a
- * test that drove the conditions the others infer has no adjustment step, and
- * a cell reaching past the adjustment row says so without a caption. It
- * replaced a bypass rail that had to explain itself in words.
+ * The 5-cycle column is NOT a third way to measure range. That was the earlier
+ * reading and it is wrong: the R2 ran the multi-cycle test AND the other three
+ * cycles. Its range comes from the depletion run like everyone else's, and the
+ * three extra cycles produce the FACTOR that scales it — per 40 CFR 600.116-12,
+ * "testing to generate a 5-cycle adjustment factor".
+ *
+ * So the column carries an addition on the top row (three more cycles, run on
+ * top of either test beside it) and its product on the second (a measured
+ * factor, beside the two estimated ones). Both rows now hold three cells, which
+ * is the layout saying the same thing: every path takes an adjustment, and they
+ * differ only in where the number came from.
  *
  * The choice between paths is not neutral, which is what the effort line and
  * the regression's note are for: lab time is why the short path exists, and
@@ -19,6 +26,14 @@
  * would decline the alternative to the flat factor.
  */
 import InfoIcon from '../InfoIcon';
+
+/**
+ * A real measured factor, named so the contrast with 0.700 is concrete rather
+ * than abstract. From EPA's MY27 Fuel Economy Guide for the R2 20" AT, and it
+ * reproduces that configuration's published city, highway and combined ranges
+ * exactly — see epaMethodologyFixtures.
+ */
+const R2_EXAMPLE_FACTOR = 0.7051;
 import { PATH_EFFORT, LABEL_ADJUSTMENT, LABEL_WEIGHT_CITY, LABEL_WEIGHT_HWY } from '../../constants/epa';
 import { derived5CycleCrossoverFe } from '../../utils/epaMethodology';
 
@@ -34,14 +49,33 @@ const METHODS = [
         detail: 'Two depletion runs, one bag each',
     },
     {
+        // Additive, not alternative — hence the leading "+". These are run in
+        // ADDITION to the MCT or SCT beside them, never instead of one.
         key: 'five_cycle',
-        title: '5-cycle',
-        detail: 'Adds high speed, cold weather and hot weather',
+        title: '+ 3 more cycles',
+        detail: 'US06, SC03 and cold FTP, on top of either test',
     },
 ];
 
+/**
+ * Per-vehicle attribution — the chips naming who took each path, and the
+ * highlight on the cells they took. OFF until #232.
+ *
+ * TEMPORARY, and left in place rather than deleted. The mechanism is right;
+ * its input is not. Attribution keys off `model.testMethod`, which is only ever
+ * 'mct' or 'sct', so the "+ 3 more cycles" column can never be credited even to
+ * a vehicle that plainly ran them — the R2 has US06, SC03 and cold FTP in its
+ * record. Showing chips on two of three columns states that the R2 took the
+ * multi-cycle path and stopped there, which is exactly the false claim the rest
+ * of this table was just corrected to stop making.
+ *
+ * Silence is the honest position until the table can read the record's own
+ * procedure codes. #232 supplies that; flip this to true in the same change.
+ */
+const PATH_ATTRIBUTION_ENABLED = false;
+
 export default function EpaCertificationPaths({ models = [] }) {
-    const namesFor = (methodKey) => models
+    const namesFor = (methodKey) => (PATH_ATTRIBUTION_ENABLED ? models : [])
         .filter(m => m.testMethod === methodKey)
         .map(m => m.vehicleName)
         .filter(Boolean);
@@ -51,13 +85,20 @@ export default function EpaCertificationPaths({ models = [] }) {
     return (
         <div className="cert-paths">
             <div className="cert-grid">
-                {/* Row 0 — who took which path */}
-                <div />
-                {METHODS.map(m => (
-                    <div key={`chips-${m.key}`} className="cert-chips">
-                        {namesFor(m.key).map(n => <span key={n} className="path-chip">{n}</span>)}
-                    </div>
-                ))}
+                {/* Row 0 — who took which path. Omitted entirely while attribution
+                    is off: .cert-chips reserves a min-height so the table does not
+                    jump as chips come and go, which with no chips at all is just a
+                    dead band above the grid. */}
+                {PATH_ATTRIBUTION_ENABLED && (
+                    <>
+                        <div />
+                        {METHODS.map(m => (
+                            <div key={`chips-${m.key}`} className="cert-chips">
+                                {namesFor(m.key).map(n => <span key={n} className="path-chip">{n}</span>)}
+                            </div>
+                        ))}
+                    </>
+                )}
 
                 {/* Row 1 — the test */}
                 <div className="cert-grid-label">Test cycle options</div>
@@ -66,27 +107,18 @@ export default function EpaCertificationPaths({ models = [] }) {
                     return (
                         <div
                             key={m.key}
-                            className={[
-                                'cert-cell',
-                                taken ? 'cert-cell-active' : '',
-                                // 5-cycle reaches into the adjustment row because it
-                                // has no adjustment step to take.
-                                m.key === 'five_cycle' ? 'cert-cell-span' : '',
-                            ].filter(Boolean).join(' ')}
+                            className={['cert-cell', taken ? 'cert-cell-active' : '']
+                                .filter(Boolean).join(' ')}
                         >
                             <span className="font-semibold text-secondary">{m.title}</span>
                             <span className="text-xs text-muted">{m.detail}</span>
-                            {m.key === 'five_cycle' && (
-                                <span className="text-xs text-faint">
-                                    No adjustment — these conditions were measured, not estimated
-                                </span>
-                            )}
                             <span className="cert-cell-effort">{PATH_EFFORT[m.key]} of lab time</span>
                         </div>
                     );
                 })}
 
-                {/* Row 2 — the adjustment MCT and SCT must take */}
+                {/* Row 2 — every path takes an adjustment. They differ only in
+                    where the number came from: assumed, regressed, or measured. */}
                 <div className="cert-grid-label">Adjustment</div>
                 <div className="cert-cell">
                     <span className="font-semibold text-secondary">× {LABEL_ADJUSTMENT} fixed factor</span>
@@ -123,6 +155,17 @@ export default function EpaCertificationPaths({ models = [] }) {
                         EPA mathematical regression to estimate 5-cycle — returns a worse result
                         than × {LABEL_ADJUSTMENT} once a vehicle is above ~{crossover.toFixed(0)} MPGe
                         unadjusted city
+                    </span>
+                </div>
+                <div className="cert-cell">
+                    <span className="font-semibold text-secondary">Measured 5-cycle factor</span>
+                    <span className="text-xs text-muted">
+                        Generated from the three cycles above rather than assumed — per vehicle,
+                        and the only route that measures the conditions instead of pricing them.
+                        The R2 20&quot; is {R2_EXAMPLE_FACTOR}, not {LABEL_ADJUSTMENT}.
+                    </span>
+                    <span className="text-xs text-faint">
+                        Requires EPA approval to use SAE J1634 App B/C (40 CFR 600.116-12)
                     </span>
                 </div>
 

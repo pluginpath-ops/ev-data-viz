@@ -41,7 +41,8 @@ describe('utilities built for the UI are reached by the UI', () => {
     // exports are unused project-wide, nearly all pre-existing in the EPA and
     // parser modules. Widening this wants a cleanup first, not an allowlist.
     const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js',
-                     'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromGroup.js'];
+                     'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromGroup.js',
+                     'epaDerivationCheck.js', 'epaSectionLabels.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -67,6 +68,14 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The bound itself, consumed inside the module by rangePlausibility and asserted by name against the observed real spread.',
         'feGuidePlausibility.HWY_CITY_RATIO_MAX':
             'As above — the upper bound, pinned by name so widening it is a deliberate edit.',
+        'epaDerivationCheck.RANGE_AGREEMENT_TOLERANCE':
+            'The slack allowed when a record is recomputed against its own stated range; consumed inside the module by checkStatedRanges and asserted by name.',
+        'epaDerivationCheck.LABEL_INVARIANT_TOLERANCE_MI':
+            'Rounding slack for a whole-number label; consumed inside the module by checkLabelInvariant and asserted by name.',
+        'epaDerivationCheck.AGREEMENT_TOLERANCE':
+            'The band itself, consumed inside the module by statusFor and asserted by name so moving it is a deliberate edit.',
+        'epaDerivationCheck.DIVERGENCE_TOLERANCE':
+            'As above — the boundary beyond which a difference is larger than any plausible rounding.',
         'phaseTypes.SS_NEIGHBOUR_MULTIPLE':
             'The multiple itself, consumed inside the module by suggestPhaseType and asserted by name so changing it is deliberate.',
         'socAlignment.extrapolationSlope':
@@ -268,6 +277,31 @@ describe('the seams that broke before', () => {
 
         const missing = [...needed].filter(k => !selected.has(k));
         expect(missing, `candidate columns read but not selected: ${missing.join(', ')}`).toEqual([]);
+    });
+
+    it('puts the derivation checks with the data, not on the public chart', () => {
+        // They started on the Charts tab, which was the wrong home: that diagram
+        // answers a reader's question about the CAR, and "the bags do not
+        // reconcile" is a fact about our RECORD of it — useful to a curator and
+        // noise to everyone else.
+        //
+        // Both halves asserted, because either alone passes while broken: the
+        // curator view must run and render them, and the chart must not.
+        const curator = read('src/components/EpaVehicleSection.jsx');
+        const checks  = read('src/components/epa/EpaDerivationChecks.jsx');
+        const chart   = read('src/components/EpaCurvesView.jsx');
+        const diagram = read('src/components/epa/EpaMethodologyDiagram.jsx');
+
+        expect(curator, 'the curator view must run all three checks').toMatch(/checkStatedRanges\(/);
+        expect(curator, 'the curator view must test the label invariant').toMatch(/checkLabelInvariant\(/);
+        expect(curator, 'the checks must be rendered').toMatch(/<EpaDerivationChecks/);
+        expect(checks, 'the verdicts must reach the page').toMatch(/rangeCheck\?\.checked/);
+        expect(checks, 'an impossible label must be shown').toMatch(/invariant\?\.violated/);
+
+        for (const [name, text] of [['EpaCurvesView', chart], ['EpaMethodologyDiagram', diagram]]) {
+            expect(text, `${name} must not carry curator diagnostics`)
+                .not.toMatch(/checkStatedRanges|checkLabelInvariant|checkUnadjustedMpge/);
+        }
     });
 
     it('builds the methodology diagram from selected vehicles, not sample records', () => {

@@ -40,7 +40,7 @@
 import {
     LABEL_ADJUSTMENT, LABEL_WEIGHT_CITY, LABEL_WEIGHT_HWY,
     UDDS_AVG_MPH, HWFET_AVG_MPH, MPG_E_CONVERSION, ASSUMED_CHARGER_EFF,
-    DERIVED_5CYCLE,
+    DERIVED_5CYCLE, HWFET_MI, UDDS_MI,
 } from '../constants/epa';
 
 const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -119,19 +119,70 @@ export function adjustmentComparison(feUnadj, cycle) {
  *     f = e_udds1 / e_total
  *     ec_city = f·ec_udds1 + (1 − f)·mean(ec_udds[2:])
  */
+/**
+ * How far a bag may fall short of its cycle and still count as having driven it.
+ *
+ * A driving cycle is a fixed trace, so a completed bag lands on its nominal
+ * distance to within the dyno's reporting precision — the Model Y Performance's
+ * two full highway bags are 10.265 and 10.266 mi against a nominal 10.26,
+ * +0.05%. There is no mechanism that produces a genuine 3%-short HWFET.
+ *
+ * Deliberately much tighter than CYCLE_DIST_TOL (±0.7 mi), which answers a
+ * different question: that one decides WHICH cycle a bag drove, and correctly
+ * types a 9.96 mi bag as highway. This decides whether it FINISHED.
+ */
+export const CYCLE_COMPLETE_TOL = 0.01;
+
+const NOMINAL_CYCLE_MI = { HWY: HWFET_MI, UDDS: UDDS_MI, 'Cold-UDDS': UDDS_MI };
+
+/**
+ * Did this bag drive its whole cycle?
+ *
+ * A depletion run ends when the vehicle stops, which is almost never on a cycle
+ * boundary — so the last bag is a partial one, and its Wh/mi is not a cycle's
+ * Wh/mi. It reads high, both because the pack is flat and sagging by then and
+ * because the fixed costs of the bag are spread over fewer miles: the Model Y
+ * Performance's final highway bag is 251.66 Wh/mi against 200.25 and 194.68 for
+ * the two that completed.
+ *
+ * Averaging it in dropped that record's derived highway range to 378.3 mi
+ * against the 412.88 the record itself states. Excluding it gives 412.87.
+ *
+ * Its ENERGY still counts toward the test total — it was really consumed. Only
+ * its consumption RATE is unusable, which is exactly EPA's construction:
+ * price the whole pack at the rate the complete cycles consumed it.
+ *
+ * Unknown distance ⇒ complete. A record that never reported bag distances
+ * cannot be judged, and excluding everything would be worse than including it.
+ */
+export function isCompleteCycle(phase) {
+    const nominal = NOMINAL_CYCLE_MI[phase?.cycle];
+    const d = Number(phase?.distanceMi);
+    if (!nominal || !Number.isFinite(d) || d <= 0) return true;
+    return Math.abs(d - nominal) / nominal <= CYCLE_COMPLETE_TOL;
+}
+
 export function cityConsumptionFromPhases(uddsPhases, totalEnergyWh) {
     if (!uddsPhases?.length || !(totalEnergyWh > 0)) return null;
-    const [cold, ...warm] = uddsPhases;
+    // Complete cycles only — see isCompleteCycle. Applied to city as well as
+    // highway: the partial bag lands wherever the run happens to end, and there
+    // is no reason it favours one cycle.
+    const complete = uddsPhases.filter(isCompleteCycle);
+    if (!complete.length) return null;
+
+    const [cold, ...warm] = complete;
     if (!warm.length) return cold.whPerMi ?? null;
 
     const f = cold.wh / totalEnergyWh;
     return f * cold.whPerMi + (1 - f) * mean(warm.map(p => p.whPerMi));
 }
 
-/** Highway consumption — a plain mean, no cold start to weight. */
+/** Highway consumption — a plain mean over the bags that finished their cycle. */
 export function highwayConsumptionFromPhases(hwyPhases) {
     if (!hwyPhases?.length) return null;
-    return mean(hwyPhases.map(p => p.whPerMi));
+    const complete = hwyPhases.filter(isCompleteCycle);
+    if (!complete.length) return null;
+    return mean(complete.map(p => p.whPerMi));
 }
 
 /**
@@ -169,6 +220,12 @@ function cycleFrom({ whPerMi, rangeUnadjMi, energyBasis, chargeEff, adjustment }
         rangeUnadjMi,
         rangeAdjMi: rangeUnadjMi * adjustment,
         mpge: mpgeFrom(whPerMi, { energyBasis, chargeEff, adjustment }),
+        // The same figure before the adjustment, which is what EPA publishes as
+        // "Unadj FE" and therefore the only one our derivation can be checked
+        // against. The adjusted value cannot serve: it embeds the factor, so
+        // comparing it would test the factor and the derivation together and
+        // pass whenever their errors happened to cancel.
+        mpgeUnadj: mpgeFrom(whPerMi, { energyBasis, chargeEff, adjustment: 1 }),
         // What the flat shortcut would have produced, so the diagram can show
         // the two side by side. Identical for the 57% of configurations whose
         // published factor IS 0.700, which is the point: it degenerates.

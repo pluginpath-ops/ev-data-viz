@@ -1646,6 +1646,37 @@ body {
     color: var(--color-text-primary);
 }
 
+/* The curator's block of reconciliation checks in Tests & Data. Stacked, with
+   each check keeping its own status edge. */
+.epa-checks {
+    @apply flex flex-col gap-2 mt-3;
+}
+
+/* Our derivation measured against EPA's published unadjusted MPGe. Bordered on
+   the leading edge in the status colour so agreement and disagreement are
+   distinguishable before any number is read. */
+.epa-check {
+    @apply flex flex-col gap-0.5 mt-3 p-2 rounded;
+    border-left: 3px solid var(--color-border);
+    background: var(--color-surface-2, transparent);
+}
+.epa-check-agrees    { border-left-color: var(--color-success); }
+.epa-check-close     { border-left-color: var(--color-warning); }
+.epa-check-disagrees { border-left-color: var(--color-danger); }
+
+.epa-check-verdict {
+    @apply text-xs font-medium ml-2 normal-case;
+}
+
+.epa-check-row {
+    @apply flex items-baseline gap-2 text-xs tabular-nums;
+}
+
+.epa-check-delta {
+    @apply text-xs tabular-nums ml-auto;
+    color: var(--color-text-muted);
+}
+
 /* The flat-0.700 counterfactual shown beside a vehicle's real adjusted figure.
    Deliberately quieter than the value it sits under: it is the road not taken,
    not a second answer. */
@@ -1847,11 +1878,6 @@ body {
     min-height: 5.5rem;
 }
 
-/* Reaches past the adjustment row: no adjustment step to take */
-.cert-cell-span {
-    grid-row: span 2;
-}
-
 /* A path something on screen actually took */
 .cert-cell-active {
     border-color: var(--color-primary);
@@ -1926,7 +1952,6 @@ body {
     /* One column: the row span carries no meaning without columns to span
        across, so cells simply stack in reading order. */
     .cert-grid { grid-template-columns: minmax(0, 1fr); }
-    .cert-cell-span { grid-row: auto; }
     .cert-cell-result { grid-column: 1; }
     /* The band spans rows that no longer sit side by side */
     .cycle-band { display: none; }

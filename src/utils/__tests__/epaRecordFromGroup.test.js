@@ -109,6 +109,38 @@ describe('epaRecordFromGroup — MCT', () => {
             .toEqual(['UDDS', 'HWY', 'UDDS', 'HWY', 'UDDS', 'UDDS']);
     });
 
+    it('reports when a group holds more than one MCT', () => {
+        // A real R2 configuration carried two, whose recharge energies differed
+        // by ~5%. Picking silently put the derived MPGe 5.15% out while every
+        // bag still reconciled — a confusing place to be sent looking.
+        const two = {
+            ...R2_GROUP,
+            epa_tests: [
+                { ...R2_GROUP.epa_tests[0], test_date: '2025-01-01', ac_recharge_kwh: 99 },
+                { ...R2_GROUP.epa_tests[0], test_date: '2025-06-01' },
+            ],
+        };
+        const out = epaRecordFromGroup(two);
+        expect(out.competingMctTests).toBe(2);
+        expect(out.record.rechargeAcWh).toBeCloseTo(104689, 0);   // the newer run
+        expect(epaRecordFromGroup(R2_GROUP).competingMctTests).toBe(1);
+    });
+
+    it('derives the same way on every load when several MCTs tie', () => {
+        // An arbitrary pick that changes between loads is worse than a wrong one
+        // that holds still: the curator cannot reproduce what they are looking at.
+        const tied = {
+            ...R2_GROUP,
+            epa_tests: [
+                { ...R2_GROUP.epa_tests[0], test_number: '1', ac_recharge_kwh: 99 },
+                { ...R2_GROUP.epa_tests[0], test_number: '2' },
+            ],
+        };
+        const a = epaRecordFromGroup(tied).record.rechargeAcWh;
+        const b = epaRecordFromGroup({ ...tied, epa_tests: [...tied.epa_tests].reverse() }).record.rechargeAcWh;
+        expect(a).toBe(b);
+    });
+
     it('picks the MCT test by procedure code, not by phase count', () => {
         // An SCT record can carry several phases; only the code discriminates.
         const both = {
