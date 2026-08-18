@@ -10,10 +10,8 @@
 import { useState } from 'react';
 import CuratorField from './CuratorField';
 import InfoIcon from '../InfoIcon';
-import {
-    PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
-    HWFET_MI, UDDS_MI, CYCLE_DIST_TOL as DIST_TOL,
-} from '../../constants/epa';
+import { PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75 } from '../../constants/epa';
+import { suggestPhaseType } from '../../utils/phaseTypes';
 
 const PROC_OPTIONS = [
     { v: PROC_MCT,     label: '77 — Multi-Cycle Test' },
@@ -27,25 +25,6 @@ const ORIGINATORS   = ['MFR', 'EPA'];
 
 
 const num = (v) => (v == null || v === '' || isNaN(Number(v)) ? null : Number(v));
-
-/**
- * Suggest a phase type from its distance (curator can always override):
- *   ~10.26 mi → HWY, ~7.45 mi → UDDS, a bag ≫10× its neighbors → SS.
- * Returns a type string or null when nothing matches confidently.
- *
- * @param {number} distanceMi
- * @param {number[]} otherDistances  distances of the test's other phases
- */
-export function suggestPhaseType(distanceMi, otherDistances = []) {
-    const d = num(distanceMi);
-    if (d == null || d <= 0) return null;
-    // SS: a depletion bag far longer than its shortest neighbor.
-    const others = otherDistances.map(num).filter(x => x != null && x > 0);
-    if (others.length && d >= 10 * Math.min(...others)) return 'SS';
-    if (Math.abs(d - HWFET_MI) <= DIST_TOL) return 'HWY';
-    if (Math.abs(d - UDDS_MI)  <= DIST_TOL) return 'UDDS';
-    return null;
-}
 
 function PhaseRow({ phase, canEdit, onSave, onDelete }) {
     const consumption = (() => {
