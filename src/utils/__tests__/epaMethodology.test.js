@@ -3,7 +3,7 @@ import {
     buildMethodologyModel, cityConsumptionFromPhases,
     derived5CycleFe, derived5CycleCrossoverFe, adjustmentComparison,
 } from '../epaMethodology';
-import { R2_MCT, LIGHTNING_SCT } from '../epaMethodologyFixtures';
+import { R2_MCT, LIGHTNING_SCT, R2_GUIDE_ADJUSTMENT } from '../epaMethodologyFixtures';
 
 /**
  * The expected values are from the certification records themselves, not from
@@ -18,6 +18,68 @@ import { R2_MCT, LIGHTNING_SCT } from '../epaMethodologyFixtures';
  */
 
 const close = (actual, expected, tol) => expect(Math.abs(actual - expected)).toBeLessThan(tol);
+
+describe('the published adjustment factor (#222)', () => {
+    // The R2 20in AT as EPA publishes it in the MY27 Fuel Economy Guide.
+    const PUBLISHED = { cityMi: 338, hwyMi: 276, combMi: 307 };
+    const withGuide = { ...R2_MCT, adjustmentFactor: R2_GUIDE_ADJUSTMENT, calcApproach: 'Electric Vehicle 5-cycle label' };
+
+    it('reproduces all three published figures, which the flat factor does not', () => {
+        // The whole case for reading the factor rather than assuming it. 0.700
+        // misses every one of these; 0.7051 hits every one.
+        const m = buildMethodologyModel(withGuide);
+
+        expect(Math.round(m.cycles.city.rangeAdjMi)).toBe(PUBLISHED.cityMi);
+        expect(Math.round(m.cycles.hwy.rangeAdjMi)).toBe(PUBLISHED.hwyMi);
+        expect(Math.round(m.combinedHarmMi)).toBe(PUBLISHED.combMi);
+
+        const flat = buildMethodologyModel(R2_MCT);
+        expect(Math.round(flat.cycles.city.rangeAdjMi)).not.toBe(PUBLISHED.cityMi);
+        expect(Math.round(flat.cycles.hwy.rangeAdjMi)).not.toBe(PUBLISHED.hwyMi);
+    });
+
+    it('keeps the flat factor available alongside it', () => {
+        // The diagram draws both. They coincide for the 57% of configurations
+        // published at exactly 0.700, so the second line costs nothing there.
+        const m = buildMethodologyModel(withGuide);
+        expect(m.adjustment).toBe(R2_GUIDE_ADJUSTMENT);
+        expect(m.adjustmentSource).toBe('guide');
+        expect(m.adjustmentFixed).toBe(0.7);
+        expect(m.combinedFixedMi).toBeCloseTo(buildMethodologyModel(R2_MCT).combinedMi, 6);
+    });
+
+    it('records which blend reproduced the label rather than asserting one', () => {
+        // The R2 is harmonic. The fleet is 72% arithmetic. Both are real, and
+        // nothing in a record says which applies, so the model reports rather
+        // than decides.
+        expect(buildMethodologyModel(withGuide).blendAgreeing).toBe('harmonic');
+    });
+
+    it('does not mistake the old coincidence for agreement', () => {
+        // Why this went unnoticed: at 0.700 the ARITHMETIC combine lands on
+        // 307.92, one mile from the 307 label, so the combined number looked
+        // roughly right while both cycle figures were wrong by 2-3 mi. A check
+        // on the combined alone would still pass today.
+        const flat = buildMethodologyModel(R2_MCT);
+        expect(flat.combinedMi).toBeCloseTo(307.92, 1);
+        expect(flat.blendAgreeing).toBe('neither');
+    });
+
+    it('ignores a corrupt factor rather than scaling every figure by it', () => {
+        for (const bad of [0.2, 1.4, 0, -0.7, NaN, null, undefined, 'x']) {
+            const m = buildMethodologyModel({ ...R2_MCT, adjustmentFactor: bad });
+            expect(m.adjustment, String(bad)).toBe(0.7);
+            expect(m.adjustmentSource, String(bad)).toBe('default');
+        }
+    });
+
+    it('falls back cleanly when no guide row is linked', () => {
+        const m = buildMethodologyModel(R2_MCT);
+        expect(m.adjustment).toBe(0.7);
+        expect(m.adjustmentSource).toBe('default');
+        expect(m.adjustmentDeclared).toBeNull();
+    });
+});
 
 describe('MCT — Rivian R2', () => {
     const m = buildMethodologyModel(R2_MCT);

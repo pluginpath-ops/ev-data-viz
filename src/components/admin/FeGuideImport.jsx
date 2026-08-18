@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { parseFeGuide } from '../../utils/parseFeGuide';
+import { PLAUSIBILITY_MESSAGES } from '../../utils/feGuidePlausibility';
 
 /**
  * Admin card: bulk-import an EPA Fuel Economy Guide export (#206, phase 2).
@@ -131,6 +132,31 @@ export default function FeGuideImport() {
                 </div>
             )}
 
+            {/* Rows that WILL import but whose published figures look wrong.
+                Named rather than counted, and never dropped: these are EPA's
+                own records, so the curator needs to know which one to distrust
+                before linking it, not discover a 26-mile highway range later
+                through a derivation that quietly used it. */}
+            {parsed?.flagged?.length > 0 && (
+                <div className="mt-3">
+                    <p className="text-xs font-medium" style={{ color: 'var(--color-warning)' }}>
+                        {parsed.flagged.length} row(s) import with implausible figures:
+                    </p>
+                    <ul className="text-xs text-muted list-disc pl-5 mt-1">
+                        {parsed.flagged.map(f => (
+                            <li key={`${f.modelYear}|${f.division}|${f.carline}`}>
+                                {f.modelYear} {f.division} {f.carline}
+                                {f.flags.map(code => (
+                                    <span key={code} className="block text-faint">
+                                        {PLAUSIBILITY_MESSAGES[code] ?? code}
+                                    </span>
+                                ))}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
             {parsed?.rows?.length > 0 && !result && (
                 <div className="mt-4">
                     <div className="fe-stat-row">
@@ -141,6 +167,9 @@ export default function FeGuideImport() {
                         <Stat label="Duplicate-unit rows" value={parsed.skipped.duplicateUnit} />
                         {parsed.skipped.unusable > 0 && (
                             <Stat label="Unusable" value={parsed.skipped.unusable} />
+                        )}
+                        {parsed.flagged?.length > 0 && (
+                            <Stat label="Flagged" value={parsed.flagged.length} />
                         )}
                     </div>
                     <button

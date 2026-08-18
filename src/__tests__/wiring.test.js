@@ -40,7 +40,7 @@ describe('utilities built for the UI are reached by the UI', () => {
     // Scoped to the modules built recently rather than the whole codebase: 48
     // exports are unused project-wide, nearly all pre-existing in the EPA and
     // parser modules. Widening this wants a cleanup first, not an allowlist.
-    const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js'];
+    const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js', 'feGuidePlausibility.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -62,6 +62,10 @@ describe('utilities built for the UI are reached by the UI', () => {
             'Called by alignSeries and minimumCommonSoc, both of which the chart calls. Exported so the trim can be asserted on its own.',
         'socAlignment.rampLength':
             'The ramp detector. Called by extrapolationSlope; exported so its behaviour is pinned directly against real R2 data.',
+        'feGuidePlausibility.HWY_CITY_RATIO_MIN':
+            'The bound itself, consumed inside the module by rangePlausibility and asserted by name against the observed real spread.',
+        'feGuidePlausibility.HWY_CITY_RATIO_MAX':
+            'As above — the upper bound, pinned by name so widening it is a deliberate edit.',
         'socAlignment.extrapolationSlope':
             'Called by alignSeries, which the chart calls. Exported so the slope basis can be asserted without going through alignment.',
     };

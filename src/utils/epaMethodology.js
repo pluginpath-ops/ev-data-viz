@@ -152,23 +152,91 @@ export function highwayConsumptionFromPhases(hwyPhases) {
  * Missing this read the R2 at 114.8 MPGe combined, against ~98 once the losses
  * are put back. Plausible enough to ship, wrong enough to matter.
  */
-function mpgeFrom(whPerMi, { energyBasis, chargeEff }) {
+function mpgeFrom(whPerMi, { energyBasis, chargeEff, adjustment }) {
     if (!(whPerMi > 0)) return null;
     if (energyBasis === 'dc' && !(chargeEff > 0)) return null;
 
     const whPerMiAc = energyBasis === 'dc' ? whPerMi / chargeEff : whPerMi;
-    return (MPG_E_CONVERSION * 1000) / (whPerMiAc / LABEL_ADJUSTMENT);
+    return (MPG_E_CONVERSION * 1000) / (whPerMiAc / adjustment);
 }
 
 /** One cycle's row: consumption in, ranges and MPGe out. */
-function cycleFrom({ whPerMi, rangeUnadjMi, energyBasis, chargeEff }) {
+function cycleFrom({ whPerMi, rangeUnadjMi, energyBasis, chargeEff, adjustment }) {
     if (!(rangeUnadjMi > 0)) return null;
     return {
         whPerMi,
         energyBasis,
         rangeUnadjMi,
-        rangeAdjMi: rangeUnadjMi * LABEL_ADJUSTMENT,
-        mpge: mpgeFrom(whPerMi, { energyBasis, chargeEff }),
+        rangeAdjMi: rangeUnadjMi * adjustment,
+        mpge: mpgeFrom(whPerMi, { energyBasis, chargeEff, adjustment }),
+        // What the flat shortcut would have produced, so the diagram can show
+        // the two side by side. Identical for the 57% of configurations whose
+        // published factor IS 0.700, which is the point: it degenerates.
+        rangeAdjFixedMi: rangeUnadjMi * LABEL_ADJUSTMENT,
+    };
+}
+
+/**
+ * Bounds on a published adjustment factor before it is trusted over the flat
+ * one. The real spread across six guide years is 0.607-0.738; anything outside
+ * 0.55-0.85 is a corrupt row rather than a vehicle.
+ */
+export const ADJUSTMENT_PLAUSIBLE_MIN = 0.55;
+export const ADJUSTMENT_PLAUSIBLE_MAX = 0.85;
+
+/** 55/45 arithmetic blend — miles over a split of driving add. */
+const blendArithmetic = (city, hwy) =>
+    (city > 0 && hwy > 0) ? LABEL_WEIGHT_CITY * city + LABEL_WEIGHT_HWY * hwy : null;
+
+/** 55/45 harmonic blend — the same split expressed as consumption. */
+const blendHarmonic = (city, hwy) =>
+    (city > 0 && hwy > 0) ? 1 / (LABEL_WEIGHT_CITY / city + LABEL_WEIGHT_HWY / hwy) : null;
+
+/**
+ * Which blend reproduces the published combined range.
+ *
+ * Compared after rounding to whole miles, because that is how EPA publishes it
+ * and an unrounded comparison would call every row 'neither'. A row where both
+ * land on the label — the common case, when city and highway are close — reads
+ * as 'arithmetic', since that is the documented default and claiming the
+ * ambiguous case for harmonic would overstate it.
+ */
+function labelBlendAgreement(labeled, arithmetic, harmonic) {
+    const label = Number(labeled);
+    if (!(label > 0)) return null;
+    if (arithmetic > 0 && Math.round(arithmetic) === Math.round(label)) return 'arithmetic';
+    if (harmonic  > 0 && Math.round(harmonic)  === Math.round(label)) return 'harmonic';
+    return (arithmetic > 0 || harmonic > 0) ? 'neither' : null;
+}
+
+/**
+ * Which adjustment factor this vehicle's label actually used.
+ *
+ * `LABEL_ADJUSTMENT` is 0.700, and for 57% of configurations that is exactly
+ * right — EPA's own published ratio is 0.700000 to six decimals. For the rest
+ * it is not: the 2027 R2 is 0.7051 at 20" and 0.7294 at 21", and substituting
+ * the real figure reproduces EPA's published city and highway ranges (337.73 →
+ * 338, 276.47 → 276) and its unadjusted MPGe to within 0.03%.
+ *
+ * So the flat factor is a fallback, not the model. Where the Fuel Economy Guide
+ * has been linked, `label_adjustment_factor` is the measured value and wins.
+ *
+ * Bounded because it is promoted data rather than a constant: a factor outside
+ * 0.55–0.85 is a corrupt row, not a vehicle, and silently scaling every figure
+ * on the diagram by it would be worse than ignoring it.
+ *
+ * @returns {{ value, source: 'guide'|'default', declared: string|null }}
+ */
+export function resolveAdjustment(record) {
+    const published = Number(record?.adjustmentFactor);
+    const usable = Number.isFinite(published)
+        && published >= ADJUSTMENT_PLAUSIBLE_MIN
+        && published <= ADJUSTMENT_PLAUSIBLE_MAX;
+
+    return {
+        value:    usable ? published : LABEL_ADJUSTMENT,
+        source:   usable ? 'guide' : 'default',
+        declared: record?.calcApproach ?? null,
     };
 }
 
@@ -191,23 +259,31 @@ export function buildMethodologyModel(record) {
     // wall-to-wheels basis MPGe is defined on needs the charging efficiency.
     const chargeEfficiency = chargeEfficiencyFrom(record);
 
+    const adjustment = resolveAdjustment(record);
+
     const cycles = record.testMethod === 'sct'
-        ? sctCycles(record)
-        : mctCycles(record, chargeEfficiency.value);
+        ? sctCycles(record, adjustment.value)
+        : mctCycles(record, chargeEfficiency.value, adjustment.value);
 
     if (!cycles?.city || !cycles?.hwy) return null;
 
-    const combinedMi =
-        LABEL_WEIGHT_CITY * cycles.city.rangeAdjMi +
-        LABEL_WEIGHT_HWY  * cycles.hwy.rangeAdjMi;
-
-    // Combined RANGE is arithmetic; combined MPGE is harmonic. Not a
-    // typo — they are different kinds of average because they answer different
+    // Combined RANGE is arithmetic; combined MPGE is harmonic. Not a typo —
+    // they are different kinds of average because they answer different
     // questions. Miles over a 55/45 split of driving add; efficiency over that
     // same split does not, since the two cycles cover their shares at different
-    // rates. Confirmed empirically on the R2: a harmonic range combine gives
-    // 304.9, below the 306 label, which cannot happen — a manufacturer may only
-    // label at or below the computed value.
+    // rates.
+    //
+    // Arithmetic is the DEFAULT, not a certainty. On the 339 published rows
+    // where the two blends differ by more than rounding, arithmetic reproduces
+    // EPA's combined figure 72% of the time and harmonic 28% — but the R2 and
+    // the Silverado EV Max are exactly harmonic (306.97 → 307, and 329.89 →
+    // 330), and nothing in the row says which a configuration uses. So both are
+    // computed and `blendAgreeing` records which one actually reproduced the
+    // label, rather than the model asserting one and quietly missing by 3 mi.
+    const combinedMi      = blendArithmetic(cycles.city.rangeAdjMi, cycles.hwy.rangeAdjMi);
+    const combinedHarmMi  = blendHarmonic(cycles.city.rangeAdjMi, cycles.hwy.rangeAdjMi);
+    const combinedFixedMi = blendArithmetic(cycles.city.rangeAdjFixedMi, cycles.hwy.rangeAdjFixedMi);
+
     const combinedMpge = (cycles.city.mpge > 0 && cycles.hwy.mpge > 0)
         ? 1 / (LABEL_WEIGHT_CITY / cycles.city.mpge + LABEL_WEIGHT_HWY / cycles.hwy.mpge)
         : null;
@@ -218,12 +294,24 @@ export function buildMethodologyModel(record) {
         vehicleName: record.vehicleName ?? null,
         modelYear:   record.modelYear ?? null,
         testMethod:  record.testMethod,
-        adjustment:  LABEL_ADJUSTMENT,
+        // The factor actually applied, plus the flat shortcut it replaced. Both,
+        // because the gap between them IS the answer to "why doesn't my car
+        // match the sticker" — and they coincide for most vehicles, so showing
+        // both degenerates gracefully rather than cluttering the common case.
+        adjustment:       adjustment.value,
+        adjustmentSource: adjustment.source,
+        adjustmentFixed:  LABEL_ADJUSTMENT,
+        adjustmentDeclared: adjustment.declared,
         weights:     { city: LABEL_WEIGHT_CITY, hwy: LABEL_WEIGHT_HWY },
         cycleSpeeds: { city: UDDS_AVG_MPH, hwy: HWFET_AVG_MPH },
         adjustmentMethod: record.adjustmentMethod ?? null,
         cycles,
         combinedMi,
+        combinedFixedMi,
+        combinedHarmMi,
+        // 'arithmetic' | 'harmonic' | 'neither' | null — which blend reproduces
+        // the published combined range, once both are rounded as EPA rounds.
+        blendAgreeing: labelBlendAgreement(record.labeledRangeMi, combinedMi, combinedHarmMi),
         combinedMpge,
         labeledMi,
         // How far the manufacturer labelled below what the test computed. Not an
@@ -238,7 +326,7 @@ export function buildMethodologyModel(record) {
 }
 
 /** MCT: consumption per cycle from the phase table, range computed from it. */
-function mctCycles(record, chargeEff) {
+function mctCycles(record, chargeEff, adjustment) {
     const { phases, totalDcWh } = record;
     if (!phases?.length || !(totalDcWh > 0)) return null;
 
@@ -253,8 +341,8 @@ function mctCycles(record, chargeEff) {
         // Range is total energy ÷ consumption — the whole pack priced at the
         // rate that cycle consumed it. This is the step people read as "they
         // drove it until it stopped". They did not.
-        city: { ...cycleFrom({ whPerMi: cityWhPerMi, rangeUnadjMi: totalDcWh / cityWhPerMi, energyBasis: 'dc', chargeEff }), basis: 'computed' },
-        hwy:  { ...cycleFrom({ whPerMi: hwyWhPerMi,  rangeUnadjMi: totalDcWh / hwyWhPerMi,  energyBasis: 'dc', chargeEff }), basis: 'computed' },
+        city: { ...cycleFrom({ whPerMi: cityWhPerMi, rangeUnadjMi: totalDcWh / cityWhPerMi, energyBasis: 'dc', chargeEff, adjustment }), basis: 'computed' },
+        hwy:  { ...cycleFrom({ whPerMi: hwyWhPerMi,  rangeUnadjMi: totalDcWh / hwyWhPerMi,  energyBasis: 'dc', chargeEff, adjustment }), basis: 'computed' },
     };
 }
 
@@ -262,7 +350,7 @@ function mctCycles(record, chargeEff) {
  * SCT: each run drove its own cycle to depletion, so range is MEASURED and
  * consumption is the derived quantity — the opposite of MCT.
  */
-function sctCycles(record) {
+function sctCycles(record, adjustment) {
     const byCycle = (name) => (record.runs ?? []).find(r => r.cycle === name);
     const city = byCycle('UDDS');
     const hwy  = byCycle('HWFET') ?? byCycle('HWY');
@@ -271,7 +359,7 @@ function sctCycles(record) {
     const row = (run) => {
         if (!(run.rangeMi > 0) || !(run.rechargeWh > 0)) return null;
         return {
-            ...cycleFrom({ whPerMi: run.rechargeWh / run.rangeMi, rangeUnadjMi: run.rangeMi, energyBasis: 'ac' }),
+            ...cycleFrom({ whPerMi: run.rechargeWh / run.rangeMi, rangeUnadjMi: run.rangeMi, energyBasis: 'ac', adjustment }),
             basis: 'measured',
         };
     };

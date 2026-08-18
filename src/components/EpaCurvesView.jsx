@@ -1156,7 +1156,10 @@ export default function EpaCurvesView({
                 <div className="card mt-6">
                     <h3 className="text-lg font-semibold mb-1">EPA range methodology</h3>
                     <p className="text-sm text-faint mb-2">
-                        Sample records — not yet wired to the selected vehicles (#206, phase B1).
+                        Sample records — not yet wired to the selected vehicles (#222).
+                        Where a vehicle&apos;s Fuel Economy Guide row is linked, the diagram uses
+                        EPA&apos;s own adjustment factor for that configuration and shows the flat
+                        0.7 shortcut beside it.
                     </p>
 
                     <CollapsibleSection title="How the EPA range is produced">
