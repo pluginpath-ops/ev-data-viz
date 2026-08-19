@@ -43,6 +43,25 @@ const DATA_FLAGS = [
  */
 const inferRunFlags = (run) => [isRangeRun(run) ? 'range' : 'charging'];
 
+/**
+ * A run's role, as the pill that opens its title line.
+ *
+ * The kind is the first thing that decides how to read every number below it,
+ * and on an inherited test it also decides which knobs mean anything —
+ * efficiency only ever moves a distance, so on a charging link it is inert
+ * while capacity is doing all the work. The inherited card was the one card
+ * without this pill, which is precisely where it was most needed.
+ */
+function RunKindPill({ run, className = '' }) {
+    const flag = DATA_FLAGS.find(f => f.key === runKindFrom(run));
+    if (!flag) return null;
+    return (
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${flag.pillStyle} shrink-0 ${className}`.trim()}>
+            {flag.label}
+        </span>
+    );
+}
+
 const INHERITED_SECTION_HELP =
     'Tests borrowed from another vehicle that shares this one\'s hardware — a ' +
     'trim with the same battery can inherit its charging curves, a battery ' +
@@ -66,6 +85,14 @@ const EFFICIENCY_HELP =
     'How much further the target goes on the same energy — aero, tyres, ' +
     'drivetrain. Scales distance only, so this is the knob that moves the ' +
     'efficiency figure.';
+
+// On a charging test efficiency is not inert, but it is nearly so: the only
+// distance such a run carries is the range readout on its data points. Saying
+// so is the difference between "this knob does nothing" and "this knob does
+// one specific thing" — the question the missing kind pill left open.
+const EFFICIENCY_ON_CHARGING =
+    'On a charging test the only distance to scale is the range readout on ' +
+    'its data points — kWh and kW are capacity\'s job.';
 
 // Capacity on a CHARGING test is the naive one: it assumes the curve keeps its
 // shape and just gets bigger. A different-size pack can differ in chemistry,
@@ -2389,17 +2416,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             <div className="run-card-header">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        {/* The kind belongs on the title line: it is
-                                            the first thing that decides how to read
-                                            every number below it. */}
-                                        {(() => {
-                                            const flag = DATA_FLAGS.find(f => f.key === runKindFrom(run));
-                                            return flag ? (
-                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${flag.pillStyle} shrink-0`}>
-                                                    {flag.label}
-                                                </span>
-                                            ) : null;
-                                        })()}
+                                        <RunKindPill run={run} />
                                         <h3 className="section-title">
                                             {run.name}
                                             {run.isHidden && (
@@ -2640,7 +2657,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         key: 'efficiency', label: 'Efficiency', stored: eff,
                                         edits: efficiencyEdits, setEdits: setEfficiencyEdits,
                                         field: 'efficiencyFactor',
-                                        title: EFFICIENCY_HELP,
+                                        title: isChargingLink
+                                            ? `${EFFICIENCY_HELP} ${EFFICIENCY_ON_CHARGING}`
+                                            : EFFICIENCY_HELP,
                                     },
                                 ];
                                 const saveFactor = async (f, raw) => {
@@ -2656,6 +2675,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <div className="run-card-header">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
+                                                    <RunKindPill run={run} />
                                                     <h3 className="section-title">
                                                         {run.name}
                                                         <RunSourceLinks run={run} className="text-sm font-normal" />
