@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { vehiclesInSession, runsInSession } from '../utils/testSessions';
 import { vehicleLabel } from '../utils/specHelpers';
+import { useAppContext } from '../context/AppContext';
 
 /**
  * Edit a session's own fields.
@@ -42,11 +43,16 @@ function toDraft(session) {
 }
 
 export default function SessionEditModal({ session, vehicles, onSave, onDelete, onClose }) {
+    const { updateRun, isContributor } = useAppContext();
     const [draft, setDraft] = useState(() => toDraft(session));
     const [saving, setSaving] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    // Result of the last "copy URL down" run, cleared whenever the session
+    // changes or the source URL is edited so a stale count can't linger.
+    const [copyResult, setCopyResult] = useState(null);
+    const [copying, setCopying] = useState(false);
 
-    useEffect(() => { setDraft(toDraft(session)); }, [session]);
+    useEffect(() => { setDraft(toDraft(session)); setCopyResult(null); }, [session]);
     useEffect(() => {
         const onKey = e => { if (e.key === 'Escape') onClose(); };
         window.addEventListener('keydown', onKey);
@@ -57,12 +63,41 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
 
     const members  = runsInSession(vehicles, session.id);
     const cars     = vehiclesInSession(vehicles, session.id);
-    const set = (key, value) => setDraft(d => ({ ...d, [key]: value }));
+    const set = (key, value) => { setDraft(d => ({ ...d, [key]: value })); setCopyResult(null); };
 
     const handleSave = async () => {
         setSaving(true);
         try { await onSave(session.id, draft); onClose(); }
         finally { setSaving(false); }
+    };
+
+    // Bulk-fill runs.source_url from the session's own URL — a one-paste
+    // labour-saver for an outing with several tests, rather than typing the
+    // same link onto every row (#208). Reads session.url, the SAVED value, not
+    // the unsaved draft: the session must be saved first, so this never writes
+    // a URL the session record doesn't actually have.
+    const withUrl    = members.filter(({ run }) => run.source_url).length;
+    const withoutUrl = members.length - withUrl;
+    const handleCopyDown = async () => {
+        if (!session.url || members.length === 0) return;
+        let targets = members;
+        if (withUrl > 0) {
+            const overwrite = window.confirm(
+                `${withUrl} test${withUrl === 1 ? '' : 's'} already ha${withUrl === 1 ? 's' : 've'} a source link. ` +
+                `Overwrite ${withUrl === 1 ? 'it' : 'them'} too? Cancel to only fill in the ` +
+                `${withoutUrl} that ${withoutUrl === 1 ? 'is' : 'are'} missing one.`
+            );
+            if (!overwrite) targets = members.filter(({ run }) => !run.source_url);
+        }
+        setCopying(true);
+        try {
+            for (const { run, vehicle } of targets) {
+                await updateRun(vehicle.id, run.id, { sourceUrl: session.url });
+            }
+            setCopyResult({ copied: targets.length, skipped: members.length - targets.length });
+        } finally {
+            setCopying(false);
+        }
     };
 
     return (
@@ -97,6 +132,27 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
                                 />
                             </label>
                         ))}
+                        {isContributor && members.length > 0 && (
+                            <div className="session-edit-field is-wide">
+                                <span className="text-label">Copy source link</span>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyDown}
+                                        disabled={!session.url || copying}
+                                        title={!session.url ? 'Save a URL on this session first' : undefined}
+                                        className="btn btn-secondary text-sm disabled:opacity-40"
+                                    >
+                                        {copying ? 'Copying…' : 'Copy URL to all tests'}
+                                    </button>
+                                    <span className="text-xs text-muted">
+                                        {copyResult
+                                            ? `Copied to ${copyResult.copied} test${copyResult.copied === 1 ? '' : 's'}${copyResult.skipped ? `, skipped ${copyResult.skipped}` : ''}.`
+                                            : `${withoutUrl} test${withoutUrl === 1 ? '' : 's'} have no source link · ${withUrl} already ${withUrl === 1 ? 'has' : 'have'} one`}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                         <label className="session-edit-field is-wide">
                             <span className="text-label">Notes</span>
                             <textarea

@@ -165,6 +165,38 @@ export function linkableRuns(sourceVehicle, alreadyLinkedRunIds = new Set(), kin
     });
 }
 
+/**
+ * The run-level magnitudes of an inherited test, scaled by its link's two
+ * factors (migration 055).
+ *
+ * What a field IS decides which factors reach it, so this never asks the run's
+ * kind:
+ *
+ *   distance  × capacity × efficiency
+ *   energy    × capacity
+ *
+ * which makes efficiency′ = (distance × c × e) / (energy × c) = efficiency × e.
+ * Capacity cancels exactly — that is the property that makes these two
+ * independent knobs rather than two numbers that both happen to move range,
+ * and it is what `capacity alone leaves efficiency untouched` in the tests
+ * pins down.
+ *
+ * The kind CHECK constraints already make distance_miles / energy_kwh and
+ * charge_energy_kwh mutually exclusive per row, so scaling all three
+ * unconditionally only ever touches the ones a given run carries.
+ *
+ * Rounded to one decimal because the energy fields have no unit conversion and
+ * so no formatter to round in — they reach the run card raw.
+ */
+export function scaleInheritedMagnitudes(run, capacity = 1, efficiency = 1) {
+    const at1 = (v, factor) => (v == null ? null : Math.round(v * factor * 10) / 10);
+    return {
+        distance_miles:    at1(run?.distance_miles,    capacity * efficiency),
+        energy_kwh:        at1(run?.energy_kwh,        capacity),
+        charge_energy_kwh: at1(run?.charge_energy_kwh, capacity),
+    };
+}
+
 /** How many runs of each kind a vehicle could contribute, for the filter's counts. */
 export function linkableCounts(sourceVehicle, alreadyLinkedRunIds = new Set()) {
     const all = linkableRuns(sourceVehicle, alreadyLinkedRunIds, 'all');

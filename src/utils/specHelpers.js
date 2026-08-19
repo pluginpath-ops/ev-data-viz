@@ -39,6 +39,31 @@ export function resolveEffectiveSpecs(vehicle, vehicles, _visited = new Set()) {
 }
 
 /**
+ * A vehicle's battery capacity in kWh, for sizing one vehicle's pack against
+ * another's (the capacity factor on an inherited test, #185).
+ *
+ * Usable is preferred over gross because it is what a test actually consumes,
+ * and it reads through spec inheritance — a trim that shares its parent's pack
+ * has no battery figure of its own, and the honest answer there is the
+ * parent's, not "unknown".
+ *
+ * The same order as resolveUseableKwh in epaPhysics, minus its EPA tier: that
+ * one is resolving the pack behind an EPA test group, which has a reported
+ * figure of its own to prefer. This is comparing two app vehicles.
+ *
+ * Returns null rather than 0 when nothing is recorded, so a caller can tell
+ * "no battery figure" from a real value and decline to suggest a ratio.
+ */
+export function packKwh(vehicle, vehicles) {
+    if (!vehicle) return null;
+    const specs  = resolveEffectiveSpecs(vehicle, vehicles ?? []);
+    const usable = Number(specs?.charging?.battery_usable_kwh);
+    if (usable > 0) return usable;
+    const gross = Number(vehicle.battery);
+    return gross > 0 ? gross : null;
+}
+
+/**
  * Merge own (override) specs with source (inherited) specs.
  * Returns:
  *   merged       — the effective spec object to display

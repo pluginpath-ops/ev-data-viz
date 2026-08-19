@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
+import { packKwh } from '../utils/specHelpers';
 import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
@@ -42,11 +43,65 @@ const DATA_FLAGS = [
  */
 const inferRunFlags = (run) => [isRangeRun(run) ? 'range' : 'charging'];
 
+/**
+ * A run's role, as the pill that opens its title line.
+ *
+ * The kind is the first thing that decides how to read every number below it,
+ * and on an inherited test it also decides which knobs mean anything —
+ * efficiency only ever moves a distance, so on a charging link it is inert
+ * while capacity is doing all the work. The inherited card was the one card
+ * without this pill, which is precisely where it was most needed.
+ */
+function RunKindPill({ run, className = '' }) {
+    const flag = DATA_FLAGS.find(f => f.key === runKindFrom(run));
+    if (!flag) return null;
+    return (
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${flag.pillStyle} shrink-0 ${className}`.trim()}>
+            {flag.label}
+        </span>
+    );
+}
+
 const INHERITED_SECTION_HELP =
     'Tests borrowed from another vehicle that shares this one\'s hardware — a ' +
     'trim with the same battery can inherit its charging curves, a battery ' +
     'variant of the same body can inherit its range tests. Linked per test, ' +
     'with a scaling factor where the two differ.';
+
+// The two knobs on an inherited test (migration 055). What a field IS decides
+// which factors reach it, so neither needs to know the run's kind:
+//
+//   capacity   × kWh and kW (and, with efficiency, distance) — a bigger pack
+//   efficiency × distance only — the same pack carried further
+//
+// Capacity cancels out of distance ÷ energy, so efficiency alone moves the
+// efficiency figure and capacity alone leaves it untouched.
+const CAPACITY_HELP =
+    'Target pack ÷ source pack. Scales energy and charge rate, and distance ' +
+    'along with them, so efficiency is unchanged — the same car carrying a ' +
+    'bigger battery.';
+
+const EFFICIENCY_HELP =
+    'How much further the target goes on the same energy — aero, tyres, ' +
+    'drivetrain. Scales distance only, so this is the knob that moves the ' +
+    'efficiency figure.';
+
+// On a charging test efficiency is not inert, but it is nearly so: the only
+// distance such a run carries is the range readout on its data points. Saying
+// so is the difference between "this knob does nothing" and "this knob does
+// one specific thing" — the question the missing kind pill left open.
+const EFFICIENCY_ON_CHARGING =
+    'On a charging test the only distance to scale is the range readout on ' +
+    'its data points — kWh and kW are capacity\'s job.';
+
+// Capacity on a CHARGING test is the naive one: it assumes the curve keeps its
+// shape and just gets bigger. A different-size pack can differ in chemistry,
+// thermal management and max current, none of which this knows about.
+const CHARGING_SCALE_WARNING =
+    'On a charging test, capacity assumes the curve keeps the same shape, ' +
+    'just bigger. That is invalid for most optional battery packs, which can ' +
+    'differ in chemistry, thermal management or max current limits. Use only ' +
+    'when you have reason to believe the curve really does scale linearly.';
 
 const TESTS_SECTION_HELP =
     'Measured charging and range tests for this vehicle. A charging test is a ' +
@@ -73,6 +128,36 @@ export const RUNS_SUBTAB_IDS = SUBTABS.map(t => t.id);
 
 /** Sub-tab shown when none is specified, and the fallback for an unknown `?sub=`. */
 export const DEFAULT_RUNS_SUBTAB = 'tests';
+
+/**
+ * One of the two scaling knobs on an inherited test, as an editable number.
+ *
+ * Module-level rather than inline: an inline definition is a new component type
+ * every render, which remounts the input and loses the caret mid-typing.
+ *
+ * Commits on blur (and on Enter, by blurring) rather than per keystroke — each
+ * save is a write plus a full vehicle reload, so per-keystroke would fire one
+ * for every digit of "1.035".
+ */
+function FactorInput({ label, title, value, onChange, onCommit }) {
+    return (
+        <label className="flex items-center gap-1 text-xs text-muted">
+            <span title={title}>{label} ×</span>
+            <input
+                type="number"
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                onBlur={onCommit}
+                onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                step="0.001"
+                min="0.001"
+                placeholder="1.0"
+                title={title}
+                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-secondary"
+            />
+        </label>
+    );
+}
 
 // ── Field tag metadata (ordered for display) ──────────────────────────────────
 const FIELD_META = [
@@ -505,11 +590,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     // removing what you did not want.
     const [newLinkKind, setNewLinkKind] = useState('all');
     const [newLinkRunIds, setNewLinkRunIds] = useState(null);   // null = all matching // source vehicle id
-    const [newLinkScaling, setNewLinkScaling]   = useState('');
+    // Two independent knobs — see CAPACITY_HELP / EFFICIENCY_HELP.
+    const [newLinkEfficiency, setNewLinkEfficiency] = useState('');
+    const [newLinkCapacity, setNewLinkCapacity]     = useState('');
     const [newLinkNotes, setNewLinkNotes]       = useState('');
     const [linkSaving, setLinkSaving]           = useState(false);
-    // linkId -> string (local edit value for scaling factor)
-    const [scalingEdits, setScalingEdits]       = useState({});
+    // linkId -> string (local edit values, one map per factor)
+    const [efficiencyEdits, setEfficiencyEdits] = useState({});
+    const [capacityEdits, setCapacityEdits]     = useState({});
 
     // ── Inline data-table state (edit mode) ──────────────────────────────────
     const [editData, setEditData]               = useState(null);   // null=not fetched, []=loaded
@@ -2328,17 +2416,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             <div className="run-card-header">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        {/* The kind belongs on the title line: it is
-                                            the first thing that decides how to read
-                                            every number below it. */}
-                                        {(() => {
-                                            const flag = DATA_FLAGS.find(f => f.key === runKindFrom(run));
-                                            return flag ? (
-                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${flag.pillStyle} shrink-0`}>
-                                                    {flag.label}
-                                                </span>
-                                            ) : null;
-                                        })()}
+                                        <RunKindPill run={run} />
                                         <h3 className="section-title">
                                             {run.name}
                                             {run.isHidden && (
@@ -2558,24 +2636,46 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         <div className="space-y-2 mb-3">
                             {inheritedRuns.map(run => {
                                 const srcName = run._sourceVehicleName || `Vehicle #${run._sourceVehicleId}`;
-                                const sf = run._scalingFactor;
                                 const linkId = run._specLinkId;
-                                const editVal = scalingEdits[linkId] ?? (sf != null ? String(sf) : '');
-                                const saveScaling = async () => {
-                                    const newSf = editVal === '' ? null : parseFloat(editVal);
-                                    const unchanged = newSf === (sf ?? null);
-                                    if (unchanged) return;
+                                const isChargingLink = runKindFrom(run) === 'charging';
+                                const runColor = run.color || '#9ca3af';
+
+                                // Both knobs, saved the same way. `edits` holds the in-progress
+                                // string so a half-typed "1." is not parsed and written.
+                                const eff = run._efficiencyFactor;
+                                const cap = run._capacityFactor;
+                                const factors = [
+                                    {
+                                        key: 'capacity', label: 'Capacity', stored: cap,
+                                        edits: capacityEdits, setEdits: setCapacityEdits,
+                                        field: 'capacityFactor',
+                                        title: isChargingLink
+                                            ? `${CAPACITY_HELP} ${CHARGING_SCALE_WARNING}`
+                                            : CAPACITY_HELP,
+                                    },
+                                    {
+                                        key: 'efficiency', label: 'Efficiency', stored: eff,
+                                        edits: efficiencyEdits, setEdits: setEfficiencyEdits,
+                                        field: 'efficiencyFactor',
+                                        title: isChargingLink
+                                            ? `${EFFICIENCY_HELP} ${EFFICIENCY_ON_CHARGING}`
+                                            : EFFICIENCY_HELP,
+                                    },
+                                ];
+                                const saveFactor = async (f, raw) => {
+                                    const next = raw === '' ? null : parseFloat(raw);
+                                    if (next === (f.stored ?? null)) return;
                                     try {
-                                        await updateSpecLink(linkId, { scalingFactor: newSf });
-                                        setScalingEdits(prev => { const n = { ...prev }; delete n[linkId]; return n; });
+                                        await updateSpecLink(linkId, { [f.field]: next });
+                                        f.setEdits(prev => { const n = { ...prev }; delete n[linkId]; return n; });
                                     } catch (_) { /* error shown by context */ }
                                 };
-                                const runColor = run.color || '#9ca3af';
                                 return (
                                     <div key={run.id} className="card border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]">
                                         <div className="run-card-header">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
+                                                    <RunKindPill run={run} />
                                                     <h3 className="section-title">
                                                         {run.name}
                                                         <RunSourceLinks run={run} className="text-sm font-normal" />
@@ -2639,27 +2739,22 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             maxLength={7}
                                                         />
                                                     </label>
-                                                    {isContributor && canEdit(vehicle) ? (
-                                                        <label className="flex items-center gap-1 text-xs text-muted">
-                                                            <span>Scale ×</span>
-                                                            <input
-                                                                type="number"
-                                                                value={editVal}
-                                                                onChange={e => setScalingEdits(prev => ({ ...prev, [linkId]: e.target.value }))}
-                                                                onBlur={saveScaling}
-                                                                onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-                                                                step="0.001"
-                                                                min="0.001"
-                                                                placeholder="1.0"
-                                                                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-secondary"
-                                                                title="Scaling factor (blank = 1.0)"
-                                                            />
-                                                        </label>
+                                                    {factors.map(f => (isContributor && canEdit(vehicle) ? (
+                                                        <FactorInput
+                                                            key={f.key}
+                                                            label={f.label}
+                                                            title={f.title}
+                                                            value={f.edits[linkId] ?? (f.stored != null ? String(f.stored) : '')}
+                                                            onChange={v => f.setEdits(prev => ({ ...prev, [linkId]: v }))}
+                                                            onCommit={() => saveFactor(f, f.edits[linkId] ?? (f.stored != null ? String(f.stored) : ''))}
+                                                        />
                                                     ) : (
-                                                        sf !== 1 && sf != null && (
-                                                            <span className="text-xs font-mono text-muted">×{sf}</span>
+                                                        f.stored !== 1 && f.stored != null && (
+                                                            <span key={f.key} className="text-xs font-mono text-muted" title={f.title}>
+                                                                {f.label.toLowerCase()} ×{f.stored}
+                                                            </span>
                                                         )
-                                                    )}
+                                                    )))}
                                                 </div>
                                             </div>
                                         </div>
@@ -2700,11 +2795,33 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             return base.includes(n) ? base.filter(x => x !== n) : [...base, n];
                         });
 
-                        const suggestEpaRatio = () => {
+                        // Capacity is a ratio of two recorded packs, so it can be
+                        // offered outright. Blank when either vehicle has no
+                        // battery figure — a silent 1.0 would be indistinguishable
+                        // from "same pack".
+                        const capacityRatio = (() => {
+                            const src = packKwh(selectedSrc, vehicles);
+                            const tgt = packKwh(vehicle, vehicles);
+                            return src && tgt ? tgt / src : null;
+                        })();
+                        const suggestCapacity = () => {
+                            if (capacityRatio) setNewLinkCapacity(capacityRatio.toFixed(3));
+                        };
+
+                        // EPA range ratio is capacity × efficiency, so the capacity
+                        // already accounted for has to come back out before this
+                        // fills the efficiency box. Filling the whole ratio here is
+                        // the bug #185 flagged: on a Standard/Long Range pair, where
+                        // the extra range is only a bigger pack, it silently scaled
+                        // inherited EFFICIENCY by the capacity ratio too.
+                        const suggestEfficiency = () => {
                             if (!selectedSrc) return;
                             const srcRange = parseFloat(selectedSrc.range);
                             const tgtRange = parseFloat(vehicle.range);
-                            if (srcRange && tgtRange) setNewLinkScaling((tgtRange / srcRange).toFixed(3));
+                            if (!srcRange || !tgtRange) return;
+                            const entered = parseFloat(newLinkCapacity);
+                            const cap = entered > 0 ? entered : (capacityRatio ?? 1);
+                            setNewLinkEfficiency(((tgtRange / srcRange) / cap).toFixed(3));
                         };
 
                         const handleAdd = async () => {
@@ -2715,12 +2832,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     await addSpecLink({
                                         targetVehicleId: vehicle.id,
                                         sourceRunId: run.id,
-                                        scalingFactor: newLinkScaling ? parseFloat(newLinkScaling) : null,
+                                        efficiencyFactor: newLinkEfficiency ? parseFloat(newLinkEfficiency) : null,
+                                        capacityFactor:   newLinkCapacity   ? parseFloat(newLinkCapacity)   : null,
                                         notes: newLinkNotes.trim() || null,
                                     });
                                 }
                                 setNewLinkSourceId('');
-                                setNewLinkScaling('');
+                                setNewLinkEfficiency('');
+                                setNewLinkCapacity('');
                                 setNewLinkNotes('');
                                 setNewLinkKind('all');
                                 setNewLinkRunIds(null);
@@ -2735,7 +2854,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 <div className="flex gap-2 flex-wrap">
                                     <select
                                         value={newLinkSourceId}
-                                        onChange={e => { setNewLinkSourceId(e.target.value); setNewLinkScaling(''); setNewLinkRunIds(null); setNewLinkKind('all'); }}
+                                        onChange={e => { setNewLinkSourceId(e.target.value); setNewLinkEfficiency(''); setNewLinkCapacity(''); setNewLinkRunIds(null); setNewLinkKind('all'); }}
                                         className="form-input text-sm flex-1 min-w-48"
                                     >
                                         <option value="">Source vehicle…</option>
@@ -2817,21 +2936,45 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 <div className="flex gap-2 mt-2 flex-wrap items-center">
                                     <input
                                         type="number"
-                                        placeholder="Scaling factor (blank = 1.0)"
-                                        value={newLinkScaling}
-                                        onChange={e => setNewLinkScaling(e.target.value)}
+                                        placeholder="Capacity (blank = 1.0)"
+                                        value={newLinkCapacity}
+                                        onChange={e => setNewLinkCapacity(e.target.value)}
                                         step="0.001"
                                         min="0.001"
-                                        className="form-input text-sm w-52"
+                                        className="form-input text-sm w-44"
+                                        title={runsToLink.some(r => runKindFrom(r) === 'charging')
+                                            ? `${CAPACITY_HELP} ${CHARGING_SCALE_WARNING}`
+                                            : CAPACITY_HELP}
                                     />
                                     <button
                                         type="button"
-                                        onClick={suggestEpaRatio}
+                                        onClick={suggestCapacity}
+                                        disabled={!capacityRatio}
+                                        className="btn btn-secondary text-xs whitespace-nowrap disabled:opacity-40"
+                                        title={capacityRatio
+                                            ? `Fill from the two battery specs (${capacityRatio.toFixed(3)}×)`
+                                            : 'Needs a battery figure on both vehicles'}
+                                    >
+                                        From battery
+                                    </button>
+                                    <input
+                                        type="number"
+                                        placeholder="Efficiency (blank = 1.0)"
+                                        value={newLinkEfficiency}
+                                        onChange={e => setNewLinkEfficiency(e.target.value)}
+                                        step="0.001"
+                                        min="0.001"
+                                        className="form-input text-sm w-44"
+                                        title={EFFICIENCY_HELP}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={suggestEfficiency}
                                         disabled={!selectedSrc}
                                         className="btn btn-secondary text-xs whitespace-nowrap disabled:opacity-40"
-                                        title="Auto-fill from EPA range ratio (target ÷ source)"
+                                        title="Fill from the EPA range ratio, divided by the capacity above — what is left once the bigger pack is accounted for"
                                     >
-                                        Suggest from EPA
+                                        From EPA
                                     </button>
                                     <input
                                         type="text"
@@ -2850,7 +2993,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => { setShowAddLink(false); setNewLinkSourceId(''); setNewLinkScaling(''); setNewLinkNotes(''); }}
+                                        onClick={() => { setShowAddLink(false); setNewLinkSourceId(''); setNewLinkEfficiency(''); setNewLinkCapacity(''); setNewLinkNotes(''); }}
                                         className="btn btn-secondary text-sm"
                                     >
                                         Cancel
