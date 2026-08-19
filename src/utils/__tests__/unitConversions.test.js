@@ -4,7 +4,7 @@ import { fmtDistance, fmtSpeed, fmtTemp, fmtPower } from '../unitConversions';
 /**
  * The imperial branches used to interpolate the stored number raw, which was
  * safe only while every value was one a human had typed. Inherited runs broke
- * that: an inherited distance is `stored × scaling_factor`, and 62.83 × 0.94
+ * that: an inherited distance is `stored × its link's factors`, and 62.83 × 0.94
  * renders as 59.060199999999995.
  *
  * The metric branches were never exposed to this — a unit conversion produces a

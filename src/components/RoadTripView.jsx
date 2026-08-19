@@ -684,7 +684,7 @@ export default function RoadTripView({
                     if (dataService.useSupabase) {
                         const run = allRuns.find(r => String(r.id) === String(runId));
                         if (run?._inherited) {
-                            updates[runId] = await dataService.getRunData(run._realRunId, run._scalingFactor ?? 1);
+                            updates[runId] = await dataService.getRunData(run._realRunId, run._efficiencyFactor ?? 1, run._capacityFactor ?? 1);
                         } else {
                             updates[runId] = await dataService.getRunData(runId);
                         }

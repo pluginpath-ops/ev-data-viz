@@ -4,7 +4,7 @@ import { roundTo, } from '../utils/unitConversions';
 import { toSessionRow } from '../utils/testSessions';
 import { rankFeCandidates } from '../utils/feGuideMatch';
 import { promotionUpdates, demotionUpdates, acceptGuideUpdates } from '../utils/feGuidePromotion';
-import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
+import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
 const roundField = roundTo;
@@ -97,7 +97,10 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
     const run = runById.get(Number(link.source_run_id));
     if (!run) continue;
     const vInfo = runToVehicle.get(Number(link.source_run_id));
-    const sf = link.scaling_factor != null ? Number(link.scaling_factor) : 1;
+    // Two independent knobs (migration 055). Null reads as 1 for both, so a
+    // link predating the split keeps exactly its old meaning.
+    const eff = link.efficiency_factor != null ? Number(link.efficiency_factor) : 1;
+    const cap = link.capacity_factor   != null ? Number(link.capacity_factor)   : 1;
     inherited.push({
       ...run,
       // Synthetic id prevents runDataCache collision when both source and
@@ -105,7 +108,8 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
       id:                buildInheritedRunId(link.id, run.id),
       _inherited:         true,
       _realRunId:         run.id,
-      _scalingFactor:     sf,
+      _efficiencyFactor:  eff,
+      _capacityFactor:    cap,
       _specLinkId:        link.id,
       _sourceVehicleId:   vInfo?.vehicleId,
       _sourceVehicleName: vInfo?.vehicleName,
@@ -113,18 +117,9 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
       color:          link.color ?? run.color ?? '#9ca3af',
       // is_default on the link row gives per-run default precision.
       isDefault:      !!link.is_default,
-      // Scale whichever run-level magnitude this run's kind actually carries.
-      // The kind CHECK constraints make distance_miles and charge_energy_kwh
-      // mutually exclusive per row, so applying `sf` to both unconditionally
-      // is safe — exactly one of them is ever non-null on a given run — and
-      // it means this needs no branch on `kind` to know which one applies.
-      //
-      // Rounded here rather than left to the formatters: kWh needs no unit
-      // conversion, so it has no formatter to round in, and both fields are
-      // interpolated raw into the run card. A synthetic run should be shaped
-      // like a real one — the same precision a curator would have typed.
-      distance_miles:     roundField(run.distance_miles    != null ? run.distance_miles    * sf : null, 1),
-      charge_energy_kwh:  roundField(run.charge_energy_kwh != null ? run.charge_energy_kwh * sf : null, 1),
+      // Which factor reaches which field is the arithmetic that makes the two
+      // knobs independent, so it lives in one tested place rather than here.
+      ...scaleInheritedMagnitudes(run, cap, eff),
     });
   }
   return inherited;
@@ -168,9 +163,17 @@ class DataService {
     // surfaced as "No vehicles yet" on any environment where the newest migration
     // hadn't been applied. Performance data is fetched separately, where a missing
     // table degrades to "no performance data" instead of "no vehicles".
+    //
+    // spec_links is embedded as `(*)` for the same reason, one level down: a
+    // NAMED column that does not exist yet fails just as hard as a missing
+    // table. Listing efficiency_factor / capacity_factor explicitly (migration
+    // 055) blanked the entire site against an un-migrated database. A wildcard
+    // brings the new columns back as undefined instead, which reads as a null
+    // factor, which reads as 1 — so inheritance is merely unscaled until the
+    // migration lands, and every other vehicle still renders.
     const { data, error } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(id, source_run_id, scaling_factor, notes, is_default, color), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
       .order('created_at', { ascending: false });
 
     // Never swallow this. Destructuring only `data` made a failed query look
@@ -367,13 +370,15 @@ class DataService {
 
   // ── Spec links ────────────────────────────────────────────────────────────
 
-  async addSpecLink({ targetVehicleId, sourceRunId, scalingFactor, notes }) {
+  async addSpecLink({ targetVehicleId, sourceRunId, efficiencyFactor, capacityFactor, notes }) {
+    const num = (v) => (v != null && v !== '' ? Number(v) : null);
     const { data, error } = await getSupabase()
       .from('spec_links')
       .insert({
         target_vehicle_id: targetVehicleId,
         source_run_id:     sourceRunId,
-        scaling_factor:    scalingFactor != null && scalingFactor !== '' ? Number(scalingFactor) : null,
+        efficiency_factor: num(efficiencyFactor),
+        capacity_factor:   num(capacityFactor),
         notes:             notes || null,
         created_by:        this.user?.id ?? null,
       })
@@ -394,9 +399,13 @@ class DataService {
       await getSupabase().from('spec_links').update({ is_default: false }).eq('target_vehicle_id', targetVehicleId);
     }
     const payload = {};
-    if ('scalingFactor' in changes) {
-      payload.scaling_factor = changes.scalingFactor != null && changes.scalingFactor !== ''
-        ? Number(changes.scalingFactor) : null;
+    if ('efficiencyFactor' in changes) {
+      payload.efficiency_factor = changes.efficiencyFactor != null && changes.efficiencyFactor !== ''
+        ? Number(changes.efficiencyFactor) : null;
+    }
+    if ('capacityFactor' in changes) {
+      payload.capacity_factor = changes.capacityFactor != null && changes.capacityFactor !== ''
+        ? Number(changes.capacityFactor) : null;
     }
     if ('useAsDefault' in changes) {
       payload.is_default = !!changes.useAsDefault;
@@ -954,7 +963,7 @@ class DataService {
     return out;
   }
 
-  async getRunData(runId, scalingFactor = 1) {
+  async getRunData(runId, efficiencyFactor = 1, capacityFactor = 1) {
     // Inherited runs carry synthetic string ids like "inherited_<linkId>_<realRunId>".
     const actualId = isInheritedRunId(runId)
       ? parseInheritedRunId(runId).realRunId
@@ -972,20 +981,25 @@ class DataService {
       frame:       p.frame,
       timestamp:   p.timestamp,
       soc:         p.soc,
-      // Scaled the same as range_value below: whichever of the two a data
-      // point actually carries. Time is deliberately left untouched in both
-      // cases — the factor scales magnitude, not the axis it's plotted against.
+      // Same rule as buildInheritedRuns, by what the field IS rather than what
+      // kind of run it sits on — a charging test carries a range readout too,
+      // and it is still a distance:
       //
-      // Both round back to their own column's precision (charge_rate is
-      // numeric(8,2), range_value numeric(8,1)) so a scaled point carries no
-      // more apparent precision than the measurement it came from.
-      chargeRate:  p.charge_rate != null && scalingFactor !== 1
-        ? roundField(p.charge_rate * scalingFactor, 2)
+      //   charge_rate (power)  → × cap        a bigger pack pulls more kW
+      //   range_value (distance) → × cap × eff  remaining range is range
+      //
+      // Time is untouched in both cases: these scale magnitude, not the axis
+      // the magnitude is plotted against.
+      //
+      // Each rounds back to its own column's precision (charge_rate is
+      // numeric(8,2), range_value numeric(8,1)) so a scaled point claims no
+      // more precision than the measurement behind it.
+      chargeRate:  p.charge_rate != null && capacityFactor !== 1
+        ? roundField(p.charge_rate * capacityFactor, 2)
         : p.charge_rate,
       time:        p.time_value,
-      // Scale range_value for inherited runs so charts reflect the target vehicle
-      range:       p.range_value != null && scalingFactor !== 1
-        ? roundField(p.range_value * scalingFactor, 1)
+      range:       p.range_value != null && (efficiencyFactor !== 1 || capacityFactor !== 1)
+        ? roundField(p.range_value * capacityFactor * efficiencyFactor, 1)
         : p.range_value,
       temperature: p.temperature,
     }));

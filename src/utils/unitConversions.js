@@ -16,7 +16,7 @@ export {
 // long float, so rounding was unavoidable there — while the imperial ones
 // interpolated the stored number raw, which was fine only for as long as every
 // value was one a human had typed. It isn't any more: an inherited run's
-// distance is `stored × scaling_factor`, which renders as 59.059000000000005.
+// distance is `stored × its link's factors`, which renders as 59.059000000000005.
 // r1 is lossless for anything already at one decimal, so this clamps the
 // computed values without touching the entered ones.
 

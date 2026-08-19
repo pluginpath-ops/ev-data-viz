@@ -869,9 +869,9 @@ export function AppProvider({ children }) {
 
     // Spec links require a full reload because buildInheritedRuns() is a two-pass
     // operation inside DataService — optimistic state cannot replicate it cheaply.
-    const addSpecLink = async ({ targetVehicleId, sourceRunId, scalingFactor, notes }) => {
+    const addSpecLink = async ({ targetVehicleId, sourceRunId, efficiencyFactor, capacityFactor, notes }) => {
         try {
-            await dataService.addSpecLink({ targetVehicleId, sourceRunId, scalingFactor, notes });
+            await dataService.addSpecLink({ targetVehicleId, sourceRunId, efficiencyFactor, capacityFactor, notes });
             await softRefreshVehicles();
         } catch (error) {
             logIfUnauthorized('add_spec_link', 'spec_link', null, error);

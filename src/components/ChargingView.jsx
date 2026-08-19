@@ -155,7 +155,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     if (dataService.useSupabase) {
                         const run = allRuns.find(r => String(r.id) === String(runId));
                         if (run?._inherited) {
-                            runData = await dataService.getRunData(run._realRunId, run._scalingFactor ?? 1);
+                            runData = await dataService.getRunData(run._realRunId, run._efficiencyFactor ?? 1, run._capacityFactor ?? 1);
                         } else {
                             runData = await dataService.getRunData(runId);
                         }
