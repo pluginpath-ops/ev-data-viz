@@ -48,6 +48,20 @@ const INHERITED_SECTION_HELP =
     'variant of the same body can inherit its range tests. Linked per test, ' +
     'with a scaling factor where the two differ.';
 
+// On a charging link, the same scaling factor scales kWh added and kW rate
+// (never time) instead of distance/range — see buildInheritedRuns and
+// getRunData in DataService. Worth flagging separately from the general
+// tooltip: it's a *naive* same-shaped-curve guess, not a real model. A bigger
+// optional battery can differ in chemistry, thermal management and max
+// current, none of which this knows about, so it is wrong for most optional
+// packs and should stay off by default.
+const CHARGING_SCALE_WARNING =
+    'On a charging test this scales kWh added and kW rate, not time — ' +
+    'assuming the curve keeps the same shape, just bigger. Invalid for most ' +
+    'optional battery packs, which can differ in chemistry, thermal ' +
+    'management or max current limits. Use only when you have reason to ' +
+    'believe the curve really does scale linearly.';
+
 const TESTS_SECTION_HELP =
     'Measured charging and range tests for this vehicle. A charging test is a ' +
     'time-series of SoC against charge rate; a range test is a distance driven ' +
@@ -2570,6 +2584,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         setScalingEdits(prev => { const n = { ...prev }; delete n[linkId]; return n; });
                                     } catch (_) { /* error shown by context */ }
                                 };
+                                // The same number scales a different pair of fields depending
+                                // on what this run actually carries — see CHARGING_SCALE_WARNING.
+                                const isChargingLink = runKindFrom(run) === 'charging';
                                 const runColor = run.color || '#9ca3af';
                                 return (
                                     <div key={run.id} className="card border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]">
@@ -2641,7 +2658,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     </label>
                                                     {isContributor && canEdit(vehicle) ? (
                                                         <label className="flex items-center gap-1 text-xs text-muted">
-                                                            <span>Scale ×</span>
+                                                            <span title={isChargingLink ? CHARGING_SCALE_WARNING : undefined}>Scale ×</span>
                                                             <input
                                                                 type="number"
                                                                 value={editVal}
@@ -2652,12 +2669,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 min="0.001"
                                                                 placeholder="1.0"
                                                                 className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-secondary"
-                                                                title="Scaling factor (blank = 1.0)"
+                                                                title={isChargingLink
+                                                                    ? `Scales kWh added and kW rate, not time (blank = 1.0). ${CHARGING_SCALE_WARNING}`
+                                                                    : 'Scaling factor (blank = 1.0)'}
                                                             />
                                                         </label>
                                                     ) : (
                                                         sf !== 1 && sf != null && (
-                                                            <span className="text-xs font-mono text-muted">×{sf}</span>
+                                                            <span className="text-xs font-mono text-muted" title={isChargingLink ? CHARGING_SCALE_WARNING : undefined}>×{sf}</span>
                                                         )
                                                     )}
                                                 </div>
@@ -2823,6 +2842,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         step="0.001"
                                         min="0.001"
                                         className="form-input text-sm w-52"
+                                        title={runsToLink.some(r => runKindFrom(r) === 'charging')
+                                            ? `On charging tests this scales kWh added and kW rate, not time. ${CHARGING_SCALE_WARNING}`
+                                            : undefined}
                                     />
                                     <button
                                         type="button"

@@ -113,9 +113,13 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
       color:          link.color ?? run.color ?? '#9ca3af',
       // is_default on the link row gives per-run default precision.
       isDefault:      !!link.is_default,
-      // Scale the run-level range metric immediately so bar charts are correct
-      // without needing to fetch data points.
-      distance_miles: run.distance_miles != null ? run.distance_miles * sf : null,
+      // Scale whichever run-level magnitude this run's kind actually carries.
+      // The kind CHECK constraints make distance_miles and charge_energy_kwh
+      // mutually exclusive per row, so applying `sf` to both unconditionally
+      // is safe — exactly one of them is ever non-null on a given run — and
+      // it means this needs no branch on `kind` to know which one applies.
+      distance_miles:     run.distance_miles     != null ? run.distance_miles     * sf : null,
+      charge_energy_kwh:  run.charge_energy_kwh  != null ? run.charge_energy_kwh  * sf : null,
     });
   }
   return inherited;
@@ -963,7 +967,12 @@ class DataService {
       frame:       p.frame,
       timestamp:   p.timestamp,
       soc:         p.soc,
-      chargeRate:  p.charge_rate,
+      // Scaled the same as range_value below: whichever of the two a data
+      // point actually carries. Time is deliberately left untouched in both
+      // cases — the factor scales magnitude, not the axis it's plotted against.
+      chargeRate:  p.charge_rate != null && scalingFactor !== 1
+        ? p.charge_rate * scalingFactor
+        : p.charge_rate,
       time:        p.time_value,
       // Scale range_value for inherited runs so charts reflect the target vehicle
       range:       p.range_value != null && scalingFactor !== 1
