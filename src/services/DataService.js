@@ -118,8 +118,13 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
       // mutually exclusive per row, so applying `sf` to both unconditionally
       // is safe — exactly one of them is ever non-null on a given run — and
       // it means this needs no branch on `kind` to know which one applies.
-      distance_miles:     run.distance_miles     != null ? run.distance_miles     * sf : null,
-      charge_energy_kwh:  run.charge_energy_kwh  != null ? run.charge_energy_kwh  * sf : null,
+      //
+      // Rounded here rather than left to the formatters: kWh needs no unit
+      // conversion, so it has no formatter to round in, and both fields are
+      // interpolated raw into the run card. A synthetic run should be shaped
+      // like a real one — the same precision a curator would have typed.
+      distance_miles:     roundField(run.distance_miles    != null ? run.distance_miles    * sf : null, 1),
+      charge_energy_kwh:  roundField(run.charge_energy_kwh != null ? run.charge_energy_kwh * sf : null, 1),
     });
   }
   return inherited;
@@ -970,13 +975,17 @@ class DataService {
       // Scaled the same as range_value below: whichever of the two a data
       // point actually carries. Time is deliberately left untouched in both
       // cases — the factor scales magnitude, not the axis it's plotted against.
+      //
+      // Both round back to their own column's precision (charge_rate is
+      // numeric(8,2), range_value numeric(8,1)) so a scaled point carries no
+      // more apparent precision than the measurement it came from.
       chargeRate:  p.charge_rate != null && scalingFactor !== 1
-        ? p.charge_rate * scalingFactor
+        ? roundField(p.charge_rate * scalingFactor, 2)
         : p.charge_rate,
       time:        p.time_value,
       // Scale range_value for inherited runs so charts reflect the target vehicle
       range:       p.range_value != null && scalingFactor !== 1
-        ? p.range_value * scalingFactor
+        ? roundField(p.range_value * scalingFactor, 1)
         : p.range_value,
       temperature: p.temperature,
     }));

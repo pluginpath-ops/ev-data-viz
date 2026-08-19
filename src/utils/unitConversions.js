@@ -11,9 +11,17 @@ export {
 };
 
 // ── Formatted strings (value + unit label) ────────────────────────────────
+//
+// Both branches round. The metric ones always did — a conversion produces a
+// long float, so rounding was unavoidable there — while the imperial ones
+// interpolated the stored number raw, which was fine only for as long as every
+// value was one a human had typed. It isn't any more: an inherited run's
+// distance is `stored × scaling_factor`, which renders as 59.059000000000005.
+// r1 is lossless for anything already at one decimal, so this clamps the
+// computed values without touching the entered ones.
 
-export const fmtDistance  = (mi,   sys) => sys === 'metric' ? `${r1(mi * MI_TO_KM)} km`           : `${mi} mi`;
-export const fmtSpeed     = (mph,  sys) => sys === 'metric' ? `${r1(mph * MI_TO_KM)} kph`          : `${mph} mph`;
+export const fmtDistance  = (mi,   sys) => sys === 'metric' ? `${r1(mi * MI_TO_KM)} km`           : `${r1(mi)} mi`;
+export const fmtSpeed     = (mph,  sys) => sys === 'metric' ? `${r1(mph * MI_TO_KM)} kph`          : `${r1(mph)} mph`;
 /**
  * A run's speed basis, when it needs one: an average over a varying-speed cycle
  * rather than a held setpoint.
@@ -26,12 +34,12 @@ export const fmtSpeed     = (mph,  sys) => sys === 'metric' ? `${r1(mph * MI_TO_
 export const speedBasisNote = (run) =>
     run?.speed_basis === 'mixed' ? 'mixed cycle' : null;
 
-export const fmtTemp      = (degF, sys) => sys === 'metric' ? `${r1((degF - 32) * 5 / 9)}°C`       : `${degF}°F`;
-export const fmtWeight    = (lbs,  sys) => sys === 'metric' ? `${r1(lbs * LBS_TO_KG)} kg`          : `${lbs} lbs`;
-export const fmtVolume    = (cuft, sys) => sys === 'metric' ? `${r1(cuft * CUFT_TO_L)} L`          : `${cuft} cu ft`;
-export const fmtDimension = (in_,  sys) => sys === 'metric' ? `${Math.round(in_ * IN_TO_MM)} mm`   : `${in_} in`;
-export const fmtTorque    = (lbft, sys) => sys === 'metric' ? `${r1(lbft * LBFT_TO_NM)} Nm`       : `${lbft} lb-ft`;
-export const fmtPower     = (hp,   sys) => sys === 'metric' ? `${r1(hp * HP_TO_KW)} kW`             : `${hp} hp`;
+export const fmtTemp      = (degF, sys) => sys === 'metric' ? `${r1((degF - 32) * 5 / 9)}°C`       : `${r1(degF)}°F`;
+export const fmtWeight    = (lbs,  sys) => sys === 'metric' ? `${r1(lbs * LBS_TO_KG)} kg`          : `${r1(lbs)} lbs`;
+export const fmtVolume    = (cuft, sys) => sys === 'metric' ? `${r1(cuft * CUFT_TO_L)} L`          : `${r1(cuft)} cu ft`;
+export const fmtDimension = (in_,  sys) => sys === 'metric' ? `${Math.round(in_ * IN_TO_MM)} mm`   : `${r1(in_)} in`;
+export const fmtTorque    = (lbft, sys) => sys === 'metric' ? `${r1(lbft * LBFT_TO_NM)} Nm`       : `${r1(lbft)} lb-ft`;
+export const fmtPower     = (hp,   sys) => sys === 'metric' ? `${r1(hp * HP_TO_KW)} kW`             : `${r1(hp)} hp`;
 
 // ── Raw conversions (no label) — for chart data values ────────────────────
 
@@ -100,7 +108,7 @@ export function formatSpecValue(value, unitGroup, sys) {
         case 'dimension': return fmtDimension(value, sys);
         case 'torque':    return fmtTorque(value, sys);
         case 'power':     return fmtPower(value, sys);
-        case 'feet':      return sys === 'metric' ? `${r1(value * FT_TO_M)} m` : `${value} ft`;
+        case 'feet':      return sys === 'metric' ? `${r1(value * FT_TO_M)} m` : `${r1(value)} ft`;
         default:          return String(value);
     }
 }
