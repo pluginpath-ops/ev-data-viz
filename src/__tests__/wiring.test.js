@@ -279,6 +279,24 @@ describe('the seams that broke before', () => {
         expect(missing, `candidate columns read but not selected: ${missing.join(', ')}`).toEqual([]);
     });
 
+    it('refreshes the vehicle after every FE guide mutation', () => {
+        // All three write to epa_test_groups, which reaches the page only through
+        // the vehicle's epa_vehicle_mappings. Without a refetch the card keeps
+        // rendering pre-link values, so the curator cannot see whether the row
+        // they picked was right without reloading — which defeats the point of a
+        // picker whose whole job is making the link checkable.
+        //
+        // FeGuidePicker does fire an onChanged callback, but EpaVehicleSection's
+        // onGroupChanged prop is never supplied by RunsView, so that path is
+        // inert. Asserting on the context is asserting on the one that runs.
+        const ctx = read('src/context/AppContext.jsx');
+        for (const fn of ['linkFeGuideRow', 'unlinkFeGuideRow', 'acceptFeGuideValues']) {
+            const body = ctx.slice(ctx.indexOf(`const ${fn} = async`));
+            expect(body.slice(0, body.indexOf('\n    };')), `${fn} must refresh the vehicle`)
+                .toMatch(/softRefreshVehicles\(\)/);
+        }
+    });
+
     it('puts the derivation checks with the data, not on the public chart', () => {
         // They started on the Charts tab, which was the wrong home: that diagram
         // answers a reader's question about the CAR, and "the bags do not

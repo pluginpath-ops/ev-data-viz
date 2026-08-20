@@ -1101,6 +1101,12 @@ export function AppProvider({ children }) {
     const linkFeGuideRow = async (testGroupId, feRowId) => {
         try {
             const res = await dataService.linkFeGuideRow(testGroupId, feRowId);
+            // The promoted figures land on the test group, which reaches the UI
+            // through the vehicle's epa_vehicle_mappings — so without this the
+            // card keeps rendering the pre-link values and the curator cannot
+            // see whether the row they picked was the right one until they
+            // reload. Same reason every sibling EPA mutation here refreshes.
+            await softRefreshVehicles();
             const note = res.skipped.length
                 ? `${res.promoted.length} field(s) filled, ${res.skipped.length} left as curator-set.`
                 : `${res.promoted.length} field(s) filled from the guide.`;
@@ -1118,6 +1124,7 @@ export function AppProvider({ children }) {
     const acceptFeGuideValues = async (testGroupId, columns) => {
         try {
             const res = await dataService.acceptFeGuideValues(testGroupId, columns);
+            await softRefreshVehicles();
             showSuccess(`${res.accepted.length} field(s) now use the published value.`);
             return res;
         } catch (error) {
@@ -1129,6 +1136,7 @@ export function AppProvider({ children }) {
     const unlinkFeGuideRow = async (testGroupId) => {
         try {
             const res = await dataService.unlinkFeGuideRow(testGroupId);
+            await softRefreshVehicles();
             showSuccess(`Unlinked; ${res.restored.length} field(s) restored.`);
             return res;
         } catch (error) {
