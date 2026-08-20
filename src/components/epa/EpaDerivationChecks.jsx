@@ -75,7 +75,7 @@ export default function EpaDerivationChecks({
             <span className="text-xs text-faint">
                 {invariant.cause === 'adjustment'
                     ? (fromGuide
-                        ? `The bags reproduce this record\u2019s own stated ranges, so the phase data is sound. The guide\u2019s factor of ${applied.toFixed(4)} is already in use and still lands short \u2014 this label implies ${invariant.impliedAdjustment?.toFixed(4)}. EPA published one factor per cycle here, which a single factor cannot reproduce.`
+                        ? `The bags reproduce this record\u2019s own stated ranges, so the phase data is sound, and the guide\u2019s own factor of ${applied.toFixed(4)} is already in use \u2014 yet the label still implies ${invariant.impliedAdjustment?.toFixed(4)}. Nothing here is known to be wrong; the residual is unexplained. Note the guide often reports its \u201cunrounded\u201d adjusted figures rounded to whole MPGe, which puts roughly \u00b10.005 of slack on that factor.`
                         : `The bags reproduce this record\u2019s own stated ranges, so the phase data is sound \u2014 the adjustment factor is too low. This label implies ${invariant.impliedAdjustment?.toFixed(4)}, not the ${applied} being applied. Link its Fuel Economy Guide row.`)
                     : invariant.cause === 'phases'
                         ? 'The bags do not reproduce this record\u2019s own stated ranges either, so the phase data is what is too low.'
