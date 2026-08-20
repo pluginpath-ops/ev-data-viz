@@ -41,8 +41,14 @@ const mi = (v) => (v == null ? '—' : `${v.toFixed(1)} mi`);
  */
 export default function EpaDerivationChecks({
     check = null, rangeCheck = null, invariant = null,
-    adjustmentFixed = 0.7, inferredPhaseTypes = 0, competingMctTests = 0,
+    adjustmentFixed = 0.7, adjustmentUsed = null, adjustmentSource = null,
+    inferredPhaseTypes = 0, competingMctTests = 0,
 }) {
+    // The factor in force, and whether a guide row supplied it. Reporting the
+    // flat constant while a linked row's factor was doing the work told curators
+    // to link a row they had already linked, and named a number nothing used.
+    const applied = Number.isFinite(adjustmentUsed) ? adjustmentUsed : adjustmentFixed;
+    const fromGuide = adjustmentSource === 'guide';
     const anything = invariant?.violated || rangeCheck?.checked || check?.checked
         || inferredPhaseTypes > 0 || competingMctTests > 1;
     if (!anything) return null;
@@ -68,7 +74,9 @@ export default function EpaDerivationChecks({
             </span>
             <span className="text-xs text-faint">
                 {invariant.cause === 'adjustment'
-                    ? `The bags reproduce this record\u2019s own stated ranges, so the phase data is sound \u2014 the adjustment factor is too low. This label implies ${invariant.impliedAdjustment?.toFixed(4)}, not the ${adjustmentFixed} being applied. Link its Fuel Economy Guide row.`
+                    ? (fromGuide
+                        ? `The bags reproduce this record\u2019s own stated ranges, so the phase data is sound, and the guide\u2019s own factor of ${applied.toFixed(4)} is already in use \u2014 yet the label still implies ${invariant.impliedAdjustment?.toFixed(4)}. Nothing here is known to be wrong; the residual is unexplained. Note the guide often reports its \u201cunrounded\u201d adjusted figures rounded to whole MPGe, which puts roughly \u00b10.005 of slack on that factor.`
+                        : `The bags reproduce this record\u2019s own stated ranges, so the phase data is sound \u2014 the adjustment factor is too low. This label implies ${invariant.impliedAdjustment?.toFixed(4)}, not the ${applied} being applied. Link its Fuel Economy Guide row.`)
                     : invariant.cause === 'phases'
                         ? 'The bags do not reproduce this record\u2019s own stated ranges either, so the phase data is what is too low.'
                         : 'A label may never exceed the computed range, so something feeding this derivation is too low.'}

@@ -103,6 +103,11 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
             invariant: checkLabelInvariant(model, {
                 bagsReconcile: rangeCheck.checked ? rangeCheck.worst === 'agrees' : null,
             }),
+            // What is ACTUALLY being applied, and where it came from. Passing
+            // only adjustmentFixed made the invariant message report 0.700 even
+            // when a linked guide row had already supplied the real factor.
+            adjustmentUsed:   model?.adjustment ?? null,
+            adjustmentSource: model?.adjustmentSource ?? null,
             adjustmentFixed: model?.adjustmentFixed ?? 0.7,
             inferredPhaseTypes,
             competingMctTests,

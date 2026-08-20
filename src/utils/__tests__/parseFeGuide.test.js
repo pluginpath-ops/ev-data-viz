@@ -233,10 +233,24 @@ describe('parseMotorPowerKw', () => {
         expect(parseMotorPowerKw('225')).toBe(225);
     });
 
+    it('reads the list when EPA writes it in prose', () => {
+        // Real cells. Splitting on commas alone returned null for the first —
+        // no comma, so the whole string was one non-numeric token — and
+        // silently dropped the last motor of the others, because "and 415"
+        // fails Number() and was filtered out as non-finite.
+        expect(parseMotorPowerKw('155 and 220')).toBe(375);
+        expect(parseMotorPowerKw('190 and 230')).toBe(420);
+        expect(parseMotorPowerKw('176, 252, and 415')).toBe(843);
+        expect(parseMotorPowerKw('140, 155, 180, 205, 220, and 260')).toBe(1160);
+        expect(parseMotorPowerKw('130, 205, 220, and 280')).toBe(835);
+    });
+
     it('returns null when there is nothing numeric', () => {
         expect(parseMotorPowerKw('')).toBeNull();
         expect(parseMotorPowerKw(null)).toBeNull();
         expect(parseMotorPowerKw('n/a')).toBeNull();
+        // "and" on its own must not become a zero-kW motor.
+        expect(parseMotorPowerKw('and')).toBeNull();
     });
 });
 
