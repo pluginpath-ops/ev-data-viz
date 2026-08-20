@@ -12,8 +12,14 @@
  *   { groups: [{ test_group_id, epa_test_family_id, model_year, make,
  *                epa_carline_name, vehicle_config_number, drive, fuel_type,
  *                total_voltage, battery_specific_energy, useable_kwh,
+ *                carryover_test_group_id, carryover_model_year,
  *                coefficient_sets: [...], tests: [{ ..., phases: [...] }] }],
  *     warnings: [...] }
+ *
+ * `model_year` / `epa_test_family_id` are the CERTIFICATION's, from page 1. The
+ * `carryover_*` pair is where the emission data vehicles were tested, which on a
+ * carryover certification is a different year and a different group — see
+ * parseCertHeader and migration 056.
  *
  * Phase type is not stated in the PDF, so it's inferred from phase distance
  * (~10.26 mi → HWY, ~7.45 mi → UDDS, ≫10× neighbors → SS), matching the curator
@@ -65,10 +71,42 @@ function mapCoeffCategory(label) {
 }
 
 /**
+ * The certification's OWN identity, read from the page-1 header.
+ *
+ * Must run on the RAW item stream, before stripNoise: page 1 states the test
+ * group as a field, every later page repeats it as a footer, and the two are
+ * character-identical, so nothing downstream of the strip can tell them apart.
+ *
+ * Both values are the certification's, NOT the emission data vehicles'. On a
+ * carryover certification those differ — VVVXT00.0ZVG / 2027 here against
+ * "Original Test Group Name" TVVXT00.0ZVG / "Original Test Vehicle Model Year"
+ * 2026 per config — and it is the certification's that identifies the record and
+ * joins to the Fuel Economy Guide. See migration 056.
+ *
+ * "Test Group" appears ~22 times in a 21-page report and all but one are the
+ * page-1 field or a footer repeating it — same value either way, so which one is
+ * read does not matter. The exception is the "Official Test Numbers" column
+ * header, whose value slot holds "Fuel". So take the first occurrence that looks
+ * like an ID rather than the first occurrence: an ID has a dot and no spaces,
+ * and scanning on means a report whose page 1 did not extract still recovers the
+ * value from a footer.
+ */
+const TEST_GROUP_ID = /^[A-Z0-9]{3,}\.[A-Z0-9]{3,}$/i;
+
+function parseCertHeader(rawItems) {
+    const items = rawItems || [];
+    const certTestGroup = indicesWhere(items, s => s === 'Test Group')
+        .map(i => String(items[i + 1] ?? '').trim())
+        .find(v => TEST_GROUP_ID.test(v)) ?? null;
+    return { certTestGroup, certModelYear: parseNum(valAfter(items, 'Model Year')) };
+}
+
+/**
  * Remove page header/footer noise that interleaves the content stream:
  *   "Date: …", "Certification Summary Information Report", "Page N of M …",
  *   and the running "Test Group"/id + "Evaporative/Refueling Family"/value
- *   footer pair (we read those values from config-level labels instead).
+ *   footer pair (parseCertHeader has already taken the page-1 field off the
+ *   raw stream, which is the only occurrence that is not noise).
  */
 function stripNoise(items) {
     const out = [];
@@ -238,6 +276,7 @@ function parseTests(items, start, end) {
  * @returns {{ groups: Array, warnings: string[] }}
  */
 export function parseEpaCsiText(rawItems) {
+    const { certTestGroup, certModelYear } = parseCertHeader(rawItems);
     const items = stripNoise(rawItems || []);
     const warnings = [];
 
@@ -291,11 +330,21 @@ export function parseEpaCsiText(rawItems) {
         const cd_range_hwy_calc = pref?.cd_range_hwy_calc ?? null;
         tests.forEach(t => { delete t.cd_range_combined_calc; delete t.cd_range_hwy_calc; });
 
+        // The certification's identity when page 1 gave it, else the carryover
+        // source — which is what the two "Original …" fields hold, and which is
+        // the same value on a certification that did not carry anything over.
+        const carryoverGroup = valAfter(items, 'Original Test Group Name', ci, end);
+        const carryoverYear = parseNum(valAfter(items, 'Original Test Vehicle Model Year', ci, end));
+
         return {
             test_group_id,
-            epa_test_family_id: valAfter(items, 'Original Test Group Name', ci, end),
+            epa_test_family_id: certTestGroup ?? carryoverGroup,
             vehicle_config_number: modeNum ?? null,   // mfr "mode" number, captured separately
-            model_year: parseNum(valAfter(items, 'Original Test Vehicle Model Year', ci, end)),
+            model_year: certModelYear ?? carryoverYear,
+            // Kept, not discarded: these say which model year's lab work the
+            // results actually are, which the certification year does not.
+            carryover_test_group_id: carryoverGroup ?? null,
+            carryover_model_year: carryoverYear,
             make,
             epa_carline_name: valAfter(items, 'Represented Test Vehicle Model', ci, end),
             fuel_type: 'Electricity',
@@ -313,6 +362,22 @@ export function parseEpaCsiText(rawItems) {
     }).filter(g => g.test_group_id);
 
     if (!groups.length) warnings.push('Configurations found but no Vehicle IDs could be read.');
+
+    if (certTestGroup == null) {
+        warnings.push('No test group on page 1 — falling back to each config\'s "Original Test Group Name", which is the carryover source on a carryover certification.');
+    }
+    if (certModelYear == null) {
+        warnings.push('No model year on page 1 — falling back to each config\'s "Original Test Vehicle Model Year", which is the carryover source on a carryover certification.');
+    }
+
+    // A carryover is not a problem, but it IS the thing that makes the two model
+    // years disagree, and every downstream comparison against a published guide
+    // row turns on which one you are holding. Said once, not per config.
+    const carried = groups.filter(g => g.carryover_model_year != null
+        && g.carryover_model_year !== g.model_year);
+    if (carried.length) {
+        warnings.push(`Carryover certification: MY${carried[0].model_year} certifies vehicles tested under MY${carried[0].carryover_model_year} (${carried[0].carryover_test_group_id ?? 'unknown group'}). Results are the earlier year's; the record is the later year's.`);
+    }
 
     // Flag configs where no DC energy could be extracted — some PDFs (e.g. Ford)
     // report it only in an external EPA spreadsheet, so η can't be measured until
