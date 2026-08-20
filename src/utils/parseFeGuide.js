@@ -109,10 +109,29 @@ const num = (row, key) => {
  *
  * Reported one value per motor in a single cell — "225, 270" for a dual-motor
  * car — so the total is the sum, and a single-motor car parses identically.
+ *
+ * EPA also writes the list in prose, and splitting on commas alone got both
+ * shapes wrong across 310 of the 916 rows in the MY26 and MY27 guides:
+ *
+ *   "155 and 220"                    no comma at all, so the whole cell was one
+ *                                    non-numeric token and the row parsed NULL
+ *   "176, 252, and 415"              the Oxford comma left "and 415", which
+ *                                    Number() rejected and the isFinite filter
+ *                                    dropped — silently summing 428 of 843
+ *
+ * The second is the dangerous one: a plausible magnitude with nothing to say a
+ * motor went missing. Splitting on "and" as well as the comma covers both.
+ *
+ * Note the sum is only meaningful when the row describes ONE configuration.
+ * Where a row covers several — MY27's "130, 205, 220, and 280" for the EX90
+ * Twin Motor, four values for a two-motor car — the cell is the union of the
+ * variants EPA collapsed into that row, and no arithmetic over it describes a
+ * real vehicle. Faithful parsing is all this can offer; `# Drive Motor Gen`
+ * carries the same union and is the signal that it happened.
  */
 export function parseMotorPowerKw(value) {
     const parts = String(value ?? '')
-        .split(',')
+        .split(/,|\band\b/)
         .map(p => p.trim())
         // Empties are dropped BEFORE Number(), because Number('') is 0 and 0 is
         // finite — an absent value would otherwise parse as a 0 kW motor and
