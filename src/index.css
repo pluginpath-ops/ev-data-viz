@@ -2060,3 +2060,394 @@ body {
     @apply grid items-center gap-2;
     grid-template-columns: minmax(0, 1fr) auto auto;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   EPA FUEL ECONOMY GUIDE BROWSER (#235)
+
+   The public browse/compare surface over `epa_fe_guide`. A dense data table
+   with faceted filters — the visual problem is legibility at ~30 columns and
+   50 rows, so the sizing here is deliberately tighter than the card-based
+   views elsewhere in the app.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.guide-view {
+    @apply flex flex-col gap-4;
+}
+
+/* ── Filters ─────────────────────────────────────────────────────────────── */
+
+.guide-filter-bar {
+    @apply flex flex-wrap gap-x-6 gap-y-3 p-4 rounded-lg;
+    background-color: var(--color-surface-muted);
+    border: 1px solid var(--color-border);
+}
+.guide-facet {
+    @apply flex flex-col gap-1.5 min-w-0;
+}
+.guide-facet-search {
+    @apply w-full sm:w-64;
+}
+.guide-facet-label {
+    @apply text-xs font-medium;
+    color: var(--color-text-secondary);
+}
+.guide-facet-values {
+    @apply flex flex-wrap gap-1;
+}
+
+/* Multi-select chip. The count rides inside so the chip stays one target.
+   
+   The dark palette sets --color-surface-sunken to rgb(14,20,42), which is the
+   SAME value as --color-surface-muted — the filter bar's own background — so a
+   chip filled with it is invisible against the panel it sits on. Dark mode
+   therefore gets a light wash instead, following the pattern .btn-tab already
+   uses for its hover state, with near-white text like the badges. */
+.guide-chip {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs transition-colors;
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+}
+.guide-chip:hover:not(:disabled) {
+    border-color: var(--color-border-strong);
+}
+[data-theme="dark"] .guide-chip {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: rgb(241, 245, 249);
+}
+[data-theme="dark"] .guide-chip:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.14);
+}
+.guide-chip.active {
+    background-color: var(--color-primary);
+    color: rgb(255, 255, 255);
+}
+/* Disabled means "selecting this leaves nothing", which is an answer. It stays
+   visible for that reason — a make disappearing from the list reads as a bug. */
+.guide-chip:disabled {
+    @apply opacity-40 cursor-not-allowed;
+}
+.guide-chip-count {
+    @apply tabular-nums opacity-60;
+    font-size: 0.6875rem;
+}
+
+.guide-range-inputs {
+    @apply flex items-center gap-1.5;
+}
+.guide-range-input {
+    @apply w-16 px-2 py-1 rounded text-sm tabular-nums;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+}
+.guide-search-input {
+    @apply w-full px-3 py-1.5 rounded text-sm;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+}
+.guide-reset {
+    @apply self-end;
+}
+/* Column picker sits in the filter bar beside the facets, so every control
+   that changes what you see is in one place. */
+.guide-facet-columns {
+    @apply justify-end;
+}
+
+/* ── Column picker ───────────────────────────────────────────────────────── */
+
+.guide-column-picker {
+    @apply relative;
+}
+.guide-column-menu {
+    @apply absolute right-0 mt-1 z-30 p-3 rounded-lg overflow-y-auto;
+    width: 17rem;
+    max-height: 26rem;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+.guide-column-menu-head {
+    @apply flex items-center justify-between mb-2 pb-2;
+    border-bottom: 1px solid var(--color-border);
+}
+.guide-column-group {
+    @apply mb-2;
+}
+.guide-column-group-title {
+    @apply mb-1;
+}
+.guide-column-option {
+    @apply flex items-center gap-2 py-0.5 text-sm cursor-pointer;
+    color: var(--color-text-primary);
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+
+/* Wide content scrolls inside its own container; the page never scrolls
+   sideways. At 30 columns this is not optional. */
+.guide-table-container {
+    @apply overflow-x-auto rounded-lg;
+    border: 1px solid var(--color-border);
+    max-height: 70vh;
+    overflow-y: auto;
+}
+/* `separate`, not `collapse`: collapsed borders are drawn on the table rather
+   than the cell, and are dropped entirely on a position:sticky cell — the
+   pinned columns would lose their gridlines. Borders therefore live on the
+   cells, and border-spacing is zeroed so they still meet. */
+.guide-table {
+    @apply w-full text-sm;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Header: name on one line, unit beneath. The unit line is always present so
+   every header is the same height. */
+.guide-th {
+    @apply px-3 py-2 text-left align-bottom whitespace-nowrap cursor-pointer select-none;
+    background-color: var(--color-surface-muted);
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+.guide-th-name {
+    @apply block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+.guide-th-unit {
+    @apply block;
+    font-size: 0.6875rem;
+    font-weight: 400;
+    color: var(--color-text-faint);
+    min-height: 0.9rem;
+}
+/* Numeric columns are centred, text stays left. Centring trades away decimal
+   alignment, which is the usual reason to right-align a number column — but
+   these are whole-number figures at a fixed precision per column, and the bar
+   fill behind them already gives the eye a left-anchored edge to scan. */
+.guide-th.numeric .guide-th-name,
+.guide-th.numeric .guide-th-unit { @apply text-center; }
+.guide-th.active .guide-th-name  { color: var(--color-primary); }
+.guide-th-select { @apply cursor-default; }
+.guide-sort-caret {
+    @apply ml-1 inline-block;
+    font-size: 0.5625rem;
+}
+
+/* ── Pinned columns ──────────────────────────────────────────────────────────
+   The checkbox and the configuration name stay put through a sideways scroll:
+   without the name, the numbers belong to nothing. Widths are fixed because a
+   sticky offset has to be known in advance. */
+.sticky-select {
+    position: sticky;
+    left: 0;
+    width: 2.25rem;
+    min-width: 2.25rem;
+}
+.sticky-name {
+    position: sticky;
+    left: 2.25rem;
+    width: 18rem;
+    min-width: 18rem;
+    max-width: 18rem;
+}
+/* Body cells sit above ordinary cells but below the header; the header's own
+   pinned cells sit above everything so the corner does not flicker through. */
+.guide-td.sticky-select, .guide-td.sticky-name { z-index: 1; }
+.guide-th.sticky-select, .guide-th.sticky-name { z-index: 3; }
+
+/* Pinned cells need their own opaque background or the scrolling columns show
+   through — which also means the row's hover and selected colours have to be
+   re-applied to them explicitly. */
+.guide-td.sticky-select, .guide-td.sticky-name {
+    background-color: var(--color-card);
+}
+.guide-row:hover .guide-td.sticky-select,
+.guide-row:hover .guide-td.sticky-name {
+    background-color: var(--color-surface-muted);
+}
+.guide-row.selected .guide-td.sticky-select,
+.guide-row.selected .guide-td.sticky-name {
+    background-color: var(--color-primary-light);
+}
+[data-theme="dark"] .guide-row.selected .guide-td.sticky-select,
+[data-theme="dark"] .guide-row.selected .guide-td.sticky-name {
+    background-color: rgb(30, 44, 66);
+}
+/* A hairline marking where the pinned block ends, so the seam is legible when
+   content scrolls under it. */
+.sticky-name { box-shadow: 1px 0 0 var(--color-border); }
+
+.guide-row {
+    @apply cursor-pointer transition-colors;
+}
+.guide-row:hover     { background-color: var(--color-surface-muted); }
+.guide-row.selected  { background-color: var(--color-primary-light); }
+[data-theme="dark"] .guide-row.selected {
+    background-color: rgba(59, 130, 246, 0.15);
+}
+.guide-td {
+    @apply px-3 py-1.5 whitespace-nowrap;
+    color: var(--color-text-primary);
+    border-bottom: 1px solid var(--color-border);
+}
+.guide-td.numeric { @apply text-center tabular-nums; }
+.guide-td-select  { @apply cursor-default; }
+
+/* The name is the one column allowed to truncate — it is also the widest, and
+   the full value is in the tooltip and the detail view. */
+.guide-carline {
+    @apply flex items-center gap-1.5 min-w-0;
+}
+.guide-carline-name {
+    @apply truncate;
+}
+
+/* ── Magnitude bars ──────────────────────────────────────────────────────────
+   A fill behind the number showing its share of the largest value in the
+   current filter, so a column can be read as a shape before it is read as
+   numbers.
+
+   Three layers, and each earns its place:
+
+   1. A TRACK across the full cell — the 100% extent. Without it a 27% fill has
+      no frame: you can see the bar but not what it is a fraction OF, so short
+      bars all look alike and the reader cannot tell 27% from 40%.
+   2. A GRADIENT fill, strongest at the left and fading rightward, so the bar
+      reads as having a direction and does not sit as a flat slab behind text.
+   3. A crisp EDGE CAP at the leading edge. The fade in (2) makes the endpoint
+      indistinct exactly where precision matters, so the last 2px are painted
+      back in at full strength.
+
+   Painted as background layers rather than elements, so it costs no extra DOM
+   across ~500 cells, and composites over whatever the row's hover or selected
+   background happens to be.
+
+   Deliberately low-contrast throughout: this sits BEHIND a number that still
+   has to be the thing you read. */
+.guide-td.has-bar {
+    background-image:
+        linear-gradient(
+            to right,
+            var(--bar-strong) 0,
+            var(--bar-soft)  calc(var(--bar-fill, 0%) - 2px),
+            var(--bar-edge)  calc(var(--bar-fill, 0%) - 2px),
+            var(--bar-edge)  var(--bar-fill, 0%),
+            transparent      var(--bar-fill, 0%)
+        ),
+        linear-gradient(to right, var(--bar-track) 0 100%);
+    background-repeat: no-repeat;
+}
+:root {
+    --bar-strong: rgba(59, 130, 246, 0.28);
+    --bar-soft:   rgba(59, 130, 246, 0.10);
+    --bar-edge:   rgba(59, 130, 246, 0.45);
+    --bar-track:  rgba(100, 116, 139, 0.07);
+}
+[data-theme="dark"] {
+    --bar-strong: rgba(96, 165, 250, 0.34);
+    --bar-soft:   rgba(96, 165, 250, 0.12);
+    --bar-edge:   rgba(96, 165, 250, 0.55);
+    --bar-track:  rgba(148, 163, 184, 0.10);
+}
+
+/* Badges ride on the configuration name rather than holding their own columns. */
+.guide-badge {
+    @apply inline-block px-1.5 py-0.5 rounded uppercase shrink-0;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: rgb(255, 255, 255);
+}
+.guide-badge-tested { background-color: var(--color-primary); }
+.guide-badge-multi  { background-color: var(--color-warning); }
+
+.guide-pager {
+    @apply flex items-center justify-center gap-3;
+}
+
+.guide-warning {
+    @apply px-3 py-2 rounded text-sm;
+    background-color: rgba(245, 158, 11, 0.12);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-warning);
+}
+.guide-tested-note {
+    @apply px-3 py-2 rounded text-sm mb-3;
+    background-color: var(--color-primary-light);
+    color: var(--color-primary-text);
+}
+[data-theme="dark"] .guide-tested-note {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: var(--color-text-primary);
+}
+
+/* ── Compare panel ───────────────────────────────────────────────────────── */
+
+.guide-compare {
+    @apply flex flex-col gap-2 p-4 rounded-lg;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+}
+.guide-compare-table .guide-th { @apply cursor-default; }
+.guide-compare-head {
+    @apply flex items-center justify-between gap-2;
+}
+.guide-compare-remove {
+    @apply leading-none px-1;
+    color: var(--color-text-faint);
+}
+.guide-compare-remove:hover { color: var(--color-danger, rgb(239, 68, 68)); }
+.guide-compare-group {
+    @apply uppercase;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    background-color: var(--color-surface-muted);
+}
+/* Field rows in the compare table are read-only — deliberately NOT .guide-row,
+   which carries a pointer cursor and a hover highlight that promise a click
+   nothing handles. */
+.guide-compare-row {
+    border-bottom: 1px solid var(--color-border);
+}
+.guide-compare-field {
+    @apply font-medium;
+    color: var(--color-text-secondary);
+}
+
+/* ── Detail modal ────────────────────────────────────────────────────────── */
+
+.guide-detail-panel {
+    @apply flex flex-col rounded-lg mx-4;
+    max-width: 52rem;
+    max-height: 88vh;
+}
+.guide-detail-group {
+    @apply mb-4;
+}
+.guide-detail-group-title {
+    @apply mb-1.5 pb-1;
+    border-bottom: 1px solid var(--color-border);
+}
+.guide-detail-grid {
+    @apply grid gap-x-6 gap-y-1.5;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+}
+.guide-detail-item {
+    @apply flex flex-col;
+}
+.guide-raw {
+    @apply mt-2 p-3 rounded max-h-64 overflow-y-auto flex flex-col gap-1;
+    background-color: var(--color-surface-sunken);
+}
+.guide-raw-row {
+    @apply flex items-baseline justify-between gap-4;
+}

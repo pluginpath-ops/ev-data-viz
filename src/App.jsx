@@ -16,6 +16,7 @@ import EpaCurvesView from './components/EpaCurvesView';
 import PerformanceCompareView from './components/PerformanceCompareView';
 import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/AdminView';
+import EpaGuideView from './components/epa/guide/EpaGuideView';
 import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory } from './constants/chartNav';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
@@ -259,6 +260,12 @@ export default function App() {
             if (vid) pendingRunsVehicleId.current = isNaN(Number(vid)) ? vid : Number(vid);
             const sub = p.get('sub');
             if (RUNS_SUBTAB_IDS.includes(sub)) pendingRunsSubtab.current = sub;
+            return;
+        }
+        if (tab === 'epa') {
+            // Nothing to wait for — the guide loads its own data and needs no
+            // vehicle, role or selection resolved first.
+            setView('epa');
             return;
         }
         if (tab === 'admin') {
@@ -704,6 +711,15 @@ export default function App() {
                                         {label}
                                     </button>
                                 ))}
+                                {/* Reference data, not a chart: the guide covers every EV EPA
+                                    has rated, so it is deliberately NOT gated on a vehicle
+                                    selection the way the chart categories above are. */}
+                                <button
+                                    onClick={() => navigateTo('epa')}
+                                    className={`btn-tab ${view === 'epa' ? 'active' : ''}`}
+                                >
+                                    EPA
+                                </button>
                                 {isAdmin && (
                                     <button
                                         onClick={() => navigateTo('admin')}
@@ -1007,6 +1023,8 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                         />
                     )}
+                    {view === 'epa' && <EpaGuideView />}
+
                     {view === 'admin' && isAdmin && (
                         <AdminView
                             getUsersForAdmin={getUsersForAdmin}
