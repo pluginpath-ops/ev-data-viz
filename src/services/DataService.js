@@ -1855,6 +1855,77 @@ class DataService {
     }));
   }
 
+  /**
+   * Every staged Fuel Economy Guide row, for the public browser (#235).
+   *
+   * Pages explicitly until the source is exhausted. That is the whole point:
+   * PostgREST caps a response at 1000 rows with no error and no flag, so a
+   * single unbounded select would return 1,175 rows as 1,000 and look complete.
+   * Migration 054 documents what that cost last time.
+   *
+   * `raw` is excluded deliberately — 76 columns per row against the ~25 the
+   * list needs, which is most of the payload for none of the display. The
+   * detail view fetches it for one row on demand via the existing
+   * getFeGuideRow(), which already selects `*` including `raw`.
+   */
+  async getFeGuideRows() {
+    if (!this.useSupabase) return [];
+    const PAGE = 1000;
+    const out = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await getSupabase()
+        .from('epa_fe_guide')
+        .select(`
+          id, model_year, division, carline, model_type_index, smog_test_group,
+          label_comb_range_mi, label_city_range_mi, label_hwy_range_mi,
+          label_comb_mpge, label_city_mpge, label_hwy_mpge,
+          unadj_city_mpge, unadj_hwy_mpge, unadj_comb_mpge,
+          adj_city_mpge, adj_hwy_mpge, adj_comb_mpge,
+          label_adjustment_factor, calc_approach, adjustment_signature,
+          total_voltage_v, batt_capacity_ah, nominal_pack_kwh, batt_specific_energy_wh_kg,
+          motor_power_kw, motor_count, charge_time_240v_h, drive_desc, carline_class
+        `)
+        .order('model_year', { ascending: false })
+        .order('division')
+        .order('carline')
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      out.push(...(data || []));
+      // A short page is the last page. Equal-to-PAGE is ambiguous, so loop
+      // again and let the next read come back empty rather than guessing.
+      if (!data || data.length < PAGE) break;
+    }
+    return out;
+  }
+
+  /**
+   * Guide row id → the vehicles we hold test data for.
+   *
+   * Two indexed hops: `epa_test_groups.fe_guide_row_id` is a foreign key with a
+   * partial index, and `epa_vehicle_mappings` joins a group to its vehicles.
+   * Only 45 of 204 groups are linked today, so this is a small map fetched once
+   * and keyed in memory rather than a lookup per displayed row.
+   */
+  async getFeGuideVehicleLinks() {
+    if (!this.useSupabase) return {};
+    const { data, error } = await getSupabase()
+      .from('epa_test_groups')
+      .select('test_group_id, fe_guide_row_id, epa_vehicle_mappings(vehicles(id, name, year))')
+      .not('fe_guide_row_id', 'is', null);
+    if (error) throw error;
+
+    const byRow = {};
+    for (const g of data || []) {
+      const vehicles = (g.epa_vehicle_mappings || [])
+        .map(m => m.vehicles)
+        .filter(Boolean);
+      if (!byRow[g.fe_guide_row_id]) byRow[g.fe_guide_row_id] = { testGroupIds: [], vehicles: [] };
+      byRow[g.fe_guide_row_id].testGroupIds.push(g.test_group_id);
+      byRow[g.fe_guide_row_id].vehicles.push(...vehicles);
+    }
+    return byRow;
+  }
+
   // ── EPA curator model: coefficient sets, tests, phases, audit ─────────────────
 
   /**

@@ -1119,6 +1119,10 @@ export function AppProvider({ children }) {
     };
 
     const getFeGuideRow = (id) => dataService.getFeGuideRow(id);
+    // The public browser (#235). Both are read-once-per-mount loads over small
+    // result sets, so they are plain pass-throughs with no caching layer here.
+    const getFeGuideRows = () => dataService.getFeGuideRows();
+    const getFeGuideVehicleLinks = () => dataService.getFeGuideVehicleLinks();
 
     /** Take the published value for fields the curator had been holding. */
     const acceptFeGuideValues = async (testGroupId, columns) => {
@@ -1570,6 +1574,8 @@ export function AppProvider({ children }) {
         linkFeGuideRow,
         unlinkFeGuideRow,
         getFeGuideRow,
+        getFeGuideRows,
+        getFeGuideVehicleLinks,
         acceptFeGuideValues,
         getExistingEpaTestGroupIds,
         updateEpaMapping,
