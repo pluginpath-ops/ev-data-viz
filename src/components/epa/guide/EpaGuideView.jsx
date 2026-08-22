@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
 import {
-    decorateRow, buildFacets, filterRows, sortRows,
+    decorateRow, buildFacets, filterRows, sortRows, buildBrandIndex,
     EMPTY_FILTERS, DEFAULT_COLUMNS, ROW_BUDGET,
     encodeGuideParams, decodeGuideParams, computeBarMaxima,
 } from '../../../utils/feGuideBrowse';
@@ -32,16 +32,23 @@ import LoadingSpinner from '../../LoadingSpinner';
 const PAGE_SIZE = 50;
 
 export default function EpaGuideView() {
-    const { getFeGuideRows, getFeGuideVehicleLinks } = useAppContext();
+    const { getFeGuideRows, getFeGuideVehicleLinks, getBrandAliases } = useAppContext();
 
-    const loadRows  = useCallback(() => getFeGuideRows(), [getFeGuideRows]);
-    const loadLinks = useCallback(() => getFeGuideVehicleLinks(), [getFeGuideVehicleLinks]);
+    const loadRows    = useCallback(() => getFeGuideRows(), [getFeGuideRows]);
+    const loadLinks   = useCallback(() => getFeGuideVehicleLinks(), [getFeGuideVehicleLinks]);
+    const loadAliases = useCallback(() => getBrandAliases(), [getBrandAliases]);
 
     const { data: rawRows, loading, error } = useAsyncResource(loadRows, []);
     // The link map is a bonus, not a dependency: if it fails the browser still
     // works and simply shows no "tested" badges.
     const { data: links } = useAsyncResource(loadLinks, []);
     const vehicleLinks = links ?? {};
+
+    // Also non-fatal. Migration 057 may not be applied, in which case every
+    // division falls back to EPA's own spelling — an un-merged Make facet, not
+    // a broken page.
+    const { data: aliases } = useAsyncResource(loadAliases, []);
+    const brandIndex = useMemo(() => buildBrandIndex(aliases ?? []), [aliases]);
 
     // Read the URL once, at mount. A filtered view is the shareable artefact
     // here, so a pasted link has to arrive already filtered.
@@ -65,7 +72,12 @@ export default function EpaGuideView() {
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
     }, [filters, sortKey, sortDir, page, selectedIds]);
 
-    const rows   = useMemo(() => (rawRows ?? []).map(decorateRow), [rawRows]);
+    // NOT `.map(decorateRow)` — Array.map passes the index as the second
+    // argument, which would arrive as the brand index and resolve nothing.
+    const rows   = useMemo(
+        () => (rawRows ?? []).map(r => decorateRow(r, brandIndex)),
+        [rawRows, brandIndex],
+    );
     const facets = useMemo(() => buildFacets(rows), [rows]);
 
     const filtered = useMemo(() => filterRows(rows, filters), [rows, filters]);
@@ -95,7 +107,7 @@ export default function EpaGuideView() {
         } else {
             setSortKey(key);
             // Numbers are almost always most interesting at the top, text at A.
-            setSortDir(key === 'division' || key === 'carline' ? 'asc' : 'desc');
+            setSortDir(key === 'brand' || key === 'carline' || key === 'division' ? 'asc' : 'desc');
         }
         setPage(0);
     };

@@ -56,6 +56,23 @@ export async function fetchAllRows(builder) {
  */
 const IMAGE_CACHE_SECONDS = 31536000;
 
+/**
+ * Whether an error means the table or function simply is not there yet.
+ *
+ * Migrations are applied by hand in the Supabase SQL editor, so a deploy can
+ * lead its schema by hours or days. Features reading a brand-new relation
+ * degrade to their un-migrated behaviour instead of erroring — an un-merged
+ * brand list is a worse page, not a broken one.
+ *
+ * Deliberately narrow: only "undefined table" (42P01), "undefined function"
+ * (42883) and PostgREST's own "no such function" (PGRST202). Anything else —
+ * permission, syntax, a genuine failure — still throws.
+ */
+function isMissingRelation(error) {
+  const code = error?.code;
+  return code === '42P01' || code === '42883' || code === 'PGRST202';
+}
+
 /** Normalise a raw data-point object into a clean DB row shape. */
 function normalisePoint(point, runId, frame) {
   return {
@@ -326,6 +343,168 @@ class DataService {
   async deleteManufacturer(id) {
     const { error } = await getSupabase().from('manufacturers').delete().eq('id', id);
     if (error) throw error;
+  }
+
+  // ── Brand registry (#149, #243) ───────────────────────────────────────────
+  //
+  // `manufacturers` is the one registry; `brand_aliases` maps every other
+  // spelling into it — EPA division strings, legacy make text, typos. See
+  // migration 057.
+
+  /**
+   * Every alias, for resolving a raw name to a brand.
+   *
+   * Small by construction (one row per spelling, tens not thousands), so it is
+   * fetched whole once and resolved in memory rather than joined per row.
+   *
+   * Returns [] rather than throwing when the table is absent: migration 057 may
+   * not be applied yet, and the FE Guide browser must still render — un-merged
+   * brands are a worse page, not a broken one.
+   */
+  async getBrandAliases() {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase()
+      .from('brand_aliases')
+      .select('id, manufacturer_id, alias, alias_key, source, manufacturers(id, name, parent_name)')
+      .order('alias');
+    if (error) {
+      if (isMissingRelation(error)) return [];
+      throw error;
+    }
+    return data || [];
+  }
+
+  async addBrandAlias(manufacturerId, alias, source = 'manual') {
+    const { data, error } = await getSupabase()
+      .from('brand_aliases')
+      .insert({ manufacturer_id: manufacturerId, alias, source })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteBrandAlias(id) {
+    const { error } = await getSupabase().from('brand_aliases').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /**
+   * Every distinct EPA division with its configuration count and resolved brand.
+   *
+   * Server-side for the reason migration 054 exists: 1,175 guide rows against a
+   * silent 1,000-row cap means counting divisions in the browser under-reports
+   * them, and a division that never appears is a decision nobody knows they
+   * have to make.
+   */
+  async getBrandDivisionSummary() {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase().rpc('brand_division_summary');
+    if (error) {
+      if (isMissingRelation(error)) return [];
+      throw error;
+    }
+    return (data || []).map(r => ({
+      division:       r.division,
+      rowCount:       Number(r.row_count),
+      manufacturerId: r.manufacturer_id,
+      brandName:      r.brand_name,
+      parentName:     r.parent_name,
+    }));
+  }
+
+  /**
+   * Vehicle / alias / guide-row counts per brand — drives "safe to delete?".
+   *
+   * Returns **null**, not {}, when the function is absent. The difference
+   * matters: a caller cannot tell "this brand has no vehicles" from "we could
+   * not find out", and treating the second as the first would enable Delete on
+   * every brand while the migration is unapplied — which nulls the FK on real
+   * vehicles and strands `vehicles.make` at a name the registry no longer
+   * holds. Unknown must read as unknown.
+   */
+  async getBrandUsageSummary() {
+    if (!this.useSupabase) return null;
+    const { data, error } = await getSupabase().rpc('brand_usage_summary');
+    if (error) {
+      if (isMissingRelation(error)) return null;
+      throw error;
+    }
+    const byId = {};
+    for (const r of data || []) {
+      byId[r.manufacturer_id] = {
+        vehicles:  Number(r.vehicle_count),
+        aliases:   Number(r.alias_count),
+        guideRows: Number(r.guide_row_count),
+      };
+    }
+    return byId;
+  }
+
+  /**
+   * Fold one brand into another.
+   *
+   * A single RPC rather than a sequence of writes from here, because the steps
+   * are not independent: repointing the FK without rewriting `vehicles.make`
+   * leaves every card showing the spelling the merge was meant to remove, and a
+   * half-applied merge is worse than none. See migration 057.
+   */
+  async mergeManufacturers(fromId, intoId) {
+    const { error } = await getSupabase().rpc('merge_manufacturers', {
+      p_from: Number(fromId), p_into: Number(intoId),
+    });
+    if (error) throw error;
+  }
+
+  // ── Tags ──────────────────────────────────────────────────────────────────
+  // (list/create/sync live with the vehicle methods above)
+
+  async updateTag(id, name) {
+    const { error } = await getSupabase().from('tags').update({ name }).eq('id', id);
+    if (error) throw error;
+  }
+
+  /**
+   * Delete a tag and its vehicle links.
+   *
+   * The join rows are removed explicitly rather than relying on a cascade:
+   * `tags` and `vehicle_tags` predate this repo's migrations directory, so the
+   * FK's delete behaviour is not stated anywhere we control, and a missing
+   * cascade would fail the delete instead of orphaning it.
+   */
+  async deleteTag(id) {
+    const supabase = getSupabase();
+    const { error: linkError } = await supabase.from('vehicle_tags').delete().eq('tag_id', id);
+    if (linkError) throw linkError;
+    const { error } = await supabase.from('tags').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /** Move every vehicle on one tag to another, then drop the empty one. */
+  async mergeTags(fromId, intoId) {
+    const supabase = getSupabase();
+    const { data: fromLinks, error: readError } = await supabase
+      .from('vehicle_tags').select('vehicle_id').eq('tag_id', fromId);
+    if (readError) throw readError;
+
+    const { data: intoLinks, error: intoError } = await supabase
+      .from('vehicle_tags').select('vehicle_id').eq('tag_id', intoId);
+    if (intoError) throw intoError;
+
+    // Skip vehicles that already carry the target tag: (vehicle_id, tag_id) is
+    // the primary key, so re-inserting one fails the whole batch.
+    const already = new Set((intoLinks || []).map(l => l.vehicle_id));
+    const toAdd = (fromLinks || [])
+      .map(l => l.vehicle_id)
+      .filter(id => !already.has(id));
+
+    if (toAdd.length > 0) {
+      const { error } = await supabase
+        .from('vehicle_tags')
+        .insert(toAdd.map(vehicle_id => ({ vehicle_id, tag_id: intoId })));
+      if (error) throw error;
+    }
+    await this.deleteTag(fromId);
   }
 
   // ── Chart help ("About this chart" copy) ──────────────────────────────────
@@ -1858,10 +2037,17 @@ class DataService {
   /**
    * Every staged Fuel Economy Guide row, for the public browser (#235).
    *
-   * Pages explicitly until the source is exhausted. That is the whole point:
-   * PostgREST caps a response at 1000 rows with no error and no flag, so a
-   * single unbounded select would return 1,175 rows as 1,000 and look complete.
-   * Migration 054 documents what that cost last time.
+   * Paged via fetchAllRows: PostgREST caps a response at 1000 rows with no
+   * error and no flag, so a single unbounded select would return 1,175 rows as
+   * 1,000 and look complete. Migration 054 documents what that cost last time.
+   *
+   * Ordered by `id`, and that matters. Paging is only sound on a UNIQUE order,
+   * and 28 keys in the guide share a (model_year, division, carline) triple —
+   * MY22 lists three Ioniq 5 rows — so tied rows may be ordered differently
+   * between the two requests, dropping some and repeating others across the
+   * 1000-row boundary. The browser sorts client-side anyway, so the fetch order
+   * is free to be the one that is correct rather than the one that reads well.
+   * Same reasoning as getFeGuideCandidates above.
    *
    * `raw` is excluded deliberately — 76 columns per row against the ~25 the
    * list needs, which is most of the payload for none of the display. The
@@ -1870,32 +2056,19 @@ class DataService {
    */
   async getFeGuideRows() {
     if (!this.useSupabase) return [];
-    const PAGE = 1000;
-    const out = [];
-    for (let from = 0; ; from += PAGE) {
-      const { data, error } = await getSupabase()
-        .from('epa_fe_guide')
-        .select(`
-          id, model_year, division, carline, model_type_index, smog_test_group,
-          label_comb_range_mi, label_city_range_mi, label_hwy_range_mi,
-          label_comb_mpge, label_city_mpge, label_hwy_mpge,
-          unadj_city_mpge, unadj_hwy_mpge, unadj_comb_mpge,
-          adj_city_mpge, adj_hwy_mpge, adj_comb_mpge,
-          label_adjustment_factor, calc_approach, adjustment_signature,
-          total_voltage_v, batt_capacity_ah, nominal_pack_kwh, batt_specific_energy_wh_kg,
-          motor_power_kw, motor_count, charge_time_240v_h, drive_desc, carline_class
-        `)
-        .order('model_year', { ascending: false })
-        .order('division')
-        .order('carline')
-        .range(from, from + PAGE - 1);
-      if (error) throw error;
-      out.push(...(data || []));
-      // A short page is the last page. Equal-to-PAGE is ambiguous, so loop
-      // again and let the next read come back empty rather than guessing.
-      if (!data || data.length < PAGE) break;
-    }
-    return out;
+    return fetchAllRows(() => getSupabase()
+      .from('epa_fe_guide')
+      .select(`
+        id, model_year, division, carline, model_type_index, smog_test_group,
+        label_comb_range_mi, label_city_range_mi, label_hwy_range_mi,
+        label_comb_mpge, label_city_mpge, label_hwy_mpge,
+        unadj_city_mpge, unadj_hwy_mpge, unadj_comb_mpge,
+        adj_city_mpge, adj_hwy_mpge, adj_comb_mpge,
+        label_adjustment_factor, calc_approach, adjustment_signature,
+        total_voltage_v, batt_capacity_ah, nominal_pack_kwh, batt_specific_energy_wh_kg,
+        motor_power_kw, motor_count, charge_time_240v_h, drive_desc, carline_class
+      `)
+      .order('id', { ascending: true }));
   }
 
   /**
