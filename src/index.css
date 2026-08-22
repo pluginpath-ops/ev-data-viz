@@ -2108,15 +2108,25 @@ body {
     color: var(--color-text-secondary);
     border: 1px solid var(--color-border);
 }
-.guide-chip:hover:not(:disabled) {
+/* `:not(.active)` on every hover rule, and it is load-bearing.
+   `[data-theme="dark"] .guide-chip:hover` is (0,4,0) where `.guide-chip.active`
+   is (0,2,0), so without the exclusion the hover background beats the selected
+   one — and since the cursor is still over a chip you just clicked, the chip
+   appears not to have been selected at all. The state only became visible after
+   moving the mouse away. */
+.guide-chip:hover:not(:disabled):not(.active) {
     border-color: var(--color-border-strong);
 }
-[data-theme="dark"] .guide-chip {
+[data-theme="dark"] .guide-chip:not(.active) {
     background-color: rgba(255, 255, 255, 0.08);
     color: rgb(241, 245, 249);
 }
-[data-theme="dark"] .guide-chip:hover:not(:disabled) {
+[data-theme="dark"] .guide-chip:hover:not(:disabled):not(.active) {
     background-color: rgba(255, 255, 255, 0.14);
+}
+/* Hovering something already selected darkens it rather than reverting it. */
+.guide-chip.active:hover:not(:disabled) {
+    background-color: var(--color-primary-hover);
 }
 .guide-chip.active {
     background-color: var(--color-primary);
@@ -2547,6 +2557,48 @@ body {
 
 .stats-table .guide-th { @apply cursor-default; }
 .stats-th-dist { @apply w-1/2; }
+
+/* ── Shared axis for the box column ──────────────────────────────────────────
+   Reads as |min ———— unit ———— max|. The labels sit ABOVE the rule rather than
+   beside it so the rule spans the full column width — the boxes below are
+   positioned as a percentage of exactly this range, and a rule inset by the
+   width of its own labels would put every box slightly off its own axis. */
+.stats-axis {
+    @apply flex flex-col gap-0.5;
+    min-width: 12rem;
+}
+/* Highest contrast the token set offers — near-black on light, near-white on
+   dark. These are the numbers the whole column is measured against, so they are
+   read deliberately rather than glanced at, and a faint axis made every box
+   below it float against nothing. */
+.stats-axis-labels {
+    @apply flex items-baseline justify-between;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+/* Not uppercased: MPGe carries a deliberate lowercase 'e' and "MPGE" is simply
+   the wrong unit name. Units render as they are written. */
+.stats-axis-unit {
+    letter-spacing: 0.02em;
+    color: var(--color-text-primary);
+}
+/* End ticks turn a bare line into an axis with bounds. */
+.stats-axis-rule {
+    @apply relative w-full;
+    height: 5px;
+    border-top: 1px solid var(--color-border-strong);
+}
+.stats-axis-rule::before,
+.stats-axis-rule::after {
+    content: '';
+    @apply absolute top-0;
+    width: 1px;
+    height: 5px;
+    background-color: var(--color-border-strong);
+}
+.stats-axis-rule::before { left: 0; }
+.stats-axis-rule::after  { right: 0; }
 .stats-row { border-bottom: 1px solid var(--color-border); }
 /* The corpus line is a reference, not a competitor — it reads above the
    ranking and is visually quieter than the buckets it frames. */

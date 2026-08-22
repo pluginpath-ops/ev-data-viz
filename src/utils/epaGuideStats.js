@@ -93,7 +93,10 @@ export const MEASURES = [
     { key: 'label_comb_mpge',     label: 'Combined',  unit: 'MPGe', digits: 1 },
     { key: 'label_city_mpge',     label: 'City',      unit: 'MPGe', digits: 1 },
     { key: 'label_hwy_mpge',      label: 'Highway',   unit: 'MPGe', digits: 1 },
-    { key: 'city_hwy_ratio',      label: 'City:Hwy',  unit: '',     digits: 3 },
+    // `axisLabel` is what an axis calls the quantity when there is no unit to
+    // print. Without it the axis falls back to the measure's own name, which is
+    // already the column heading directly above it.
+    { key: 'city_hwy_ratio',      label: 'City:Hwy',  unit: '', axisLabel: 'ratio', digits: 3 },
     { key: 'label_comb_range_mi', label: 'Range',     unit: 'mi',   digits: 0 },
     { key: 'nominal_pack_kwh',    label: 'Pack',      unit: 'kWh',  digits: 1 },
 ];

@@ -51,7 +51,19 @@ export default function StatsTable({ rows, measure, overall, dimensionLabel }) {
                         <th className="guide-th numeric">IQR</th>
                         {usable && (
                             <th className="guide-th stats-th-dist">
-                                {fmt(scale.min)} — {fmt(scale.max)} {m?.unit}
+                                {/* A drawn axis, not a range written out. The boxes below
+                                    are positioned against exactly this scale, so the ends
+                                    have to sit where the data ends — labels above the rule
+                                    rather than beside it, or the line would be inset from
+                                    the plot area and every box would read shifted. */}
+                                <div className="stats-axis">
+                                    <div className="stats-axis-labels">
+                                        <span>{fmt(scale.min)}</span>
+                                        <span className="stats-axis-unit">{m?.unit || m?.axisLabel || ''}</span>
+                                        <span>{fmt(scale.max)}</span>
+                                    </div>
+                                    <div className="stats-axis-rule" />
+                                </div>
                             </th>
                         )}
                     </tr>

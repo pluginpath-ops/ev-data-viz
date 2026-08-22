@@ -43,13 +43,18 @@ export default function EpaStatsView({ subtab = 'stats' }) {
             unit:      UNITS.some(u => u.key === p.get('u')) ? p.get('u') : DEFAULT_UNIT,
             dimension: DIMENSIONS.some(d => d.key === p.get('d')) ? p.get('d') : 'body_class',
             measure:   MEASURES.some(m => m.key === p.get('ms')) ? p.get('ms') : 'label_comb_mpge',
-            year:      p.get('yr') === 'all' ? 'all' : (p.get('yr') ? Number(p.get('yr')) : null),
+            // A list, so a reader can compare two years side by side. Absent
+            // means "not chosen yet" and falls back to the best-covered year;
+            // an explicitly empty list means every year.
+            years: p.has('yr')
+                ? p.get('yr').split(',').map(Number).filter(Number.isFinite)
+                : null,
         };
     });
     const [unit, setUnit]           = useState(initial.unit);
     const [dimension, setDimension] = useState(initial.dimension);
     const [measure, setMeasure]     = useState(initial.measure);
-    const [year, setYear]           = useState(initial.year);
+    const [years, setYears]         = useState(initial.years);
 
     const brandIndex = useMemo(() => buildBrandIndex(aliases ?? []), [aliases]);
     const allRows = useMemo(
@@ -57,7 +62,7 @@ export default function EpaStatsView({ subtab = 'stats' }) {
         [rawRows, brandIndex],
     );
 
-    const years = useMemo(
+    const allYears = useMemo(
         () => [...new Set(allRows.map(r => r.model_year).filter(Boolean))].sort((a, b) => b - a),
         [allRows],
     );
@@ -82,17 +87,31 @@ export default function EpaStatsView({ subtab = 'stats' }) {
         return best;
     }, [allRows]);
 
-    // A single model year by default. The same configuration recurs across
-    // years at identical figures — the 2025 and 2026 Rivian groups are the same
-    // 24 rows — so a multi-year "what is typical" counts those cars twice.
-    // 'all' is an explicit choice, never a fallback.
-    const effectiveYear = year ?? bestCoveredYear;
-    const rows = useMemo(
-        () => (effectiveYear === 'all' || effectiveYear == null
-            ? allRows
-            : allRows.filter(r => r.model_year === effectiveYear)),
-        [allRows, effectiveYear],
+    // One year by default, because the same configuration recurs across years
+    // at identical figures — the 2025 and 2026 Rivian groups are the same 24
+    // rows — so a multi-year "what is typical" counts those cars more than
+    // once. Selecting several is allowed and sometimes wanted; the view says
+    // what it costs rather than refusing.
+    // Memoised because the fallback allocates. As a bare expression it built a
+    // new array on every render, so the `rows` memo below saw a changed
+    // dependency each time and re-filtered all 1,175 rows for nothing.
+    const selectedYears = useMemo(
+        () => years ?? (bestCoveredYear ? [bestCoveredYear] : []),
+        [years, bestCoveredYear],
     );
+    const rows = useMemo(
+        () => (selectedYears.length === 0
+            ? allRows
+            : allRows.filter(r => selectedYears.includes(r.model_year))),
+        [allRows, selectedYears],
+    );
+
+    const toggleYear = (y) => {
+        const next = selectedYears.includes(y)
+            ? selectedYears.filter(v => v !== y)
+            : [...selectedYears, y].sort((a, b) => b - a);
+        setYears(next);
+    };
 
     useEffect(() => {
         const p = new URLSearchParams();
@@ -101,9 +120,11 @@ export default function EpaStatsView({ subtab = 'stats' }) {
         if (unit !== DEFAULT_UNIT)        p.set('u', unit);
         if (dimension !== 'body_class')   p.set('d', dimension);
         if (measure !== 'label_comb_mpge') p.set('ms', measure);
-        if (year != null)                 p.set('yr', String(year));
+        // Written even when empty, so "all years" survives a reload instead of
+        // reverting to the best-covered default.
+        if (years != null)                p.set('yr', years.join(','));
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [unit, dimension, measure, year, subtab]);
+    }, [unit, dimension, measure, years, subtab]);
 
     const summary   = useMemo(() => summarise(rows, { unit, dimension, measure, minN: MIN_N }), [rows, unit, dimension, measure]);
     const corpus    = useMemo(() => overall(rows, { unit, measure }), [rows, unit, measure]);
@@ -136,7 +157,11 @@ export default function EpaStatsView({ subtab = 'stats' }) {
                     <div className="section-title">EPA statistics</div>
                     <div className="text-caption text-secondary">
                         {measDef?.label} by {dimDef?.label.toLowerCase()}, {unitDef?.label.toLowerCase()},
-                        {' '}{effectiveYear === 'all' ? 'all model years' : `model year ${effectiveYear}`}.
+                        {' '}{selectedYears.length === 0
+                            ? 'all model years'
+                            : selectedYears.length === 1
+                                ? `model year ${selectedYears[0]}`
+                                : `model years ${selectedYears.join(', ')}`}.
                     </div>
                 </div>
             </div>
@@ -167,16 +192,24 @@ export default function EpaStatsView({ subtab = 'stats' }) {
                 <div className="guide-facet">
                     <div className="guide-facet-label">Model year</div>
                     <div className="guide-facet-values">
-                        {years.map(y => (
+                        {allYears.map(y => (
                             <button key={y} type="button"
-                                className={`guide-chip ${effectiveYear === y ? 'active' : ''}`}
-                                onClick={() => setYear(y)}>{y}</button>
+                                className={`guide-chip ${selectedYears.includes(y) ? 'active' : ''}`}
+                                onClick={() => toggleYear(y)}>{y}</button>
                         ))}
                         <button type="button"
-                            className={`guide-chip ${effectiveYear === 'all' ? 'active' : ''}`}
-                            onClick={() => setYear('all')}
-                            title="Counts a configuration once per year it appears in — the same car can be counted several times">All</button>
+                            className={`guide-chip ${selectedYears.length === 0 ? 'active' : ''}`}
+                            onClick={() => setYears([])}>All</button>
                     </div>
+                    {/* Stated rather than prevented. Comparing two years is a
+                        real question; counting one car twice while asking what
+                        is typical is a different one, and the reader should be
+                        told which they are looking at. */}
+                    {selectedYears.length !== 1 && (
+                        <div className="text-hint">
+                            A configuration that appears in several years is counted once per year.
+                        </div>
+                    )}
                 </div>
 
                 <div className="guide-facet">
