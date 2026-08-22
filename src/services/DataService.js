@@ -2055,6 +2055,41 @@ class DataService {
     if (error) throw error;
   }
 
+  /**
+   * Link many groups in one operation (#238).
+   *
+   * Exists because the per-link path in AppContext refreshes every vehicle in
+   * the app afterwards — correct for one link, since the promoted figures reach
+   * a vehicle card through its epa_vehicle_mappings, and catastrophic for
+   * ninety-eight: that is ninety-eight sequential re-runs of the largest query
+   * the app makes, for one refresh's worth of benefit.
+   *
+   * Sequential rather than parallel, deliberately. Each link reads its group,
+   * computes what may be promoted and writes it back; firing them all at once
+   * makes a mid-way failure impossible to attribute, and a batch that half
+   * worked is exactly what a curator must be able to reason about.
+   *
+   * Never throws for a single failure. One group with a stale row should not
+   * discard ninety-seven good links, so failures are collected and returned
+   * with everything that did work.
+   */
+  async linkFeGuideRows(pairs) {
+    const result = { linked: 0, promoted: 0, skipped: 0, failures: [] };
+    if (!this.useSupabase || !pairs?.length) return result;
+
+    for (const { testGroupId, feRowId } of pairs) {
+      try {
+        const res = await this.linkFeGuideRow(testGroupId, feRowId);
+        result.linked   += 1;
+        result.promoted += res.promoted.length;
+        result.skipped  += res.skipped.length;
+      } catch (error) {
+        result.failures.push({ testGroupId, message: error.message });
+      }
+    }
+    return result;
+  }
+
   /** One staged guide row by id — the linked row, for showing what it holds. */
   async getFeGuideRow(id) {
     if (!this.useSupabase || id == null) return null;

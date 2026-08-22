@@ -186,13 +186,14 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
 export default function FeGuideLinkSweep() {
     const {
         getGroupsAwaitingFeLink, getFeLinkProgress, getFeGuideRows,
-        linkFeGuideRow, setFeLinkSkipped,
+        linkFeGuideRow, linkFeGuideRows, setFeLinkSkipped,
     } = useAppContext();
 
     const [includeSkipped, setIncludeSkipped] = useState(false);
     const [tier, setTier] = useState('energy');
     const [busy, setBusy] = useState(false);
     const [note, setNote] = useState(null);
+    const [result, setResult] = useState(null);
 
     const loadGroups   = useCallback(() => getGroupsAwaitingFeLink({ includeSkipped }), [getGroupsAwaitingFeLink, includeSkipped]);
     const loadRows     = useCallback(() => getFeGuideRows(), [getFeGuideRows]);
@@ -215,8 +216,8 @@ export default function FeGuideLinkSweep() {
     const refresh = () => { reloadGroups(); reloadProgress(); };
 
     const run = async (fn, message) => {
-        setBusy(true); setNote(null);
-        try { await fn(); setNote(message); refresh(); }
+        setBusy(true); setNote(null); setResult(null);
+        try { await fn(); if (message) setNote(message); refresh(); }
         catch (e) { setNote(`Failed: ${e.message}`); }
         finally { setBusy(false); }
     };
@@ -224,24 +225,20 @@ export default function FeGuideLinkSweep() {
     const linkOne = (groupId, rowId) =>
         run(() => linkFeGuideRow(groupId, rowId), 'Linked.');
 
+    /**
+     * The batch goes through `linkFeGuideRows`, not a loop over the single-link
+     * call. The single-link wrapper refreshes every vehicle in the app after
+     * each one — right for one, ninety-eight times over for a batch, which is
+     * why this appeared to do nothing but churn.
+     */
     const linkBatch = () => run(async () => {
-        // Sequential, not parallel. Each link reads the group, computes what
-        // may be promoted and writes it back; firing 40 of those at once makes
-        // a failure halfway impossible to attribute to a group.
-        //
-        // A failure part-way stops the batch and reports how far it got, rather
-        // than pressing on: the remaining groups stay listed, so the state on
-        // screen after a refresh is the truth either way.
-        let done = 0;
-        try {
-            for (const it of batch) {
-                await linkFeGuideRow(it.group.test_group_id, it.proposal.row.id);
-                done += 1;
-            }
-        } catch (e) {
-            throw new Error(`linked ${done} of ${batch.length}, then: ${e.message}`, { cause: e });
-        }
-    }, `Linked ${batch.length} group${batch.length === 1 ? '' : 's'}.`);
+        const pairs = batch.map(it => ({
+            testGroupId: it.group.test_group_id,
+            feRowId: it.proposal.row.id,
+        }));
+        const res = await linkFeGuideRows(pairs);
+        setResult(res);
+    });
 
     if (loading) return <div className="text-caption text-secondary">Loading groups…</div>;
     if (error) return <div className="empty-state">Could not load the sweep: {String(error.message ?? error)}</div>;
@@ -277,6 +274,20 @@ export default function FeGuideLinkSweep() {
 
             {note && <div className="guide-tested-note">{note}</div>}
 
+            {/* A batch reports what it did as a whole. Per-link toasts are
+                useful for one link and unreadable ninety-eight times over, and
+                only the last one survived anyway. */}
+            {result && (
+                <div className={result.failures.length ? 'guide-warning' : 'guide-tested-note'}>
+                    Linked {result.linked} group{result.linked === 1 ? '' : 's'};
+                    {' '}{result.promoted} field{result.promoted === 1 ? '' : 's'} filled
+                    {result.skipped > 0 && `, ${result.skipped} left as curator-set`}.
+                    {result.failures.length > 0 && (
+                        <> {result.failures.length} failed: {result.failures.slice(0, 5).map(f => f.testGroupId).join(', ')}.</>
+                    )}
+                </div>
+            )}
+
             <div className="guide-facet-values">
                 {TIERS.map(t => (
                     <button key={t.key} type="button"
@@ -298,7 +309,7 @@ export default function FeGuideLinkSweep() {
                         match. Ties, borrowed years and weak matches are excluded and need a look.
                     </div>
                     <button className="btn btn-primary" disabled={busy} onClick={linkBatch}>
-                        Link all {batch.length}
+                        {busy ? 'Linking…' : `Link all ${batch.length}`}
                     </button>
                 </div>
             )}

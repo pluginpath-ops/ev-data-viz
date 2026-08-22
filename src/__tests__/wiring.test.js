@@ -265,6 +265,30 @@ describe('the seams that broke before', () => {
             .toEqual([]);
     });
 
+    it('links a batch through the batch path, not a loop over the single-link one', () => {
+        // AppContext.linkFeGuideRow refreshes every vehicle in the app after
+        // each call — correct for one link, since the promoted figures reach a
+        // vehicle card through epa_vehicle_mappings. Looping it over 98 groups
+        // ran the app's largest query 98 times, so the sweep appeared to hang
+        // and only the last of 98 toasts survived. The batch path refreshes
+        // once. Nothing about that is visible from either file alone.
+        const sweep = read('src/components/admin/FeGuideLinkSweep.jsx');
+        const batchFn = sweep.slice(sweep.indexOf('const linkBatch'));
+        const body = batchFn.slice(0, batchFn.indexOf('\n    };'));
+
+        expect(body, 'linkBatch must call linkFeGuideRows, the batch path')
+            .toMatch(/linkFeGuideRows\(/);
+        expect(body, 'linkBatch must not loop the single-link call')
+            .not.toMatch(/await\s+linkFeGuideRow\(/);
+
+        // And the batch path must refresh once rather than per link.
+        const ctx = read('src/context/AppContext.jsx');
+        const plural = ctx.slice(ctx.indexOf('const linkFeGuideRows'));
+        const pluralBody = plural.slice(0, plural.indexOf('\n    };'));
+        expect((pluralBody.match(/softRefreshVehicles\(/g) ?? []).length,
+            'the batch wrapper should refresh exactly once').toBe(1);
+    });
+
     it('lets the FE guide ranker see every year, and fetches what it ranks on', () => {
         // rankFeCandidates treats the model year as a SORT key and
         // bestFeCandidate has a dedicated wrong-year path — both written for
