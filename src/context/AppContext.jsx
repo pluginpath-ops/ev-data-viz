@@ -865,6 +865,102 @@ export function AppProvider({ children }) {
         }
     };
 
+    // ── Brand registry: aliases, merge, corporate parent (#149, #243) ─────────
+
+    const getBrandAliases        = () => dataService.getBrandAliases();
+    const getBrandDivisionSummary = () => dataService.getBrandDivisionSummary();
+    const getBrandUsageSummary   = () => dataService.getBrandUsageSummary();
+
+    const addBrandAlias = async (manufacturerId, alias, source = 'manual') => {
+        try {
+            return await dataService.addBrandAlias(manufacturerId, alias, source);
+        } catch (error) {
+            logIfUnauthorized('add_brand_alias', 'brand_alias', null, error);
+            // A duplicate alias is the common failure and is a real answer, not
+            // a system fault: the spelling already resolves to some brand, and
+            // saying which one is more use than "insert failed".
+            showError('Could not add that alias: ' + error.message);
+            throw error;
+        }
+    };
+
+    const deleteBrandAlias = async (id) => {
+        try {
+            await dataService.deleteBrandAlias(id);
+        } catch (error) {
+            logIfUnauthorized('delete_brand_alias', 'brand_alias', id, error);
+            showError('Error removing alias: ' + error.message);
+            throw error;
+        }
+    };
+
+    /**
+     * Fold one brand into another, then reload.
+     *
+     * A full vehicle reload rather than optimistic state: the merge rewrites
+     * `vehicles.make` as well as the FK, across rows this client may never have
+     * had in memory, so patching locally would leave the old spelling on screen
+     * — the exact symptom the merge exists to remove.
+     */
+    const mergeManufacturers = async (fromId, intoId) => {
+        try {
+            await dataService.mergeManufacturers(fromId, intoId);
+            setManufacturers(prev => prev.filter(m => m.id !== fromId));
+            await softRefreshVehicles();
+        } catch (error) {
+            logIfUnauthorized('merge_manufacturers', 'manufacturer', fromId, error);
+            showError('Error merging brands: ' + error.message);
+            throw error;
+        }
+    };
+
+    // ── Tag maintenance (#149) ────────────────────────────────────────────────
+
+    const updateTag = async (id, name) => {
+        try {
+            await dataService.updateTag(id, name);
+            setTags(prev => prev.map(t => t.id === id ? { ...t, name } : t)
+                                .sort((a, b) => a.name.localeCompare(b.name)));
+            // Tags are denormalised onto each vehicle for the cards, so a rename
+            // has to reach them too or the old label survives until a reload.
+            setVehicles(prev => prev.map(v => ({
+                ...v,
+                tags: (v.tags || []).map(t => t.id === id ? { ...t, name } : t),
+            })));
+        } catch (error) {
+            logIfUnauthorized('update_tag', 'tag', id, error);
+            showError('Error renaming tag: ' + error.message);
+            throw error;
+        }
+    };
+
+    const deleteTag = async (id) => {
+        try {
+            await dataService.deleteTag(id);
+            setTags(prev => prev.filter(t => t.id !== id));
+            setVehicles(prev => prev.map(v => ({
+                ...v,
+                tags: (v.tags || []).filter(t => t.id !== id),
+            })));
+        } catch (error) {
+            logIfUnauthorized('delete_tag', 'tag', id, error);
+            showError('Error deleting tag: ' + error.message);
+            throw error;
+        }
+    };
+
+    const mergeTags = async (fromId, intoId) => {
+        try {
+            await dataService.mergeTags(fromId, intoId);
+            setTags(prev => prev.filter(t => t.id !== fromId));
+            await softRefreshVehicles();
+        } catch (error) {
+            logIfUnauthorized('merge_tags', 'tag', fromId, error);
+            showError('Error merging tags: ' + error.message);
+            throw error;
+        }
+    };
+
     // ── Spec link CRUD ────────────────────────────────────────────────────────
 
     // Spec links require a full reload because buildInheritedRuns() is a two-pass
@@ -1576,6 +1672,15 @@ export function AppProvider({ children }) {
         getFeGuideRow,
         getFeGuideRows,
         getFeGuideVehicleLinks,
+        getBrandAliases,
+        getBrandDivisionSummary,
+        getBrandUsageSummary,
+        addBrandAlias,
+        deleteBrandAlias,
+        mergeManufacturers,
+        updateTag,
+        deleteTag,
+        mergeTags,
         acceptFeGuideValues,
         getExistingEpaTestGroupIds,
         updateEpaMapping,

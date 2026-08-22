@@ -83,7 +83,8 @@ export default function GuideFilterBar({ rows, facets, filters, onChange, onRese
         };
         return {
             years:       forFacet('years', 'model_year'),
-            makes:       forFacet('makes', 'division'),
+            makes:       forFacet('makes', 'brand'),
+            parents:     forFacet('parents', 'parent_name'),
             bodyClasses: forFacet('bodyClasses', 'body_class'),
             drives:      forFacet('drives', 'drive_desc'),
             motorCounts: forFacet('motorCounts', 'motor_count'),
@@ -124,6 +125,10 @@ export default function GuideFilterBar({ rows, facets, filters, onChange, onRese
                 onToggle={toggle('bodyClasses')} countFor={v => counts.bodyClasses.get(v) ?? 0} />
             <FacetGroup label="Make" values={facets.makes} selected={filters.makes}
                 onToggle={toggle('makes')} countFor={v => counts.makes.get(v) ?? 0} />
+            {/* Only rendered once a curator has set parents — an empty facet
+                would be a row of nothing with a heading over it. */}
+            <FacetGroup label="Parent" values={facets.parents} selected={filters.parents}
+                onToggle={toggle('parents')} countFor={v => counts.parents.get(v) ?? 0} />
             <FacetGroup label="Drive" values={facets.drives} selected={filters.drives}
                 onToggle={toggle('drives')} countFor={v => counts.drives.get(v) ?? 0} />
             <FacetGroup label="Motors" values={facets.motorCounts} selected={filters.motorCounts}

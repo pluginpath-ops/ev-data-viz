@@ -137,14 +137,66 @@ export function isCollapsedRow(row) {
     return Number.isFinite(n) && n > 4;
 }
 
+// ── Brand resolution (#243) ──────────────────────────────────────────────────
+
+/**
+ * alias → brand, built once from `brand_aliases`.
+ *
+ * EPA's `division` is the text a manufacturer filed under, so the same company
+ * appears more than once: `Lucid` and `Lucid USA Inc.`, `KIA` and `KIA MOTORS
+ * CORPORATION`. Faceting on the raw column splits a brand in two and a filter
+ * on one half quietly returns part of the answer — 52 of 61 configurations for
+ * Lucid.
+ *
+ * Keyed lowercased and trimmed to match the generated `alias_key` in migration
+ * 057, because EPA shouts and `KIA` and `Kia` are one brand.
+ */
+export function buildBrandIndex(aliases = []) {
+    const index = new Map();
+    for (const a of aliases) {
+        const key = String(a.alias_key ?? a.alias ?? '').trim().toLowerCase();
+        if (!key) continue;
+        index.set(key, {
+            brand:  a.manufacturers?.name ?? null,
+            parent: a.manufacturers?.parent_name ?? null,
+        });
+    }
+    return index;
+}
+
+/**
+ * The brand and corporate parent a raw division resolves to.
+ *
+ * Falls back to the raw text when nothing claims it. That fallback is the
+ * honest behaviour rather than a stopgap: an unmapped division is a decision a
+ * curator has not made yet, and hiding the configurations until they make it
+ * would be worse than showing them under EPA's own spelling. The admin panel
+ * is where the unmapped ones are surfaced for deciding.
+ */
+export function resolveBrand(division, brandIndex) {
+    const raw = String(division ?? '').trim();
+    if (!raw) return { brand: null, parent: null, mapped: false };
+    // Guarded rather than assumed. `decorateRow` is legitimately called before
+    // the aliases have loaded, and `rows.map(decorateRow)` would hand this the
+    // array index — a number, which would throw on .get and take the whole
+    // table down over a cosmetic feature.
+    const hit = brandIndex instanceof Map ? brandIndex.get(raw.toLowerCase()) : undefined;
+    if (!hit?.brand) return { brand: raw, parent: null, mapped: false };
+    return { brand: hit.brand, parent: hit.parent, mapped: true };
+}
+
 /** Every derived field, attached once at load so filters and sorts share them. */
-export function decorateRow(row) {
+export function decorateRow(row, brandIndex) {
+    const { brand, parent, mapped } = resolveBrand(row.division, brandIndex);
     return {
         ...row,
         wheel_size_in:   wheelSizeIn(row.carline),
         body_class:      bodyClassLabel(row.carline_class),
         city_hwy_ratio:  cityHwyRatio(row),
         is_collapsed:    isCollapsedRow(row),
+        brand,
+        parent_name:     parent,
+        brand_mapped:    mapped,
     };
 }
 
@@ -167,7 +219,12 @@ export const GUIDE_COLUMNS = [
     // column that says which car a row is, so it has to survive a sideways
     // scroll that pushes everything else off screen.
     { key: 'carline',          label: 'Configuration', group: 'Identity', default: true, sticky: true },
-    { key: 'division',         label: 'Make',        group: 'Identity',   default: true },
+    { key: 'brand',            label: 'Make',        group: 'Identity',   default: true,
+      hint: 'The curated brand name. EPA files under several spellings — `Lucid` and `Lucid USA Inc.` are one company — so this resolves them; an unmapped division falls back to EPA’s own text.' },
+    { key: 'parent_name',      label: 'Parent',      group: 'Identity',
+      hint: 'Corporate parent: Chevrolet, Cadillac and GMC all read General Motors. Blank until a curator sets it.' },
+    { key: 'division',         label: 'EPA division', group: 'Identity',
+      hint: 'The division exactly as EPA filed it, before brand resolution.' },
     { key: 'model_year',       label: 'Year',        group: 'Identity',   numeric: true,  digits: 0, default: true },
     { key: 'model_type_index', label: 'Model type',  group: 'Identity',
       hint: 'EPA’s own index for a model type. Part of the natural key — carline alone is not unique.' },
@@ -248,7 +305,7 @@ export function formatCell(row, col) {
 
 /** The empty filter state — also the shape the URL round-trips. */
 export const EMPTY_FILTERS = {
-    years: [], makes: [], bodyClasses: [], drives: [], motorCounts: [], wheelSizes: [],
+    years: [], makes: [], parents: [], bodyClasses: [], drives: [], motorCounts: [], wheelSizes: [],
     search: '',
     minRange: null, maxRange: null, minMpge: null, maxMpge: null,
 };
@@ -261,7 +318,8 @@ export function buildFacets(rows) {
     };
     return {
         years:       uniq(r => r.model_year, true).reverse(),
-        makes:       uniq(r => r.division),
+        makes:       uniq(r => r.brand),
+        parents:     uniq(r => r.parent_name),
         bodyClasses: uniq(r => r.body_class),
         drives:      uniq(r => r.drive_desc),
         // Only counts that describe a real vehicle. A collapsed row reads 9
@@ -284,7 +342,8 @@ export function filterRows(rows, filters) {
     const needle = f.search.trim().toLowerCase();
     return rows.filter((r) => {
         if (!inList(f.years, r.model_year))          return false;
-        if (!inList(f.makes, r.division))            return false;
+        if (!inList(f.makes, r.brand))               return false;
+        if (!inList(f.parents, r.parent_name))       return false;
         if (!inList(f.bodyClasses, r.body_class))    return false;
         if (!inList(f.drives, r.drive_desc))         return false;
         if (!inList(f.motorCounts, r.motor_count))   return false;
@@ -292,7 +351,9 @@ export function filterRows(rows, filters) {
         if (!within(r.label_comb_range_mi, f.minRange, f.maxRange)) return false;
         if (!within(r.label_comb_mpge, f.minMpge, f.maxMpge))       return false;
         if (needle) {
-            const hay = `${r.division} ${r.carline} ${r.smog_test_group ?? ''}`.toLowerCase();
+            // Both spellings are searchable: someone may type either what EPA
+            // filed or the name we display.
+            const hay = `${r.brand ?? ''} ${r.division} ${r.carline} ${r.smog_test_group ?? ''}`.toLowerCase();
             if (!hay.includes(needle)) return false;
         }
         return true;
@@ -338,7 +399,7 @@ export function sortRows(rows, key, dir = 'asc') {
  * rather than throwing, because this parses whatever a URL happens to contain.
  */
 const LIST_PARAMS = {
-    years: 'y', makes: 'mk', bodyClasses: 'cl', drives: 'dr',
+    years: 'y', makes: 'mk', parents: 'pa', bodyClasses: 'cl', drives: 'dr',
     motorCounts: 'mo', wheelSizes: 'wh',
 };
 const NUM_PARAMS = {

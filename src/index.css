@@ -2451,3 +2451,79 @@ body {
 .guide-raw-row {
     @apply flex items-baseline justify-between gap-4;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BRAND REGISTRY (#149, #243)
+
+   Admin maintenance for the one brand list shared by vehicles and EPA
+   filings, plus tag maintenance. Row-per-entity with inline editing — the
+   same shape as the other admin tables, deliberately.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.brand-list {
+    @apply flex flex-col gap-1.5;
+}
+.brand-row {
+    @apply flex flex-col gap-2 p-3 rounded-lg;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+}
+.brand-row-main {
+    @apply flex flex-wrap items-center gap-3;
+}
+.brand-input {
+    @apply px-2 py-1 rounded text-sm;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+    min-width: 9rem;
+}
+.brand-select {
+    @apply px-2 py-1 rounded text-sm;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+}
+.brand-counts {
+    @apply whitespace-nowrap;
+}
+/* Actions push right on desktop and wrap underneath on narrow screens rather
+   than squeezing the name field to nothing. */
+.brand-row-actions {
+    @apply flex flex-wrap items-center gap-2 ml-auto;
+}
+.brand-merge {
+    @apply flex items-center gap-1.5;
+}
+/* Merge deletes a brand, so the confirmation states what happens to the
+   vehicles and aliases rather than asking "are you sure?". */
+.brand-merge-confirm {
+    @apply p-2 rounded;
+    background-color: rgba(245, 158, 11, 0.12);
+    border: 1px solid var(--color-warning);
+}
+
+.brand-aliases {
+    @apply flex flex-wrap items-center gap-1.5 pt-2;
+    border-top: 1px solid var(--color-border);
+}
+.brand-alias-chip {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs;
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+}
+[data-theme="dark"] .brand-alias-chip {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: rgb(241, 245, 249);
+}
+.brand-alias-chip button {
+    @apply leading-none px-0.5;
+    color: var(--color-text-faint);
+}
+.brand-alias-chip button:hover {
+    color: var(--color-danger, rgb(239, 68, 68));
+}
+.brand-alias-add {
+    @apply flex items-center gap-1.5;
+}

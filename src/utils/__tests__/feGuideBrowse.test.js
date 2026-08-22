@@ -4,6 +4,7 @@ import {
     decorateRow, GUIDE_COLUMNS, DEFAULT_COLUMNS, columnByKey, formatCell,
     buildFacets, filterRows, sortRows, EMPTY_FILTERS,
     encodeGuideParams, decodeGuideParams, computeBarMaxima, barPercent,
+    buildBrandIndex, resolveBrand,
 } from '../feGuideBrowse';
 
 describe('wheelSizeIn', () => {
@@ -245,5 +246,43 @@ describe('shareable comparison', () => {
     });
     it('drops junk ids rather than carrying them into a lookup', () => {
         expect(decodeGuideParams('sel=12,abc,,47').selectedIds).toEqual([12, 47]);
+    });
+});
+
+describe('brand resolution', () => {
+    const aliases = [
+        { alias: 'Lucid USA Inc.', alias_key: 'lucid usa inc.', manufacturers: { name: 'Lucid', parent_name: null } },
+        { alias: 'KIA MOTORS CORPORATION', alias_key: 'kia motors corporation', manufacturers: { name: 'Kia', parent_name: 'Hyundai Motor Group' } },
+        { alias: 'Chevrolet', alias_key: 'chevrolet', manufacturers: { name: 'Chevrolet', parent_name: 'General Motors' } },
+    ];
+    const index = buildBrandIndex(aliases);
+
+    it('folds EPA’s filing spellings onto one brand', () => {
+        expect(resolveBrand('Lucid USA Inc.', index).brand).toBe('Lucid');
+        expect(resolveBrand('KIA MOTORS CORPORATION', index).brand).toBe('Kia');
+    });
+    it('matches case- and whitespace-insensitively, because EPA shouts', () => {
+        expect(resolveBrand('  kia motors corporation  ', index).brand).toBe('Kia');
+    });
+    it('carries the corporate parent through', () => {
+        expect(resolveBrand('Chevrolet', index).parent).toBe('General Motors');
+    });
+    it('falls back to EPA’s own text when nothing claims it, and says so', () => {
+        const r = resolveBrand('Bugatti Rimac', index);
+        expect(r.brand).toBe('Bugatti Rimac');
+        expect(r.mapped).toBe(false);
+    });
+    it('survives being handed something that is not an index', () => {
+        // rows.map(decorateRow) passes the array index as the second argument.
+        // A cosmetic feature must not take the table down over it.
+        expect(resolveBrand('Rivian', 3).brand).toBe('Rivian');
+        expect(resolveBrand('Rivian', undefined).brand).toBe('Rivian');
+        expect(() => decorateRow({ carline: 'R1S', division: 'Rivian' }, 0)).not.toThrow();
+    });
+    it('decorates a row with brand, parent and mapped-ness', () => {
+        const d = decorateRow({ carline: 'Air', division: 'Lucid USA Inc.' }, index);
+        expect(d.brand).toBe('Lucid');
+        expect(d.brand_mapped).toBe(true);
+        expect(d.division).toBe('Lucid USA Inc.');   // the source is never rewritten
     });
 });

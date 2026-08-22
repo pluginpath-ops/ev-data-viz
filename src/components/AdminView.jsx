@@ -7,11 +7,14 @@ import RolesPermissions from './admin/RolesPermissions';
 import ConstantsKnobs from './admin/ConstantsKnobs';
 import InterfaceSettings from './admin/InterfaceSettings';
 import FeGuideImport from './admin/FeGuideImport';
+import BrandRegistry from './admin/BrandRegistry';
+import TagRegistry from './admin/TagRegistry';
 
 const SUBTABS = [
     { id: 'roles',     label: 'Roles & Permissions' },
     { id: 'epa',       label: 'EPA Data' },
     { id: 'feguide',   label: 'Fuel Economy Guide' },
+    { id: 'brands',    label: 'Brands & Tags' },
     { id: 'constants', label: 'Model Constants' },
     { id: 'interface', label: 'Interface Settings' },
 ];
@@ -26,6 +29,7 @@ const SUBTITLES = {
     roles:     'Manage registered users and their roles.',
     epa:       'Browse, edit, link, and delete imported EPA test groups.',
     feguide:   'Import EPA\'s published label figures, one guide per model year.',
+    brands:    'One brand list for vehicles and EPA filings. Rename, merge, and map EPA\'s division spellings.',
     constants: 'Tune the EPA model math (local sandbox).',
     interface: 'Site-wide appearance settings.',
 };
@@ -189,6 +193,13 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
             )}
 
             {subtab === 'feguide' && <FeGuideImport />}
+
+            {subtab === 'brands' && (
+                <div className="flex flex-col gap-6">
+                    <BrandRegistry />
+                    <TagRegistry />
+                </div>
+            )}
 
             {subtab === 'constants' && <ConstantsKnobs />}
 
