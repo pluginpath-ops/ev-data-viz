@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     TIERS, tierOf, hasDerivableEnergy, hasCoefficients,
     classifyGroup, buildSweep, sweepProgress, batchable, NO_PROPOSAL_REASONS,
-    impliedUsableKwh, groupEnergyFacts,
+    impliedUsableKwh, groupEnergyFacts, estimatedAdjustedRange,
 } from '../epaLinkSweep';
 
 const group = (o = {}) => ({
@@ -148,5 +148,69 @@ describe('telling near-identical candidates apart', () => {
     it('is all-null when the group knows nothing about its own energy', () => {
         expect(groupEnergyFacts({ epa_tests: [], epa_coefficient_sets: [] }))
             .toEqual({ dcEnergyKwh: null, procedure: null, etwLbs: null, useableKwh: null });
+    });
+});
+
+describe('identifier matches and shared certifications', () => {
+    const g = (o) => ({ test_group_id: o.id, make: 'Lucid', epa_carline_name: o.carline ?? 'Air Touring AWD',
+        model_year: o.year ?? 2024, epa_tests: [], epa_coefficient_sets: [] });
+    const row = (o) => ({ id: o.id, model_year: o.year ?? 2024, division: 'Lucid',
+        carline: o.carline, smog_test_group: o.tg, label_comb_range_mi: o.range ?? 400, label_comb_mpge: 120 });
+
+    it('takes an identifier match over any name score', () => {
+        // The guide's smog test group is usually EPA's own identifier, but for
+        // 10 groups in the corpus it IS our test group id. That is not a
+        // similarity — it is the same string.
+        const rows = [
+            row({ id: 1, carline: 'Completely Different Car', tg: 'ABC123' }),
+            row({ id: 2, carline: 'Air Touring AWD w/19" wheels', tg: 'ZZZ' }),
+        ];
+        const c = classifyGroup(g({ id: 'ABC123' }), rows);
+        expect(c.exactIdMatch).toBe(true);
+        expect(c.proposal.row.id).toBe(1);
+    });
+    it('declines an identifier match that is not unique', () => {
+        // The guide's test group is not unique per configuration, so several
+        // rows can carry it — that is a choice, not an answer.
+        const rows = [row({ id: 1, carline: 'A', tg: 'ABC123' }), row({ id: 2, carline: 'B', tg: 'ABC123' })];
+        expect(classifyGroup(g({ id: 'ABC123' }), rows).exactIdMatch).toBe(false);
+    });
+
+    it('names the case where the candidates are one certification', () => {
+        // MY2024 Lucid Air Touring AWD is three rows at 411, 382 and 365 miles
+        // for 19, 20 and 21 inch wheels, ALL under smog group RLMUV00.0ZA2.
+        // EPA certified it once; nothing on our side picks a wheel.
+        const rows = [
+            row({ id: 1, carline: 'Air Touring AWD w/19" wheels', tg: 'RLMUV00.0ZA2', range: 411 }),
+            row({ id: 2, carline: 'Air Touring AWD w/20" wheels', tg: 'RLMUV00.0ZA2', range: 382 }),
+            row({ id: 3, carline: 'Air Touring AWD w/21" wheels', tg: 'RLMUV00.0ZA2', range: 365 }),
+        ];
+        const c = classifyGroup(g({ id: '202400005', carline: 'Air Touring' }), rows);
+        expect(c.proposal).toBeNull();
+        expect(c.shared).toEqual({ smogTestGroup: 'RLMUV00.0ZA2', count: 3 });
+    });
+    it('says nothing when the candidates are genuinely different certifications', () => {
+        const rows = [
+            row({ id: 1, carline: 'Air Touring AWD', tg: 'AAA' }),
+            row({ id: 2, carline: 'Air Sapphire AWD', tg: 'BBB' }),
+        ];
+        expect(classifyGroup(g({ id: 'X', carline: 'Air' }), rows).shared).toBeNull();
+    });
+});
+
+describe('estimated label range', () => {
+    it('adjusts the unadjusted range with the group’s own factor', () => {
+        const e = estimatedAdjustedRange({ cd_range_combined_calc: 500, derived_5cycle_coefficient: 0.7294 });
+        expect(e.miles).toBeCloseTo(364.7, 1);
+        expect(e.factorIsDerived).toBe(true);
+    });
+    it('falls back to the fixed factor and says it did', () => {
+        const e = estimatedAdjustedRange({ cd_range_combined_calc: 500 });
+        expect(e.miles).toBeCloseTo(350, 1);
+        expect(e.factor).toBe(0.7);
+        expect(e.factorIsDerived).toBe(false);
+    });
+    it('is null when the group has no unadjusted range — most of them', () => {
+        expect(estimatedAdjustedRange({})).toBeNull();
     });
 });

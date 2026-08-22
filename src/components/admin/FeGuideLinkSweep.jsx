@@ -3,8 +3,9 @@ import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
 import {
     TIERS, buildSweep, sweepProgress, batchable, NO_PROPOSAL_REASONS,
-    impliedUsableKwh, groupEnergyFacts,
+    impliedUsableKwh, groupEnergyFacts, estimatedAdjustedRange,
 } from '../../utils/epaLinkSweep';
+import { wheelSizeIn } from '../../utils/feGuideBrowse';
 
 /**
  * Work through the certification groups with no Fuel Economy Guide row (#238).
@@ -42,6 +43,9 @@ function CandidateFacts({ row, score, exactYear }) {
         <span className="text-caption text-faint">
             {row.label_comb_range_mi} mi
             {row.label_comb_mpge != null && ` · ${row.label_comb_mpge} MPGe`}
+            {/* Pulled out of the carline, where it is easy to miss when three
+                rows differ by nothing else. */}
+            {wheelSizeIn(row.carline) != null && ` · ${wheelSizeIn(row.carline)}" wheels`}
             {row.nominal_pack_kwh != null && ` · ${Number(row.nominal_pack_kwh).toFixed(1)} kWh pack`}
             {implied != null && (
                 <span title="Range ÷ MPGe × 33.705 — the energy these label figures were computed from. AC basis, so it reads about 1/0.88 higher than a certification test's DC energy.">
@@ -67,9 +71,19 @@ function CandidateFacts({ row, score, exactYear }) {
  */
 function GroupEnergyFacts({ group }) {
     const f = groupEnergyFacts(group);
-    if (f.dcEnergyKwh == null && f.etwLbs == null && f.useableKwh == null) return null;
+    const est = estimatedAdjustedRange(group);
+    if (f.dcEnergyKwh == null && f.etwLbs == null && f.useableKwh == null && est == null) return null;
     return (
         <div className="text-caption text-secondary">
+            {/* The strongest hint when it exists: the group's own unadjusted
+                range on a label basis, directly comparable with a candidate's. */}
+            {est && (
+                <span title={`${est.factor.toFixed(4)} adjustment ${est.factorIsDerived ? 'derived for this group' : '— the fixed default, since this group states none'}`}>
+                    ~{est.miles.toFixed(0)} mi est. label range
+                    {!est.factorIsDerived && '*'}
+                    {' · '}
+                </span>
+            )}
             {f.dcEnergyKwh != null && (
                 <span title={`Measured DC energy from procedure ${f.procedure}. DC basis — not directly comparable with a candidate's implied kWh, which is AC.`}>
                     {f.dcEnergyKwh.toFixed(1)} kWh measured DC
@@ -100,8 +114,19 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                                 title={vehicles.map(v => `${v.year} ${v.name}`).join(', ')}>tested</span>
                         )}
                     </div>
+                    {/* The name the RANKER scored against, when it differs from
+                        the one on display. A curator reading "Touring AWd" and a
+                        50% score cannot tell that the match was computed from
+                        "Lucid Air Touring AWD" — and the score only makes sense
+                        against the text that produced it. */}
+                    {g.display_name && g.epa_carline_name && g.display_name !== g.epa_carline_name && (
+                        <div className="text-caption text-secondary">matched as “{g.epa_carline_name}”</div>
+                    )}
                     <div className="text-caption text-faint">
                         {g.model_year} {g.make} · {g.test_group_id}
+                        {/* A carryover states which year the test actually came
+                            from, which is usually why a candidate's year differs. */}
+                        {g.carryover_model_year && ` · carried over from ${g.carryover_model_year}`}
                     </div>
                     <GroupEnergyFacts group={g} />
                 </div>
@@ -109,12 +134,34 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                 <div className="sweep-proposal">
                     {item.proposal ? (
                         <>
-                            <div className="sweep-proposal-name">{item.proposal.row.carline}</div>
-                            <CandidateFacts row={item.proposal.row} score={item.proposal.score} exactYear />
+                            <div className="sweep-proposal-name">
+                                {item.proposal.row.carline}
+                                {/* Not a similarity score — the guide row carries
+                                    this group's own identifier. */}
+                                {item.exactIdMatch && (
+                                    <span className="guide-badge guide-badge-tested" title="The guide row's test group is this group's id — an identifier match, not a name score">
+                                        exact id
+                                    </span>
+                                )}
+                            </div>
+                            <CandidateFacts row={item.proposal.row}
+                                score={item.exactIdMatch ? null : item.proposal.score}
+                                exactYear={item.proposal.exactYear} />
                         </>
                     ) : (
                         <div className="text-caption text-secondary">
                             {NO_PROPOSAL_REASONS[item.reason] ?? 'No proposal.'}
+                            {/* The unanswerable case, named. Without this a
+                                curator hunts for a distinguishing fact that does
+                                not exist in either dataset. */}
+                            {item.shared && (
+                                <div className="sweep-shared-note">
+                                    These {item.shared.count} candidates are <strong>one certification</strong>
+                                    {' '}({item.shared.smogTestGroup}) — EPA tested them once and the guide lists
+                                    the wheel or tyre options separately. Nothing distinguishes them on our side,
+                                    so pick the variant you mean.
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

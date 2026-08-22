@@ -11,7 +11,7 @@
  * reports. The matching itself is `feGuideMatch`, unchanged.
  */
 import { rankFeCandidates, bestFeCandidate, MATCH_FLOOR } from './feGuideMatch';
-import { PROC_MCT, PROC_CD_HWY, MPG_E_CONVERSION } from '../constants/epa';
+import { PROC_MCT, PROC_CD_HWY, MPG_E_CONVERSION, LABEL_ADJUSTMENT } from '../constants/epa';
 
 // ── Priority ─────────────────────────────────────────────────────────────────
 
@@ -124,6 +124,68 @@ export function groupEnergyFacts(group) {
     };
 }
 
+/**
+ * The range this certification record implies, adjusted to a label basis.
+ *
+ * `cd_range_combined_calc` is the unadjusted combined range EPA computed from
+ * the test. Multiplying by the adjustment gives roughly what the window sticker
+ * should say — which is directly comparable to a candidate's `label_comb_range_mi`
+ * and settles a set of trims a carline name cannot.
+ *
+ * Uses the group's own `derived_5cycle_coefficient` where it has one and the
+ * fixed 0.7 otherwise, and reports which, because the difference between them
+ * is several percent and a reader comparing 411 against 382 needs to know how
+ * soft the number is.
+ *
+ * Only ~29 of the 158 unlinked groups carry the unadjusted range, so this is a
+ * strong hint where it exists rather than a general answer.
+ */
+export function estimatedAdjustedRange(group) {
+    const unadjusted = num(group?.cd_range_combined_calc);
+    if (unadjusted == null) return null;
+    const derived = num(group?.derived_5cycle_coefficient);
+    const factor = derived != null && derived > 0 ? derived : LABEL_ADJUSTMENT;
+    return { miles: unadjusted * factor, factor, factorIsDerived: derived != null && derived > 0 };
+}
+
+/**
+ * A guide row whose smog test group IS our certification group id.
+ *
+ * Migration 053 dismissed this join because it matched 1 of 87 linked groups,
+ * and as a general key it is still useless — the guide's test group is not
+ * unique per configuration and usually carries EPA's own smog identifier rather
+ * than the manufacturer's Vehicle ID. But where the two DO coincide, and they
+ * do for 10 groups in the current corpus, it is not a similarity score. It is
+ * the same identifier, and it outranks any name match.
+ */
+export function exactTestGroupMatches(group, feRows = []) {
+    const id = String(group?.test_group_id ?? '').trim().toUpperCase();
+    if (!id) return [];
+    return feRows.filter(r => String(r.smog_test_group ?? '').trim().toUpperCase() === id);
+}
+
+/**
+ * Whether the remaining candidates are one certification seen several times.
+ *
+ * The Lucid case: `Air Touring AWD` appears three times in MY2024 at 411, 382
+ * and 365 miles for 19, 20 and 21 inch wheels — and all three carry the SAME
+ * smog test group, because EPA certified them once and the guide lists the
+ * wheel options separately.
+ *
+ * So there is no fact that makes one of them the right answer, and a curator
+ * hunting for one is looking for something that does not exist. Saying that
+ * turns an unanswerable question into a choice: pick the wheel you mean.
+ */
+export function sharedCertification(ranked) {
+    const groups = ranked
+        .map(c => String(c.row.smog_test_group ?? '').trim())
+        .filter(Boolean);
+    if (groups.length < 2) return null;
+    const unique = new Set(groups);
+    if (unique.size !== 1) return null;
+    return { smogTestGroup: [...unique][0], count: ranked.length };
+}
+
 // ── Proposals ────────────────────────────────────────────────────────────────
 
 /**
@@ -156,6 +218,24 @@ export const NO_PROPOSAL_REASONS = {
  */
 export function classifyGroup(group, feRows) {
     const ranked = rankFeCandidates(group, feRows);
+
+    // An identifier match is not a guess, so it is taken before the ranker is
+    // consulted at all — and only when it is unambiguous, since the guide's
+    // test group is not unique per configuration and several rows can carry it.
+    const exact = exactTestGroupMatches(group, feRows);
+    if (exact.length === 1) {
+        return {
+            group,
+            tier: tierOf(group),
+            proposal: { row: exact[0], score: 1, exactYear: Number(exact[0].model_year) === Number(group.model_year) },
+            exactIdMatch: true,
+            reason: null,
+            ranked: ranked.slice(0, 8),
+            candidateCount: ranked.length,
+            shared: sharedCertification(ranked.slice(0, 8)),
+        };
+    }
+
     const best = bestFeCandidate(group, feRows);
 
     let reason = null;
@@ -172,9 +252,14 @@ export function classifyGroup(group, feRows) {
         group,
         tier: tierOf(group),
         proposal: best,
+        exactIdMatch: false,
         reason,
         ranked: ranked.slice(0, 8),
         candidateCount: ranked.length,
+        // Only worth saying when there is no proposal: if one candidate already
+        // won cleanly, the fact that its siblings share a certification is not
+        // what the curator is stuck on.
+        shared: best ? null : sharedCertification(ranked.slice(0, 8)),
     };
 }
 

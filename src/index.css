@@ -2749,3 +2749,12 @@ body {
 .sweep-candidate {
     @apply flex items-center justify-between gap-3;
 }
+
+/* The "these are one certification" note — the answer to a question the
+   curator would otherwise keep asking of data that cannot answer it. */
+.sweep-shared-note {
+    @apply mt-1 px-2 py-1 rounded text-xs;
+    background-color: rgba(59, 130, 246, 0.12);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-primary);
+}

@@ -1986,6 +1986,7 @@ class DataService {
       .select(`
         test_group_id, model_year, make, epa_carline_name, display_name,
         vehicle_config_number, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note, useable_kwh,
+        carryover_model_year, cd_range_combined_calc, derived_5cycle_coefficient,
         epa_coefficient_sets(target_a, equiv_test_weight_lbs),
         epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh),
         epa_vehicle_mappings(vehicles(id, name, year))
@@ -2005,6 +2006,7 @@ class DataService {
           .select(`
             test_group_id, model_year, make, epa_carline_name, display_name,
             vehicle_config_number, fe_guide_row_id, useable_kwh,
+            carryover_model_year, cd_range_combined_calc, derived_5cycle_coefficient,
             epa_coefficient_sets(target_a, equiv_test_weight_lbs),
             epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh),
             epa_vehicle_mappings(vehicles(id, name, year))
