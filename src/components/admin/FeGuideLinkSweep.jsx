@@ -1,0 +1,267 @@
+import { useState, useMemo, useCallback } from 'react';
+import { useAppContext } from '../../context/AppContext';
+import { useAsyncResource } from '../../hooks/useAsyncResource';
+import {
+    TIERS, buildSweep, sweepProgress, batchable, NO_PROPOSAL_REASONS,
+} from '../../utils/epaLinkSweep';
+
+/**
+ * Work through the certification groups with no Fuel Economy Guide row (#238).
+ *
+ * 159 of 211 groups are unlinked, and that link is the ceiling on the cert half
+ * of #236: without it, drivetrain η and charger efficiency can only be reported
+ * against a manufacturer's Vehicle ID rather than by class, brand or drive.
+ *
+ * `FeGuidePicker` already does this one group at a time, correctly, from the
+ * vehicle's Tests & Data tab. What was missing is a way to work through the
+ * list — and for the 113 groups linked to no vehicle at all, there is no Tests
+ * & Data tab to reach, so this is the only place they can be linked.
+ *
+ * The proposal test is `bestFeCandidate`, unchanged. It declines below the
+ * match floor, declines a borrowed model year, and declines a tie — the last
+ * learned from data, where `Ioniq 5` scores identically against `Ioniq 5 N` and
+ * `Ioniq 5 RWD`, cars 221 and ~300 miles apart. Applying a looser rule here,
+ * at the moment those judgements are made in bulk, would quietly undo it.
+ */
+function CandidateFacts({ row, score, exactYear }) {
+    return (
+        <span className="text-caption text-faint">
+            {row.label_comb_range_mi} mi
+            {row.label_comb_mpge != null && ` · ${row.label_comb_mpge} MPGe`}
+            {/* Motor count separates the ties that name and score cannot: MY25
+                lists HUMMER EV SUV twice, and the rows are the 2X and the 3X. */}
+            {row.motor_count != null && ` · ${row.motor_count} motor${row.motor_count === 1 ? '' : 's'}`}
+            {' · '}
+            <span style={exactYear ? undefined : { color: 'var(--color-warning)' }}>{row.model_year}</span>
+            {score != null && ` · ${Math.round(score * 100)}%`}
+        </span>
+    );
+}
+
+function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
+    const [open, setOpen] = useState(false);
+    const [note, setNote] = useState('');
+    const [asking, setAsking] = useState(false);
+    const g = item.group;
+    const vehicles = (g.epa_vehicle_mappings ?? []).map(m => m.vehicles).filter(Boolean);
+    const skipped = g.fe_guide_skipped_at != null;
+
+    return (
+        <div className={`sweep-row ${skipped ? 'skipped' : ''}`}>
+            <div className="sweep-row-main">
+                <div className="sweep-group">
+                    <div className="sweep-group-name">
+                        {g.display_name || g.epa_carline_name || g.test_group_id}
+                        {vehicles.length > 0 && (
+                            <span className="guide-badge guide-badge-tested"
+                                title={vehicles.map(v => `${v.year} ${v.name}`).join(', ')}>tested</span>
+                        )}
+                    </div>
+                    <div className="text-caption text-faint">
+                        {g.model_year} {g.make} · {g.test_group_id}
+                    </div>
+                </div>
+
+                <div className="sweep-proposal">
+                    {item.proposal ? (
+                        <>
+                            <div className="sweep-proposal-name">{item.proposal.row.carline}</div>
+                            <CandidateFacts row={item.proposal.row} score={item.proposal.score} exactYear />
+                        </>
+                    ) : (
+                        <div className="text-caption text-secondary">
+                            {NO_PROPOSAL_REASONS[item.reason] ?? 'No proposal.'}
+                        </div>
+                    )}
+                </div>
+
+                <div className="sweep-actions">
+                    {item.proposal && !skipped && (
+                        <button className="btn btn-primary" disabled={busy}
+                            onClick={() => onLink(g.test_group_id, item.proposal.row.id)}>
+                            Link
+                        </button>
+                    )}
+                    {item.candidateCount > 0 && (
+                        <button className="btn btn-secondary" onClick={() => setOpen(o => !o)}>
+                            {open ? 'Hide' : `${item.candidateCount} candidate${item.candidateCount === 1 ? '' : 's'}`}
+                        </button>
+                    )}
+                    {skipped ? (
+                        <button className="btn btn-secondary" disabled={busy}
+                            onClick={() => onUnskip(g.test_group_id)}>Un-skip</button>
+                    ) : (
+                        <button className="btn btn-secondary" disabled={busy}
+                            onClick={() => setAsking(a => !a)}>Skip</button>
+                    )}
+                </div>
+            </div>
+
+            {skipped && g.fe_guide_skip_note && (
+                <div className="text-caption text-muted">Skipped: {g.fe_guide_skip_note}</div>
+            )}
+
+            {asking && (
+                <div className="sweep-skip-ask">
+                    <input className="brand-input" value={note} onChange={e => setNote(e.target.value)}
+                        placeholder="Why is there nothing to link? (optional)" />
+                    <button className="btn btn-warning" disabled={busy}
+                        onClick={async () => { await onSkip(g.test_group_id, note.trim() || null); setAsking(false); }}>
+                        Record skip
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => setAsking(false)}>Cancel</button>
+                </div>
+            )}
+
+            {open && (
+                <div className="sweep-candidates">
+                    {item.ranked.map(c => (
+                        <div key={c.row.id} className="sweep-candidate">
+                            <div>
+                                <div>{c.row.carline}</div>
+                                <CandidateFacts row={c.row} score={c.score} exactYear={c.exactYear} />
+                            </div>
+                            <button className="btn btn-secondary" disabled={busy}
+                                onClick={() => onLink(g.test_group_id, c.row.id)}>Link this</button>
+                        </div>
+                    ))}
+                    {/* A borrowed year is a legitimate link, not a weaker one:
+                        a configuration often has no row in its own year. */}
+                    {item.ranked.some(c => !c.exactYear) && (
+                        <div className="text-hint">
+                            Rows from another model year are marked in amber. Borrowing one is legitimate —
+                            a configuration often has no row in its own year — but the figures may have moved.
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default function FeGuideLinkSweep() {
+    const {
+        getGroupsAwaitingFeLink, getFeLinkProgress, getFeGuideRows,
+        linkFeGuideRow, setFeLinkSkipped,
+    } = useAppContext();
+
+    const [includeSkipped, setIncludeSkipped] = useState(false);
+    const [tier, setTier] = useState('energy');
+    const [busy, setBusy] = useState(false);
+    const [note, setNote] = useState(null);
+
+    const loadGroups   = useCallback(() => getGroupsAwaitingFeLink({ includeSkipped }), [getGroupsAwaitingFeLink, includeSkipped]);
+    const loadRows     = useCallback(() => getFeGuideRows(), [getFeGuideRows]);
+    const loadProgress = useCallback(() => getFeLinkProgress(), [getFeLinkProgress]);
+
+    const { data: groups, loading, error, reload: reloadGroups } = useAsyncResource(loadGroups, [includeSkipped]);
+    // Fetched ONCE and ranked in memory. FeGuidePicker fetches the corpus per
+    // group, which is right for one group and 159 full-corpus reads here.
+    const { data: feRows } = useAsyncResource(loadRows, []);
+    const { data: progress, reload: reloadProgress } = useAsyncResource(loadProgress, []);
+
+    const items = useMemo(
+        () => buildSweep(groups ?? [], feRows ?? []),
+        [groups, feRows],
+    );
+    const counts = useMemo(() => sweepProgress(items), [items]);
+    const shown = useMemo(() => items.filter(i => i.tier === tier), [items, tier]);
+    const batch = useMemo(() => batchable(shown), [shown]);
+
+    const refresh = () => { reloadGroups(); reloadProgress(); };
+
+    const run = async (fn, message) => {
+        setBusy(true); setNote(null);
+        try { await fn(); setNote(message); refresh(); }
+        catch (e) { setNote(`Failed: ${e.message}`); }
+        finally { setBusy(false); }
+    };
+
+    const linkOne = (groupId, rowId) =>
+        run(() => linkFeGuideRow(groupId, rowId), 'Linked.');
+
+    const linkBatch = () => run(async () => {
+        // Sequential, not parallel. Each link reads the group, computes what
+        // may be promoted and writes it back; firing 40 of those at once makes
+        // a failure halfway impossible to attribute to a group.
+        for (const it of batch) await linkFeGuideRow(it.group.test_group_id, it.proposal.row.id);
+    }, `Linked ${batch.length} group${batch.length === 1 ? '' : 's'}.`);
+
+    if (loading) return <div className="text-caption text-secondary">Loading groups…</div>;
+    if (error) return <div className="empty-state">Could not load the sweep: {String(error.message ?? error)}</div>;
+
+    const tierDef = TIERS.find(t => t.key === tier);
+
+    return (
+        <div className="flex flex-col gap-4">
+            <div className="section-header">
+                <div>
+                    <div className="section-header-title">Link certification groups to guide rows</div>
+                    {progress && (
+                        <div className="text-caption text-secondary">
+                            {progress.linked} linked · {progress.awaiting} awaiting a decision
+                            {progress.skipped > 0 && ` · ${progress.skipped} skipped`}
+                            {' '}of {progress.total}
+                        </div>
+                    )}
+                    {progress === null && (
+                        <div className="text-caption text-muted">
+                            Skips cannot be recorded until migration 058 is applied.
+                        </div>
+                    )}
+                </div>
+                <div className="section-header-actions">
+                    <label className="text-caption flex items-center gap-1.5">
+                        <input type="checkbox" checked={includeSkipped}
+                            onChange={e => setIncludeSkipped(e.target.checked)} />
+                        Show skipped
+                    </label>
+                </div>
+            </div>
+
+            {note && <div className="guide-tested-note">{note}</div>}
+
+            <div className="guide-facet-values">
+                {TIERS.map(t => (
+                    <button key={t.key} type="button"
+                        className={`guide-chip ${tier === t.key ? 'active' : ''}`}
+                        onClick={() => setTier(t.key)}
+                        title={t.why}>
+                        {t.label}
+                        <span className="guide-chip-count">{counts[t.key].total}</span>
+                    </button>
+                ))}
+            </div>
+
+            <div className="text-hint">{tierDef?.why}</div>
+
+            {batch.length > 0 && (
+                <div className="sweep-batch">
+                    <div className="text-caption">
+                        <strong>{batch.length}</strong> of these have a single unambiguous same-year
+                        match. Ties, borrowed years and weak matches are excluded and need a look.
+                    </div>
+                    <button className="btn btn-primary" disabled={busy} onClick={linkBatch}>
+                        Link all {batch.length}
+                    </button>
+                </div>
+            )}
+
+            <div className="brand-list">
+                {shown.map(item => (
+                    <SweepRow
+                        key={item.group.test_group_id}
+                        item={item}
+                        busy={busy}
+                        onLink={linkOne}
+                        onSkip={(id, n) => run(() => setFeLinkSkipped(id, true, n), 'Skip recorded.')}
+                        onUnskip={(id) => run(() => setFeLinkSkipped(id, false), 'Skip cleared.')}
+                    />
+                ))}
+                {shown.length === 0 && (
+                    <div className="empty-state">Nothing awaiting a decision in this tier.</div>
+                )}
+            </div>
+        </div>
+    );
+}

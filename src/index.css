@@ -2695,3 +2695,57 @@ body {
     @apply truncate;
     color: var(--color-text-primary);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   FE GUIDE LINK SWEEP (#238)
+
+   Working through 159 unlinked certification groups. Three columns per row —
+   what we hold, what is proposed, what to do — so a curator scans down the
+   middle column and only stops where the proposal looks wrong.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.sweep-row {
+    @apply flex flex-col gap-2 p-3 rounded-lg;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+}
+.sweep-row.skipped { @apply opacity-60; }
+.sweep-row-main {
+    @apply grid items-start gap-3;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+@media (max-width: 48rem) {
+    .sweep-row-main { grid-template-columns: 1fr; }
+}
+.sweep-group-name {
+    @apply flex items-center gap-1.5 font-medium;
+    color: var(--color-text-primary);
+}
+.sweep-proposal-name { color: var(--color-text-primary); }
+.sweep-actions {
+    @apply flex flex-wrap items-center gap-2 justify-end;
+}
+
+/* The batch is the point of a sweep: everything unambiguous cleared at once,
+   with the count stated so it is a decision rather than a leap. */
+.sweep-batch {
+    @apply flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg;
+    background-color: var(--color-primary-light);
+    border: 1px solid var(--color-primary);
+}
+[data-theme="dark"] .sweep-batch {
+    background-color: rgba(59, 130, 246, 0.15);
+}
+
+.sweep-skip-ask {
+    @apply flex flex-wrap items-center gap-2 p-2 rounded;
+    background-color: rgba(245, 158, 11, 0.12);
+    border: 1px solid var(--color-warning);
+}
+.sweep-candidates {
+    @apply flex flex-col gap-1.5 pt-2;
+    border-top: 1px solid var(--color-border);
+}
+.sweep-candidate {
+    @apply flex items-center justify-between gap-3;
+}

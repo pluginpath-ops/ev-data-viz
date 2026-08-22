@@ -68,6 +68,11 @@ const IMAGE_CACHE_SECONDS = 31536000;
  * (42883) and PostgREST's own "no such function" (PGRST202). Anything else —
  * permission, syntax, a genuine failure — still throws.
  */
+/** Whether an error means a COLUMN is absent — a migration not yet applied. */
+function isMissingColumn(error) {
+  return error?.code === '42703';
+}
+
 function isMissingRelation(error) {
   const code = error?.code;
   return code === '42P01' || code === '42883' || code === 'PGRST202';
@@ -1958,6 +1963,95 @@ class DataService {
       .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
     if (error) throw error;
     return { promoted, skipped };
+  }
+
+  /**
+   * Every certification group still awaiting a guide link (#238).
+   *
+   * Includes what each one would unlock, so the sweep can prioritise: the
+   * procedure codes and DC energy that decide whether a link adds a charger
+   * efficiency, and the coefficient targets that decide whether it adds a
+   * road-load figure. Both are read here rather than counted server-side
+   * because the sweep needs the values anyway.
+   *
+   * Skipped groups are excluded by default. "We looked and there is nothing" is
+   * a decision, and a sweep that keeps re-asking it never finishes — but the
+   * caller can ask for them, because that is different from having no opinion.
+   */
+  async getGroupsAwaitingFeLink({ includeSkipped = false } = {}) {
+    if (!this.useSupabase) return [];
+    let q = getSupabase()
+      .from('epa_test_groups')
+      .select(`
+        test_group_id, model_year, make, epa_carline_name, display_name,
+        vehicle_config_number, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note,
+        epa_coefficient_sets(target_a),
+        epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh),
+        epa_vehicle_mappings(vehicles(id, name, year))
+      `)
+      .is('fe_guide_row_id', null)
+      .order('test_group_id');
+    if (!includeSkipped) q = q.is('fe_guide_skipped_at', null);
+
+    const { data, error } = await q;
+    if (error) {
+      // The skip columns arrive in migration 058. Without them the sweep still
+      // works; it simply cannot remember a decision yet, which is better than
+      // an admin panel that will not render.
+      if (isMissingColumn(error)) {
+        const { data: fallback, error: e2 } = await getSupabase()
+          .from('epa_test_groups')
+          .select(`
+            test_group_id, model_year, make, epa_carline_name, display_name,
+            vehicle_config_number, fe_guide_row_id,
+            epa_coefficient_sets(target_a),
+            epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh),
+            epa_vehicle_mappings(vehicles(id, name, year))
+          `)
+          .is('fe_guide_row_id', null)
+          .order('test_group_id');
+        if (e2) throw e2;
+        return fallback || [];
+      }
+      throw error;
+    }
+    return data || [];
+  }
+
+  /** How far the sweep has got: linked, skipped, still awaiting a decision. */
+  async getFeLinkProgress() {
+    if (!this.useSupabase) return null;
+    const { data, error } = await getSupabase()
+      .from('epa_test_groups')
+      .select('test_group_id, fe_guide_row_id, fe_guide_skipped_at');
+    if (error) {
+      if (isMissingColumn(error)) return null;
+      throw error;
+    }
+    const rows = data || [];
+    return {
+      total:    rows.length,
+      linked:   rows.filter(r => r.fe_guide_row_id != null).length,
+      skipped:  rows.filter(r => r.fe_guide_row_id == null && r.fe_guide_skipped_at != null).length,
+      awaiting: rows.filter(r => r.fe_guide_row_id == null && r.fe_guide_skipped_at == null).length,
+    };
+  }
+
+  /**
+   * Record that a group has no guide row to link, or undo that.
+   *
+   * Deliberately not a link and not a deletion: the group stays unlinked and
+   * stays findable, because a curator having looked is worth knowing.
+   */
+  async setFeLinkSkipped(testGroupId, skipped, note = null) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('epa_test_groups')
+      .update(skipped
+        ? { fe_guide_skipped_at: new Date().toISOString(), fe_guide_skip_note: note }
+        : { fe_guide_skipped_at: null, fe_guide_skip_note: null })
+      .eq('test_group_id', testGroupId);
+    if (error) throw error;
   }
 
   /** One staged guide row by id — the linked row, for showing what it holds. */

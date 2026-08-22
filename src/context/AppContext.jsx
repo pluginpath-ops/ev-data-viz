@@ -1215,6 +1215,10 @@ export function AppProvider({ children }) {
     };
 
     const getFeGuideRow = (id) => dataService.getFeGuideRow(id);
+    // The linking sweep (#238).
+    const getGroupsAwaitingFeLink = (opts) => dataService.getGroupsAwaitingFeLink(opts);
+    const getFeLinkProgress = () => dataService.getFeLinkProgress();
+    const setFeLinkSkipped = (id, skipped, note) => dataService.setFeLinkSkipped(id, skipped, note);
     // The public browser (#235). Both are read-once-per-mount loads over small
     // result sets, so they are plain pass-throughs with no caching layer here.
     const getFeGuideRows = () => dataService.getFeGuideRows();
@@ -1672,6 +1676,9 @@ export function AppProvider({ children }) {
         getFeGuideRow,
         getFeGuideRows,
         getFeGuideVehicleLinks,
+        getGroupsAwaitingFeLink,
+        getFeLinkProgress,
+        setFeLinkSkipped,
         getBrandAliases,
         getBrandDivisionSummary,
         getBrandUsageSummary,

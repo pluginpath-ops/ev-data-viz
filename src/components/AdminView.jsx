@@ -7,6 +7,7 @@ import RolesPermissions from './admin/RolesPermissions';
 import ConstantsKnobs from './admin/ConstantsKnobs';
 import InterfaceSettings from './admin/InterfaceSettings';
 import FeGuideImport from './admin/FeGuideImport';
+import FeGuideLinkSweep from './admin/FeGuideLinkSweep';
 import BrandRegistry from './admin/BrandRegistry';
 import TagRegistry from './admin/TagRegistry';
 
@@ -28,7 +29,7 @@ export const DEFAULT_ADMIN_SUBTAB = 'roles';
 const SUBTITLES = {
     roles:     'Manage registered users and their roles.',
     epa:       'Browse, edit, link, and delete imported EPA test groups.',
-    feguide:   'Import EPA\'s published label figures, one guide per model year.',
+    feguide:   'Import EPA\'s published label figures, and link them to certification groups.',
     brands:    'One brand list for vehicles and EPA filings. Rename, merge, and map EPA\'s division spellings.',
     constants: 'Tune the EPA model math (local sandbox).',
     interface: 'Site-wide appearance settings.',
@@ -192,7 +193,14 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                 />
             )}
 
-            {subtab === 'feguide' && <FeGuideImport />}
+            {/* Import and linking live together: one loads the guide, the
+                other connects it to the certification records. */}
+            {subtab === 'feguide' && (
+                <div className="flex flex-col gap-6">
+                    <FeGuideImport />
+                    <FeGuideLinkSweep />
+                </div>
+            )}
 
             {subtab === 'brands' && (
                 <div className="flex flex-col gap-6">

@@ -40,9 +40,15 @@ describe('utilities built for the UI are reached by the UI', () => {
     // Scoped to the modules built recently rather than the whole codebase: 48
     // exports are unused project-wide, nearly all pre-existing in the EPA and
     // parser modules. Widening this wants a cleanup first, not an allowlist.
+    // feGuideMatch earned its place here: `bestFeCandidate` was written with
+    // care — it declines a tie because `Ioniq 5` scores identically against two
+    // cars 80 miles apart — fully unit-tested, and had ZERO call sites until
+    // #238 wired it in. Exactly the "built, tested, never connected" shape this
+    // suite exists to catch, and the one module doing that work was not watched.
     const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js',
                      'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromGroup.js',
-                     'epaDerivationCheck.js', 'epaSectionLabels.js'];
+                     'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
+                     'epaLinkSweep.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -80,6 +86,20 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The multiple itself, consumed inside the module by suggestPhaseType and asserted by name so changing it is deliberate.',
         'socAlignment.extrapolationSlope':
             'Called by alignSeries, which the chart calls. Exported so the slope basis can be asserted without going through alignment.',
+        'feGuideMatch.normaliseMake':
+            'The make comparison, consumed inside the module by sameMake. Exported so the abbreviation and punctuation rules can be asserted directly.',
+        'feGuideMatch.sameMake':
+            'The candidate filter, consumed inside the module by rankFeCandidates. Exported so "same manufacturer" is testable without ranking.',
+        'feGuideMatch.carlineScore':
+            'The similarity metric, consumed inside the module by rankFeCandidates. Exported so a score can be pinned against real carline pairs.',
+        'epaLinkSweep.hasDerivableEnergy':
+            'Consumed inside the module by tierOf. Exported so the procedure-code rule — 77 and 84 only, never 86 — is asserted on its own.',
+        'epaLinkSweep.hasCoefficients':
+            'As above, consumed by tierOf and exported so the target-set check is testable without tiering.',
+        'epaLinkSweep.tierOf':
+            'Consumed inside the module by classifyGroup. Exported so the priority order is asserted directly rather than inferred from a sorted sweep.',
+        'epaLinkSweep.classifyGroup':
+            'Consumed inside the module by buildSweep, which the sweep view calls. Exported so one group\'s proposal and decline reason can be asserted without building a whole sweep.',
     };
 
     for (const mod of WATCHED) {
