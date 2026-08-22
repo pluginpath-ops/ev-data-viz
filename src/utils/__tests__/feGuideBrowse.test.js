@@ -4,7 +4,7 @@ import {
     decorateRow, GUIDE_COLUMNS, DEFAULT_COLUMNS, columnByKey, formatCell,
     buildFacets, filterRows, sortRows, EMPTY_FILTERS,
     encodeGuideParams, decodeGuideParams, computeBarMaxima, barPercent,
-    buildBrandIndex, resolveBrand,
+    buildBrandIndex, resolveBrand, driveGroup,
 } from '../feGuideBrowse';
 
 describe('wheelSizeIn', () => {
@@ -284,5 +284,34 @@ describe('brand resolution', () => {
         expect(d.brand).toBe('Lucid');
         expect(d.brand_mapped).toBe(true);
         expect(d.division).toBe('Lucid USA Inc.');   // the source is never rewritten
+    });
+});
+
+describe('driveGroup', () => {
+    // EPA's three all-wheel labels describe hardware distinctions that do not
+    // exist on an EV. The data proves it: `Part-time 4-Wheel Drive` is used by
+    // exactly one manufacturer (Rivian, 80 rows), and 82 of the 118 plain
+    // `4-Wheel Drive` rows are ALSO Rivian — the same clutch-disconnect
+    // mechanism split across two labels by the same maker.
+    it('collapses every all-wheel variant into one', () => {
+        expect(driveGroup('All Wheel Drive')).toBe('All Wheel Drive');
+        expect(driveGroup('4-Wheel Drive')).toBe('All Wheel Drive');
+        expect(driveGroup('Part-time 4-Wheel Drive')).toBe('All Wheel Drive');
+    });
+    it('keeps front and rear apart, which is a real distinction', () => {
+        expect(driveGroup('2-Wheel Drive, Rear')).toBe('Rear Wheel Drive');
+        expect(driveGroup('2-Wheel Drive, Front')).toBe('Front Wheel Drive');
+    });
+    it('passes an unrecognised description through rather than guessing', () => {
+        expect(driveGroup('Six Wheel Drive')).toBe('Six Wheel Drive');
+    });
+    it('is null when EPA said nothing', () => {
+        expect(driveGroup(null)).toBeNull();
+        expect(driveGroup('  ')).toBeNull();
+    });
+    it('never loses EPA’s own wording', () => {
+        const d = decorateRow({ carline: 'R1S', drive_desc: 'Part-time 4-Wheel Drive' }, undefined);
+        expect(d.drive_group).toBe('All Wheel Drive');
+        expect(d.drive_desc).toBe('Part-time 4-Wheel Drive');
     });
 });

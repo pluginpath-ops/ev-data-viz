@@ -16,7 +16,7 @@ import EpaCurvesView from './components/EpaCurvesView';
 import PerformanceCompareView from './components/PerformanceCompareView';
 import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/AdminView';
-import EpaGuideView from './components/epa/guide/EpaGuideView';
+import EpaSection from './components/epa/EpaSection';
 import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory } from './constants/chartNav';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
@@ -1023,7 +1023,7 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                         />
                     )}
-                    {view === 'epa' && <EpaGuideView />}
+                    {view === 'epa' && <EpaSection />}
 
                     {view === 'admin' && isAdmin && (
                         <AdminView

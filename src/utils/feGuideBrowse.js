@@ -107,6 +107,35 @@ export function bodyClassLabel(carlineClass) {
 }
 
 /**
+ * EPA's five drive descriptions collapsed to the three that mean something.
+ *
+ * `All Wheel Drive` (707), `4-Wheel Drive` (118) and `Part-time 4-Wheel Drive`
+ * (80) are one category on an EV. The distinctions those labels carry on a
+ * combustion car — a transfer case, a locked front-to-rear speed ratio, a
+ * driver-selectable mode — describe hardware no EV in this corpus has.
+ *
+ * The data says so plainly. `Part-time 4-Wheel Drive` is used by exactly ONE
+ * manufacturer, Rivian, across all 80 rows; it appears to mean clutch
+ * disconnect. But 82 of the 118 rows labelled plain `4-Wheel Drive` are also
+ * Rivian — the Tri and Quad variants — and those disconnect too. So the same
+ * maker, using the same mechanism, is split across two labels. A distinction
+ * that does not survive contact with a single manufacturer's own lineup is not
+ * one worth grouping by.
+ *
+ * `drive_desc` is kept and remains selectable, exactly as `division` is kept
+ * beside the resolved brand. This collapses for grouping and display; EPA's own
+ * wording is never lost.
+ */
+export function driveGroup(driveDesc) {
+    const d = String(driveDesc ?? '').trim();
+    if (!d) return null;
+    if (/front/i.test(d)) return 'Front Wheel Drive';
+    if (/rear/i.test(d))  return 'Rear Wheel Drive';
+    if (/all wheel|4-wheel|4wd|awd/i.test(d)) return 'All Wheel Drive';
+    return d;
+}
+
+/**
  * City ÷ highway MPGe.
  *
  * Mostly aerodynamics and mass, which is what makes it a verdict on the
@@ -192,6 +221,7 @@ export function decorateRow(row, brandIndex) {
         ...row,
         wheel_size_in:   wheelSizeIn(row.carline),
         body_class:      bodyClassLabel(row.carline_class),
+        drive_group:     driveGroup(row.drive_desc),
         city_hwy_ratio:  cityHwyRatio(row),
         is_collapsed:    isCollapsedRow(row),
         brand,
@@ -249,7 +279,10 @@ export const GUIDE_COLUMNS = [
     { key: 'batt_specific_energy_wh_kg', label: 'Specific energy', unit: 'Wh/kg', group: 'Battery', numeric: true, digits: 0 },
 
     // Powertrain
-    { key: 'drive_desc',     label: 'Drive',       group: 'Powertrain', default: true },
+    { key: 'drive_group',    label: 'Drive',       group: 'Powertrain', derived: true, default: true,
+      hint: 'All-wheel, 4-wheel and part-time 4-wheel collapsed into one: on an EV they are the same thing, and Rivian alone is split across two of those labels for the same clutch-disconnect hardware.' },
+    { key: 'drive_desc',     label: 'EPA drive',   group: 'Powertrain',
+      hint: 'The drive description exactly as EPA filed it.' },
     { key: 'motor_power_kw', label: 'Motor power', unit: 'kW', group: 'Powertrain', numeric: true, digits: 0, bar: true,
       hint: 'Summed across motors. On a row EPA collapsed from several configurations this is a union of them, not one car’s output — those rows carry a "multi" flag.' },
     // Off by default: `# Drive Motor Gen` is a union wherever EPA folded
@@ -321,7 +354,7 @@ export function buildFacets(rows) {
         makes:       uniq(r => r.brand),
         parents:     uniq(r => r.parent_name),
         bodyClasses: uniq(r => r.body_class),
-        drives:      uniq(r => r.drive_desc),
+        drives:      uniq(r => r.drive_group),
         // Only counts that describe a real vehicle. A collapsed row reads 9
         // motors, and offering that as a filter value invites someone to
         // select it believing such a car exists.
@@ -345,7 +378,7 @@ export function filterRows(rows, filters) {
         if (!inList(f.makes, r.brand))               return false;
         if (!inList(f.parents, r.parent_name))       return false;
         if (!inList(f.bodyClasses, r.body_class))    return false;
-        if (!inList(f.drives, r.drive_desc))         return false;
+        if (!inList(f.drives, r.drive_group))        return false;
         if (!inList(f.motorCounts, r.motor_count))   return false;
         if (!inList(f.wheelSizes, r.wheel_size_in))  return false;
         if (!within(r.label_comb_range_mi, f.minRange, f.maxRange)) return false;
