@@ -11,7 +11,7 @@
  * reports. The matching itself is `feGuideMatch`, unchanged.
  */
 import { rankFeCandidates, bestFeCandidate, MATCH_FLOOR } from './feGuideMatch';
-import { PROC_MCT, PROC_CD_HWY } from '../constants/epa';
+import { PROC_MCT, PROC_CD_HWY, MPG_E_CONVERSION } from '../constants/epa';
 
 // ── Priority ─────────────────────────────────────────────────────────────────
 
@@ -77,6 +77,51 @@ export function tierOf(group) {
     if (hasDerivableEnergy(group)) return 'energy';
     if (hasCoefficients(group))    return 'coefficients';
     return 'other';
+}
+
+// ── Telling near-identical candidates apart ──────────────────────────────────
+
+/**
+ * The energy a guide row implies, from its own range and efficiency.
+ *
+ * MPGe is miles per 33.705 kWh, so range ÷ MPGe × 33.705 is the energy the
+ * label figures were computed from. This is the field that separates trims a
+ * carline name does not: `R1T All-Terrain Performance Dual` matches Large, Large
+ * Plus and Max identically at 71%, and those are 128, 137 and 160 kWh.
+ *
+ * ⚠ AC basis. MPGe is computed from energy drawn at the wall, so this includes
+ * charging losses and reads roughly 1/0.88 higher than the DC energy a
+ * certification test reports. It is a discriminator, NOT a quantity to compare
+ * arithmetically against `total_dc_energy_kwh` — which is why the UI shows both
+ * and labels each rather than differencing them.
+ */
+export function impliedUsableKwh(feRow) {
+    const range = num(feRow?.label_comb_range_mi);
+    const mpge  = num(feRow?.label_comb_mpge);
+    if (range == null || mpge == null || mpge <= 0) return null;
+    return (range / mpge) * MPG_E_CONVERSION;
+}
+
+/**
+ * What the certification record itself knows about its pack and mass.
+ *
+ * The other half of the same question. A group carrying 144 kWh of measured DC
+ * energy is a big-pack car whatever its carline says, and the equivalent test
+ * weight moves with the pack too.
+ */
+export function groupEnergyFacts(group) {
+    const test = (group?.epa_tests ?? [])
+        .filter(t => [PROC_MCT, PROC_CD_HWY].includes(num(t.procedure_code)))
+        .find(t => num(t.total_dc_energy_kwh) != null);
+    const etw = (group?.epa_coefficient_sets ?? [])
+        .map(c => num(c.equiv_test_weight_lbs))
+        .find(v => v != null);
+    return {
+        dcEnergyKwh: test ? num(test.total_dc_energy_kwh) : null,
+        procedure:   test ? num(test.procedure_code) : null,
+        etwLbs:      etw ?? null,
+        useableKwh:  num(group?.useable_kwh),
+    };
 }
 
 // ── Proposals ────────────────────────────────────────────────────────────────

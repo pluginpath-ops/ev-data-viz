@@ -3,6 +3,7 @@ import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
 import {
     TIERS, buildSweep, sweepProgress, batchable, NO_PROPOSAL_REASONS,
+    impliedUsableKwh, groupEnergyFacts,
 } from '../../utils/epaLinkSweep';
 
 /**
@@ -23,18 +24,60 @@ import {
  * `Ioniq 5 RWD`, cars 221 and ~300 miles apart. Applying a looser rule here,
  * at the moment those judgements are made in bulk, would quietly undo it.
  */
+/**
+ * The facts that tell two candidates apart.
+ *
+ * Pack size and implied energy are here because the carline often is not
+ * enough: `R1T All-Terrain Performance Dual` scores 71% against Large, Large
+ * Plus and Max alike, and nothing in the name says which. Those three are 116,
+ * 150 and 150 kWh of pack and 128, 137 and 160 kWh of implied energy — the
+ * numbers decide what the name cannot.
+ *
+ * Motor count stays for the ties it separates: MY25 lists HUMMER EV SUV twice
+ * and the rows are the 2X and the 3X.
+ */
 function CandidateFacts({ row, score, exactYear }) {
+    const implied = impliedUsableKwh(row);
     return (
         <span className="text-caption text-faint">
             {row.label_comb_range_mi} mi
             {row.label_comb_mpge != null && ` · ${row.label_comb_mpge} MPGe`}
-            {/* Motor count separates the ties that name and score cannot: MY25
-                lists HUMMER EV SUV twice, and the rows are the 2X and the 3X. */}
+            {row.nominal_pack_kwh != null && ` · ${Number(row.nominal_pack_kwh).toFixed(1)} kWh pack`}
+            {implied != null && (
+                <span title="Range ÷ MPGe × 33.705 — the energy these label figures were computed from. AC basis, so it reads about 1/0.88 higher than a certification test's DC energy.">
+                    {` · ~${implied.toFixed(0)} kWh implied`}
+                </span>
+            )}
             {row.motor_count != null && ` · ${row.motor_count} motor${row.motor_count === 1 ? '' : 's'}`}
             {' · '}
             <span style={exactYear ? undefined : { color: 'var(--color-warning)' }}>{row.model_year}</span>
             {score != null && ` · ${Math.round(score * 100)}%`}
         </span>
+    );
+}
+
+/**
+ * What the certification record knows about its own pack and mass.
+ *
+ * The other half of the disambiguation, shown beside the candidates rather than
+ * differenced against them: the group's DC energy and the candidates' implied
+ * energy are on different bases (DC against AC), so a subtraction would look
+ * precise and be wrong. Side by side, a 144 kWh group against candidates at
+ * 128, 137 and 160 is still an easy call.
+ */
+function GroupEnergyFacts({ group }) {
+    const f = groupEnergyFacts(group);
+    if (f.dcEnergyKwh == null && f.etwLbs == null && f.useableKwh == null) return null;
+    return (
+        <div className="text-caption text-secondary">
+            {f.dcEnergyKwh != null && (
+                <span title={`Measured DC energy from procedure ${f.procedure}. DC basis — not directly comparable with a candidate's implied kWh, which is AC.`}>
+                    {f.dcEnergyKwh.toFixed(1)} kWh measured DC
+                </span>
+            )}
+            {f.useableKwh != null && ` · ${f.useableKwh.toFixed(1)} kWh useable`}
+            {f.etwLbs != null && ` · ${f.etwLbs.toFixed(0)} lb test weight`}
+        </div>
     );
 }
 
@@ -60,6 +103,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                     <div className="text-caption text-faint">
                         {g.model_year} {g.make} · {g.test_group_id}
                     </div>
+                    <GroupEnergyFacts group={g} />
                 </div>
 
                 <div className="sweep-proposal">
@@ -184,7 +228,19 @@ export default function FeGuideLinkSweep() {
         // Sequential, not parallel. Each link reads the group, computes what
         // may be promoted and writes it back; firing 40 of those at once makes
         // a failure halfway impossible to attribute to a group.
-        for (const it of batch) await linkFeGuideRow(it.group.test_group_id, it.proposal.row.id);
+        //
+        // A failure part-way stops the batch and reports how far it got, rather
+        // than pressing on: the remaining groups stay listed, so the state on
+        // screen after a refresh is the truth either way.
+        let done = 0;
+        try {
+            for (const it of batch) {
+                await linkFeGuideRow(it.group.test_group_id, it.proposal.row.id);
+                done += 1;
+            }
+        } catch (e) {
+            throw new Error(`linked ${done} of ${batch.length}, then: ${e.message}`, { cause: e });
+        }
     }, `Linked ${batch.length} group${batch.length === 1 ? '' : 's'}.`);
 
     if (loading) return <div className="text-caption text-secondary">Loading groups…</div>;

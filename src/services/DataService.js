@@ -1957,8 +1957,9 @@ class DataService {
     if (fErr) throw fErr;
 
     const { updates, promoted, skipped } = promotionUpdates(group, feRow);
-    if (!promoted.length) return { promoted, skipped };
-
+    // No early return on an empty `promoted`. `updates` always carries
+    // fe_guide_row_id, and skipping the write when the guide happened to add no
+    // new values left the group unlinked while reporting success.
     const { error } = await supabase
       .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
     if (error) throw error;
@@ -1984,8 +1985,8 @@ class DataService {
       .from('epa_test_groups')
       .select(`
         test_group_id, model_year, make, epa_carline_name, display_name,
-        vehicle_config_number, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note,
-        epa_coefficient_sets(target_a),
+        vehicle_config_number, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note, useable_kwh,
+        epa_coefficient_sets(target_a, equiv_test_weight_lbs),
         epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh),
         epa_vehicle_mappings(vehicles(id, name, year))
       `)
@@ -2003,8 +2004,8 @@ class DataService {
           .from('epa_test_groups')
           .select(`
             test_group_id, model_year, make, epa_carline_name, display_name,
-            vehicle_config_number, fe_guide_row_id,
-            epa_coefficient_sets(target_a),
+            vehicle_config_number, fe_guide_row_id, useable_kwh,
+            epa_coefficient_sets(target_a, equiv_test_weight_lbs),
             epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh),
             epa_vehicle_mappings(vehicles(id, name, year))
           `)

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     TIERS, tierOf, hasDerivableEnergy, hasCoefficients,
     classifyGroup, buildSweep, sweepProgress, batchable, NO_PROPOSAL_REASONS,
+    impliedUsableKwh, groupEnergyFacts,
 } from '../epaLinkSweep';
 
 const group = (o = {}) => ({
@@ -108,5 +109,44 @@ describe('ordering', () => {
         expect(batchable(out).map(i => i.group.test_group_id)).toEqual(['A', 'C', 'D']);
         // The tie and wrong-year cases must never reach a batch confirm.
         expect(batchable(out).every(i => i.proposal)).toBe(true);
+    });
+});
+
+describe('telling near-identical candidates apart', () => {
+    // The real case: `R1T All-Terrain Performance Dual` scores 71% against
+    // three MY2025 Rivian rows and the name says nothing about which pack.
+    const large     = { label_comb_range_mi: 289, label_comb_mpge: 76, nominal_pack_kwh: 116.116 };
+    const largePlus = { label_comb_range_mi: 292, label_comb_mpge: 72, nominal_pack_kwh: 149.744 };
+    const max       = { label_comb_range_mi: 370, label_comb_mpge: 78, nominal_pack_kwh: 149.744 };
+
+    it('separates trims a carline name cannot', () => {
+        expect(impliedUsableKwh(large)).toBeCloseTo(128.2, 1);
+        expect(impliedUsableKwh(largePlus)).toBeCloseTo(136.7, 1);
+        expect(impliedUsableKwh(max)).toBeCloseTo(159.9, 1);
+    });
+    it('is null without both inputs, rather than dividing by zero', () => {
+        expect(impliedUsableKwh({ label_comb_range_mi: 300 })).toBeNull();
+        expect(impliedUsableKwh({ label_comb_range_mi: 300, label_comb_mpge: 0 })).toBeNull();
+        expect(impliedUsableKwh(null)).toBeNull();
+    });
+
+    it('reads the group’s own measured energy from a usable procedure only', () => {
+        // The real group carries both: proc 86 at 6.09 kWh and proc 77 at
+        // 144.23. Taking the first test would have reported 6 kWh and pointed
+        // at the smallest pack — the opposite of the truth.
+        const f = groupEnergyFacts({
+            epa_tests: [
+                { procedure_code: 86, total_dc_energy_kwh: 6.093 },
+                { procedure_code: 77, total_dc_energy_kwh: 144.232 },
+            ],
+            epa_coefficient_sets: [{ equiv_test_weight_lbs: 7000 }],
+        });
+        expect(f.dcEnergyKwh).toBeCloseTo(144.232, 3);
+        expect(f.procedure).toBe(77);
+        expect(f.etwLbs).toBe(7000);
+    });
+    it('is all-null when the group knows nothing about its own energy', () => {
+        expect(groupEnergyFacts({ epa_tests: [], epa_coefficient_sets: [] }))
+            .toEqual({ dcEnergyKwh: null, procedure: null, etwLbs: null, useableKwh: null });
     });
 });

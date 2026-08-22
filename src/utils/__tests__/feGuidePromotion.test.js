@@ -82,11 +82,15 @@ describe('promotionUpdates', () => {
         expect('unadj_city_mpge' in updates).toBe(false);
     });
 
-    it('writes nothing at all when there is nothing to promote', () => {
-        const { updates, promoted } = promotionUpdates({ overrides: {} }, { id: 9 });
+    it('writes nothing at all for a guide row carrying none of the fields', () => {
+        const { updates, promoted, skipped } = promotionUpdates({ overrides: {} }, { id: 9 });
         expect(promoted).toEqual([]);
+        expect(skipped).toEqual([]);
         expect(updates).toEqual({});
-        // No link recorded either — an empty promotion is not a link.
+        // No link either. Nothing was promoted AND nothing was held back, so
+        // the row carries none of the promotable fields — a correspondence with
+        // nothing behind it. Distinct from the curator-owned case below, where
+        // the row is real and the link is recorded.
         expect(updates.fe_guide_row_id).toBeUndefined();
     });
 
@@ -224,5 +228,42 @@ describe('acceptGuideUpdates', () => {
     it('does nothing when asked for nothing', () => {
         expect(acceptGuideUpdates(held, feRow, []).accepted).toEqual([]);
         expect(acceptGuideUpdates(held, feRow, ['not_a_column']).accepted).toEqual([]);
+    });
+});
+
+describe('linking is not conditional on promoting', () => {
+    // A link and a promotion are two different facts. Conflating them meant a
+    // group whose promotable fields were all curator-owned came back from
+    // "Link" reporting success with NOTHING written — no fe_guide_row_id, so
+    // the group stayed unlinked and reappeared in the sweep, and the toast said
+    // it had worked.
+    const feRow = { id: 42, label_comb_range_mi: 300, label_comb_mpge: 95 };
+
+    it('records the link even when every field is curator-owned', () => {
+        const group = {
+            label_range_published: 111,
+            label_combined_mpge: 99,
+            overrides: {
+                label_range_published: { source: 'manual' },
+                label_combined_mpge:   { source: 'manual' },
+            },
+        };
+        const { updates, promoted, skipped } = promotionUpdates(group, feRow);
+        expect(promoted).toEqual([]);
+        expect(skipped.length).toBeGreaterThan(0);
+        expect(updates.fe_guide_row_id).toBe(42);
+    });
+
+    it('still promotes and links together in the ordinary case', () => {
+        const { updates, promoted } = promotionUpdates({ overrides: {} }, feRow);
+        expect(promoted.length).toBeGreaterThan(0);
+        expect(updates.fe_guide_row_id).toBe(42);
+    });
+
+    it('leaves curator values alone while linking', () => {
+        const group = { overrides: { label_range_published: { source: 'manual' } }, label_range_published: 111 };
+        const { updates } = promotionUpdates(group, feRow);
+        expect(updates).not.toHaveProperty('label_range_published');
+        expect(updates.fe_guide_row_id).toBe(42);
     });
 });

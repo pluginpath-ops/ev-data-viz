@@ -96,10 +96,28 @@ export function promotionUpdates(group, feRow) {
         promoted.push(to);
     }
 
-    if (promoted.length) {
-        updates.overrides = overrides;
-        updates.fe_guide_row_id = feRow.id;
-    }
+    // The LINK is recorded unconditionally; only the displaced-value bookkeeping
+    // depends on something actually having been promoted.
+    //
+    // These are two different facts and conflating them was a bug: a group whose
+    // promotable fields were all curator-owned produced an empty `promoted`, the
+    // caller returned before writing, and the group came back from "Link"
+    // reporting success with nothing written at all. It stayed unlinked, so it
+    // reappeared in the sweep while the toast said it had worked.
+    //
+    // "This group corresponds to that guide row" is worth recording even when
+    // the guide has nothing to add to it — that is what makes the row's figures
+    // available for comparison later, and what stops the sweep re-asking.
+    if (promoted.length) updates.overrides = overrides;
+    // Linked whenever the guide row had something to say — whether it landed
+    // (`promoted`) or was held off by a curator value (`skipped`). Both mean the
+    // row is real and corresponds to this group.
+    //
+    // An empty promotion AND an empty skip list is the other case: a guide row
+    // carrying none of the promotable fields at all. Linking to that records a
+    // correspondence with nothing behind it, so it stays unlinked.
+    if (promoted.length || skipped.length) updates.fe_guide_row_id = feRow.id;
+
     return { updates, promoted, skipped };
 }
 
