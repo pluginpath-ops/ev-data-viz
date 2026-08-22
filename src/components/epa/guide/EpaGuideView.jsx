@@ -31,7 +31,7 @@ import LoadingSpinner from '../../LoadingSpinner';
  */
 const PAGE_SIZE = 50;
 
-export default function EpaGuideView() {
+export default function EpaGuideView({ subtab = 'browse' }) {
     const { getFeGuideRows, getFeGuideVehicleLinks, getBrandAliases } = useAppContext();
 
     const loadRows    = useCallback(() => getFeGuideRows(), [getFeGuideRows]);
@@ -69,8 +69,13 @@ export default function EpaGuideView() {
     useEffect(() => {
         const p = encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds });
         p.set('tab', 'epa');
+        // Re-set the sub-tab the section owns. encodeGuideParams builds a fresh
+        // URLSearchParams from this view's state alone, so anything not written
+        // back here is dropped — and losing `sub` would bounce a shared link to
+        // the default tab.
+        p.set('sub', subtab);
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [filters, sortKey, sortDir, page, selectedIds]);
+    }, [filters, sortKey, sortDir, page, selectedIds, subtab]);
 
     // NOT `.map(decorateRow)` — Array.map passes the index as the second
     // argument, which would arrive as the brand index and resolve nothing.
