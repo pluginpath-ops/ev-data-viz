@@ -49,12 +49,16 @@ export default function EpaStatsView({ subtab = 'stats' }) {
             years: p.has('yr')
                 ? p.get('yr').split(',').map(Number).filter(Number.isFinite)
                 : null,
+            classes: p.get('cl') ? p.get('cl').split(',').filter(Boolean) : [],
+            drives:  p.get('dr') ? p.get('dr').split(',').filter(Boolean) : [],
         };
     });
     const [unit, setUnit]           = useState(initial.unit);
     const [dimension, setDimension] = useState(initial.dimension);
     const [measure, setMeasure]     = useState(initial.measure);
     const [years, setYears]         = useState(initial.years);
+    const [classes, setClasses]     = useState(initial.classes);
+    const [drives, setDrives]       = useState(initial.drives);
 
     const brandIndex = useMemo(() => buildBrandIndex(aliases ?? []), [aliases]);
     const allRows = useMemo(
@@ -99,12 +103,42 @@ export default function EpaStatsView({ subtab = 'stats' }) {
         () => years ?? (bestCoveredYear ? [bestCoveredYear] : []),
         [years, bestCoveredYear],
     );
-    const rows = useMemo(
-        () => (selectedYears.length === 0
-            ? allRows
-            : allRows.filter(r => selectedYears.includes(r.model_year))),
-        [allRows, selectedYears],
+    /**
+     * Filters narrow the population; the dimension splits what remains.
+     *
+     * A filter on the dimension being grouped by is deliberately not offered —
+     * it would only remove rows from a table of that same field, which the eye
+     * does better than a control. So the class filter appears when grouping by
+     * anything but class, and likewise for drive.
+     *
+     * A hidden filter is not APPLIED, rather than being cleared. Leaving it
+     * applied would narrow the data invisibly, with nothing on screen to
+     * explain the missing rows; clearing it would lose a selection the moment
+     * you glanced at another grouping. Skipping it does neither — switch back
+     * and the choice is still there.
+     */
+    const showClassFilter = dimension !== 'body_class';
+    const showDriveFilter = dimension !== 'drive_group';
+
+    const rows = useMemo(() => {
+        let out = allRows;
+        if (selectedYears.length) out = out.filter(r => selectedYears.includes(r.model_year));
+        if (showClassFilter && classes.length) out = out.filter(r => classes.includes(r.body_class));
+        if (showDriveFilter && drives.length)  out = out.filter(r => drives.includes(r.drive_group));
+        return out;
+    }, [allRows, selectedYears, classes, drives, showClassFilter, showDriveFilter]);
+
+    const allClasses = useMemo(
+        () => [...new Set(allRows.map(r => r.body_class).filter(Boolean))].sort(),
+        [allRows],
     );
+    const allDrives = useMemo(
+        () => [...new Set(allRows.map(r => r.drive_group).filter(Boolean))].sort(),
+        [allRows],
+    );
+
+    const toggleIn = (list, setList) => (v) =>
+        setList(list.includes(v) ? list.filter(x => x !== v) : [...list, v]);
 
     const toggleYear = (y) => {
         const next = selectedYears.includes(y)
@@ -123,8 +157,10 @@ export default function EpaStatsView({ subtab = 'stats' }) {
         // Written even when empty, so "all years" survives a reload instead of
         // reverting to the best-covered default.
         if (years != null)                p.set('yr', years.join(','));
+        if (showClassFilter && classes.length) p.set('cl', classes.join(','));
+        if (showDriveFilter && drives.length)  p.set('dr', drives.join(','));
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [unit, dimension, measure, years, subtab]);
+    }, [unit, dimension, measure, years, classes, drives, showClassFilter, showDriveFilter, subtab]);
 
     const summary   = useMemo(() => summarise(rows, { unit, dimension, measure, minN: MIN_N }), [rows, unit, dimension, measure]);
     const corpus    = useMemo(() => overall(rows, { unit, measure }), [rows, unit, measure]);
@@ -161,7 +197,9 @@ export default function EpaStatsView({ subtab = 'stats' }) {
                             ? 'all model years'
                             : selectedYears.length === 1
                                 ? `model year ${selectedYears[0]}`
-                                : `model years ${selectedYears.join(', ')}`}.
+                                : `model years ${selectedYears.join(', ')}`}
+                        {showClassFilter && classes.length > 0 && `, ${classes.join(' / ')} only`}
+                        {showDriveFilter && drives.length > 0 && `, ${drives.join(' / ')} only`}.
                     </div>
                 </div>
             </div>
@@ -222,6 +260,32 @@ export default function EpaStatsView({ subtab = 'stats' }) {
                         ))}
                     </div>
                 </div>
+
+                {showClassFilter && (
+                    <div className="guide-facet">
+                        <div className="guide-facet-label">Only these classes</div>
+                        <div className="guide-facet-values">
+                            {allClasses.map(c => (
+                                <button key={c} type="button"
+                                    className={`guide-chip ${classes.includes(c) ? 'active' : ''}`}
+                                    onClick={() => toggleIn(classes, setClasses)(c)}>{c}</button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {showDriveFilter && (
+                    <div className="guide-facet">
+                        <div className="guide-facet-label">Only these drivetrains</div>
+                        <div className="guide-facet-values">
+                            {allDrives.map(d => (
+                                <button key={d} type="button"
+                                    className={`guide-chip ${drives.includes(d) ? 'active' : ''}`}
+                                    onClick={() => toggleIn(drives, setDrives)(d)}>{d}</button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <div className="guide-facet">
                     <div className="guide-facet-label">Measure</div>

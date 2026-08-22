@@ -28,7 +28,13 @@ export default function StatsHistogram({ data, measure }) {
             </div>
             <div className="stats-histogram-axis text-hint">
                 <span>{data.bins[0].from.toFixed(digits)}</span>
-                <span>{m?.label} {m?.unit && `(${m.unit})`} · n={data.n}</span>
+                {/* The unit only when the label does not already carry it —
+                    the measures are named in full now, so "Combined MPGe
+                    (MPGe)" says it twice. */}
+                <span>
+                    {m?.label}
+                    {m?.unit && !m.label.includes(m.unit) ? ` (${m.unit})` : ''} · n={data.n}
+                </span>
                 <span>{data.bins[data.bins.length - 1].to.toFixed(digits)}</span>
             </div>
         </div>

@@ -80,25 +80,44 @@ const UNIT_KEYS = {
 
 // ── Dimensions and measures ──────────────────────────────────────────────────
 
+/**
+ * What a bucket can be.
+ *
+ * Model year is not here: it is a filter, and grouping by it as well would put
+ * the same control in two places with different semantics.
+ *
+ * Motors is not here either. `# Drive Motor Gen` is a union wherever EPA folded
+ * several configurations into one row — nine motors on a Taycan — so a bucket
+ * labelled "6" is a mixture of real six-motor cars and rows that are not one
+ * car at all. See #241.
+ */
 export const DIMENSIONS = [
     { key: 'body_class',  label: 'Class' },
     { key: 'brand',       label: 'Make' },
     { key: 'parent_name', label: 'Corporate parent' },
-    { key: 'drive_desc',  label: 'Drive' },
-    { key: 'model_year',  label: 'Model year', numeric: true },
-    { key: 'motor_count', label: 'Motors',     numeric: true },
+    { key: 'drive_group', label: 'Drive' },
 ];
 
+/**
+ * What can be measured.
+ *
+ * Named in full — "Combined MPGe", not "Combined". These labels are read as
+ * standalone chips in a row beside each other, where "City" and "Combined"
+ * could mean efficiency or range with equal likelihood, and the selected one
+ * then titles the whole view.
+ */
 export const MEASURES = [
-    { key: 'label_comb_mpge',     label: 'Combined',  unit: 'MPGe', digits: 1 },
-    { key: 'label_city_mpge',     label: 'City',      unit: 'MPGe', digits: 1 },
-    { key: 'label_hwy_mpge',      label: 'Highway',   unit: 'MPGe', digits: 1 },
+    { key: 'label_comb_mpge',     label: 'Combined MPGe', unit: 'MPGe', digits: 1 },
+    { key: 'label_city_mpge',     label: 'City MPGe',     unit: 'MPGe', digits: 1 },
+    { key: 'label_hwy_mpge',      label: 'Highway MPGe',  unit: 'MPGe', digits: 1 },
     // `axisLabel` is what an axis calls the quantity when there is no unit to
     // print. Without it the axis falls back to the measure's own name, which is
     // already the column heading directly above it.
-    { key: 'city_hwy_ratio',      label: 'City:Hwy',  unit: '', axisLabel: 'ratio', digits: 3 },
-    { key: 'label_comb_range_mi', label: 'Range',     unit: 'mi',   digits: 0 },
-    { key: 'nominal_pack_kwh',    label: 'Pack',      unit: 'kWh',  digits: 1 },
+    { key: 'city_hwy_ratio',      label: 'City:Hwy ratio', unit: '', axisLabel: 'ratio', digits: 3 },
+    { key: 'label_comb_range_mi', label: 'Combined Range', unit: 'mi', digits: 0 },
+    { key: 'label_city_range_mi', label: 'City Range',     unit: 'mi', digits: 0 },
+    { key: 'label_hwy_range_mi',  label: 'Highway Range',  unit: 'mi', digits: 0 },
+    { key: 'nominal_pack_kwh',    label: 'Battery Capacity', unit: 'kWh', digits: 1 },
 ];
 export const measureByKey = (key) => MEASURES.find(m => m.key === key) ?? null;
 
