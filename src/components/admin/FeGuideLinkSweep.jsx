@@ -4,7 +4,7 @@ import { useAsyncResource } from '../../hooks/useAsyncResource';
 import {
     TIERS, buildSweep, sweepProgress, batchable, NO_PROPOSAL_REASONS,
     impliedUsableKwh, groupEnergyFacts, estimatedAdjustedRange,
-    wheelMentions, coveredWheelSizes,
+    wheelMentions, coveredWheelSizes, hasCsiDetail,
 } from '../../utils/epaLinkSweep';
 import { wheelSizeIn } from '../../utils/feGuideBrowse';
 
@@ -153,6 +153,14 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                             {coveredWheels.length > 0 && ` · ${coveredWheels.map(w => `${w}"`).join(', ')}`}
                         </div>
                     )}
+                    {/* Only where a proposal is missing: if one candidate has
+                        already won cleanly, the absence of certificate detail is
+                        not what the curator is stuck on. */}
+                    {!item.proposal && !hasCsiDetail(g) && (
+                        <div className="sweep-needs-csi" title="The covered-models table and the manufacturer's note come from a CSI PDF. This group was imported from the certification CSV, so neither exists for it.">
+                            no CSI detail — import this certificate for wheel and variant clues
+                        </div>
+                    )}
                     {comments.map((c, k) => (
                         <div key={k} className="sweep-note-inline" title={c}>
                             {noteWheels(c).length > 0 && (
@@ -247,6 +255,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
 
             {open && (
                 <div className="sweep-candidates">
+                    <div className="text-label">Fuel Economy Guide rows for this manufacturer</div>
                     {/* What the certificate says it covers, and what the
                         manufacturer wrote about the vehicle they tested. Both
                         come from a page the importer only started reading in
@@ -254,9 +263,10 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                         represented-vehicle name cannot. */}
                     {(g.epa_covered_models?.length > 0 || comments.length > 0) && (
                         <div className="sweep-cert-detail">
+                            <div className="text-label">From the certification (CSI)</div>
                             {g.epa_covered_models?.length > 0 && (
                                 <>
-                                    <div className="text-label">This certificate covers</div>
+                                    <div className="text-caption text-secondary">This certificate covers</div>
                                     <div className="sweep-covered-list">
                                         {[...new Map(g.epa_covered_models.map(cm =>
                                             [cm.carline_name, cm])).values()].map(cm => (
@@ -328,6 +338,12 @@ export default function FeGuideLinkSweep() {
     const counts = useMemo(() => sweepProgress(items), [items]);
     const shown = useMemo(() => items.filter(i => i.tier === tier), [items, tier]);
     const batch = useMemo(() => batchable(shown), [shown]);
+    // Ambiguous AND without a certificate to consult: the ones a CSI import
+    // would actually help, as opposed to the ones already decided.
+    const needsCsi = useMemo(
+        () => shown.filter(i => !i.proposal && !hasCsiDetail(i.group)).length,
+        [shown],
+    );
 
     const refresh = () => { reloadGroups(); reloadProgress(); };
 
@@ -416,7 +432,14 @@ export default function FeGuideLinkSweep() {
                 ))}
             </div>
 
-            <div className="text-hint">{tierDef?.why}</div>
+            <div className="text-hint">
+                {tierDef?.why}
+                {needsCsi > 0 && (
+                    <> {needsCsi} of these {needsCsi === 1 ? 'has' : 'have'} no CSI certificate imported,
+                    so the covered-models table and the manufacturer's note — the two things that settle
+                    an ambiguous match — do not exist for {needsCsi === 1 ? 'it' : 'them'} yet.</>
+                )}
+            </div>
 
             {batch.length > 0 && (
                 <div className="sweep-batch">
@@ -427,6 +450,18 @@ export default function FeGuideLinkSweep() {
                     <button className="btn btn-primary" disabled={busy} onClick={linkBatch}>
                         {busy ? 'Linking…' : `Link all ${batch.length}`}
                     </button>
+                </div>
+            )}
+
+            {/* The two sides are different datasets and the sweep is the only
+                place they meet, so they are named rather than left to be
+                remembered: a certification record on the left, the published
+                label rows it might correspond to on the right. */}
+            {shown.length > 0 && (
+                <div className="sweep-legend">
+                    <div>Certification record <span className="text-faint">— from the EPA cert / CSI import</span></div>
+                    <div>Proposed match <span className="text-faint">— from the Fuel Economy Guide</span></div>
+                    <div />
                 </div>
             )}
 

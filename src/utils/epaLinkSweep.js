@@ -177,6 +177,22 @@ export function wheelMentions(text) {
     return [...out].sort((a, b) => a - b);
 }
 
+/**
+ * Whether a group carries anything from its CSI certificate.
+ *
+ * The two fields that resolve an ambiguous match — the covered-models table and
+ * the manufacturer's note — exist only on groups imported from a CSI PDF. A
+ * group that came from the certification CSV has neither, and no amount of
+ * looking at it will produce them.
+ *
+ * Worth stating rather than leaving as an absence: it turns "there is nothing
+ * to go on here" into "fetch this certificate", which is an action.
+ */
+export function hasCsiDetail(group) {
+    return (group?.epa_covered_models?.length ?? 0) > 0
+        || (group?.epa_tests ?? []).some(t => t.mfr_test_vehicle_comments);
+}
+
 /** Every wheel size this certificate's covered models name, deduplicated. */
 export function coveredWheelSizes(group) {
     const out = new Set();

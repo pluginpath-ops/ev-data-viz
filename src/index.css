@@ -2799,3 +2799,23 @@ body {
     background-color: var(--bar-strong);
     color: var(--color-text-primary);
 }
+
+/* Names the two datasets the sweep joins. Aligned to the row grid so each
+   label sits over the column it describes. */
+.sweep-legend {
+    @apply grid items-end gap-3 px-3 pb-1 text-xs font-semibold;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    color: var(--color-text-secondary);
+}
+@media (max-width: 48rem) {
+    .sweep-legend { display: none; }
+}
+
+/* Names a gap that can be closed, rather than leaving an absence to puzzle
+   over: this group has no certificate imported, so import one. */
+.sweep-needs-csi {
+    @apply text-xs px-1.5 py-0.5 rounded inline-block;
+    background-color: rgba(245, 158, 11, 0.12);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-warning);
+}

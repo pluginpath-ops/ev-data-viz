@@ -3,7 +3,7 @@ import {
     TIERS, tierOf, hasDerivableEnergy, hasCoefficients,
     classifyGroup, buildSweep, sweepProgress, batchable, NO_PROPOSAL_REASONS,
     impliedUsableKwh, groupEnergyFacts, estimatedAdjustedRange, coveredModelMatches,
-    wheelMentions, coveredWheelSizes,
+    wheelMentions, coveredWheelSizes, hasCsiDetail,
 } from '../epaLinkSweep';
 
 const group = (o = {}) => ({
@@ -292,5 +292,21 @@ describe('wheel sizes distilled from free text', () => {
     });
     it('is empty for a group with no CSI detail — a CSV-imported group', () => {
         expect(coveredWheelSizes({})).toEqual([]);
+    });
+});
+
+describe('whether a certificate was ever imported', () => {
+    it('is true when the covered-models table came through', () => {
+        expect(hasCsiDetail({ epa_covered_models: [{ carline_name: 'X' }] })).toBe(true);
+    });
+    it('is true when only the manufacturer note came through', () => {
+        expect(hasCsiDetail({ epa_tests: [{ mfr_test_vehicle_comments: 'Tested on 20 inch tire' }] })).toBe(true);
+    });
+    it('is false for a group imported from the certification CSV', () => {
+        // Neither field exists on those, and no amount of looking produces
+        // them — which is the difference between "nothing to go on" and
+        // "fetch this certificate".
+        expect(hasCsiDetail({ epa_tests: [{ procedure_code: 77 }], epa_covered_models: [] })).toBe(false);
+        expect(hasCsiDetail({})).toBe(false);
     });
 });
