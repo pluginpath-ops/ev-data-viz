@@ -157,6 +157,10 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                         <th className="p-2">Config ID</th>
                                         <th className="p-2">Make · Carline</th>
                                         <th className="p-2">Coeff / Tests / Phases</th>
+                                        {/* Certificate-wide, so every configuration from one PDF
+                                            shows the same count — the table describes what the
+                                            CERTIFICATE covers, not one configuration. */}
+                                        <th className="p-2">Covered models</th>
                                         <th className="p-2">Status</th>
                                     </tr>
                                 </thead>
@@ -176,6 +180,17 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                                 <td className="p-2 font-mono">{id}</td>
                                                 <td className="p-2">{g.make} · <span className="text-muted">{g.epa_carline_name}</span></td>
                                                 <td className="p-2 font-mono text-muted">{g.coefficient_sets.length} / {g.tests.length} / {phaseCount}</td>
+                                                <td className="p-2 font-mono text-muted">
+                                                    {g.covered_models?.length
+                                                        ? `${new Set(g.covered_models.map(c => c.carline_name)).size} (${g.covered_models.length} rows)`
+                                                        : '—'}
+                                                    {/* The manufacturer's own note is the other thing
+                                                        this import newly captures, and the only place
+                                                        some wheel variants are stated at all. */}
+                                                    {g.tests.some(t => t.mfr_test_vehicle_comments) && (
+                                                        <span className="text-faint"> · note</span>
+                                                    )}
+                                                </td>
                                                 <td className="p-2">
                                                     {existing.has(id)
                                                         ? <span className="text-amber-600 dark:text-amber-400">⟳ overwrite</span>

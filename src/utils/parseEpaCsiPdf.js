@@ -314,10 +314,36 @@ function parsePhases(items, start, end, cold) {
     return raw.map(p => ({ ...p, phase_type: inferPhaseType(p.distance_mi, dists.filter((_, i) => raw[i] !== p), cold) }));
 }
 
+/**
+ * The manufacturer's note for the test beginning at `ti`.
+ *
+ * Searched BACKWARDS, because the field sits above its test rather than inside
+ * it — in the Volvo certificate the comment is item 516 and that test's `Test #`
+ * is 525. A forward scan from the test header, which is what a first attempt
+ * did, finds nothing and silently drops the field.
+ *
+ * Bounded below by the previous test (or the configuration start) so a
+ * certificate with several tests gives each the note that precedes it, rather
+ * than every test inheriting the first one. `Test #` is read the same way, for
+ * the same reason.
+ */
+function commentsBefore(items, ti, lowerBound) {
+    for (let b = ti - 1; b >= lowerBound; b--) {
+        if (items[b] === 'Manufacturer Test Vehicle Comments') {
+            const v = items[b + 1];
+            // The label is present on every certificate; the value is often the
+            // placeholder EPA writes when a manufacturer said nothing.
+            return v && v !== '--' ? v : null;
+        }
+    }
+    return null;
+}
+
 function parseTests(items, start, end) {
     const testIdx = indicesWhere(items, isTestHeader, start, end);
     return testIdx.map((ti, k) => {
         const tEnd = k + 1 < testIdx.length ? testIdx[k + 1] : end;
+        const tStart = k > 0 ? testIdx[k - 1] : start;
         const header = items[ti];
         const procMatch = header.match(/^(\d{1,3})\s*-/);
         const cold = /cold|degree/i.test(header);
@@ -377,7 +403,7 @@ function parseTests(items, start, end) {
             // software variant a test represents: Volvo's says "Tested on 20
             // inch tire, covering 22 inch tire as worst case", which its
             // covered-models table — naming only 21 inch — does not.
-            mfr_test_vehicle_comments: valAfter(items, 'Manufacturer Test Vehicle Comments', ti, tEnd),
+            mfr_test_vehicle_comments: commentsBefore(items, ti, tStart),
             test_date: toIsoDate(valAfter(items, 'Test Date', ti, tEnd)),
             source: 'csi_pdf',   // epa_tests.source enum (override field-tag stays 'pdf')
             recharge_voltage: parseNum(valAfter(items, 'Recharge Event Voltage', ti, tEnd)),
