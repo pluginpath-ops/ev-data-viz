@@ -1214,7 +1214,35 @@ export function AppProvider({ children }) {
         }
     };
 
+    /**
+     * Link many groups, then refresh ONCE (#238).
+     *
+     * The single-link wrapper above refreshes every vehicle after each call,
+     * which is right for one link and ruinous for a batch — ninety-eight links
+     * meant ninety-eight runs of the app's largest query, so the sweep appeared
+     * to hang and only the last toast survived. One refresh at the end reaches
+     * the same state.
+     */
+    const linkFeGuideRows = async (pairs) => {
+        try {
+            const res = await dataService.linkFeGuideRows(pairs);
+            if (res.linked > 0) await softRefreshVehicles();
+            if (res.failures.length) {
+                showError(`${res.linked} linked, ${res.failures.length} failed — `
+                    + res.failures.slice(0, 3).map(f => f.testGroupId).join(', '));
+            }
+            return res;
+        } catch (error) {
+            showError('Could not link the guide rows: ' + error.message);
+            throw error;
+        }
+    };
+
     const getFeGuideRow = (id) => dataService.getFeGuideRow(id);
+    // The linking sweep (#238).
+    const getGroupsAwaitingFeLink = (opts) => dataService.getGroupsAwaitingFeLink(opts);
+    const getFeLinkProgress = () => dataService.getFeLinkProgress();
+    const setFeLinkSkipped = (id, skipped, note) => dataService.setFeLinkSkipped(id, skipped, note);
     // The public browser (#235). Both are read-once-per-mount loads over small
     // result sets, so they are plain pass-throughs with no caching layer here.
     const getFeGuideRows = () => dataService.getFeGuideRows();
@@ -1672,6 +1700,10 @@ export function AppProvider({ children }) {
         getFeGuideRow,
         getFeGuideRows,
         getFeGuideVehicleLinks,
+        linkFeGuideRows,
+        getGroupsAwaitingFeLink,
+        getFeLinkProgress,
+        setFeLinkSkipped,
         getBrandAliases,
         getBrandDivisionSummary,
         getBrandUsageSummary,

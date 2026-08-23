@@ -2695,3 +2695,127 @@ body {
     @apply truncate;
     color: var(--color-text-primary);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   FE GUIDE LINK SWEEP (#238)
+
+   Working through 159 unlinked certification groups. Three columns per row —
+   what we hold, what is proposed, what to do — so a curator scans down the
+   middle column and only stops where the proposal looks wrong.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.sweep-row {
+    @apply flex flex-col gap-2 p-3 rounded-lg;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+}
+.sweep-row.skipped { @apply opacity-60; }
+.sweep-row-main {
+    @apply grid items-start gap-3;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+@media (max-width: 48rem) {
+    .sweep-row-main { grid-template-columns: 1fr; }
+}
+.sweep-group-name {
+    @apply flex items-center gap-1.5 font-medium;
+    color: var(--color-text-primary);
+}
+.sweep-proposal-name { color: var(--color-text-primary); }
+.sweep-actions {
+    @apply flex flex-wrap items-center gap-2 justify-end;
+}
+
+/* The batch is the point of a sweep: everything unambiguous cleared at once,
+   with the count stated so it is a decision rather than a leap. */
+.sweep-batch {
+    @apply flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg;
+    background-color: var(--color-primary-light);
+    border: 1px solid var(--color-primary);
+}
+[data-theme="dark"] .sweep-batch {
+    background-color: rgba(59, 130, 246, 0.15);
+}
+
+.sweep-skip-ask {
+    @apply flex flex-wrap items-center gap-2 p-2 rounded;
+    background-color: rgba(245, 158, 11, 0.12);
+    border: 1px solid var(--color-warning);
+}
+.sweep-candidates {
+    @apply flex flex-col gap-1.5 pt-2;
+    border-top: 1px solid var(--color-border);
+}
+.sweep-candidate {
+    @apply flex items-center justify-between gap-3;
+}
+
+/* The "these are one certification" note — the answer to a question the
+   curator would otherwise keep asking of data that cannot answer it. */
+.sweep-shared-note {
+    @apply mt-1 px-2 py-1 rounded text-xs;
+    background-color: rgba(59, 130, 246, 0.12);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-primary);
+}
+
+/* What the certificate covers, and the manufacturer's own note about the
+   vehicle tested — the two things that answer what a carline name cannot. */
+.sweep-cert-detail {
+    @apply flex flex-col gap-2 p-2 rounded mb-2;
+    background-color: var(--color-surface-muted);
+}
+.sweep-covered-list {
+    @apply flex flex-wrap gap-1.5;
+}
+.sweep-comment {
+    @apply text-xs leading-relaxed;
+    color: var(--color-text-secondary);
+}
+
+/* Per-file outcome in the multi-PDF CSI import. A file that yielded nothing is
+   a named failure here rather than configs that quietly never appeared. */
+.pdf-file-list {
+    @apply flex flex-col gap-0.5 mb-3 max-h-32 overflow-y-auto p-2 rounded text-xs;
+    background-color: var(--color-surface-muted);
+}
+.pdf-file-row {
+    @apply flex items-baseline justify-between gap-3;
+    color: var(--color-text-secondary);
+}
+.pdf-file-row.failed { color: var(--color-warning); }
+
+/* The manufacturer's note, on the row. One line, full text on hover — the note
+   runs to a paragraph and only a clause of it bears on the link. */
+.sweep-note-inline {
+    @apply text-xs truncate;
+    max-width: 34rem;
+    color: var(--color-text-muted);
+}
+/* The wheel sizes pulled out of it, which is the part being looked for. */
+.sweep-note-wheels {
+    @apply inline-block mr-1.5 px-1.5 rounded;
+    font-weight: 700;
+    background-color: var(--bar-strong);
+    color: var(--color-text-primary);
+}
+
+/* Names the two datasets the sweep joins. Aligned to the row grid so each
+   label sits over the column it describes. */
+.sweep-legend {
+    @apply grid items-end gap-3 px-3 pb-1 text-xs font-semibold;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    color: var(--color-text-secondary);
+}
+@media (max-width: 48rem) {
+    .sweep-legend { display: none; }
+}
+
+/* Names a gap that can be closed, rather than leaving an absence to puzzle
+   over: this group has no certificate imported, so import one. */
+.sweep-needs-csi {
+    @apply text-xs px-1.5 py-0.5 rounded inline-block;
+    background-color: rgba(245, 158, 11, 0.12);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-warning);
+}

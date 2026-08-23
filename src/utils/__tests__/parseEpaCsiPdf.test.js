@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { parseEpaCsiText } from '../parseEpaCsiPdf';
+import { parseEpaCsiText, parseCoveredModels } from '../parseEpaCsiPdf';
 
 /**
  * The fixture is the real pdf.js item stream from Volvo's CSI-VVVXT00.0ZVG,
@@ -116,5 +116,106 @@ describe('parseEpaCsiText — falling back when page 1 is unreadable', () => {
         const { groups, warnings } = parseEpaCsiText(noGroup);
         expect(groups[0].epa_test_family_id).toBe('TVVXT00.0ZVG');
         expect(warnings.some(w => w.includes('No test group on page 1'))).toBe(true);
+    });
+});
+
+describe('models covered by this certificate (#250)', () => {
+    // Cells WRAP: EPA emits "296 - EX90 Twin" and "Motor" as separate items,
+    // and "California + CAA" then "Section 177 states".
+    const volvo = [
+        'Models Covered by this Certificate', 'Carline Manufacturer', 'Division', 'Carline',
+        'Certification Region', 'Code(s)', 'Drive System', 'Trans - Type', '- # of Gears', 'Trans - Lockup',
+        'Volvo Car USA,  LLC', '1 - Volvo Cars of North', 'America, LLC', '296 - EX90 Twin', 'Motor',
+        'California + CAA', 'Section 177 states', 'All Wheel Drive', 'Automatic', '1', 'No',
+        'Volvo Car USA,  LLC', '1 - Volvo Cars of North', 'America, LLC', '297 - EX90 Twin',
+        'Motor (21 inch Wheels)', 'Federal', 'All Wheel Drive', 'Automatic', '1', 'No',
+        'Engine Description',
+    ];
+
+    it('rejoins a carline split across items, wheels and all', () => {
+        const rows = parseCoveredModels(volvo);
+        expect(rows.map(r => r.carline_name))
+            .toEqual(['EX90 Twin Motor', 'EX90 Twin Motor (21 inch Wheels)']);
+    });
+    it('rejoins a region split across items', () => {
+        expect(parseCoveredModels(volvo)[0].certification_region)
+            .toBe('California + CAA Section 177 states');
+    });
+    it('keeps the carline number and the other columns', () => {
+        const [first] = parseCoveredModels(volvo);
+        expect(first).toMatchObject({
+            carline_number: '296', drive_system: 'All Wheel Drive',
+            transmission_type: 'Automatic', gears: 1,
+        });
+    });
+    it('tells the division from the carline by position, not shape', () => {
+        // Both look like "N - Name", and Lucid numbers carlines in single
+        // digits: `2 - Lucid USA Inc.` is a division, `4 - Gravity GT` is not.
+        const lucid = [
+            'Models Covered by this Certificate',
+            'Lucid USA, Inc.', '2 - Lucid USA Inc.', '4 - Gravity GT', 'w/20F21R wheels (3R)',
+            'California + CAA', 'Section 177 states', 'All Wheel Drive', 'Automatic', '1', 'No',
+            'Engine Description',
+        ];
+        const rows = parseCoveredModels(lucid);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].carline_number).toBe('4');
+        expect(rows[0].carline_name).toBe('Gravity GT w/20F21R wheels (3R)');
+        expect(rows[0].division).toBe('Lucid USA Inc.');
+    });
+    it('stops at the next section rather than eating it', () => {
+        // A scan without bounds swallowed "Multi-Cycle Test (MCT) Exhaust
+        // Test #…" out of a later section as a carline.
+        const withTail = [...volvo, '77 - Multi-Cycle Test (MCT) Exhaust Test # for this configuration'];
+        expect(parseCoveredModels(withTail)).toHaveLength(2);
+    });
+    it('is empty when the certificate has no such table', () => {
+        expect(parseCoveredModels(['Emission Data Vehicle Information', 'Vehicle ID'])).toEqual([]);
+    });
+});
+
+describe('the certification\'s own model year', () => {
+    /** pdf.js emits a separator between a label and its value. */
+    const header = (year) => [
+        'Manufacturer', ' ', 'Volvo', '',
+        'Test Group', ' ', 'VVVXT00.0ZVG', '',
+        'Model Year', ' ', String(year), '',
+        'Test Group Information', '',
+    ];
+    const config = (carryYear) => [
+        'Vehicle ID / Configuration', ' ', '202625-2', '',
+        'Represented Test Vehicle Model', ' ', 'EX90 Twin Motor', '',
+        'Original Test Group Name', ' ', 'TVVXT00.0ZVG', '',
+        'Original Test Vehicle Model Year', ' ', String(carryYear), '',
+    ];
+
+    it('reads past the blank between label and value', () => {
+        // valAfter returns the separator, parseNum makes that null, and every
+        // certificate silently fell back to the carryover year.
+        const { groups, warnings } = parseEpaCsiText([...header(2027), ...config(2026)]);
+        expect(groups[0].model_year).toBe(2027);
+        expect(warnings.some(w => w.includes('No model year'))).toBe(false);
+    });
+
+    it('keeps the certification year and the carryover year apart', () => {
+        // The whole point of migration 056: a 2027 certificate carrying 2026
+        // lab work is a 2027 record. Storing 2026 makes the guide-linking sweep
+        // reject its own correct same-year candidate as a borrowed year.
+        const { groups } = parseEpaCsiText([...header(2027), ...config(2026)]);
+        expect(groups[0].model_year).toBe(2027);
+        expect(groups[0].carryover_model_year).toBe(2026);
+    });
+
+    it('still falls back when page 1 genuinely has no year', () => {
+        const noYear = ['Test Group', ' ', 'VVVXT00.0ZVG', '', 'Test Group Information', ''];
+        const { groups, warnings } = parseEpaCsiText([...noYear, ...config(2026)]);
+        expect(groups[0].model_year).toBe(2026);
+        expect(warnings.some(w => w.includes('No model year'))).toBe(true);
+    });
+
+    it('does not read a non-year that follows the label', () => {
+        const odd = ['Model Year', ' ', 'Fuel', '', 'Test Group', ' ', 'VVVXT00.0ZVG', ''];
+        const { groups } = parseEpaCsiText([...odd, ...config(2026)]);
+        expect(groups[0].model_year).toBe(2026);
     });
 });

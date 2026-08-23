@@ -68,6 +68,11 @@ const IMAGE_CACHE_SECONDS = 31536000;
  * (42883) and PostgREST's own "no such function" (PGRST202). Anything else —
  * permission, syntax, a genuine failure — still throws.
  */
+/** Whether an error means a COLUMN is absent — a migration not yet applied. */
+function isMissingColumn(error) {
+  return error?.code === '42703';
+}
+
 function isMissingRelation(error) {
   const code = error?.code;
   return code === '42P01' || code === '42883' || code === 'PGRST202';
@@ -1779,7 +1784,7 @@ class DataService {
   async importEpaGroupFull(group) {
     if (!this.useSupabase) return;
     const supabase = getSupabase();
-    const { coefficient_sets = [], tests = [], ...g } = group;
+    const { coefficient_sets = [], tests = [], covered_models = [], ...g } = group;
     const tgid = g.test_group_id;
 
     // Tag every populated scalar field as PDF-sourced.
@@ -1804,15 +1809,45 @@ class DataService {
       if (error) throw error;
     }
 
+    // 2b. Covered models (clean-replace, like the coefficient sets).
+    //
+    // Certificate-wide rather than per configuration, so every group parsed
+    // from one PDF writes the same list — which is faithful: the table says
+    // what the CERTIFICATE covers. Re-importing replaces rather than doubles.
+    //
+    // Non-fatal: migration 059 may not be applied, and a missing covered-models
+    // table must not fail an import that otherwise worked.
+    try {
+      await supabase.from('epa_covered_models').delete().eq('test_group_id', tgid);
+      if (covered_models.length) {
+        const rows = covered_models.map(cm => ({ test_group_id: tgid, ...cm }));
+        const { error } = await supabase.from('epa_covered_models').insert(rows);
+        if (error) throw error;
+      }
+    } catch (error) {
+      if (!isMissingRelation(error)) throw error;
+    }
+
     // 3. Tests + phases (clean-replace; phases cascade on test delete).
     await supabase.from('epa_tests').delete().eq('test_group_id', tgid);
     for (const t of tests) {
       const { phases = [], ...testRow } = t;
-      const { data: savedTest, error: tErr } = await supabase
+      let { data: savedTest, error: tErr } = await supabase
         .from('epa_tests')
         .insert({ test_group_id: tgid, ...testRow, overrides: pdfOverrides(testRow) })
         .select('id')
         .single();
+      // `mfr_test_vehicle_comments` arrives in migration 059. Retry without it
+      // rather than failing a whole import over a field that is a curator's
+      // reading aid — the numbers matter more than the note.
+      if (tErr && isMissingColumn(tErr)) {
+        const { mfr_test_vehicle_comments: _dropped, ...withoutNote } = testRow;
+        ({ data: savedTest, error: tErr } = await supabase
+          .from('epa_tests')
+          .insert({ test_group_id: tgid, ...withoutNote, overrides: pdfOverrides(withoutNote) })
+          .select('id')
+          .single());
+      }
       if (tErr) throw tErr;
       if (phases.length) {
         const pRows = phases.map(p => ({ test_id: savedTest.id, ...p, overrides: pdfOverrides(p) }));
@@ -1952,12 +1987,140 @@ class DataService {
     if (fErr) throw fErr;
 
     const { updates, promoted, skipped } = promotionUpdates(group, feRow);
-    if (!promoted.length) return { promoted, skipped };
-
+    // No early return on an empty `promoted`. `updates` always carries
+    // fe_guide_row_id, and skipping the write when the guide happened to add no
+    // new values left the group unlinked while reporting success.
     const { error } = await supabase
       .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
     if (error) throw error;
     return { promoted, skipped };
+  }
+
+  /**
+   * Every certification group still awaiting a guide link (#238).
+   *
+   * Includes what each one would unlock, so the sweep can prioritise: the
+   * procedure codes and DC energy that decide whether a link adds a charger
+   * efficiency, and the coefficient targets that decide whether it adds a
+   * road-load figure. Both are read here rather than counted server-side
+   * because the sweep needs the values anyway.
+   *
+   * Skipped groups are excluded by default. "We looked and there is nothing" is
+   * a decision, and a sweep that keeps re-asking it never finishes — but the
+   * caller can ask for them, because that is different from having no opinion.
+   */
+  async getGroupsAwaitingFeLink({ includeSkipped = false } = {}) {
+    if (!this.useSupabase) return [];
+    let q = getSupabase()
+      .from('epa_test_groups')
+      .select(`
+        test_group_id, model_year, make, epa_carline_name, display_name,
+        vehicle_config_number, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note, useable_kwh,
+        carryover_model_year, cd_range_combined_calc, derived_5cycle_coefficient,
+        epa_coefficient_sets(target_a, equiv_test_weight_lbs),
+        epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh, mfr_test_vehicle_comments),
+        epa_covered_models(carline_number, carline_name, certification_region, drive_system),
+        epa_vehicle_mappings(vehicles(id, name, year))
+      `)
+      .is('fe_guide_row_id', null)
+      .order('test_group_id');
+    if (!includeSkipped) q = q.is('fe_guide_skipped_at', null);
+
+    const { data, error } = await q;
+    if (error) {
+      // The skip columns arrive in migration 058. Without them the sweep still
+      // works; it simply cannot remember a decision yet, which is better than
+      // an admin panel that will not render.
+      if (isMissingColumn(error)) {
+        const { data: fallback, error: e2 } = await getSupabase()
+          .from('epa_test_groups')
+          .select(`
+            test_group_id, model_year, make, epa_carline_name, display_name,
+            vehicle_config_number, fe_guide_row_id, useable_kwh,
+            carryover_model_year, cd_range_combined_calc, derived_5cycle_coefficient,
+            epa_coefficient_sets(target_a, equiv_test_weight_lbs),
+            epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh),
+            epa_vehicle_mappings(vehicles(id, name, year))
+          `)
+          .is('fe_guide_row_id', null)
+          .order('test_group_id');
+        if (e2) throw e2;
+        return fallback || [];
+      }
+      throw error;
+    }
+    return data || [];
+  }
+
+  /** How far the sweep has got: linked, skipped, still awaiting a decision. */
+  async getFeLinkProgress() {
+    if (!this.useSupabase) return null;
+    const { data, error } = await getSupabase()
+      .from('epa_test_groups')
+      .select('test_group_id, fe_guide_row_id, fe_guide_skipped_at');
+    if (error) {
+      if (isMissingColumn(error)) return null;
+      throw error;
+    }
+    const rows = data || [];
+    return {
+      total:    rows.length,
+      linked:   rows.filter(r => r.fe_guide_row_id != null).length,
+      skipped:  rows.filter(r => r.fe_guide_row_id == null && r.fe_guide_skipped_at != null).length,
+      awaiting: rows.filter(r => r.fe_guide_row_id == null && r.fe_guide_skipped_at == null).length,
+    };
+  }
+
+  /**
+   * Record that a group has no guide row to link, or undo that.
+   *
+   * Deliberately not a link and not a deletion: the group stays unlinked and
+   * stays findable, because a curator having looked is worth knowing.
+   */
+  async setFeLinkSkipped(testGroupId, skipped, note = null) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('epa_test_groups')
+      .update(skipped
+        ? { fe_guide_skipped_at: new Date().toISOString(), fe_guide_skip_note: note }
+        : { fe_guide_skipped_at: null, fe_guide_skip_note: null })
+      .eq('test_group_id', testGroupId);
+    if (error) throw error;
+  }
+
+  /**
+   * Link many groups in one operation (#238).
+   *
+   * Exists because the per-link path in AppContext refreshes every vehicle in
+   * the app afterwards — correct for one link, since the promoted figures reach
+   * a vehicle card through its epa_vehicle_mappings, and catastrophic for
+   * ninety-eight: that is ninety-eight sequential re-runs of the largest query
+   * the app makes, for one refresh's worth of benefit.
+   *
+   * Sequential rather than parallel, deliberately. Each link reads its group,
+   * computes what may be promoted and writes it back; firing them all at once
+   * makes a mid-way failure impossible to attribute, and a batch that half
+   * worked is exactly what a curator must be able to reason about.
+   *
+   * Never throws for a single failure. One group with a stale row should not
+   * discard ninety-seven good links, so failures are collected and returned
+   * with everything that did work.
+   */
+  async linkFeGuideRows(pairs) {
+    const result = { linked: 0, promoted: 0, skipped: 0, failures: [] };
+    if (!this.useSupabase || !pairs?.length) return result;
+
+    for (const { testGroupId, feRowId } of pairs) {
+      try {
+        const res = await this.linkFeGuideRow(testGroupId, feRowId);
+        result.linked   += 1;
+        result.promoted += res.promoted.length;
+        result.skipped  += res.skipped.length;
+      } catch (error) {
+        result.failures.push({ testGroupId, message: error.message });
+      }
+    }
+    return result;
   }
 
   /** One staged guide row by id — the linked row, for showing what it holds. */

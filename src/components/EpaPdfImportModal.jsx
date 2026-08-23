@@ -1,11 +1,20 @@
 /**
- * EPA CSI-PDF import modal. Drag/drop a lab Certification Summary PDF; pdf.js
- * extracts the text (lazy-loaded), parseEpaCsiText builds the config records,
- * and a preview lets the curator review before committing (clean-replace upsert).
+ * EPA CSI-PDF import modal. Drop one or many lab Certification Summary PDFs;
+ * pdf.js extracts the text (lazy-loaded), parseEpaCsiText builds the config
+ * records, and a preview lets the curator review everything before committing
+ * (clean-replace upsert).
  *
  * Two modes via `targetVehicle`:
  *   • absent  → Admin bulk import (no auto-link)
  *   • present → per-vehicle: pick which config links to the current vehicle
+ *
+ * ── Many files, read one at a time ──────────────────────────────────────────
+ *
+ * Files are parsed SEQUENTIALLY, not in parallel. pdf.js holds a whole document
+ * in memory while it reads, and a certificate runs to thousands of text items;
+ * starting twenty at once trades a few seconds for a tab that may not survive
+ * the attempt. Sequential also means the progress line can name the file being
+ * read, so a slow certificate looks like work rather than a hang.
  */
 import { useState } from 'react';
 import { extractPdfText } from '../utils/extractPdfText';
@@ -13,7 +22,8 @@ import { parseEpaCsiText } from '../utils/parseEpaCsiPdf';
 
 export default function EpaPdfImportModal({ targetVehicle = null, onImport, getExistingIds, onClose }) {
     const [step, setStep]       = useState('upload'); // upload | review | done
-    const [fileName, setFileName] = useState('');
+    const [files, setFiles]     = useState([]);   // [{ name, configs, error }]
+    const [progress, setProgress] = useState(null); // { done, total, name }
     const [busy, setBusy]       = useState(false);
     const [error, setError]     = useState(null);
     const [dragOver, setDragOver] = useState(false);
@@ -24,37 +34,90 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
     const [linkIds, setLinkIds]   = useState(new Set());   // configs to link (per-vehicle mode)
     const [result, setResult]   = useState(null);
 
-    const processFile = async (file) => {
-        if (!file) return;
-        setFileName(file.name);
+    /**
+     * Read a list of PDFs, then review them together.
+     *
+     * One file failing does not abandon the rest: a certificate with a layout
+     * the parser cannot read is recorded against its own name and the others
+     * still import. A run of twenty where the third is malformed should not
+     * cost the other nineteen.
+     */
+    const processFiles = async (fileList) => {
+        const list = [...(fileList ?? [])].filter(f => f && /\.pdf$/i.test(f.name));
+        if (!list.length) return;
+
         setBusy(true);
         setError(null);
-        try {
-            const items = await extractPdfText(file);
-            const { groups: g, warnings: w } = parseEpaCsiText(items);
-            if (!g.length) { setError(w[0] || 'No EPA configurations found in this PDF.'); setBusy(false); return; }
-            const ids = g.map(x => x.test_group_id);
-            let exists = [];
-            try { exists = await getExistingIds(ids); } catch { /* non-fatal */ }
-            setGroups(g);
-            setWarnings(w);
-            setExisting(new Set(exists));
-            setSelected(new Set(ids));
-            // Per-vehicle: default-link the config whose carline best matches the vehicle, else the first.
-            if (targetVehicle) {
-                const vn = (targetVehicle.name || '').toLowerCase();
-                const best = g.find(x => vn && (x.epa_carline_name || '').toLowerCase().includes(vn.split(' ')[0]));
-                setLinkIds(new Set([(best || g[0]).test_group_id]));
+        setProgress({ done: 0, total: list.length, name: list[0].name });
+
+        const allGroups = [];
+        const allWarnings = [];
+        const statuses = [];
+        const seen = new Map();   // test_group_id → the file that claimed it
+
+        for (const [i, file] of list.entries()) {
+            setProgress({ done: i, total: list.length, name: file.name });
+            try {
+                const items = await extractPdfText(file);
+                const { groups: g, warnings: w } = parseEpaCsiText(items);
+                if (!g.length) {
+                    statuses.push({ name: file.name, configs: 0, error: w[0] || 'No EPA configurations found.' });
+                    continue;
+                }
+
+                const kept = [];
+                for (const grp of g) {
+                    // The same configuration in two files is a real situation —
+                    // a re-issued certificate, a V2 of the same PDF. Keeping the
+                    // first and naming the loser is predictable; letting the
+                    // last silently win is not, because which file is "last"
+                    // depends on the order the picker happened to hand them over.
+                    if (seen.has(grp.test_group_id)) {
+                        allWarnings.push(`${file.name}: ${grp.test_group_id} also appears in ${seen.get(grp.test_group_id)} — keeping the first.`);
+                        continue;
+                    }
+                    seen.set(grp.test_group_id, file.name);
+                    // Provenance, which nothing was setting before: the column
+                    // exists and importEpaGroupFull writes it, but the modal
+                    // never supplied a name, so every imported group recorded
+                    // null for the file it came from.
+                    kept.push({ ...grp, source_file: file.name });
+                }
+                allGroups.push(...kept);
+                allWarnings.push(...w.map(x => list.length > 1 ? `${file.name}: ${x}` : x));
+                statuses.push({ name: file.name, configs: kept.length, error: null });
+            } catch (e) {
+                statuses.push({ name: file.name, configs: 0, error: e.message || 'Failed to read PDF.' });
             }
-            setStep('review');
-        } catch (e) {
-            setError(e.message || 'Failed to read PDF.');
-        } finally {
-            setBusy(false);
         }
+
+        setProgress(null);
+        setFiles(statuses);
+
+        if (!allGroups.length) {
+            setError(statuses.find(s2 => s2.error)?.error || 'No EPA configurations found in these PDFs.');
+            setBusy(false);
+            return;
+        }
+
+        const ids = allGroups.map(x => x.test_group_id);
+        let exists = [];
+        try { exists = await getExistingIds(ids); } catch { /* non-fatal */ }
+
+        setGroups(allGroups);
+        setWarnings(allWarnings);
+        setExisting(new Set(exists));
+        setSelected(new Set(ids));
+        if (targetVehicle) {
+            const vn = (targetVehicle.name || '').toLowerCase();
+            const best = allGroups.find(x => vn && (x.epa_carline_name || '').toLowerCase().includes(vn.split(' ')[0]));
+            setLinkIds(new Set([(best || allGroups[0]).test_group_id]));
+        }
+        setStep('review');
+        setBusy(false);
     };
 
-    const onDrop = (e) => { e.preventDefault(); setDragOver(false); processFile(e.dataTransfer.files[0]); };
+    const onDrop = (e) => { e.preventDefault(); setDragOver(false); processFiles(e.dataTransfer.files); };
 
     // Import-select toggle; deselecting also drops any link.
     const toggle = (id) => {
@@ -125,12 +188,18 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                         className={`border-2 border-dashed rounded-lg p-10 text-center ${dragOver ? 'border-indigo-400 bg-indigo-50/40' : 'border-[var(--color-border)]'}`}
                     >
                         <p className="text-sm text-muted mb-3">
-                            {busy ? 'Reading PDF…' : 'Drop an EPA Certification Summary (CSI) PDF here, or'}
+                            {progress
+                                ? `Reading ${progress.done + 1} of ${progress.total}: ${progress.name}`
+                                : busy
+                                    ? 'Reading…'
+                                    : 'Drop EPA Certification Summary (CSI) PDFs here — one or many — or'}
                         </p>
                         <label className="btn btn-secondary text-sm cursor-pointer">
-                            Choose PDF
-                            <input type="file" accept=".pdf" className="hidden"
-                                onChange={e => processFile(e.target.files[0])} />
+                            Choose PDFs
+                            {/* `multiple`, and the picker returns a FileList that
+                                is read one at a time — see processFiles. */}
+                            <input type="file" accept=".pdf" multiple className="hidden"
+                                onChange={e => processFiles(e.target.files)} />
                         </label>
                         <p className="text-xs text-faint mt-3">Parsed entirely in your browser — nothing is uploaded.</p>
                     </div>
@@ -139,8 +208,26 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                 {step === 'review' && (
                     <>
                         <p className="text-sm text-muted mb-2">
-                            <span className="font-medium">{fileName}</span> — {groups.length} configuration(s) found.
+                            {files.length === 1
+                                ? <><span className="font-medium">{files[0].name}</span> — {groups.length} configuration(s) found.</>
+                                : <>{files.length} files — {groups.length} configuration(s) found.</>}
                         </p>
+
+                        {/* Per-file outcome, so a file that yielded nothing is
+                            visible as a named failure rather than as configs
+                            that quietly never appeared. */}
+                        {files.length > 1 && (
+                            <div className="pdf-file-list">
+                                {files.map(f => (
+                                    <div key={f.name} className={`pdf-file-row ${f.error ? 'failed' : ''}`}>
+                                        <span className="truncate">{f.name}</span>
+                                        <span className="text-caption text-faint shrink-0">
+                                            {f.error ? f.error : `${f.configs} config${f.configs === 1 ? '' : 's'}`}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <div className="max-h-80 overflow-y-auto border rounded-lg">
                             <table className="w-full text-xs">
                                 <thead className="bg-[var(--color-surface-muted)] sticky top-0">
@@ -157,6 +244,11 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                         <th className="p-2">Config ID</th>
                                         <th className="p-2">Make · Carline</th>
                                         <th className="p-2">Coeff / Tests / Phases</th>
+                                        {/* Certificate-wide, so every configuration from one PDF
+                                            shows the same count — the table describes what the
+                                            CERTIFICATE covers, not one configuration. */}
+                                        <th className="p-2">Covered models</th>
+                                        {files.length > 1 && <th className="p-2">File</th>}
                                         <th className="p-2">Status</th>
                                     </tr>
                                 </thead>
@@ -176,6 +268,20 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                                 <td className="p-2 font-mono">{id}</td>
                                                 <td className="p-2">{g.make} · <span className="text-muted">{g.epa_carline_name}</span></td>
                                                 <td className="p-2 font-mono text-muted">{g.coefficient_sets.length} / {g.tests.length} / {phaseCount}</td>
+                                                <td className="p-2 font-mono text-muted">
+                                                    {g.covered_models?.length
+                                                        ? `${new Set(g.covered_models.map(c => c.carline_name)).size} (${g.covered_models.length} rows)`
+                                                        : '—'}
+                                                    {/* The manufacturer's own note is the other thing
+                                                        this import newly captures, and the only place
+                                                        some wheel variants are stated at all. */}
+                                                    {g.tests.some(t => t.mfr_test_vehicle_comments) && (
+                                                        <span className="text-faint"> · note</span>
+                                                    )}
+                                                </td>
+                                                {files.length > 1 && (
+                                                    <td className="p-2 text-faint truncate" style={{ maxWidth: '11rem' }} title={g.source_file}>{g.source_file}</td>
+                                                )}
                                                 <td className="p-2">
                                                     {existing.has(id)
                                                         ? <span className="text-amber-600 dark:text-amber-400">⟳ overwrite</span>
@@ -210,7 +316,10 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                 {step === 'done' && (
                     <div className="text-center py-6">
                         <p className="text-2xl mb-2">✓</p>
-                        <p className="text-sm">Imported {result?.count ?? selected.size} configuration(s).</p>
+                        <p className="text-sm">
+                            Imported {result?.count ?? selected.size} configuration(s)
+                            {files.length > 1 && ` from ${files.filter(f => f.configs > 0).length} of ${files.length} files`}.
+                        </p>
                         <button onClick={onClose} className="btn btn-primary text-sm mt-4">Done</button>
                     </div>
                 )}
