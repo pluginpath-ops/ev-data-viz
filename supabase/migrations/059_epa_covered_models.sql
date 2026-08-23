@@ -60,12 +60,37 @@ CREATE TABLE IF NOT EXISTS epa_covered_models (
     transmission_type    text,
     gears                integer,
 
-    created_at timestamptz DEFAULT now(),
-
-    -- Same configuration, same region, once. Re-importing a certificate
-    -- replaces its rows rather than doubling them.
-    UNIQUE (test_group_id, carline_name, certification_region)
+    created_at timestamptz DEFAULT now()
 );
+
+-- ── Uniqueness, with NULLS NOT DISTINCT and it matters ──────────────────────
+--
+-- Same configuration, same region, once.
+--
+-- A plain UNIQUE would not enforce that. `certification_region` is nullable —
+-- the parser leaves it null when a row's region column is absent or unread —
+-- and in Postgres NULL is not equal to NULL, so a plain constraint lets two
+-- otherwise identical rows both insert. Verified: two rows with the same
+-- (test_group_id, carline_name, NULL) were accepted.
+--
+-- Migration 053 hit the same trap from the other side and solved it by making
+-- `model_type_index` NOT NULL, noting that "a NULL here would defeat the
+-- constraint, since Postgres treats NULLs as distinct". That is not open here —
+-- an absent region is a real state, and inventing a sentinel to stand for it
+-- would put a fake value in a column people read.
+--
+-- NULLS NOT DISTINCT says the intended thing directly: for uniqueness, treat
+-- null as a value. Postgres 15+, and production is 17.6.
+--
+-- Added separately rather than inline so re-running the migration can replace a
+-- constraint created by an earlier version of this file.
+ALTER TABLE epa_covered_models
+    DROP CONSTRAINT IF EXISTS epa_covered_models_test_group_id_carline_name_certification_key;
+ALTER TABLE epa_covered_models
+    DROP CONSTRAINT IF EXISTS epa_covered_models_unique_config;
+ALTER TABLE epa_covered_models
+    ADD CONSTRAINT epa_covered_models_unique_config
+    UNIQUE NULLS NOT DISTINCT (test_group_id, carline_name, certification_region);
 
 COMMENT ON TABLE epa_covered_models IS
     'The "Models Covered by this Certificate" table from a CSI PDF — every configuration one certification covers, with the wheel or tyre variant where the manufacturer states it (#250).';
@@ -112,7 +137,14 @@ COMMIT;
 -- Nothing lands until the CSI PDFs are re-imported; the table was never read
 -- before, so existing groups have no covered models.
 --
--- 1. The table and column exist:
+-- 1. A null region no longer defeats the constraint — the second insert must
+--    fail with a unique violation:
+--
+--      INSERT INTO epa_covered_models (test_group_id, carline_name, certification_region)
+--      SELECT test_group_id, 'DUPE', NULL FROM epa_test_groups LIMIT 1;
+--      -- run it twice; the second must raise
+--
+-- 2. The table and column exist:
 --
 --      SELECT count(*) FROM epa_covered_models;                     -- expect 0
 --      SELECT count(*) FROM information_schema.columns
