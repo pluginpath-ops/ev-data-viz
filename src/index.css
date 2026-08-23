@@ -2772,3 +2772,15 @@ body {
     @apply text-xs leading-relaxed;
     color: var(--color-text-secondary);
 }
+
+/* Per-file outcome in the multi-PDF CSI import. A file that yielded nothing is
+   a named failure here rather than configs that quietly never appeared. */
+.pdf-file-list {
+    @apply flex flex-col gap-0.5 mb-3 max-h-32 overflow-y-auto p-2 rounded text-xs;
+    background-color: var(--color-surface-muted);
+}
+.pdf-file-row {
+    @apply flex items-baseline justify-between gap-3;
+    color: var(--color-text-secondary);
+}
+.pdf-file-row.failed { color: var(--color-warning); }
