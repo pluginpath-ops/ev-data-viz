@@ -92,13 +92,48 @@ function mapCoeffCategory(label) {
  * value from a footer.
  */
 const TEST_GROUP_ID = /^[A-Z0-9]{3,}\.[A-Z0-9]{3,}$/i;
+const YEAR = /^(19|20)\d{2}$/;
+
+/**
+ * The certification's own model year, skipping the blank items between a label
+ * and its value.
+ *
+ * `valAfter` cannot be used here. This runs on the RAW stream — it has to, so
+ * page 1 can be told from the footers that repeat it — and pdf.js emits a
+ * separator between a label and its value that `stripNoise` would have removed:
+ *
+ *     "Model Year"  " "  "2027"  ""  "Test Group Information"
+ *
+ * So the literal next item is a space, `parseNum` returned null, and EVERY
+ * certificate fell back to "Original Test Vehicle Model Year". On a normal
+ * certificate the two agree and nothing looked wrong. On a CARRYOVER they do
+ * not: the Volvo EX90 certifies for 2027 and carries over 2026 lab work, and it
+ * was being stored as 2026 — the precise confusion migration 056 exists to
+ * prevent, and enough to make the guide-linking sweep reject its own correct
+ * same-year candidate.
+ *
+ * `certTestGroup` above escaped this only by accident: it scans every
+ * occurrence for something shaped like an ID, so blanks are skipped on the way.
+ * This does the same thing deliberately — scan forward past empties, and stop
+ * at the first non-blank, which must look like a year or this was not the field.
+ */
+function certYearFrom(items) {
+    for (const i of indicesWhere(items, s => s === 'Model Year')) {
+        for (let j = i + 1; j < Math.min(i + 5, items.length); j++) {
+            const v = String(items[j] ?? '').trim();
+            if (!v) continue;
+            return YEAR.test(v) ? Number(v) : null;
+        }
+    }
+    return null;
+}
 
 function parseCertHeader(rawItems) {
     const items = rawItems || [];
     const certTestGroup = indicesWhere(items, s => s === 'Test Group')
         .map(i => String(items[i + 1] ?? '').trim())
         .find(v => TEST_GROUP_ID.test(v)) ?? null;
-    return { certTestGroup, certModelYear: parseNum(valAfter(items, 'Model Year')) };
+    return { certTestGroup, certModelYear: certYearFrom(items) };
 }
 
 /**
