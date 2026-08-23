@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     TIERS, tierOf, hasDerivableEnergy, hasCoefficients,
     classifyGroup, buildSweep, sweepProgress, batchable, NO_PROPOSAL_REASONS,
-    impliedUsableKwh, groupEnergyFacts, estimatedAdjustedRange,
+    impliedUsableKwh, groupEnergyFacts, estimatedAdjustedRange, coveredModelMatches,
 } from '../epaLinkSweep';
 
 const group = (o = {}) => ({
@@ -212,5 +212,54 @@ describe('estimated label range', () => {
     });
     it('is null when the group has no unadjusted range — most of them', () => {
         expect(estimatedAdjustedRange({})).toBeNull();
+    });
+});
+
+describe('covered models', () => {
+    const g = (covered, o = {}) => ({
+        test_group_id: o.id ?? 'TG', make: 'Rivian',
+        epa_carline_name: o.carline ?? 'R1T All-Terrain Performance Dual',
+        model_year: o.year ?? 2025, epa_tests: [], epa_coefficient_sets: [],
+        epa_covered_models: covered.map(n => ({ carline_name: n })),
+    });
+    const row = (id, carline, year = 2025) => ({
+        id, carline, division: 'Rivian', model_year: year,
+        label_comb_range_mi: 370, label_comb_mpge: 78,
+    });
+
+    it('matches a guide carline the certificate names as covered', () => {
+        // The represented-vehicle name says "R1T All-Terrain Performance Dual"
+        // and scores 71% against three trims. The covered-models table names
+        // the exact one, wheels and all.
+        const rows = [
+            row(1, 'R1T Performance Dual Large (20in)'),
+            row(2, 'R1T Performance Dual Max (20in)'),
+        ];
+        const c = classifyGroup(g(['R1T Performance Dual Max (20in)']), rows);
+        expect(c.coveredMatch).toBe(true);
+        expect(c.proposal.row.id).toBe(2);
+    });
+    it('ignores case, quotes and spacing', () => {
+        const rows = [row(1, 'EX90 Twin Motor (21 inch Wheels)')];
+        const c = classifyGroup(g(['ex90  twin motor (21 inch wheels)']), rows);
+        expect(c.coveredMatch).toBe(true);
+    });
+    it('declines when the certificate covers several of the candidates', () => {
+        // A certificate covering four configurations matches four guide rows;
+        // choosing among them is still the curator's.
+        const rows = [row(1, 'R1S Dual Max (20in)'), row(2, 'R1S Dual Max (22in)')];
+        const c = classifyGroup(g(['R1S Dual Max (20in)', 'R1S Dual Max (22in)']), rows);
+        expect(c.coveredMatch).toBe(false);
+    });
+    it('does not match across model years', () => {
+        const rows = [row(1, 'R1T Performance Dual Max (20in)', 2024)];
+        expect(classifyGroup(g(['R1T Performance Dual Max (20in)'], { year: 2025 }), rows).coveredMatch).toBe(false);
+    });
+    it('returns every covered match for a caller that wants them all', () => {
+        const rows = [row(1, 'A'), row(2, 'B'), row(3, 'C')];
+        expect(coveredModelMatches(g(['A', 'C']), rows).map(r => r.id)).toEqual([1, 3]);
+    });
+    it('is empty when the certificate lists nothing — the pre-#250 state', () => {
+        expect(coveredModelMatches({ epa_covered_models: [] }, [row(1, 'A')])).toEqual([]);
     });
 });

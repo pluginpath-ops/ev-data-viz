@@ -1784,7 +1784,7 @@ class DataService {
   async importEpaGroupFull(group) {
     if (!this.useSupabase) return;
     const supabase = getSupabase();
-    const { coefficient_sets = [], tests = [], ...g } = group;
+    const { coefficient_sets = [], tests = [], covered_models = [], ...g } = group;
     const tgid = g.test_group_id;
 
     // Tag every populated scalar field as PDF-sourced.
@@ -1809,15 +1809,45 @@ class DataService {
       if (error) throw error;
     }
 
+    // 2b. Covered models (clean-replace, like the coefficient sets).
+    //
+    // Certificate-wide rather than per configuration, so every group parsed
+    // from one PDF writes the same list — which is faithful: the table says
+    // what the CERTIFICATE covers. Re-importing replaces rather than doubles.
+    //
+    // Non-fatal: migration 059 may not be applied, and a missing covered-models
+    // table must not fail an import that otherwise worked.
+    try {
+      await supabase.from('epa_covered_models').delete().eq('test_group_id', tgid);
+      if (covered_models.length) {
+        const rows = covered_models.map(cm => ({ test_group_id: tgid, ...cm }));
+        const { error } = await supabase.from('epa_covered_models').insert(rows);
+        if (error) throw error;
+      }
+    } catch (error) {
+      if (!isMissingRelation(error)) throw error;
+    }
+
     // 3. Tests + phases (clean-replace; phases cascade on test delete).
     await supabase.from('epa_tests').delete().eq('test_group_id', tgid);
     for (const t of tests) {
       const { phases = [], ...testRow } = t;
-      const { data: savedTest, error: tErr } = await supabase
+      let { data: savedTest, error: tErr } = await supabase
         .from('epa_tests')
         .insert({ test_group_id: tgid, ...testRow, overrides: pdfOverrides(testRow) })
         .select('id')
         .single();
+      // `mfr_test_vehicle_comments` arrives in migration 059. Retry without it
+      // rather than failing a whole import over a field that is a curator's
+      // reading aid — the numbers matter more than the note.
+      if (tErr && isMissingColumn(tErr)) {
+        const { mfr_test_vehicle_comments: _dropped, ...withoutNote } = testRow;
+        ({ data: savedTest, error: tErr } = await supabase
+          .from('epa_tests')
+          .insert({ test_group_id: tgid, ...withoutNote, overrides: pdfOverrides(withoutNote) })
+          .select('id')
+          .single());
+      }
       if (tErr) throw tErr;
       if (phases.length) {
         const pRows = phases.map(p => ({ test_id: savedTest.id, ...p, overrides: pdfOverrides(p) }));
@@ -1988,7 +2018,8 @@ class DataService {
         vehicle_config_number, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note, useable_kwh,
         carryover_model_year, cd_range_combined_calc, derived_5cycle_coefficient,
         epa_coefficient_sets(target_a, equiv_test_weight_lbs),
-        epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh),
+        epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh, mfr_test_vehicle_comments),
+        epa_covered_models(carline_number, carline_name, certification_region, drive_system),
         epa_vehicle_mappings(vehicles(id, name, year))
       `)
       .is('fe_guide_row_id', null)

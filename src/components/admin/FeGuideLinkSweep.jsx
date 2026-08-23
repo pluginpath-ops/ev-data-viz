@@ -102,6 +102,11 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
     const g = item.group;
     const vehicles = (g.epa_vehicle_mappings ?? []).map(m => m.vehicles).filter(Boolean);
     const skipped = g.fe_guide_skipped_at != null;
+    // Deduplicated: a certificate's tests often repeat the same note.
+    const comments = [...new Set((g.epa_tests ?? [])
+        .map(t => t.mfr_test_vehicle_comments)
+        .filter(Boolean)
+        .map(c => c.trim()))];
 
     return (
         <div className={`sweep-row ${skipped ? 'skipped' : ''}`}>
@@ -143,9 +148,16 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                                         exact id
                                     </span>
                                 )}
+                                {/* The certificate itself lists this carline as
+                                    covered — a name identity, not a score. */}
+                                {item.coveredMatch && (
+                                    <span className="guide-badge guide-badge-tested" title="This carline is named in the certificate's own Models Covered table">
+                                        covered model
+                                    </span>
+                                )}
                             </div>
                             <CandidateFacts row={item.proposal.row}
-                                score={item.exactIdMatch ? null : item.proposal.score}
+                                score={(item.exactIdMatch || item.coveredMatch) ? null : item.proposal.score}
                                 exactYear={item.proposal.exactYear} />
                         </>
                     ) : (
@@ -206,6 +218,34 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
 
             {open && (
                 <div className="sweep-candidates">
+                    {/* What the certificate says it covers, and what the
+                        manufacturer wrote about the vehicle they tested. Both
+                        come from a page the importer only started reading in
+                        #250, and between them they answer the cases the
+                        represented-vehicle name cannot. */}
+                    {(g.epa_covered_models?.length > 0 || comments.length > 0) && (
+                        <div className="sweep-cert-detail">
+                            {g.epa_covered_models?.length > 0 && (
+                                <>
+                                    <div className="text-label">This certificate covers</div>
+                                    <div className="sweep-covered-list">
+                                        {[...new Map(g.epa_covered_models.map(cm =>
+                                            [cm.carline_name, cm])).values()].map(cm => (
+                                            <span key={cm.carline_name} className="brand-alias-chip">
+                                                {cm.carline_number && <span className="text-faint">{cm.carline_number} · </span>}
+                                                {cm.carline_name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                            {comments.map((c, k) => (
+                                <div key={k} className="sweep-comment">
+                                    <span className="text-label">Manufacturer note</span> {c}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     {item.ranked.map(c => (
                         <div key={c.row.id} className="sweep-candidate">
                             <div>

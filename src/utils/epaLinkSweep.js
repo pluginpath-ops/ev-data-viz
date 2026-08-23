@@ -148,6 +148,41 @@ export function estimatedAdjustedRange(group) {
     return { miles: unadjusted * factor, factor, factorIsDerived: derived != null && derived > 0 };
 }
 
+/** Loose comparison for a carline: case, punctuation and spacing are noise. */
+const carlineKey = (v) => String(v ?? '')
+    .toLowerCase()
+    .replace(/[''"".,]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/**
+ * A guide row whose carline IS one of the configurations this certificate says
+ * it covers.
+ *
+ * The strongest signal available, and it comes from a page the importer only
+ * started reading in #250. The Emission Data Vehicle Information page names one
+ * represented vehicle for a whole certificate — `R1T All-Terrain Performance
+ * Dual` — while the Models Covered table enumerates what it actually covers,
+ * wheel variants and all, in words that match the guide almost exactly:
+ *
+ *     covered model : R1T Performance Dual Max (20in)
+ *     guide carline : R1T Performance Dual Max (20in)
+ *
+ * So this is a name identity rather than a similarity, and it settles the cases
+ * a score cannot: 59 of the 115 covered-model rows in the sample name a wheel
+ * or tyre, which is exactly what the represented-vehicle name leaves out.
+ *
+ * Returns every match. A certificate covering four configurations legitimately
+ * matches four guide rows, and choosing among them is still the curator's.
+ */
+export function coveredModelMatches(group, feRows = []) {
+    const covered = new Set(
+        (group?.epa_covered_models ?? []).map(cm => carlineKey(cm.carline_name)).filter(Boolean),
+    );
+    if (!covered.size) return [];
+    return feRows.filter(r => covered.has(carlineKey(r.carline)));
+}
+
 /**
  * A guide row whose smog test group IS our certification group id.
  *
@@ -229,10 +264,31 @@ export function classifyGroup(group, feRows) {
             tier: tierOf(group),
             proposal: { row: exact[0], score: 1, exactYear: Number(exact[0].model_year) === Number(group.model_year) },
             exactIdMatch: true,
+            coveredMatch: false,
             reason: null,
             ranked: ranked.slice(0, 8),
             candidateCount: ranked.length,
             shared: sharedCertification(ranked.slice(0, 8)),
+        };
+    }
+
+    // A carline that the certificate itself lists as covered. Same standing as
+    // the identifier match — a name identity, not a score — and only taken when
+    // it is unambiguous, since a certificate covering four configurations
+    // matches four guide rows and picking among them is a judgement.
+    const coveredSameYear = coveredModelMatches(group, feRows)
+        .filter(r => Number(r.model_year) === Number(group.model_year));
+    if (coveredSameYear.length === 1) {
+        return {
+            group,
+            tier: tierOf(group),
+            proposal: { row: coveredSameYear[0], score: 1, exactYear: true },
+            exactIdMatch: false,
+            coveredMatch: true,
+            reason: null,
+            ranked: ranked.slice(0, 8),
+            candidateCount: ranked.length,
+            shared: null,
         };
     }
 
@@ -253,6 +309,7 @@ export function classifyGroup(group, feRows) {
         tier: tierOf(group),
         proposal: best,
         exactIdMatch: false,
+        coveredMatch: false,
         reason,
         ranked: ranked.slice(0, 8),
         candidateCount: ranked.length,

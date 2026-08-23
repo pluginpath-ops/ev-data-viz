@@ -144,6 +144,123 @@ function indicesWhere(items, pred, start = 0, end = items.length) {
     return out;
 }
 
+// ── Models covered by this certificate ──────────────────────────────────────
+
+/**
+ * Where a covered-model row stops, and what its other columns look like.
+ *
+ * The table's remaining columns are a closed vocabulary, so a carline name runs
+ * until one of them appears or until the next `NNN - ` marker.
+ *
+ * Matched by PREFIX, not equality, and that is the whole difficulty: the cells
+ * WRAP. EPA emits `296 - EX90 Twin` then `Motor` then `California + CAA` then
+ * `Section 177 states` as four separate text items. An exact-match stop list
+ * never fires on `California + CAA`, so the name swallows the rest of the row —
+ * which is precisely what a first attempt did.
+ */
+const COVERED_REGION_RE = /^(California|Federal|Section 177)/;
+const COVERED_DRIVE_RE  = /^(All Wheel|Part-time|Full-time|2-Wheel|4-Wheel|Rear Wheel|Front Wheel|Drive$)/;
+const COVERED_TRANS_RE  = /^(Automatic|Manual|Continuously|Semi-Automatic)/;
+
+/** True when an item begins a column that is not the carline name. */
+function endsCoveredName(item) {
+    return COVERED_REGION_RE.test(item)
+        || COVERED_DRIVE_RE.test(item)
+        || COVERED_TRANS_RE.test(item)
+        || /^(No|Yes|--)$/.test(item)
+        || /^\d+$/.test(item);
+}
+
+/**
+ * Every configuration a certificate covers.
+ *
+ * The Emission Data Vehicle Information page names ONE represented vehicle for
+ * the whole certificate. This table names them all, with the wheel or tyre
+ * variant where the manufacturer writes it — `EX90 Twin Motor (21 inch Wheels)`,
+ * `R1T Performance Dual Max (20in)` — and those strings match Fuel Economy
+ * Guide carlines closely enough to link on (#250).
+ *
+ * Bounded to the table. A scan that only looked for `NNN - ` swallowed
+ * `Multi-Cycle Test (MCT) Exhaust Test #…` out of a later section on a real
+ * file, so it stops at whichever section heading comes next.
+ */
+export function parseCoveredModels(items) {
+    const start = idxOf(items, 'Models Covered by this Certificate');
+    if (start < 0) return [];
+
+    let end = items.length;
+    for (const marker of ['Engine Description', 'Emission Data Vehicle Information',
+                          'Vehicle Emission Control', 'Certification Summary']) {
+        const i = idxOf(items, marker, start + 1);
+        if (i >= 0 && i < end) end = i;
+    }
+
+    /**
+     * Read one `N - Name` cell, rejoining the fragments EPA split it across.
+     * Returns the value and where reading stopped.
+     */
+    const readNumbered = (from) => {
+        const m = /^(\d{1,4}) - (.*)$/.exec(items[from]);
+        if (!m) return null;
+        let name = m[2];
+        let k = from + 1;
+        while (k < end && !endsCoveredName(items[k]) && !/^\d{1,4} - /.test(items[k])) {
+            name += ' ' + items[k];
+            k += 1;
+        }
+        return { number: m[1], name: name.replace(/\s+/g, ' ').trim(), next: k };
+    };
+
+    const rows = [];
+    let i = start;
+    while (i < end) {
+        const first = readNumbered(i);
+        if (!first) { i += 1; continue; }
+
+        // Division and carline have the SAME shape — `1 - Volvo Cars of North
+        // America, LLC` and `297 - EX90 Twin Motor (21 inch Wheels)` — and
+        // Lucid numbers its carlines in single digits, so neither the format
+        // nor the width tells them apart. Position does: the division always
+        // immediately precedes the carline. When two numbered cells run
+        // together, the first is the division.
+        let division = null;
+        let carline = first;
+        if (first.next < end && /^\d{1,4} - /.test(items[first.next])) {
+            const second = readNumbered(first.next);
+            if (second) { division = first; carline = second; }
+        }
+
+        let i2 = carline.next;
+        let region = null;
+        while (i2 < end && COVERED_REGION_RE.test(items[i2])) {
+            region = region ? `${region} ${items[i2]}` : items[i2];
+            i2 += 1;
+        }
+        let drive = null;
+        while (i2 < end && COVERED_DRIVE_RE.test(items[i2])) {
+            drive = drive ? `${drive} ${items[i2]}` : items[i2];
+            i2 += 1;
+        }
+        const transmission = (i2 < end && COVERED_TRANS_RE.test(items[i2])) ? items[i2++] : null;
+        const gears = (i2 < end && /^\d+$/.test(items[i2])) ? Number(items[i2++]) : null;
+
+        if (carline.name) {
+            rows.push({
+                carline_number: carline.number,
+                carline_name: carline.name,
+                division: division?.name ?? null,
+                certification_region: region,
+                drive_system: drive,
+                transmission_type: transmission,
+                gears,
+            });
+        }
+        i = Math.max(i2, carline.next);
+    }
+
+    return rows;
+}
+
 // ── Coefficient table ───────────────────────────────────────────────────────
 
 /**
@@ -255,6 +372,12 @@ function parseTests(items, start, end) {
             procedure_code: procCode,
             originator: 'MFR',
             lab_id: valAfter(items, 'Verify Test Lab ID', ti, tEnd),
+            // Unstructured and manufacturer-specific, captured verbatim for a
+            // person to read. Often the ONLY statement of which wheel or
+            // software variant a test represents: Volvo's says "Tested on 20
+            // inch tire, covering 22 inch tire as worst case", which its
+            // covered-models table — naming only 21 inch — does not.
+            mfr_test_vehicle_comments: valAfter(items, 'Manufacturer Test Vehicle Comments', ti, tEnd),
             test_date: toIsoDate(valAfter(items, 'Test Date', ti, tEnd)),
             source: 'csi_pdf',   // epa_tests.source enum (override field-tag stays 'pdf')
             recharge_voltage: parseNum(valAfter(items, 'Recharge Event Voltage', ti, tEnd)),
@@ -297,6 +420,9 @@ export function parseEpaCsiText(rawItems) {
     // across configs; we must disambiguate the test_group_id with the config #).
     const rawIds = cfgIdx.map(ci => (items[ci + 1] || '').split('/')[0].trim());
     const idCounts = rawIds.reduce((m, id) => (m[id] = (m[id] || 0) + 1, m), {});
+
+    // Read once: the table is certificate-wide, not per configuration.
+    const coveredModels = parseCoveredModels(items);
 
     const groups = cfgIdx.map((ci, k) => {
         const end = k + 1 < cfgIdx.length ? cfgIdx[k + 1] : items.length;
@@ -358,10 +484,17 @@ export function parseEpaCsiText(rawItems) {
             cd_range_hwy_calc,
             coefficient_sets,
             tests,
+            // Certificate-wide, so every configuration parsed from this PDF
+            // carries the same list. That is faithful: the table describes what
+            // the CERTIFICATE covers, not what one configuration is.
+            covered_models: coveredModels,
         };
     }).filter(g => g.test_group_id);
 
     if (!groups.length) warnings.push('Configurations found but no Vehicle IDs could be read.');
+    if (!coveredModels.length) {
+        warnings.push('No "Models Covered by this Certificate" table found — the configurations this certificate covers will not be recorded.');
+    }
 
     if (certTestGroup == null) {
         warnings.push('No test group on page 1 — falling back to each config\'s "Original Test Group Name", which is the carryover source on a carryover certification.');

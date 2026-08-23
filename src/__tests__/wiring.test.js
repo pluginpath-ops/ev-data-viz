@@ -98,6 +98,8 @@ describe('utilities built for the UI are reached by the UI', () => {
             'As above, consumed by tierOf and exported so the target-set check is testable without tiering.',
         'epaLinkSweep.tierOf':
             'Consumed inside the module by classifyGroup. Exported so the priority order is asserted directly rather than inferred from a sorted sweep.',
+        'epaLinkSweep.coveredModelMatches':
+            'Consumed inside the module by classifyGroup. Exported so the certificate-covers-this-carline match, and its refusal when a certificate covers several candidates, are asserted directly.',
         'epaLinkSweep.exactTestGroupMatches':
             'Consumed inside the module by classifyGroup. Exported so the identifier match — and its refusal to fire when several rows share the id — is asserted directly.',
         'epaLinkSweep.sharedCertification':
