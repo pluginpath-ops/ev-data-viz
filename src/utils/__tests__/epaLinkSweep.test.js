@@ -3,6 +3,7 @@ import {
     TIERS, tierOf, hasDerivableEnergy, hasCoefficients,
     classifyGroup, buildSweep, sweepProgress, batchable, NO_PROPOSAL_REASONS,
     impliedUsableKwh, groupEnergyFacts, estimatedAdjustedRange, coveredModelMatches,
+    wheelMentions, coveredWheelSizes,
 } from '../epaLinkSweep';
 
 const group = (o = {}) => ({
@@ -261,5 +262,35 @@ describe('covered models', () => {
     });
     it('is empty when the certificate lists nothing — the pre-#250 state', () => {
         expect(coveredModelMatches({ epa_covered_models: [] }, [row(1, 'A')])).toEqual([]);
+    });
+});
+
+describe('wheel sizes distilled from free text', () => {
+    it('pulls both sizes out of the Volvo note', () => {
+        // The clause that settles the case, inside a paragraph of axle ratios.
+        expect(wheelMentions('Tested on 20 inch tire, covering 22 inch tire as worst case. Average N/V 106.8 (Front 101.0 and Rear 112.7).'))
+            .toEqual([20, 22]);
+    });
+    it('reads the notations the corpus actually uses', () => {
+        expect(wheelMentions('EX90 Twin Motor (21 inch Wheels)')).toEqual([21]);
+        expect(wheelMentions('R1T Performance Dual Max (20in)')).toEqual([20]);
+        expect(wheelMentions("iX3 50 xDrive (20'' Summer Tires)")).toEqual([20]);
+    });
+    it('reads Lucid’s front/rear pair as two sizes, not one number', () => {
+        expect(wheelMentions('Gravity GT w/20F21R wheels (3R)')).toEqual([20, 21]);
+    });
+    it('does not mistake a year, a power or an N/V figure for a wheel', () => {
+        expect(wheelMentions('Model Y Long Range AWD; Front Motor Power - 87 kW; 2026 model')).toEqual([]);
+        expect(wheelMentions('Average N/V 106.8 (Front 101.0 and Rear 112.7)')).toEqual([]);
+    });
+    it('collects every size a certificate’s covered models name', () => {
+        expect(coveredWheelSizes({ epa_covered_models: [
+            { carline_name: 'EX90 Twin Motor' },
+            { carline_name: 'EX90 Twin Motor (21 inch Wheels)' },
+            { carline_name: 'EX90 Twin Motor Performance (21 inch Wheels)' },
+        ] })).toEqual([21]);
+    });
+    it('is empty for a group with no CSI detail — a CSV-imported group', () => {
+        expect(coveredWheelSizes({})).toEqual([]);
     });
 });

@@ -2784,3 +2784,18 @@ body {
     color: var(--color-text-secondary);
 }
 .pdf-file-row.failed { color: var(--color-warning); }
+
+/* The manufacturer's note, on the row. One line, full text on hover — the note
+   runs to a paragraph and only a clause of it bears on the link. */
+.sweep-note-inline {
+    @apply text-xs truncate;
+    max-width: 34rem;
+    color: var(--color-text-muted);
+}
+/* The wheel sizes pulled out of it, which is the part being looked for. */
+.sweep-note-wheels {
+    @apply inline-block mr-1.5 px-1.5 rounded;
+    font-weight: 700;
+    background-color: var(--bar-strong);
+    color: var(--color-text-primary);
+}

@@ -148,6 +148,44 @@ export function estimatedAdjustedRange(group) {
     return { miles: unadjusted * factor, factor, factorIsDerived: derived != null && derived > 0 };
 }
 
+/**
+ * Wheel and tyre sizes named anywhere in a piece of free text.
+ *
+ * The distillation that makes the manufacturer's note usable in a list. The
+ * note itself runs to a paragraph — axle ratios, N/V figures, software
+ * variants — and the part a curator needs while linking is which wheel was on
+ * the car:
+ *
+ *   "Tested on 20 inch tire, covering 22 inch tire as worst case" → [20, 22]
+ *
+ * Three notations, all real: `21 inch Wheels`, `(20in)`, `20''`, plus Lucid's
+ * front/rear pairing `w/20F21R wheels`, which means 20 front and 21 rear and
+ * would otherwise read as one nonsense number.
+ *
+ * Bounded to 15–26 inches so a model year, an axle ratio or an N/V figure in
+ * the same sentence cannot arrive as a wheel size.
+ */
+export function wheelMentions(text) {
+    const s = String(text ?? '');
+    const out = new Set();
+    const add = (v) => { const n = Number(v); if (n >= 15 && n <= 26) out.add(n); };
+
+    // Lucid's front/rear pair first: "20F21R" is two sizes, not one.
+    for (const m of s.matchAll(/(\d{2})\s*F\s*(\d{2})\s*R/gi)) { add(m[1]); add(m[2]); }
+    for (const m of s.matchAll(/(\d{2})\s*(?:inch|in\b|''|"|')\s*(?:wheel|tire|tyre)?/gi)) add(m[1]);
+
+    return [...out].sort((a, b) => a - b);
+}
+
+/** Every wheel size this certificate's covered models name, deduplicated. */
+export function coveredWheelSizes(group) {
+    const out = new Set();
+    for (const cm of group?.epa_covered_models ?? []) {
+        for (const w of wheelMentions(cm.carline_name)) out.add(w);
+    }
+    return [...out].sort((a, b) => a - b);
+}
+
 /** Loose comparison for a carline: case, punctuation and spacing are noise. */
 const carlineKey = (v) => String(v ?? '')
     .toLowerCase()

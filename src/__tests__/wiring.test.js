@@ -98,6 +98,8 @@ describe('utilities built for the UI are reached by the UI', () => {
             'As above, consumed by tierOf and exported so the target-set check is testable without tiering.',
         'epaLinkSweep.tierOf':
             'Consumed inside the module by classifyGroup. Exported so the priority order is asserted directly rather than inferred from a sorted sweep.',
+        'epaLinkSweep.wheelMentions':
+            'Called by the sweep view to distil a manufacturer note, and inside the module by coveredWheelSizes. Exported so the four real notations — inch, in, doubled quote, and Lucid\'s 20F21R pair — are pinned by name.',
         'epaLinkSweep.coveredModelMatches':
             'Consumed inside the module by classifyGroup. Exported so the certificate-covers-this-carline match, and its refusal when a certificate covers several candidates, are asserted directly.',
         'epaLinkSweep.exactTestGroupMatches':

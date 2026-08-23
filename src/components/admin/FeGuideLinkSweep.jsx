@@ -4,6 +4,7 @@ import { useAsyncResource } from '../../hooks/useAsyncResource';
 import {
     TIERS, buildSweep, sweepProgress, batchable, NO_PROPOSAL_REASONS,
     impliedUsableKwh, groupEnergyFacts, estimatedAdjustedRange,
+    wheelMentions, coveredWheelSizes,
 } from '../../utils/epaLinkSweep';
 import { wheelSizeIn } from '../../utils/feGuideBrowse';
 
@@ -107,6 +108,12 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
         .map(t => t.mfr_test_vehicle_comments)
         .filter(Boolean)
         .map(c => c.trim()))];
+    // Deduplicated by name: a certificate lists each configuration once per
+    // certification region, so Federal and California double every row.
+    const covered = [...new Map((g.epa_covered_models ?? [])
+        .map(cm => [cm.carline_name, cm])).values()];
+    const coveredWheels = coveredWheelSizes(g);
+    const noteWheels = wheelMentions;
 
     return (
         <div className={`sweep-row ${skipped ? 'skipped' : ''}`}>
@@ -134,6 +141,28 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                         {g.carryover_model_year && ` · carried over from ${g.carryover_model_year}`}
                     </div>
                     <GroupEnergyFacts group={g} />
+                    {/* The certificate's own detail, on the row rather than
+                        behind the expand. It is the most decisive thing we hold
+                        and a curator working through 39 rows should not have to
+                        click each one to find out whether it exists. Distilled,
+                        because the note itself is a paragraph of axle ratios and
+                        N/V figures around one useful clause. */}
+                    {(coveredWheels.length > 0 || covered.length > 0) && (
+                        <div className="text-caption text-secondary">
+                            covers {covered.length} config{covered.length === 1 ? '' : 's'}
+                            {coveredWheels.length > 0 && ` · ${coveredWheels.map(w => `${w}"`).join(', ')}`}
+                        </div>
+                    )}
+                    {comments.map((c, k) => (
+                        <div key={k} className="sweep-note-inline" title={c}>
+                            {noteWheels(c).length > 0 && (
+                                <span className="sweep-note-wheels">
+                                    {noteWheels(c).map(w => `${w}"`).join(', ')}
+                                </span>
+                            )}
+                            {c}
+                        </div>
+                    ))}
                 </div>
 
                 <div className="sweep-proposal">
