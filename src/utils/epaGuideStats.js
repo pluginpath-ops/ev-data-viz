@@ -121,6 +121,51 @@ export const MEASURES = [
 ];
 export const measureByKey = (key) => MEASURES.find(m => m.key === key) ?? null;
 
+/**
+ * Narrow a set of observations by year, class and drivetrain.
+ *
+ * ONE implementation for both datasets. Guide rows and certification
+ * observations are deliberately given the same three field names —
+ * `model_year`, `body_class`, `drive_group` — precisely so the filtering can be
+ * shared rather than written twice against the same names and left to drift the
+ * first time a fourth filter is added.
+ *
+ * `showClass` and `showDrive` reflect whether the control is on screen: a
+ * filter the reader cannot see must not narrow the data, or rows go missing
+ * with nothing to explain them.
+ */
+export function applyStatsFilters(observations, { years = [], classes = [], drives = [], showClass = true, showDrive = true } = {}) {
+    let out = observations;
+    if (years.length)              out = out.filter(o => years.includes(o.model_year));
+    if (showClass && classes.length) out = out.filter(o => classes.includes(o.body_class));
+    if (showDrive && drives.length)  out = out.filter(o => drives.includes(o.drive_group));
+    return out;
+}
+
+/**
+ * The model year with the most observations — the default, and NOT the newest.
+ *
+ * EPA files a model year over many months, so the newest is always thinnest.
+ * Computed from whichever dataset is being shown: the guide's best-covered year
+ * is not necessarily the certification records', and defaulting the
+ * certification tab to the guide's answer would land it on a thin year for no
+ * reason the reader could see.
+ */
+export function bestCoveredYear(observations) {
+    const counts = new Map();
+    for (const o of observations) {
+        if (!o.model_year) continue;
+        counts.set(o.model_year, (counts.get(o.model_year) ?? 0) + 1);
+    }
+    let best = null, bestN = -1;
+    for (const [y, n] of counts) if (n > bestN || (n === bestN && y > best)) { best = y; bestN = n; }
+    return best;
+}
+
+/** The years present in a set of observations, newest first. */
+export const yearsPresent = (observations) =>
+    [...new Set(observations.map(o => o.model_year).filter(Boolean))].sort((a, b) => b - a);
+
 // ── Descriptive statistics ───────────────────────────────────────────────────
 
 const num = (v) => {

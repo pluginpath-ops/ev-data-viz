@@ -5,7 +5,7 @@ import { decorateRow, buildBrandIndex } from '../../../utils/feGuideBrowse';
 import {
     UNITS, DEFAULT_UNIT, DIMENSIONS, MEASURES, measureByKey,
     summarise, overall, histogram, extremes, bucketise, describe,
-    histogramOf, extremesOf,
+    histogramOf, extremesOf, applyStatsFilters, bestCoveredYear, yearsPresent,
 } from '../../../utils/epaGuideStats';
 import {
     CERT_MEASURES, certMeasureByKey, certObservations, coverageFor,
@@ -106,30 +106,27 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
         [rawRows, brandIndex],
     );
 
-    const allYears = useMemo(
-        () => [...new Set(allRows.map(r => r.model_year).filter(Boolean))].sort((a, b) => b - a),
-        [allRows],
+    /**
+     * Certification observations: one per test group, already flat, so they are
+     * bucketed directly rather than clustered. The unit-of-analysis question
+     * does not arise — a certification record IS the unit, and there is nothing
+     * below it to collapse.
+     */
+    const certObs = useMemo(
+        () => certObservations(certGroups ?? [], brandIndex),
+        [certGroups, brandIndex],
     );
 
-    /**
-     * The default year is the best-covered one, not the newest.
-     *
-     * EPA files a model year over many months, so the newest is always the
-     * thinnest: MY2027 holds 135 rows against MY2026's 323, which is 49 test
-     * groups instead of 122 and puts three classes below the reporting
-     * threshold. Landing there makes the corpus look sparse and several
-     * segments unanswerable, when a year-old figure would answer them.
-     */
-    const bestCoveredYear = useMemo(() => {
-        const counts = new Map();
-        for (const r of allRows) {
-            if (!r.model_year) continue;
-            counts.set(r.model_year, (counts.get(r.model_year) ?? 0) + 1);
-        }
-        let best = null, bestN = -1;
-        for (const [y, n] of counts) if (n > bestN || (n === bestN && y > best)) { best = y; bestN = n; }
-        return best;
-    }, [allRows]);
+    // Both derived from the dataset on screen. The guide's best-covered year is
+    // not the certification records' — defaulting one tab to the other's answer
+    // lands it on a thin year for no visible reason.
+    const activeForYears = isCert ? certObs : allRows;
+    const allYears = useMemo(() => yearsPresent(activeForYears), [activeForYears]);
+    const defaultYear = useMemo(() => bestCoveredYear(activeForYears), [activeForYears]);
+
+
+
+
 
     // One year by default, because the same configuration recurs across years
     // at identical figures — the 2025 and 2026 Rivian groups are the same 24
@@ -140,8 +137,8 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
     // new array on every render, so the `rows` memo below saw a changed
     // dependency each time and re-filtered all 1,175 rows for nothing.
     const selectedYears = useMemo(
-        () => years ?? (bestCoveredYear ? [bestCoveredYear] : []),
-        [years, bestCoveredYear],
+        () => years ?? (defaultYear ? [defaultYear] : []),
+        [years, defaultYear],
     );
     /**
      * Filters narrow the population; the dimension splits what remains.
@@ -160,13 +157,6 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
     const showClassFilter = dimension !== 'body_class';
     const showDriveFilter = dimension !== 'drive_group';
 
-    const rows = useMemo(() => {
-        let out = allRows;
-        if (selectedYears.length) out = out.filter(r => selectedYears.includes(r.model_year));
-        if (showClassFilter && classes.length) out = out.filter(r => classes.includes(r.body_class));
-        if (showDriveFilter && drives.length)  out = out.filter(r => drives.includes(r.drive_group));
-        return out;
-    }, [allRows, selectedYears, classes, drives, showClassFilter, showDriveFilter]);
 
     const allClasses = useMemo(
         () => [...new Set(allRows.map(r => r.body_class).filter(Boolean))].sort(),
@@ -202,51 +192,49 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
     }, [dataset, unit, dimension, measure, years, classes, drives, showClassFilter, showDriveFilter, subtab]);
 
-
     /**
-     * Certification observations: one per test group, already flat, so they are
-     * bucketed directly rather than clustered. The unit-of-analysis question
-     * does not arise — a certification record IS the unit, and there is nothing
-     * below it to collapse.
+     * The population under study, whichever dataset that is.
+     *
+     * Guide rows and certification observations carry the same three dimension
+     * fields by design, so one filter serves both. Written twice, the second
+     * copy would drift the first time a filter was added — which is the failure
+     * this whole module keeps arguing against elsewhere.
      */
-    const certObs = useMemo(
-        () => certObservations(certGroups ?? [], brandIndex),
-        [certGroups, brandIndex],
+    const active = isCert ? certObs : allRows;
+    const filtered = useMemo(
+        () => applyStatsFilters(active, {
+            years: selectedYears, classes, drives,
+            showClass: showClassFilter, showDrive: showDriveFilter,
+        }),
+        [active, selectedYears, classes, drives, showClassFilter, showDriveFilter],
     );
-    const certFiltered = useMemo(() => {
-        let out = certObs;
-        if (selectedYears.length) out = out.filter(o => selectedYears.includes(o.model_year));
-        if (showClassFilter && classes.length) out = out.filter(o => classes.includes(o.body_class));
-        if (showDriveFilter && drives.length)  out = out.filter(o => drives.includes(o.drive_group));
-        return out;
-    }, [certObs, selectedYears, classes, drives, showClassFilter, showDriveFilter]);
 
     const coverage = useMemo(
-        () => (isCert ? coverageFor(certFiltered, measure) : null),
-        [isCert, certFiltered, measure],
+        () => (isCert ? coverageFor(filtered, measure) : null),
+        [isCert, filtered, measure],
     );
 
     const summary   = useMemo(
         () => (isCert
-            ? bucketise(certFiltered, { dimension, measure, minN: MIN_N })
-            : summarise(rows, { unit, dimension, measure, minN: MIN_N })),
-        [isCert, certFiltered, rows, unit, dimension, measure],
+            ? bucketise(filtered, { dimension, measure, minN: MIN_N })
+            : summarise(filtered, { unit, dimension, measure, minN: MIN_N })),
+        [isCert, filtered, unit, dimension, measure],
     );
     const corpus    = useMemo(
-        () => (isCert ? describe(certFiltered.map(o => o[measure])) : overall(rows, { unit, measure })),
-        [isCert, certFiltered, rows, unit, measure],
+        () => (isCert ? describe(filtered.map(o => o[measure])) : overall(filtered, { unit, measure })),
+        [isCert, filtered, unit, measure],
     );
     const hist = useMemo(
         () => (isCert
-            ? histogramOf(certFiltered, { measure, bins: 24 })
-            : histogram(rows, { unit, measure, bins: 24 })),
-        [isCert, certFiltered, rows, unit, measure],
+            ? histogramOf(filtered, { measure, bins: 24 })
+            : histogram(filtered, { unit, measure, bins: 24 })),
+        [isCert, filtered, unit, measure],
     );
     const tails = useMemo(
         () => (isCert
-            ? extremesOf(certFiltered, { measure, count: 5 })
-            : extremes(rows, { unit, measure, count: 5 })),
-        [isCert, certFiltered, rows, unit, measure],
+            ? extremesOf(filtered, { measure, count: 5 })
+            : extremes(filtered, { unit, measure, count: 5 })),
+        [isCert, filtered, unit, measure],
     );
 
     if (loading) return <LoadingSpinner />;
