@@ -1915,6 +1915,12 @@ body {
 .collapsible-section:first-child {
     @apply border-t-0;
 }
+/* For a section that follows a sibling inside a card and should not be divided
+   from it — the divider reads as a break between unrelated things, and the
+   chart's axis choice and its environmental adjustments are one group. */
+.collapsible-section--flush {
+    @apply border-t-0;
+}
 
 .collapsible-header {
     @apply w-full flex items-center gap-2 py-3 text-left transition-colors;

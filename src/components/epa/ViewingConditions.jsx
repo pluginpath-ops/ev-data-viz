@@ -105,25 +105,6 @@ export default function ViewingConditions({ conditions }) {
 
     return (
         <>
-            {/* The elevation-gain disclosure. Turning it OFF clears the inputs
-                rather than only hiding them — a hidden adjustment that keeps
-                applying is the worst of both. */}
-            <button
-                type="button"
-                className={`btn btn-sm ${gradeExpanded ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setGradeExpanded(e => {
-                    const next = !e;
-                    if (!next) {
-                        setGradeGainFt('');
-                        setGradeDistanceMiles('');
-                    }
-                    return next;
-                })}
-                title="Adjust for a net elevation gain/loss over a route (advanced — usually 0)"
-            >
-                Adj. Elevation
-            </button>
-
             <div className="chart-viewing-conditions">
                 {/* Altitude — viewing condition, applies to all curves */}
                 <div className="flex items-center gap-1.5">
@@ -235,6 +216,25 @@ export default function ViewingConditions({ conditions }) {
                     />
                     <span className="text-sm text-faint">°{windAdjusted ? ' ▲' : ''}</span>
                 </div>
+
+                {/* The elevation-gain disclosure. Turning it OFF clears the inputs
+                    rather than only hiding them — a hidden adjustment that keeps
+                    applying is the worst of both. */}
+                <button
+                    type="button"
+                    className={`btn btn-sm ${gradeExpanded ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setGradeExpanded(e => {
+                        const next = !e;
+                        if (!next) {
+                            setGradeGainFt('');
+                            setGradeDistanceMiles('');
+                        }
+                        return next;
+                    })}
+                    title="Adjust for a net elevation gain/loss over a route (advanced — usually 0)"
+                >
+                    Adj. Elevation
+                </button>
             </div>
 
             {/* Elevation gain/loss panel — a route/grade effect (distinct from static

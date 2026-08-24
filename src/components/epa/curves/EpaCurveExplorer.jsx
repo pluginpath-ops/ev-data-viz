@@ -215,39 +215,45 @@ export default function EpaCurveExplorer() {
                 onClear={() => setSelected([])}
             />
 
-            {/* Between the search and the graph, collapsed by default: these
-                scale the curve at plot time and are almost always left alone,
-                but a reader who has set one needs to see that from the header
-                without opening it. */}
-            <CollapsibleSection
-                title="Viewing conditions"
-                subtitle={conditions.anyAdjusted
-                    ? 'adjusted — the curves below are not at standard conditions'
-                    : 'standard conditions'}
-            >
-                <div className="chart-controls-row">
-                    <ViewingConditions conditions={conditions} />
-                </div>
-            </CollapsibleSection>
-
-            <div className="guide-facet">
-                <div className="guide-facet-label">Y axis</div>
-                <div className="guide-facet-values">
-                    {Y_AXES.map(a => (
-                        <button key={a.key} type="button"
-                            className={`guide-chip ${yAxis === a.key ? 'active' : ''}`}
-                            onClick={() => setYAxis(a.key)}
-                            title={a.needsEnergy ? 'Needs usable energy — records without it cannot be drawn on this axis' : undefined}>
-                            {a.label}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
             {/* Two different caveats, and they belong to different axes.
                 Missing energy REMOVES a curve from the range axis; an assumed η
                 leaves the curve drawn and makes every point on it an estimate.
                 Reporting them the same way would flatten that difference. */}
+            {/* Chart options in one card, Y axis above the adjustments —
+                the same shape as the vehicle-driven curves, so the two tabs do
+                not present the same controls in two different arrangements. */}
+            <div className="card mb-4">
+                <div className="guide-facet">
+                    <div className="guide-facet-label">Y axis</div>
+                    <div className="guide-facet-values">
+                        {Y_AXES.map(a => (
+                            <button key={a.key} type="button"
+                                className={`guide-chip ${yAxis === a.key ? 'active' : ''}`}
+                                onClick={() => setYAxis(a.key)}
+                                title={a.needsEnergy ? 'Needs usable energy — records without it cannot be drawn on this axis' : undefined}>
+                                {a.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Between the search and the graph, collapsed by default: these
+                    scale the curve at plot time and are almost always left alone,
+                    but a reader who has set one needs to see that from the header
+                    without opening it. */}
+                <CollapsibleSection
+                    className="collapsible-section--flush"
+                    title="Environmental Conditions"
+                    subtitle={conditions.anyAdjusted
+                        ? 'adjusted — the curves below are not at standard conditions'
+                        : 'standard conditions'}
+                >
+                    <div className="chart-controls-row">
+                        <ViewingConditions conditions={conditions} />
+                    </div>
+                </CollapsibleSection>
+            </div>
+
             {withoutRange.length > 0 && (
                 <div className="guide-warning">
                     {withoutRange.length === 1 ? (
