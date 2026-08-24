@@ -48,7 +48,7 @@ describe('utilities built for the UI are reached by the UI', () => {
     const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js',
                      'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromGroup.js',
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
-                     'epaLinkSweep.js', 'epaCertStats.js'];
+                     'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -98,6 +98,12 @@ describe('utilities built for the UI are reached by the UI', () => {
             'As above, consumed by tierOf and exported so the target-set check is testable without tiering.',
         'epaLinkSweep.tierOf':
             'Consumed inside the module by classifyGroup. Exported so the priority order is asserted directly rather than inferred from a sorted sweep.',
+        'epaCurveSubjects.curveSubject':
+            'Consumed inside the module by curveSubjects, which the explorer calls. Exported so one record\'s tier and energy source are assertable without building a whole list.',
+        'epaCurveSubjects.resolveCurveEnergy':
+            'Consumed inside the module by curveSubject. Exported so the precedence — curator value, then DC on procedure 77 or 84, then the guide\'s gross pack — is pinned on its own.',
+        'epaCurveSubjects.tierByKey':
+            'The tier lookup, used by the picker for its hints and asserted here so every tier a subject can be given has a declared entry.',
         'epaCertStats.derivedUsableKwh':
             'Consumed inside the module by certObservation. Exported so the precedence — a curator value first, then DC discharged on procedure 77 or 84, never 86 — is asserted directly rather than inferred from a ratio.',
         'epaCertStats.certObservation':

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState } from 'react';
+import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import Chart from 'chart.js/auto';
 import { useTheme } from '../hooks/useTheme';
 import { useAppContext } from '../context/AppContext';
@@ -10,7 +10,7 @@ import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH, MPG_E_CONVERSION,
 } from '../utils/epaPhysics';
-import { buildEpaCurveFromModel, deriveDrivetrainEta, resolvePrimaryCoeffs, airDensityRatio, temperatureDensityRatio, correctMeasuredConsumption, averageGradePercent, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
+import { buildEpaCurveFromModel, deriveDrivetrainEta, resolvePrimaryCoeffs, correctMeasuredConsumption, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
 import { filterRangeRuns } from '../utils/runUtils';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
@@ -25,11 +25,9 @@ import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
 import AutoColorToggle from './AutoColorToggle';
+import { useRunSelection } from '../hooks/useRunSelection';
+import ViewingConditions, { useViewingConditions } from './epa/ViewingConditions';
 
-// Sane bounds for the ambient-temperature viewing condition; far outside this
-// the ideal-gas density approximation isn't meaningful anyway.
-const MIN_TEMP_F = -100;
-const MAX_TEMP_F = 150;
 
 // ── Highway band plugin ───────────────────────────────────────────────────────
 
@@ -199,57 +197,6 @@ function ConfidenceBadge({ confidence }) {
     );
 }
 
-// ── Accessory-load reference table (for the Accessory Load info tooltip) ─────
-
-// Steady-state auxiliary draw by ambient temperature, in watts. Heat-pump and
-// resistive rows are alternative heating methods for the same job, not
-// simultaneous loads. Battery conditioning here is steady-state pack-temperature
-// maintenance, not the much higher, short-duration draw of active DC-fast-charge
-// preconditioning.
-const ACCESSORY_LOAD_REFERENCE_W = [
-    { ambient: '0°F',   heatPump: '2500–4000*',  resistive: '4000–6000', ac: '—',         battery: '1000–3000', lighting: '100–300' },
-    { ambient: '32°F',  heatPump: '1000–1500',   resistive: '2000–3000', ac: '—',         battery: '500–1500',  lighting: '100–300' },
-    { ambient: '50°F',  heatPump: '400–700',     resistive: '1000–1500', ac: '—',         battery: '0–500',     lighting: '100–300' },
-    { ambient: '68°F',  heatPump: '~0',          resistive: '~0',        ac: '~0',        battery: '~0',        lighting: '100–300' },
-    { ambient: '80°F',  heatPump: '—',           resistive: '—',         ac: '1000–1500',  battery: '~0',        lighting: '100–300' },
-    { ambient: '90°F',  heatPump: '—',           resistive: '—',         ac: '1500–2500',  battery: '0–500',     lighting: '100–300' },
-    { ambient: '105°F', heatPump: '—',           resistive: '—',         ac: '3000–5000**', battery: '1000–3000', lighting: '100–300' },
-];
-
-function AccessoryLoadReferenceTable() {
-    return (
-        <div>
-            <p className="font-semibold mb-1">EV Auxiliary Load Reference (steady-state, W)</p>
-            <table className="accessory-load-table">
-                <thead>
-                    <tr>
-                        <th>Ambient</th>
-                        <th>Heat Pump</th>
-                        <th>Resistive</th>
-                        <th>A/C</th>
-                        <th>Batt. Cond.</th>
-                        <th>Lighting</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {ACCESSORY_LOAD_REFERENCE_W.map(row => (
-                        <tr key={row.ambient}>
-                            <td>{row.ambient}</td>
-                            <td>{row.heatPump}</td>
-                            <td>{row.resistive}</td>
-                            <td>{row.ac}</td>
-                            <td>{row.battery}</td>
-                            <td>{row.lighting}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            <p className="mt-1.5 text-[10px] leading-snug opacity-80">
-                *At 0°F, heat pump COP approaches its floor, so most heating duty shifts to the resistive backup element. **Assumes a stabilized cabin; hot-soak or high solar load can push this higher during pull-down. Heat pump/resistive are alternative heating methods, not simultaneous loads. Battery conditioning is steady-state maintenance, not active DC-fast-charge preconditioning. Curve default is {DEFAULT_ACCESSORY_W}W.
-            </p>
-        </div>
-    );
-}
 
 // ── Default color for a mapping ───────────────────────────────────────────────
 
@@ -292,29 +239,22 @@ export default function EpaCurvesView({
 
     // ── UI state ──────────────────────────────────────────────────────────────
     const [selectorExpanded, setSelectorExpanded] = useState(false);
-    const [hiddenMappings,   setHiddenMappings]   = useState(new Set()); // mapping.id
-    const [mappingColors,    setMappingColors]    = useState({});        // mapping.id → hex
     const [urlCopied,        setUrlCopied]        = useState(false);
     const [imageCopied,      setImageCopied]      = useState(false);
     // Altitude, temperature, and accessory load are viewing conditions (like the
     // unit toggle): they scale the plotted curve at plot time for ALL curves.
     // Never persisted; never affect stored coefficients, accessory fields, or
     // the standard-condition η.
-    const [elevationFt,      setElevationFt]      = useState(0);
-    const [tempF,            setTempF]            = useState('');
-    const [accessoryOverrideW, setAccessoryOverrideW] = useState('');
-    // Wind — same 0=tailwind/180=headwind/90|270=crosswind convention as
-    // runs.wind_direction_deg (#142). Applied to the curve as apparent airspeed
-    // (see apparentAirspeed in epaDerivations.js); never persisted, η untouched.
-    const [windSpeedMph,     setWindSpeedMph]     = useState('');
-    const [windDirectionDeg, setWindDirectionDeg] = useState('');
-    // Elevation gain/loss — a route/grade effect, distinct from static altitude
-    // (an air-density effect). Almost always 0; hidden behind a collapsible
-    // disclosure since the physics (weight-based PE, regen-efficiency
-    // approximation for descents) is more involved than the other conditions.
-    const [gradeExpanded,        setGradeExpanded]        = useState(false);
-    const [gradeGainFt,          setGradeGainFt]          = useState('');
-    const [gradeDistanceMiles,   setGradeDistanceMiles]   = useState('');
+    // Viewing conditions — altitude, temperature, accessory load, wind, grade.
+    // Shared with the certification-anchored curves (#237) rather than kept
+    // here, so the two cannot compute air density differently.
+    const conditions = useViewingConditions();
+    const {
+        densityRatio, densityAdjusted, accessoryAdjusted, accessoryOverrideWNum,
+        windAdjusted, windSpeedMphNum, windDirectionDegNum,
+        gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted,
+    } = conditions.derived;
+
     // Overlay real-world range-test points on top of the curve. null = off.
     // 'corrected' scales each point (temp, wind, and elevation gain/loss) to
     // the viewing conditions above, so it's comparable to the curve as
@@ -322,49 +262,11 @@ export default function EpaCurvesView({
     // recorded — not a valid comparison across different test conditions,
     // but useful to see the true recorded data.
     const [overlayMode, setOverlayMode] = useState(null); // null | 'corrected' | 'uncorrected'
-    const clampTempF = (raw) => {
-        if (raw === '' || raw === '-') return raw; // allow in-progress typing of a negative number
-        const n = Number(raw);
-        if (isNaN(n)) return raw;
-        return String(Math.min(MAX_TEMP_F, Math.max(MIN_TEMP_F, n)));
-    };
-    const clampWindDirection = (raw) => {
-        if (raw === '') return raw;
-        const n = Number(raw);
-        if (isNaN(n)) return raw;
-        return String(Math.min(360, Math.max(0, n)));
-    };
-    const densityRatio = useMemo(
-        () => airDensityRatio(elevationFt) * temperatureDensityRatio(tempF === '' ? null : Number(tempF)),
-        [elevationFt, tempF]
-    );
-    const densityAdjusted  = Math.abs(densityRatio - 1) > 1e-6;
-    const accessoryAdjusted = accessoryOverrideW !== '';
-    const accessoryOverrideWNum = accessoryAdjusted ? Number(accessoryOverrideW) : null;
-    const windAdjusted = windSpeedMph !== '' && Number(windSpeedMph) > 0;
-    const windSpeedMphNum = windAdjusted ? Number(windSpeedMph) : 0;
-    const windDirectionDegNum = windDirectionDeg === '' ? 0 : Number(windDirectionDeg);
-    const gradeGainFtNum        = gradeGainFt === '' ? 0 : Number(gradeGainFt);
-    const gradeDistanceMilesNum = gradeDistanceMiles === '' ? 0 : Number(gradeDistanceMiles);
-    const gradeAdjusted    = gradeGainFtNum !== 0 && gradeDistanceMilesNum > 0;
-    const avgGradePercent  = averageGradePercent(gradeGainFtNum, gradeDistanceMilesNum);
+
 
     const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
 
     // ── Vehicle lists ─────────────────────────────────────────────────────────
-    // Show or hide every EPA configuration a vehicle contributes. Only mappings
-    // that actually render are touched — one with no epaGroup is skipped below,
-    // so hiding it would leave a phantom entry in the hidden set.
-    const setVehicleMappingsVisible = (vehicle, visible) => {
-        setHiddenMappings(prev => {
-            const next = new Set(prev);
-            for (const m of vehicle.epa_mappings ?? []) {
-                if (!m.epaGroup) continue;
-                visible ? next.delete(m.id) : next.add(m.id);
-            }
-            return next;
-        });
-    };
 
     const selectedVehicles = useMemo(() =>
         selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
@@ -372,6 +274,67 @@ export default function EpaCurvesView({
 
     const vehiclesWithEpa    = selectedVehicles.filter(v => v.epa_mappings?.length > 0);
     const vehiclesWithoutEpa = selectedVehicles.filter(v => !v.epa_mappings?.length);
+
+    /**
+     * Which curves are drawn (#221).
+     *
+     * This was a local `hiddenMappings` set — opt-OUT, owned by the component —
+     * and every consequence of that was a bug. It started empty in a pop-out, so
+     * curves switched off came back. Nothing pruned it when a vehicle left the
+     * selection, so re-selecting that vehicle restored curves the reader had
+     * hidden, with nothing on screen to say why. It survived neither a reload
+     * nor a tab switch. And it was the opposite bookkeeping from the four charts
+     * already sharing `useRunSelection`.
+     *
+     * The hook's contract is `{ key, vehicleId, groupId }` and it never reads a
+     * run field, so the substitution is total: the mapping id is both key and
+     * group. `groupId` being the key makes CARRY a no-op, which is right — CARRY
+     * exists for a run being repinned, and an EPA mapping has no such event.
+     *
+     * Controlled, so the selection lives in `epaConfig` beside the axis and
+     * bounds. That is what carries it into the URL and over the BroadcastChannel
+     * to the pop-out, which is where the original bug showed.
+     */
+    const selectableRows = useMemo(
+        () => vehiclesWithEpa.flatMap(v =>
+            (v.epa_mappings ?? [])
+                // A mapping with no group draws nothing. Selecting it would put
+                // a key in the selection that no row can clear, and PRUNE would
+                // strip it on the next render — a toggle that appears to fail.
+                .filter(m => m.epaGroup)
+                .map(m => ({ key: m.id, vehicleId: v.id, groupId: m.id }))),
+        [vehiclesWithEpa],
+    );
+
+    const setSelectedMappings = useCallback(
+        (next) => setEpaConfig(prev => ({ ...prev, selectedMappings: next })),
+        [setEpaConfig],
+    );
+    const {
+        selected: selectedMappings,
+        toggle: toggleMapping,
+        setVehicle: setVehicleMappings,
+    } = useRunSelection(selectableRows, {
+        value: epaConfig.selectedMappings ?? [],
+        onChange: setSelectedMappings,
+    });
+
+    // A Set rather than repeated `.includes`: the curve builder tests every
+    // mapping on every rebuild.
+    const shown = useMemo(() => new Set(selectedMappings), [selectedMappings]);
+
+    // Colours move into epaConfig for the same reason the selection does — a
+    // pop-out was losing them. Memoised because `?? {}` allocates, and a fresh
+    // object every render invalidates every dependency array holding it.
+    const mappingColors = useMemo(() => epaConfig.mappingColors ?? {}, [epaConfig.mappingColors]);
+    const setMappingColors = useCallback(
+        (updater) => setEpaConfig(prev => ({
+            ...prev,
+            mappingColors: typeof updater === 'function' ? updater(prev.mappingColors ?? {}) : updater,
+        })),
+        [setEpaConfig],
+    );
+
 
     // ── Vehicle color map (Okabe-Ito when autoColor) ──────────────────────────
     // EPA curves are per-vehicle (not per-run), so we resolve colors at the
@@ -394,7 +357,7 @@ export default function EpaCurvesView({
             vehicle.epa_mappings.forEach((mapping, mi) => {
                 const { epaGroup, confidence } = mapping;
                 if (!epaGroup) return;
-                if (hiddenMappings.has(mapping.id)) return;
+                if (!shown.has(mapping.id)) return;
 
                 // An elevation adjustment needs the group's own EPA equivalent test
                 // weight (see gradeEnergyKwh100mi) — some imports never captured it.
@@ -512,7 +475,7 @@ export default function EpaCurvesView({
             });
         });
         return { datasets: result, missingWeightWarnings };
-    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted, overlayMode]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, shown, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted, overlayMode]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -688,7 +651,7 @@ export default function EpaCurvesView({
             for (const mapping of vehicle.epa_mappings ?? []) {
                 const { epaGroup } = mapping;
                 if (!epaGroup) continue;
-                if (hiddenMappings.has(mapping.id)) continue;
+                if (!shown.has(mapping.id)) continue;
 
                 const vehicleName = vehicleLabel(vehicle);
                 const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name || null;
@@ -715,13 +678,13 @@ export default function EpaCurvesView({
             }
         }
         return out;
-    }, [vehiclesWithEpa, hiddenMappings]);
+    }, [vehiclesWithEpa, shown]);
 
     const methodologyModels = methodologyEntries.filter(e => e.model);
     const methodologyGaps   = methodologyEntries.filter(e => !e.model);
 
     const totalMappings = vehiclesWithEpa.reduce((n, v) => n + (v.epa_mappings?.length ?? 0), 0);
-    const visibleCount  = totalMappings - hiddenMappings.size;
+    const visibleCount  = selectedMappings.length;
 
     // ── Empty state ───────────────────────────────────────────────────────────
     if (selectedVehicleIds.length === 0) {
@@ -786,187 +749,14 @@ export default function EpaCurvesView({
                                 Uncorrected
                             </button>
                         </div>
-                        {/* Advanced/experimental toggles — collapsed by default, own panel
-                            row below so opening one never reflows the rows above it. */}
-                        <button
-                            type="button"
-                            className={`btn btn-sm ${gradeExpanded ? 'btn-primary' : 'btn-secondary'}`}
-                            onClick={() => setGradeExpanded(e => {
-                                const next = !e;
-                                // Turning off fully disables the adjustment, not just hides
-                                // the panel — otherwise it keeps applying invisibly.
-                                if (!next) {
-                                    setGradeGainFt('');
-                                    setGradeDistanceMiles('');
-                                }
-                                return next;
-                            })}
-                            title="Adjust for a net elevation gain/loss over a route (advanced — usually 0)"
-                        >
-                            Adj. Elevation
-                        </button>
+                        {/* The viewing-condition controls, shared with the
+                            certification-anchored curves (#237). The overlay above
+                            stays here: it plots a VEHICLE's own range runs, which
+                            that view has no way to reach. */}
                     </div>
 
-                    {/* Viewing conditions — altitude, temperature, accessory load. Kept on
-                        their own row (not wrapped in with the Y-axis controls above) since
-                        three input groups don't fit the same line at most widths. */}
-                    <div className="chart-viewing-conditions">
-                        {/* Altitude — viewing condition, applies to all curves */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
-                                Altitude
-                                <InfoIcon
-                                    text="Adjusts aerodynamic drag for air density at this elevation. Models air density only — does not capture battery, regen, or cabin-heating effects. Curve is the standard-condition baseline scaled for thinner air."
-                                    position="right"
-                                    className="ml-1"
-                                />
-                            </span>
-                            <input
-                                type="number"
-                                step="100"
-                                value={elevationFt}
-                                onChange={e => setElevationFt(Number(e.target.value) || 0)}
-                                className="form-input text-sm py-1 w-24 text-right"
-                                aria-label="Elevation in feet"
-                            />
-                            <span className="text-sm text-faint">ft</span>
-                        </div>
+                    <ViewingConditions conditions={conditions} />
 
-                        {/* Temperature — viewing condition, applies to all curves */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
-                                Temp
-                                <InfoIcon
-                                    text={`Adjusts aerodynamic drag for air density at this ambient temperature (colder air is denser). Standard condition is ${STANDARD_TEMP_F}°F. Models air density only — does not capture battery, HVAC, or cold-tire effects.`}
-                                    position="right"
-                                    className="ml-1"
-                                />
-                            </span>
-                            <input
-                                type="number"
-                                step="5"
-                                min={MIN_TEMP_F}
-                                max={MAX_TEMP_F}
-                                value={tempF}
-                                onChange={e => setTempF(clampTempF(e.target.value))}
-                                placeholder={String(STANDARD_TEMP_F)}
-                                className="form-input text-sm py-1 w-20 text-right"
-                                aria-label="Ambient temperature in °F"
-                            />
-                            <span className="text-sm text-faint">°F</span>
-                            <span
-                                className={`text-xs whitespace-nowrap ${densityAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-faint'}`}
-                                title="Combined air-density ratio (altitude × temperature) applied to the aerodynamic (C) term"
-                            >
-                                → ρ {densityRatio.toFixed(2)}{densityAdjusted ? ' ▲' : ''}
-                            </span>
-                        </div>
-
-                        {/* Accessory load — viewing condition, applies to all curves */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
-                                Accessory Load
-                                <InfoIcon
-                                    tooltipClassName="info-icon-tooltip--wide"
-                                    position="right"
-                                    className="ml-1"
-                                >
-                                    <AccessoryLoadReferenceTable />
-                                </InfoIcon>
-                            </span>
-                            <input
-                                type="number"
-                                step="50"
-                                min="0"
-                                value={accessoryOverrideW}
-                                onChange={e => setAccessoryOverrideW(e.target.value)}
-                                placeholder={String(DEFAULT_ACCESSORY_W)}
-                                className="form-input text-sm py-1 w-24 text-right"
-                                aria-label="Accessory load override in watts"
-                            />
-                            <span className="text-sm text-faint">W</span>
-                        </div>
-
-                        {/* Wind — viewing condition, applies to all curves */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
-                                Wind
-                                <InfoIcon
-                                    text="Scales aerodynamic drag by apparent (relative) airspeed — a headwind raises effective drag speed, a tailwind lowers it, a pure crosswind raises it slightly. Direction is relative to travel: 0°=tailwind, 180°=headwind, 90°/270°=crosswind. Models relative-airspeed magnitude only — does not capture yaw-angle sensitivity of drag coefficient."
-                                    position="right"
-                                    className="ml-1"
-                                />
-                            </span>
-                            <input
-                                type="number"
-                                step="5"
-                                min="0"
-                                value={windSpeedMph}
-                                onChange={e => setWindSpeedMph(e.target.value)}
-                                placeholder="0"
-                                className="form-input text-sm py-1 w-16 text-right"
-                                aria-label="Wind speed in mph"
-                            />
-                            <span className="text-sm text-faint">mph @</span>
-                            <input
-                                type="number"
-                                step="15"
-                                min="0"
-                                max="360"
-                                value={windDirectionDeg}
-                                onChange={e => setWindDirectionDeg(clampWindDirection(e.target.value))}
-                                placeholder="180"
-                                className="form-input text-sm py-1 w-16 text-right"
-                                aria-label="Wind direction relative to travel, in degrees"
-                            />
-                            <span className="text-sm text-faint">°{windAdjusted ? ' ▲' : ''}</span>
-                        </div>
-                    </div>
-
-                    {/* Elevation gain/loss panel — a route/grade effect (distinct from static
-                        altitude). Its own row, toggled by the "Adj. Elevation" button above, so
-                        opening/closing it never reflows the altitude/temp/wind row. */}
-                    {gradeExpanded && (
-                        <div className="chart-viewing-conditions">
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
-                                    Elevation Gain/Loss
-                                    <InfoIcon
-                                        text="Adds a fixed energy cost/credit for a net climb or descent over a given distance — a route effect, distinct from static altitude (air density). Climbing: full physics based on vehicle weight. Descending: only ~70% of the theoretical energy is assumed recovered via regen. Usually 0 — most tests are round trips or flat routes."
-                                        position="right"
-                                        className="ml-1"
-                                    />
-                                </span>
-                                <input
-                                    type="number"
-                                    step="50"
-                                    value={gradeGainFt}
-                                    onChange={e => setGradeGainFt(e.target.value)}
-                                    placeholder="0"
-                                    className="form-input text-sm py-1 w-20 text-right"
-                                    aria-label="Net elevation gain in feet (negative for net descent)"
-                                />
-                                <span className="text-sm text-faint">ft over</span>
-                                <input
-                                    type="number"
-                                    step="5"
-                                    min="0"
-                                    value={gradeDistanceMiles}
-                                    onChange={e => setGradeDistanceMiles(e.target.value)}
-                                    placeholder="0"
-                                    className="form-input text-sm py-1 w-16 text-right"
-                                    aria-label="Distance in miles the elevation change is spread over"
-                                />
-                                <span className="text-sm text-faint">mi</span>
-                                <span
-                                    className={`text-xs whitespace-nowrap ${gradeAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-faint'}`}
-                                    title="Average grade over the distance above"
-                                >
-                                    → {avgGradePercent.toFixed(1)}% grade{gradeAdjusted ? ' ▲' : ''}
-                                </span>
-                            </div>
-                        </div>
-                    )}
 
                     {missingWeightWarnings.length > 0 && (
                         <div className="chart-warning-banner">
@@ -1012,7 +802,7 @@ export default function EpaCurvesView({
                                                             one at a time is the common complaint. */}
                                                         <button
                                                             type="button"
-                                                            onClick={() => setVehicleMappingsVisible(vehicle, true)}
+                                                            onClick={() => setVehicleMappings(vehicle.id, true)}
                                                             className="run-bulk-link"
                                                         >
                                                             all
@@ -1020,7 +810,7 @@ export default function EpaCurvesView({
                                                         <span className="text-faint text-xs select-none">/</span>
                                                         <button
                                                             type="button"
-                                                            onClick={() => setVehicleMappingsVisible(vehicle, false)}
+                                                            onClick={() => setVehicleMappings(vehicle.id, false)}
                                                             className="run-bulk-link"
                                                         >
                                                             none
@@ -1030,7 +820,7 @@ export default function EpaCurvesView({
                                                         {vehicle.epa_mappings.map((mapping, mi) => {
                                                             const { epaGroup, confidence } = mapping;
                                                             if (!epaGroup) return null;
-                                                            const isVisible  = !hiddenMappings.has(mapping.id);
+                                                            const isVisible  = shown.has(mapping.id);
                                                             const baseVehicleColor = vehicleColorMap[vehicle.id] || vehicle.color || PALETTE[vi % PALETTE.length];
                                                             const color      = mappingColors[mapping.id] ?? (mi === 0 ? baseVehicleColor : baseVehicleColor + 'bb').replace(/[0-9a-f]{2}$/i, '');
                                                             // Strip any alpha suffix for the color input
@@ -1053,11 +843,7 @@ export default function EpaCurvesView({
                                                                     <input
                                                                         type="checkbox"
                                                                         checked={isVisible}
-                                                                        onChange={() => setHiddenMappings(prev => {
-                                                                            const s = new Set(prev);
-                                                                            s.has(mapping.id) ? s.delete(mapping.id) : s.add(mapping.id);
-                                                                            return s;
-                                                                        })}
+                                                                        onChange={() => toggleMapping(mapping.id)}
                                                                         className="w-4 h-4 mt-0.5 shrink-0"
                                                                     />
                                                                     {/* Color picker */}

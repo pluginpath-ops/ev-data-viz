@@ -2159,6 +2159,35 @@ class DataService {
     return data || [];
   }
 
+  /**
+   * Every certification group that could be plotted (#237).
+   *
+   * Unlike getCertGroupsForStats this does NOT require a guide link: 210 of 211
+   * groups carry road-load coefficients, and a curve's shape needs nothing else.
+   * The link matters for the ENERGY — without it there is no gross pack to fall
+   * back on — which is what separates a curve with a range axis from one
+   * without, and is surfaced as a tier rather than as a filter applied here.
+   */
+  async getCertGroupsForCurves() {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase()
+      .from('epa_test_groups')
+      .select(`
+        test_group_id, model_year, make, epa_carline_name, display_name,
+        useable_kwh, accessory_load_w_override, derived_5cycle_coefficient,
+        epa_coefficient_sets(is_primary, category, target_a, target_b, target_c,
+                             set_a, set_b, set_c, equiv_test_weight_lbs),
+        epa_tests(procedure_code, total_dc_energy_kwh,
+                  epa_test_phases(phase_type, distance_mi, dc_energy_kwh)),
+        epa_fe_guide!epa_test_groups_fe_guide_row_id_fkey(
+          carline, division, carline_class, drive_desc, nominal_pack_kwh
+        )
+      `)
+      .order('test_group_id');
+    if (error) throw error;
+    return data || [];
+  }
+
   /** One staged guide row by id — the linked row, for showing what it holds. */
   async getFeGuideRow(id) {
     if (!this.useSupabase || id == null) return null;

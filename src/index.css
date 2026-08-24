@@ -1349,6 +1349,26 @@ body {
     transform: translateY(-50%);
 }
 
+/* Tooltip that opens OVER a muted panel (e.g. a filter bar).
+
+   The default fill is --color-surface-sunken, which the dark palette sets to
+   the same value as --color-surface-muted — the filter bar's own background.
+   A tooltip filled with its backdrop reads as a hole in the panel, so lift it
+   to the card colour, which differs from muted in both themes. */
+.info-icon-tooltip--on-panel {
+    background-color: var(--color-card);
+}
+
+/* Tier gloss inside that tooltip: the chip's own label, then what it means. */
+.curve-tier-legend {
+    @apply mt-1;
+    color: var(--color-text-secondary);
+}
+.curve-tier-legend-name {
+    @apply font-medium mr-1;
+    color: var(--color-text-primary);
+}
+
 /* Width override for richer tooltip content (e.g. a reference table) */
 .info-icon-tooltip--wide {
     width: 460px;
@@ -1913,6 +1933,12 @@ body {
     border-color: var(--color-border);
 }
 .collapsible-section:first-child {
+    @apply border-t-0;
+}
+/* For a section that follows a sibling inside a card and should not be divided
+   from it — the divider reads as a break between unrelated things, and the
+   chart's axis choice and its environmental adjustments are one group. */
+.collapsible-section--flush {
     @apply border-t-0;
 }
 
@@ -2818,4 +2844,64 @@ body {
     background-color: rgba(245, 158, 11, 0.12);
     color: var(--color-text-secondary);
     border: 1px solid var(--color-warning);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CERTIFICATION CURVES (#237)
+
+   Curves anchored on certification records rather than on vehicles. The tier
+   badge is the load-bearing part: every curve's shape is measured, but only
+   some carry a measured energy behind the range axis.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.curve-picker-list-facet {
+    @apply w-full;
+}
+.curve-picker-list {
+    @apply flex flex-col gap-px max-h-64 overflow-y-auto rounded;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+}
+.curve-picker-row {
+    @apply flex items-center gap-2 px-2 py-1 text-sm cursor-pointer;
+    color: var(--color-text-primary);
+}
+.curve-picker-row:hover    { background-color: var(--color-surface-muted); }
+.curve-picker-row.selected { background-color: var(--color-primary-light); }
+[data-theme="dark"] .curve-picker-row.selected {
+    background-color: rgba(59, 130, 246, 0.18);
+}
+.curve-picker-name {
+    @apply truncate flex-1 min-w-0;
+}
+
+/* Named on every row, because once a mixed set is plotted this is the only
+   thing distinguishing a measured range from a borrowed one. */
+.curve-tier-badge {
+    @apply px-1.5 py-0.5 rounded uppercase shrink-0;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+.curve-tier-badge.tier-measured {
+    background-color: var(--color-primary);
+    color: rgb(255, 255, 255);
+}
+.curve-tier-badge.tier-nominal {
+    background-color: var(--color-warning);
+    color: rgb(255, 255, 255);
+}
+.curve-tier-badge.tier-shape {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-muted);
+}
+[data-theme="dark"] .curve-tier-badge.tier-shape {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.curve-canvas-wrap {
+    @apply p-3 rounded-lg;
+    height: 26rem;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
 }

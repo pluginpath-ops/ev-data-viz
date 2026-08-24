@@ -11,13 +11,15 @@ import { useState } from 'react';
  *   title       {node}    — the always-visible heading
  *   subtitle    {node}    — optional detail beside the title, muted
  *   defaultOpen {boolean} — starts open when true (default: closed)
+ *   className   {string}  — extra classes on the section, for a caller that
+ *                           needs to drop the divider (see --flush)
  *   children    {node}    — revealed when open
  */
-export default function CollapsibleSection({ title, subtitle, defaultOpen = false, children }) {
+export default function CollapsibleSection({ title, subtitle, defaultOpen = false, className = '', children }) {
     const [open, setOpen] = useState(defaultOpen);
 
     return (
-        <section className="collapsible-section">
+        <section className={`collapsible-section ${className}`.trim()}>
             <button
                 type="button"
                 onClick={() => setOpen(o => !o)}

@@ -1240,6 +1240,7 @@ export function AppProvider({ children }) {
 
     const getFeGuideRow = (id) => dataService.getFeGuideRow(id);
     const getCertGroupsForStats = () => dataService.getCertGroupsForStats();
+    const getCertGroupsForCurves = () => dataService.getCertGroupsForCurves();
     // The linking sweep (#238).
     const getGroupsAwaitingFeLink = (opts) => dataService.getGroupsAwaitingFeLink(opts);
     const getFeLinkProgress = () => dataService.getFeLinkProgress();
@@ -1702,6 +1703,7 @@ export function AppProvider({ children }) {
         getFeGuideRows,
         getFeGuideVehicleLinks,
         getCertGroupsForStats,
+        getCertGroupsForCurves,
         linkFeGuideRows,
         getGroupsAwaitingFeLink,
         getFeLinkProgress,
