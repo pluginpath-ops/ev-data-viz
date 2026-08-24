@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState } from 'react';
+import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import Chart from 'chart.js/auto';
 import { useTheme } from '../hooks/useTheme';
 import { useAppContext } from '../context/AppContext';
@@ -25,6 +25,7 @@ import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
 import AutoColorToggle from './AutoColorToggle';
+import { useRunSelection } from '../hooks/useRunSelection';
 
 // Sane bounds for the ambient-temperature viewing condition; far outside this
 // the ideal-gas density approximation isn't meaningful anyway.
@@ -292,8 +293,6 @@ export default function EpaCurvesView({
 
     // ── UI state ──────────────────────────────────────────────────────────────
     const [selectorExpanded, setSelectorExpanded] = useState(false);
-    const [hiddenMappings,   setHiddenMappings]   = useState(new Set()); // mapping.id
-    const [mappingColors,    setMappingColors]    = useState({});        // mapping.id → hex
     const [urlCopied,        setUrlCopied]        = useState(false);
     const [imageCopied,      setImageCopied]      = useState(false);
     // Altitude, temperature, and accessory load are viewing conditions (like the
@@ -352,19 +351,6 @@ export default function EpaCurvesView({
     const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
 
     // ── Vehicle lists ─────────────────────────────────────────────────────────
-    // Show or hide every EPA configuration a vehicle contributes. Only mappings
-    // that actually render are touched — one with no epaGroup is skipped below,
-    // so hiding it would leave a phantom entry in the hidden set.
-    const setVehicleMappingsVisible = (vehicle, visible) => {
-        setHiddenMappings(prev => {
-            const next = new Set(prev);
-            for (const m of vehicle.epa_mappings ?? []) {
-                if (!m.epaGroup) continue;
-                visible ? next.delete(m.id) : next.add(m.id);
-            }
-            return next;
-        });
-    };
 
     const selectedVehicles = useMemo(() =>
         selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
@@ -372,6 +358,67 @@ export default function EpaCurvesView({
 
     const vehiclesWithEpa    = selectedVehicles.filter(v => v.epa_mappings?.length > 0);
     const vehiclesWithoutEpa = selectedVehicles.filter(v => !v.epa_mappings?.length);
+
+    /**
+     * Which curves are drawn (#221).
+     *
+     * This was a local `hiddenMappings` set — opt-OUT, owned by the component —
+     * and every consequence of that was a bug. It started empty in a pop-out, so
+     * curves switched off came back. Nothing pruned it when a vehicle left the
+     * selection, so re-selecting that vehicle restored curves the reader had
+     * hidden, with nothing on screen to say why. It survived neither a reload
+     * nor a tab switch. And it was the opposite bookkeeping from the four charts
+     * already sharing `useRunSelection`.
+     *
+     * The hook's contract is `{ key, vehicleId, groupId }` and it never reads a
+     * run field, so the substitution is total: the mapping id is both key and
+     * group. `groupId` being the key makes CARRY a no-op, which is right — CARRY
+     * exists for a run being repinned, and an EPA mapping has no such event.
+     *
+     * Controlled, so the selection lives in `epaConfig` beside the axis and
+     * bounds. That is what carries it into the URL and over the BroadcastChannel
+     * to the pop-out, which is where the original bug showed.
+     */
+    const selectableRows = useMemo(
+        () => vehiclesWithEpa.flatMap(v =>
+            (v.epa_mappings ?? [])
+                // A mapping with no group draws nothing. Selecting it would put
+                // a key in the selection that no row can clear, and PRUNE would
+                // strip it on the next render — a toggle that appears to fail.
+                .filter(m => m.epaGroup)
+                .map(m => ({ key: m.id, vehicleId: v.id, groupId: m.id }))),
+        [vehiclesWithEpa],
+    );
+
+    const setSelectedMappings = useCallback(
+        (next) => setEpaConfig(prev => ({ ...prev, selectedMappings: next })),
+        [setEpaConfig],
+    );
+    const {
+        selected: selectedMappings,
+        toggle: toggleMapping,
+        setVehicle: setVehicleMappings,
+    } = useRunSelection(selectableRows, {
+        value: epaConfig.selectedMappings ?? [],
+        onChange: setSelectedMappings,
+    });
+
+    // A Set rather than repeated `.includes`: the curve builder tests every
+    // mapping on every rebuild.
+    const shown = useMemo(() => new Set(selectedMappings), [selectedMappings]);
+
+    // Colours move into epaConfig for the same reason the selection does — a
+    // pop-out was losing them. Memoised because `?? {}` allocates, and a fresh
+    // object every render invalidates every dependency array holding it.
+    const mappingColors = useMemo(() => epaConfig.mappingColors ?? {}, [epaConfig.mappingColors]);
+    const setMappingColors = useCallback(
+        (updater) => setEpaConfig(prev => ({
+            ...prev,
+            mappingColors: typeof updater === 'function' ? updater(prev.mappingColors ?? {}) : updater,
+        })),
+        [setEpaConfig],
+    );
+
 
     // ── Vehicle color map (Okabe-Ito when autoColor) ──────────────────────────
     // EPA curves are per-vehicle (not per-run), so we resolve colors at the
@@ -394,7 +441,7 @@ export default function EpaCurvesView({
             vehicle.epa_mappings.forEach((mapping, mi) => {
                 const { epaGroup, confidence } = mapping;
                 if (!epaGroup) return;
-                if (hiddenMappings.has(mapping.id)) return;
+                if (!shown.has(mapping.id)) return;
 
                 // An elevation adjustment needs the group's own EPA equivalent test
                 // weight (see gradeEnergyKwh100mi) — some imports never captured it.
@@ -512,7 +559,7 @@ export default function EpaCurvesView({
             });
         });
         return { datasets: result, missingWeightWarnings };
-    }, [vehiclesWithEpa, vehicles, yAxis, units, hiddenMappings, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted, overlayMode]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, shown, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted, overlayMode]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -688,7 +735,7 @@ export default function EpaCurvesView({
             for (const mapping of vehicle.epa_mappings ?? []) {
                 const { epaGroup } = mapping;
                 if (!epaGroup) continue;
-                if (hiddenMappings.has(mapping.id)) continue;
+                if (!shown.has(mapping.id)) continue;
 
                 const vehicleName = vehicleLabel(vehicle);
                 const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name || null;
@@ -715,13 +762,13 @@ export default function EpaCurvesView({
             }
         }
         return out;
-    }, [vehiclesWithEpa, hiddenMappings]);
+    }, [vehiclesWithEpa, shown]);
 
     const methodologyModels = methodologyEntries.filter(e => e.model);
     const methodologyGaps   = methodologyEntries.filter(e => !e.model);
 
     const totalMappings = vehiclesWithEpa.reduce((n, v) => n + (v.epa_mappings?.length ?? 0), 0);
-    const visibleCount  = totalMappings - hiddenMappings.size;
+    const visibleCount  = selectedMappings.length;
 
     // ── Empty state ───────────────────────────────────────────────────────────
     if (selectedVehicleIds.length === 0) {
@@ -1012,7 +1059,7 @@ export default function EpaCurvesView({
                                                             one at a time is the common complaint. */}
                                                         <button
                                                             type="button"
-                                                            onClick={() => setVehicleMappingsVisible(vehicle, true)}
+                                                            onClick={() => setVehicleMappings(vehicle.id, true)}
                                                             className="run-bulk-link"
                                                         >
                                                             all
@@ -1020,7 +1067,7 @@ export default function EpaCurvesView({
                                                         <span className="text-faint text-xs select-none">/</span>
                                                         <button
                                                             type="button"
-                                                            onClick={() => setVehicleMappingsVisible(vehicle, false)}
+                                                            onClick={() => setVehicleMappings(vehicle.id, false)}
                                                             className="run-bulk-link"
                                                         >
                                                             none
@@ -1030,7 +1077,7 @@ export default function EpaCurvesView({
                                                         {vehicle.epa_mappings.map((mapping, mi) => {
                                                             const { epaGroup, confidence } = mapping;
                                                             if (!epaGroup) return null;
-                                                            const isVisible  = !hiddenMappings.has(mapping.id);
+                                                            const isVisible  = shown.has(mapping.id);
                                                             const baseVehicleColor = vehicleColorMap[vehicle.id] || vehicle.color || PALETTE[vi % PALETTE.length];
                                                             const color      = mappingColors[mapping.id] ?? (mi === 0 ? baseVehicleColor : baseVehicleColor + 'bb').replace(/[0-9a-f]{2}$/i, '');
                                                             // Strip any alpha suffix for the color input
@@ -1053,11 +1100,7 @@ export default function EpaCurvesView({
                                                                     <input
                                                                         type="checkbox"
                                                                         checked={isVisible}
-                                                                        onChange={() => setHiddenMappings(prev => {
-                                                                            const s = new Set(prev);
-                                                                            s.has(mapping.id) ? s.delete(mapping.id) : s.add(mapping.id);
-                                                                            return s;
-                                                                        })}
+                                                                        onChange={() => toggleMapping(mapping.id)}
                                                                         className="w-4 h-4 mt-0.5 shrink-0"
                                                                     />
                                                                     {/* Color picker */}

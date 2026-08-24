@@ -112,7 +112,13 @@ export default function App() {
     // chart session rather than per-view, so two charts on one screen can never
     // disagree about what "range" means. See utils/pairings.js.
     const [pairings, setPairings] = useState({});
-    const [epaConfig, setEpaConfig] = useState({ yAxis: 'kwh100mi', xMin: null, xMax: null, yMin: null, yMax: null });
+    const [epaConfig, setEpaConfig] = useState({
+        yAxis: 'kwh100mi', xMin: null, xMax: null, yMin: null, yMax: null,
+        // Which curves are drawn, and any colours overridden for them (#221).
+        // Held here rather than inside EpaCurvesView so they reach the URL and
+        // the pop-out, exactly as every other chart's selection does.
+        selectedMappings: [], mappingColors: {},
+    });
     const [roadTripConfig, setRoadTripConfig] = useState({
         mode: 'distance', startSoc: 90, minSoc: 10, destinationMinSoc: 10,
         legDistance: 150, chargeTime: 30,
@@ -337,7 +343,17 @@ export default function App() {
 
         // EPA Curves config
         const epaYa = p.get('epa_ya');
-        if (epaYa) setEpaConfig(prev => ({ ...prev, yAxis: epaYa }));
+        const epaSel = p.get('epa_m');
+        const epaOverride = {};
+        if (epaYa) epaOverride.yAxis = epaYa;
+        if (epaSel) {
+            // Mapping ids are numeric; `filter(Boolean)` runs BEFORE the map
+            // because Number('') is 0 and 0 is finite, so `epa_m=` alone would
+            // decode to a selection of the mapping with id zero.
+            epaOverride.selectedMappings = epaSel.split(',').filter(Boolean)
+                .map(Number).filter(Number.isFinite);
+        }
+        if (Object.keys(epaOverride).length > 0) setEpaConfig(prev => ({ ...prev, ...epaOverride }));
     }, []);
 
     // ── Handle browser back/forward ─────────────────────────────────────────
@@ -505,6 +521,10 @@ export default function App() {
         // EPA Curves options
         if (chartMode === 'epacurves') {
             if (epaConfig.yAxis && epaConfig.yAxis !== 'kwh100mi') p.set('epa_ya', epaConfig.yAxis);
+            // Written whenever anything is selected. Without it the curves a
+            // link was sent to show are whatever BOOTSTRAP happens to pick on
+            // the recipient's machine.
+            if (epaConfig.selectedMappings?.length) p.set('epa_m', epaConfig.selectedMappings.join(','));
         }
 
         history.replaceState({ view, chartMode }, '', '?' + p.toString());
