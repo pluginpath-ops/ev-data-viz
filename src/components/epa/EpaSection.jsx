@@ -13,16 +13,37 @@ import EpaStatsView from './stats/EpaStatsView';
  * does — see EPA_SUBTABS below — because both own state worth sharing and
  * neither can be allowed to wipe the other's.
  */
+/**
+ * Three siblings, not two with a switch inside one.
+ *
+ * The label figures and the lab measurements are separate datasets, not two
+ * views of one: a certification covers MANY configurations — one Rivian
+ * certificate lists 24 — so 211 certifications sit behind 1,175 guide rows and
+ * the two can never be put side by side row for row. No measure is computable
+ * from both, either.
+ *
+ * Folding the choice into the measure picker would hide that, and would leave
+ * the unit-of-analysis control appearing and vanishing depending on which
+ * measure was selected. Separate tabs let each carry only the controls that
+ * mean something in it — the unit question exists for guide rows, where a
+ * configuration, a test group and a make are three different populations, and
+ * not for certifications, where the record IS the unit.
+ */
 export const EPA_SUBTABS = [
-    { id: 'browse', label: 'Browse' },
-    { id: 'stats',  label: 'Statistics' },
+    { id: 'browse',    label: 'Browse' },
+    { id: 'labelstats', label: 'Label Statistics' },
+    { id: 'certstats',  label: 'Certification Statistics' },
 ];
 export const EPA_SUBTAB_IDS = EPA_SUBTABS.map(t => t.id);
 export const DEFAULT_EPA_SUBTAB = 'browse';
 
+/** Links shared before the split named the statistics tab `stats`. */
+const LEGACY_SUBTABS = { stats: 'labelstats' };
+
 export default function EpaSection() {
     const [subtab, setSubtab] = useState(() => {
-        const sub = new URLSearchParams(window.location.search).get('sub');
+        const raw = new URLSearchParams(window.location.search).get('sub');
+        const sub = LEGACY_SUBTABS[raw] ?? raw;
         return EPA_SUBTAB_IDS.includes(sub) ? sub : DEFAULT_EPA_SUBTAB;
     });
 
@@ -49,8 +70,9 @@ export default function EpaSection() {
                 ))}
             </div>
 
-            {subtab === 'browse' && <EpaGuideView subtab={subtab} />}
-            {subtab === 'stats'  && <EpaStatsView subtab={subtab} />}
+            {subtab === 'browse'     && <EpaGuideView subtab={subtab} />}
+            {subtab === 'labelstats' && <EpaStatsView subtab={subtab} dataset="guide" />}
+            {subtab === 'certstats'  && <EpaStatsView subtab={subtab} dataset="cert" />}
         </div>
     );
 }

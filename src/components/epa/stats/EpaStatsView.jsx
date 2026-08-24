@@ -47,7 +47,7 @@ const DATASETS = [
     { key: 'cert',  label: 'Lab measurements', source: 'EPA certification records — road load, efficiency, energy' },
 ];
 
-export default function EpaStatsView({ subtab = 'stats' }) {
+export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' }) {
     const { getFeGuideRows, getBrandAliases, getCertGroupsForStats } = useAppContext();
 
     const loadRows    = useCallback(() => getFeGuideRows(), [getFeGuideRows]);
@@ -60,7 +60,6 @@ export default function EpaStatsView({ subtab = 'stats' }) {
     const [initial] = useState(() => {
         const p = new URLSearchParams(window.location.search);
         return {
-            dataset:   DATASETS.some(d => d.key === p.get('ds')) ? p.get('ds') : 'guide',
             unit:      UNITS.some(u => u.key === p.get('u')) ? p.get('u') : DEFAULT_UNIT,
             dimension: DIMENSIONS.some(d => d.key === p.get('d')) ? p.get('d') : 'body_class',
             measure:   MEASURES.some(m => m.key === p.get('ms')) ? p.get('ms') : 'label_comb_mpge',
@@ -77,7 +76,6 @@ export default function EpaStatsView({ subtab = 'stats' }) {
             drives:  p.get('dr') ? p.get('dr').split(',').filter(Boolean) : [],
         };
     });
-    const [dataset, setDataset]     = useState(initial.dataset);
     const [unit, setUnit]           = useState(initial.unit);
     const [dimension, setDimension] = useState(initial.dimension);
     const [storedMeasure, setMeasure] = useState(initial.measure);
@@ -192,7 +190,6 @@ export default function EpaStatsView({ subtab = 'stats' }) {
     useEffect(() => {
         const p = new URLSearchParams();
         p.set('tab', 'epa');
-        if (dataset !== 'guide')          p.set('ds', dataset);
         p.set('sub', subtab);
         if (unit !== DEFAULT_UNIT)        p.set('u', unit);
         if (dimension !== 'body_class')   p.set('d', dimension);
@@ -275,9 +272,17 @@ export default function EpaStatsView({ subtab = 'stats' }) {
         <div className="stats-view">
             <div className="section-header">
                 <div>
-                    <div className="section-title">EPA statistics</div>
+                    <div className="section-title">{dsDef?.label}</div>
                     <div className="text-caption text-secondary">
-                        {measDef?.label} by {dimDef?.label.toLowerCase()}, {unitDef?.label.toLowerCase()},
+                        {dsDef?.source}
+                    </div>
+                    <div className="text-caption text-secondary">
+                        {/* The unit clause is the guide's question. On the
+                            certification side there is no choice to report —
+                            the record is the unit — so it states that rather
+                            than echoing a control that is not on screen. */}
+                        {measDef?.label} by {dimDef?.label.toLowerCase()},
+                        {' '}{isCert ? 'per certification record' : unitDef?.label.toLowerCase()},
                         {' '}{selectedYears.length === 0
                             ? 'all model years'
                             : selectedYears.length === 1
@@ -294,19 +299,6 @@ export default function EpaStatsView({ subtab = 'stats' }) {
                     same query gives materially different numbers, and a reader
                     who does not know which one they are looking at cannot use
                     any of them. */}
-                <div className="guide-facet stats-facet-unit">
-                    <div className="guide-facet-label">Dataset</div>
-                    <div className="guide-facet-values">
-                        {DATASETS.map(d => (
-                            <button key={d.key} type="button"
-                                className={`guide-chip ${dataset === d.key ? 'active' : ''}`}
-                                onClick={() => setDataset(d.key)}
-                                title={d.source}>{d.label}</button>
-                        ))}
-                    </div>
-                    <div className="text-hint">{dsDef?.source}</div>
-                </div>
-
                 {/* Only the guide has a unit-of-analysis question. A
                     certification record IS the unit; there is nothing below it
                     to collapse. */}
