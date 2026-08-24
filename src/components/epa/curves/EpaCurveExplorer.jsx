@@ -135,6 +135,11 @@ export default function EpaCurveExplorer() {
             type: 'line',
             data: { datasets },
             options: {
+                /* The whole chart is rebuilt on every conditions change, so an
+                   animation replays from scratch each time — which hides the
+                   very thing the sliders are for. Without it the curves jump
+                   straight to the new position and the delta is readable. */
+                animation: false,
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: { mode: 'nearest', intersect: false },
