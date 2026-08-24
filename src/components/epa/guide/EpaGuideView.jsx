@@ -12,6 +12,7 @@ import GuideTable from './GuideTable';
 import GuideComparePanel from './GuideComparePanel';
 import GuideDetailModal from './GuideDetailModal';
 import LoadingSpinner from '../../LoadingSpinner';
+import CollapsibleSection from '../../CollapsibleSection';
 
 /**
  * The public Fuel Economy Guide browser — phase 1 of #234, issue #235.
@@ -95,6 +96,22 @@ export default function EpaGuideView({ subtab = 'browse' }) {
     // paging does not rescale the bars underneath the reader.
     const barMaxima = useMemo(() => computeBarMaxima(filtered), [filtered]);
 
+    /**
+     * How many filters are narrowing the view.
+     *
+     * Counted against EMPTY_FILTERS rather than by listing the keys here, so a
+     * filter added later is counted without anyone remembering to come back —
+     * a collapsed panel silently hiding a filter nobody knew was on is the one
+     * failure this subtitle exists to prevent.
+     */
+    const activeFilterCount = useMemo(
+        () => Object.entries(filters).filter(([k, v]) => {
+            const empty = EMPTY_FILTERS[k];
+            return Array.isArray(v) ? v.length > 0 : (v ?? '') !== (empty ?? '');
+        }).length,
+        [filters],
+    );
+
     const compareRows = useMemo(
         () => selectedIds.map(id => rows.find(r => r.id === id)).filter(Boolean),
         [selectedIds, rows],
@@ -154,7 +171,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                     <div className="section-title">EPA Fuel Economy Guide</div>
                     <div className="text-caption text-secondary">
                         EPA’s published label figures — {rows.length.toLocaleString()} configurations
-                        across {facets.years.length} model years. Showing {sorted.length.toLocaleString()}.
+                        across {facets.years.length} model years.
                     </div>
                 </div>
 
@@ -167,15 +184,67 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                 </div>
             )}
 
-            <GuideFilterBar
-                rows={rows}
-                facets={facets}
-                filters={filters}
-                onChange={updateFilters}
-                onReset={resetFilters}
-                filterFn={filterRows}
-                columnPicker={<GuideColumnPicker visible={columns} onChange={setColumns} />}
-            />
+            {/* Same disclosure as the table below. The filters are how you
+                arrive at a set, and dead weight once you have — collapsing them
+                is what puts a comparison and its controls on one screen. */}
+            <CollapsibleSection
+                defaultOpen
+                title="Filters"
+                subtitle={`${activeFilterCount > 0 ? `${activeFilterCount} active` : 'none active'} · ${sorted.length.toLocaleString()} shown`}
+            >
+                <GuideFilterBar
+                    rows={rows}
+                    facets={facets}
+                    filters={filters}
+                    onChange={updateFilters}
+                    onReset={resetFilters}
+                    filterFn={filterRows}
+                    columnPicker={<GuideColumnPicker visible={columns} onChange={setColumns} />}
+                />
+            </CollapsibleSection>
+
+            {/* The table comes FIRST and the comparison grows beneath it.
+                Above, the panel appeared on the first tick and resized on every
+                one after — so the rows being clicked slid down the page
+                mid-click, and ticking a fourth car moved the third away from
+                the cursor. Below, the thing being interacted with stays put and
+                the panel changes size in space the reader is not aiming at.
+
+                Collapsible for the same reason from the other end: once the
+                cars are picked, fifty rows sit between the reader and the
+                comparison they came for. */}
+            <CollapsibleSection
+                defaultOpen
+                title="Configurations"
+                subtitle={selectedIds.length
+                    ? `${selectedIds.length} selected of ${sorted.length.toLocaleString()}`
+                    : `${sorted.length.toLocaleString()} shown`}
+            >
+                <GuideTable
+                    rows={pageRows}
+                    visibleColumns={columns}
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={handleSort}
+                    selectedIds={selectedIds}
+                    onToggleSelect={toggleSelect}
+                    onOpenRow={setOpenRow}
+                    vehicleLinks={vehicleLinks}
+                    barMaxima={barMaxima}
+                />
+
+                {sorted.length > PAGE_SIZE && (
+                    <div className="guide-pager">
+                        <button className="btn btn-secondary" disabled={page === 0}
+                            onClick={() => setPage(p => p - 1)}>Previous</button>
+                        <span className="text-caption text-secondary">
+                            Page {page + 1} of {totalPages}
+                        </span>
+                        <button className="btn btn-secondary" disabled={page >= totalPages - 1}
+                            onClick={() => setPage(p => p + 1)}>Next</button>
+                    </div>
+                )}
+            </CollapsibleSection>
 
             <GuideComparePanel
                 rows={compareRows}
@@ -185,30 +254,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                 onRemove={toggleSelect}
             />
 
-            <GuideTable
-                rows={pageRows}
-                visibleColumns={columns}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={handleSort}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
-                onOpenRow={setOpenRow}
-                vehicleLinks={vehicleLinks}
-                barMaxima={barMaxima}
-            />
 
-            {sorted.length > PAGE_SIZE && (
-                <div className="guide-pager">
-                    <button className="btn btn-secondary" disabled={page === 0}
-                        onClick={() => setPage(p => p - 1)}>Previous</button>
-                    <span className="text-caption text-secondary">
-                        Page {page + 1} of {totalPages}
-                    </span>
-                    <button className="btn btn-secondary" disabled={page >= totalPages - 1}
-                        onClick={() => setPage(p => p + 1)}>Next</button>
-                </div>
-            )}
 
             {openRow && (
                 <GuideDetailModal
