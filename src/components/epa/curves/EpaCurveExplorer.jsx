@@ -4,13 +4,14 @@ import { useTheme } from '../../../hooks/useTheme';
 import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
 import { buildEpaCurveFromModel } from '../../../utils/epaDerivations';
-import { DEFAULT_ETA } from '../../../constants/epa';
+import { DEFAULT_ETA, CURVE_SPEED_RANGE } from '../../../constants/epa';
 import { curveSubjects, curveTooltipLines, disambiguateLabels } from '../../../utils/epaCurveSubjects';
 import { PALETTE } from '../../../utils/specHelpers';
 import { convSpeed, speedLabel } from '../../../utils/unitConversions';
 import CurveSubjectPicker from './CurveSubjectPicker';
 import ViewingConditions, { useViewingConditions } from '../ViewingConditions';
 import CollapsibleSection from '../../CollapsibleSection';
+import AxisScaleControls from '../../AxisScaleControls';
 import LoadingSpinner from '../../LoadingSpinner';
 
 /**
@@ -60,6 +61,10 @@ export default function EpaCurveExplorer() {
     });
     const [selected, setSelected] = useState(initial.selected);
     const [yAxis, setYAxis] = useState(initial.yAxis);
+    // Manual axis bounds, null = auto. Not persisted to the URL: the record
+    // selection and the axis choice describe WHAT is plotted and are worth
+    // sharing, where a zoom is tuning for the session.
+    const [scale, setScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
 
     // The same controls the vehicle-driven curves use, from the same module —
     // two views computing air density slightly differently would be invisible
@@ -147,10 +152,18 @@ export default function EpaCurveExplorer() {
                     x: {
                         type: 'linear',
                         title: { display: true, text: speedLabel(units), color: text },
+                        // The default window is the curve's own domain rather
+                        // than a literal 5–120: CURVE_SPEED_RANGE is an Admin
+                        // knob, and a hardcoded bound would stop tracking the
+                        // data the moment someone widened it.
+                        min: scale.xMin ?? convSpeed(CURVE_SPEED_RANGE[0], units),
+                        max: scale.xMax ?? convSpeed(CURVE_SPEED_RANGE[1], units),
                         grid: { color: grid }, ticks: { color: text },
                     },
                     y: {
                         title: { display: true, text: `${axis.label} (${axis.unit})`, color: text },
+                        min: scale.yMin ?? undefined,
+                        max: scale.yMax ?? undefined,
                         grid: { color: grid }, ticks: { color: text },
                     },
                 },
@@ -192,7 +205,7 @@ export default function EpaCurveExplorer() {
             },
         });
         return () => chartRef.current?.destroy();
-    }, [plotted, yAxis, axis, units, isDark, displayNames,
+    }, [plotted, yAxis, axis, units, isDark, displayNames, scale,
         densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum,
         gradeGainFtNum, gradeDistanceMilesNum]);
 
@@ -300,9 +313,21 @@ export default function EpaCurveExplorer() {
             {plotted.length === 0 ? (
                 <div className="empty-state">Choose one or more certification records to plot.</div>
             ) : (
-                <div className="curve-canvas-wrap">
-                    <canvas ref={canvasRef} />
-                </div>
+                <>
+                    <div className="curve-canvas-wrap">
+                        <canvas ref={canvasRef} />
+                    </div>
+
+                    {/* Below the chart, as in every other chart view. The card
+                        comes from AxisScaleControls itself. */}
+                    <AxisScaleControls
+                        xMin={scale.xMin} xMax={scale.xMax}
+                        yMin={scale.yMin} yMax={scale.yMax}
+                        xAxisLabel={`Speed (${speedLabel(units)})`}
+                        yAxisLabel={`${axis.label} (${axis.unit})`}
+                        onChange={(key, value) => setScale(p => ({ ...p, [key]: value }))}
+                    />
+                </>
             )}
         </div>
     );
