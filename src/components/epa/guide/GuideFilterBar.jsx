@@ -23,26 +23,6 @@ function FacetGroup({ label, hint, values, selected, onToggle, onClear, countFor
                 {hint && <span className="text-hint ml-1">{hint}</span>}
             </div>
             <div className="guide-facet-values">
-                {/* Clearing one facet took a click per selected chip, and with
-                    six model years that is six. Shown only once something is
-                    selected: with nothing chosen "All" is already true, and a
-                    chip that does nothing is worse than no chip.
-
-                    The Statistics tab keeps an always-visible All on its year
-                    facet, deliberately — there a single year is the DEFAULT and
-                    "all years" is a distinct analytic choice that double-counts
-                    configurations, so it needs to be selectable rather than
-                    merely reachable. */}
-                {selected.length > 0 && (
-                    <button
-                        type="button"
-                        onClick={onClear}
-                        className="guide-chip"
-                        title={`Clear the ${label.toLowerCase()} filter`}
-                    >
-                        All
-                    </button>
-                )}
                 {values.map((v) => {
                     const on = selected.includes(v);
                     const n = countFor(v);
@@ -60,6 +40,29 @@ function FacetGroup({ label, hint, values, selected, onToggle, onClear, countFor
                         </button>
                     );
                 })}
+                {/* LAST, not first. It comes and goes with the selection, and
+                    at the head of the row every other chip shifts sideways as
+                    it appears — under a cursor that is on its way to one of
+                    them. At the tail nothing that was already there moves.
+
+                    Clearing one facet took a click per selected chip otherwise,
+                    and with six model years that is six.
+
+                    The Statistics tab keeps an always-visible All on its year
+                    facet, deliberately — there a single year is the DEFAULT and
+                    "all years" is a distinct analytic choice that counts a
+                    configuration once per year it appears in, so it has to be
+                    selectable rather than merely reachable. */}
+                {selected.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={onClear}
+                        className="guide-chip"
+                        title={`Clear the ${label.toLowerCase()} filter`}
+                    >
+                        All
+                    </button>
+                )}
             </div>
         </div>
     );
