@@ -1,4 +1,4 @@
-import { measureByKey, observationLabel } from '../../../utils/epaGuideStats';
+import { observationLabel } from '../../../utils/epaGuideStats';
 
 /**
  * Both tails, named.
@@ -26,8 +26,8 @@ function List({ title, items, measure, digits, unit }) {
     );
 }
 
-export default function StatsExtremes({ data, measure }) {
-    const m = measureByKey(measure);
+export default function StatsExtremes({ data, measure, measureDef }) {
+    const m = measureDef;
     return (
         <div className="stats-extremes">
             <List title="Highest" items={data.highest} measure={measure} digits={m?.digits ?? 1} unit={m?.unit} />

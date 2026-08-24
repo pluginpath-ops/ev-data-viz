@@ -1,4 +1,6 @@
-import { measureByKey } from '../../../utils/epaGuideStats';
+// The definition is passed in, not looked up: measures come from two
+// registries now — the guide's and the certification records' — and a lookup
+// here would silently return null for half of them, rendering 0.0198 as 0.0.
 
 /**
  * One row per bucket: n, and the five-number summary drawn as a box.
@@ -25,8 +27,8 @@ function Box({ stats, scale, digits }) {
     );
 }
 
-export default function StatsTable({ rows, measure, overall, dimensionLabel }) {
-    const m = measureByKey(measure);
+export default function StatsTable({ rows, measureDef, overall, dimensionLabel }) {
+    const m = measureDef;
     const digits = m?.digits ?? 1;
 
     // One scale across every row, including the corpus line, or the boxes are

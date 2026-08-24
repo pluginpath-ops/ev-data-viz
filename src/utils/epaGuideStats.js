@@ -210,7 +210,19 @@ export function toObservations(rows, unit = DEFAULT_UNIT) {
  * "n too small" is an answer.
  */
 export function summarise(rows, { unit = DEFAULT_UNIT, dimension, measure, minN = 3 } = {}) {
-    const observations = toObservations(rows, unit);
+    return bucketise(toObservations(rows, unit), { dimension, measure, minN });
+}
+
+/**
+ * Bucket already-flat observations. The half of `summarise` that does not care
+ * where an observation came from.
+ *
+ * Split out so the certification statistics can reuse it: those are one
+ * observation per test group and need no clustering, but every rule about
+ * buckets — suppress rather than drop, sink the suppressed, sort by median —
+ * should be the same in both places rather than written twice.
+ */
+export function bucketise(observations, { dimension, measure, minN = 3 } = {}) {
     const buckets = new Map();
     for (const o of observations) {
         const v = o[dimension];
@@ -248,7 +260,20 @@ export function overall(rows, { unit = DEFAULT_UNIT, measure } = {}) {
  * would spread it across several buckets and hide it.
  */
 export function histogram(rows, { unit = DEFAULT_UNIT, measure, bins = 20 } = {}) {
-    const values = toObservations(rows, unit).map(o => num(o[measure])).filter(v => v != null);
+    return histogramOf(toObservations(rows, unit), { measure, bins });
+}
+
+/**
+ * The same, over observations that are already one per thing.
+ *
+ * Certification records need this: they are one observation per test group and
+ * must not be clustered again. Passing them through `toObservations` keyed them
+ * by the guide's natural key, which a certification record does not have — so
+ * 44 groups collapsed to 39 and the histogram quietly disagreed with the table
+ * beside it.
+ */
+export function histogramOf(observations, { measure, bins = 20 } = {}) {
+    const values = observations.map(o => num(o[measure])).filter(v => v != null);
     if (!values.length) return { bins: [], n: 0 };
     const min = Math.min(...values), max = Math.max(...values);
     if (min === max) return { bins: [{ from: min, to: max, count: values.length }], n: values.length };
@@ -272,12 +297,17 @@ export function histogram(rows, { unit = DEFAULT_UNIT, measure, bins = 20 } = {}
  * about a specific vehicle, and a distribution alone never names one.
  */
 export function extremes(rows, { unit = DEFAULT_UNIT, measure, count = 5 } = {}) {
-    const observations = toObservations(rows, unit)
+    return extremesOf(toObservations(rows, unit), { measure, count });
+}
+
+/** As above, over observations that are already one per thing. */
+export function extremesOf(observations, { measure, count = 5 } = {}) {
+    const ranked = observations
         .filter(o => num(o[measure]) != null)
         .sort((a, b) => num(b[measure]) - num(a[measure]));
     return {
-        highest: observations.slice(0, count),
-        lowest:  observations.slice(-count).reverse(),
+        highest: ranked.slice(0, count),
+        lowest:  ranked.slice(-count).reverse(),
     };
 }
 

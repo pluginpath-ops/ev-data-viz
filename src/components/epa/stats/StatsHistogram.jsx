@@ -1,4 +1,4 @@
-import { measureByKey } from '../../../utils/epaGuideStats';
+// See StatsTable: the definition is passed in rather than looked up.
 
 /**
  * Equal-width histogram of one measure across the current selection.
@@ -8,8 +8,8 @@ import { measureByKey } from '../../../utils/epaGuideStats';
  * label — only reads as a spike against a linear axis; quantile bins would
  * spread it across several buckets and make a bimodal fleet look smooth.
  */
-export default function StatsHistogram({ data, measure }) {
-    const m = measureByKey(measure);
+export default function StatsHistogram({ data, measureDef }) {
+    const m = measureDef;
     const digits = m?.digits ?? 1;
     if (!data.n) return null;
     const peak = Math.max(...data.bins.map(b => b.count));

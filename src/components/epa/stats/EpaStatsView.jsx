@@ -4,8 +4,12 @@ import { useAsyncResource } from '../../../hooks/useAsyncResource';
 import { decorateRow, buildBrandIndex } from '../../../utils/feGuideBrowse';
 import {
     UNITS, DEFAULT_UNIT, DIMENSIONS, MEASURES, measureByKey,
-    summarise, overall, histogram, extremes,
+    summarise, overall, histogram, extremes, bucketise, describe,
+    histogramOf, extremesOf,
 } from '../../../utils/epaGuideStats';
+import {
+    CERT_MEASURES, certMeasureByKey, certObservations, coverageFor,
+} from '../../../utils/epaCertStats';
 import StatsTable from './StatsTable';
 import StatsHistogram from './StatsHistogram';
 import StatsExtremes from './StatsExtremes';
@@ -29,36 +33,74 @@ import LoadingSpinner from '../../LoadingSpinner';
  */
 const MIN_N = 3;
 
+/**
+ * Two datasets, not two views of one.
+ *
+ * The guide holds what reached the window sticker for 1,175 configurations; the
+ * certification records hold the lab's own measurements for 181. Different
+ * populations, different measures, different n — so which one is being read has
+ * to be a deliberate choice rather than something inferred from the measure
+ * that happens to be selected.
+ */
+const DATASETS = [
+    { key: 'guide', label: 'Label figures', source: 'Fuel Economy Guide — what reached the window sticker' },
+    { key: 'cert',  label: 'Lab measurements', source: 'EPA certification records — road load, efficiency, energy' },
+];
+
 export default function EpaStatsView({ subtab = 'stats' }) {
-    const { getFeGuideRows, getBrandAliases } = useAppContext();
+    const { getFeGuideRows, getBrandAliases, getCertGroupsForStats } = useAppContext();
 
     const loadRows    = useCallback(() => getFeGuideRows(), [getFeGuideRows]);
     const loadAliases = useCallback(() => getBrandAliases(), [getBrandAliases]);
     const { data: rawRows, loading, error } = useAsyncResource(loadRows, []);
     const { data: aliases } = useAsyncResource(loadAliases, []);
+    const loadCert = useCallback(() => getCertGroupsForStats(), [getCertGroupsForStats]);
+    const { data: certGroups } = useAsyncResource(loadCert, []);
 
     const [initial] = useState(() => {
         const p = new URLSearchParams(window.location.search);
         return {
+            dataset:   DATASETS.some(d => d.key === p.get('ds')) ? p.get('ds') : 'guide',
             unit:      UNITS.some(u => u.key === p.get('u')) ? p.get('u') : DEFAULT_UNIT,
             dimension: DIMENSIONS.some(d => d.key === p.get('d')) ? p.get('d') : 'body_class',
             measure:   MEASURES.some(m => m.key === p.get('ms')) ? p.get('ms') : 'label_comb_mpge',
             // A list, so a reader can compare two years side by side. Absent
             // means "not chosen yet" and falls back to the best-covered year;
             // an explicitly empty list means every year.
+            // `filter(Boolean)` BEFORE the map, not after: `Number('')` is 0
+            // and 0 is finite, so `?yr=` alone decoded to the year zero and the
+            // view reported "0 of 0 groups" for a filter nobody set.
             years: p.has('yr')
-                ? p.get('yr').split(',').map(Number).filter(Number.isFinite)
+                ? p.get('yr').split(',').filter(Boolean).map(Number).filter(Number.isFinite)
                 : null,
             classes: p.get('cl') ? p.get('cl').split(',').filter(Boolean) : [],
             drives:  p.get('dr') ? p.get('dr').split(',').filter(Boolean) : [],
         };
     });
+    const [dataset, setDataset]     = useState(initial.dataset);
     const [unit, setUnit]           = useState(initial.unit);
     const [dimension, setDimension] = useState(initial.dimension);
-    const [measure, setMeasure]     = useState(initial.measure);
+    const [storedMeasure, setMeasure] = useState(initial.measure);
     const [years, setYears]         = useState(initial.years);
     const [classes, setClasses]     = useState(initial.classes);
     const [drives, setDrives]       = useState(initial.drives);
+
+    const isCert = dataset === 'cert';
+    const measures = isCert ? CERT_MEASURES : MEASURES;
+
+    /**
+     * A measure belongs to one dataset. Switching datasets with `aero_c`
+     * selected would ask the guide for a road-load coefficient it has never
+     * heard of and render an empty table with nothing to explain it.
+     *
+     * Resolved rather than reset in an effect: an effect would set state during
+     * render and cascade, and this is derivable — the selection is only ever
+     * the stored one when the active dataset actually has it.
+     */
+    const measure = measures.some(m => m.key === storedMeasure)
+        ? storedMeasure
+        : (isCert ? 'aero_c' : 'label_comb_mpge');
+    const measDef = isCert ? certMeasureByKey(measure) : measureByKey(measure);
 
     const brandIndex = useMemo(() => buildBrandIndex(aliases ?? []), [aliases]);
     const allRows = useMemo(
@@ -150,6 +192,7 @@ export default function EpaStatsView({ subtab = 'stats' }) {
     useEffect(() => {
         const p = new URLSearchParams();
         p.set('tab', 'epa');
+        if (dataset !== 'guide')          p.set('ds', dataset);
         p.set('sub', subtab);
         if (unit !== DEFAULT_UNIT)        p.set('u', unit);
         if (dimension !== 'body_class')   p.set('d', dimension);
@@ -160,12 +203,54 @@ export default function EpaStatsView({ subtab = 'stats' }) {
         if (showClassFilter && classes.length) p.set('cl', classes.join(','));
         if (showDriveFilter && drives.length)  p.set('dr', drives.join(','));
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [unit, dimension, measure, years, classes, drives, showClassFilter, showDriveFilter, subtab]);
+    }, [dataset, unit, dimension, measure, years, classes, drives, showClassFilter, showDriveFilter, subtab]);
 
-    const summary   = useMemo(() => summarise(rows, { unit, dimension, measure, minN: MIN_N }), [rows, unit, dimension, measure]);
-    const corpus    = useMemo(() => overall(rows, { unit, measure }), [rows, unit, measure]);
-    const hist      = useMemo(() => histogram(rows, { unit, measure, bins: 24 }), [rows, unit, measure]);
-    const tails     = useMemo(() => extremes(rows, { unit, measure, count: 5 }), [rows, unit, measure]);
+
+    /**
+     * Certification observations: one per test group, already flat, so they are
+     * bucketed directly rather than clustered. The unit-of-analysis question
+     * does not arise — a certification record IS the unit, and there is nothing
+     * below it to collapse.
+     */
+    const certObs = useMemo(
+        () => certObservations(certGroups ?? [], brandIndex),
+        [certGroups, brandIndex],
+    );
+    const certFiltered = useMemo(() => {
+        let out = certObs;
+        if (selectedYears.length) out = out.filter(o => selectedYears.includes(o.model_year));
+        if (showClassFilter && classes.length) out = out.filter(o => classes.includes(o.body_class));
+        if (showDriveFilter && drives.length)  out = out.filter(o => drives.includes(o.drive_group));
+        return out;
+    }, [certObs, selectedYears, classes, drives, showClassFilter, showDriveFilter]);
+
+    const coverage = useMemo(
+        () => (isCert ? coverageFor(certFiltered, measure) : null),
+        [isCert, certFiltered, measure],
+    );
+
+    const summary   = useMemo(
+        () => (isCert
+            ? bucketise(certFiltered, { dimension, measure, minN: MIN_N })
+            : summarise(rows, { unit, dimension, measure, minN: MIN_N })),
+        [isCert, certFiltered, rows, unit, dimension, measure],
+    );
+    const corpus    = useMemo(
+        () => (isCert ? describe(certFiltered.map(o => o[measure])) : overall(rows, { unit, measure })),
+        [isCert, certFiltered, rows, unit, measure],
+    );
+    const hist = useMemo(
+        () => (isCert
+            ? histogramOf(certFiltered, { measure, bins: 24 })
+            : histogram(rows, { unit, measure, bins: 24 })),
+        [isCert, certFiltered, rows, unit, measure],
+    );
+    const tails = useMemo(
+        () => (isCert
+            ? extremesOf(certFiltered, { measure, count: 5 })
+            : extremes(rows, { unit, measure, count: 5 })),
+        [isCert, certFiltered, rows, unit, measure],
+    );
 
     if (loading) return <LoadingSpinner />;
     if (error) {
@@ -184,7 +269,7 @@ export default function EpaStatsView({ subtab = 'stats' }) {
 
     const unitDef = UNITS.find(u => u.key === unit);
     const dimDef  = DIMENSIONS.find(d => d.key === dimension);
-    const measDef = measureByKey(measure);
+    const dsDef   = DATASETS.find(d => d.key === dataset);
 
     return (
         <div className="stats-view">
@@ -210,6 +295,23 @@ export default function EpaStatsView({ subtab = 'stats' }) {
                     who does not know which one they are looking at cannot use
                     any of them. */}
                 <div className="guide-facet stats-facet-unit">
+                    <div className="guide-facet-label">Dataset</div>
+                    <div className="guide-facet-values">
+                        {DATASETS.map(d => (
+                            <button key={d.key} type="button"
+                                className={`guide-chip ${dataset === d.key ? 'active' : ''}`}
+                                onClick={() => setDataset(d.key)}
+                                title={d.source}>{d.label}</button>
+                        ))}
+                    </div>
+                    <div className="text-hint">{dsDef?.source}</div>
+                </div>
+
+                {/* Only the guide has a unit-of-analysis question. A
+                    certification record IS the unit; there is nothing below it
+                    to collapse. */}
+                {!isCert && (
+                <div className="guide-facet stats-facet-unit">
                     <div className="guide-facet-label">Count one observation per</div>
                     <div className="guide-facet-values">
                         {UNITS.map(u => (
@@ -226,6 +328,7 @@ export default function EpaStatsView({ subtab = 'stats' }) {
                     </div>
                     <div className="text-hint">{unitDef?.answers}</div>
                 </div>
+                )}
 
                 <div className="guide-facet">
                     <div className="guide-facet-label">Model year</div>
@@ -290,7 +393,7 @@ export default function EpaStatsView({ subtab = 'stats' }) {
                 <div className="guide-facet">
                     <div className="guide-facet-label">Measure</div>
                     <div className="guide-facet-values">
-                        {MEASURES.map(m => (
+                        {measures.map(m => (
                             <button key={m.key} type="button"
                                 className={`guide-chip ${measure === m.key ? 'active' : ''}`}
                                 onClick={() => setMeasure(m.key)}>{m.label}</button>
@@ -299,9 +402,20 @@ export default function EpaStatsView({ subtab = 'stats' }) {
                 </div>
             </div>
 
+            {/* What the figure is computed from, and what it is not. A median
+                over a population padded with a fallback constant looks exactly
+                like one over 73 real derivations. */}
+            {coverage && (
+                <div className="text-hint">
+                    {coverage.usable} of {coverage.total} certification groups carry this figure
+                    {coverage.assumed > 0 && `; ${coverage.assumed} could not be derived and fall back to a default, so they are excluded rather than counted`}
+                    {coverage.missing > 0 && `; ${coverage.missing} do not report it`}.
+                </div>
+            )}
+
             <StatsTable
                 rows={summary}
-                measure={measure}
+                measureDef={measDef}
                 overall={corpus}
                 dimensionLabel={dimDef?.label ?? ''}
             />
@@ -309,11 +423,11 @@ export default function EpaStatsView({ subtab = 'stats' }) {
             <div className="stats-panels">
                 <div className="stats-panel">
                     <div className="section-header-title">Distribution</div>
-                    <StatsHistogram data={hist} measure={measure} />
+                    <StatsHistogram data={hist} measureDef={measDef} />
                 </div>
                 <div className="stats-panel">
                     <div className="section-header-title">Named extremes</div>
-                    <StatsExtremes data={tails} measure={measure} />
+                    <StatsExtremes data={tails} measure={measure} measureDef={measDef} />
                 </div>
             </div>
 
