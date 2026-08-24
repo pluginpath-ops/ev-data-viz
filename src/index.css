@@ -2819,3 +2819,63 @@ body {
     color: var(--color-text-secondary);
     border: 1px solid var(--color-warning);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CERTIFICATION CURVES (#237)
+
+   Curves anchored on certification records rather than on vehicles. The tier
+   badge is the load-bearing part: every curve's shape is measured, but only
+   some carry a measured energy behind the range axis.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.curve-picker-list-facet {
+    @apply w-full;
+}
+.curve-picker-list {
+    @apply flex flex-col gap-px max-h-64 overflow-y-auto rounded;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+}
+.curve-picker-row {
+    @apply flex items-center gap-2 px-2 py-1 text-sm cursor-pointer;
+    color: var(--color-text-primary);
+}
+.curve-picker-row:hover    { background-color: var(--color-surface-muted); }
+.curve-picker-row.selected { background-color: var(--color-primary-light); }
+[data-theme="dark"] .curve-picker-row.selected {
+    background-color: rgba(59, 130, 246, 0.18);
+}
+.curve-picker-name {
+    @apply truncate flex-1 min-w-0;
+}
+
+/* Named on every row, because once a mixed set is plotted this is the only
+   thing distinguishing a measured range from a borrowed one. */
+.curve-tier-badge {
+    @apply px-1.5 py-0.5 rounded uppercase shrink-0;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+.curve-tier-badge.tier-measured {
+    background-color: var(--color-primary);
+    color: rgb(255, 255, 255);
+}
+.curve-tier-badge.tier-nominal {
+    background-color: var(--color-warning);
+    color: rgb(255, 255, 255);
+}
+.curve-tier-badge.tier-shape {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-muted);
+}
+[data-theme="dark"] .curve-tier-badge.tier-shape {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.curve-canvas-wrap {
+    @apply p-3 rounded-lg;
+    height: 26rem;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import EpaGuideView from './guide/EpaGuideView';
 import EpaStatsView from './stats/EpaStatsView';
+import EpaCurveExplorer from './curves/EpaCurveExplorer';
 
 /**
  * The EPA top-level section and its sub-nav (#234).
@@ -33,6 +34,7 @@ export const EPA_SUBTABS = [
     { id: 'browse',    label: 'Browse' },
     { id: 'labelstats', label: 'Label Statistics' },
     { id: 'certstats',  label: 'Certification Statistics' },
+    { id: 'curves',     label: 'Certification Curves' },
 ];
 export const EPA_SUBTAB_IDS = EPA_SUBTABS.map(t => t.id);
 export const DEFAULT_EPA_SUBTAB = 'browse';
@@ -73,6 +75,7 @@ export default function EpaSection() {
             {subtab === 'browse'     && <EpaGuideView subtab={subtab} />}
             {subtab === 'labelstats' && <EpaStatsView subtab={subtab} dataset="guide" />}
             {subtab === 'certstats'  && <EpaStatsView subtab={subtab} dataset="cert" />}
+            {subtab === 'curves'     && <EpaCurveExplorer />}
         </div>
     );
 }
