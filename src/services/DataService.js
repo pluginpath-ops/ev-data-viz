@@ -2123,6 +2123,42 @@ class DataService {
     return result;
   }
 
+  /**
+   * Certification groups with everything the statistics derive from (#236).
+   *
+   * Only groups carrying a guide link, and that is the point rather than a
+   * convenience: a cert-side figure has to be groupable by class, brand, parent
+   * or drive to be a statistic at all, and those dimensions live on the guide
+   * row. An unlinked group can produce a number but nothing to compare it
+   * against — which is why #238 came first and took this population from 45 to
+   * 181.
+   *
+   * The nested guide row carries only the grouping fields plus
+   * `nominal_pack_kwh`, which the usable-vs-gross buffer ratio needs.
+   */
+  async getCertGroupsForStats() {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase()
+      .from('epa_test_groups')
+      .select(`
+        test_group_id, model_year, make, epa_carline_name, display_name,
+        useable_kwh, cd_range_combined_calc, label_range_published,
+        derived_5cycle_coefficient, accessory_load_w_override, charger_efficiency_override,
+        epa_coefficient_sets(is_primary, category, target_a, target_b, target_c,
+                             set_a, set_b, set_c, equiv_test_weight_lbs),
+        epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh,
+                  epa_test_phases(phase_type, distance_mi, dc_energy_kwh)),
+        epa_fe_guide!epa_test_groups_fe_guide_row_id_fkey(
+          division, carline, carline_class, drive_desc, nominal_pack_kwh,
+          label_comb_range_mi, label_comb_mpge, model_year
+        )
+      `)
+      .not('fe_guide_row_id', 'is', null)
+      .order('test_group_id');
+    if (error) throw error;
+    return data || [];
+  }
+
   /** One staged guide row by id — the linked row, for showing what it holds. */
   async getFeGuideRow(id) {
     if (!this.useSupabase || id == null) return null;

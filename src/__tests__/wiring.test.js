@@ -48,7 +48,7 @@ describe('utilities built for the UI are reached by the UI', () => {
     const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js',
                      'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromGroup.js',
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
-                     'epaLinkSweep.js'];
+                     'epaLinkSweep.js', 'epaCertStats.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -98,6 +98,12 @@ describe('utilities built for the UI are reached by the UI', () => {
             'As above, consumed by tierOf and exported so the target-set check is testable without tiering.',
         'epaLinkSweep.tierOf':
             'Consumed inside the module by classifyGroup. Exported so the priority order is asserted directly rather than inferred from a sorted sweep.',
+        'epaCertStats.derivedUsableKwh':
+            'Consumed inside the module by certObservation. Exported so the precedence — a curator value first, then DC discharged on procedure 77 or 84, never 86 — is asserted directly rather than inferred from a ratio.',
+        'epaCertStats.certObservation':
+            'Consumed inside the module by certObservations, which the statistics view calls. Exported so one group\'s flattening — dimensions from the guide row, a fallback derivation dropped — is asserted without building a whole set.',
+        'epaCertStats.NOT_MEASURED_SOURCES':
+            'The source names that mean "not derived", consumed inside the module and asserted BY NAME against what epaDerivations actually returns — deriveDrivetrainEta says "estimated" where deriveChargerEfficiency says "assumed", and a single check for one of them published DEFAULT_ETA as a fleet measurement.',
         'epaLinkSweep.wheelMentions':
             'Called by the sweep view to distil a manufacturer note, and inside the module by coveredWheelSizes. Exported so the four real notations — inch, in, doubled quote, and Lucid\'s 20F21R pair — are pinned by name.',
         'epaLinkSweep.coveredModelMatches':

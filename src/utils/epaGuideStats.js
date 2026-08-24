@@ -121,6 +121,51 @@ export const MEASURES = [
 ];
 export const measureByKey = (key) => MEASURES.find(m => m.key === key) ?? null;
 
+/**
+ * Narrow a set of observations by year, class and drivetrain.
+ *
+ * ONE implementation for both datasets. Guide rows and certification
+ * observations are deliberately given the same three field names —
+ * `model_year`, `body_class`, `drive_group` — precisely so the filtering can be
+ * shared rather than written twice against the same names and left to drift the
+ * first time a fourth filter is added.
+ *
+ * `showClass` and `showDrive` reflect whether the control is on screen: a
+ * filter the reader cannot see must not narrow the data, or rows go missing
+ * with nothing to explain them.
+ */
+export function applyStatsFilters(observations, { years = [], classes = [], drives = [], showClass = true, showDrive = true } = {}) {
+    let out = observations;
+    if (years.length)              out = out.filter(o => years.includes(o.model_year));
+    if (showClass && classes.length) out = out.filter(o => classes.includes(o.body_class));
+    if (showDrive && drives.length)  out = out.filter(o => drives.includes(o.drive_group));
+    return out;
+}
+
+/**
+ * The model year with the most observations — the default, and NOT the newest.
+ *
+ * EPA files a model year over many months, so the newest is always thinnest.
+ * Computed from whichever dataset is being shown: the guide's best-covered year
+ * is not necessarily the certification records', and defaulting the
+ * certification tab to the guide's answer would land it on a thin year for no
+ * reason the reader could see.
+ */
+export function bestCoveredYear(observations) {
+    const counts = new Map();
+    for (const o of observations) {
+        if (!o.model_year) continue;
+        counts.set(o.model_year, (counts.get(o.model_year) ?? 0) + 1);
+    }
+    let best = null, bestN = -1;
+    for (const [y, n] of counts) if (n > bestN || (n === bestN && y > best)) { best = y; bestN = n; }
+    return best;
+}
+
+/** The years present in a set of observations, newest first. */
+export const yearsPresent = (observations) =>
+    [...new Set(observations.map(o => o.model_year).filter(Boolean))].sort((a, b) => b - a);
+
 // ── Descriptive statistics ───────────────────────────────────────────────────
 
 const num = (v) => {
@@ -210,7 +255,19 @@ export function toObservations(rows, unit = DEFAULT_UNIT) {
  * "n too small" is an answer.
  */
 export function summarise(rows, { unit = DEFAULT_UNIT, dimension, measure, minN = 3 } = {}) {
-    const observations = toObservations(rows, unit);
+    return bucketise(toObservations(rows, unit), { dimension, measure, minN });
+}
+
+/**
+ * Bucket already-flat observations. The half of `summarise` that does not care
+ * where an observation came from.
+ *
+ * Split out so the certification statistics can reuse it: those are one
+ * observation per test group and need no clustering, but every rule about
+ * buckets — suppress rather than drop, sink the suppressed, sort by median —
+ * should be the same in both places rather than written twice.
+ */
+export function bucketise(observations, { dimension, measure, minN = 3 } = {}) {
     const buckets = new Map();
     for (const o of observations) {
         const v = o[dimension];
@@ -248,7 +305,20 @@ export function overall(rows, { unit = DEFAULT_UNIT, measure } = {}) {
  * would spread it across several buckets and hide it.
  */
 export function histogram(rows, { unit = DEFAULT_UNIT, measure, bins = 20 } = {}) {
-    const values = toObservations(rows, unit).map(o => num(o[measure])).filter(v => v != null);
+    return histogramOf(toObservations(rows, unit), { measure, bins });
+}
+
+/**
+ * The same, over observations that are already one per thing.
+ *
+ * Certification records need this: they are one observation per test group and
+ * must not be clustered again. Passing them through `toObservations` keyed them
+ * by the guide's natural key, which a certification record does not have — so
+ * 44 groups collapsed to 39 and the histogram quietly disagreed with the table
+ * beside it.
+ */
+export function histogramOf(observations, { measure, bins = 20 } = {}) {
+    const values = observations.map(o => num(o[measure])).filter(v => v != null);
     if (!values.length) return { bins: [], n: 0 };
     const min = Math.min(...values), max = Math.max(...values);
     if (min === max) return { bins: [{ from: min, to: max, count: values.length }], n: values.length };
@@ -272,12 +342,17 @@ export function histogram(rows, { unit = DEFAULT_UNIT, measure, bins = 20 } = {}
  * about a specific vehicle, and a distribution alone never names one.
  */
 export function extremes(rows, { unit = DEFAULT_UNIT, measure, count = 5 } = {}) {
-    const observations = toObservations(rows, unit)
+    return extremesOf(toObservations(rows, unit), { measure, count });
+}
+
+/** As above, over observations that are already one per thing. */
+export function extremesOf(observations, { measure, count = 5 } = {}) {
+    const ranked = observations
         .filter(o => num(o[measure]) != null)
         .sort((a, b) => num(b[measure]) - num(a[measure]));
     return {
-        highest: observations.slice(0, count),
-        lowest:  observations.slice(-count).reverse(),
+        highest: ranked.slice(0, count),
+        lowest:  ranked.slice(-count).reverse(),
     };
 }
 

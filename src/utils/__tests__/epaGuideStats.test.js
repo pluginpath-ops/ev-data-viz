@@ -3,6 +3,7 @@ import { decorateRow } from '../feGuideBrowse';
 import {
     quantile, describe as summarize1, toObservations, summarise, overall,
     histogram, extremes, observationLabel, UNITS, DEFAULT_UNIT, MEASURES,
+    applyStatsFilters, bestCoveredYear, yearsPresent,
 } from '../epaGuideStats';
 
 /**
@@ -208,5 +209,52 @@ suite('identity without an id column', () => {
             bare({ make: 'B', carline: 'two', idx: '2', tg: null, mpge: 150 }),
         ];
         expect(toObservations(noTg, 'test_group')).toHaveLength(2);
+    });
+});
+
+suite('filters and defaults are shared, not duplicated', () => {
+    // Guide rows and certification observations are given the same three
+    // dimension field names on purpose, so one filter serves both. Written
+    // twice, the second copy drifts the first time a filter is added.
+    const obs = (o) => ({ model_year: o.y, body_class: o.c, drive_group: o.d, v: o.v });
+    const set = [
+        obs({ y: 2025, c: 'Small SUV', d: 'All Wheel Drive', v: 1 }),
+        obs({ y: 2025, c: 'Large Car', d: 'Rear Wheel Drive', v: 2 }),
+        obs({ y: 2024, c: 'Small SUV', d: 'All Wheel Drive', v: 3 }),
+        obs({ y: 2024, c: 'Small SUV', d: 'Rear Wheel Drive', v: 4 }),
+        // 2024 genuinely better-covered than 2025 — three against two — so the
+        // assertion below is about coverage and not about the tie-break.
+        obs({ y: 2024, c: 'Large Car', d: 'Rear Wheel Drive', v: 5 }),
+    ];
+
+    it('narrows by year, class and drive together', () => {
+        expect(applyStatsFilters(set, { years: [2024], classes: ['Small SUV'], drives: ['All Wheel Drive'] }))
+            .toHaveLength(1);
+    });
+    it('an empty filter narrows nothing', () => {
+        expect(applyStatsFilters(set, {})).toHaveLength(5);
+    });
+    it('does NOT apply a filter whose control is hidden', () => {
+        // A filter the reader cannot see must not remove rows, or they vanish
+        // with nothing on screen to explain it.
+        expect(applyStatsFilters(set, { classes: ['Small SUV'], showClass: false })).toHaveLength(5);
+        expect(applyStatsFilters(set, { drives: ['Rear Wheel Drive'], showDrive: false })).toHaveLength(5);
+    });
+
+    it('picks the best-covered year, not the newest', () => {
+        // EPA files a year over many months, so the newest is always thinnest.
+        expect(bestCoveredYear(set)).toBe(2024);
+    });
+    it('breaks a tie toward the newer year', () => {
+        expect(bestCoveredYear([obs({ y: 2025, v: 1 }), obs({ y: 2024, v: 2 })])).toBe(2025);
+    });
+    it('lists only the years actually present, newest first', () => {
+        // The certification records cover four years where the guide covers
+        // six; offering a year with no data is a filter that answers nothing.
+        expect(yearsPresent(set)).toEqual([2025, 2024]);
+    });
+    it('survives an empty set', () => {
+        expect(bestCoveredYear([])).toBeNull();
+        expect(yearsPresent([])).toEqual([]);
     });
 });
