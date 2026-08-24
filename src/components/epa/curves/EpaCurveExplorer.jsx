@@ -4,6 +4,7 @@ import { useTheme } from '../../../hooks/useTheme';
 import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
 import { buildEpaCurveFromModel } from '../../../utils/epaDerivations';
+import { DEFAULT_ETA } from '../../../constants/epa';
 import { curveSubjects, curveTooltipLines, disambiguateLabels } from '../../../utils/epaCurveSubjects';
 import { PALETTE } from '../../../utils/specHelpers';
 import { convSpeed, speedLabel } from '../../../utils/unitConversions';
@@ -235,14 +236,22 @@ export default function EpaCurveExplorer() {
 
             {assumedEta.length > 0 && (
                 <div className="guide-warning">
-                    <strong>⚠ {assumedEta.length} curve{assumedEta.length === 1 ? '' : 's'} rest
-                    {assumedEta.length === 1 ? 's' : ''} on an assumed drivetrain efficiency.</strong>{' '}
-                    {axis.label} is computed through η, and these records carry no test phases to
-                    back-solve it from, so the model default is used instead:{' '}
-                    <strong>{assumedEta.map(s => s.label).join(', ')}</strong>. Their road load is
-                    measured, so the SHAPE of each curve is real — but its height scales inversely
-                    with η, and a record whose true efficiency differs from the default is offset by
-                    that much at every speed. Marked ⚠ in the legend.
+                    {/* The affected records are NOT listed. The ⚠ in the legend
+                        already points at them, and repeating the names here
+                        turned a caveat into a paragraph nobody finishes. */}
+                    <strong>
+                        ⚠ {assumedEta.length} curve{assumedEta.length === 1 ? ' is' : 's are'} using
+                        an assumed drivetrain efficiency (η).
+                    </strong>
+                    <div className="mt-1">
+                        {axis.label} requires an η in addition to the EPA provided road load. These
+                        records currently do not have test data to estimate η from, so a universal
+                        estimate of {DEFAULT_ETA} is used instead.
+                    </div>
+                    <div className="mt-1">
+                        The SHAPE of each curve is real, but its magnitude scales with η.
+                        Estimated entries are marked ⚠ in the legend.
+                    </div>
                 </div>
             )}
 
