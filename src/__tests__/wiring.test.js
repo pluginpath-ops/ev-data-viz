@@ -98,6 +98,8 @@ describe('utilities built for the UI are reached by the UI', () => {
             'As above, consumed by tierOf and exported so the target-set check is testable without tiering.',
         'epaLinkSweep.tierOf':
             'Consumed inside the module by classifyGroup. Exported so the priority order is asserted directly rather than inferred from a sorted sweep.',
+        'epaCertStats.derivedUsableKwh':
+            'Consumed inside the module by certObservation. Exported so the precedence — a curator value first, then DC discharged on procedure 77 or 84, never 86 — is asserted directly rather than inferred from a ratio.',
         'epaCertStats.certObservation':
             'Consumed inside the module by certObservations, which the statistics view calls. Exported so one group\'s flattening — dimensions from the guide row, a fallback derivation dropped — is asserted without building a whole set.',
         'epaCertStats.NOT_MEASURED_SOURCES':
