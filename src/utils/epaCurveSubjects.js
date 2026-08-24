@@ -45,12 +45,15 @@ const num = (v) => {
  * borrowed number.
  */
 export const CURVE_TIERS = [
-    { key: 'measured', label: 'Measured energy',
-      hint: 'η derived from this record’s own test phases, and usable energy from the DC discharged to depletion. Range and consumption are both grounded in this vehicle’s lab numbers.' },
-    { key: 'nominal', label: 'Nominal energy',
-      hint: 'Measured road load, but η is the model default and the energy is the Fuel Economy Guide’s gross pack — voltage × amp-hours, a few percent above real usable capacity. The curve’s shape is measured; its range is an estimate.' },
-    { key: 'shape', label: 'Shape only',
-      hint: 'Road-load coefficients and nothing else. Consumption against speed is real; with no energy there is no range to plot.' },
+    { key: 'measured', label: 'Full test cycle',
+      tooltip: 'efficiency and capacity both come from this record’s own phases.',
+      hint: 'This record carries its own test phases, so η is back-solved from them and usable capacity is the DC actually discharged to depletion. Both halves of the energy model are measured.' },
+    { key: 'nominal', label: 'Published battery capacity',
+      tooltip: 'efficiency is the model default; capacity is the guide’s gross pack, a few percent above what is usable.',
+      hint: 'No test phases, so η falls back to the universal default. Capacity comes from the Fuel Economy Guide’s gross pack — voltage × amp-hours, which runs a few percent above real usable energy. Range is drawable but doubly approximate.' },
+    { key: 'shape', label: 'Road load only',
+      tooltip: 'same default efficiency as above, but no capacity at all, so these plot consumption and not range.',
+      hint: 'Coefficients and nothing else. η falls back to the default and there is no capacity at all, so consumption is drawable and range is not.' },
 ];
 export const tierByKey = (key) => CURVE_TIERS.find(t => t.key === key) ?? null;
 

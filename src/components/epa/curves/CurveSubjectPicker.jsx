@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { CURVE_TIERS, tierCounts } from '../../../utils/epaCurveSubjects';
+import InfoIcon from '../../InfoIcon';
 
 /**
  * Choose certification records to plot (#237).
@@ -46,7 +47,27 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
             </div>
 
             <div className="guide-facet">
-                <div className="guide-facet-label">How the energy was obtained</div>
+                <div className="guide-facet-label">
+                    Energy model basis
+                    {/* Two things vary across the tiers, not one, and a reader who
+                        misses that takes the middle chip for a better CONSUMPTION
+                        curve than the last. It isn't: consumption is road load and
+                        η, identical for both. Only capacity — and so range —
+                        separates them. Detail rather than a standing caption, so
+                        the control reads as a control. */}
+                    <InfoIcon position="below" tooltipClassName="info-icon-tooltip--on-panel">
+                        <div className="mb-1">
+                            Every curve’s shape is measured road load. What differs is the
+                            energy behind it.
+                        </div>
+                        {CURVE_TIERS.map(t => (
+                            <div key={t.key} className="curve-tier-legend">
+                                <span className="curve-tier-legend-name">{t.label}</span>
+                                {t.tooltip}
+                            </div>
+                        ))}
+                    </InfoIcon>
+                </div>
                 <div className="guide-facet-values">
                     {CURVE_TIERS.map(t => (
                         <button key={t.key} type="button"
@@ -57,9 +78,6 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                             <span className="guide-chip-count">{counts[t.key]}</span>
                         </button>
                     ))}
-                </div>
-                <div className="text-hint">
-                    Every curve’s shape is measured. What differs is the energy behind the range axis.
                 </div>
             </div>
 
@@ -83,8 +101,8 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                                 mixed set is plotted the tier is the only thing
                                 saying which curves carry a measured range. */}
                             <span className={`curve-tier-badge tier-${s.tier}`}>
-                                {s.tier === 'measured' ? 'measured'
-                                    : s.tier === 'nominal' ? 'nominal'
+                                {s.tier === 'measured' ? 'test cycle'
+                                    : s.tier === 'nominal' ? 'published pack'
                                         : 'no range'}
                             </span>
                         </label>

@@ -1349,6 +1349,26 @@ body {
     transform: translateY(-50%);
 }
 
+/* Tooltip that opens OVER a muted panel (e.g. a filter bar).
+
+   The default fill is --color-surface-sunken, which the dark palette sets to
+   the same value as --color-surface-muted — the filter bar's own background.
+   A tooltip filled with its backdrop reads as a hole in the panel, so lift it
+   to the card colour, which differs from muted in both themes. */
+.info-icon-tooltip--on-panel {
+    background-color: var(--color-card);
+}
+
+/* Tier gloss inside that tooltip: the chip's own label, then what it means. */
+.curve-tier-legend {
+    @apply mt-1;
+    color: var(--color-text-secondary);
+}
+.curve-tier-legend-name {
+    @apply font-medium mr-1;
+    color: var(--color-text-primary);
+}
+
 /* Width override for richer tooltip content (e.g. a reference table) */
 .info-icon-tooltip--wide {
     width: 460px;
