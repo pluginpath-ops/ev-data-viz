@@ -177,14 +177,12 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                 columnPicker={<GuideColumnPicker visible={columns} onChange={setColumns} />}
             />
 
-            <GuideComparePanel
-                rows={compareRows}
-                showAll={showAllCompare}
-                onToggleShowAll={() => setShowAllCompare(s => !s)}
-                onClear={() => setSelectedIds([])}
-                onRemove={toggleSelect}
-            />
-
+            {/* The table comes FIRST and the comparison grows beneath it.
+                Above, the panel appears on the first tick and resizes on every
+                one after — so the rows being clicked slide down the page
+                mid-click, and ticking a fourth car moves the third away from
+                the cursor. Below, the thing being interacted with stays put and
+                the panel changes size in space the reader is not aiming at. */}
             <GuideTable
                 rows={pageRows}
                 visibleColumns={columns}
@@ -197,6 +195,15 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                 vehicleLinks={vehicleLinks}
                 barMaxima={barMaxima}
             />
+
+            <GuideComparePanel
+                rows={compareRows}
+                showAll={showAllCompare}
+                onToggleShowAll={() => setShowAllCompare(s => !s)}
+                onClear={() => setSelectedIds([])}
+                onRemove={toggleSelect}
+            />
+
 
             {sorted.length > PAGE_SIZE && (
                 <div className="guide-pager">
