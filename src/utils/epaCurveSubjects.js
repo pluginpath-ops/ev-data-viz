@@ -123,3 +123,44 @@ export function tierCounts(subjects) {
     for (const s of subjects) out[s.tier] += 1;
     return out;
 }
+
+// ── Chart labelling ──────────────────────────────────────────────────────────
+
+/**
+ * The three lines of a curve tooltip.
+ *
+ * Name first (the colour swatch sits beside it), then each axis with its unit:
+ *
+ *     ■ Blazer EV AWD
+ *     60 mph
+ *     3.116 mi/kWh
+ *
+ * Chart.js's default puts the x value in the title and crams the series name
+ * and the y value onto one line, which read differently from the other charts
+ * here. Pure so the format is pinned by a test rather than by looking at a
+ * canvas, which nothing can read back.
+ */
+export function curveTooltipLines({ name, x, y, xUnit, yUnit, digits = 1 }) {
+    return [
+        name,
+        `${Math.round(x)} ${xUnit}`,
+        `${Number(y).toFixed(digits)} ${yUnit}`,
+    ];
+}
+
+/**
+ * Display names, disambiguated only where they collide.
+ *
+ * Two records can share a carline — the same car certified in consecutive
+ * years, or two configurations under one name — and a legend showing the same
+ * text twice cannot be read. The model year is appended only to the ones that
+ * clash, so the common case stays short.
+ */
+export function disambiguateLabels(subjects) {
+    const counts = new Map();
+    for (const s of subjects) counts.set(s.label, (counts.get(s.label) ?? 0) + 1);
+    return new Map(subjects.map(s => [
+        s.key,
+        counts.get(s.label) > 1 ? `${s.label} (${s.group?.model_year ?? '—'})` : s.label,
+    ]));
+}

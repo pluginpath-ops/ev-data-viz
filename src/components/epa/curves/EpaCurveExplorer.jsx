@@ -4,7 +4,7 @@ import { useTheme } from '../../../hooks/useTheme';
 import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
 import { buildEpaCurveFromModel } from '../../../utils/epaDerivations';
-import { curveSubjects } from '../../../utils/epaCurveSubjects';
+import { curveSubjects, curveTooltipLines, disambiguateLabels } from '../../../utils/epaCurveSubjects';
 import { PALETTE } from '../../../utils/specHelpers';
 import { convSpeed, speedLabel } from '../../../utils/unitConversions';
 import CurveSubjectPicker from './CurveSubjectPicker';
@@ -24,11 +24,19 @@ import LoadingSpinner from '../../LoadingSpinner';
  * vehicle-driven view. What differs is only what supplies the group and the
  * energy — which is the whole argument of the subject model.
  */
+/**
+ * `needsEnergy` decides whether a record without usable energy can appear at
+ * all. `etaSensitive` is a different question: consumption, efficiency and MPGe
+ * are all computed THROUGH the drivetrain efficiency, so a record whose η fell
+ * back to the model default carries that assumption into every point on those
+ * axes. Range is affected too, but its energy caveat is the larger one and is
+ * reported separately.
+ */
 const Y_AXES = [
-    { key: 'kwh100mi', label: 'Consumption', unit: 'kWh/100mi', needsEnergy: false },
-    { key: 'miPerKwh', label: 'Efficiency',  unit: 'mi/kWh',    needsEnergy: false },
-    { key: 'mpge',     label: 'MPGe',        unit: 'MPGe',      needsEnergy: false },
-    { key: 'rangeMi',  label: 'Range',       unit: 'mi',        needsEnergy: true },
+    { key: 'kwh100mi', label: 'Consumption', unit: 'kWh/100mi', digits: 1, needsEnergy: false, etaSensitive: true },
+    { key: 'miPerKwh', label: 'Efficiency',  unit: 'mi/kWh',    digits: 3, needsEnergy: false, etaSensitive: true },
+    { key: 'mpge',     label: 'MPGe',        unit: 'MPGe',      digits: 1, needsEnergy: false, etaSensitive: true },
+    { key: 'rangeMi',  label: 'Range',       unit: 'mi',        digits: 0, needsEnergy: true,  etaSensitive: false },
 ];
 
 export default function EpaCurveExplorer() {
@@ -61,6 +69,11 @@ export default function EpaCurveExplorer() {
 
     // A record with no energy has no range, and saying so beats drawing a gap.
     const withoutRange = axis.needsEnergy ? plotted.filter(s => !s.canPlotRange) : [];
+    // A different caveat, on the other axes: the curve is drawn, and every
+    // point on it rests on an assumed η.
+    const assumedEta = axis.etaSensitive ? plotted.filter(s => !s.etaMeasured) : [];
+
+    const displayNames = useMemo(() => disambiguateLabels(plotted), [plotted]);
 
     useEffect(() => {
         const p = new URLSearchParams(window.location.search);
@@ -79,7 +92,11 @@ export default function EpaCurveExplorer() {
         const datasets = plotted.map((s, i) => {
             const curve = buildEpaCurveFromModel(s.group, s.useableKwh ?? 0);
             return {
-                label: s.label,
+                label: displayNames.get(s.key) ?? s.label,
+                // Read by the legend to mark a curve the current axis qualifies.
+                // Kept off the label itself so the tooltip's first line stays
+                // the name and nothing else.
+                _flagged: axis.etaSensitive && !s.etaMeasured,
                 data: curve
                     .filter(pt => pt[yAxis] != null)
                     .map(pt => ({ x: convSpeed(pt.mph, units), y: pt[yAxis] })),
@@ -117,11 +134,45 @@ export default function EpaCurveExplorer() {
                         grid: { color: grid }, ticks: { color: text },
                     },
                 },
-                plugins: { legend: { labels: { color: text, boxHeight: 2 } } },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: text,
+                            boxHeight: 2,
+                            // ⚠ on the curves the current axis qualifies, so a
+                            // mixed plot says which lines rest on an assumption
+                            // without the reader consulting the picker.
+                            generateLabels(chart) {
+                                const base = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                                return base.map(item => {
+                                    const ds = chart.data.datasets[item.datasetIndex];
+                                    return ds?._flagged ? { ...item, text: `⚠ ${item.text}` } : item;
+                                });
+                            },
+                        },
+                    },
+                    tooltip: {
+                        // Three lines: the name with its colour, then each axis
+                        // with its unit. The default put the x value in the
+                        // title and crammed name and y value onto one line,
+                        // which read differently from every other chart here.
+                        callbacks: {
+                            title: () => '',
+                            label: (ctx) => curveTooltipLines({
+                                name: ctx.dataset.label, x: ctx.parsed.x, y: ctx.parsed.y,
+                                xUnit: speedLabel(units), yUnit: axis.unit, digits: axis.digits,
+                            })[0],
+                            afterLabel: (ctx) => curveTooltipLines({
+                                name: ctx.dataset.label, x: ctx.parsed.x, y: ctx.parsed.y,
+                                xUnit: speedLabel(units), yUnit: axis.unit, digits: axis.digits,
+                            }).slice(1),
+                        },
+                    },
+                },
             },
         });
         return () => chartRef.current?.destroy();
-    }, [plotted, yAxis, axis, units, isDark]);
+    }, [plotted, yAxis, axis, units, isDark, displayNames]);
 
     if (loading) return <LoadingSpinner />;
     if (error) return <div className="empty-state">Certification records could not be loaded.</div>;
@@ -161,20 +212,37 @@ export default function EpaCurveExplorer() {
                 </div>
             </div>
 
+            {/* Two different caveats, and they belong to different axes.
+                Missing energy REMOVES a curve from the range axis; an assumed η
+                leaves the curve drawn and makes every point on it an estimate.
+                Reporting them the same way would flatten that difference. */}
             {withoutRange.length > 0 && (
                 <div className="guide-warning">
                     {withoutRange.length === 1 ? (
                         <>
                             One selected record has no usable energy, so it is absent from the range axis:
-                            {' '}{withoutRange[0].label}. Its consumption curve is unaffected.
+                            {' '}<strong>{withoutRange[0].label}</strong>. Its consumption curve is unaffected.
                         </>
                     ) : (
                         <>
                             {withoutRange.length} selected records have no usable energy, so they are absent
-                            from the range axis: {withoutRange.map(s => s.label).join(', ')}. Their
-                            consumption curves are unaffected.
+                            from the range axis: <strong>{withoutRange.map(s => s.label).join(', ')}</strong>.
+                            Their consumption curves are unaffected.
                         </>
                     )}
+                </div>
+            )}
+
+            {assumedEta.length > 0 && (
+                <div className="guide-warning">
+                    <strong>⚠ {assumedEta.length} curve{assumedEta.length === 1 ? '' : 's'} rest
+                    {assumedEta.length === 1 ? 's' : ''} on an assumed drivetrain efficiency.</strong>{' '}
+                    {axis.label} is computed through η, and these records carry no test phases to
+                    back-solve it from, so the model default is used instead:{' '}
+                    <strong>{assumedEta.map(s => s.label).join(', ')}</strong>. Their road load is
+                    measured, so the SHAPE of each curve is real — but its height scales inversely
+                    with η, and a record whose true efficiency differs from the default is offset by
+                    that much at every speed. Marked ⚠ in the legend.
                 </div>
             )}
 
