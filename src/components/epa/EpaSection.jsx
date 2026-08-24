@@ -34,7 +34,7 @@ export const EPA_SUBTABS = [
     { id: 'browse',    label: 'Browse' },
     { id: 'labelstats', label: 'Label Statistics' },
     { id: 'certstats',  label: 'Certification Statistics' },
-    { id: 'curves',     label: 'Certification Curves' },
+    { id: 'curves',     label: 'Speed-Consumption Curves' },
 ];
 export const EPA_SUBTAB_IDS = EPA_SUBTABS.map(t => t.id);
 export const DEFAULT_EPA_SUBTAB = 'browse';

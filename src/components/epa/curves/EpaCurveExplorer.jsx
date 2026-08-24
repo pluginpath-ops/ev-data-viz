@@ -9,6 +9,8 @@ import { curveSubjects, curveTooltipLines, disambiguateLabels } from '../../../u
 import { PALETTE } from '../../../utils/specHelpers';
 import { convSpeed, speedLabel } from '../../../utils/unitConversions';
 import CurveSubjectPicker from './CurveSubjectPicker';
+import ViewingConditions, { useViewingConditions } from '../ViewingConditions';
+import CollapsibleSection from '../../CollapsibleSection';
 import LoadingSpinner from '../../LoadingSpinner';
 
 /**
@@ -59,6 +61,15 @@ export default function EpaCurveExplorer() {
     const [selected, setSelected] = useState(initial.selected);
     const [yAxis, setYAxis] = useState(initial.yAxis);
 
+    // The same controls the vehicle-driven curves use, from the same module —
+    // two views computing air density slightly differently would be invisible
+    // until someone compared one car in both.
+    const conditions = useViewingConditions();
+    const {
+        densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum,
+        gradeGainFtNum, gradeDistanceMilesNum,
+    } = conditions.derived;
+
     const subjects = useMemo(() => curveSubjects(groups ?? []), [groups]);
     const byKey = useMemo(() => new Map(subjects.map(s => [s.key, s])), [subjects]);
     const plotted = useMemo(
@@ -91,7 +102,10 @@ export default function EpaCurveExplorer() {
         if (!plotted.length) return;
 
         const datasets = plotted.map((s, i) => {
-            const curve = buildEpaCurveFromModel(s.group, s.useableKwh ?? 0);
+            const curve = buildEpaCurveFromModel(
+                s.group, s.useableKwh ?? 0, densityRatio, accessoryOverrideWNum,
+                windSpeedMphNum, windDirectionDegNum, gradeGainFtNum, gradeDistanceMilesNum,
+            );
             return {
                 label: displayNames.get(s.key) ?? s.label,
                 // Read by the legend to mark a curve the current axis qualifies.
@@ -173,7 +187,9 @@ export default function EpaCurveExplorer() {
             },
         });
         return () => chartRef.current?.destroy();
-    }, [plotted, yAxis, axis, units, isDark, displayNames]);
+    }, [plotted, yAxis, axis, units, isDark, displayNames,
+        densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum,
+        gradeGainFtNum, gradeDistanceMilesNum]);
 
     if (loading) return <LoadingSpinner />;
     if (error) return <div className="empty-state">Certification records could not be loaded.</div>;
@@ -182,7 +198,7 @@ export default function EpaCurveExplorer() {
         <div className="stats-view">
             <div className="section-header">
                 <div>
-                    <div className="section-title">Certification curves</div>
+                    <div className="section-title">Speed-consumption curves</div>
                     <div className="text-caption text-secondary">
                         Efficiency against steady speed, computed from each record’s own road-load
                         coefficients. {subjects.length} records can be plotted — most belong to no
@@ -198,6 +214,21 @@ export default function EpaCurveExplorer() {
                     prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])}
                 onClear={() => setSelected([])}
             />
+
+            {/* Between the search and the graph, collapsed by default: these
+                scale the curve at plot time and are almost always left alone,
+                but a reader who has set one needs to see that from the header
+                without opening it. */}
+            <CollapsibleSection
+                title="Viewing conditions"
+                subtitle={conditions.anyAdjusted
+                    ? 'adjusted — the curves below are not at standard conditions'
+                    : 'standard conditions'}
+            >
+                <div className="chart-controls-row">
+                    <ViewingConditions conditions={conditions} />
+                </div>
+            </CollapsibleSection>
 
             <div className="guide-facet">
                 <div className="guide-facet-label">Y axis</div>
