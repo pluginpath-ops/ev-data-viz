@@ -91,6 +91,28 @@ function preferredMctTest(tests) {
     })[0];
 }
 
+/**
+ * Which stated ranges a check should compare against, and where they came from.
+ *
+ * Per-test when the row has them — that is the same test the phases came from,
+ * so the comparison is like with like. Group-level otherwise, which is what
+ * every caller did before migration 060 and is still right for a group holding
+ * one test.
+ */
+function statedRangesFor(test, group) {
+    const cityMi = num(test?.cd_range_combined_calc);
+    const hwyMi  = num(test?.cd_range_hwy_calc);
+    if (cityMi != null || hwyMi != null) {
+        return { cityMi, hwyMi, source: 'test', testNumber: test?.test_number ?? null };
+    }
+    return {
+        cityMi: num(group?.cd_range_combined_calc),
+        hwyMi:  num(group?.cd_range_hwy_calc),
+        source: 'group',
+        testNumber: null,
+    };
+}
+
 const sctTestsOf = (tests) => tests.filter(t => {
     const code = num(t.procedure_code);
     return code === PROC_CD_HWY || code === PROC_CD_UDDS;
@@ -139,7 +161,8 @@ function phasesFor(test) {
  * @returns {{ record: Object|null, reason: string|null, inferredPhaseTypes: number }}
  */
 export function epaRecordFromGroup(group, meta = {}) {
-    const fail = (reason) => ({ record: null, reason, inferredPhaseTypes: 0, competingMctTests: 0 });
+    const fail = (reason) => ({ record: null, reason, inferredPhaseTypes: 0,
+        competingMctTests: 0, derivedFrom: null, statedRanges: null });
 
     if (!group) return fail('no-group');
     const tests = group.epa_tests ?? [];
@@ -192,22 +215,37 @@ export function epaRecordFromGroup(group, meta = {}) {
             derivedFrom: mct.test_number
                 ? { testNumber: mct.test_number, testDate: mct.test_date ?? null }
                 : null,
+            // The ranges to check the recomputed ones against, belonging to the
+            // test the phases above came from (#227).
+            //
+            // Callers used to read these off the GROUP, where they are set at
+            // import from the first procedure-77 test. The derivation uses the
+            // most RECENT, so on a group holding two the check compared one
+            // test's phases against the other test's stated figures and called
+            // the difference a fault. Mercedes' CLA 350 holds two a month
+            // apart: 461.373/450.544 and 475.482/460.354.
+            //
+            // Falling back to the group keeps every record imported before
+            // migration 060 behaving exactly as it did, and `source` says which
+            // happened so nothing has to infer it from a null.
+            statedRanges: statedRangesFor(mct, group),
         };
     }
 
     const sct = sctTestsOf(tests);
     if (!sct.length) return fail('no-tests');
 
-    // ⚠ The range columns are on the GROUP, not the test, and their names lie.
-    // `cd_range_combined_calc` is the CITY range on an SCT record — the epic
-    // calls this out as the single most dangerous column in the schema, because
-    // assigning it to the wrong cycle produces two plausible wrong ranges rather
-    // than an error. Highway has its own column and is unambiguous.
+    // The group's range columns are ambiguous on an SCT record and the epic
+    // called them the single most dangerous pair in the schema: assigning one to
+    // the wrong cycle produces two plausible wrong ranges rather than an error.
+    //
+    // Migration 060 removes the ambiguity where it can. A single-cycle test
+    // states the range for the cycle IT drove, so procedure 81 carries the UDDS
+    // range and 84 the highway one, each on its own row — BMW's i7 reads 409.29
+    // and 445.14. Read per test first; the group columns stay as the fallback
+    // for rows imported before that, where the old assignment still applies.
     const cityMi = num(group.cd_range_combined_calc);
     const hwyMi  = num(group.cd_range_hwy_calc);
-    if (!(cityMi > 0) || !(hwyMi > 0)) return fail('sct-no-ranges');
-
-    const rangeFor = (code) => (code === PROC_CD_HWY ? hwyMi : cityMi);
 
     const runs = sct
         .map(t => {
@@ -216,11 +254,18 @@ export function epaRecordFromGroup(group, meta = {}) {
                 cycle: code === PROC_CD_HWY ? 'HWFET' : 'UDDS',
                 procedureCode: code,
                 rechargeWh: kwhToWh(t.ac_recharge_kwh),
-                rangeMi: rangeFor(code),
+                // This test's own figure when it has one; otherwise the group's,
+                // split by procedure exactly as before.
+                rangeMi: num(t.cd_range_combined_calc)
+                    ?? (code === PROC_CD_HWY ? hwyMi : cityMi),
+                testNumber: t.test_number ?? null,
             };
         })
         .filter(r => r.rechargeWh > 0 && r.rangeMi > 0);
 
+    // Said as "no ranges" only when that is what happened. A record whose runs
+    // are missing their recharge energy is a different fault and reads as one.
+    if (!runs.length) return fail('sct-no-ranges');
     if (runs.length < 2) return fail('missing-cycle');
 
     return {
@@ -236,5 +281,9 @@ export function epaRecordFromGroup(group, meta = {}) {
         reason: null,
         inferredPhaseTypes: 0,
         competingMctTests: 0,
+        derivedFrom: null,
+        // An SCT record is checked run by run against each run's own range, so
+        // there is no single pair to compare a recomputed total against.
+        statedRanges: null,
     };
 }

@@ -195,7 +195,7 @@ class DataService {
     // migration lands, and every other vehicle still renders.
     const { data, error } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
       .order('created_at', { ascending: false });
 
     // Never swallow this. Destructuring only `data` made a failed query look
@@ -2170,6 +2170,7 @@ class DataService {
                              set_a, set_b, set_c, equiv_test_weight_lbs),
         epa_tests(test_number, test_date, procedure_code,
                   total_dc_energy_kwh, ac_recharge_kwh,
+                  cd_range_combined_calc, cd_range_hwy_calc,
                   epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh)),
         epa_vehicle_mappings(id, confidence, vehicles(id, name, year))
       `)
