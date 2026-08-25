@@ -25,6 +25,9 @@ export const KNOB_GROUPS = [
             { key: 'ASSUMED_CHARGER_EFF', label: 'Assumed charger efficiency', kind: 'number',
               min: 0.50, max: 1.00, step: 0.01, unit: '',
               help: 'AC→DC charging efficiency when measured AC recharge energy is unavailable.' },
+            { key: 'HWFET_TO_SS_ETA_RATIO', label: 'HWFET → steady-state η ratio', kind: 'number',
+              min: 1.00, max: 1.50, step: 0.0001, unit: '',
+              help: 'How much higher a steady-state η runs than the HWFET one on the same vehicle — the fleet median across every group carrying both. For correcting a record with no constant-speed phase, where the alternative is being systematically 11% low. Flat rather than per-vehicle on purpose: correcting by each car’s own aerodynamics makes the spread worse, because the ratio is tight precisely because the aerodynamics cancel.' },
         ],
     },
     {

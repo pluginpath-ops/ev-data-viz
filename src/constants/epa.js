@@ -174,6 +174,32 @@ export const EPA_DEFAULTS = {
     // agree to rounding; anything larger means a phase is missing or mistyped.
     PHASE_SUM_TOLERANCE_PCT: 1,
 
+    // How much higher a steady-state η runs than the HWFET one on the same
+    // vehicle, for correcting a record that has no constant-speed phase.
+    //
+    // MEASURED, not chosen: the fleet median of ss_eta / eta across 210
+    // certification groups that carry both. IQR 1.1162-1.1449, so half the
+    // fleet sits within 2.5% of this and the full observed range is
+    // 1.0647-1.2830.
+    //
+    // Worth knowing what it is worth. Applying it to a group with no
+    // constant-speed phase lands within a few percent for the middle of the
+    // fleet and 13.7% out at the extreme — against a guaranteed 11.4% low, in
+    // one direction, for every such vehicle if it is not applied at all.
+    //
+    // A FLAT factor, deliberately. The ratio decomposes into a road-load shape
+    // term computable from the coefficients and a remainder, and the obvious
+    // improvement — correct each vehicle by its own aerodynamics — makes it
+    // WORSE: the remainder scatters at 5.3% against the raw ratio's 2.5%,
+    // because the two halves encode the same aerodynamics and cancel. The ratio
+    // is tight precisely because that cancellation happens.
+    //
+    // Make medians run 1.081 to 1.173, so a class or make refinement is
+    // available later. Two badges of one car agree to 0.3% — Toyota 1.0844
+    // against Subaru 1.0811, the bZ4X and Solterra — which is the best
+    // repeatability check the corpus offers.
+    HWFET_TO_SS_ETA_RATIO: 1.1281,
+
     // The speed the multi-cycle constant-speed section is driven at.
     //
     // SPECIFIED, not assumed. J1634 sets the constant-speed section at 65 mph,
@@ -213,6 +239,8 @@ export const CURVE_SPEED_RANGE = resolve('CURVE_SPEED_RANGE', EPA_DEFAULTS.CURVE
 export const PACK_KWH_BAND     = resolve('PACK_KWH_BAND',     EPA_DEFAULTS.PACK_KWH_BAND);
 export const PHASE_SUM_TOLERANCE_PCT =
     resolve('PHASE_SUM_TOLERANCE_PCT', EPA_DEFAULTS.PHASE_SUM_TOLERANCE_PCT);
+export const HWFET_TO_SS_ETA_RATIO =
+    resolve('HWFET_TO_SS_ETA_RATIO', EPA_DEFAULTS.HWFET_TO_SS_ETA_RATIO);
 export const SS_CYCLE_SPEED_MPH =
     resolve('SS_CYCLE_SPEED_MPH', EPA_DEFAULTS.SS_CYCLE_SPEED_MPH);
 

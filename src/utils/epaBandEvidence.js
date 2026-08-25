@@ -40,6 +40,13 @@ export const BAND_EVIDENCE = {
     ETA_BAND:         { measure: 'eta',         label: 'Drivetrain η' },
     CHARGER_EFF_BAND: { measure: 'charger_eff', label: 'Charger efficiency' },
     PACK_KWH_BAND:    { measure: 'usable_kwh',  label: 'Usable energy' },
+    // Not a band but a single value, and the case for showing evidence is
+    // STRONGER here. A band is a curation judgement informed by data — how much
+    // of a tail to call suspect. This is a measurement, the fleet median of a
+    // measure, and it should read as one rather than as a literal someone
+    // chose. It is also the value most likely to go stale: it was derived from
+    // 210 groups and the next import changes that.
+    HWFET_TO_SS_ETA_RATIO: { measure: 'ss_eta_ratio', label: 'steady-state ÷ HWFET η' },
 };
 
 /**
@@ -52,6 +59,13 @@ export const BAND_EVIDENCE = {
  * bare median does not.
  */
 export const BAND_EVIDENCE_MIN_N = 20;
+
+/**
+ * How far a scalar knob may sit from the corpus median and still read as being
+ * on it. Half a percent — tight enough that drift shows, loose enough that
+ * rounding a median to four places does not read as disagreement.
+ */
+export const SCALAR_ON_MEDIAN = 0.005;
 
 export function bandEvidence(observations, bandKey) {
     const spec = BAND_EVIDENCE[bandKey];
@@ -99,7 +113,30 @@ export function bandEvidence(observations, bandKey) {
  *   'fits'   the band contains the p5-p95 body and clips the tails
  */
 export function bandVerdict(band, evidence) {
-    if (!evidence?.enough || !Array.isArray(band) || band.length !== 2) return null;
+    if (!evidence?.enough) return null;
+
+    // A scalar knob asks a different question. A band asks "does this bound cut
+    // into real records"; a single measured value asks "is this still what the
+    // corpus says" — which is the question worth re-reading as the corpus
+    // grows, and the reason a measured default is a knob rather than a literal.
+    if (!Array.isArray(band)) {
+        // `Number(null)` and `Number('')` are both 0, and 0 is finite — so the
+        // naive check judged "no value set" as a value, and reported a knob
+        // nobody had configured as having drifted from the corpus. Same trap
+        // the `num` helper above exists for.
+        if (band == null || band === '') return null;
+        const v = Number(band);
+        if (!Number.isFinite(v)) return null;
+        if (v < evidence.p5 || v > evidence.p95) {
+            return { key: 'tight', text: 'outside the p5–p95 body — the corpus has moved away from this' };
+        }
+        const off = Math.abs(v - evidence.median) / evidence.median;
+        return off <= SCALAR_ON_MEDIAN
+            ? { key: 'fits', text: 'on the corpus median' }
+            : { key: 'loose', text: `inside the body, ${(off * 100).toFixed(1)}% off the median` };
+    }
+
+    if (band.length !== 2) return null;
     const [lo, hi] = band;
 
     const excludes = evidence.p5 < lo || evidence.p95 > hi;

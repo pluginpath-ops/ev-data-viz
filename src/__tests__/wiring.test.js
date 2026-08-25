@@ -112,6 +112,8 @@ describe('utilities built for the UI are reached by the UI', () => {
             'Consumed inside the module by certObservations, which the statistics view calls. Exported so one group\'s flattening — dimensions from the guide row, a fallback derivation dropped — is asserted without building a whole set.',
         'epaBandEvidence.BAND_EVIDENCE':
             'The band-to-measure mapping. Consumed inside the module by bandEvidence and allBandEvidence, and exported so a test can assert every band points at a measure that exists — a band shown against the wrong distribution is worse than none, because it looks like evidence.',
+        'epaBandEvidence.SCALAR_ON_MEDIAN':
+            'How close a scalar knob must sit to the corpus median to read as being on it. Consumed inside the module by bandVerdict and asserted by name, so a measured default rounded for the constants file does not read as disagreement with the value it came from.',
         'epaBandEvidence.bandEvidence':
             'Consumed inside the module by allBandEvidence, which the knob panel calls. Exported so one band\'s summary — and its refusal to describe a handful of records — is assertable without building the whole set.',
         'epaBandEvidence.BAND_EVIDENCE_MIN_N':
