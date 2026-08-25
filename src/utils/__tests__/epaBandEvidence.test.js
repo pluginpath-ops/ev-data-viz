@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     bandEvidence, bandVerdict, allBandEvidence, BAND_EVIDENCE, BAND_EVIDENCE_MIN_N,
+    SCALAR_ON_MEDIAN,
 } from '../epaBandEvidence';
 
 /**
@@ -108,5 +109,62 @@ describe('allBandEvidence', () => {
         for (const e of Object.values(allBandEvidence([], null))) {
             expect(e.enough).toBe(false);
         }
+    });
+});
+
+describe('a scalar knob asks a different question of the corpus', () => {
+    /**
+     * HWFET_TO_SS_ETA_RATIO is not a bound, it is a MEASUREMENT — the fleet
+     * median of ss_eta_ratio. A band asks "does this cut into real records";
+     * this asks "is this still what the corpus says", which is the question
+     * that goes stale as the corpus grows.
+     */
+    const ratios = (n, lo, hi) => Array.from({ length: n }, (_, i) =>
+        ({ ss_eta_ratio: lo + ((hi - lo) * i) / (n - 1) }));
+    const e = bandEvidence(ratios(101, 1.05, 1.25), 'HWFET_TO_SS_ETA_RATIO');
+
+    it('summarises the ratio like any other measure', () => {
+        expect(e.enough).toBe(true);
+        expect(e.median).toBeCloseTo(1.15, 3);
+    });
+
+    it('says so when the value is the corpus median', () => {
+        expect(bandVerdict(1.15, e).key).toBe('fits');
+        expect(bandVerdict(1.15, e).text).toContain('median');
+    });
+
+    it('says how far off it is when it drifts but stays in the body', () => {
+        const v = bandVerdict(1.19, e);
+        expect(v.key).toBe('loose');
+        expect(v.text).toMatch(/off the median/);
+    });
+
+    it('warns when the corpus has moved away from it entirely', () => {
+        // The failure that matters for a measured default: it was right once.
+        expect(bandVerdict(1.30, e).key).toBe('tight');
+        expect(bandVerdict(1.01, e).key).toBe('tight');
+    });
+
+    it('tolerates a median rounded for the constants file', () => {
+        // The default is written to four places; that must not read as
+        // disagreement with the value it came from.
+        expect(bandVerdict(1.15 * (1 + SCALAR_ON_MEDIAN * 0.9), e).key).toBe('fits');
+    });
+
+    it('still judges a range knob as a range', () => {
+        // One function, two shapes. A regression here would silently swap
+        // which question every band is answering.
+        const etaEvidence = bandEvidence(
+            Array.from({ length: 101 }, (_, i) => ({ eta: 0.80 + (0.10 * i) / 100 })),
+            'ETA_BAND',
+        );
+        expect(bandVerdict([0.84, 0.86], etaEvidence).key).toBe('tight');
+        expect(bandVerdict([0.1, 0.99], etaEvidence).key).toBe('loose');
+    });
+
+    it('declines a value that is not a number', () => {
+        expect(bandVerdict(null, e)).toBeNull();
+        expect(bandVerdict('1.13', e)).not.toBeNull();   // numeric strings are fine
+        expect(bandVerdict('nope', e)).toBeNull();
     });
 });
