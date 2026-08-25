@@ -5,6 +5,7 @@ import {
 } from '../epaCertStats';
 import { deriveDrivetrainEta, deriveChargerEfficiency } from '../epaDerivations';
 
+
 const group = (o = {}) => ({
     test_group_id: o.id ?? 'TG1',
     model_year: o.year ?? 2025,
@@ -115,5 +116,103 @@ describe('measures', () => {
     });
     it('every measure resolves', () => {
         CERT_MEASURES.forEach(m => expect(certMeasureByKey(m.key)).not.toBeNull());
+    });
+});
+
+describe('the steady-state η measure, and the ratio that decides a correction', () => {
+    /**
+     * Mercedes' MY2027 CLA 350 — a multi-cycle record with both highway and
+     * constant-speed phases, so it carries both η values and therefore a ratio.
+     */
+    const MCT_COEFFS = [{ is_primary: true, target_a: 40.69, target_b: 0.0723,
+        target_c: 0.01437, equiv_test_weight_lbs: 5000 }];
+    const mct = () => group({
+        coeffs: MCT_COEFFS,
+        tests: [{
+            test_number: 'TMBX10091675', procedure_code: 77,
+            total_dc_energy_kwh: 90.038, ac_recharge_kwh: 100.556,
+            epa_test_phases: [
+                { phase_type: 'HWY', distance_mi: 10.2743406, dc_energy_kwh: 2.0807097 },
+                { phase_type: 'HWY', distance_mi: 10.2624932, dc_energy_kwh: 2.0233391 },
+                { phase_type: 'SS',  distance_mi: 281.313556, dc_energy_kwh: 66.0184098 },
+                { phase_type: 'SS',  distance_mi: 59.723748,  dc_energy_kwh: 13.8985443 },
+            ],
+        }],
+    });
+
+    /** BMW's i7 — procedures 81 and 84, so no constant-speed phase exists. */
+    const sct = () => group({
+        coeffs: MCT_COEFFS,
+        tests: [{
+            test_number: 'RBMX10080458', procedure_code: 84,
+            total_dc_energy_kwh: 106.227, ac_recharge_kwh: 119.873,
+            epa_test_phases: [{ phase_type: 'HWY', distance_mi: 10.25, dc_energy_kwh: 2.446 }],
+        }],
+    });
+
+    it('reports a steady-state η where the phases support one', () => {
+        const o = certObservation(mct(), undefined);
+        expect(o.ss_eta).toBeGreaterThan(0.85);
+        expect(o.eta).toBeGreaterThan(0);
+    });
+
+    it('reports null where the test has no constant-speed phase', () => {
+        // The coverage question, and the reason a steady-state basis cannot
+        // simply replace the HWFET one.
+        const o = certObservation(sct(), undefined);
+        expect(o.ss_eta).toBeNull();
+        expect(o.eta).toBeGreaterThan(0);
+    });
+
+    it('reports the ratio PER GROUP, not as two medians', () => {
+        // Two separate distributions can each look tight while the per-vehicle
+        // ratio scatters, and it is the scatter that decides whether one
+        // correction factor could stand in for a missing measurement.
+        const o = certObservation(mct(), undefined);
+        expect(o.ss_eta_ratio).toBeCloseTo(o.ss_eta / o.eta, 10);
+        expect(o.ss_eta_ratio).toBeGreaterThan(1);
+    });
+
+    it('has no ratio without both halves', () => {
+        expect(certObservation(sct(), undefined).ss_eta_ratio).toBeNull();
+    });
+
+    it('refuses a ratio against an ASSUMED HWFET η', () => {
+        // A group with no highway phase falls back to DEFAULT_ETA. Dividing by
+        // a constant would manufacture a ratio that describes the constant.
+        const noHwy = group({
+            coeffs: MCT_COEFFS,
+            tests: [{
+                procedure_code: 77, total_dc_energy_kwh: 90, ac_recharge_kwh: 100,
+                epa_test_phases: [{ phase_type: 'SS', distance_mi: 281.3, dc_energy_kwh: 66.0 }],
+            }],
+        });
+        const o = certObservation(noHwy, undefined);
+        expect(o.eta).toBeNull();
+        expect(o.ss_eta).not.toBeNull();
+        expect(o.ss_eta_ratio).toBeNull();
+    });
+
+    it('counts coverage of the steady-state measure across a mixed corpus', () => {
+        // This is the number that decides whether the graph-side toggle is
+        // worth building at all.
+        const obs = certObservations([mct(), sct(), sct()], undefined);
+        // toMatchObject, not toEqual: coverageFor also splits the shortfall
+        // into `assumed` and `missing`, and this test is about the count.
+        expect(coverageFor(obs, 'ss_eta')).toMatchObject({ usable: 1, total: 3 });
+        expect(coverageFor(obs, 'eta').usable).toBe(3);
+
+        // And the shortfall is `missing`, not `assumed` — a group with no
+        // constant-speed phase has no steady-state figure at all, rather than
+        // one that fell back to a constant.
+        expect(coverageFor(obs, 'ss_eta').missing).toBe(2);
+    });
+
+    it('declares both measures, so the view can offer them', () => {
+        for (const key of ['ss_eta', 'ss_eta_ratio']) {
+            const m = certMeasureByKey(key);
+            expect(m, `${key} must be declared in CERT_MEASURES`).toBeTruthy();
+            expect(m.hint).toBeTruthy();
+        }
     });
 });

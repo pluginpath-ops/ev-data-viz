@@ -25,7 +25,8 @@
  */
 import {
     resolvePrimaryCoeffs, pickDerivationTest,
-    deriveDrivetrainEta, deriveChargerEfficiency, deriveEffectiveAdjustmentFactor,
+    deriveDrivetrainEta, deriveSteadyStateEta, deriveChargerEfficiency,
+    deriveEffectiveAdjustmentFactor,
 } from './epaDerivations';
 import { PROC_MCT, PROC_CD_HWY } from '../constants/epa';
 import { bodyClassLabel, driveGroup, resolveBrand } from './feGuideBrowse';
@@ -59,6 +60,11 @@ const num = (v) => {
 export const NOT_MEASURED_SOURCES = {
     eta: ['estimated'],
     charger_eff: ['assumed'],
+    // deriveSteadyStateEta has no fallback at all — it returns a null value and
+    // a null source when it cannot compute, rather than a constant. Listed
+    // anyway so the vocabulary is complete and a future fallback cannot be
+    // added without this file noticing.
+    ss_eta: [],
 };
 
 /**
@@ -83,6 +89,10 @@ export const CERT_MEASURES = [
       hint: 'Total DC energy discharged to depletion on the derivation test — the pack\'s measured usable capacity.' },
     { key: 'usable_fraction', label: 'Usable ÷ gross pack', unit: '', axisLabel: 'fraction', digits: 3,
       hint: 'Measured usable energy against the guide\'s gross pack figure. Migration 053 cited 0.939–0.955 from four packs by hand; this is the same quantity across every linked group. Ratios above 1 are dropped — a pack cannot deliver more than it holds, so the two sources disagree and the gross figure is the softer of them.' },
+    { key: 'ss_eta', label: 'Drivetrain efficiency (η, steady state)', unit: '', axisLabel: 'η', digits: 3,
+      hint: 'Back-solved from the constant-speed phases at the 65 mph J1634 specifies, rather than from the HWFET phase. Only a multi-cycle test has those phases, so the coverage here against the HWFET measure is exactly how much of the fleet a steady-state basis could ever describe.' },
+    { key: 'ss_eta_ratio', label: 'Steady-state η ÷ HWFET η', unit: '', axisLabel: 'ratio', digits: 4,
+      hint: 'Computed PER GROUP, on the groups carrying both, which is the only form that answers the question. Two separate distributions can each look tight while the per-vehicle ratio scatters — and it is the scatter that decides whether one fleet-wide correction factor could ever stand in for a missing steady-state measurement. A tight ratio makes that defensible; a loose one means two honest bases beat one invented one.' },
     { key: 'adjustment_factor', label: 'Effective adjustment (computed)', unit: '', axisLabel: 'factor', digits: 4,
       hint: 'Published label range ÷ OUR computed unadjusted range — not EPA\'s published adjustment factor, which the guide carries separately and which sits at exactly 0.700 for over half the fleet. This one lands near 0.66 and almost never on 0.70, so it is measuring our computed range as much as the adjustment. Read it as a check on the model, not as the factor EPA applied.' },
 ];
@@ -108,6 +118,7 @@ export function certObservation(group, brandIndex) {
     const guide = group?.epa_fe_guide ?? null;
     const coeffs = resolvePrimaryCoeffs(group);
     const eta = deriveDrivetrainEta(group);
+    const ssEta = deriveSteadyStateEta(group);
     const charger = deriveChargerEfficiency(group);
     const adjustment = deriveEffectiveAdjustmentFactor(group);
 
@@ -144,11 +155,23 @@ export function certObservation(group, brandIndex) {
             const f = usable / gross;
             return f > 1 ? null : f;
         })(),
+        ss_eta: ssEta?.value ?? null,
+        // Per group, and only where BOTH exist. A ratio of two fleet medians
+        // would answer a different question — whether the typical car's two
+        // figures differ — when what decides a correction factor is whether the
+        // SAME car's two figures differ by a consistent amount.
+        ss_eta_ratio: (() => {
+            const measured = isMeasured('eta', eta?.source) ? num(eta?.value) : null;
+            const ss = num(ssEta?.value);
+            if (measured == null || ss == null || measured <= 0) return null;
+            return ss / measured;
+        })(),
         adjustment_factor: adjustment?.value ?? null,
 
         // Kept so the view can say what it left out rather than only how much
         // it kept.
         _etaSource: eta?.source ?? null,
+        _ssEtaSource: ssEta?.source ?? null,
         _chargerSource: charger?.source ?? null,
     };
 }
