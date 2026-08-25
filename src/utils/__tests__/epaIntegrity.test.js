@@ -117,19 +117,23 @@ describe('checkRecordIntegrity — the implausibilities', () => {
         expect(codes(g)).toContain('test-weight-missing');
     });
 
-    it('catches a group with no multi-cycle test', () => {
+    it('catches a group with no charge-depleting test', () => {
         const g = clean();
-        g.epa_tests[0].procedure_code = 81;
-        expect(codes(g)).toContain('no-mct');
+        g.epa_tests[0].procedure_code = 2;
+        expect(codes(g)).toContain('no-cd-test');
     });
 });
 
-describe('checkRecordIntegrity — single-cycle tests are not depletions', () => {
+describe('checkRecordIntegrity — single-cycle tests measure a rate and a capacity', () => {
     /**
-     * BMW's MY2026 i7 eDrive50 (CSI-TBMXV00.0G7A), the record that exposed this.
-     * It has no procedure 77 at all — only 81 (CD-UDDS) and 84 (CD-Highway) —
-     * and on those `total_dc_energy_kwh` is ONE cycle's energy while
-     * `ac_recharge_kwh` is still the whole pack going back in.
+     * BMW's MY2026 i7 eDrive50 (CSI-TBMXV00.0G7A). No procedure 77 — only 81
+     * (CD-UDDS) and 84 (CD-Highway). A single-cycle test drives ONE cycle and
+     * repeats it until the pack is empty, so the phase is the RATE (2.446 kWh
+     * over one 10.25-mile HWFET) and "System End State of Charge Watt-hours" is
+     * the CAPACITY (106.227 kWh over the 445.14-mile depletion).
+     *
+     * The parser stored the phase sum as the total, which is where the 2-5 kWh
+     * packs came from, and made charging efficiency 2.446/119.873 = 2%.
      */
     const bmw = () => ({
         test_group_id: 'CL34779-0',
@@ -140,42 +144,47 @@ describe('checkRecordIntegrity — single-cycle tests are not depletions', () =>
         ],
         epa_tests: [
             { test_number: 'RBMX10080457', procedure_code: 81,
-              total_dc_energy_kwh: 1.931, ac_recharge_kwh: 119.873,
+              total_dc_energy_kwh: 106.227, ac_recharge_kwh: 119.873,
               epa_test_phases: [{ phase_index: 1, phase_type: 'UDDS', distance_mi: 7.45, dc_energy_kwh: 1.931 }] },
             { test_number: 'RBMX10080458', procedure_code: 84,
-              total_dc_energy_kwh: 2.446, ac_recharge_kwh: 119.873,
-              epa_test_phases: [{ phase_index: 1, phase_type: 'HWY', distance_mi: 10.26, dc_energy_kwh: 2.446 }] },
+              total_dc_energy_kwh: 106.227, ac_recharge_kwh: 119.873,
+              epa_test_phases: [{ phase_index: 1, phase_type: 'HWY', distance_mi: 10.25, dc_energy_kwh: 2.446 }] },
         ],
     });
 
-    it('does not report 1.6% as a broken charger', () => {
-        // 1.931 kWh over one UDDS against a 119.873 kWh recharge is 1.6%, and
-        // it is arithmetic on incomparable inputs rather than a fault. The
-        // first version of this module reported it on all four BMW configs.
-        expect(codes(bmw())).not.toContain('charger-eff-out-of-band');
+    it('reads a sound single-cycle record as sound', () => {
+        // 106.227/119.873 is 88.6%, which is an ordinary charger. The record
+        // reconciles every way it can be checked: 106.227 / (2.446/10.25) is
+        // 445.15 miles against a stated 445.14.
+        expect(checkRecordIntegrity(bmw()).findings).toEqual([]);
     });
 
-    it('does not report the recharge as impossible either', () => {
-        expect(codes(bmw())).not.toContain('recharge-below-draw');
+    it('does not read the per-cycle phase as a missing phase', () => {
+        // The phase is one cycle and the total is the depletion, so they are
+        // not the same quantity and never agree. Comparing them reported a
+        // -97.7% shortfall on a correct record.
+        expect(codes(bmw())).not.toContain('phase-sum-mismatch');
     });
 
-    it('says instead that nothing here measures capacity', () => {
-        // The useful finding, and the actual cause of the 2-5 kWh packs: a
-        // single-cycle test reports one cycle, so anything reading capacity off
-        // these tests gets a few kWh.
-        const f = checkRecordIntegrity(bmw()).findings.find(x => x.code === 'no-mct');
-        expect(f).toBeDefined();
-        expect(f.detail).toContain('capacity');
+    it('does not call a single-cycle group deficient', () => {
+        // 81 and 84 measure city and highway in separate tests, so this is a
+        // different method rather than a missing one. An earlier version said
+        // the cycles could not be separated, which was false.
+        expect(codes(bmw())).not.toContain('no-cd-test');
     });
 
-    it('still checks a full-depletion run in the same group', () => {
-        // The restriction is per test, not per group — a group holding both
-        // must still have its MCT checked.
+    it('still catches a genuinely bad single-cycle record', () => {
+        // The restriction removed above must not have removed the check: if the
+        // depletion total really is a per-cycle figure, say so.
         const g = bmw();
-        g.epa_tests.push({ test_number: 'X77', procedure_code: 77,
-            total_dc_energy_kwh: 0.9, ac_recharge_kwh: 100,
-            epa_test_phases: [{ phase_index: 1, phase_type: 'UDDS', distance_mi: 7.45, dc_energy_kwh: 0.9 }] });
+        g.epa_tests[0].total_dc_energy_kwh = 2.446;
         expect(codes(g)).toContain('charger-eff-out-of-band');
+    });
+
+    it('flags a group with no charge-depleting test at all', () => {
+        const g = bmw();
+        g.epa_tests.forEach(t => { t.procedure_code = 2; });
+        expect(codes(g)).toContain('no-cd-test');
     });
 });
 

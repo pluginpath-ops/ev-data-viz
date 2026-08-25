@@ -23,8 +23,12 @@
  */
 
 import {
-    CHARGER_EFF_BAND, PACK_KWH_BAND, PHASE_SUM_TOLERANCE_PCT, PROC_MCT,
+    CHARGER_EFF_BAND, PACK_KWH_BAND, PHASE_SUM_TOLERANCE_PCT,
+    PROC_MCT, PROC_CD_UDDS, PROC_CD_HWY,
 } from '../constants/epa';
+
+/** Every procedure that depletes the pack, and so measures something usable. */
+const CD_PROCEDURES = [PROC_MCT, PROC_CD_UDDS, PROC_CD_HWY];
 
 // Absent must stay absent. `Number(null)` and `Number('')` are both 0, and 0 is
 // finite — so the naive version turned "this record has no pack figure" into
@@ -111,10 +115,7 @@ export function checkRecordIntegrity(group) {
         // ── Recharge below draw ─────────────────────────────────────────────
         // Not a band and not tunable. Putting less energy in at the wall than
         // came out of the pack requires the charger to generate energy.
-        // Same restriction, same reason: on a single-cycle test the two are
-        // not the same quantity, so one exceeding the other proves nothing.
-        if (t.procedureCode === PROC_MCT
-            && t.acRechargeKwh != null && t.totalDcKwh != null
+        if (t.acRechargeKwh != null && t.totalDcKwh != null
             && t.acRechargeKwh > 0 && t.totalDcKwh > 0
             && t.acRechargeKwh < t.totalDcKwh) {
             findings.push(finding(
@@ -130,15 +131,7 @@ export function checkRecordIntegrity(group) {
         // The 1% records. Computed here rather than read from the derivation
         // layer so this module stays answerable from the record alone.
         //
-        // ONLY on a full-depletion run. `total_dc_energy_kwh` is a column name
-        // that lies on a single-cycle test: for procedure 77 it is the energy
-        // drawn to depletion, but for 81 (CD-UDDS) and 84 (CD-Highway) it is the
-        // energy of ONE cycle, while `ac_recharge_kwh` is still the whole pack
-        // going back in. Dividing the two compares a 7-mile cycle against a
-        // full recharge — BMW's i7, tested on 81 + 84, reads 1.6%. That is the
-        // arithmetic working on incomparable inputs, not a broken charger, and
-        // reporting it would send a curator after a fault that is not there.
-        if (t.procedureCode === PROC_MCT && t.acRechargeKwh > 0 && t.totalDcKwh > 0) {
+        if (t.acRechargeKwh > 0 && t.totalDcKwh > 0) {
             const eff = t.totalDcKwh / t.acRechargeKwh;
             if (eff >= 1) {
                 // already reported as recharge-below-draw; saying it twice adds nothing
@@ -159,8 +152,13 @@ export function checkRecordIntegrity(group) {
         // and when they do not the usual cause is a phase that failed to parse
         // — which is invisible otherwise, because the remaining phases still
         // produce a consumption figure of entirely believable magnitude.
+        // Multi-cycle only. There the phases span the depletion, so their sum
+        // and the stated total are one measurement reported twice. On a
+        // single-cycle test the phase is ONE cycle and the total is the whole
+        // depletion — 2.446 kWh against 106.227 on BMW's i7 — which is the
+        // method working, not a phase gone missing.
         const phaseEnergy = t.phases.reduce((s, p) => s + (p.dcKwh ?? 0), 0);
-        if (t.totalDcKwh > 0 && phaseEnergy > 0) {
+        if (t.procedureCode === PROC_MCT && t.totalDcKwh > 0 && phaseEnergy > 0) {
             const delta = pct(phaseEnergy, t.totalDcKwh);
             if (Math.abs(delta) > PHASE_SUM_TOLERANCE_PCT) {
                 findings.push(finding(
@@ -198,14 +196,18 @@ export function checkRecordIntegrity(group) {
         ));
     }
 
-    // ── No usable multi-cycle test ──────────────────────────────────────────
-    if (!g.tests.some(t => t.procedureCode === PROC_MCT)) {
+    // A group with NO charge-depleting test of any kind has nothing to derive
+    // from. Single-cycle groups are deliberately not flagged: procedures 81 and
+    // 84 measure city and highway in separate tests and each states its own
+    // depletion energy, so an SCT record is a different method rather than a
+    // deficient one. An earlier version reported "no multi-cycle test" on
+    // BMW's i7 and claimed the cycles could not be separated, which was false
+    // on both counts.
+    if (!g.tests.some(t => CD_PROCEDURES.includes(t.procedureCode))) {
         findings.push(finding(
-            'no-mct', 'warning', 'No multi-cycle test',
-            'Nothing in this group ran procedure 77. City and highway consumption cannot be '
-            + 'separated from one another, and — the sharper consequence — no test here measures '
-            + 'pack capacity: a single-cycle test reports one cycle\u2019s energy, not a depletion. '
-            + 'Anything reading capacity off these tests gets a few kWh.',
+            'no-cd-test', 'warning', 'No charge-depleting test',
+            'Nothing in this group ran procedure 77, 81 or 84, so there is no measurement of '
+            + 'consumption or of pack capacity to derive anything from.',
             {},
         ));
     }
