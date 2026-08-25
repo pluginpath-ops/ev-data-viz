@@ -42,7 +42,7 @@ const mi = (v) => (v == null ? '—' : `${v.toFixed(1)} mi`);
 export default function EpaDerivationChecks({
     check = null, rangeCheck = null, invariant = null,
     adjustmentFixed = 0.7, adjustmentUsed = null, adjustmentSource = null,
-    integrity = null, inferredPhaseTypes = 0, competingMctTests = 0,
+    integrity = null, inferredPhaseTypes = 0, competingMctTests = 0, derivedFrom = null,
 }) {
     // The factor in force, and whether a guide row supplied it. Reporting the
     // flat constant while a linked row's factor was doing the work told curators
@@ -166,10 +166,15 @@ export default function EpaDerivationChecks({
                 the figures above deserve, and both are fixable from this view. */}
             {competingMctTests > 1 && (
                 <p className="text-xs" style={{ color: 'var(--color-warning)' }}>
-                    This group holds {competingMctTests} multi-cycle tests and the most recent was
-                    used. Both may be valid — the R2 21&quot; was tested at two laboratories — so this
-                    is a choice, not a fault. The stated ranges above belong to whichever test was
-                    imported first, so they may not be this one&apos;s.
+                    This group holds {competingMctTests} multi-cycle tests, and every figure above
+                    was derived from the most recent
+                    {derivedFrom?.testNumber && <> — <span className="font-mono">{derivedFrom.testNumber}</span></>}
+                    {derivedFrom?.testDate && <>, {derivedFrom.testDate}</>}.
+                    More than one run can be legitimate: the same vehicle is sometimes tested at two
+                    laboratories, and the runs disagree without either being wrong. So this is a
+                    choice, not a fault, and deleting the others would discard valid tests. Note the
+                    stated ranges above are stored per GROUP and were set from whichever test was
+                    imported first, so they may not belong to this one.
                 </p>
             )}
 

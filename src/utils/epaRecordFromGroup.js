@@ -186,6 +186,12 @@ export function epaRecordFromGroup(group, meta = {}) {
             // >1 means the derivation used one of several and the others were
             // ignored. Surfaced, because that choice changes every figure.
             competingMctTests,
+            // WHICH one, so the UI can name it. A message saying a choice was
+            // made without saying which leaves the curator to work out from the
+            // test list what the code already knows.
+            derivedFrom: mct.test_number
+                ? { testNumber: mct.test_number, testDate: mct.test_date ?? null }
+                : null,
         };
     }
 

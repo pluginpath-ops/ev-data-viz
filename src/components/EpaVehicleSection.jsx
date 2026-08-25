@@ -92,7 +92,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
     // Recomputed on render like every other derived figure here — nothing is
     // stored, so a corrected phase shows its effect immediately.
     const derivationChecks = useMemo(() => {
-        const { record, inferredPhaseTypes, competingMctTests } = epaRecordFromGroup(g);
+        const { record, inferredPhaseTypes, competingMctTests, derivedFrom } = epaRecordFromGroup(g);
         const model = record ? buildMethodologyModel(record) : null;
         const rangeCheck = checkStatedRanges(model, {
             cityMi: g?.cd_range_combined_calc,
@@ -115,6 +115,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
             integrity: checkRecordIntegrity(g),
             inferredPhaseTypes,
             competingMctTests,
+            derivedFrom,
         };
     }, [g]);
     if (!g) return null;
