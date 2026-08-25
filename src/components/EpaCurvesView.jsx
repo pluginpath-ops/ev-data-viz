@@ -10,7 +10,7 @@ import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH, MPG_E_CONVERSION,
 } from '../utils/epaPhysics';
-import { buildEpaCurveFromModel, deriveDrivetrainEta, resolvePrimaryCoeffs, correctMeasuredConsumption, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
+import { buildEpaCurveFromModel, resolveCurveEta, resolvePrimaryCoeffs, correctMeasuredConsumption, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
 import { filterRangeRuns } from '../utils/runUtils';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
@@ -828,7 +828,7 @@ export default function EpaCurvesView({
 
                                                             // η from the DC-side curator derivation (proc 77 → 84 → estimated),
                                                             // with provenance + sanity flags.
-                                                            const etaResult = deriveDrivetrainEta(epaGroup);
+                                                            const etaResult = resolveCurveEta(epaGroup);
                                                             const eta = etaResult.value;
                                                             const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
                                                             const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);

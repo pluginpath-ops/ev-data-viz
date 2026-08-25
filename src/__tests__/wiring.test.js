@@ -468,6 +468,29 @@ describe('the seams that broke before', () => {
             .not.toMatch(/localeCompare/);
     });
 
+    it('builds speed curves on the steady-state η, and statistics on the raw one', () => {
+        // Two directions, and both matter.
+        //
+        // The curve predicts steady cruise, so it must resolve a cruise η —
+        // reverting it to deriveDrivetrainEta would silently drop every range
+        // figure ~13% with nothing to show for it.
+        const deriv = read('src/utils/epaDerivations.js');
+        const builder = deriv.slice(deriv.indexOf('export function buildEpaCurveFromModel'));
+        expect(builder.slice(0, builder.indexOf('\n}')), 'the curve builder must use the cruise η')
+            .toMatch(/resolveCurveEta\(/);
+        expect(read('src/utils/epaCurveSubjects.js'), 'so must the subject model')
+            .toMatch(/resolveCurveEta\(/);
+
+        // And the statistics must NOT. ETA_BAND is calibrated on HWFET values,
+        // and ss_eta_ratio divides the steady-state η by this one — correcting
+        // it there would make the ratio circular and drift the very constant
+        // the correction is derived from.
+        const stats = read('src/utils/epaCertStats.js');
+        expect(stats, 'cert statistics must measure the raw HWFET η')
+            .toMatch(/deriveDrivetrainEta\(/);
+        expect(stats, 'and must not correct it').not.toMatch(/resolveCurveEta/);
+    });
+
     it('checks a recomputed range against the test it derived from', () => {
         // The group's cd_range_* is set at import from the FIRST procedure-77
         // test while the derivation uses the most RECENT, so reading the group

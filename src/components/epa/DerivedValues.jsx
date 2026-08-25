@@ -17,6 +17,10 @@ const SOURCE_LABEL = {
     estimated:           { text: 'estimated', cls: 'text-amber-600 dark:text-amber-400' },
     manual:              { text: 'manual',    cls: 'text-indigo-600 dark:text-indigo-400' },
     computed:            { text: 'computed',  cls: 'text-green-600 dark:text-green-400' },
+    // Amber, with the others that are not this vehicle's own measurement. A
+    // corrected η is a real highway measurement scaled by a fleet constant —
+    // better than the highway figure for a cruise curve, and still borrowed.
+    corrected:           { text: 'corrected', cls: 'text-amber-600 dark:text-amber-400' },
 };
 
 function DerivedRow({ label, tooltip, result, format }) {
