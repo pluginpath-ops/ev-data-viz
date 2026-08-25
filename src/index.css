@@ -1680,6 +1680,14 @@ body {
     border-left: 3px solid var(--color-border);
     background: var(--color-surface-2, transparent);
 }
+/* One row of the Admin reconciliation sweep (#229). Separated by a rule rather
+   than a card each: the list is scanned worst-first and a hundred cards is a
+   hundred boxes to read past. */
+.epa-audit-row {
+    @apply border-b border-[var(--color-border)] last:border-b-0;
+}
+.epa-audit-row:hover { background: var(--color-surface-muted); }
+
 .epa-check-agrees    { border-left-color: var(--color-success); }
 .epa-check-close     { border-left-color: var(--color-warning); }
 .epa-check-disagrees { border-left-color: var(--color-danger); }
