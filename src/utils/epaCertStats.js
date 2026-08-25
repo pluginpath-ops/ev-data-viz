@@ -26,7 +26,7 @@
 import {
     resolvePrimaryCoeffs, pickDerivationTest,
     deriveDrivetrainEta, deriveSteadyStateEta, deriveChargerEfficiency,
-    deriveEffectiveAdjustmentFactor,
+    deriveEffectiveAdjustmentFactor, steadyStateShapeFactor,
 } from './epaDerivations';
 import { PROC_MCT, PROC_CD_HWY } from '../constants/epa';
 import { bodyClassLabel, driveGroup, resolveBrand } from './feGuideBrowse';
@@ -93,6 +93,10 @@ export const CERT_MEASURES = [
       hint: 'Back-solved from the constant-speed phases at the 65 mph J1634 specifies, rather than from the HWFET phase. Only a multi-cycle test has those phases, so the coverage here against the HWFET measure is exactly how much of the fleet a steady-state basis could ever describe.' },
     { key: 'ss_eta_ratio', label: 'Steady-state η ÷ HWFET η', unit: '', axisLabel: 'ratio', digits: 4,
       hint: 'Computed PER GROUP, on the groups carrying both, which is the only form that answers the question. Two separate distributions can each look tight while the per-vehicle ratio scatters — and it is the scatter that decides whether one fleet-wide correction factor could ever stand in for a missing steady-state measurement. A tight ratio makes that defensible; a loose one means two honest bases beat one invented one.' },
+    { key: 'ss_shape_factor', label: 'Road-load shape (65 ÷ 48.3 mph)', unit: '', axisLabel: 'ratio', digits: 4,
+      hint: 'How much more road-load energy a mile at 65 mph costs than a mile at 48.3, from the coefficients alone. Needs no phases, so it covers nearly every group — and it is the half of the η ratio that varies by body class, because it is the vehicle\'s own aero and rolling balance.' },
+    { key: 'ss_eta_residual', label: 'η ratio ÷ road-load shape', unit: '', axisLabel: 'residual', digits: 4,
+      hint: 'The η ratio with the road-load shape divided out — what the transient cycle costs BEYOND what road load predicts. If this is tighter than the raw ratio, the class gradient was aerodynamics rather than an unexplained spread, and a vehicle with no constant-speed phase can be corrected using its OWN coefficients while borrowing only this. If it is no tighter, the decomposition bought nothing.' },
     { key: 'adjustment_factor', label: 'Effective adjustment (computed)', unit: '', axisLabel: 'factor', digits: 4,
       hint: 'Published label range ÷ OUR computed unadjusted range — not EPA\'s published adjustment factor, which the guide carries separately and which sits at exactly 0.700 for over half the fleet. This one lands near 0.66 and almost never on 0.70, so it is measuring our computed range as much as the adjustment. Read it as a check on the model, not as the factor EPA applied.' },
 ];
@@ -122,6 +126,7 @@ export function certObservation(group, brandIndex) {
     const charger = deriveChargerEfficiency(group);
     const adjustment = deriveEffectiveAdjustmentFactor(group);
 
+    const shape = steadyStateShapeFactor(group);
     const usable = derivedUsableKwh(group);
     const gross = num(guide?.nominal_pack_kwh);
     const { brand, parent } = resolveBrand(guide?.division, brandIndex);
@@ -156,6 +161,7 @@ export function certObservation(group, brandIndex) {
             return f > 1 ? null : f;
         })(),
         ss_eta: ssEta?.value ?? null,
+        ss_shape_factor: shape,
         // Per group, and only where BOTH exist. A ratio of two fleet medians
         // would answer a different question — whether the typical car's two
         // figures differ — when what decides a correction factor is whether the
@@ -165,6 +171,15 @@ export function certObservation(group, brandIndex) {
             const ss = num(ssEta?.value);
             if (measured == null || ss == null || measured <= 0) return null;
             return ss / measured;
+        })(),
+        // The unexplained remainder. Only where the ratio exists, since that is
+        // what is being decomposed — the shape factor alone is not a residual.
+        ss_eta_residual: (() => {
+            const measured = isMeasured('eta', eta?.source) ? num(eta?.value) : null;
+            const ss = num(ssEta?.value);
+            if (measured == null || ss == null || measured <= 0) return null;
+            if (shape == null || shape <= 0) return null;
+            return (ss / measured) / shape;
         })(),
         adjustment_factor: adjustment?.value ?? null,
 

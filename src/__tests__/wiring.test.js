@@ -128,6 +128,8 @@ describe('utilities built for the UI are reached by the UI', () => {
             'Consumed inside the module by auditGroups, which the sweep calls. Exported so one record\'s verdict is assertable without building a whole list.',
         'epaIntegrity.integrityWarnings':
             'The import-time form of checkRecordIntegrity, called by EpaPdfImportModal. Listed because the checks it wraps are also read directly by the curator card, and only this spelling reaches the import path.',
+        'epaDerivations.steadyStateShapeFactor':
+            'The coefficients-only half of the η ratio, consumed by epaCertStats to build the ss_shape_factor and ss_eta_residual measures. Exported so the decomposition identity — ratio = shape x residual — is assertable directly.',
         'epaCertStats.NOT_MEASURED_SOURCES':
             'The source names that mean "not derived", consumed inside the module and asserted BY NAME against what epaDerivations actually returns — deriveDrivetrainEta says "estimated" where deriveChargerEfficiency says "assumed", and a single check for one of them published DEFAULT_ETA as a fleet measurement.',
         'epaLinkSweep.wheelMentions':
