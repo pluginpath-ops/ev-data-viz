@@ -161,6 +161,29 @@ export const EPA_DEFAULTS = {
     CHARGER_EFF_BAND:  [0.80, 0.92],
     SS_SPEED_BAND:     [55, 70],      // mph
     CURVE_SPEED_RANGE: [5, 120],      // mph, inclusive
+
+    // What a battery-electric traction pack can plausibly hold. Deliberately
+    // wide: the job is catching an import that read the wrong field, not
+    // judging a pack. A bulk import of every MY2026 CSI produced records at
+    // 2-5 kWh — an aux battery or an amp-hour figure landing in a kWh column —
+    // and nothing said so.
+    PACK_KWH_BAND: [20, 250],
+
+    // How far a test's stated total DC energy may sit from the sum of its own
+    // phases. They are the same measurement reported twice, so they should
+    // agree to rounding; anything larger means a phase is missing or mistyped.
+    PHASE_SUM_TOLERANCE_PCT: 1,
+
+    // The speed the multi-cycle constant-speed section is assumed to have been
+    // driven at, for the steady-state η back-solve.
+    //
+    // ASSUMED, and the CSI does not state it — which is exactly why the figure
+    // is surfaced beside the HWFET-derived η rather than replacing it. J1634
+    // lets the manufacturer choose, and the choice moves η a long way: on the
+    // MY2027 CLA 350 the same phase data gives η 0.839 at 60 mph and 0.918 at
+    // 65. Treat a large gap between the two ηs as a question about this number,
+    // not as a fault in either.
+    SS_ASSUMED_SPEED_MPH: 60,
 };
 
 // Resolved values (override ∥ default). These are what the math imports.
@@ -184,6 +207,11 @@ export const ETA_BAND          = resolve('ETA_BAND',          EPA_DEFAULTS.ETA_B
 export const CHARGER_EFF_BAND  = resolve('CHARGER_EFF_BAND',  EPA_DEFAULTS.CHARGER_EFF_BAND);
 export const SS_SPEED_BAND     = resolve('SS_SPEED_BAND',     EPA_DEFAULTS.SS_SPEED_BAND);
 export const CURVE_SPEED_RANGE = resolve('CURVE_SPEED_RANGE', EPA_DEFAULTS.CURVE_SPEED_RANGE);
+export const PACK_KWH_BAND     = resolve('PACK_KWH_BAND',     EPA_DEFAULTS.PACK_KWH_BAND);
+export const PHASE_SUM_TOLERANCE_PCT =
+    resolve('PHASE_SUM_TOLERANCE_PCT', EPA_DEFAULTS.PHASE_SUM_TOLERANCE_PCT);
+export const SS_ASSUMED_SPEED_MPH =
+    resolve('SS_ASSUMED_SPEED_MPH', EPA_DEFAULTS.SS_ASSUMED_SPEED_MPH);
 
 // ── EPA test procedure codes ────────────────────────────────────────────────
 export const PROC_MCT     = 77; // Multi-Cycle Test — city + highway + totals in one run

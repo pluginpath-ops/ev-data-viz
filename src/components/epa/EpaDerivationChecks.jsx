@@ -42,7 +42,7 @@ const mi = (v) => (v == null ? '—' : `${v.toFixed(1)} mi`);
 export default function EpaDerivationChecks({
     check = null, rangeCheck = null, invariant = null,
     adjustmentFixed = 0.7, adjustmentUsed = null, adjustmentSource = null,
-    inferredPhaseTypes = 0, competingMctTests = 0,
+    integrity = null, inferredPhaseTypes = 0, competingMctTests = 0,
 }) {
     // The factor in force, and whether a guide row supplied it. Reporting the
     // flat constant while a linked row's factor was doing the work told curators
@@ -50,11 +50,24 @@ export default function EpaDerivationChecks({
     const applied = Number.isFinite(adjustmentUsed) ? adjustmentUsed : adjustmentFixed;
     const fromGuide = adjustmentSource === 'guide';
     const anything = invariant?.violated || rangeCheck?.checked || check?.checked
+        || integrity?.findings?.length > 0
         || inferredPhaseTypes > 0 || competingMctTests > 1;
     if (!anything) return null;
 
     return (
         <div className="epa-checks">
+    {/* FIRST, and before anything that compares against EPA. Those checks ask
+        which of two sources is right; these say the record contradicts itself,
+        which no outside figure can resolve and which makes every derivation
+        below it untrustworthy. Runs with no guide row linked, so it is often
+        the only thing here. */}
+    {integrity?.findings?.map(f => (
+        <div key={f.code}
+             className={`epa-check ${f.severity === 'error' ? 'epa-check-disagrees' : 'epa-check-close'}`}>
+            <span className="text-label">{f.label}</span>
+            <span className="text-xs text-faint">{f.detail}</span>
+        </div>
+    ))}
     {/* The regulatory invariant, first because it is not a matter of
         degree. A maker may label at or below the computed range and
         never above, so a label ABOVE it proves our derivation is too

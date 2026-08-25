@@ -17,6 +17,7 @@ import FeGuidePicker from './epa/FeGuidePicker';
 import { epaRecordFromGroup } from '../utils/epaRecordFromGroup';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { checkUnadjustedMpge, checkStatedRanges, checkLabelInvariant } from '../utils/epaDerivationCheck';
+import { checkRecordIntegrity } from '../utils/epaIntegrity';
 import LazyBoundary from './LazyBoundary';
 import { EpaPdfImportModal } from './lazyComponents';
 import { useAppContext } from '../context/AppContext';
@@ -109,6 +110,9 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
             adjustmentUsed:   model?.adjustment ?? null,
             adjustmentSource: model?.adjustmentSource ?? null,
             adjustmentFixed: model?.adjustmentFixed ?? 0.7,
+            // Answerable from the record alone, so unlike the three checks above
+            // it runs whether or not a guide row has ever been linked.
+            integrity: checkRecordIntegrity(g),
             inferredPhaseTypes,
             competingMctTests,
         };
