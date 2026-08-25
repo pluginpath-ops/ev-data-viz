@@ -60,8 +60,16 @@ export const PROMOTION_MAP = {
 
 export const PROMOTION_SOURCE = 'fe_guide';
 
-/** A field a human set by hand is not the import's to overwrite. */
-const isCuratorOwned = (overrides, column) => overrides?.[column]?.source === 'manual';
+/**
+ * A field a human set by hand is not the import's to overwrite.
+ *
+ * Exported because the same question is asked outside promotion: unlinking
+ * clears the guide-derived test selection, and must leave a hand-set one alone.
+ * A second spelling of this rule is how one of them ends up wrong — the first
+ * version of that guard checked for source 'curator', which nothing writes, so
+ * it never fired.
+ */
+export const isCuratorOwned = (overrides, column) => overrides?.[column]?.source === 'manual';
 
 /**
  * What linking this guide row to this group should write.

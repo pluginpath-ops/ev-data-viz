@@ -80,9 +80,22 @@ function mctTestsOf(tests) {
  * derives the same way — an arbitrary pick that changes between loads is worse
  * than a wrong one that holds still.
  */
-function preferredMctTest(tests) {
+function preferredMctTest(tests, preferredTestNumber = null) {
     const mcts = mctTestsOf(tests);
     if (mcts.length <= 1) return mcts[0] ?? null;
+
+    // A selection beats the default. It is set from the linked guide row, whose
+    // published highway figure identifies the run EPA used — and on Mercedes'
+    // CLA 350 that is the OLDER of the two, so the default was picking the test
+    // EPA did not use. A curator may also set it by hand. Either way it is a
+    // stated choice and this is a fallback for when none was made.
+    if (preferredTestNumber) {
+        const chosen = mcts.find(t => t.test_number === preferredTestNumber);
+        if (chosen) return chosen;
+        // Named a test that is not here — a re-import that dropped it, or a
+        // typo. Fall through rather than failing: the default is still a
+        // reasonable answer, and epaAudit reports the dangling reference.
+    }
 
     return [...mcts].sort((a, b) => {
         const date = String(b.test_date ?? '').localeCompare(String(a.test_date ?? ''));
@@ -182,7 +195,7 @@ export function epaRecordFromGroup(group, meta = {}) {
         adjustmentMethod: group.label_calc_approach ?? null,
     };
 
-    const mct = preferredMctTest(tests);
+    const mct = preferredMctTest(tests, group?.preferred_test_number);
     const competingMctTests = mctTestsOf(tests).length;
     if (mct) {
         const totalDcWh = kwhToWh(mct.total_dc_energy_kwh);
@@ -213,7 +226,15 @@ export function epaRecordFromGroup(group, meta = {}) {
             // made without saying which leaves the curator to work out from the
             // test list what the code already knows.
             derivedFrom: mct.test_number
-                ? { testNumber: mct.test_number, testDate: mct.test_date ?? null }
+                ? {
+                    testNumber: mct.test_number,
+                    testDate: mct.test_date ?? null,
+                    // Which rule chose it. "Selected" means a guide row or a
+                    // curator settled it; "most-recent" means nothing did, and
+                    // the figures rest on a default.
+                    basis: group?.preferred_test_number === mct.test_number
+                        ? 'selected' : 'most-recent',
+                }
                 : null,
             // The ranges to check the recomputed ones against, belonging to the
             // test the phases above came from (#227).

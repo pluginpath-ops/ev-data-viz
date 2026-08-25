@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     promotionUpdates, demotionUpdates, guideConflicts, acceptGuideUpdates,
-    PROMOTION_MAP, PROMOTION_SOURCE,
+    PROMOTION_MAP, PROMOTION_SOURCE, isCuratorOwned,
 } from '../feGuidePromotion';
 
 const feRow = {
@@ -265,5 +265,27 @@ describe('linking is not conditional on promoting', () => {
         const { updates } = promotionUpdates(group, feRow);
         expect(updates).not.toHaveProperty('label_range_published');
         expect(updates.fe_guide_row_id).toBe(42);
+    });
+});
+
+describe('isCuratorOwned — one spelling of "a human set this"', () => {
+    it('recognises the source the curator editor actually writes', () => {
+        // EpaCuratorEditor tags hand edits `manual`. An unlink guard written
+        // against 'curator' never fired, and would have wiped the very choice
+        // it was meant to protect.
+        expect(isCuratorOwned({ preferred_test_number: { source: 'manual' } }, 'preferred_test_number'))
+            .toBe(true);
+        expect(isCuratorOwned({ preferred_test_number: { source: 'curator' } }, 'preferred_test_number'))
+            .toBe(false);
+    });
+
+    it('says no for a field nothing has touched', () => {
+        expect(isCuratorOwned({}, 'preferred_test_number')).toBe(false);
+        expect(isCuratorOwned(null, 'preferred_test_number')).toBe(false);
+    });
+
+    it('says no for a value the guide promoted', () => {
+        expect(isCuratorOwned({ label_hwy_mpge: { source: PROMOTION_SOURCE } }, 'label_hwy_mpge'))
+            .toBe(false);
     });
 });
