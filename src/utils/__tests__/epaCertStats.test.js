@@ -217,101 +217,6 @@ describe('the steady-state η measure, and the ratio that decides a correction',
     });
 });
 
-describe('decomposing the η ratio into road-load shape and a residual', () => {
-    /**
-     * The ratio between the two η values varies by body class — across 220
-     * groups the class medians run 1.106 for a small wagon to 1.163 for a large
-     * car, a spread wider than the whole fleet's interquartile range.
-     *
-     * Both η values come from the SAME coefficients, so the ratio factors
-     * exactly into a part that depends only on those coefficients and a part
-     * that does not. The first is the class gradient; the second is what a
-     * vehicle with no constant-speed phase would have to borrow.
-     */
-    const MCT_COEFFS = [{ is_primary: true, target_a: 40.69, target_b: 0.0723,
-        target_c: 0.01437, equiv_test_weight_lbs: 5000 }];
-    const cla = () => group({
-        coeffs: MCT_COEFFS,
-        tests: [{
-            procedure_code: 77, total_dc_energy_kwh: 90.038, ac_recharge_kwh: 100.556,
-            epa_test_phases: [
-                { phase_type: 'HWY', distance_mi: 10.2743406, dc_energy_kwh: 2.0807097 },
-                { phase_type: 'HWY', distance_mi: 10.2624932, dc_energy_kwh: 2.0233391 },
-                { phase_type: 'SS',  distance_mi: 281.313556, dc_energy_kwh: 66.0184098 },
-                { phase_type: 'SS',  distance_mi: 59.723748,  dc_energy_kwh: 13.8985443 },
-            ],
-        }],
-    });
-
-    it('factors the ratio exactly', () => {
-        // Not an approximation — the conversion and per-100-mile scaling cancel,
-        // so this is an algebraic identity and a drift in either half would
-        // break it.
-        const o = certObservation(cla(), undefined);
-        expect(o.ss_shape_factor * o.ss_eta_residual).toBeCloseTo(o.ss_eta_ratio, 10);
-    });
-
-    it('reproduces the CLA 350 figures computed by hand', () => {
-        // F(65)/F(48.3) = 106.103/77.706, and the residual from the two
-        // measured consumptions. Both worked through by hand before this was
-        // written.
-        const o = certObservation(cla(), undefined);
-        expect(o.ss_shape_factor).toBeCloseTo(1.3654, 3);
-        expect(o.ss_eta_residual).toBeCloseTo(0.8429, 3);
-    });
-
-    it('gives a near-identical answer when the tail segment is untyped', () => {
-        // Which is the state the real record actually arrives in. Both CLA
-        // tests end with a constant-speed run to depletion that inferPhaseType
-        // leaves null — 59.7 miles is only 8x a UDDS, under the 10x threshold
-        // for SS — so the derivation sees the first SS block alone.
-        //
-        // It barely matters, and that is worth pinning: both segments are at
-        // the same speed, so dropping one moves the rate by 0.14% and η from
-        // 0.9187 to 0.9173. A curator typing that phase corrects a caveat
-        // rather than a figure.
-        const g = cla();
-        g.epa_tests[0].epa_test_phases = g.epa_tests[0].epa_test_phases
-            .filter(p => p.distance_mi < 100 ? p.phase_type !== 'SS' : true);
-        const o = certObservation(g, undefined);
-        expect(o.ss_eta_residual).toBeCloseTo(0.8416, 3);
-        expect(Math.abs(o.ss_eta_residual - 0.8429)).toBeLessThan(0.002);
-    });
-
-    it('computes the shape factor with NO phases at all', () => {
-        // The whole reason for separating it: this is the half available for a
-        // group that never ran a constant-speed section.
-        const o = certObservation(group({ coeffs: MCT_COEFFS, tests: [] }), undefined);
-        expect(o.ss_shape_factor).toBeCloseTo(1.3654, 3);
-        expect(o.ss_eta).toBeNull();
-        expect(o.ss_eta_residual).toBeNull();
-    });
-
-    it('tracks the coefficients, which is what makes it vary by class', () => {
-        // A draggier vehicle pays more to go from 48.3 to 65, because the C
-        // term is quadratic. That is the class gradient.
-        const draggy = certObservation(group({
-            coeffs: [{ is_primary: true, target_a: 40.69, target_b: 0.0723, target_c: 0.03 }],
-            tests: [],
-        }), undefined);
-        expect(draggy.ss_shape_factor).toBeGreaterThan(1.3654);
-    });
-
-    it('has no residual without a ratio to decompose', () => {
-        // The shape factor alone is not a residual, and reporting it as one
-        // would put a number in the column for every group that never measured
-        // the thing being decomposed.
-        const o = certObservation(group({ coeffs: MCT_COEFFS, tests: [] }), undefined);
-        expect(o.ss_eta_residual).toBeNull();
-    });
-
-    it('declares both measures', () => {
-        for (const key of ['ss_shape_factor', 'ss_eta_residual']) {
-            expect(certMeasureByKey(key), `${key} must be declared`).toBeTruthy();
-        }
-    });
-});
-
 describe('an impossible value is not a measurement either', () => {
     /**
      * Nissan's six groups derive a steady-state η above 1 — a drivetrain
@@ -339,17 +244,9 @@ describe('an impossible value is not a measurement either', () => {
         expect(o.ss_eta).toBeNull();
     });
 
-    it('drops the ratio and residual that would have been built on it', () => {
+    it('drops the ratio that would have been built on it', () => {
         // Otherwise one impossible half produces a plausible-looking whole.
-        const o = certObservation(impossible(), undefined);
-        expect(o.ss_eta_ratio).toBeNull();
-        expect(o.ss_eta_residual).toBeNull();
-    });
-
-    it('keeps the shape factor, which depends on nothing measured', () => {
-        // It is computed from the coefficients alone, so a bad phase cannot
-        // make it impossible.
-        expect(certObservation(impossible(), undefined).ss_shape_factor).not.toBeNull();
+        expect(certObservation(impossible(), undefined).ss_eta_ratio).toBeNull();
     });
 
     it('excludes rather than clamps', () => {

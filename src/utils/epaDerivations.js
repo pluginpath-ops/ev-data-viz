@@ -297,40 +297,6 @@ export function deriveImpliedSsSpeed(group, etaResult = deriveDrivetrainEta(grou
     };
 }
 
-/**
- * How much more road-load energy a mile at 65 mph costs than a mile at 48.3.
- *
- * Both η values are back-solved from the SAME coefficients, so the ratio
- * between them decomposes exactly:
- *
- *   η_SS / η_HWFET = [ E_wheel(65) / E_wheel(48.3) ]  x  [ measured consumptions ]
- *                     \_______ this function _______/
- *
- * The first bracket needs no phases at all — it is the vehicle's own aero and
- * rolling balance, and it is what makes the observed ratio vary by body class:
- * across 220 groups the class medians run 1.106 for a small wagon to 1.163 for
- * a large car, a spread wider than the whole fleet's interquartile range.
- *
- * Separating it matters because it is the half we can compute for a vehicle
- * that has NO constant-speed phase. What has to be borrowed from the fleet is
- * only the second bracket — see `ss_eta_residual` in epaCertStats.
- *
- * The kWh conversion and the per-100-mile scaling cancel, so this is a pure
- * ratio of road-load forces.
- */
-export function steadyStateShapeFactor(group, speedMph = SS_CYCLE_SPEED_MPH) {
-    const coeffs = resolvePrimaryCoeffs(group);
-    const v = Number(speedMph);
-    if (!coeffs || !(v > 0)) return null;
-
-    const { a, b, c } = coeffs;
-    const atSs    = roadLoadForce(v, a, b, c);
-    const atHwfet = roadLoadForce(HWFET_AVG_MPH, a, b, c);
-    if (!(atSs > 0) || !(atHwfet > 0)) return null;
-
-    return atSs / atHwfet;
-}
-
 // ── Derivation 5: η from the steady-state phase ─────────────────────────────
 
 /**

@@ -26,7 +26,7 @@
 import {
     resolvePrimaryCoeffs, pickDerivationTest,
     deriveDrivetrainEta, deriveSteadyStateEta, deriveChargerEfficiency,
-    deriveEffectiveAdjustmentFactor, steadyStateShapeFactor,
+    deriveEffectiveAdjustmentFactor,
 } from './epaDerivations';
 import { PROC_MCT, PROC_CD_HWY } from '../constants/epa';
 import { bodyClassLabel, driveGroup, resolveBrand } from './feGuideBrowse';
@@ -75,30 +75,29 @@ export const NOT_MEASURED_SOURCES = {
  * measurement. They are counted as excluded instead, and the view says how many.
  */
 export const CERT_MEASURES = [
-    { key: 'aero_c', label: 'Aero drag (C)', unit: 'lbf/mph²', digits: 4,
-      hint: 'The road-load coefficient that scales with the square of speed — the aerodynamic term. Present on 203 of 204 groups, so it is the highest-coverage figure the certification side has.' },
+    // Ordered as a curator reads a record: what the dynamometer was set to,
+    // then how efficiently the car turns energy into miles, then how much
+    // energy it holds, then how much is lost putting it there.
     { key: 'rolling_a', label: 'Rolling resistance (A)', unit: 'lbf', digits: 2,
       hint: 'The speed-independent road-load term: tyres and driveline drag.' },
-    { key: 'etw_lbs', label: 'Test weight', unit: 'lb', digits: 0,
-      hint: 'Equivalent test weight — the mass the dynamometer was set to, which moves with the pack.' },
-    { key: 'eta', label: 'Drivetrain efficiency (η)', unit: '', axisLabel: 'η', digits: 3, assumedIsNotData: true,
-      hint: 'Back-solved from DC-side phase consumption. Groups where it could not be derived fall back to a default and are excluded rather than counted as measurements.' },
-    { key: 'charger_eff', label: 'Charger efficiency', unit: '', axisLabel: 'ratio', digits: 3, assumedIsNotData: true,
-      hint: 'DC energy discharged ÷ AC energy to refill. Read only from a procedure the derivations use — 77 or 84, never 86, where a short cycle against a full recharge reads 0.04.' },
+    { key: 'aero_c', label: 'Aero drag (C)', unit: 'lbf/mph\u00b2', digits: 4,
+      hint: 'The road-load coefficient that scales with the square of speed \u2014 the aerodynamic term. Present on 203 of 204 groups, so it is the highest-coverage figure the certification side has.' },
+    { key: 'eta', label: 'Drivetrain efficiency (\u03b7, HWFET)', unit: '', axisLabel: '\u03b7', digits: 3, assumedIsNotData: true,
+      hint: 'Back-solved from the HWY phase against road load at the cycle\'s 48.3 mph average. A transient cycle measured with a steady-state formula, so it absorbs braking losses and the convexity of the drag term \u2014 which is why it reads about 13% below the steady-state figure. Groups where it could not be derived fall back to a default and are excluded rather than counted as measurements.' },
+    { key: 'ss_eta', label: 'Drivetrain efficiency (\u03b7, steady state)', unit: '', axisLabel: '\u03b7', digits: 3,
+      hint: 'Back-solved from the constant-speed phases at the 65 mph J1634 specifies. Only a multi-cycle test has those phases, so the coverage here against the HWFET measure is exactly how much of the fleet a steady-state basis could describe.' },
+    { key: 'ss_eta_ratio', label: 'Steady-state \u00f7 HWFET \u03b7', unit: '', axisLabel: 'ratio', digits: 4,
+      hint: 'Computed PER GROUP, on the groups carrying both. Its spread is what decides whether one fleet-wide factor can stand in for a missing steady-state measurement \u2014 and it is tight, median 1.128 with an interquartile range of 2.5%, which is what HWFET_TO_SS_ETA_RATIO is set from.' },
     { key: 'usable_kwh', label: 'Usable energy', unit: 'kWh', digits: 1,
-      hint: 'Total DC energy discharged to depletion on the derivation test — the pack\'s measured usable capacity.' },
-    { key: 'usable_fraction', label: 'Usable ÷ gross pack', unit: '', axisLabel: 'fraction', digits: 3,
-      hint: 'Measured usable energy against the guide\'s gross pack figure. Migration 053 cited 0.939–0.955 from four packs by hand; this is the same quantity across every linked group. Ratios above 1 are dropped — a pack cannot deliver more than it holds, so the two sources disagree and the gross figure is the softer of them.' },
-    { key: 'ss_eta', label: 'Drivetrain efficiency (η, steady state)', unit: '', axisLabel: 'η', digits: 3,
-      hint: 'Back-solved from the constant-speed phases at the 65 mph J1634 specifies, rather than from the HWFET phase. Only a multi-cycle test has those phases, so the coverage here against the HWFET measure is exactly how much of the fleet a steady-state basis could ever describe.' },
-    { key: 'ss_eta_ratio', label: 'Steady-state η ÷ HWFET η', unit: '', axisLabel: 'ratio', digits: 4,
-      hint: 'Computed PER GROUP, on the groups carrying both, which is the only form that answers the question. Two separate distributions can each look tight while the per-vehicle ratio scatters — and it is the scatter that decides whether one fleet-wide correction factor could ever stand in for a missing steady-state measurement. A tight ratio makes that defensible; a loose one means two honest bases beat one invented one.' },
-    { key: 'ss_shape_factor', label: 'Road-load shape (65 ÷ 48.3 mph)', unit: '', axisLabel: 'ratio', digits: 4,
-      hint: 'How much more road-load energy a mile at 65 mph costs than a mile at 48.3, from the coefficients alone. Needs no phases, so it covers nearly every group — and it is the half of the η ratio that varies by body class, because it is the vehicle\'s own aero and rolling balance.' },
-    { key: 'ss_eta_residual', label: 'η ratio ÷ road-load shape', unit: '', axisLabel: 'residual', digits: 4,
-      hint: 'The η ratio with the road-load shape divided out — what the transient cycle costs BEYOND what road load predicts. If this is tighter than the raw ratio, the class gradient was aerodynamics rather than an unexplained spread, and a vehicle with no constant-speed phase can be corrected using its OWN coefficients while borrowing only this. If it is no tighter, the decomposition bought nothing.' },
+      hint: 'Total DC energy discharged to depletion on the derivation test \u2014 the pack\'s measured usable capacity.' },
+    { key: 'usable_fraction', label: 'Usable \u00f7 gross pack', unit: '', axisLabel: 'fraction', digits: 3,
+      hint: 'Measured usable energy against the guide\'s gross pack figure. Migration 053 cited 0.939\u20130.955 from four packs by hand; this is the same quantity across every linked group. Ratios above 1 are dropped \u2014 a pack cannot deliver more than it holds, so the two sources disagree and the gross figure is the softer of them.' },
+    { key: 'charger_eff', label: 'Charger efficiency', unit: '', axisLabel: 'ratio', digits: 3, assumedIsNotData: true,
+      hint: 'DC energy discharged \u00f7 AC energy to refill. Read only from a procedure the derivations use \u2014 77 or 84, never 86, where a short cycle against a full recharge reads 0.04.' },
+    { key: 'etw_lbs', label: 'Test weight', unit: 'lb', digits: 0,
+      hint: 'Equivalent test weight \u2014 the mass the dynamometer was set to, which moves with the pack.' },
     { key: 'adjustment_factor', label: 'Effective adjustment (computed)', unit: '', axisLabel: 'factor', digits: 4,
-      hint: 'Published label range ÷ OUR computed unadjusted range — not EPA\'s published adjustment factor, which the guide carries separately and which sits at exactly 0.700 for over half the fleet. This one lands near 0.66 and almost never on 0.70, so it is measuring our computed range as much as the adjustment. Read it as a check on the model, not as the factor EPA applied.' },
+      hint: 'Published label range \u00f7 OUR computed unadjusted range \u2014 not EPA\'s published adjustment factor, which the guide carries separately and which sits at exactly 0.700 for over half the fleet. This one lands near 0.66 and almost never on 0.70, so it is measuring our computed range as much as the adjustment. Read it as a check on the model, not as the factor EPA applied.' },
 ];
 export const certMeasureByKey = (key) => CERT_MEASURES.find(m => m.key === key) ?? null;
 
@@ -126,7 +125,6 @@ export function certObservation(group, brandIndex) {
     const charger = deriveChargerEfficiency(group);
     const adjustment = deriveEffectiveAdjustmentFactor(group);
 
-    const shape = steadyStateShapeFactor(group);
     const usable = derivedUsableKwh(group);
     const gross = num(guide?.nominal_pack_kwh);
     const { brand, parent } = resolveBrand(guide?.division, brandIndex);
@@ -162,7 +160,6 @@ export function certObservation(group, brandIndex) {
             return f > 1 ? null : f;
         })(),
         ss_eta: isPossible(ssEta) ? (ssEta?.value ?? null) : null,
-        ss_shape_factor: shape,
         // Per group, and only where BOTH exist. A ratio of two fleet medians
         // would answer a different question — whether the typical car's two
         // figures differ — when what decides a correction factor is whether the
@@ -173,16 +170,6 @@ export function certObservation(group, brandIndex) {
             const ss = isPossible(ssEta) ? num(ssEta?.value) : null;
             if (measured == null || ss == null || measured <= 0) return null;
             return ss / measured;
-        })(),
-        // The unexplained remainder. Only where the ratio exists, since that is
-        // what is being decomposed — the shape factor alone is not a residual.
-        ss_eta_residual: (() => {
-            const measured = isMeasured('eta', eta?.source) && isPossible(eta)
-                ? num(eta?.value) : null;
-            const ss = isPossible(ssEta) ? num(ssEta?.value) : null;
-            if (measured == null || ss == null || measured <= 0) return null;
-            if (shape == null || shape <= 0) return null;
-            return (ss / measured) / shape;
         })(),
         adjustment_factor: adjustment?.value ?? null,
 
