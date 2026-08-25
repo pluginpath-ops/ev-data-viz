@@ -97,7 +97,9 @@ export function roadLoadForce(v, a, b, c) {
  * η_eff lumps motor inverter losses, gearbox losses, and the net benefit of
  * regenerative braking into a single composite factor. Typical EVs: 0.80–0.95.
  *
- * Fallback to DEFAULT_ETA (0.88) when HWFET data is absent.
+ * Fallback to DEFAULT_ETA when HWFET data is absent — the HWFET-basis
+ * constant, which is what this back-solve is on. Not restated here as a
+ * number: it is set from the corpus median and has already moved once.
  * Clamped to [0.60, 0.98] to reject physically implausible back-solves.
  *
  * @param {number} a — road-load A coefficient (lbf)

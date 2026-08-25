@@ -120,7 +120,13 @@ export const PATH_EFFORT = {
 // override is set (applied on page reload).
 export const EPA_DEFAULTS = {
     // assumptions
-    DEFAULT_ETA:         0.88,        // fallback drivetrain efficiency, HWFET basis
+    // Fallback drivetrain efficiency on the HWFET basis, from the fleet median
+    // of the measured values. Was 0.88, which sat outside the observed
+    // p5-p95 of 0.763-0.865 — a fallback only ever appears on records that
+    // could not be derived, so nothing on screen ever contradicted it and the
+    // statistics exclude it by design. The knob panel now shows this measure's
+    // distribution beside the value, which is what surfaced the gap.
+    DEFAULT_ETA:         0.826,
     // The same fallback on the CRUISE basis, for a speed curve with no phases
     // to derive from. A separate constant because the two are not the same
     // quantity: a steady-state η runs ~13% above a HWFET one on the same

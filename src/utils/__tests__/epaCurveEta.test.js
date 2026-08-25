@@ -124,3 +124,20 @@ describe('resolveCurveEta — the statistics keep the raw value', () => {
         expect(raw.value).toBeLessThan(resolveCurveEta(noSs()).value);
     });
 });
+
+describe('the two fallbacks are set from their own measures', () => {
+    it('keeps them on opposite sides of the ratio between the bases', () => {
+        // Both are fleet medians of the measure they stand in for, so the gap
+        // between them should be roughly the gap between the two bases. If a
+        // future edit moves one without the other, this is what notices.
+        const impliedRatio = DEFAULT_SS_ETA / DEFAULT_ETA;
+        expect(Math.abs(impliedRatio - HWFET_TO_SS_ETA_RATIO)).toBeLessThan(0.03);
+    });
+
+    it('keeps both inside what a drivetrain can do', () => {
+        for (const v of [DEFAULT_ETA, DEFAULT_SS_ETA]) {
+            expect(v).toBeGreaterThan(0.5);
+            expect(v).toBeLessThan(1);
+        }
+    });
+});
