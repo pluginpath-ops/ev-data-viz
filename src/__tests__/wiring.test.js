@@ -49,7 +49,7 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromGroup.js',
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
                      'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
-                     'epaIntegrity.js', 'epaAudit.js'];
+                     'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -109,6 +109,14 @@ describe('utilities built for the UI are reached by the UI', () => {
             'Consumed inside the module by certObservation. Exported so the precedence — a curator value first, then DC discharged on procedure 77 or 84, never 86 — is asserted directly rather than inferred from a ratio.',
         'epaCertStats.certObservation':
             'Consumed inside the module by certObservations, which the statistics view calls. Exported so one group\'s flattening — dimensions from the guide row, a fallback derivation dropped — is asserted without building a whole set.',
+        'epaTestSelection.scoreAgainstGuideRanges':
+            'The range fallback\'s scorer, consumed inside the module by selectTestForGuide. Exported so the implied-factor consistency rule is asserted directly rather than inferred from a selection.',
+        'epaTestSelection.SELECTION_MAX_SCORE':
+            'The credibility floor, consumed inside the module by decide and asserted by name so moving it is a deliberate edit.',
+        'epaTestSelection.SELECTION_MIN_MARGIN':
+            'How much better the winner must be than the runner-up before a selection is persisted. Consumed inside the module by selectTestForGuide, and exported so a threshold that decides whether a choice is recorded at all is named rather than a literal.',
+        'epaTestSelection.RANGE_SELECTION_MIN_MARGIN':
+            'The same guard for the range fallback, deliberately stricter because published ranges are whole miles. Exported alongside its sibling so the two can be asserted against each other.',
         'epaAudit.auditGroup':
             'Consumed inside the module by auditGroups, which the sweep calls. Exported so one record\'s verdict is assertable without building a whole list.',
         'epaIntegrity.integrityWarnings':
@@ -406,6 +414,30 @@ describe('the seams that broke before', () => {
         expect(read('src/utils/epaRecordFromGroup.js'),
             'the derivation must honour the selection')
             .toMatch(/preferred_test_number/);
+    });
+
+    it('lets a curator pick the test, through the path that persists it', () => {
+        // #228's own words: the warning "tells you a choice was made without
+        // letting you make it". The control has to be mounted, and it has to
+        // write through saveGroup — which is what tags the field `manual` and
+        // appends the audit entry. A direct write would skip both, and unlink
+        // would then wipe the choice, because isCuratorOwned looks for that tag.
+        const editor = read('src/components/epa/EpaCuratorEditor.jsx');
+        expect(editor, 'the curator editor must mount the picker')
+            .toMatch(/<PreferredTestPicker/);
+        expect(editor, 'the picker must write through the buffered save path')
+            .toMatch(/saveGroup\('preferred_test_number'/);
+
+        // One copy of the default's rule. The picker labels a row "Automatic";
+        // if that label and the derivation disagreed the control would be
+        // describing behaviour it does not have.
+        const picker = read('src/components/epa/PreferredTestPicker.jsx');
+        expect(picker, 'the picker must use the shared default, not its own copy')
+            .toMatch(/defaultMctTest/);
+        expect(read('src/utils/epaRecordFromGroup.js'),
+            'the derivation must use the same one').toMatch(/defaultMctTest\(/);
+        expect(picker, 'the picker must not re-implement the tie-break')
+            .not.toMatch(/localeCompare/);
     });
 
     it('checks a recomputed range against the test it derived from', () => {

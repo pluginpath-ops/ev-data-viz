@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     selectTestForGuide, scoreAgainstGuide, highwayUnadjustedMpge, chargeEfficiencyOf,
     SELECTION_MIN_MARGIN, SELECTION_MAX_SCORE,
-    scoreAgainstGuideRanges, RANGE_SELECTION_MIN_MARGIN,
+    scoreAgainstGuideRanges, RANGE_SELECTION_MIN_MARGIN, defaultMctTest,
 } from '../epaTestSelection';
 
 /**
@@ -201,5 +201,33 @@ describe('the range fallback, for guide rows with no unadjusted MPGe', () => {
 
     it('declines when neither signal can score', () => {
         expect(selectTestForGuide([JUL, AUG], {}).reason).toBe('not-scorable');
+    });
+});
+
+describe('defaultMctTest — the rule when nothing has been selected', () => {
+    it('takes the most recent', () => {
+        expect(defaultMctTest([JUL, AUG]).test_number).toBe('TMBX10092210');
+    });
+
+    it('gives the same answer whichever order the tests arrive in', () => {
+        // The picker labels one row "Automatic". If that label and the
+        // derivation disagreed, the control would be lying about what it does.
+        expect(defaultMctTest([AUG, JUL]).test_number).toBe('TMBX10092210');
+    });
+
+    it('falls back to test number when dates tie', () => {
+        const a = { ...JUL, test_number: '100', test_date: '2025-07-22' };
+        const b = { ...AUG, test_number: '200', test_date: '2025-07-22' };
+        expect(defaultMctTest([a, b]).test_number).toBe('200');
+    });
+
+    it('ignores tests that are not multi-cycle', () => {
+        expect(defaultMctTest([{ ...AUG, procedure_code: 84 }, JUL]).test_number)
+            .toBe('TMBX10091675');
+    });
+
+    it('has nothing to return when there are no multi-cycle tests', () => {
+        expect(defaultMctTest([{ ...JUL, procedure_code: 81 }])).toBeNull();
+        expect(defaultMctTest([])).toBeNull();
     });
 });

@@ -1680,6 +1680,20 @@ body {
     border-left: 3px solid var(--color-border);
     background: var(--color-surface-2, transparent);
 }
+/* Which multi-cycle test a group derives from (#228). Radios rather than a
+   select: the options carry evidence — each test's derived figure and its
+   distance from what EPA published — and a dropdown hides all of it until the
+   moment it is closed again. */
+.epa-test-picker {
+    @apply rounded border border-[var(--color-border)] p-3 mb-3;
+    background: var(--color-surface-muted);
+}
+.epa-test-option {
+    @apply flex items-start gap-2 py-1 cursor-pointer;
+}
+.epa-test-option input { @apply mt-1 shrink-0; }
+.epa-test-option:has(input:disabled) { @apply cursor-default; }
+
 /* One row of the Admin reconciliation sweep (#229). Separated by a rule rather
    than a card each: the list is scanned worst-first and a hundred cards is a
    hundred boxes to read past. */
