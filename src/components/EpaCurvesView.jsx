@@ -871,12 +871,21 @@ export default function EpaCurvesView({
                                                                             {eta != null && (
                                                                                 <span>
                                                                                     η<sub>eff</sub>: {!etaResult.certain && '~'}{(eta * 100).toFixed(1)}%
-                                                                                    {etaResult.source === 'measured'          && <> · HWFET DC</>}
-                                                                                    {etaResult.source === 'measured-fallback' && <> · Hwy DC (proc 84)</>}
-                                                                                    {etaResult.source === 'estimated'         && <> · default η</>}
-                                                                                    <InfoIcon text={EPA_EXPLAINERS.hwfetCalibration} />
-                                                                                    {etaResult.flags?.includes('eta-out-of-band') && (
-                                                                                        <span title="Back-solved η outside the 75–92% sanity band — check phase data"> ⚠</span>
+                                                                                    {/* The curve runs on the CRUISE basis, so these name where
+                                                                                        that came from. 'measured' used to mean the HWFET phase
+                                                                                        and now means the constant-speed one — a badge left
+                                                                                        saying HWFET would have described the wrong phase of
+                                                                                        the wrong test. */}
+                                                                                    {etaResult.source === 'measured'  && <> · steady-state DC (65 mph)</>}
+                                                                                    {etaResult.source === 'corrected' && (
+                                                                                        <span title="No constant-speed phase on this record, so its highway η was scaled to a cruise basis by the fleet median ratio">
+                                                                                            {' · '}corrected from Hwy DC
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {etaResult.source === 'estimated' && <> · default η</>}
+                                                                                    <InfoIcon text={EPA_EXPLAINERS.curveEta} />
+                                                                                    {etaResult.flags?.includes('correction-nonphysical') && (
+                                                                                        <span title="Correcting this record's highway η put it above 1, so the default is used instead"> ⚠</span>
                                                                                     )}
                                                                                 </span>
                                                                             )}

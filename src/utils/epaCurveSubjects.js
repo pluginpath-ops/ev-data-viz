@@ -52,7 +52,7 @@ const num = (v) => {
 export const CURVE_TIERS = [
     { key: 'measured', label: 'Full test cycle',
       tooltip: 'efficiency and capacity both come from this record’s own phases.',
-      hint: 'This record carries its own test phases, so η is back-solved from them and usable capacity is the DC actually discharged to depletion. Both halves of the energy model are measured.' },
+      hint: 'This record ran a constant-speed section, so η is back-solved from it at 65 mph — the same steady cruise this curve plots — and usable capacity is the DC actually discharged to depletion. Both halves of the energy model are this vehicle\'s own.' },
     { key: 'corrected', label: 'Corrected efficiency',
       tooltip: 'capacity is this record’s own; efficiency is its highway figure scaled to a cruise basis.',
       hint: 'This record measured its capacity but never ran a constant-speed section, so η comes from its highway phase scaled by the fleet median of the ratio between the two. Half the fleet sits within a few percent of that ratio. It is a real improvement on the highway figure for a cruise curve — which reads about 13% low — and it is still borrowed from other vehicles.' },
