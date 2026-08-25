@@ -15,6 +15,7 @@ import { fuelEconomySearchUrl, baseModelFor } from '../../utils/fuelEconomyLink'
 import { labelRangeCheck, labelRangeCheckNote } from '../../utils/labelRangeCheck';
 import DerivedValues from './DerivedValues';
 import TestPhaseEditor from './TestPhaseEditor';
+import PreferredTestPicker from './PreferredTestPicker';
 import AuditHistory from './AuditHistory';
 import { ASSUMED_CHARGER_EFF, DEFAULT_ACCESSORY_W } from '../../constants/epa';
 
@@ -359,6 +360,17 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange, 
 
             {/* Sections 3–5: Tests & phases */}
             <div className="mb-4">
+                {/* Which run the figures come from, above the tests themselves:
+                    the choice governs everything already rendered, so reading it
+                    after the fact is reading it too late (#228). */}
+                <PreferredTestPicker
+                    tests={group.epa_tests}
+                    value={group.preferred_test_number ?? null}
+                    publishedHwyMpge={group.unadj_hwy_mpge ?? null}
+                    canEdit={canEdit}
+                    onSave={v => saveGroup('preferred_test_number', v)}
+                />
+
                 <TestPhaseEditor
                     tests={group.epa_tests}
                     canEdit={canEdit}

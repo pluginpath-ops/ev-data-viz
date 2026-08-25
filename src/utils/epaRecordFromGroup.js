@@ -25,6 +25,7 @@
  */
 import { PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS } from '../constants/epa';
 import { resolvePhaseTypes } from './phaseTypes';
+import { defaultMctTest } from './epaTestSelection';
 
 const num = (v) => {
     const n = Number(v);
@@ -88,7 +89,7 @@ function preferredMctTest(tests, preferredTestNumber = null) {
     // published highway figure identifies the run EPA used — and on Mercedes'
     // CLA 350 that is the OLDER of the two, so the default was picking the test
     // EPA did not use. A curator may also set it by hand. Either way it is a
-    // stated choice and this is a fallback for when none was made.
+    // stated choice and the default is for when none was made.
     if (preferredTestNumber) {
         const chosen = mcts.find(t => t.test_number === preferredTestNumber);
         if (chosen) return chosen;
@@ -97,11 +98,9 @@ function preferredMctTest(tests, preferredTestNumber = null) {
         // reasonable answer, and epaAudit reports the dangling reference.
     }
 
-    return [...mcts].sort((a, b) => {
-        const date = String(b.test_date ?? '').localeCompare(String(a.test_date ?? ''));
-        if (date !== 0) return date;
-        return (num(b.test_number) ?? 0) - (num(a.test_number) ?? 0);
-    })[0];
+    // One copy of this rule, shared with the curator picker so the option it
+    // labels "Automatic" is the row this actually returns.
+    return defaultMctTest(mcts);
 }
 
 /**

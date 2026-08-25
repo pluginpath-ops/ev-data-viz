@@ -71,6 +71,28 @@ const num = (v) => {
 /** Only a test that could have produced a published figure is a candidate. */
 const mctsOf = (tests = []) => tests.filter(t => num(t.procedure_code) === PROC_MCT);
 
+/**
+ * The test used when nothing has selected one: the most recent, falling back to
+ * test number and then to position.
+ *
+ * Lives here rather than inside epaRecordFromGroup because two places need the
+ * same answer — the derivation, and the curator picker that has to say which
+ * row "Automatic" would land on. A second copy of a tie-break is how the label
+ * and the behaviour drift apart.
+ *
+ * Deterministic on purpose: an arbitrary pick that changes between loads is
+ * worse than a wrong one that holds still.
+ */
+export function defaultMctTest(tests = []) {
+    const mcts = mctsOf(tests);
+    if (mcts.length <= 1) return mcts[0] ?? null;
+    return [...mcts].sort((a, b) => {
+        const date = String(b.test_date ?? '').localeCompare(String(a.test_date ?? ''));
+        if (date !== 0) return date;
+        return (num(b.test_number) ?? 0) - (num(a.test_number) ?? 0);
+    })[0];
+}
+
 /** Wall-side highway unadjusted MPGe for one test, from its own phases. */
 export function highwayUnadjustedMpge(test) {
     const phases = (test?.epa_test_phases ?? test?.phases ?? [])
