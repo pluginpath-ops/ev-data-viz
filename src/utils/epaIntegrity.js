@@ -111,7 +111,10 @@ export function checkRecordIntegrity(group) {
         // ── Recharge below draw ─────────────────────────────────────────────
         // Not a band and not tunable. Putting less energy in at the wall than
         // came out of the pack requires the charger to generate energy.
-        if (t.acRechargeKwh != null && t.totalDcKwh != null
+        // Same restriction, same reason: on a single-cycle test the two are
+        // not the same quantity, so one exceeding the other proves nothing.
+        if (t.procedureCode === PROC_MCT
+            && t.acRechargeKwh != null && t.totalDcKwh != null
             && t.acRechargeKwh > 0 && t.totalDcKwh > 0
             && t.acRechargeKwh < t.totalDcKwh) {
             findings.push(finding(
@@ -126,7 +129,16 @@ export function checkRecordIntegrity(group) {
         // ── Charger efficiency ──────────────────────────────────────────────
         // The 1% records. Computed here rather than read from the derivation
         // layer so this module stays answerable from the record alone.
-        if (t.acRechargeKwh > 0 && t.totalDcKwh > 0) {
+        //
+        // ONLY on a full-depletion run. `total_dc_energy_kwh` is a column name
+        // that lies on a single-cycle test: for procedure 77 it is the energy
+        // drawn to depletion, but for 81 (CD-UDDS) and 84 (CD-Highway) it is the
+        // energy of ONE cycle, while `ac_recharge_kwh` is still the whole pack
+        // going back in. Dividing the two compares a 7-mile cycle against a
+        // full recharge — BMW's i7, tested on 81 + 84, reads 1.6%. That is the
+        // arithmetic working on incomparable inputs, not a broken charger, and
+        // reporting it would send a curator after a fault that is not there.
+        if (t.procedureCode === PROC_MCT && t.acRechargeKwh > 0 && t.totalDcKwh > 0) {
             const eff = t.totalDcKwh / t.acRechargeKwh;
             if (eff >= 1) {
                 // already reported as recharge-below-draw; saying it twice adds nothing
@@ -190,8 +202,10 @@ export function checkRecordIntegrity(group) {
     if (!g.tests.some(t => t.procedureCode === PROC_MCT)) {
         findings.push(finding(
             'no-mct', 'warning', 'No multi-cycle test',
-            'Nothing in this group ran procedure 77, so city and highway consumption cannot be '
-            + 'separated from one another.',
+            'Nothing in this group ran procedure 77. City and highway consumption cannot be '
+            + 'separated from one another, and — the sharper consequence — no test here measures '
+            + 'pack capacity: a single-cycle test reports one cycle\u2019s energy, not a depletion. '
+            + 'Anything reading capacity off these tests gets a few kWh.',
             {},
         ));
     }
