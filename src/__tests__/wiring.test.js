@@ -49,7 +49,8 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromGroup.js',
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
                      'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
-                     'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js'];
+                     'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
+                     'epaBandEvidence.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -109,6 +110,12 @@ describe('utilities built for the UI are reached by the UI', () => {
             'Consumed inside the module by certObservation. Exported so the precedence — a curator value first, then DC discharged on procedure 77 or 84, never 86 — is asserted directly rather than inferred from a ratio.',
         'epaCertStats.certObservation':
             'Consumed inside the module by certObservations, which the statistics view calls. Exported so one group\'s flattening — dimensions from the guide row, a fallback derivation dropped — is asserted without building a whole set.',
+        'epaBandEvidence.BAND_EVIDENCE':
+            'The band-to-measure mapping. Consumed inside the module by bandEvidence and allBandEvidence, and exported so a test can assert every band points at a measure that exists — a band shown against the wrong distribution is worse than none, because it looks like evidence.',
+        'epaBandEvidence.bandEvidence':
+            'Consumed inside the module by allBandEvidence, which the knob panel calls. Exported so one band\'s summary — and its refusal to describe a handful of records — is assertable without building the whole set.',
+        'epaBandEvidence.BAND_EVIDENCE_MIN_N':
+            'The floor below which quantiles describe a handful of cars rather than a corpus. Consumed inside the module and asserted by name so lowering it is a deliberate edit.',
         'epaTestSelection.scoreAgainstGuideRanges':
             'The range fallback\'s scorer, consumed inside the module by selectTestForGuide. Exported so the implied-factor consistency rule is asserted directly rather than inferred from a selection.',
         'epaTestSelection.SELECTION_MAX_SCORE':
@@ -414,6 +421,25 @@ describe('the seams that broke before', () => {
         expect(read('src/utils/epaRecordFromGroup.js'),
             'the derivation must honour the selection')
             .toMatch(/preferred_test_number/);
+    });
+
+    it('shows a band its own evidence, and pays for it only on the admin panel', () => {
+        // These bounds decide whether a figure is flagged on every EPA card and
+        // all of them were set by hand. The corpus can say what the real spread
+        // is — but only where that costs nothing: the knob panel, on the same
+        // fetch the statistics view already makes. A vehicle card must never
+        // pull the corpus to decorate a row.
+        const knobs = read('src/components/admin/ConstantsKnobs.jsx');
+        expect(knobs, 'the knob panel must show each band its evidence')
+            .toMatch(/allBandEvidence\(/);
+        expect(knobs, 'and judge the live value, not the default')
+            .toMatch(/bandVerdict/);
+
+        for (const f of ['src/components/EpaVehicleSection.jsx',
+                         'src/components/epa/DerivedValues.jsx']) {
+            expect(read(f), `${f} must not pull the corpus`)
+                .not.toMatch(/BandEvidence|getCertGroupsForStats/);
+        }
     });
 
     it('lets a curator pick the test, through the path that persists it', () => {

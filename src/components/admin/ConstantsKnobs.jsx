@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { KNOB_GROUPS, knobDefault } from '../../constants/knobs';
 import { getOverrides, setOverride, clearOverrides } from '../../constants/overrides';
+import { useAppContext } from '../../context/AppContext';
+import { useAsyncResource } from '../../hooks/useAsyncResource';
+import { allBandEvidence, bandVerdict } from '../../utils/epaBandEvidence';
 
 /**
  * Admin panel for tuning the EPA model constants in real time.
@@ -15,6 +18,14 @@ const eq = (a, b) =>
 const numOrNull = (s) => (s === '' || s == null ? null : Number(s));
 
 export default function ConstantsKnobs() {
+    // The corpus, once, on an admin page. Nothing on a vehicle card pays for
+    // this — showing a band's evidence beside a knob costs one fetch on the
+    // panel that sets it, which is the same trade the statistics view makes.
+    const { getCertGroupsForStats } = useAppContext();
+    const loadCert = useCallback(() => getCertGroupsForStats(), [getCertGroupsForStats]);
+    const { data: certGroups } = useAsyncResource(loadCert, []);
+    const evidence = useMemo(() => allBandEvidence(certGroups ?? [], null), [certGroups]);
+
     const [overrides, setOverrides] = useState(getOverrides);
     const [dirty, setDirty] = useState(false);
 
@@ -89,6 +100,7 @@ export default function ConstantsKnobs() {
                                 modified={isModified(knob.key)}
                                 onChange={(v) => commit(knob.key, v)}
                                 onReset={() => resetKey(knob.key)}
+                                evidence={evidence[knob.key] ?? null}
                             />
                         ))}
                     </div>
@@ -98,7 +110,46 @@ export default function ConstantsKnobs() {
     );
 }
 
-function KnobRow({ knob, value, def, modified, onChange, onReset }) {
+/**
+ * What the corpus says about a band, under the band's own control.
+ *
+ * These bounds decide whether a derived figure is flagged on every EPA card and
+ * all of them were set by hand. The records they judge are now numerous enough
+ * to say what the real spread is — so it is shown here rather than baked into
+ * the constants, because the corpus moves and a literal in a file is re-read
+ * never. It informs the choice without making it: how much of a tail to call
+ * suspect is a curation decision, which is why these are knobs at all.
+ */
+function BandEvidence({ evidence, band }) {
+    if (!evidence) return null;
+
+    if (!evidence.enough) {
+        return (
+            <p className="text-[11px] text-faint mt-0.5">
+                observed: only {evidence.n} of {evidence.total} records carry a measured
+                {' '}{evidence.label.toLowerCase()} — too few to set a bound from.
+            </p>
+        );
+    }
+
+    const d = (v) => v.toFixed(evidence.digits);
+    const verdict = bandVerdict(band, evidence);
+    const tone = verdict?.key === 'tight' ? 'var(--color-danger)'
+        : verdict?.key === 'loose' ? 'var(--color-warning)'
+        : 'var(--color-success)';
+
+    return (
+        <p className="text-[11px] text-faint mt-0.5">
+            observed: <code>{d(evidence.p5)}–{d(evidence.p95)}</code> p5–p95,
+            {' '}median <code>{d(evidence.median)}</code>,
+            {' '}full <code>{d(evidence.min)}–{d(evidence.max)}</code>
+            {' '}(n={evidence.n} measured of {evidence.total})
+            {verdict && <>{' · '}<span style={{ color: tone }}>{verdict.text}</span></>}
+        </p>
+    );
+}
+
+function KnobRow({ knob, value, def, modified, onChange, onReset, evidence }) {
     const { key, label, help, kind, min, max, step, unit } = knob;
 
     return (
@@ -120,6 +171,7 @@ function KnobRow({ knob, value, def, modified, onChange, onReset }) {
                     default: <code>{Array.isArray(def) ? `${def[0]}–${def[1]}` : String(def)}</code>
                     {unit ? ` ${unit}` : ''}
                 </p>
+                <BandEvidence evidence={evidence} band={value} />
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
