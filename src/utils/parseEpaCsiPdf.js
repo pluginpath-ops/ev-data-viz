@@ -567,14 +567,20 @@ export function parseEpaCsiText(rawItems) {
         const coefficient_sets = parseCoefficients(items, ci, end, equivTestWeightLbs);
         const tests = parseTests(items, ci, end);
 
-        // CD range is a GROUP-level (Section 6) field, not an epa_tests column.
-        // Take it from the preferred test (77 → 84 → first), then drop it off the
-        // test rows so the epa_tests insert only has valid columns.
+        // The CSI states these PER TEST and parseTests has always read them.
+        // They used to be deleted here, because epa_tests had nowhere to put
+        // them — so a group holding two multi-cycle tests kept one test's
+        // ranges and the derivation then used the OTHER test's phases. Migration
+        // 060 adds the columns; they are kept on each test now.
+        //
+        // The group still carries a headline figure, from the first procedure-77
+        // test, because that is what the guide comparison is stated against.
+        // Which one the checks compare against is decided in epaRecordFromGroup,
+        // where the derivation test is chosen.
         const pref = tests.find(t => t.procedure_code === 77)
             || tests.find(t => t.procedure_code === 84) || tests[0];
         const cd_range_combined_calc = pref?.cd_range_combined_calc ?? null;
         const cd_range_hwy_calc = pref?.cd_range_hwy_calc ?? null;
-        tests.forEach(t => { delete t.cd_range_combined_calc; delete t.cd_range_hwy_calc; });
 
         // The certification's identity when page 1 gave it, else the carryover
         // source — which is what the two "Original …" fields hold, and which is

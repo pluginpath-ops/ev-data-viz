@@ -206,3 +206,83 @@ describe('auditGroup — the real CLA 350, whose label is DC-side', () => {
         expect(auditGroup(real()).rangeCheck.worst).toBe('agrees');
     });
 });
+
+describe('auditGroup — a group holding two multi-cycle tests (#227)', () => {
+    /**
+     * Mercedes' CLA 350 was run twice, a month apart, and the two disagree by
+     * about 3%: 461.373/450.544 on 2025-07-22 and 475.482/460.354 on 2025-08-19.
+     *
+     * The derivation uses the most RECENT test. The group's stated ranges were
+     * set at import from the FIRST. So the bag check recomputed one test's
+     * phases and compared them against the other test's figures, and called the
+     * difference a fault — on exactly the records where careful reading matters
+     * most, and using the one check that otherwise needs no external source.
+     */
+    const twoTests = ({ perTest = true } = {}) => {
+        const g = cla();
+        const first = g.epa_tests[0];
+        // The REAL second run, not a copy of the first — its phases are what
+        // make the two ranges differ, and a copied fixture would reconcile
+        // against either test and prove nothing.
+        const second = {
+            test_number: 'TMBX10092210', test_date: '2025-08-19', procedure_code: 77,
+            total_dc_energy_kwh: 89.595, ac_recharge_kwh: 99.4041,
+            cd_range_combined_calc: perTest ? 475.482 : undefined,
+            cd_range_hwy_calc: perTest ? 460.354 : undefined,
+            epa_test_phases: [
+                { phase_index: 1, phase_type: 'UDDS', distance_mi: 7.495,    dc_energy_kwh: 1.5658 },
+                { phase_index: 2, phase_type: 'HWY',  distance_mi: 10.257,   dc_energy_kwh: 2.0355 },
+                { phase_index: 3, phase_type: 'UDDS', distance_mi: 7.4751,   dc_energy_kwh: 1.4221 },
+                { phase_index: 4, phase_type: 'SS',   distance_mi: 303.3528, dc_energy_kwh: 70.9878 },
+                { phase_index: 5, phase_type: 'UDDS', distance_mi: 7.5068,   dc_energy_kwh: 1.4092 },
+                { phase_index: 6, phase_type: 'HWY',  distance_mi: 10.2669,  dc_energy_kwh: 1.9589 },
+                { phase_index: 7, phase_type: 'UDDS', distance_mi: 7.4919,   dc_energy_kwh: 1.3952 },
+                { phase_index: 8, phase_type: 'SS',   distance_mi: 38.0074,  dc_energy_kwh: 8.8209 },
+            ],
+        };
+        if (perTest) {
+            first.cd_range_combined_calc = 461.373;
+            first.cd_range_hwy_calc = 450.544;
+        }
+        g.epa_tests = [first, second];
+        // The group keeps the FIRST test's figures, which is what import writes.
+        g.cd_range_combined_calc = 461.373;
+        g.cd_range_hwy_calc = 450.544;
+        // Both runs are wall-side-checked against the same published pair; the
+        // MPGe check is not what this block is about.
+        g.unadj_city_mpge = null;
+        g.unadj_hwy_mpge = null;
+        return g;
+    };
+
+    it('compares against the ranges of the test it derived from', () => {
+        // The second test's phases against the second test's stated ranges.
+        const r = auditGroup(twoTests());
+        expect(r.notes.some(n => n.includes('TMBX10092210'))).toBe(true);
+        expect(r.rangeCheck.checked).toBe(true);
+        for (const c of r.rangeCheck.cycles) {
+            expect(Math.abs(c.deltaPct), `${c.label} should reconcile`).toBeLessThan(1);
+        }
+    });
+
+    it('reported a false disagreement before, on the same data', () => {
+        // Without per-test ranges there is nothing to compare like with like:
+        // the group's pair belongs to the other laboratory's run.
+        const r = auditGroup(twoTests({ perTest: false }));
+        const worst = Math.max(...r.rangeCheck.cycles.map(c => Math.abs(c.deltaPct)));
+        expect(worst).toBeGreaterThan(1);
+    });
+
+    it('says so, rather than letting the old verdict pass as sound', () => {
+        // Records imported before migration 060 still cross tests, and the
+        // check's verdict is worth less on them. Silence would hide that.
+        const r = auditGroup(twoTests({ perTest: false }));
+        expect(r.notes.some(n => n.includes('re-import'))).toBe(true);
+    });
+
+    it('leaves a group with one test alone', () => {
+        // Nothing to cross, so no caveat and no behaviour change.
+        const r = auditGroup(cla());
+        expect(r.notes.some(n => n.includes('re-import'))).toBe(false);
+    });
+});

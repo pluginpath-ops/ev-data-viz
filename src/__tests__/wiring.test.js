@@ -373,6 +373,29 @@ describe('the seams that broke before', () => {
                            'ac_recharge_kwh']) {
             expect(fn, `the audit query must select ${col}`).toMatch(new RegExp(col));
         }
+
+        // The per-test ranges specifically (#227). They fall back to the
+        // group's when absent, so forgetting them in a query does not error —
+        // it silently reinstates the cross-test comparison the fix removed.
+        const testsSelect = fn.slice(fn.indexOf('epa_tests('));
+        expect(testsSelect.slice(0, testsSelect.indexOf(')')),
+            'the audit query must select the per-test cd ranges')
+            .toMatch(/cd_range_combined_calc/);
+    });
+
+    it('checks a recomputed range against the test it derived from', () => {
+        // The group's cd_range_* is set at import from the FIRST procedure-77
+        // test while the derivation uses the most RECENT, so reading the group
+        // compared one laboratory's phases against another's stated figures.
+        // On the real CLA 350 that was a 3.06% disagreement that was really two
+        // runs a month apart. Both readers must go through statedRanges.
+        for (const f of ['src/utils/epaAudit.js', 'src/components/EpaVehicleSection.jsx']) {
+            const text = read(f);
+            expect(text, `${f} must not read cd_range off the group`)
+                .not.toMatch(/cityMi:\s*g(roup)?\??\.cd_range_combined_calc/);
+            expect(text, `${f} must compare against the derivation test's ranges`)
+                .toMatch(/statedRanges/);
+        }
     });
 
     it('makes no judgement the per-vehicle card does not', () => {

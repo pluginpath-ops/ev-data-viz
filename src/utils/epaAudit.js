@@ -81,7 +81,7 @@ const REASON_TEXT = {
  * reach — which makes this the only place their verdict is visible.
  */
 export function auditGroup(group) {
-    const { record, reason, inferredPhaseTypes, competingMctTests, derivedFrom }
+    const { record, reason, inferredPhaseTypes, competingMctTests, derivedFrom, statedRanges }
         = epaRecordFromGroup(group);
 
     // Runs on the raw record, so it answers even when nothing can be derived —
@@ -89,9 +89,11 @@ export function auditGroup(group) {
     const integrity = checkRecordIntegrity(group);
 
     const model = record ? buildMethodologyModel(record) : null;
+    // From the test the phases came from (#227). Reading the group's pair
+    // compared one laboratory's phases against another's stated figures.
     const rangeCheck = checkStatedRanges(model, {
-        cityMi: group?.cd_range_combined_calc,
-        hwyMi:  group?.cd_range_hwy_calc,
+        cityMi: statedRanges?.cityMi,
+        hwyMi:  statedRanges?.hwyMi,
     });
     const mpgeCheck = checkUnadjustedMpge(model, {
         city: group?.unadj_city_mpge,
@@ -108,6 +110,11 @@ export function auditGroup(group) {
     if (competingMctTests > 1) {
         notes.push(`${competingMctTests} multi-cycle tests; derived from `
             + `${derivedFrom?.testNumber ?? 'the most recent'}`);
+    }
+    if (statedRanges?.source === 'group' && competingMctTests > 1) {
+        // The pre-060 shape: no per-test ranges to compare against, so the
+        // check is still crossing tests and its verdict is worth less.
+        notes.push('stated ranges are the group\'s, not this test\'s — re-import to compare like with like');
     }
     if (inferredPhaseTypes > 0) {
         notes.push(`${inferredPhaseTypes} phase${inferredPhaseTypes === 1 ? '' : 's'} typed by distance`);
