@@ -128,12 +128,38 @@ function certYearFrom(items) {
     return null;
 }
 
+/**
+ * The certification test group, skipping the same blanks certYearFrom does.
+ *
+ * The previous version read `items[i + 1]` and a comment claimed it escaped the
+ * separator problem "by accident" because it scans every occurrence. It does
+ * not. EVERY occurrence has the blank, so every candidate was a space, nothing
+ * matched the ID shape, and the result was null on every certificate — Volvo,
+ * Mercedes and BMW alike. `epa_test_family_id` therefore fell back to the
+ * carryover group on every import, which is both the wrong identity and the
+ * loss of a real join: the Fuel Economy Guide carries this exact string as
+ * "#1 Smog Rating Test Group".
+ *
+ * Scanning past empties keeps what the original was actually right about —
+ * checking the SHAPE rather than trusting position. The one occurrence that is
+ * not a test group is the "Official Test Numbers" column header, whose value
+ * slot holds "Fuel", and an ID has a dot and no spaces.
+ */
+function certGroupFrom(items) {
+    for (const i of indicesWhere(items, s => s === 'Test Group')) {
+        for (let j = i + 1; j < Math.min(i + 5, items.length); j++) {
+            const v = String(items[j] ?? '').trim();
+            if (!v) continue;
+            if (TEST_GROUP_ID.test(v)) return v;
+            break;   // first non-blank was not an ID: wrong occurrence, try the next
+        }
+    }
+    return null;
+}
+
 function parseCertHeader(rawItems) {
     const items = rawItems || [];
-    const certTestGroup = indicesWhere(items, s => s === 'Test Group')
-        .map(i => String(items[i + 1] ?? '').trim())
-        .find(v => TEST_GROUP_ID.test(v)) ?? null;
-    return { certTestGroup, certModelYear: certYearFrom(items) };
+    return { certTestGroup: certGroupFrom(items), certModelYear: certYearFrom(items) };
 }
 
 /**
@@ -303,7 +329,7 @@ export function parseCoveredModels(items) {
  * per category one row of 7 numbers (target A/B/C, set A/B/C, HP). Returns
  * coefficient_sets[].
  */
-function parseCoefficients(items, start, end) {
+function parseCoefficients(items, start, end, equivTestWeightLbs = null) {
     const head = idxOf(items, 'Target Coefficients', start, end);
     if (head < 0) return [];
     const sets = [];
@@ -320,6 +346,10 @@ function parseCoefficients(items, start, end) {
             is_primary: cat === 'City/Highway',
             target_a: nums[0], target_b: nums[1], target_c: nums[2],
             set_a: nums[3], set_b: nums[4], set_c: nums[5],
+            // Stated once per configuration, on the page above this table, and
+            // shared by every category on it — the categories are different
+            // coefficient sets for the same vehicle at the same inertia class.
+            equiv_test_weight_lbs: equivTestWeightLbs,
         });
         i = j - 1;
     }
@@ -393,14 +423,29 @@ function parseTests(items, start, end) {
         //      Rivian/BMW/Lucid MCT do this (~142 kWh).
         //   2. Per-phase KW-HRS are dummy/zero and the total is in "System End
         //      State of Charge Watt-hours" (Tesla CD-Hwy/UDDS).
-        // So: use the phase sum when phases carry real energy; otherwise the SoC
-        // field. The SoC field is *labelled* Watt-hours but some OEMs report kWh
-        // there (Tesla: 78.688) and others Wh — normalise by magnitude (EV packs
-        // are ~30–250 kWh, so >400 ⇒ value is Wh).
+        //   3. A single-cycle test carries BOTH, and they are different
+        //      quantities. BMW's i7 (TBMXV00.0G7A) reports a real 2.446 kWh
+        //      against a 10.25-mile phase — one HWFET — while the SoC field
+        //      holds 106.227 kWh, the whole depletion. A single-cycle test
+        //      drives ONE cycle and repeats it until the pack is empty, so the
+        //      phase is the RATE and the SoC field is the CAPACITY.
+        //
+        // So: on a multi-cycle test the phases span the depletion and their sum
+        // IS the total. On a single-cycle test it never is, however real the
+        // per-phase energy looks. Taking the phase sum there stored 2.446 kWh as
+        // the pack, which is where the 2-5 kWh batteries came from — and made
+        // charging efficiency 2.446/119.873 = 2%, which is one cycle measured
+        // against a full recharge.
+        //
+        // The SoC field is *labelled* Watt-hours but some OEMs report kWh there
+        // (Tesla: 78.688) and others Wh — normalise by magnitude (EV packs are
+        // ~30–250 kWh, so >400 ⇒ value is Wh).
         const endSoc = parseNum(valAfter(items, 'System End State of Charge Watt-hours', ti, tEnd));
         const endSocKwh = endSoc == null ? null : (endSoc > 400 ? endSoc / 1000 : endSoc);
-        const total_dc = phaseDc > 0 ? phaseDc : endSocKwh;
         const procCode = procMatch ? Number(procMatch[1]) : null;
+        const singleCycle = procCode === 84 || procCode === 81;
+        const total_dc = (singleCycle && endSocKwh > 0) ? endSocKwh
+            : (phaseDc > 0 ? phaseDc : endSocKwh);
 
         // Single-cycle CD tests (84 = Highway, 81 = UDDS) whose per-phase data is
         // dummy: the whole depletion IS one cycle, so synthesize one phase from
@@ -420,7 +465,14 @@ function parseTests(items, start, end) {
                 }];
             }
         }
-        const total_dist2 = effPhases.reduce((s, p) => s + (p.distance_mi ?? 0), 0);
+        // Distance has to describe the same run as the energy above. On a
+        // single-cycle test the phase is one cycle, so its distance is not what
+        // total_dc was drawn over — the depletion range is. Leaving the phase
+        // sum here paired 106 kWh with 10.25 miles.
+        const cdActualMi = parseNum(valAfter(items, 'Charge Depleting Range (Actual miles)', ti, tEnd))
+            ?? parseNum(valAfter(items, 'Charge Depleting Range (Calculated miles)', ti, tEnd));
+        const phaseDist = effPhases.reduce((s, p) => s + (p.distance_mi ?? 0), 0);
+        const total_dist2 = (singleCycle && phaseDc > 0 && cdActualMi > 0) ? cdActualMi : phaseDist;
 
         // The EPA "Test #" + value precede the procedure header (Test # → value
         // → Test Procedure → "NN - …"), so look back a few items for it.
@@ -505,7 +557,14 @@ export function parseEpaCsiText(rawItems) {
         const rawMake = valAfter(items, 'Represented Test Vehicle Make', ci, end);
         const make = (!rawMake || /^\d+$/.test(rawMake)) ? groupManufacturer : cleanMake(rawMake);
 
-        const coefficient_sets = parseCoefficients(items, ci, end);
+        // The dynamometer's inertia setting, and the only mass in the record.
+        // Without it the grade term of any road-trip or elevation calculation
+        // multiplies by nothing and silently returns zero rather than declining.
+        // Curb weight and GVWR are stated alongside it and are NOT substitutes:
+        // EPA tests at a rounded inertia class (this BMW is 5635 lb curb, tested
+        // at 6000), and it is the tested figure the coefficients belong to.
+        const equivTestWeightLbs = parseNum(valAfter(items, 'Equivalent Test Weight (pounds)', ci, end));
+        const coefficient_sets = parseCoefficients(items, ci, end, equivTestWeightLbs);
         const tests = parseTests(items, ci, end);
 
         // CD range is a GROUP-level (Section 6) field, not an epa_tests column.

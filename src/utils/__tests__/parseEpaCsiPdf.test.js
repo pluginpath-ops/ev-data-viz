@@ -21,6 +21,9 @@ import { parseEpaCsiText, parseCoveredModels } from '../parseEpaCsiPdf';
  *     "Test Group" but whose next item is "Fuel", not an ID
  *   • one page footer, which repeats "Test Group" a third time
  *   • both configurations, each carrying the "Original …" pair
+ *   • each configuration's equivalent test weight and City/Highway coefficient
+ *     row, so the two configs differ where the real document differs — the 20"
+ *     set reads A=40.75 and the 21" set A=35.74
  */
 const ITEMS = JSON.parse(readFileSync(
     join(dirname(fileURLToPath(import.meta.url)), 'fixtures/csiCarryoverItems.json'),
@@ -59,6 +62,26 @@ describe('parseEpaCsiText — certification identity vs carryover source', () =>
         // That header is the bare string "Test Group" followed by "Fuel". Taking
         // it would put a fuel name in the test group column.
         expect(groups.map(g => g.epa_test_family_id)).not.toContain('Fuel');
+    });
+
+    it('reads the equivalent test weight onto every coefficient set', () => {
+        // Stated once per configuration, above the coefficient table, and shared
+        // by every category on it. It was never parsed at all, so the only mass
+        // in the record was absent and the grade term of any elevation
+        // calculation multiplied by nothing.
+        for (const g of groups) {
+            expect(g.coefficient_sets.length).toBeGreaterThan(0);
+            for (const set of g.coefficient_sets) {
+                expect(set.equiv_test_weight_lbs).toBe(6000);
+            }
+        }
+    });
+
+    it('keeps the two configurations distinct', () => {
+        // Same test weight, different road load: config 2 is the 20"/22" set and
+        // config 3 the 21". A fixture where both configs were identical could
+        // not tell a per-config read from a first-occurrence read.
+        expect(groups.map(g => g.coefficient_sets[0].target_a)).toEqual([40.75, 35.74]);
     });
 
     it('still reads the per-config fields', () => {

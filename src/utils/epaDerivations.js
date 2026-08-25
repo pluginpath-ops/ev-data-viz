@@ -46,13 +46,13 @@ import { roadLoadForce } from './epaPhysics';
 import {
     LBF_MILE_TO_KWH, DEFAULT_ETA, HWFET_AVG_MPH, MPG_E_CONVERSION, CURVE_SPEED_RANGE,
     PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
-    ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND,
+    ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND, SS_ASSUMED_SPEED_MPH,
     DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF,
 } from '../constants/epa';
 
 export {
     PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
-    ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND,
+    ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND, SS_ASSUMED_SPEED_MPH,
     DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF,
 };
 
@@ -297,6 +297,83 @@ export function deriveImpliedSsSpeed(group, etaResult = deriveDrivetrainEta(grou
     };
 }
 
+// ── Derivation 5: η from the steady-state phase ─────────────────────────────
+
+/**
+ * Back-solve η from the constant-speed phase instead of the HWFET phase.
+ *
+ *   η = E_wheel(assumed speed) / (SS dcConsumption − E_acc)
+ *
+ * The same equation as `deriveDrivetrainEta`, at a different operating point,
+ * and the reason to have both is that they disagree — on the MY2027 CLA 350 by
+ * four points at 60 mph and twelve at 65.
+ *
+ * THE HWFET FIGURE IS NOT A DRIVETRAIN EFFICIENCY. It is back-solved by making
+ * a STEADY-STATE formula reproduce a TRANSIENT cycle, so it quietly absorbs
+ * everything that differs between the two:
+ *
+ *   • road load is evaluated at the cycle's MEAN speed, but C·v² is convex, so
+ *     F(mean v) understates mean F(v) — worth ~1.9% on HWFET's spread
+ *   • HWFET brakes repeatedly and regen returns only part of that energy; the
+ *     steady-state formula has no term for it at all
+ *
+ * Both push the back-solved value DOWN, which is why applying it to a cruise it
+ * was never measured on under-predicts range. The SS phase has neither problem:
+ * constant speed, no braking, so it measures η where a highway curve needs it.
+ *
+ * What it costs is certainty about the speed. The CSI does not state what the
+ * constant-speed section was held at, so this takes `SS_ASSUMED_SPEED_MPH` and
+ * is never `certain` — the assumption is the whole uncertainty. Surfaced beside
+ * the HWFET figure rather than replacing it; which one should drive the curves
+ * is a separate decision, and one worth making with both numbers visible.
+ *
+ * source: 'assumed-speed' | null
+ */
+export function deriveSteadyStateEta(group, speedMph = SS_ASSUMED_SPEED_MPH) {
+    const coeffs = resolvePrimaryCoeffs(group);
+    if (!coeffs) {
+        return { value: null, source: null, certain: false, flags: ['no-coefficients'] };
+    }
+
+    const test = pickDerivationTest(group?.epa_tests || []);
+    const ssPhases = (test?.epa_test_phases || []).filter(p => p.phase_type === 'SS');
+    const dcConsumption = phaseConsumptionKwh100mi(ssPhases);
+    if (dcConsumption == null) {
+        return { value: null, source: null, certain: false, flags: ['no-ss-phase'] };
+    }
+
+    const v = Number(speedMph);
+    if (!(v > 0)) {
+        return { value: null, source: null, certain: false, flags: ['no-speed'] };
+    }
+
+    const { a, b, c } = coeffs;
+    const eWheel = roadLoadForce(v, a, b, c) * LBF_MILE_TO_KWH * 100;
+    const eAcc   = accessoryKw(group) * 100 / v;
+    const denom  = dcConsumption - eAcc;
+
+    if (denom <= 0) {
+        return { value: null, source: null, certain: false, flags: ['nonphysical-consumption'] };
+    }
+
+    const eta = eWheel / denom;
+    const flags = inBand(eta, ETA_BAND) ? [] : ['eta-out-of-band'];
+
+    return {
+        value: eta,
+        source: 'assumed-speed',
+        // Never certain: the speed is an assumption, not a measurement.
+        certain: false,
+        flags,
+        basis: {
+            assumed_speed_mph: v,
+            ss_consumption_kwh_100mi: dcConsumption,
+            test_number: test?.test_number ?? null,
+            phase_indices: ssPhases.map(p => p.phase_index),
+        },
+    };
+}
+
 // ── Convenience: all derivations at once ────────────────────────────────────
 
 /**
@@ -313,6 +390,10 @@ export function deriveAll(group) {
         chargerEfficiency:          deriveChargerEfficiency(group),
         effectiveAdjustmentFactor:  deriveEffectiveAdjustmentFactor(group),
         impliedSsSpeed:             deriveImpliedSsSpeed(group, eta),
+        // Surfaced beside `eta`, not instead of it — the two measure the same
+        // quantity at different operating points and a gap between them is
+        // information, not a fault. See deriveSteadyStateEta.
+        steadyStateEta:             deriveSteadyStateEta(group),
     };
 }
 

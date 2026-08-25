@@ -19,6 +19,7 @@
 import { useState } from 'react';
 import { extractPdfText } from '../utils/extractPdfText';
 import { parseEpaCsiText } from '../utils/parseEpaCsiPdf';
+import { integrityWarnings } from '../utils/epaIntegrity';
 
 export default function EpaPdfImportModal({ targetVehicle = null, onImport, getExistingIds, onClose }) {
     const [step, setStep]       = useState('upload'); // upload | review | done
@@ -85,6 +86,16 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                 }
                 allGroups.push(...kept);
                 allWarnings.push(...w.map(x => list.length > 1 ? `${file.name}: ${x}` : x));
+                // Is what we just read internally possible? A bulk load of every
+                // MY2026 certification wrote 2-5 kWh packs and 1% charging
+                // efficiencies, and none of it surfaced — a nonsensical figure
+                // imported exactly as quietly as a sound one. Cheapest place to
+                // say so is here, beside the file it came from, while the
+                // curator can still choose not to import it.
+                for (const grp of kept) {
+                    allWarnings.push(...integrityWarnings(grp)
+                        .map(x => list.length > 1 ? `${file.name}: ${x}` : x));
+                }
                 statuses.push({ name: file.name, configs: kept.length, error: null });
             } catch (e) {
                 statuses.push({ name: file.name, configs: 0, error: e.message || 'Failed to read PDF.' });
