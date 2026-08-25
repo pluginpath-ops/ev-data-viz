@@ -5,7 +5,7 @@
  * fires. Per-derivation provenance: η can be measured while charger eff is
  * assumed on the same record.
  */
-import { deriveAll, SS_ASSUMED_SPEED_MPH } from '../../utils/epaDerivations';
+import { deriveAll, SS_CYCLE_SPEED_MPH } from '../../utils/epaDerivations';
 import { resolveUseableKwh, resolveUseableKwhSource } from '../../utils/epaPhysics';
 import InfoIcon from '../InfoIcon';
 import { EPA_EXPLAINERS } from '../../utils/epaExplainers';
@@ -17,9 +17,6 @@ const SOURCE_LABEL = {
     estimated:           { text: 'estimated', cls: 'text-amber-600 dark:text-amber-400' },
     manual:              { text: 'manual',    cls: 'text-indigo-600 dark:text-indigo-400' },
     computed:            { text: 'computed',  cls: 'text-green-600 dark:text-green-400' },
-    // Measured phases, assumed speed. Amber rather than green: the measurement
-    // is sound and the operating point it is attributed to is a guess.
-    'assumed-speed':     { text: 'assumed speed', cls: 'text-amber-600 dark:text-amber-400' },
 };
 
 function DerivedRow({ label, tooltip, result, format }) {
@@ -57,12 +54,14 @@ export default function DerivedValues({ group, vehicle = null }) {
             />
             {/* The second opinion, shown only when the phases support one.
                 It is not a correction of the row above — the two measure the
-                same quantity at different operating points, and a gap between
-                them is a question about the assumed speed rather than a fault
-                in either. The curves still run on the HWFET figure. */}
+                same quantity at different operating points, and the gap between
+                them is what the HWFET figure absorbs from a transient cycle.
+                The curves still run on the HWFET figure: a group tested on
+                procedures 81 and 84 has no constant-speed phase, and mixing the
+                two bases on one chart would compare different quantities. */}
             {d.steadyStateEta?.value != null && (
                 <DerivedRow
-                    label={`η at ${d.steadyStateEta.basis?.assumed_speed_mph ?? SS_ASSUMED_SPEED_MPH} mph`}
+                    label={`η at ${d.steadyStateEta.basis?.cycle_speed_mph ?? SS_CYCLE_SPEED_MPH} mph`}
                     tooltip={EPA_EXPLAINERS.steadyStateEta}
                     result={d.steadyStateEta} format={v => `${(v * 100).toFixed(1)}%`}
                 />

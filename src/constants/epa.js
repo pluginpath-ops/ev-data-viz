@@ -174,16 +174,19 @@ export const EPA_DEFAULTS = {
     // agree to rounding; anything larger means a phase is missing or mistyped.
     PHASE_SUM_TOLERANCE_PCT: 1,
 
-    // The speed the multi-cycle constant-speed section is assumed to have been
-    // driven at, for the steady-state η back-solve.
+    // The speed the multi-cycle constant-speed section is driven at.
     //
-    // ASSUMED, and the CSI does not state it — which is exactly why the figure
-    // is surfaced beside the HWFET-derived η rather than replacing it. J1634
-    // lets the manufacturer choose, and the choice moves η a long way: on the
-    // MY2027 CLA 350 the same phase data gives η 0.839 at 60 mph and 0.918 at
-    // 65. Treat a large gap between the two ηs as a question about this number,
-    // not as a fault in either.
-    SS_ASSUMED_SPEED_MPH: 60,
+    // SPECIFIED, not assumed. J1634 sets the constant-speed section at 65 mph,
+    // which is why this drives a derivation rather than only a sanity check.
+    // The CSI does not restate it per test, so it stays a knob: a manufacturer
+    // that deviated, or a report that says otherwise, is a curator override
+    // rather than a reason to distrust the whole derivation.
+    //
+    // It moves η a long way, so it is worth knowing what changed. The MY2027
+    // CLA 350 reads 0.839 at 60 and 0.918 at 65 from identical phase data —
+    // this was 60 while the speed was a guess, and correcting it raises every
+    // steady-state η by roughly eight points.
+    SS_CYCLE_SPEED_MPH: 65,
 };
 
 // Resolved values (override ∥ default). These are what the math imports.
@@ -210,8 +213,8 @@ export const CURVE_SPEED_RANGE = resolve('CURVE_SPEED_RANGE', EPA_DEFAULTS.CURVE
 export const PACK_KWH_BAND     = resolve('PACK_KWH_BAND',     EPA_DEFAULTS.PACK_KWH_BAND);
 export const PHASE_SUM_TOLERANCE_PCT =
     resolve('PHASE_SUM_TOLERANCE_PCT', EPA_DEFAULTS.PHASE_SUM_TOLERANCE_PCT);
-export const SS_ASSUMED_SPEED_MPH =
-    resolve('SS_ASSUMED_SPEED_MPH', EPA_DEFAULTS.SS_ASSUMED_SPEED_MPH);
+export const SS_CYCLE_SPEED_MPH =
+    resolve('SS_CYCLE_SPEED_MPH', EPA_DEFAULTS.SS_CYCLE_SPEED_MPH);
 
 // ── EPA test procedure codes ────────────────────────────────────────────────
 export const PROC_MCT     = 77; // Multi-Cycle Test — city + highway + totals in one run
