@@ -148,7 +148,8 @@ export function certObservation(group, brandIndex) {
         aero_c:     coeffs?.c ?? null,
         rolling_a:  coeffs?.a ?? null,
         etw_lbs:    coeffs?.equivTestWeightLbs ?? null,
-        eta:         isMeasured('eta', eta?.source) ? (eta?.value ?? null) : null,
+        eta:         isMeasured('eta', eta?.source) && isPossible(eta)
+            ? (eta?.value ?? null) : null,
         charger_eff: isMeasured('charger_eff', charger?.source) ? (charger?.value ?? null) : null,
         usable_kwh: usable,
         // Above 1 the two sources contradict each other — a pack cannot
@@ -160,23 +161,25 @@ export function certObservation(group, brandIndex) {
             const f = usable / gross;
             return f > 1 ? null : f;
         })(),
-        ss_eta: ssEta?.value ?? null,
+        ss_eta: isPossible(ssEta) ? (ssEta?.value ?? null) : null,
         ss_shape_factor: shape,
         // Per group, and only where BOTH exist. A ratio of two fleet medians
         // would answer a different question — whether the typical car's two
         // figures differ — when what decides a correction factor is whether the
         // SAME car's two figures differ by a consistent amount.
         ss_eta_ratio: (() => {
-            const measured = isMeasured('eta', eta?.source) ? num(eta?.value) : null;
-            const ss = num(ssEta?.value);
+            const measured = isMeasured('eta', eta?.source) && isPossible(eta)
+                ? num(eta?.value) : null;
+            const ss = isPossible(ssEta) ? num(ssEta?.value) : null;
             if (measured == null || ss == null || measured <= 0) return null;
             return ss / measured;
         })(),
         // The unexplained remainder. Only where the ratio exists, since that is
         // what is being decomposed — the shape factor alone is not a residual.
         ss_eta_residual: (() => {
-            const measured = isMeasured('eta', eta?.source) ? num(eta?.value) : null;
-            const ss = num(ssEta?.value);
+            const measured = isMeasured('eta', eta?.source) && isPossible(eta)
+                ? num(eta?.value) : null;
+            const ss = isPossible(ssEta) ? num(ssEta?.value) : null;
             if (measured == null || ss == null || measured <= 0) return null;
             if (shape == null || shape <= 0) return null;
             return (ss / measured) / shape;
@@ -190,6 +193,23 @@ export function certObservation(group, brandIndex) {
         _chargerSource: charger?.source ?? null,
     };
 }
+
+/**
+ * A derivation that flagged its own result impossible is not a measurement.
+ *
+ * `isMeasured` asks where a value came from; this asks whether it can be true.
+ * They are different questions and both have to pass. A steady-state η above 1
+ * is a drivetrain returning more energy than it was given — the inputs
+ * contradict each other — and Nissan's six groups did exactly that, inflating
+ * their ratio to 1.53 against a fleet median of 1.13 and pulling the fleet
+ * figures with them.
+ *
+ * Excluded from the statistics rather than clamped: the number is not a
+ * measurement of anything, and clamping would publish the bound as if it were.
+ * It stays visible on the vehicle card, flagged, where it is a fault to fix.
+ */
+const NONPHYSICAL = ['nonphysical-eta', 'nonphysical-consumption'];
+const isPossible = (result) => !(result?.flags ?? []).some(f => NONPHYSICAL.includes(f));
 
 /** Every linked group as an observation. */
 export const certObservations = (groups, brandIndex) =>

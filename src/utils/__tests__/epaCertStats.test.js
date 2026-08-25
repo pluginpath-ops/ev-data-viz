@@ -311,3 +311,51 @@ describe('decomposing the η ratio into road-load shape and a residual', () => {
         }
     });
 });
+
+describe('an impossible value is not a measurement either', () => {
+    /**
+     * Nissan's six groups derive a steady-state η above 1 — a drivetrain
+     * returning more energy than it was given — which inflated their ratio to
+     * 1.53 against a fleet median of 1.13 and pulled the fleet figures with it.
+     *
+     * `isMeasured` asks where a value came from. That is a different question
+     * from whether it can be true, and both have to pass.
+     */
+    const impossible = () => group({
+        // Coefficients far above what the phase actually spent, so the
+        // back-solve returns more energy out than in.
+        coeffs: [{ is_primary: true, target_a: 200, target_b: 0.5, target_c: 0.05 }],
+        tests: [{
+            procedure_code: 77, total_dc_energy_kwh: 90, ac_recharge_kwh: 100,
+            epa_test_phases: [
+                { phase_type: 'HWY', distance_mi: 10.26, dc_energy_kwh: 2.08 },
+                { phase_type: 'SS',  distance_mi: 281.3, dc_energy_kwh: 66.0 },
+            ],
+        }],
+    });
+
+    it('drops a steady-state η above 1 from the statistics', () => {
+        const o = certObservation(impossible(), undefined);
+        expect(o.ss_eta).toBeNull();
+    });
+
+    it('drops the ratio and residual that would have been built on it', () => {
+        // Otherwise one impossible half produces a plausible-looking whole.
+        const o = certObservation(impossible(), undefined);
+        expect(o.ss_eta_ratio).toBeNull();
+        expect(o.ss_eta_residual).toBeNull();
+    });
+
+    it('keeps the shape factor, which depends on nothing measured', () => {
+        // It is computed from the coefficients alone, so a bad phase cannot
+        // make it impossible.
+        expect(certObservation(impossible(), undefined).ss_shape_factor).not.toBeNull();
+    });
+
+    it('excludes rather than clamps', () => {
+        // Clamping to 1.0 would publish the bound as if it were a measurement,
+        // and a fleet median would quietly absorb it.
+        const obs = certObservations([impossible(), impossible()], undefined);
+        expect(coverageFor(obs, 'ss_eta')).toMatchObject({ usable: 0, total: 2 });
+    });
+});
