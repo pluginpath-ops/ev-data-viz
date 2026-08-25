@@ -329,7 +329,7 @@ export function parseCoveredModels(items) {
  * per category one row of 7 numbers (target A/B/C, set A/B/C, HP). Returns
  * coefficient_sets[].
  */
-function parseCoefficients(items, start, end) {
+function parseCoefficients(items, start, end, equivTestWeightLbs = null) {
     const head = idxOf(items, 'Target Coefficients', start, end);
     if (head < 0) return [];
     const sets = [];
@@ -346,6 +346,10 @@ function parseCoefficients(items, start, end) {
             is_primary: cat === 'City/Highway',
             target_a: nums[0], target_b: nums[1], target_c: nums[2],
             set_a: nums[3], set_b: nums[4], set_c: nums[5],
+            // Stated once per configuration, on the page above this table, and
+            // shared by every category on it — the categories are different
+            // coefficient sets for the same vehicle at the same inertia class.
+            equiv_test_weight_lbs: equivTestWeightLbs,
         });
         i = j - 1;
     }
@@ -553,7 +557,14 @@ export function parseEpaCsiText(rawItems) {
         const rawMake = valAfter(items, 'Represented Test Vehicle Make', ci, end);
         const make = (!rawMake || /^\d+$/.test(rawMake)) ? groupManufacturer : cleanMake(rawMake);
 
-        const coefficient_sets = parseCoefficients(items, ci, end);
+        // The dynamometer's inertia setting, and the only mass in the record.
+        // Without it the grade term of any road-trip or elevation calculation
+        // multiplies by nothing and silently returns zero rather than declining.
+        // Curb weight and GVWR are stated alongside it and are NOT substitutes:
+        // EPA tests at a rounded inertia class (this BMW is 5635 lb curb, tested
+        // at 6000), and it is the tested figure the coefficients belong to.
+        const equivTestWeightLbs = parseNum(valAfter(items, 'Equivalent Test Weight (pounds)', ci, end));
+        const coefficient_sets = parseCoefficients(items, ci, end, equivTestWeightLbs);
         const tests = parseTests(items, ci, end);
 
         // CD range is a GROUP-level (Section 6) field, not an epa_tests column.
