@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveDrivetrainEta, deriveSteadyStateEta, SS_CYCLE_SPEED_MPH } from '../epaDerivations';
+import { deriveDrivetrainEta, deriveSteadyStateEta, SS_CYCLE_SPEED_MPH, ETA_BAND } from '../epaDerivations';
 
 /**
  * Mercedes' MY2027 CLA 350 4MATIC (CSI-VMBXV00.0ED7), which is the record that
@@ -75,11 +75,25 @@ describe('deriveSteadyStateEta — the same quantity, a different operating poin
             .toBeLessThan(deriveSteadyStateEta(cla(), 65).value);
     });
 
-    it('flags a value outside the band', () => {
-        // 70 mph drives η above the band, which is itself the useful signal:
-        // the constant-speed section cannot have been held that high.
+    it('is not judged against ETA_BAND, which is calibrated on HWFET values', () => {
+        // A steady-state η sits systematically ~12 points above a HWFET one, so
+        // judging it against that band would flag sound records for being the
+        // quantity they are. The band is a data-integrity check on inputs this
+        // derivation shares with the HWFET one, and it passes there.
+        const r = deriveSteadyStateEta(cla());
+        expect(r.value).toBeGreaterThan(ETA_BAND[0]);
+        expect(r.flags).not.toContain('eta-out-of-band');
+        expect(r.certain).toBe(true);
+    });
+
+    it('does check physics, which is not a matter of judgement', () => {
+        // At 70 mph the road load exceeds the energy the phase actually spent,
+        // so η comes out above 1 — a drivetrain returning more than it is
+        // given. That means the inputs contradict each other, whatever any
+        // band would have said.
         const r = deriveSteadyStateEta(cla(), 70);
-        expect(r.flags).toContain('eta-out-of-band');
+        expect(r.value).toBeGreaterThan(1);
+        expect(r.flags).toContain('nonphysical-eta');
         expect(r.certain).toBe(false);
     });
 

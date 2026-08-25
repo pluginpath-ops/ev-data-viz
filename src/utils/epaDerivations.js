@@ -335,6 +335,9 @@ export function deriveImpliedSsSpeed(group, etaResult = deriveDrivetrainEta(grou
  * that: it inverts this through the HWFET η and should land near 65 when the
  * two agree, and does not on a record where they do not.
  *
+ * ETA_BAND does NOT apply here — see the note at the return. It is calibrated
+ * on HWFET values and a steady-state η sits systematically above them.
+ *
  * NOT yet what the curves run on. Coverage decides that — a group tested on
  * procedures 81 and 84 has no constant-speed phase at all, and a chart mixing
  * a steady-state η against a cycle-average one would compare two different
@@ -370,14 +373,31 @@ export function deriveSteadyStateEta(group, speedMph = SS_CYCLE_SPEED_MPH) {
     }
 
     const eta = eWheel / denom;
-    const flags = inBand(eta, ETA_BAND) ? [] : ['eta-out-of-band'];
+
+    // NOT checked against ETA_BAND, deliberately. That band is a data-integrity
+    // sanity check calibrated on HWFET values — its whole corpus is HWFET
+    // values — and a steady-state η sits systematically ~12 points above them,
+    // so judging one against the other would flag sound records for being the
+    // quantity they are.
+    //
+    // Nor does it need its own band. The band exists to catch bad inputs, and
+    // this derivation shares every input with the HWFET one except the phases:
+    // the same coefficients, the same accessory load. If the HWFET η is in
+    // band, those are sound. The SS phases themselves are already covered —
+    // phase-sum-mismatch catches a wrong energy, checkStatedRanges catches a
+    // wrong distance, and deriveImpliedSsSpeed against SS_SPEED_BAND catches a
+    // phase that implies an impossible speed.
+    //
+    // What is checked is physics rather than judgement: a drivetrain cannot
+    // return more energy than it is given. Above 1 the inputs contradict each
+    // other regardless of what any band says.
+    const flags = eta > 1 ? ['nonphysical-eta'] : [];
 
     return {
         value: eta,
         source: 'measured',
-        // Certain on the same terms as the HWFET derivation: measured phases,
-        // a specified speed, and a result inside the band. It was permanently
-        // uncertain only while the speed was a guess.
+        // Measured phases at a specified speed. It was permanently uncertain
+        // only while the speed was a guess.
         certain: flags.length === 0,
         flags,
         basis: {
