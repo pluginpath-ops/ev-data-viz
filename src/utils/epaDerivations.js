@@ -44,7 +44,7 @@ import { roadLoadForce } from './epaPhysics';
 // here for use, and re-exported so existing `… from './epaDerivations'` imports
 // (TestPhaseEditor, EpaCuratorEditor, etc.) keep working.
 import {
-    LBF_MILE_TO_KWH, DEFAULT_ETA, HWFET_AVG_MPH, MPG_E_CONVERSION, CURVE_SPEED_RANGE,
+    LBF_MILE_TO_KWH, DEFAULT_ETA, DEFAULT_SS_ETA, HWFET_AVG_MPH, MPG_E_CONVERSION, CURVE_SPEED_RANGE,
     PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
     ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND, SS_CYCLE_SPEED_MPH,
     DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF, HWFET_TO_SS_ETA_RATIO,
@@ -440,7 +440,10 @@ export function deriveSteadyStateEta(group, speedMph = SS_CYCLE_SPEED_MPH) {
  *   corrected  it does not — a test run on procedures 81 and 84 has no such
  *              phase — so the HWFET value is scaled by the fleet median of the
  *              ratio between them. Roughly a third of the corpus.
- *   estimated  no phases at all, so DEFAULT_ETA, exactly as before.
+ *   estimated  no phases at all, so DEFAULT_SS_ETA — the cruise-basis fallback.
+ *              NOT DEFAULT_ETA, which is the HWFET one: a steady-state η runs
+ *              ~13% above it, and reaching for the wrong constant here would
+ *              put a curve with no data 13% below every curve around it.
  *
  * The correction is what makes ONE basis possible. Without it a steady-state
  * curve could only describe the two-thirds of the fleet with an SS phase, and a
@@ -467,7 +470,11 @@ export function resolveCurveEta(group) {
     // would dress the assumption up as a derivation, and the result would look
     // more specific than the constant it came from.
     if (hwfet?.source === 'estimated' || !(hwfet?.value > 0)) {
-        return { ...hwfet, basis: { ...(hwfet.basis ?? {}), corrected: false } };
+        // Swapped to the cruise-basis default. Falling through with the HWFET
+        // one would make a curve with NO data sit 13% below every curve around
+        // it, purely from which constant it happened to reach for.
+        return { ...hwfet, value: DEFAULT_SS_ETA,
+            basis: { ...(hwfet.basis ?? {}), corrected: false } };
     }
 
     const eta = hwfet.value * HWFET_TO_SS_ETA_RATIO;
@@ -477,7 +484,7 @@ export function resolveCurveEta(group) {
     // inputs, and the honest answer is to decline it rather than publish it.
     if (eta > 1) {
         return {
-            value: DEFAULT_ETA, source: 'estimated', certain: false,
+            value: DEFAULT_SS_ETA, source: 'estimated', certain: false,
             flags: [...flags, 'correction-nonphysical'],
             basis: { corrected: false, hwfet_eta: hwfet.value },
         };

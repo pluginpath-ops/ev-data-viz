@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveCurveEta, deriveDrivetrainEta, deriveSteadyStateEta } from '../epaDerivations';
-import { HWFET_TO_SS_ETA_RATIO, DEFAULT_ETA } from '../../constants/epa';
+import { HWFET_TO_SS_ETA_RATIO, DEFAULT_ETA, DEFAULT_SS_ETA } from '../../constants/epa';
 
 /**
  * Mercedes' MY2027 CLA 350 has constant-speed phases; BMW's i7, certified on
@@ -71,13 +71,23 @@ describe('resolveCurveEta — one basis for every vehicle', () => {
 
 describe('resolveCurveEta — what it refuses to correct', () => {
     it('does not scale an assumed η', () => {
-        // Scaling DEFAULT_ETA would dress the assumption up as a derivation and
+        // Scaling a default would dress the assumption up as a derivation and
         // produce a number that looks more specific than the constant it came
         // from.
         const r = resolveCurveEta({ epa_coefficient_sets: COEFFS, epa_tests: [] });
         expect(r.source).toBe('estimated');
-        expect(r.value).toBe(DEFAULT_ETA);
         expect(r.basis.corrected).toBe(false);
+    });
+
+    it('falls back on the CRUISE default, not the HWFET one', () => {
+        // They are not the same quantity — a steady-state η runs ~13% above a
+        // HWFET one — so reaching for the wrong constant would put a curve with
+        // no data 13% below every curve around it, from nothing but which
+        // fallback it happened to hit.
+        const r = resolveCurveEta({ epa_coefficient_sets: COEFFS, epa_tests: [] });
+        expect(r.value).toBe(DEFAULT_SS_ETA);
+        expect(r.value).not.toBe(DEFAULT_ETA);
+        expect(DEFAULT_SS_ETA).toBeGreaterThan(DEFAULT_ETA);
     });
 
     it('declines a correction that lands past 1', () => {
@@ -87,6 +97,7 @@ describe('resolveCurveEta — what it refuses to correct', () => {
         g.epa_coefficient_sets = [{ is_primary: true, target_a: 120, target_b: 0.2, target_c: 0.04 }];
         const r = resolveCurveEta(g);
         expect(r.source).toBe('estimated');
+        expect(r.value).toBe(DEFAULT_SS_ETA);
         expect(r.flags).toContain('correction-nonphysical');
     });
 

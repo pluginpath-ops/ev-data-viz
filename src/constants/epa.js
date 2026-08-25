@@ -120,7 +120,13 @@ export const PATH_EFFORT = {
 // override is set (applied on page reload).
 export const EPA_DEFAULTS = {
     // assumptions
-    DEFAULT_ETA:         0.88,        // fallback drivetrain efficiency
+    DEFAULT_ETA:         0.88,        // fallback drivetrain efficiency, HWFET basis
+    // The same fallback on the CRUISE basis, for a speed curve with no phases
+    // to derive from. A separate constant because the two are not the same
+    // quantity: a steady-state η runs ~13% above a HWFET one on the same
+    // vehicle, so one number cannot stand in for both without being wrong for
+    // one of them. Fleet median of the measured steady-state values.
+    DEFAULT_SS_ETA:      0.929,
     DEFAULT_ACCESSORY_W: 300,         // constant accessory draw, watts
     // Used when AC recharge energy is unavailable. Was 0.88 from a read of CSI
     // observations (~0.87–0.89); now 0.855, from the two cert records where BOTH
@@ -217,6 +223,7 @@ export const EPA_DEFAULTS = {
 
 // Resolved values (override ∥ default). These are what the math imports.
 export const DEFAULT_ETA         = resolve('DEFAULT_ETA',         EPA_DEFAULTS.DEFAULT_ETA);
+export const DEFAULT_SS_ETA      = resolve('DEFAULT_SS_ETA',      EPA_DEFAULTS.DEFAULT_SS_ETA);
 export const DEFAULT_ACCESSORY_W = resolve('DEFAULT_ACCESSORY_W', EPA_DEFAULTS.DEFAULT_ACCESSORY_W);
 export const ACCESSORY_LOAD_KW   = DEFAULT_ACCESSORY_W / 1000;  // derived (kW)
 export const ASSUMED_CHARGER_EFF = resolve('ASSUMED_CHARGER_EFF', EPA_DEFAULTS.ASSUMED_CHARGER_EFF);
