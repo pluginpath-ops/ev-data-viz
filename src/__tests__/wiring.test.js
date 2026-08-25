@@ -48,7 +48,8 @@ describe('utilities built for the UI are reached by the UI', () => {
     const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js',
                      'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromGroup.js',
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
-                     'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js'];
+                     'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
+                     'epaIntegrity.js', 'epaAudit.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -108,6 +109,10 @@ describe('utilities built for the UI are reached by the UI', () => {
             'Consumed inside the module by certObservation. Exported so the precedence — a curator value first, then DC discharged on procedure 77 or 84, never 86 — is asserted directly rather than inferred from a ratio.',
         'epaCertStats.certObservation':
             'Consumed inside the module by certObservations, which the statistics view calls. Exported so one group\'s flattening — dimensions from the guide row, a fallback derivation dropped — is asserted without building a whole set.',
+        'epaAudit.auditGroup':
+            'Consumed inside the module by auditGroups, which the sweep calls. Exported so one record\'s verdict is assertable without building a whole list.',
+        'epaIntegrity.integrityWarnings':
+            'The import-time form of checkRecordIntegrity, called by EpaPdfImportModal. Listed because the checks it wraps are also read directly by the curator card, and only this spelling reaches the import path.',
         'epaCertStats.NOT_MEASURED_SOURCES':
             'The source names that mean "not derived", consumed inside the module and asserted BY NAME against what epaDerivations actually returns — deriveDrivetrainEta says "estimated" where deriveChargerEfficiency says "assumed", and a single check for one of them published DEFAULT_ETA as a fleet measurement.',
         'epaLinkSweep.wheelMentions':
@@ -341,6 +346,46 @@ describe('the seams that broke before', () => {
 
         const missing = [...needed].filter(k => !selected.has(k));
         expect(missing, `candidate columns read but not selected: ${missing.join(', ')}`).toEqual([]);
+    });
+
+    it('reaches the reconciliation sweep from the Admin view', () => {
+        // The sweep's whole value is being somewhere a curator lands. It is a
+        // read-only view built on modules that already existed, so nothing else
+        // in the codebase would break if it were never mounted — which is the
+        // exact shape this suite exists for.
+        const admin = read('src/components/AdminView.jsx');
+        expect(admin, 'AdminView must mount the sweep').toMatch(/<EpaAuditSweep\s*\/>/);
+
+        // And it must reach real data. The query is deliberately unfiltered:
+        // a group with no guide row still has phases that can contradict its
+        // own stated ranges, and those are the ones nobody has looked at.
+        const svc = read('src/services/DataService.js');
+        const body = svc.slice(svc.indexOf('async getEpaGroupsForAudit'));
+        const fn = body.slice(0, body.indexOf('\n  }'));
+        expect(fn, 'the audit query must not filter to linked groups')
+            .not.toMatch(/\.not\(\s*['"]fe_guide_row_id['"]/);
+
+        // Every column the checks read has to be selected or it arrives
+        // undefined and the check silently reports "not checked".
+        for (const col of ['cd_range_combined_calc', 'cd_range_hwy_calc',
+                           'unadj_city_mpge', 'unadj_hwy_mpge', 'label_range_published',
+                           'epa_test_phases', 'equiv_test_weight_lbs', 'total_dc_energy_kwh',
+                           'ac_recharge_kwh']) {
+            expect(fn, `the audit query must select ${col}`).toMatch(new RegExp(col));
+        }
+    });
+
+    it('makes no judgement the per-vehicle card does not', () => {
+        // A finding shown in the sweep and not on the vehicle's own card would
+        // mean the sweep had grown a second opinion. It calls the four checks
+        // and must not define thresholds of its own.
+        const audit = read('src/utils/epaAudit.js');
+        for (const fn of ['checkStatedRanges', 'checkUnadjustedMpge',
+                          'checkLabelInvariant', 'checkRecordIntegrity']) {
+            expect(audit, `epaAudit must call ${fn}`).toMatch(new RegExp(`${fn}\\(`));
+        }
+        expect(audit, 'epaAudit must not carry thresholds of its own')
+            .not.toMatch(/TOLERANCE|_BAND\s*=/);
     });
 
     it('refreshes the vehicle after every FE guide mutation', () => {

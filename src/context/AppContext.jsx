@@ -1318,6 +1318,9 @@ export function AppProvider({ children }) {
     /** Pass-through: fetch all test groups with linked vehicles for admin panel. */
     const getEpaTestGroupsAdmin = () => dataService.getEpaTestGroupsAdmin();
 
+    /** Every group with what the reconciliation checks read (#229). Read-only. */
+    const getEpaGroupsForAudit = () => dataService.getEpaGroupsForAudit();
+
     /**
      * Update editable fields on an EPA test group.
      * Accepts any subset of: { label_method, display_name }.
@@ -1723,6 +1726,7 @@ export function AppProvider({ children }) {
         unlinkEpaTestGroup,
         importEpaTestGroups,
         getEpaTestGroupsAdmin,
+        getEpaGroupsForAudit,
         deleteEpaTestGroup,
         updateEpaLabelMethod,
         updateEpaTestGroup,

@@ -2136,6 +2136,46 @@ class DataService {
    * The nested guide row carries only the grouping fields plus
    * `nominal_pack_kwh`, which the usable-vs-gross buffer ratio needs.
    */
+  /**
+   * Every EPA test group with everything the reconciliation checks read (#229).
+   *
+   * Deliberately NOT filtered to linked groups, unlike getCertGroupsForStats.
+   * The question this answers is "which of my records do not reconcile?", and a
+   * group with no guide row still has phases that can contradict its own stated
+   * ranges — in fact those are the ones nobody has looked at.
+   *
+   * Wide, because the checks are wide: epaRecordFromGroup needs the phases,
+   * checkUnadjustedMpge needs the promoted unadjusted figures, checkLabelInvariant
+   * needs the label range and adjustment factor, and checkRecordIntegrity needs
+   * the energies and the coefficient sets. Fetching them separately would mean
+   * one round trip per group.
+   *
+   * Paged: 211 groups is under PostgREST's 1000-row cap today and the cap is not
+   * a thing to be under by luck.
+   */
+  async getEpaGroupsForAudit() {
+    if (!this.useSupabase) return [];
+    return fetchAllRows(() => getSupabase()
+      .from('epa_test_groups')
+      .select(`
+        test_group_id, epa_test_family_id, carryover_test_group_id, carryover_model_year,
+        model_year, make, epa_carline_name, display_name, vehicle_config_number,
+        source_file, fe_guide_row_id,
+        useable_kwh, nominal_pack_kwh, total_voltage,
+        cd_range_combined_calc, cd_range_hwy_calc,
+        label_range_published, label_adjustment_factor, label_calc_approach,
+        unadj_city_mpge, unadj_hwy_mpge,
+        accessory_load_w_override, charger_efficiency_override,
+        epa_coefficient_sets(category, is_primary, target_a, target_b, target_c,
+                             set_a, set_b, set_c, equiv_test_weight_lbs),
+        epa_tests(test_number, test_date, procedure_code,
+                  total_dc_energy_kwh, ac_recharge_kwh,
+                  epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh)),
+        epa_vehicle_mappings(id, confidence, vehicles(id, name, year))
+      `)
+      .order('test_group_id', { ascending: true }));
+  }
+
   async getCertGroupsForStats() {
     if (!this.useSupabase) return [];
     const { data, error } = await getSupabase()
