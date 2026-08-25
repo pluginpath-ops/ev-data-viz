@@ -97,7 +97,12 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
      */
     const measure = measures.some(m => m.key === storedMeasure)
         ? storedMeasure
-        : (isCert ? 'aero_c' : 'label_comb_mpge');
+        // Charger efficiency opens the certification side because it is the
+        // one figure here with no counterpart anywhere else: nobody publishes
+        // it, it is measured rather than derived from an assumption, and its
+        // spread is the most immediate signal of whether a record imported
+        // soundly.
+        : (isCert ? 'charger_eff' : 'label_comb_mpge');
     const measDef = isCert ? certMeasureByKey(measure) : measureByKey(measure);
 
     const brandIndex = useMemo(() => buildBrandIndex(aliases ?? []), [aliases]);
