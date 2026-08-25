@@ -3,7 +3,8 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { roundTo, } from '../utils/unitConversions';
 import { toSessionRow } from '../utils/testSessions';
 import { rankFeCandidates } from '../utils/feGuideMatch';
-import { promotionUpdates, demotionUpdates, acceptGuideUpdates } from '../utils/feGuidePromotion';
+import { promotionUpdates, demotionUpdates, acceptGuideUpdates, isCuratorOwned } from '../utils/feGuidePromotion';
+import { selectTestForGuide } from '../utils/epaTestSelection';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
@@ -195,7 +196,7 @@ class DataService {
     // migration lands, and every other vehicle still renders.
     const { data, error } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
       .order('created_at', { ascending: false });
 
     // Never swallow this. Destructuring only `data` made a failed query look
@@ -1980,20 +1981,39 @@ class DataService {
     const supabase = getSupabase();
 
     const [{ data: group, error: gErr }, { data: feRow, error: fErr }] = await Promise.all([
-      supabase.from('epa_test_groups').select('*').eq('test_group_id', testGroupId).single(),
+      supabase.from('epa_test_groups')
+        .select('*, epa_tests(test_number, test_date, procedure_code, total_dc_energy_kwh, '
+                + 'ac_recharge_kwh, epa_test_phases(phase_type, distance_mi, dc_energy_kwh))')
+        .eq('test_group_id', testGroupId).single(),
       supabase.from('epa_fe_guide').select('*').eq('id', feRowId).single(),
     ]);
     if (gErr) throw gErr;
     if (fErr) throw fErr;
 
     const { updates, promoted, skipped } = promotionUpdates(group, feRow);
+
+    // Which test the figures should come from, now that there is something to
+    // decide it with. EPA published one pair of unadjusted figures and we hold
+    // the tests, so the published highway figure identifies the run — see
+    // utils/epaTestSelection.js for why highway, and why the score is a ratio
+    // measured against two targets rather than a plain difference.
+    //
+    // Declines rather than guesses: one test is not a choice, and two runs too
+    // alike to separate leave the most-recent default standing. A declined
+    // selection writes null, so re-linking never leaves a stale winner behind.
+    const selection = selectTestForGuide(group?.epa_tests ?? [], {
+      unadjHwyMpge:     feRow?.unadj_hwy_mpge,
+      labelCityRangeMi: feRow?.label_city_range_mi,
+      labelHwyRangeMi:  feRow?.label_hwy_range_mi,
+    });
+    updates.preferred_test_number = selection.testNumber;
     // No early return on an empty `promoted`. `updates` always carries
     // fe_guide_row_id, and skipping the write when the guide happened to add no
     // new values left the group unlinked while reporting success.
     const { error } = await supabase
       .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
     if (error) throw error;
-    return { promoted, skipped };
+    return { promoted, skipped, selection };
   }
 
   /**
@@ -2164,6 +2184,7 @@ class DataService {
         useable_kwh, nominal_pack_kwh, total_voltage,
         cd_range_combined_calc, cd_range_hwy_calc,
         label_range_published, label_adjustment_factor, label_calc_approach,
+        preferred_test_number,
         unadj_city_mpge, unadj_hwy_mpge,
         accessory_load_w_override, charger_efficiency_override,
         epa_coefficient_sets(category, is_primary, target_a, target_b, target_c,
@@ -2273,6 +2294,21 @@ class DataService {
     if (gErr) throw gErr;
 
     const { updates, restored } = demotionUpdates(group);
+
+    // The selection was evidence from the guide row, so it goes when the row
+    // does. Leaving it would keep steering every derived figure from a source
+    // the record no longer has — and unlink is exactly what a curator does when
+    // they decide the link was wrong.
+    //
+    // A curator-set choice is NOT collateral here. Uses the same predicate
+    // promotion does rather than a second spelling of it: hand-set fields carry
+    // source 'manual', and an earlier version of this guard looked for
+    // 'curator', which nothing writes — so it never fired and would have wiped
+    // exactly the choice it was meant to protect.
+    if (!isCuratorOwned(group?.overrides, 'preferred_test_number')) {
+        updates.preferred_test_number = null;
+    }
+
     const { error } = await supabase
       .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
     if (error) throw error;

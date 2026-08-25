@@ -286,3 +286,38 @@ describe('auditGroup — a group holding two multi-cycle tests (#227)', () => {
         expect(r.notes.some(n => n.includes('re-import'))).toBe(false);
     });
 });
+
+describe('auditGroup — honouring a selected test', () => {
+    const twoRuns = (over = {}) => {
+        const g = cla();
+        const first = g.epa_tests[0];
+        first.cd_range_combined_calc = 461.373;
+        first.cd_range_hwy_calc = 450.544;
+        g.epa_tests = [first, {
+            test_number: 'TMBX10092210', test_date: '2025-08-19', procedure_code: 77,
+            total_dc_energy_kwh: 89.595, ac_recharge_kwh: 99.4041,
+            cd_range_combined_calc: 475.482, cd_range_hwy_calc: 460.354,
+            epa_test_phases: first.epa_test_phases.map(p => ({ ...p })),
+        }];
+        return { ...g, ...over };
+    };
+
+    it('derives from the most recent when nothing has been selected', () => {
+        const r = auditGroup(twoRuns());
+        expect(r.notes.some(n => n.includes('TMBX10092210'))).toBe(true);
+    });
+
+    it('derives from the selected test instead, even though it is older', () => {
+        // The whole point: EPA used the July run, and the default picks August.
+        const r = auditGroup(twoRuns({ preferred_test_number: 'TMBX10091675' }));
+        expect(r.notes.some(n => n.includes('TMBX10091675'))).toBe(true);
+    });
+
+    it('falls back rather than failing when the selection names a missing test', () => {
+        // A re-import can drop a test number. The default is still a reasonable
+        // answer, so this degrades instead of refusing to derive at all.
+        const r = auditGroup(twoRuns({ preferred_test_number: 'GONE' }));
+        expect(r.verdict).not.toBe('unchecked');
+        expect(r.notes.some(n => n.includes('TMBX10092210'))).toBe(true);
+    });
+});

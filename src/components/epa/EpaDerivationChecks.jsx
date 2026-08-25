@@ -167,14 +167,18 @@ export default function EpaDerivationChecks({
             {competingMctTests > 1 && (
                 <p className="text-xs" style={{ color: 'var(--color-warning)' }}>
                     This group holds {competingMctTests} multi-cycle tests, and every figure above
-                    was derived from the most recent
+                    was derived from
+                    {derivedFrom?.basis === 'selected' ? ' the one its guide row identifies' : ' the most recent'}
                     {derivedFrom?.testNumber && <> — <span className="font-mono">{derivedFrom.testNumber}</span></>}
                     {derivedFrom?.testDate && <>, {derivedFrom.testDate}</>}.
                     More than one run can be legitimate: the same vehicle is sometimes tested at two
                     laboratories, and the runs disagree without either being wrong. So this is a
-                    choice, not a fault, and deleting the others would discard valid tests. Note the
-                    stated ranges above are stored per GROUP and were set from whichever test was
-                    imported first, so they may not belong to this one.
+                    choice, not a fault, and deleting the others would discard valid tests.
+                    {derivedFrom?.basis !== 'selected' && <>
+                        {' '}Nothing has settled which run EPA used, so these figures rest on a
+                        default. Linking a Fuel Economy Guide row settles it — its published
+                        highway figure identifies the run.
+                    </>}
                 </p>
             )}
 

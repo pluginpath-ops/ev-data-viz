@@ -383,6 +383,31 @@ describe('the seams that broke before', () => {
             .toMatch(/cd_range_combined_calc/);
     });
 
+    it('sets the preferred test when a guide row is linked, and clears it on unlink', () => {
+        // The selection is evidence from the guide row. Linking without setting
+        // it leaves every figure on an unsettled default; unlinking without
+        // clearing it keeps steering from a source the record no longer has.
+        const svc = read('src/services/DataService.js');
+        const link = svc.slice(svc.indexOf('async linkFeGuideRow('));
+        expect(link.slice(0, link.indexOf('\n  }')), 'linkFeGuideRow must select a test')
+            .toMatch(/selectTestForGuide\(/);
+        const unlink = svc.slice(svc.indexOf('async unlinkFeGuideRow('));
+        expect(unlink.slice(0, unlink.indexOf('\n  }')), 'unlinkFeGuideRow must clear it')
+            .toMatch(/preferred_test_number\s*=\s*null/);
+
+        // And it has to be READ back. The derivation falls back to most-recent
+        // when the column is absent, so a query that forgets it silently
+        // reinstates the default with nothing to show anything went wrong.
+        for (const marker of ['async getEpaGroupsForAudit', 'async getVehicles']) {
+            const q = svc.slice(svc.indexOf(marker));
+            expect(q.slice(0, q.indexOf('\n  }')), `${marker} must select preferred_test_number`)
+                .toMatch(/preferred_test_number/);
+        }
+        expect(read('src/utils/epaRecordFromGroup.js'),
+            'the derivation must honour the selection')
+            .toMatch(/preferred_test_number/);
+    });
+
     it('checks a recomputed range against the test it derived from', () => {
         // The group's cd_range_* is set at import from the FIRST procedure-77
         // test while the derivation uses the most RECENT, so reading the group

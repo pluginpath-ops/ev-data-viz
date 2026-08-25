@@ -108,8 +108,12 @@ export function auditGroup(group) {
 
     const notes = [];
     if (competingMctTests > 1) {
+        // Whether a choice was MADE or merely defaulted to. A group deriving
+        // from an unsettled default is a different thing to review than one
+        // whose guide row identified the run.
+        const how = derivedFrom?.basis === 'selected' ? 'selected' : 'default';
         notes.push(`${competingMctTests} multi-cycle tests; derived from `
-            + `${derivedFrom?.testNumber ?? 'the most recent'}`);
+            + `${derivedFrom?.testNumber ?? 'the most recent'} (${how})`);
     }
     if (statedRanges?.source === 'group' && competingMctTests > 1) {
         // The pre-060 shape: no per-test ranges to compare against, so the
