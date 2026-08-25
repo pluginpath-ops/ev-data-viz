@@ -82,9 +82,9 @@ export const KNOB_GROUPS = [
             { key: 'PHASE_SUM_TOLERANCE_PCT', label: 'Phase-sum tolerance', kind: 'number',
               min: 0, max: 10, step: 0.25, unit: '%',
               help: 'How far a test’s stated total DC energy may sit from the sum of its own phases. They are one measurement reported twice, so a gap means a phase is missing or mistyped.' },
-            { key: 'SS_ASSUMED_SPEED_MPH', label: 'Assumed steady-state speed', kind: 'number',
+            { key: 'SS_CYCLE_SPEED_MPH', label: 'Steady-state cycle speed', kind: 'number',
               min: 30, max: 90, step: 1, unit: 'mph',
-              help: 'The speed the multi-cycle constant-speed section is assumed to have been driven at, for the second η back-solve. The CSI does not state it and J1634 lets the manufacturer choose, so this moves η a long way — on the MY2027 CLA 350, 0.839 at 60 mph against 0.918 at 65.' },
+              help: 'The speed J1634 specifies for the multi-cycle constant-speed section, and the anchor the steady-state η is back-solved at. The CSI does not restate it per test, so override it only for a report that says otherwise. It moves η a long way — the MY2027 CLA 350 reads 0.839 at 60 mph and 0.918 at 65 from identical phase data.' },
         ],
     },
 ];

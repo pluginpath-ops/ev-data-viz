@@ -46,13 +46,13 @@ import { roadLoadForce } from './epaPhysics';
 import {
     LBF_MILE_TO_KWH, DEFAULT_ETA, HWFET_AVG_MPH, MPG_E_CONVERSION, CURVE_SPEED_RANGE,
     PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
-    ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND, SS_ASSUMED_SPEED_MPH,
+    ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND, SS_CYCLE_SPEED_MPH,
     DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF,
 } from '../constants/epa';
 
 export {
     PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
-    ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND, SS_ASSUMED_SPEED_MPH,
+    ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND, SS_CYCLE_SPEED_MPH,
     DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF,
 };
 
@@ -302,11 +302,11 @@ export function deriveImpliedSsSpeed(group, etaResult = deriveDrivetrainEta(grou
 /**
  * Back-solve η from the constant-speed phase instead of the HWFET phase.
  *
- *   η = E_wheel(assumed speed) / (SS dcConsumption − E_acc)
+ *   η = E_wheel(65 mph) / (SS dcConsumption − E_acc)
  *
  * The same equation as `deriveDrivetrainEta`, at a different operating point,
  * and the reason to have both is that they disagree — on the MY2027 CLA 350 by
- * four points at 60 mph and twelve at 65.
+ * twelve points.
  *
  * THE HWFET FIGURE IS NOT A DRIVETRAIN EFFICIENCY. It is back-solved by making
  * a STEADY-STATE formula reproduce a TRANSIENT cycle, so it quietly absorbs
@@ -318,18 +318,31 @@ export function deriveImpliedSsSpeed(group, etaResult = deriveDrivetrainEta(grou
  *     steady-state formula has no term for it at all
  *
  * Both push the back-solved value DOWN, which is why applying it to a cruise it
- * was never measured on under-predicts range. The SS phase has neither problem:
- * constant speed, no braking, so it measures η where a highway curve needs it.
+ * was never measured on under-predicts range. The constant-speed phase has
+ * neither problem: no braking, one speed, so it measures η where a highway
+ * curve actually needs it.
  *
- * What it costs is certainty about the speed. The CSI does not state what the
- * constant-speed section was held at, so this takes `SS_ASSUMED_SPEED_MPH` and
- * is never `certain` — the assumption is the whole uncertainty. Surfaced beside
- * the HWFET figure rather than replacing it; which one should drive the curves
- * is a separate decision, and one worth making with both numbers visible.
+ * ── The speed is specified, not assumed ─────────────────────────────────────
  *
- * source: 'assumed-speed' | null
+ * J1634 sets the constant-speed section at 65 mph. This derivation was built
+ * while that was unknown, took an assumed 60, and was marked never-certain for
+ * that reason. It is now anchored at the standard's speed and carries the same
+ * confidence rule as its HWFET sibling: measured, and certain when in band.
+ *
+ * `SS_CYCLE_SPEED_MPH` remains a knob because the CSI does not restate the
+ * speed per test — a manufacturer that deviated is a curator override, not a
+ * reason to distrust the derivation. `deriveImpliedSsSpeed` is the check on
+ * that: it inverts this through the HWFET η and should land near 65 when the
+ * two agree, and does not on a record where they do not.
+ *
+ * NOT yet what the curves run on. Coverage decides that — a group tested on
+ * procedures 81 and 84 has no constant-speed phase at all, and a chart mixing
+ * a steady-state η against a cycle-average one would compare two different
+ * quantities and call it a difference between cars.
+ *
+ * source: 'measured' | null
  */
-export function deriveSteadyStateEta(group, speedMph = SS_ASSUMED_SPEED_MPH) {
+export function deriveSteadyStateEta(group, speedMph = SS_CYCLE_SPEED_MPH) {
     const coeffs = resolvePrimaryCoeffs(group);
     if (!coeffs) {
         return { value: null, source: null, certain: false, flags: ['no-coefficients'] };
@@ -361,12 +374,14 @@ export function deriveSteadyStateEta(group, speedMph = SS_ASSUMED_SPEED_MPH) {
 
     return {
         value: eta,
-        source: 'assumed-speed',
-        // Never certain: the speed is an assumption, not a measurement.
-        certain: false,
+        source: 'measured',
+        // Certain on the same terms as the HWFET derivation: measured phases,
+        // a specified speed, and a result inside the band. It was permanently
+        // uncertain only while the speed was a guess.
+        certain: flags.length === 0,
         flags,
         basis: {
-            assumed_speed_mph: v,
+            cycle_speed_mph: v,
             ss_consumption_kwh_100mi: dcConsumption,
             test_number: test?.test_number ?? null,
             phase_indices: ssPhases.map(p => p.phase_index),
