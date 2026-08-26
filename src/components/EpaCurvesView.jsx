@@ -20,7 +20,7 @@ import EpaMethodologyDiagram from './epa/EpaMethodologyDiagram';
 import EpaCertificationPaths from './epa/EpaCertificationPaths';
 import EpaCycleSpeedChart from './epa/EpaCycleSpeedChart';
 import CollapsibleSection from './CollapsibleSection';
-import { TWO_CYCLE_KEYS } from '../constants/epa';
+import { TWO_CYCLE_KEYS, CURVE_SPEED_RANGE } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
@@ -505,8 +505,14 @@ export default function EpaCurvesView({
                     x: {
                         type: 'linear',
                         title: { display: true, text: `Speed (${speedLabel(units)})`, color: tickColor },
-                        min: xMin ?? convSpeed(5,   units),
-                        max: xMax ?? convSpeed(120, units),
+                        // The curve's own domain, not a literal 5-120:
+                        // CURVE_SPEED_RANGE is an Admin knob, and these bounds
+                        // were the defaults frozen in place — so widening the
+                        // knob extended the data and left the extra points
+                        // drawn off-screen. EpaCurveExplorer already reads the
+                        // knob here; this view was the one that never got it.
+                        min: xMin ?? convSpeed(CURVE_SPEED_RANGE[0], units),
+                        max: xMax ?? convSpeed(CURVE_SPEED_RANGE[1], units),
                         ticks: { color: tickColor },
                         grid:  { color: gridColor },
                     },

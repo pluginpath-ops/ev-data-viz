@@ -491,6 +491,23 @@ describe('the seams that broke before', () => {
         expect(stats, 'and must not correct it').not.toMatch(/resolveCurveEta/);
     });
 
+    it('windows every speed chart on the knob its data is computed from', () => {
+        // CURVE_SPEED_RANGE decides how far buildEpaCurveFromModel computes.
+        // EpaCurvesView had the same numbers written out as chart.js axis
+        // bounds, so widening the knob extended the data and drew the extra
+        // points off-screen — the curve was right and nobody could see it.
+        // EpaCurveExplorer carried a comment warning about exactly this and
+        // the other view never got the fix.
+        for (const f of ['src/components/EpaCurvesView.jsx',
+                         'src/components/epa/curves/EpaCurveExplorer.jsx']) {
+            const text = read(f);
+            expect(text, `${f} must window on CURVE_SPEED_RANGE`)
+                .toMatch(/min: xMin \?\? convSpeed\(CURVE_SPEED_RANGE\[0\]|min: scale\.xMin \?\? convSpeed\(CURVE_SPEED_RANGE\[0\]/);
+            expect(text, `${f} must not hardcode the curve's speed bounds`)
+                .not.toMatch(/convSpeed\(\s*\d+\s*,/);
+        }
+    });
+
     it('checks a recomputed range against the test it derived from', () => {
         // The group's cd_range_* is set at import from the FIRST procedure-77
         // test while the derivation uses the most RECENT, so reading the group
