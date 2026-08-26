@@ -34,6 +34,19 @@ const cla = () => ({
     }],
 });
 
+/**
+ * The same record as the certificate actually files it: the second
+ * constant-speed block, phase 8, carries no type. It is 8x a UDDS where
+ * `suggestPhaseType` wants 10x, so nothing types it by distance and the
+ * derivation used to lose it (#264).
+ */
+const claAsFiled = () => {
+    const g = cla();
+    g.epa_tests[0].epa_test_phases = g.epa_tests[0].epa_test_phases
+        .map(p => (p.phase_index === 8 ? { ...p, phase_type: null } : p));
+    return g;
+};
+
 const close = (a, b, tol) => expect(Math.abs(a - b)).toBeLessThan(tol);
 
 describe('deriveSteadyStateEta — the same quantity, a different operating point', () => {
@@ -95,6 +108,39 @@ describe('deriveSteadyStateEta — the same quantity, a different operating poin
         expect(r.value).toBeGreaterThan(1);
         expect(r.flags).toContain('nonphysical-eta');
         expect(r.certain).toBe(false);
+    });
+
+    it('reads the whole constant-speed run, typed or not', () => {
+        // Both legs are the same section at the same speed — 23.47 and 23.27
+        // kWh/100mi here — so which of them the derivation sees should not
+        // depend on how much charge was left when the second one started.
+        expect(deriveSteadyStateEta(claAsFiled()).value)
+            .toBeCloseTo(deriveSteadyStateEta(cla()).value, 10);
+        expect(deriveSteadyStateEta(claAsFiled()).basis.phase_indices).toEqual([4, 8]);
+    });
+
+    it('used to be one leg or two depending on where the threshold fell', () => {
+        // The scatter this removes. Dropping phase 8 moves η by 0.14% on this
+        // record and by up to 0.9% across the corpus — small, but conditioned
+        // on nothing meaningful, and it lands in ss_eta_ratio where #263 reads
+        // it to decide whether a fleet-wide correction is defensible.
+        const firstLegOnly = claAsFiled();
+        firstLegOnly.epa_tests[0].epa_test_phases
+            = firstLegOnly.epa_tests[0].epa_test_phases.filter(p => p.phase_index !== 8);
+
+        const one = deriveSteadyStateEta(firstLegOnly).value;
+        const both = deriveSteadyStateEta(claAsFiled()).value;
+        expect(one).not.toBeCloseTo(both, 4);
+        expect(Math.abs(one / both - 1)).toBeLessThan(0.01);
+    });
+
+    it('still yields to a curator who typed that bag as something else', () => {
+        // An explicit choice outranks the structural rule, so the derivation
+        // falls back to the first block alone — which is what it did before.
+        const g = claAsFiled();
+        g.epa_tests[0].epa_test_phases = g.epa_tests[0].epa_test_phases
+            .map(p => (p.phase_index === 8 ? { ...p, phase_type: 'HWY' } : p));
+        expect(deriveSteadyStateEta(g).basis.phase_indices).toEqual([4]);
     });
 
     it('declines when there is no steady-state phase', () => {

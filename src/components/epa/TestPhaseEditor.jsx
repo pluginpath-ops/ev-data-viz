@@ -86,6 +86,14 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
 
     // Auto-suggest the phase type from distance when the curator hasn't set one
     // (never overrides an explicit choice). Uses sibling distances for the SS case.
+    //
+    // Distance only, deliberately — NOT the positional continuation rule that
+    // `resolvePhaseTypes` adds for the last bag of a multi-cycle test. What is
+    // typed here gets STORED, and a stored type outranks every inference
+    // afterwards. The distance match is a fact about the bag and safe to write
+    // down; the continuation is a reading of the test's shape, which stays a
+    // reading. Storing it is how six records ended up with a constant-speed bag
+    // filed as HWFET (#264, migration 063).
     const handleSavePhase = (row) => {
         if (!row.phase_type && row.distance_mi != null) {
             const others = phases.filter(p => p.id !== row.id).map(p => p.distance_mi);

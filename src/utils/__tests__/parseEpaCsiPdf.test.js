@@ -242,3 +242,54 @@ describe('the certification\'s own model year', () => {
         expect(groups[0].model_year).toBe(2026);
     });
 });
+
+/**
+ * A multi-cycle test's eight bags, as an item stream.
+ *
+ * Every proc-77 test in the corpus has exactly this shape — UDDS, HWY, UDDS,
+ * constant speed, UDDS, HWY, UDDS, and then the rest of the constant-speed run
+ * — so the distances are the real ones and only the last bag varies.
+ */
+const mctItems = (lastBagMi) => [
+    'Vehicle ID / Configuration', 'SYNTH01 / 0',
+    'Represented Test Vehicle Make', 'Synthetic',
+    'Test #', 'T1', 'Test Procedure', '77 - Multi-Cycle Test (MCT)',
+    ...[7.45, 10.26, 7.45, 281.31, 7.45, 10.26, 7.45, lastBagMi]
+        .flatMap((mi, i) => [
+            `Charge Depleting Bag/Phase #${i + 1}`,
+            'Actual Distance Driven (miles)', String(mi),
+            'Integrated DC KW-HRS', String((mi * 0.23).toFixed(4)),
+        ]),
+];
+
+const phasesOf = (items) => parseEpaCsiText(items).groups[0].tests[0].phases;
+
+describe('phase typing on import', () => {
+    it('types the eight bags of a multi-cycle test', () => {
+        expect(phasesOf(mctItems(59.72)).map(p => p.phase_type))
+            .toEqual(['UDDS', 'HWY', 'UDDS', 'SS', 'UDDS', 'HWY', 'UDDS', 'SS']);
+    });
+
+    it('does not file the last bag as a highway cycle when it lands on 10.26 mi', () => {
+        // Six records in the corpus have a last bag between 9.6 and 10.9 miles,
+        // and every one of them was imported as HWY — a coincidence of where
+        // the pack gave out, consuming 27% more than the same test's real HWFET
+        // bags. That energy went into the cycle average (#264).
+        expect(phasesOf(mctItems(10.72)).at(-1).phase_type).toBe('SS');
+    });
+
+    it('files a cold test\'s city bags under their own type', () => {
+        // A property of the TEST, not of a bag's distance, so it stays here
+        // rather than inside the shared inference.
+        const cold = mctItems(59.72)
+            .map(s => (s === '77 - Multi-Cycle Test (MCT)' ? '77 - Multi-Cycle Test (MCT) Cold' : s));
+        expect(phasesOf(cold).map(p => p.phase_type))
+            .toEqual(['Cold-UDDS', 'HWY', 'Cold-UDDS', 'SS', 'Cold-UDDS', 'HWY', 'Cold-UDDS', 'SS']);
+    });
+
+    it('carries the bag number and its measurements through', () => {
+        const p = phasesOf(mctItems(59.72)).at(-1);
+        expect(p).toMatchObject({ phase_index: 8, distance_mi: 59.72 });
+        expect(p.dc_energy_kwh).toBeCloseTo(59.72 * 0.23, 3);
+    });
+});

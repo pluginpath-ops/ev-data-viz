@@ -21,12 +21,13 @@
  * carryover certification is a different year and a different group — see
  * parseCertHeader and migration 056.
  *
- * Phase type is not stated in the PDF, so it's inferred from phase distance
- * (~10.26 mi → HWY, ~7.45 mi → UDDS, ≫10× neighbors → SS), matching the curator
- * form's auto-suggest. Everything is editable post-import.
+ * Phase type is not stated in the PDF, so it's inferred — by `phaseTypes`,
+ * the same module the curator form's auto-suggest uses, so an import and a
+ * curator looking at the same bag get the same answer. Everything is editable
+ * post-import.
  */
 
-import { HWFET_MI, UDDS_MI, CYCLE_DIST_TOL as DIST_TOL } from '../constants/epa';
+import { resolvePhaseTypes } from './phaseTypes';
 
 /** MM/DD/YYYY → YYYY-MM-DD (Postgres date); pass through anything else. */
 function toIsoDate(s) {
@@ -41,17 +42,6 @@ const parseNum = (s) => {
     const n = parseFloat(t);
     return Number.isNaN(n) ? null : n;
 };
-
-/** Infer a phase type from its distance + the test's other distances. */
-function inferPhaseType(distanceMi, otherDistances, cold) {
-    const d = parseNum(distanceMi);
-    if (d == null || d <= 0) return null;
-    const others = otherDistances.map(parseNum).filter(x => x != null && x > 0);
-    if (others.length && d >= 10 * Math.min(...others)) return 'SS';
-    if (Math.abs(d - HWFET_MI) <= DIST_TOL) return cold ? 'HWY' : 'HWY';
-    if (Math.abs(d - UDDS_MI)  <= DIST_TOL) return cold ? 'Cold-UDDS' : 'UDDS';
-    return null;
-}
 
 /** Trim verbose legal suffixes from a manufacturer name (Lucid USA, Inc → Lucid). */
 function cleanMake(make) {
@@ -375,8 +365,16 @@ function parsePhases(items, start, end, cold) {
             dc_energy_kwh: parseNum(valAfter(items, 'Integrated DC KW-HRS', bi, bEnd)),
         };
     });
-    const dists = raw.map(p => p.distance_mi);
-    return raw.map(p => ({ ...p, phase_type: inferPhaseType(p.distance_mi, dists.filter((_, i) => raw[i] !== p), cold) }));
+    // One rule for what a bag is, shared with the curator form and the
+    // derivations. A cold-start test files its UDDS bags under their own type,
+    // which is a property of the TEST rather than of the bag's distance and so
+    // has no place inside the shared inference.
+    return resolvePhaseTypes(raw).map(p => ({
+        phase_index: p.phase_index,
+        distance_mi: p.distance_mi,
+        dc_energy_kwh: p.dc_energy_kwh,
+        phase_type: cold && p.cycle === 'UDDS' ? 'Cold-UDDS' : p.cycle,
+    }));
 }
 
 /**
