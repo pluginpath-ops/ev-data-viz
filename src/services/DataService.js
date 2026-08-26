@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { fetchSiteSettings, updateCachedSetting, MODEL_CONSTANTS_KEY } from './siteSettings';
 import { vehicleLabel } from '../utils/specHelpers';
 import { roundTo, } from '../utils/unitConversions';
 import { toSessionRow } from '../utils/testSessions';
@@ -1206,10 +1207,42 @@ class DataService {
 
   async getSiteSettings() {
     if (!this.useSupabase) return {};
-    const { data } = await getSupabase().from('site_settings').select('*');
-    const settings = {};
-    for (const row of data || []) settings[row.key] = row.value;
-    return settings;
+    // Shared with the constants bootstrap, which has already fetched this
+    // before the app mounted (#261) — so this resolves from cache and costs
+    // the startup Promise.all nothing.
+    return fetchSiteSettings();
+  }
+
+  /**
+   * Publish one model constant site-wide, or revert it (value == null).
+   *
+   * Admin only, enforced in the RPC. Goes through `set_model_constant` rather
+   * than an upsert on site_settings for the same reason the header image does:
+   * a direct INSERT … ON CONFLICT DO UPDATE trips a double RLS check that
+   * fails even for a writer who is allowed to write. The RPC also keeps the
+   * read-modify-write of the JSON blob on the server, so two admins editing
+   * different knobs cannot clobber each other's key.
+   *
+   * @returns {Promise<Object>} the full published map after the change
+   */
+  async setModelConstant(key, value) {
+    if (!this.useSupabase) throw new Error('Publishing constants requires a database.');
+    const { data, error } = await getSupabase()
+      .rpc('set_model_constant', { constant_key: key, constant_value: value ?? null });
+    if (error) throw new Error(`[DB] ${error.message}`);
+    const map = data ?? {};
+    updateCachedSetting(MODEL_CONSTANTS_KEY, JSON.stringify(map));
+    return map;
+  }
+
+  /** Revert every published constant to its compiled default. Admin only. */
+  async clearModelConstants() {
+    if (!this.useSupabase) throw new Error('Publishing constants requires a database.');
+    const { data, error } = await getSupabase().rpc('clear_model_constants');
+    if (error) throw new Error(`[DB] ${error.message}`);
+    const map = data ?? {};
+    updateCachedSetting(MODEL_CONSTANTS_KEY, JSON.stringify(map));
+    return map;
   }
 
   async uploadHeaderImage(file) {
@@ -1228,6 +1261,7 @@ class DataService {
     const { error: settingError } = await getSupabase()
       .rpc('update_site_setting', { setting_key: 'header_image_url', setting_value: url });
     if (settingError) throw new Error(`[DB] ${settingError.message}`);
+    updateCachedSetting('header_image_url', url);
     return url;
   }
 

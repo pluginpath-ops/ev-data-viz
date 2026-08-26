@@ -800,6 +800,22 @@ export function AppProvider({ children }) {
         }
     };
 
+    /**
+     * Publish one model constant site-wide, or revert it (value == null).
+     *
+     * Deliberately not caught here. The knob panel reports the failure beside
+     * the knob that failed, and a swallowed error would leave a curator
+     * believing they had changed what everyone else sees.
+     *
+     * Nothing is re-seeded: constants/epa.js resolved at module load, so the
+     * new value reaches the math on the next reload — for this admin exactly
+     * as for everyone else.
+     */
+    const publishModelConstant = (key, value) => dataService.setModelConstant(key, value);
+
+    /** Revert every published constant to its compiled default. */
+    const clearPublishedConstants = () => dataService.clearModelConstants();
+
     const importTableauSessions = async (sessions, vehicleMap) => {
         // Deliberately not caught here: the import modal shows the failure, and
         // swallowing it would leave the user staring at a dialog that never
@@ -1633,6 +1649,8 @@ export function AppProvider({ children }) {
         appNotification,
         clearNotification,
         uploadHeaderImage,
+        publishModelConstant,
+        clearPublishedConstants,
         toggleVehicleSelection,
         removeVehicleSelection,
         clearAllSelections,
