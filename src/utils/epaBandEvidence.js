@@ -47,6 +47,13 @@ export const BAND_EVIDENCE = {
     // chose. It is also the value most likely to go stale: it was derived from
     // 210 groups and the next import changes that.
     HWFET_TO_SS_ETA_RATIO: { measure: 'ss_eta_ratio', label: 'steady-state ÷ HWFET η' },
+    // The two fallbacks, each against the measure it stands in for. They are
+    // the values most able to drift unnoticed: a fallback only appears on
+    // records that could not be derived, so nothing on screen contradicts it.
+    // DEFAULT_ETA sat at 0.88 against an observed HWFET median of 0.826 —
+    // outside its own p5-p95 — and nothing said so until this line existed.
+    DEFAULT_ETA:    { measure: 'eta',    label: 'Drivetrain η (HWFET)' },
+    DEFAULT_SS_ETA: { measure: 'ss_eta', label: 'Drivetrain η (steady state)' },
 };
 
 /**

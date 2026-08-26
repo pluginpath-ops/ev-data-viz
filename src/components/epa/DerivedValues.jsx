@@ -17,6 +17,10 @@ const SOURCE_LABEL = {
     estimated:           { text: 'estimated', cls: 'text-amber-600 dark:text-amber-400' },
     manual:              { text: 'manual',    cls: 'text-indigo-600 dark:text-indigo-400' },
     computed:            { text: 'computed',  cls: 'text-green-600 dark:text-green-400' },
+    // Amber, with the others that are not this vehicle's own measurement. A
+    // corrected η is a real highway measurement scaled by a fleet constant —
+    // better than the highway figure for a cruise curve, and still borrowed.
+    corrected:           { text: 'corrected', cls: 'text-amber-600 dark:text-amber-400' },
 };
 
 function DerivedRow({ label, tooltip, result, format }) {
@@ -49,19 +53,19 @@ export default function DerivedValues({ group, vehicle = null }) {
                 Derived Values
             </div>
             <DerivedRow
-                label="Drivetrain η" tooltip={EPA_EXPLAINERS.hwfetCalibration}
+                label="Drivetrain η (HWFET)" tooltip={EPA_EXPLAINERS.hwfetCalibration}
                 result={d.eta} format={v => `${(v * 100).toFixed(1)}%`}
             />
             {/* The second opinion, shown only when the phases support one.
                 It is not a correction of the row above — the two measure the
                 same quantity at different operating points, and the gap between
                 them is what the HWFET figure absorbs from a transient cycle.
-                The curves still run on the HWFET figure: a group tested on
-                procedures 81 and 84 has no constant-speed phase, and mixing the
-                two bases on one chart would compare different quantities. */}
+                THIS is the one the speed curves run on. The row above remains
+                what the sanity band and the corpus statistics measure, which is
+                why both are shown rather than one replacing the other. */}
             {d.steadyStateEta?.value != null && (
                 <DerivedRow
-                    label={`η at ${d.steadyStateEta.basis?.cycle_speed_mph ?? SS_CYCLE_SPEED_MPH} mph`}
+                    label={`Drivetrain η (steady state, ${d.steadyStateEta.basis?.cycle_speed_mph ?? SS_CYCLE_SPEED_MPH} mph)`}
                     tooltip={EPA_EXPLAINERS.steadyStateEta}
                     result={d.steadyStateEta} format={v => `${(v * 100).toFixed(1)}%`}
                 />

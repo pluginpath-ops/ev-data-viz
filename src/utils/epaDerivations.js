@@ -44,16 +44,16 @@ import { roadLoadForce } from './epaPhysics';
 // here for use, and re-exported so existing `… from './epaDerivations'` imports
 // (TestPhaseEditor, EpaCuratorEditor, etc.) keep working.
 import {
-    LBF_MILE_TO_KWH, DEFAULT_ETA, HWFET_AVG_MPH, MPG_E_CONVERSION, CURVE_SPEED_RANGE,
+    LBF_MILE_TO_KWH, DEFAULT_ETA, DEFAULT_SS_ETA, HWFET_AVG_MPH, MPG_E_CONVERSION, CURVE_SPEED_RANGE,
     PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
     ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND, SS_CYCLE_SPEED_MPH,
-    DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF,
+    DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF, HWFET_TO_SS_ETA_RATIO,
 } from '../constants/epa';
 
 export {
     PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
     ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND, SS_CYCLE_SPEED_MPH,
-    DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF,
+    DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF, HWFET_TO_SS_ETA_RATIO,
 };
 
 // ── Small helpers ───────────────────────────────────────────────────────────
@@ -409,6 +409,104 @@ export function deriveSteadyStateEta(group, speedMph = SS_CYCLE_SPEED_MPH) {
     };
 }
 
+/**
+ * The η a SPEED-BASED curve should use, on one basis for every vehicle.
+ *
+ * A consumption-against-speed curve predicts steady cruise, so it wants the
+ * efficiency measured at steady cruise. `deriveDrivetrainEta` does not measure
+ * that: it back-solves a STEADY-STATE formula against a TRANSIENT cycle, so it
+ * absorbs braking losses and the convexity of the drag term and reads about 13%
+ * low. Building a highway curve on it under-predicts range, which is how the
+ * MY2027 CLA 350 came to show ~285 miles at 70 mph against a 385-mile road test.
+ *
+ * ── Why this is a separate function ─────────────────────────────────────────
+ *
+ * `deriveDrivetrainEta` must stay pure HWFET and is deliberately not touched:
+ *
+ *   • ETA_BAND is calibrated on HWFET values and stays that way — it is a
+ *     data-integrity check on the inputs, and the record's integrity is
+ *     established there.
+ *   • the `ss_eta_ratio` measure divides the steady-state η by the HWFET one.
+ *     Correcting the denominator with a factor derived from that same ratio
+ *     would be circular, and the corpus figure would drift every time the
+ *     constant was re-set from it.
+ *
+ * So the curve resolves its own η and the statistics keep measuring the raw one.
+ *
+ * ── The precedence ─────────────────────────────────────────────────────────
+ *
+ *   measured   the group has constant-speed phases, so η is back-solved at the
+ *              65 mph J1634 specifies. The real thing.
+ *   corrected  it does not — a test run on procedures 81 and 84 has no such
+ *              phase — so the HWFET value is scaled by the fleet median of the
+ *              ratio between them. Roughly a third of the corpus.
+ *   estimated  no phases at all, so DEFAULT_SS_ETA — the cruise-basis fallback.
+ *              NOT DEFAULT_ETA, which is the HWFET one: a steady-state η runs
+ *              ~13% above it, and reaching for the wrong constant here would
+ *              put a curve with no data 13% below every curve around it.
+ *
+ * The correction is what makes ONE basis possible. Without it a steady-state
+ * curve could only describe the two-thirds of the fleet with an SS phase, and a
+ * chart mixing the two bases would put a 13% efficiency difference between two
+ * cars that came from which procedure their manufacturer chose.
+ *
+ * ── What a corrected value is worth ─────────────────────────────────────────
+ *
+ * The ratio's interquartile range is 2.5%, so half the corrected vehicles land
+ * within a few percent and the worst observed case is 13.7% out. Against the
+ * alternative — every one of them 11.4% low, in the same direction, with no
+ * indication — it is a large improvement and still an estimate. It carries its
+ * own source for that reason: `corrected` is not `measured`, and nothing should
+ * render it as though it were.
+ */
+export function resolveCurveEta(group) {
+    const ss = deriveSteadyStateEta(group);
+    if (ss?.value != null && !(ss.flags ?? []).includes('nonphysical-eta')) {
+        return { ...ss, basis: { ...ss.basis, corrected: false } };
+    }
+
+    const hwfet = deriveDrivetrainEta(group);
+    // Only a MEASURED highway value is worth correcting. Scaling DEFAULT_ETA
+    // would dress the assumption up as a derivation, and the result would look
+    // more specific than the constant it came from.
+    if (hwfet?.source === 'estimated' || !(hwfet?.value > 0)) {
+        // Swapped to the cruise-basis default. Falling through with the HWFET
+        // one would make a curve with NO data sit 13% below every curve around
+        // it, purely from which constant it happened to reach for.
+        return { ...hwfet, value: DEFAULT_SS_ETA,
+            basis: { ...(hwfet.basis ?? {}), corrected: false } };
+    }
+
+    const eta = hwfet.value * HWFET_TO_SS_ETA_RATIO;
+    const flags = [...(hwfet.flags ?? []).filter(f => f !== 'eta-out-of-band')];
+    // The same physical bound the steady-state derivation checks. A correction
+    // that pushes η past 1 has produced an impossibility out of two plausible
+    // inputs, and the honest answer is to decline it rather than publish it.
+    if (eta > 1) {
+        return {
+            value: DEFAULT_SS_ETA, source: 'estimated', certain: false,
+            flags: [...flags, 'correction-nonphysical'],
+            basis: { corrected: false, hwfet_eta: hwfet.value },
+        };
+    }
+
+    return {
+        value: eta,
+        source: 'corrected',
+        // Never certain. It is a measurement of a different vehicle population
+        // applied to this one.
+        certain: false,
+        flags,
+        basis: {
+            corrected: true,
+            hwfet_eta: hwfet.value,
+            ratio: HWFET_TO_SS_ETA_RATIO,
+            reason: (ss?.flags ?? []).includes('nonphysical-eta')
+                ? 'steady-state η was not physical' : 'no constant-speed phase',
+        },
+    };
+}
+
 // ── Convenience: all derivations at once ────────────────────────────────────
 
 /**
@@ -659,7 +757,14 @@ export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1, acce
     const coeffs = resolvePrimaryCoeffs(group);
     if (!coeffs) return [];
 
-    const eta   = deriveDrivetrainEta(group).value;
+    // The steady-state basis, because that is what this curve predicts: every
+    // point on it is a constant speed. Measured from the constant-speed phases
+    // where a group has them, corrected from the fleet ratio where it does not,
+    // so one basis covers the whole corpus — see resolveCurveEta.
+    //
+    // This is the line that moves the numbers. On the HWFET value the MY2027
+    // CLA 350 drew ~285 miles at 70 mph against a 385-mile road test.
+    const eta   = resolveCurveEta(group).value;
     const accKw = accessoryOverrideW != null ? accessoryOverrideW / 1000 : accessoryKw(group);
     const { a, b } = coeffs;
     const c = coeffs.c * densityRatio; // aerodynamic term only, display-time scale

@@ -16,7 +16,7 @@
  * selector, colour map and URL parameter in the app learn about a thing that
  * has none of those.
  */
-import { resolvePrimaryCoeffs, deriveDrivetrainEta, pickDerivationTest } from './epaDerivations';
+import { resolvePrimaryCoeffs, resolveCurveEta, pickDerivationTest } from './epaDerivations';
 
 const num = (v) => {
     if (v == null || v === '') return null;
@@ -31,14 +31,19 @@ const num = (v) => {
  * numbers and 210 of 211 groups carry them. What varies is the ENERGY, and the
  * energy is what turns a consumption curve into a range curve.
  *
- *   measured    η back-solved from this group's own phases, and usable energy
- *               taken from the DC actually discharged to depletion. 73 groups.
+ *   measured    η back-solved from this group's own constant-speed phases, and
+ *               usable energy taken from the DC actually discharged to
+ *               depletion. Both halves are this vehicle's.
+ *   corrected   the capacity is still this vehicle's, but it never ran a
+ *               constant-speed section, so its highway η was scaled by the
+ *               fleet median of the ratio between the two. About a third of the
+ *               corpus, and what lets one basis cover all of it.
  *   nominal     the same coefficients, but η is the default constant and the
  *               energy is the guide's gross pack — voltage x amp-hours, which
  *               ran a few percent above measured usable on every pack checked.
- *               The shape is measured; the range is an estimate. 108 groups.
+ *               The shape is measured; the range is an estimate.
  *   shape       coefficients and nothing else. Consumption against speed is
- *               real; there is no energy, so there is no range at all. 29.
+ *               real; there is no energy, so there is no range at all.
  *
  * Named rather than scored because the difference is categorical: a nominal
  * curve is not a less precise measurement, it is a measured shape scaled by a
@@ -47,7 +52,10 @@ const num = (v) => {
 export const CURVE_TIERS = [
     { key: 'measured', label: 'Full test cycle',
       tooltip: 'efficiency and capacity both come from this record’s own phases.',
-      hint: 'This record carries its own test phases, so η is back-solved from them and usable capacity is the DC actually discharged to depletion. Both halves of the energy model are measured.' },
+      hint: 'This record ran a constant-speed section, so η is back-solved from it at 65 mph — the same steady cruise this curve plots — and usable capacity is the DC actually discharged to depletion. Both halves of the energy model are this vehicle\'s own.' },
+    { key: 'corrected', label: 'Corrected efficiency',
+      tooltip: 'capacity is this record’s own; efficiency is its highway figure scaled to a cruise basis.',
+      hint: 'This record measured its capacity but never ran a constant-speed section, so η comes from its highway phase scaled by the fleet median of the ratio between the two. Half the fleet sits within a few percent of that ratio. It is a real improvement on the highway figure for a cruise curve — which reads about 13% low — and it is still borrowed from other vehicles.' },
     { key: 'nominal', label: 'Published battery capacity',
       tooltip: 'efficiency is the model default; capacity is the guide’s gross pack, a few percent above what is usable.',
       hint: 'No test phases, so η falls back to the universal default. Capacity comes from the Fuel Economy Guide’s gross pack — voltage × amp-hours, which runs a few percent above real usable energy. Range is drawable but doubly approximate.' },
@@ -85,13 +93,25 @@ export function curveSubject(group) {
     const coeffs = resolvePrimaryCoeffs(group);
     if (!coeffs) return null;
 
-    const eta = deriveDrivetrainEta(group);
-    const etaMeasured = eta?.source !== 'estimated';
+    // The curve predicts steady cruise, so it uses the steady-state basis —
+    // measured where the phases allow, corrected from the fleet ratio where
+    // they do not. See resolveCurveEta.
+    const eta = resolveCurveEta(group);
+    // 'corrected' is not measured. It is a real improvement on the HWFET value
+    // for a cruise curve and still an estimate, and the tier below says so.
+    const etaMeasured = eta?.source === 'measured';
     const energy = resolveCurveEnergy(group);
 
+    // Three questions, in order: is there energy at all, is the energy this
+    // vehicle's, and is the efficiency this vehicle's. A corrected η with a
+    // measured pack is not 'nominal' — that label promises a borrowed CAPACITY,
+    // and this record's capacity is its own.
+    const ownEnergy = energy.source === 'measured' || energy.source === 'curator';
     const tier = energy.kwh == null ? 'shape'
-        : (etaMeasured && (energy.source === 'measured' || energy.source === 'curator')) ? 'measured'
-            : 'nominal';
+        : !ownEnergy ? 'nominal'
+            : etaMeasured ? 'measured'
+                : eta?.source === 'corrected' ? 'corrected'
+                    : 'nominal';
 
     const guide = group.epa_fe_guide ?? null;
     return {

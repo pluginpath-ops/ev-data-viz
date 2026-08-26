@@ -157,7 +157,7 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
                         <th className="font-semibold pr-2" title="UDDS / HWY / SS / Cold-UDDS / US06 / SC03. SS = steady-state depletion at a lab-chosen speed — stored for energy totals but NOT a valid efficiency anchor.">Phase</th>
                         <th className="font-semibold pr-2" title="Actual distance driven for this phase (miles).">Dist (mi)</th>
                         <th className="font-semibold pr-2" title="Integrated DC KW-HRS: battery-side energy for this phase — what actually left the battery. This is what efficiency derivation uses.">DC Energy (kWh)</th>
-                        <th className="font-semibold pr-2 text-right" title="Energy ÷ distance (Wh/mi). HWY phases at ~48.3 mph average are the efficiency anchor.">Consumption</th>
+                        <th className="font-semibold pr-2 text-right" title="Energy ÷ distance (Wh/mi). The HWY phases at ~48.3 mph anchor the HWFET η, which the sanity band and the corpus statistics use; the SS phases at 65 mph anchor the steady-state η, which the speed curves use.">Consumption</th>
                         <th></th>
                     </tr>
                 </thead>

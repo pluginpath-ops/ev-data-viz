@@ -5,13 +5,32 @@ import {
 } from '../epaCurveSubjects';
 
 const coeffs = [{ is_primary: true, target_a: 37, target_b: 0.2, target_c: 0.02, equiv_test_weight_lbs: 5500 }];
-/** A test with phases, which is what lets η be derived. */
+const HWY_PHASES = [
+    { phase_type: 'HWY', distance_mi: 10.26, dc_energy_kwh: 3.1 },
+    { phase_type: 'HWY', distance_mi: 10.26, dc_energy_kwh: 3.0 },
+];
+
+/**
+ * A test with a constant-speed section, which is what lets η be MEASURED on the
+ * basis the curve uses. A cruise curve wants cruise efficiency, so a record with
+ * only highway phases now derives a CORRECTED η rather than a measured one.
+ */
 const derivableTest = {
     procedure_code: 77, total_dc_energy_kwh: 90,
-    epa_test_phases: [
-        { phase_type: 'HWY', distance_mi: 10.26, dc_energy_kwh: 3.1 },
-        { phase_type: 'HWY', distance_mi: 10.26, dc_energy_kwh: 3.0 },
-    ],
+    // 84.52 kWh over 280 miles puts η at 0.90 against these coefficients. The
+    // figures have to be mutually consistent: a constant-speed phase that
+    // spends less than road load predicts derives an η above 1, and
+    // resolveCurveEta declines that and falls through to a corrected value —
+    // which is correct behaviour and made an earlier fixture assert the
+    // opposite of what it meant.
+    epa_test_phases: [...HWY_PHASES,
+        { phase_type: 'SS', distance_mi: 280, dc_energy_kwh: 84.52 }],
+};
+
+/** The same record without one — procedures 81 and 84 never run it. */
+const highwayOnlyTest = {
+    procedure_code: 84, total_dc_energy_kwh: 90,
+    epa_test_phases: HWY_PHASES,
 };
 const group = (o = {}) => ({
     test_group_id: o.id ?? 'TG1', model_year: 2025, make: 'Rivian',
@@ -58,8 +77,17 @@ describe('where the energy comes from', () => {
 });
 
 describe('tiers say how much of a curve is measurement', () => {
-    it('measured needs BOTH a derived η and a measured energy', () => {
+    it('measured needs a constant-speed η AND a measured energy', () => {
         expect(curveSubject(group({ tests: [derivableTest] })).tier).toBe('measured');
+    });
+    it('a corrected η with this record’s own pack is not nominal', () => {
+        // 'nominal' promises a borrowed CAPACITY. Here the capacity is the
+        // record's own and only the efficiency is borrowed, which is a
+        // materially better curve and deserves its own name.
+        const s = curveSubject(group({ tests: [highwayOnlyTest] }));
+        expect(s.tier).toBe('corrected');
+        expect(s.canPlotRange).toBe(true);
+        expect(s.etaMeasured).toBe(false);
     });
     it('a borrowed pack is nominal even though the shape is measured', () => {
         // Road load is the lab's own number either way; only the scale is
@@ -74,7 +102,8 @@ describe('tiers say how much of a curve is measurement', () => {
     });
     it('every tier a subject can be given is declared', () => {
         const keys = CURVE_TIERS.map(t => t.key);
-        [group({ tests: [derivableTest] }), group({ guide: { nominal_pack_kwh: 100 } }), group()]
+        [group({ tests: [derivableTest] }), group({ tests: [highwayOnlyTest] }),
+         group({ guide: { nominal_pack_kwh: 100 } }), group()]
             .forEach(g => expect(keys).toContain(curveSubject(g).tier));
         keys.forEach(k => expect(tierByKey(k)).not.toBeNull());
     });
@@ -82,18 +111,21 @@ describe('tiers say how much of a curve is measurement', () => {
 
 describe('ordering and counts', () => {
     const set = [
-        group({ id: 'C' }),                                        // shape
-        group({ id: 'B', guide: { nominal_pack_kwh: 100 } }),      // nominal
+        group({ id: 'D' }),                                        // shape
+        group({ id: 'C', guide: { nominal_pack_kwh: 100 } }),      // nominal
+        group({ id: 'B', tests: [highwayOnlyTest] }),              // corrected
         group({ id: 'A', tests: [derivableTest] }),                // measured
     ];
     it('puts the best-grounded first', () => {
-        expect(curveSubjects(set).map(s => s.tier)).toEqual(['measured', 'nominal', 'shape']);
+        expect(curveSubjects(set).map(s => s.tier))
+            .toEqual(['measured', 'corrected', 'nominal', 'shape']);
     });
     it('counts each tier for the filter', () => {
-        expect(tierCounts(curveSubjects(set))).toEqual({ measured: 1, nominal: 1, shape: 1 });
+        expect(tierCounts(curveSubjects(set)))
+            .toEqual({ measured: 1, corrected: 1, nominal: 1, shape: 1 });
     });
     it('drops the unplottable from the list entirely', () => {
-        expect(curveSubjects([...set, group({ id: 'D', coeffs: [] })])).toHaveLength(3);
+        expect(curveSubjects([...set, group({ id: 'E', coeffs: [] })])).toHaveLength(4);
     });
 });
 

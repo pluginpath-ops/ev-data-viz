@@ -4,7 +4,7 @@ import { useTheme } from '../../../hooks/useTheme';
 import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
 import { buildEpaCurveFromModel } from '../../../utils/epaDerivations';
-import { DEFAULT_ETA, CURVE_SPEED_RANGE } from '../../../constants/epa';
+import { DEFAULT_SS_ETA, CURVE_SPEED_RANGE } from '../../../constants/epa';
 import { curveSubjects, curveTooltipLines, disambiguateLabels } from '../../../utils/epaCurveSubjects';
 import { PALETTE } from '../../../utils/specHelpers';
 import { convSpeed, speedLabel } from '../../../utils/unitConversions';
@@ -301,7 +301,8 @@ export default function EpaCurveExplorer() {
                     <div className="mt-1">
                         {axis.label} requires an η in addition to the EPA provided road load. These
                         records currently do not have test data to estimate η from, so a universal
-                        estimate of {DEFAULT_ETA} is used instead.
+                        estimate of {DEFAULT_SS_ETA} is used instead — the cruise-basis fallback,
+                        because every point on these curves is a constant speed.
                     </div>
                     <div className="mt-1">
                         The SHAPE of each curve is real, but its magnitude scales with η.
