@@ -2,10 +2,58 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
+/**
+ * Preload the app chunk while the constants bootstrap is on the network (#261).
+ *
+ * main.jsx loads the app with a dynamic import, so that the published model
+ * constants are seeded before constants/epa.js resolves them. The cost of that
+ * is discovery: nothing tells the browser about the app chunk until the
+ * settings fetch resolves, so ~1.2MB of app and vendor code would queue behind
+ * a round trip that returns a few hundred bytes.
+ *
+ * One modulepreload link fixes it — the browser fetches the chunk and its
+ * dependency graph in parallel with the settings query, and evaluation still
+ * waits for the seed. The filename is content-hashed, so it has to be read out
+ * of the bundle rather than written into index.html by hand.
+ */
+function preloadAppChunk() {
+  return {
+    name: 'preload-app-chunk',
+    apply: 'build',
+    enforce: 'post',
+    // 'post' so the bundle is on the context — the hashed filename only exists
+    // once the chunks have been generated.
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, ctx) {
+        // By moduleIds, not facadeModuleId: the app chunk absorbs more than
+        // its entry module, and rollup leaves the facade null when it does.
+        const chunk = Object.values(ctx.bundle ?? {}).find(
+          c => c.type === 'chunk' && c.moduleIds?.some(id => id.endsWith('/src/renderApp.jsx')));
+        if (!chunk) return html;
+        // Its static imports too — vendor-react and vendor-charts are ~430KB
+        // the browser would otherwise not learn about until the app chunk has
+        // been fetched and parsed.
+        const files = [chunk.fileName, ...(chunk.imports ?? [])]
+          .filter(f => !html.includes(f));
+        return {
+          html,
+          tags: files.map(fileName => ({
+            tag: 'link',
+            attrs: { rel: 'modulepreload', crossorigin: true, href: `/${fileName}` },
+            injectTo: 'head',
+          })),
+        };
+      },
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    preloadAppChunk(),
   ],
   server: {
     // Honour PORT so a second concurrent session can still get a dev server.

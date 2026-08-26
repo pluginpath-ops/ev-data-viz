@@ -340,6 +340,14 @@ body {
     color: var(--color-text-primary);
 }
 
+/* The same banner for a failure. Tinted rather than solid so the text stays
+   readable in both themes without a second colour token. */
+.notice-error {
+    background-color: rgba(239, 68, 68, 0.12);
+    border: 1px solid var(--color-danger);
+    color: var(--color-text-primary);
+}
+
 /* Horizontal inline group — flex row with standard gap */
 .inline-row {
     @apply flex items-center gap-2;
@@ -637,6 +645,25 @@ body {
 /* Border-style status badge (full-radius); color classes added inline */
 .badge-status {
     @apply text-xs px-1.5 py-0.5 rounded-full border;
+}
+
+/* Which layer a Model Constants knob's live value came from (#261): this
+   browser's sandbox, or what the site publishes. No badge means the compiled
+   default. Amber for local because it is the layer only you can see; blue for
+   site because it is the one everyone computes from. */
+.knob-source-local,
+.knob-source-site {
+    @apply text-[10px] font-semibold px-1.5 py-0.5 rounded border cursor-help;
+}
+.knob-source-local {
+    color: var(--color-warning);
+    border-color: rgba(245, 158, 11, 0.35);
+    background-color: rgba(245, 158, 11, 0.12);
+}
+.knob-source-site {
+    color: var(--color-primary);
+    border-color: rgba(59, 130, 246, 0.35);
+    background-color: rgba(59, 130, 246, 0.12);
 }
 
 /* ── Navigation (App.jsx) ───────────────────────────────────────────────────── */

@@ -654,6 +654,74 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
     });
 });
 
+describe('published model constants reach the math (#261)', () => {
+    // The constants decide what OTHER PEOPLE see — the bands flag records on
+    // every EPA card, DEFAULT_ETA is an input to the physics, and the EPA
+    // section is public. Publishing them is only real if three seams hold, and
+    // each one fails silently: no error, just everyone quietly computing from
+    // the compiled defaults.
+
+    it('seeds the site values before anything that reads a constant is loaded', () => {
+        // constants/epa.js resolves every tunable at MODULE LOAD, deliberately,
+        // so the math modules stay plain static imports. That makes the entry
+        // point's import list load-bearing: one static import of a component,
+        // the context or DataService evaluates epa.js before the seed and pins
+        // the whole site to its defaults.
+        const main = read('src/main.jsx');
+        expect(main, 'main.jsx must seed the published constants')
+            .toMatch(/seedSiteConstants\(/);
+        expect(main, 'and load the app dynamically, after the seed')
+            .toMatch(/import\(['"]\.\/renderApp['"]\)/);
+
+        const statics = [...main.matchAll(/^import .*?from\s+['"]([^'"]+)['"]/gm)].map(m => m[1]);
+        for (const spec of statics) {
+            expect(['./App', './context/AppContext', './services/DataService', './renderApp'],
+                `main.jsx statically imports ${spec}, which loads constants/epa.js before the seed`)
+                .not.toContain(spec);
+        }
+    });
+
+    it('still preloads the app chunk the bootstrap defers', () => {
+        // Loading the app dynamically is what lets the seed happen first, and
+        // it costs discovery: nothing tells the browser about ~1.2MB of app and
+        // vendor code until a few-hundred-byte settings query comes back. The
+        // build injects a modulepreload to cover it, matched on the module path
+        // — so renaming renderApp.jsx silently un-preloads the whole app.
+        const cfg = read('vite.config.js');
+        expect(cfg, 'the preload must name the module main.jsx defers')
+            .toContain('/src/renderApp.jsx');
+        expect(cfg, 'and preload it').toMatch(/modulepreload/);
+    });
+
+    it('resolves a constant through the site layer, not only the local one', () => {
+        const overrides = read('src/constants/overrides.js');
+        expect(overrides, 'resolve() must consult the published values')
+            .toMatch(/site\[key\]/);
+        expect(read('src/constants/epa.js'), 'the math must read through the same resolver')
+            .toMatch(/resolve\(/);
+    });
+
+    it('offers an admin a way to publish, and a way back', () => {
+        const panel = read('src/components/admin/ConstantsKnobs.jsx');
+        expect(panel, 'the knob panel must be able to publish a value')
+            .toMatch(/publishModelConstant/);
+        expect(panel, 'and to revert the published set')
+            .toMatch(/clearPublishedConstants/);
+        expect(panel, 'and must say which layer a value came from')
+            .toMatch(/SourceBadge/);
+
+        const ctx = read('src/context/AppContext.jsx');
+        for (const fn of ['publishModelConstant', 'clearPublishedConstants']) {
+            expect(ctx, `${fn} must be exposed on the context`).toContain(fn);
+        }
+
+        const svc = read('src/services/DataService.js');
+        for (const rpc of ['set_model_constant', 'clear_model_constants']) {
+            expect(svc, `DataService must call the ${rpc} RPC`).toContain(rpc);
+        }
+    });
+});
+
 describe('components import what they use', () => {
     // Twice now a helper has been used in JSX without being imported — a runtime
     // ReferenceError no build step catches, because Vite does not resolve

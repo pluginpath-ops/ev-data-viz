@@ -115,9 +115,14 @@ export const PATH_EFFORT = {
 // ── Tunable knobs: pristine defaults ────────────────────────────────────────
 // Single source of truth for the adjustable model assumptions and sanity bands.
 // The Admin "Model Constants" panel (src/components/admin/ConstantsKnobs.jsx)
-// reads these as the reset baseline and writes per-browser overrides via
-// constants/overrides.js. Each export below is the default UNLESS a local
-// override is set (applied on page reload).
+// reads these as the reset baseline.
+//
+// Each resolved export below is the default UNLESS an override sits over it:
+// this browser's local sandbox first, then the value an admin published to the
+// site (#261), then this file. Both override layers are read ONCE, here, at
+// module load — the site layer is seeded before the app's module graph loads
+// (src/main.jsx) precisely so that stays true. A change of either kind applies
+// on the next page reload.
 export const EPA_DEFAULTS = {
     // assumptions
     // Fallback drivetrain efficiency on the HWFET basis, from the fleet median

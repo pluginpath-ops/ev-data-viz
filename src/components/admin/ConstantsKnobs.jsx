@@ -1,41 +1,77 @@
 import { useState, useMemo, useCallback } from 'react';
 import { KNOB_GROUPS, knobDefault } from '../../constants/knobs';
-import { getOverrides, setOverride, clearOverrides } from '../../constants/overrides';
+import { getOverrides, setOverride, clearOverrides, getSiteConstants } from '../../constants/overrides';
 import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
 import { allBandEvidence, bandVerdict } from '../../utils/epaBandEvidence';
 
 /**
- * Admin panel for tuning the EPA model constants in real time.
+ * Admin panel for tuning the EPA model constants.
  *
- * Writes per-browser overrides to localStorage (constants/overrides.js); the math
- * modules read them at load, so changes apply on the next page reload. Pure local
- * sandbox — never touches the DB or other users.
+ * Three layers, highest first (#261):
+ *
+ *   local     this browser's sandbox — try a change without imposing it
+ *   site      published to the database; what every other curator and every
+ *             public visitor computes from
+ *   default   the compiled-in value
+ *
+ * The number inputs edit the LOCAL layer, as they always have. Publishing
+ * promotes what you are looking at to the site layer and drops the local
+ * override, so the row then reads its value from where everyone else does.
+ *
+ * Every change — local or published — applies on the next page reload, because
+ * constants/epa.js resolves at module load. That is the property this panel is
+ * built around rather than against; see constants/overrides.js.
  */
 const eq = (a, b) =>
     Array.isArray(a) && Array.isArray(b) ? a[0] === b[0] && a[1] === b[1] : a === b;
 
+/** Layer-comparison that treats "absent" as its own value. */
+const eqSlot = (a, b) => (a == null || b == null ? a == null && b == null : eq(a, b));
+
 const numOrNull = (s) => (s === '' || s == null ? null : Number(s));
+
+const show = (v) => (Array.isArray(v) ? `${v[0]}–${v[1]}` : String(v));
 
 export default function ConstantsKnobs() {
     // The corpus, once, on an admin page. Nothing on a vehicle card pays for
     // this — showing a band's evidence beside a knob costs one fetch on the
     // panel that sets it, which is the same trade the statistics view makes.
-    const { getCertGroupsForStats } = useAppContext();
+    const { getCertGroupsForStats, publishModelConstant, clearPublishedConstants, isAdmin } = useAppContext();
     const loadCert = useCallback(() => getCertGroupsForStats(), [getCertGroupsForStats]);
     const { data: certGroups } = useAsyncResource(loadCert, []);
     const evidence = useMemo(() => allBandEvidence(certGroups ?? [], null), [certGroups]);
 
     const [overrides, setOverrides] = useState(getOverrides);
+    // The published map as this page load saw it, then as our own writes leave
+    // it. The RPC returns the whole map, so a concurrent edit by another admin
+    // is picked up by the next publish rather than silently lost.
+    const [published, setPublished] = useState(getSiteConstants);
     const [dirty, setDirty] = useState(false);
+    const [busyKey, setBusyKey] = useState(null);
+    const [failure, setFailure] = useState(null);
 
-    // Effective (live) value for a knob: override if set, else default.
-    const valueOf = (key) => (key in overrides ? overrides[key] : knobDefault(key));
-    const isModified = (key) => key in overrides && !eq(overrides[key], knobDefault(key));
+    // Effective (live) value for a knob, and which layer it came from.
+    const valueOf = (key) => {
+        if (key in overrides && overrides[key] != null) return overrides[key];
+        if (key in published && published[key] != null) return published[key];
+        return knobDefault(key);
+    };
+    const sourceOf = (key) => {
+        if (key in overrides && overrides[key] != null) return 'local';
+        if (key in published && published[key] != null) return 'site';
+        return 'default';
+    };
+
+    /** What the layer BELOW local resolves to — what a local reset falls back to. */
+    const beneathLocal = (key) =>
+        (key in published && published[key] != null ? published[key] : knobDefault(key));
 
     function commit(key, value) {
-        const def = knobDefault(key);
-        if (value == null || eq(value, def)) setOverride(key, null);
+        // Store a local override only where it actually differs from the layer
+        // it sits over, so the source badge never claims a sandbox that only
+        // restates the published value.
+        if (value == null || eq(value, beneathLocal(key))) setOverride(key, null);
         else setOverride(key, value);
         setOverrides(getOverrides());
         setDirty(true);
@@ -53,7 +89,46 @@ export default function ConstantsKnobs() {
         setDirty(true);
     }
 
-    const anyModified = KNOB_GROUPS.some(g => g.knobs.some(k => isModified(k.key)));
+    /** The published entry a publish of `key` would produce (undefined = revert). */
+    const publishTarget = (key) => {
+        const v = valueOf(key);
+        return eq(v, knobDefault(key)) ? null : v;
+    };
+
+    async function publish(key) {
+        setBusyKey(key);
+        setFailure(null);
+        try {
+            const map = await publishModelConstant(key, publishTarget(key));
+            setPublished(map ?? {});
+            // The value now comes from the site layer, so the sandbox copy of
+            // it would be a lie about where it came from.
+            setOverride(key, null);
+            setOverrides(getOverrides());
+            setDirty(true);
+        } catch (e) {
+            setFailure({ key, message: e.message });
+        } finally {
+            setBusyKey(null);
+        }
+    }
+
+    async function revertPublished() {
+        setBusyKey('__all__');
+        setFailure(null);
+        try {
+            const map = await clearPublishedConstants();
+            setPublished(map ?? {});
+            setDirty(true);
+        } catch (e) {
+            setFailure({ key: null, message: e.message });
+        } finally {
+            setBusyKey(null);
+        }
+    }
+
+    const anyLocal = KNOB_GROUPS.some(g => g.knobs.some(k => sourceOf(k.key) === 'local'));
+    const anyPublished = Object.keys(published).length > 0;
 
     return (
         <div className="card p-5">
@@ -61,24 +136,42 @@ export default function ConstantsKnobs() {
                 <div>
                     <h3 className="section-title">Model Constants</h3>
                     <p className="text-sm text-secondary mt-0.5">
-                        Tune the EPA math on <strong>this browser only</strong>. Changes are saved
-                        instantly but apply on the next page reload. Never affects the database or
-                        other users.
+                        The assumptions and sanity bands the EPA math runs on. Editing a value
+                        changes it on <strong>this browser only</strong>; <strong>Publish</strong> promotes
+                        it to the site, where every curator and every public visitor computes
+                        from it. Both apply on the next page reload.
                     </p>
                 </div>
-                <button
-                    onClick={resetAll}
-                    disabled={!anyModified}
-                    className="btn btn-secondary text-sm whitespace-nowrap disabled:opacity-40"
-                >
-                    Reset all
-                </button>
+                <div className="flex flex-col gap-2 shrink-0">
+                    <button
+                        onClick={resetAll}
+                        disabled={!anyLocal}
+                        className="btn btn-secondary text-sm whitespace-nowrap disabled:opacity-40"
+                    >
+                        Reset local
+                    </button>
+                    {isAdmin && (
+                        <button
+                            onClick={revertPublished}
+                            disabled={!anyPublished || busyKey === '__all__'}
+                            title="Revert every published constant to its compiled default, for everyone"
+                            className="btn btn-secondary text-sm whitespace-nowrap disabled:opacity-40"
+                        >
+                            {busyKey === '__all__' ? 'Reverting…' : 'Revert published'}
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {failure && !failure.key && (
+                <div className="notice-error my-3 p-3 rounded-lg text-sm">{failure.message}</div>
+            )}
 
             {dirty && (
                 <div className="notice-info my-3 flex items-center justify-between gap-3 p-3 rounded-lg">
                     <span className="text-sm">
-                        Overrides saved — reload to apply them to the calculations.
+                        Saved — reload to apply the change to the calculations here. Anyone else
+                        picks up a published value on their next load.
                     </span>
                     <button onClick={() => window.location.reload()} className="btn btn-primary text-sm whitespace-nowrap">
                         ↻ Reload now
@@ -97,9 +190,15 @@ export default function ConstantsKnobs() {
                                 knob={knob}
                                 value={valueOf(knob.key)}
                                 def={knobDefault(knob.key)}
-                                modified={isModified(knob.key)}
+                                source={sourceOf(knob.key)}
+                                siteValue={published[knob.key] ?? null}
+                                canPublish={isAdmin}
+                                publishable={!eqSlot(publishTarget(knob.key), published[knob.key] ?? null)}
+                                busy={busyKey === knob.key}
+                                failure={failure?.key === knob.key ? failure.message : null}
                                 onChange={(v) => commit(knob.key, v)}
                                 onReset={() => resetKey(knob.key)}
+                                onPublish={() => publish(knob.key)}
                                 evidence={evidence[knob.key] ?? null}
                             />
                         ))}
@@ -149,7 +248,29 @@ function BandEvidence({ evidence, band }) {
     );
 }
 
-function KnobRow({ knob, value, def, modified, onChange, onReset, evidence }) {
+/**
+ * Where this row's live value came from.
+ *
+ * A curator setting a band from the evidence beside it needs to know whether
+ * they are looking at their own sandbox, at what the site publishes, or at the
+ * shipped default — the same question `overrideSource` answers on a curator
+ * field, and for the same reason: an unlabelled number invites you to assume
+ * it is the one everyone else sees.
+ */
+function SourceBadge({ source }) {
+    if (source === 'local') {
+        return <span className="knob-source-local" title="Set on this browser only — publish it to apply site-wide">local</span>;
+    }
+    if (source === 'site') {
+        return <span className="knob-source-site" title="Published — every user computes from this">site</span>;
+    }
+    return null;
+}
+
+function KnobRow({
+    knob, value, def, source, siteValue, canPublish, publishable, busy, failure,
+    onChange, onReset, onPublish, evidence,
+}) {
     const { key, label, help, kind, min, max, step, unit } = knob;
 
     return (
@@ -160,18 +281,17 @@ function KnobRow({ knob, value, def, modified, onChange, onReset, evidence }) {
                     <code className="text-[11px] text-muted bg-[var(--color-surface-sunken)] px-1.5 py-0.5 rounded">
                         {key}
                     </code>
-                    {modified && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">
-                            modified
-                        </span>
-                    )}
+                    <SourceBadge source={source} />
                 </div>
                 {help && <p className="text-xs text-faint mt-0.5">{help}</p>}
                 <p className="text-[11px] text-faint mt-0.5">
-                    default: <code>{Array.isArray(def) ? `${def[0]}–${def[1]}` : String(def)}</code>
-                    {unit ? ` ${unit}` : ''}
+                    default: <code>{show(def)}</code>{unit ? ` ${unit}` : ''}
+                    {siteValue != null && (
+                        <> {' · '} published: <code>{show(siteValue)}</code>{unit ? ` ${unit}` : ''}</>
+                    )}
                 </p>
                 <BandEvidence evidence={evidence} band={value} />
+                {failure && <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-danger)' }}>{failure}</p>}
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
@@ -200,10 +320,22 @@ function KnobRow({ knob, value, def, modified, onChange, onReset, evidence }) {
                     />
                 )}
                 {unit && <span className="text-xs text-faint w-7">{unit}</span>}
+                {canPublish && (
+                    <button
+                        onClick={onPublish}
+                        disabled={!publishable || busy}
+                        title={publishable
+                            ? 'Publish this value site-wide'
+                            : 'Already what the site publishes'}
+                        className="text-xs text-faint hover:text-secondary disabled:opacity-30 px-1"
+                    >
+                        {busy ? '…' : '⇧'}
+                    </button>
+                )}
                 <button
                     onClick={onReset}
-                    disabled={!modified}
-                    title="Reset to default"
+                    disabled={source !== 'local'}
+                    title="Drop this browser's override"
                     className="text-xs text-faint hover:text-secondary disabled:opacity-30 px-1"
                 >
                     ↺
