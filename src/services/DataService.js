@@ -2017,7 +2017,7 @@ class DataService {
     const [{ data: group, error: gErr }, { data: feRow, error: fErr }] = await Promise.all([
       supabase.from('epa_test_groups')
         .select('*, epa_tests(test_number, test_date, procedure_code, total_dc_energy_kwh, '
-                + 'ac_recharge_kwh, epa_test_phases(phase_type, distance_mi, dc_energy_kwh))')
+                + 'ac_recharge_kwh, epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh))')
         .eq('test_group_id', testGroupId).single(),
       supabase.from('epa_fe_guide').select('*').eq('id', feRowId).single(),
     ]);
@@ -2243,7 +2243,7 @@ class DataService {
         epa_coefficient_sets(is_primary, category, target_a, target_b, target_c,
                              set_a, set_b, set_c, equiv_test_weight_lbs),
         epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh,
-                  epa_test_phases(phase_type, distance_mi, dc_energy_kwh)),
+                  epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh)),
         epa_fe_guide!epa_test_groups_fe_guide_row_id_fkey(
           division, carline, carline_class, drive_desc, nominal_pack_kwh,
           label_comb_range_mi, label_comb_mpge, model_year
@@ -2274,7 +2274,7 @@ class DataService {
         epa_coefficient_sets(is_primary, category, target_a, target_b, target_c,
                              set_a, set_b, set_c, equiv_test_weight_lbs),
         epa_tests(procedure_code, total_dc_energy_kwh,
-                  epa_test_phases(phase_type, distance_mi, dc_energy_kwh)),
+                  epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh)),
         epa_fe_guide!epa_test_groups_fe_guide_row_id_fkey(
           carline, division, carline_class, drive_desc, nominal_pack_kwh
         )

@@ -39,6 +39,7 @@
  */
 
 import { roadLoadForce } from './epaPhysics';
+import { resolvePhaseTypes } from './phaseTypes';
 
 // EPA constants live in src/constants/epa.js (single source of truth). Imported
 // here for use, and re-exported so existing `… from './epaDerivations'` imports
@@ -252,6 +253,26 @@ export function deriveEffectiveAdjustmentFactor(group) {
     };
 }
 
+/**
+ * The constant-speed phases of a test, as `phaseTypes` reads them.
+ *
+ * Resolved rather than read straight off `phase_type`, because the column does
+ * not carry the whole answer: J1634 drives its constant-speed section in two
+ * blocks and only the first is long enough for the importer's distance rule to
+ * catch. The second is the last bag of the test, typed by position — see
+ * `ssContinuation`. Reading the raw column left the derivations back-solving η
+ * from one block or two depending on how far the second one got (#264).
+ *
+ * `deriveDrivetrainEta` deliberately keeps reading the raw column. ETA_BAND,
+ * DEFAULT_ETA and HWFET_TO_SS_ETA_RATIO are all MEASURED off the corpus that
+ * selection produces, so widening its inputs is a re-measurement of three
+ * constants rather than a bug fix, and belongs in its own change. The
+ * continuation rule cannot type a HWY phase in any case.
+ */
+function steadyStatePhases(test) {
+    return resolvePhaseTypes(test?.epa_test_phases || []).filter(p => p.cycle === 'SS');
+}
+
 // ── Derivation 4: Implied steady-state speed (validation) ───────────────────
 
 /**
@@ -269,7 +290,7 @@ export function deriveImpliedSsSpeed(group, etaResult = deriveDrivetrainEta(grou
     }
 
     const test = pickDerivationTest(group?.epa_tests || []);
-    const ssPhases = (test?.epa_test_phases || []).filter(p => p.phase_type === 'SS');
+    const ssPhases = steadyStatePhases(test);
     const ssConsumption = phaseConsumptionKwh100mi(ssPhases);
     if (ssConsumption == null) {
         return { value: null, source: null, certain: false, flags: ['no-ss-phase'] };
@@ -352,7 +373,7 @@ export function deriveSteadyStateEta(group, speedMph = SS_CYCLE_SPEED_MPH) {
     }
 
     const test = pickDerivationTest(group?.epa_tests || []);
-    const ssPhases = (test?.epa_test_phases || []).filter(p => p.phase_type === 'SS');
+    const ssPhases = steadyStatePhases(test);
     const dcConsumption = phaseConsumptionKwh100mi(ssPhases);
     if (dcConsumption == null) {
         return { value: null, source: null, certain: false, flags: ['no-ss-phase'] };
