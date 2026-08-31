@@ -32,7 +32,32 @@ function Box({ stats, scale, digits }) {
     );
 }
 
-export default function StatsTable({ rows, measureDef, overall, dimensionLabel }) {
+/**
+ * A column heading that orders the table.
+ *
+ * The arrow marks the active column only. Showing a faint one on every heading
+ * to advertise that they are all clickable makes six arrows compete with the
+ * one that is actually telling you something.
+ */
+function SortTh({ label, sortKey, sort, onSort, className = 'guide-th numeric' }) {
+    const active = sort?.key === sortKey;
+    const dir = active ? sort.dir : null;
+    // Names read naturally A–Z; a measure reads best biggest-first. Either way
+    // clicking the column you are already on reverses it.
+    const next = active ? (dir === 'desc' ? 'asc' : 'desc')
+        : (sortKey === 'bucket' ? 'asc' : 'desc');
+    return (
+        <th className={className} aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+            <button type="button" className={`stats-sort ${active ? 'active' : ''}`}
+                onClick={() => onSort({ key: sortKey, dir: next })}
+                title={`Sort by ${label}`}>
+                {label}{active && <span className="stats-sort-arrow">{dir === 'asc' ? '\u2191' : '\u2193'}</span>}
+            </button>
+        </th>
+    );
+}
+
+export default function StatsTable({ rows, measureDef, overall, dimensionLabel, sort, onSort }) {
     const m = measureDef;
     const digits = m?.digits ?? 1;
 
@@ -52,14 +77,15 @@ export default function StatsTable({ rows, measureDef, overall, dimensionLabel }
             <table className="guide-table stats-table">
                 <thead>
                     <tr>
-                        <th className="guide-th">{dimensionLabel}</th>
-                        <th className="guide-th numeric">n</th>
+                        <SortTh label={dimensionLabel} sortKey="bucket" sort={sort} onSort={onSort}
+                            className="guide-th" />
+                        <SortTh label="n" sortKey="n" sort={sort} onSort={onSort} />
                         {/* The box's order, left to right. */}
-                        <th className="guide-th numeric">Min</th>
-                        <th className="guide-th numeric">Lower Q</th>
-                        <th className="guide-th numeric">Median</th>
-                        <th className="guide-th numeric">Upper Q</th>
-                        <th className="guide-th numeric">Max</th>
+                        <SortTh label="Min" sortKey="min" sort={sort} onSort={onSort} />
+                        <SortTh label="Lower Q" sortKey="q1" sort={sort} onSort={onSort} />
+                        <SortTh label="Median" sortKey="median" sort={sort} onSort={onSort} />
+                        <SortTh label="Upper Q" sortKey="q3" sort={sort} onSort={onSort} />
+                        <SortTh label="Max" sortKey="max" sort={sort} onSort={onSort} />
                         {usable && (
                             <th className="guide-th stats-th-dist">
                                 {/* A drawn axis, not a range written out. The boxes below

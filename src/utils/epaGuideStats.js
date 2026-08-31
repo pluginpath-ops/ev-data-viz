@@ -254,8 +254,8 @@ export function toObservations(rows, unit = DEFAULT_UNIT) {
  * dropped. A make vanishing from a ranking reads as an error; a make shown as
  * "n too small" is an answer.
  */
-export function summarise(rows, { unit = DEFAULT_UNIT, dimension, measure, minN = 3 } = {}) {
-    return bucketise(toObservations(rows, unit), { dimension, measure, minN });
+export function summarise(rows, { unit = DEFAULT_UNIT, dimension, measure, minN = 3, sort } = {}) {
+    return bucketise(toObservations(rows, unit), { dimension, measure, minN, sort });
 }
 
 /**
@@ -267,7 +267,40 @@ export function summarise(rows, { unit = DEFAULT_UNIT, dimension, measure, minN 
  * buckets — suppress rather than drop, sink the suppressed, sort by median —
  * should be the same in both places rather than written twice.
  */
-export function bucketise(observations, { dimension, measure, minN = 3 } = {}) {
+/** The row fields a reader can order the table by. */
+export const SORT_KEYS = ['bucket', 'n', 'min', 'q1', 'median', 'q3', 'max'];
+
+export const DEFAULT_SORT = { key: 'median', dir: 'desc' };
+
+/**
+ * Compare two bucket rows on one field.
+ *
+ * A bucket label is text and everything else is a number, so the comparison has
+ * to know which it is holding — `'Small SUV' - 'Large Car'` is NaN, and a NaN
+ * comparator leaves the array in whatever order it started in.
+ *
+ * Empty buckets sort to the END in BOTH directions rather than following the
+ * direction like a value. A bucket with no median has not scored badly, it has
+ * not scored, and floating it to the top of an ascending sort would read as the
+ * lowest figure in the table.
+ */
+function compareRows(a, b, key, dir) {
+    const flip = dir === 'asc' ? 1 : -1;
+
+    if (key === 'bucket') {
+        return String(a.bucket).localeCompare(String(b.bucket), undefined, { numeric: true }) * flip;
+    }
+
+    const x = a[key], y = b[key];
+    if (x == null && y == null) return 0;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    // Ties broken by name so the order is stable: without it two buckets on the
+    // same median swap places whenever anything upstream re-renders.
+    return (x - y) * flip || String(a.bucket).localeCompare(String(b.bucket));
+}
+
+export function bucketise(observations, { dimension, measure, minN = 3, sort } = {}) {
     const buckets = new Map();
     for (const o of observations) {
         const v = o[dimension];
@@ -283,11 +316,17 @@ export function bucketise(observations, { dimension, measure, minN = 3 } = {}) {
         if (stats.n === 0) continue;
         rowsOut.push({ bucket, ...stats, suppressed: stats.n < minN });
     }
-    // Largest first among the reportable ones; suppressed buckets sink to the
-    // bottom so they read as a footnote rather than as part of the ranking.
+    // Two sections, not one list. Suppressed buckets sink to the bottom so they
+    // read as a footnote rather than as part of the ranking — a bucket already
+    // labelled "n too small" should not be crowned by the control that is meant
+    // to help you read the ranking. Within each section the chosen order
+    // applies, so the footnote is sorted too rather than being an arbitrary
+    // pile.
+    const { key, dir } = { ...DEFAULT_SORT, ...(sort ?? {}) };
+    const by = SORT_KEYS.includes(key) ? key : DEFAULT_SORT.key;
     rowsOut.sort((a, b) => {
         if (a.suppressed !== b.suppressed) return a.suppressed ? 1 : -1;
-        return (b.median ?? -Infinity) - (a.median ?? -Infinity);
+        return compareRows(a, b, by, dir);
     });
     return rowsOut;
 }

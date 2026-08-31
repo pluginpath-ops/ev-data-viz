@@ -3,7 +3,7 @@ import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
 import { decorateRow, buildBrandIndex } from '../../../utils/feGuideBrowse';
 import {
-    UNITS, DEFAULT_UNIT, DIMENSIONS, MEASURES, measureByKey,
+    UNITS, DEFAULT_UNIT, DIMENSIONS, MEASURES, measureByKey, SORT_KEYS, DEFAULT_SORT,
     summarise, overall, histogram, extremes, bucketise, describe,
     histogramOf, extremesOf, applyStatsFilters, bestCoveredYear, yearsPresent,
 } from '../../../utils/epaGuideStats';
@@ -72,6 +72,14 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
             // against the active tab.
             measure:   [...MEASURES, ...CERT_MEASURES].some(m => m.key === p.get('ms'))
                 ? p.get('ms') : 'label_comb_mpge',
+            // `key:dir` in one parameter — two would let a link carry half a
+            // sort, and there is no sensible reading of a direction with no
+            // column. Anything unrecognised falls back whole.
+            sort: (() => {
+                const [key, dir] = String(p.get('so') ?? '').split(':');
+                return SORT_KEYS.includes(key) && (dir === 'asc' || dir === 'desc')
+                    ? { key, dir } : DEFAULT_SORT;
+            })(),
             // A list, so a reader can compare two years side by side. Absent
             // means "not chosen yet" and falls back to the best-covered year;
             // an explicitly empty list means every year.
@@ -89,6 +97,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
     const [dimension, setDimension] = useState(initial.dimension);
     const [storedMeasure, setMeasure] = useState(initial.measure);
     const [years, setYears]         = useState(initial.years);
+    const [sort, setSort]           = useState(initial.sort);
     const [classes, setClasses]     = useState(initial.classes);
     const [drives, setDrives]       = useState(initial.drives);
 
@@ -211,13 +220,16 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
         if (unit !== DEFAULT_UNIT)        p.set('u', unit);
         if (dimension !== 'body_class')   p.set('d', dimension);
         if (measure !== 'label_comb_mpge') p.set('ms', measure);
+        if (sort.key !== DEFAULT_SORT.key || sort.dir !== DEFAULT_SORT.dir) {
+            p.set('so', `${sort.key}:${sort.dir}`);
+        }
         // Written even when empty, so "all years" survives a reload instead of
         // reverting to the best-covered default.
         if (years != null)                p.set('yr', years.join(','));
         if (showClassFilter && classes.length) p.set('cl', classes.join(','));
         if (showDriveFilter && drives.length)  p.set('dr', drives.join(','));
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [dataset, unit, dimension, measure, years, classes, drives, showClassFilter, showDriveFilter, subtab]);
+    }, [dataset, unit, dimension, measure, sort, years, classes, drives, showClassFilter, showDriveFilter, subtab]);
 
     /**
      * The population under study, whichever dataset that is.
@@ -263,9 +275,9 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
 
     const summary   = useMemo(
         () => (isCert
-            ? bucketise(plotted, { dimension, measure, minN: MIN_N })
-            : summarise(plotted, { unit, dimension, measure, minN: MIN_N })),
-        [isCert, plotted, unit, dimension, measure],
+            ? bucketise(plotted, { dimension, measure, minN: MIN_N, sort })
+            : summarise(plotted, { unit, dimension, measure, minN: MIN_N, sort })),
+        [isCert, plotted, unit, dimension, measure, sort],
     );
     const corpus    = useMemo(
         () => (isCert ? describe(plotted.map(o => o[measure])) : overall(plotted, { unit, measure })),
@@ -451,6 +463,8 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
                 rows={summary}
                 measureDef={measDef}
                 overall={corpus}
+                sort={sort}
+                onSort={setSort}
                 dimensionLabel={dimDef?.label ?? ''}
             />
 

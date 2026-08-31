@@ -130,6 +130,71 @@ suite('summarise', () => {
     });
 });
 
+suite('ordering the table', () => {
+    const rows = [
+        row({ id: 1, cls: 'Standard Pick-up Trucks 4WD', mpge: 64 }),
+        row({ id: 2, cls: 'Standard Pick-up Trucks 4WD', mpge: 70 }),
+        row({ id: 3, cls: 'Standard Pick-up Trucks 4WD', mpge: 67 }),
+        row({ id: 4, cls: 'Large Cars', mpge: 100 }),
+        row({ id: 5, cls: 'Large Cars', mpge: 104 }),
+        row({ id: 6, cls: 'Large Cars', mpge: 108 }),
+        row({ id: 7, cls: 'Midsize Cars', mpge: 80 }),
+        row({ id: 8, cls: 'Midsize Cars', mpge: 84 }),
+        row({ id: 9, cls: 'Midsize Cars', mpge: 88 }),
+    ];
+    const at = (sort) => summarise(rows, { dimension: 'body_class', measure: 'label_comb_mpge', sort })
+        .map(b => b.bucket);
+
+    it('defaults to median, largest first', () => {
+        expect(at(undefined)).toEqual(['Large Car', 'Midsize Car', 'Standard Pickup']);
+    });
+    it('reverses on direction', () => {
+        expect(at({ key: 'median', dir: 'asc' })).toEqual(['Standard Pickup', 'Midsize Car', 'Large Car']);
+    });
+    it('orders by any of the five summary figures', () => {
+        expect(at({ key: 'min', dir: 'asc' })).toEqual(['Standard Pickup', 'Midsize Car', 'Large Car']);
+        expect(at({ key: 'max', dir: 'desc' })).toEqual(['Large Car', 'Midsize Car', 'Standard Pickup']);
+    });
+    it('orders by the bucket name as text, not as a subtraction', () => {
+        // `'Large Car' - 'Midsize Car'` is NaN, and a NaN comparator leaves the
+        // array in whatever order it happened to be in.
+        expect(at({ key: 'bucket', dir: 'asc' })).toEqual(['Large Car', 'Midsize Car', 'Standard Pickup']);
+        expect(at({ key: 'bucket', dir: 'desc' })).toEqual(['Standard Pickup', 'Midsize Car', 'Large Car']);
+    });
+    it('falls back whole when the key is not one it knows', () => {
+        expect(at({ key: 'wat', dir: 'desc' })).toEqual(at(undefined));
+    });
+
+    suite('the footnote is a section, not a rank', () => {
+        const thin = [...rows, row({ id: 10, cls: 'Two Seaters', mpge: 999 })];
+        const order = (sort) => summarise(thin,
+            { dimension: 'body_class', measure: 'label_comb_mpge', minN: 3, sort }).map(b => b.bucket);
+
+        it('keeps suppressed buckets below however the table is sorted', () => {
+            // A bucket already labelled "n too small" must not be crowned by
+            // the control meant to help you read the ranking — on max it would
+            // otherwise top the table on a single observation.
+            for (const sort of [{ key: 'max', dir: 'desc' }, { key: 'n', dir: 'asc' },
+                { key: 'bucket', dir: 'asc' }, { key: 'median', dir: 'asc' }]) {
+                expect(order(sort).at(-1)).toBe('Two Seater');
+            }
+        });
+
+        it('sorts the footnote within itself', () => {
+            // Below the line, but ordered — not an arbitrary pile.
+            const many = [...rows,
+                row({ id: 11, cls: 'Two Seaters', mpge: 120 }),
+                row({ id: 12, cls: 'Minivans', mpge: 60 }),
+            ];
+            const foot = (dir) => summarise(many,
+                { dimension: 'body_class', measure: 'label_comb_mpge', minN: 3, sort: { key: 'median', dir } })
+                .filter(b => b.suppressed).map(b => b.bucket);
+            expect(foot('desc')).toEqual(['Two Seater', 'Minivan']);
+            expect(foot('asc')).toEqual(['Minivan', 'Two Seater']);
+        });
+    });
+});
+
 suite('histogram', () => {
     it('bins equal-width so a pile at one value stays visible', () => {
         // The adjustment factor's spike at exactly 0.700 is the finding;
