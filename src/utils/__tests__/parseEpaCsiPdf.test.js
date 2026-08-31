@@ -293,3 +293,63 @@ describe('phase typing on import', () => {
         expect(p.dc_energy_kwh).toBeCloseTo(59.72 * 0.23, 3);
     });
 });
+
+/**
+ * A single-cycle charge-depleting test with a real bag, which is the shape both
+ * placeholder records in the corpus actually have: one
+ * `Charge Depleting Bag/Phase #1` carrying the whole depletion.
+ */
+const cdItems = ({ dc, miles, ac }) => [
+    'Vehicle ID / Configuration', 'SYNTH02 / 0',
+    'Test #', 'T2', 'Test Procedure', '84 - Charge Depleting Highway',
+    'Charge Depleting Range (Actual miles)', String(miles),
+    'Recharge Event Energy (kiloWatt-hours)', String(ac),
+    'Charge Depleting Bag/Phase #1',
+    'Actual Distance Driven (miles)', String(miles),
+    'Integrated DC KW-HRS', String(dc),
+];
+const testOf = (items) => parseEpaCsiText(items).groups[0].tests[0];
+
+describe('a placeholder is not a measurement', () => {
+    it('nulls a test whose energy, distance and recharge are all one number', () => {
+        // Zoox filed 999.0 in all three; stored as written it became the
+        // largest battery pack in the corpus.
+        const t = testOf(cdItems({ dc: 999, miles: 999, ac: 999 }));
+        expect(t.total_dc_energy_kwh).toBeNull();
+        expect(t.total_distance_mi).toBeNull();
+        expect(t.ac_recharge_kwh).toBeNull();
+    });
+
+    it('nulls the bag with it', () => {
+        // Left behind, the sentinel would wait for someone to give that phase a
+        // type and then reach the η back-solve as a 1,000 Wh/mi cycle.
+        const [p] = testOf(cdItems({ dc: 1, miles: 1, ac: 1 })).phases;
+        expect(p.distance_mi).toBeNull();
+        expect(p.dc_energy_kwh).toBeNull();
+    });
+
+    it('keeps the test itself — it was conducted, it just reports nothing', () => {
+        const t = testOf(cdItems({ dc: 999, miles: 999, ac: 999 }));
+        expect(t.procedure_code).toBe(84);
+        expect(t.test_number).toBe('T2');
+        expect(t.phases).toHaveLength(1);
+    });
+
+    it('needs all three to agree, not two', () => {
+        // Two can legitimately coincide — a test that drives as many miles as
+        // it spends kWh is unremarkable. Three unrelated quantities in
+        // different units landing on one value is a filled-in form. Across 360
+        // stored tests exactly two match.
+        const t = testOf(cdItems({ dc: 78.9, miles: 78.9, ac: 92.4 }));
+        expect(t.total_dc_energy_kwh).toBe(78.9);
+        expect(t.ac_recharge_kwh).toBe(92.4);
+    });
+
+    it('leaves a sound test alone', () => {
+        // Tesla's Model Y CD-Highway: 78.946 kWh over 369 miles.
+        const t = testOf(cdItems({ dc: 78.946, miles: 369, ac: 88.2 }));
+        expect(t.total_dc_energy_kwh).toBe(78.946);
+        expect(t.total_distance_mi).toBe(369);
+        expect(t.phases[0].dc_energy_kwh).toBe(78.946);
+    });
+});

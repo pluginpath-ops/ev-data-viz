@@ -2232,6 +2232,21 @@ class DataService {
       .order('test_group_id', { ascending: true }));
   }
 
+  /**
+   * Every certification group, for the cert-side statistics.
+   *
+   * NOT filtered to guide-linked groups any more. It was, because the
+   * statistics group by class and drivetrain and those live on the guide row —
+   * but a group with no link still knows its make and still carries the lab's
+   * own measurements, and dropping it here meant nothing downstream could even
+   * report that it existed. 90 of 413 were being filtered out, taking every GM
+   * truck with a 180 kWh pack with them and leaving Chevrolet's usable energy
+   * to be described by three cars.
+   *
+   * `certObservation` handles the missing half: brand falls back to `make`,
+   * class and drivetrain read `Unknown`, and `_guideLinked` says which is
+   * which.
+   */
   async getCertGroupsForStats() {
     if (!this.useSupabase) return [];
     const { data, error } = await getSupabase()
@@ -2249,7 +2264,6 @@ class DataService {
           label_comb_range_mi, label_comb_mpge, model_year
         )
       `)
-      .not('fe_guide_row_id', 'is', null)
       .order('test_group_id');
     if (error) throw error;
     return data || [];

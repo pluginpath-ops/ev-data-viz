@@ -8,7 +8,8 @@ import {
     histogramOf, extremesOf, applyStatsFilters, bestCoveredYear, yearsPresent,
 } from '../../../utils/epaGuideStats';
 import {
-    CERT_MEASURES, certMeasureByKey, certObservations, coverageFor,
+    CERT_MEASURES, certMeasureByKey, certObservations, coverageFor, nullImpossible,
+    UNKNOWN_DIMENSION,
 } from '../../../utils/epaCertStats';
 import StatsTable from './StatsTable';
 import StatsHistogram from './StatsHistogram';
@@ -62,7 +63,15 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
         return {
             unit:      UNITS.some(u => u.key === p.get('u')) ? p.get('u') : DEFAULT_UNIT,
             dimension: DIMENSIONS.some(d => d.key === p.get('d')) ? p.get('d') : 'body_class',
-            measure:   MEASURES.some(m => m.key === p.get('ms')) ? p.get('ms') : 'label_comb_mpge',
+            // Checked against BOTH catalogues. Only the guide's was consulted,
+            // so a certification-side measure in the URL failed validation and
+            // reverted to the guide default — which the cert tab then swapped
+            // for charger efficiency. Every shared link to a certification
+            // measure opened on the wrong one. Which dataset owns the key does
+            // not need deciding here; `measure` below already resolves that
+            // against the active tab.
+            measure:   [...MEASURES, ...CERT_MEASURES].some(m => m.key === p.get('ms'))
+                ? p.get('ms') : 'label_comb_mpge',
             // A list, so a reader can compare two years side by side. Absent
             // means "not chosen yet" and falls back to the best-covered year;
             // an explicitly empty list means every year.
@@ -163,14 +172,27 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
     const showDriveFilter = dimension !== 'drive_group';
 
 
-    const allClasses = useMemo(
-        () => [...new Set(allRows.map(r => r.body_class).filter(Boolean))].sort(),
-        [allRows],
-    );
-    const allDrives = useMemo(
-        () => [...new Set(allRows.map(r => r.drive_group).filter(Boolean))].sort(),
-        [allRows],
-    );
+    /**
+     * The filter chips, from the dataset on screen rather than always from the
+     * guide.
+     *
+     * These read `allRows` whichever tab was open, which offered the
+     * certification tab classes no certification group has. That became a real
+     * hole once unlinked groups joined it: they read `Unknown`, the guide has
+     * no such class, so `Unknown` could never be offered — and picking any
+     * class chip then dropped every unlinked group with nothing on screen
+     * saying so.
+     *
+     * `Unknown` sorts last rather than alphabetically. It is not a class.
+     */
+    const facetRows = isCert ? certObs : allRows;
+    const facetValues = (rows, key) => {
+        const vals = [...new Set(rows.map(r => r[key]).filter(Boolean))];
+        const known = vals.filter(v => v !== UNKNOWN_DIMENSION).sort();
+        return vals.includes(UNKNOWN_DIMENSION) ? [...known, UNKNOWN_DIMENSION] : known;
+    };
+    const allClasses = useMemo(() => facetValues(facetRows, 'body_class'), [facetRows]);
+    const allDrives  = useMemo(() => facetValues(facetRows, 'drive_group'), [facetRows]);
 
     const toggleIn = (list, setList) => (v) =>
         setList(list.includes(v) ? list.filter(x => x !== v) : [...list, v]);
@@ -214,32 +236,52 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
         [active, selectedYears, classes, drives, showClassFilter, showDriveFilter],
     );
 
-    const coverage = useMemo(
-        () => (isCert ? coverageFor(filtered, measure) : null),
+    /**
+     * The plotted population: the filtered one with any impossible value for
+     * the measure on screen nulled.
+     *
+     * A backstop, not the fix. Zoox filed 999.0 for energy, distance and
+     * recharge alike and Karsan filed 1.0 for all three — placeholders, not
+     * measurements — and one of them alone set the axis from 1 to 999 and
+     * flattened every box on the table. The records want correcting on the
+     * certification side; this stops a value that cannot be true from reaching
+     * a median in the meantime.
+     *
+     * Everything below reads `plotted` rather than `filtered`, coverage
+     * included, so the count in the caption describes the same numbers the
+     * table and the histogram were built from.
+     */
+    const plotted = useMemo(
+        () => (isCert ? nullImpossible(filtered, measure) : filtered),
         [isCert, filtered, measure],
+    );
+
+    const coverage = useMemo(
+        () => (isCert ? coverageFor(plotted, measure) : null),
+        [isCert, plotted, measure],
     );
 
     const summary   = useMemo(
         () => (isCert
-            ? bucketise(filtered, { dimension, measure, minN: MIN_N })
-            : summarise(filtered, { unit, dimension, measure, minN: MIN_N })),
-        [isCert, filtered, unit, dimension, measure],
+            ? bucketise(plotted, { dimension, measure, minN: MIN_N })
+            : summarise(plotted, { unit, dimension, measure, minN: MIN_N })),
+        [isCert, plotted, unit, dimension, measure],
     );
     const corpus    = useMemo(
-        () => (isCert ? describe(filtered.map(o => o[measure])) : overall(filtered, { unit, measure })),
-        [isCert, filtered, unit, measure],
+        () => (isCert ? describe(plotted.map(o => o[measure])) : overall(plotted, { unit, measure })),
+        [isCert, plotted, unit, measure],
     );
     const hist = useMemo(
         () => (isCert
-            ? histogramOf(filtered, { measure, bins: 24 })
-            : histogram(filtered, { unit, measure, bins: 24 })),
-        [isCert, filtered, unit, measure],
+            ? histogramOf(plotted, { measure, bins: 24 })
+            : histogram(plotted, { unit, measure, bins: 24 })),
+        [isCert, plotted, unit, measure],
     );
     const tails = useMemo(
         () => (isCert
-            ? extremesOf(filtered, { measure, count: 5 })
-            : extremes(filtered, { unit, measure, count: 5 })),
-        [isCert, filtered, unit, measure],
+            ? extremesOf(plotted, { measure, count: 5 })
+            : extremes(plotted, { unit, measure, count: 5 })),
+        [isCert, plotted, unit, measure],
     );
 
     if (loading) return <LoadingSpinner />;
@@ -394,7 +436,14 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
                 <div className="text-hint">
                     {coverage.usable} of {coverage.total} certification groups carry this figure
                     {coverage.assumed > 0 && `; ${coverage.assumed} could not be derived and fall back to a default, so they are excluded rather than counted`}
-                    {coverage.missing > 0 && `; ${coverage.missing} do not report it`}.
+                    {coverage.missing > 0 && `; ${coverage.missing} do not report it`}
+                    {coverage.impossible > 0 && `; ${coverage.impossible} reported a value that cannot be one and were set aside, not clamped`}.
+                    {/* The other half of the population question. These groups
+                        used to be filtered out before this caption ran, so the
+                        total read as the whole corpus when 90 of 413 were not
+                        in it. */}
+                    {coverage.unlinked > 0 && ` ${coverage.unlinked} have no Fuel Economy Guide link: `
+                        + 'grouped by the make on the certification record, and Unknown for class and drivetrain.'}
                 </div>
             )}
 
