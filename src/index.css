@@ -1569,11 +1569,15 @@ body {
 .session-group-body > .card {
     @apply mb-0 shadow-none;
 }
-.session-vehicle-link {
+/* A vehicle name that navigates to that vehicle's Tests & Data. Named for what
+   it is rather than where it first appeared: the session band had the only copy
+   until the inherited-tests list wanted the same affordance for the same
+   reason. */
+.vehicle-link {
     @apply underline decoration-dotted underline-offset-2 transition-colors;
     color: var(--color-text-secondary);
 }
-.session-vehicle-link:hover {
+.vehicle-link:hover {
     color: var(--color-primary);
 }
 
