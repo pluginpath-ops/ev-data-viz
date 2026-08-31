@@ -402,6 +402,26 @@ function commentsBefore(items, ti, lowerBound) {
     return null;
 }
 
+/**
+ * A test whose energy, distance and recharge are all the same number reported
+ * nothing.
+ *
+ * Zoox filed 999.0 in all three fields and Karsan 1.0 — a manufacturer's
+ * placeholder for a figure it did not disclose, not a measurement. Stored as
+ * written, Zoox became the largest battery pack in the corpus.
+ *
+ * All THREE, deliberately. Two of them can legitimately coincide — a test that
+ * happens to drive as many miles as it spends kWh is unremarkable — but three
+ * unrelated quantities in different units landing on one value is a filled-in
+ * form, not a coincidence. Across 360 stored tests exactly the two above match.
+ *
+ * Nulled rather than dropped: the test was conducted and the certificate says
+ * so. What it does not carry is numbers.
+ */
+function placeholderTest(dc, miles, ac) {
+    return dc != null && dc === miles && dc === ac;
+}
+
 function parseTests(items, start, end) {
     const testIdx = indicesWhere(items, isTestHeader, start, end);
     return testIdx.map((ti, k) => {
@@ -478,6 +498,12 @@ function parseTests(items, start, end) {
         for (let b = ti - 1; b >= Math.max(0, ti - 6); b--) {
             if (items[b] === 'Test #') { test_number = items[b + 1] || null; break; }
         }
+        const placeholder = placeholderTest(
+            total_dc > 0 ? Math.round(total_dc * 1000) / 1000 : null,
+            total_dist2 > 0 ? Math.round(total_dist2 * 1000) / 1000 : null,
+            parseNum(valAfter(items, 'Recharge Event Energy (kiloWatt-hours)', ti, tEnd)),
+        );
+
         return {
             test_number,
             procedure_code: procCode,
@@ -492,13 +518,18 @@ function parseTests(items, start, end) {
             test_date: toIsoDate(valAfter(items, 'Test Date', ti, tEnd)),
             source: 'csi_pdf',   // epa_tests.source enum (override field-tag stays 'pdf')
             recharge_voltage: parseNum(valAfter(items, 'Recharge Event Voltage', ti, tEnd)),
-            ac_recharge_kwh: parseNum(valAfter(items, 'Recharge Event Energy (kiloWatt-hours)', ti, tEnd)),
+            ac_recharge_kwh: placeholder ? null
+                : parseNum(valAfter(items, 'Recharge Event Energy (kiloWatt-hours)', ti, tEnd)),
             cd_range_combined_calc: parseNum(valAfter(items, 'Charge Depleting Range (Calculated miles)', ti, tEnd)),
             cd_range_hwy_calc: cdRangeHwy,
             bags_phases_conducted: parseNum(valAfter(items, 'Conducted', ti, tEnd)),
-            total_dc_energy_kwh: total_dc > 0 ? Math.round(total_dc * 1000) / 1000 : null,
-            total_distance_mi: total_dist2 > 0 ? Math.round(total_dist2 * 1000) / 1000 : null,
-            phases: effPhases,
+            total_dc_energy_kwh: (!placeholder && total_dc > 0) ? Math.round(total_dc * 1000) / 1000 : null,
+            total_distance_mi: (!placeholder && total_dist2 > 0) ? Math.round(total_dist2 * 1000) / 1000 : null,
+            // The bags carry the sentinel too — a single-cycle test's one phase
+            // is synthesised from these same totals just above.
+            phases: placeholder
+                ? effPhases.map(p => ({ ...p, distance_mi: null, dc_energy_kwh: null }))
+                : effPhases,
         };
     });
 }

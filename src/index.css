@@ -2633,6 +2633,31 @@ body {
 .stats-table .guide-th { @apply cursor-default; }
 .stats-th-dist { @apply w-1/2; }
 
+/* ── Sortable headings ───────────────────────────────────────────────────────
+   The heading IS the control, so the button carries no chrome of its own and
+   inherits the header's own type. It aligns with its column rather than to the
+   left: the numeric columns are right-aligned, and a heading that did not
+   follow them would sit over the wrong edge of its own figures. */
+.stats-sort {
+    @apply inline-flex items-center gap-1 w-full cursor-pointer;
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+}
+.guide-th.numeric .stats-sort { @apply justify-end; }
+.stats-sort:hover { color: var(--color-text-primary); }
+.stats-sort.active { color: var(--color-text-primary); font-weight: 700; }
+
+/* Marks the active column only. A faint arrow on every heading to advertise
+   that they are all clickable puts six of them against the one that is
+   actually saying something. */
+.stats-sort-arrow {
+    @apply leading-none;
+    font-size: 0.6875rem;
+}
+
 /* ── Shared axis for the box column ──────────────────────────────────────────
    Reads as |min ———— unit ———— max|. The labels sit ABOVE the rule rather than
    beside it so the rule spans the full column width — the boxes below are

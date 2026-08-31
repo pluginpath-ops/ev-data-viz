@@ -1,14 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
     CERT_MEASURES, certMeasureByKey, certObservation, certObservations,
-    coverageFor, derivedUsableKwh, NOT_MEASURED_SOURCES,
+    coverageFor, derivedUsableKwh, NOT_MEASURED_SOURCES, UNKNOWN_DIMENSION,
+    isPossibleValue, nullImpossible,
 } from '../epaCertStats';
+import { PACK_KWH_BAND } from '../../constants/epa';
 import { deriveDrivetrainEta, deriveChargerEfficiency } from '../epaDerivations';
 
 
 const group = (o = {}) => ({
     test_group_id: o.id ?? 'TG1',
     model_year: o.year ?? 2025,
+    make: o.make ?? 'Rivian',
     useable_kwh: o.useable ?? null,
     epa_coefficient_sets: o.coeffs ?? [{ is_primary: true, target_a: 37, target_b: 0.2, target_c: 0.02, equiv_test_weight_lbs: 5500 }],
     epa_tests: o.tests ?? [],
@@ -28,13 +31,39 @@ describe('dimensions come from the linked guide row', () => {
         expect(o.body_class).toBe('Standard SUV');
         expect(o.drive_group).toBe('All Wheel Drive');
     });
-    it('leaves them null when the group has no guide row', () => {
+    it('buckets them as Unknown when the group has no guide row', () => {
+        // Not null. `bucketise` skips an observation whose dimension is null,
+        // so a null drops the group out of the table with nothing said — which
+        // is how 90 unlinked groups, every GM truck among them, were invisible
+        // rather than merely unclassified.
         const o = certObservation(group({ guide: null }), undefined);
-        expect(o.body_class).toBeNull();
-        expect(o.drive_group).toBeNull();
+        expect(o.body_class).toBe(UNKNOWN_DIMENSION);
+        expect(o.drive_group).toBe(UNKNOWN_DIMENSION);
     });
     it('still reports the measures without a guide row', () => {
         expect(certObservation(group({ guide: null }), undefined).aero_c).toBe(0.02);
+    });
+    it('takes the brand from the certification record when there is no guide row', () => {
+        // `make` is on the certification record — it is how the manufacturer
+        // filed — so brand is the one dimension that does not need the link.
+        const o = certObservation(group({ guide: null, make: 'CHEVROLET' }), undefined);
+        expect(o.brand).toBe('CHEVROLET');
+    });
+    it('resolves both spellings of a brand to one bucket', () => {
+        // The unlinked group says CHEVROLET and the guide says Chevrolet. Two
+        // buckets for one brand is the bug #243 exists to prevent, so both go
+        // through the registry rather than only the division.
+        const index = new Map([['chevrolet', { brand: 'Chevrolet', parent: 'General Motors' }]]);
+        const unlinked = certObservation(group({ guide: null, make: 'CHEVROLET' }), index);
+        const linked = certObservation(group({
+            guide: { division: 'Chevrolet', carline_class: 'Small Station Wagons', drive_desc: 'Front-Wheel Drive' },
+        }), index);
+        expect(unlinked.brand).toBe('Chevrolet');
+        expect(linked.brand).toBe('Chevrolet');
+    });
+    it('says whether the guide half of the record exists', () => {
+        expect(certObservation(group(), undefined)._guideLinked).toBe(true);
+        expect(certObservation(group({ guide: null }), undefined)._guideLinked).toBe(false);
     });
 });
 
@@ -106,6 +135,23 @@ describe('coverage', () => {
         const c = coverageFor(obs, 'etw_lbs');
         expect(c.usable).toBe(3);
         expect(c.assumed).toBe(0);
+    });
+    it('counts how many are missing their guide half', () => {
+        // The population question, which the caption used to be unable to ask:
+        // these groups were filtered out upstream, so a total read as the whole
+        // corpus when 90 of 413 were not in it.
+        const mixed = certObservations([
+            group({ id: 'A', tests: [{ procedure_code: 77, total_dc_energy_kwh: 88 }] }),
+            group({ id: 'B', guide: null, tests: [{ procedure_code: 77, total_dc_energy_kwh: 179 }] }),
+        ], undefined);
+        expect(coverageFor(mixed, 'usable_kwh')).toMatchObject({ usable: 2, unlinked: 1, total: 2 });
+    });
+    it('counts unlinked ACROSS the other three, not alongside them', () => {
+        // An unlinked group usually carries the measure perfectly well — it is
+        // only missing the half that says what the car is. Adding `unlinked`
+        // to `usable` would double-count it and the caption would not add up.
+        const c = coverageFor(obs, 'usable_kwh');
+        expect(c.usable + c.assumed + c.missing).toBe(c.total);
     });
 });
 
@@ -254,5 +300,75 @@ describe('an impossible value is not a measurement either', () => {
         // and a fleet median would quietly absorb it.
         const obs = certObservations([impossible(), impossible()], undefined);
         expect(coverageFor(obs, 'ss_eta')).toMatchObject({ usable: 0, total: 2 });
+    });
+});
+
+describe('a value that cannot be a measurement', () => {
+    it('rejects zero and below for every measure', () => {
+        // Each of these is a physical quantity. None of them can be zero.
+        for (const key of ['usable_kwh', 'eta', 'charger_eff', 'etw_lbs', 'aero_c']) {
+            expect(isPossibleValue(key, 0)).toBe(false);
+            expect(isPossibleValue(key, -1)).toBe(false);
+        }
+    });
+
+    it('rejects the placeholders two manufacturers filed', () => {
+        // Zoox reported 999.0 for energy, distance AND recharge; Karsan 1.0 for
+        // all three. One sentinel in every numeric field is not a measurement.
+        expect(isPossibleValue('usable_kwh', 999)).toBe(false);
+        expect(isPossibleValue('usable_kwh', 1)).toBe(false);
+    });
+
+    it('accepts the largest pack actually certified', () => {
+        // The bound has to clear real trucks or it would quietly delete them:
+        // GM's Sierra EV discharged 179.7 kWh, and the guide lists a 233.7 kWh
+        // gross pack.
+        expect(isPossibleValue('usable_kwh', 179.7)).toBe(true);
+        expect(isPossibleValue('usable_kwh', 233.7)).toBe(true);
+        expect(PACK_KWH_BAND[1]).toBeGreaterThanOrEqual(233.7);
+    });
+
+    it('leaves a measure with no published band to the positivity rule alone', () => {
+        // Not a place to invent bounds. Test weight has no knob, so anything
+        // above zero stands.
+        expect(isPossibleValue('etw_lbs', 9999)).toBe(true);
+    });
+
+    it('nulls the value and keeps the observation', () => {
+        // Dropped, the group would leave the population and every other measure
+        // it carries would go with it.
+        const [a, b] = nullImpossible(
+            [{ test_group_id: 'A', usable_kwh: 999, aero_c: 0.07 },
+             { test_group_id: 'B', usable_kwh: 89.1, aero_c: 0.02 }],
+            'usable_kwh',
+        );
+        expect(a.usable_kwh).toBeNull();
+        expect(a.aero_c).toBe(0.07);
+        expect(a.test_group_id).toBe('A');
+        expect(b.usable_kwh).toBe(89.1);
+    });
+
+    it('nulls rather than clamps', () => {
+        // Clamping would publish the bound as if it were a measurement — the
+        // same rule the nonphysical-flag check states.
+        expect(nullImpossible([{ usable_kwh: 999 }], 'usable_kwh')[0].usable_kwh)
+            .not.toBe(PACK_KWH_BAND[1]);
+    });
+
+    it('only touches the measure being plotted', () => {
+        const [o] = nullImpossible([{ usable_kwh: 999, charger_eff: 0.88 }], 'charger_eff');
+        expect(o.usable_kwh).toBe(999);
+        expect(o.charger_eff).toBe(0.88);
+    });
+
+    it('is counted under its own heading, not as a record that did not report', () => {
+        // The caption has to be able to say what happened. "Does not report it"
+        // and "reported 999.0" are different facts about a record.
+        const c = coverageFor(nullImpossible([
+            { test_group_id: 'A', usable_kwh: 999 },
+            { test_group_id: 'B', usable_kwh: 89.1 },
+            { test_group_id: 'C', usable_kwh: null },
+        ], 'usable_kwh'), 'usable_kwh');
+        expect(c).toMatchObject({ usable: 1, impossible: 1, missing: 1, total: 3 });
     });
 });

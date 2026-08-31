@@ -106,6 +106,8 @@ describe('utilities built for the UI are reached by the UI', () => {
             'Consumed inside the module by curveSubject. Exported so the precedence — curator value, then DC on procedure 77 or 84, then the guide\'s gross pack — is pinned on its own.',
         'epaCurveSubjects.tierByKey':
             'The tier lookup, used by the picker for its hints and asserted here so every tier a subject can be given has a declared entry.',
+        'epaCertStats.isPossibleValue':
+            'The predicate itself, consumed inside the module by nullImpossible. Exported so the two rules — every measure strictly positive, and the three with a published knob also inside it — are asserted directly rather than inferred from a nulled observation.',
         'epaCertStats.derivedUsableKwh':
             'Consumed inside the module by certObservation. Exported so the precedence — a curator value first, then DC discharged on procedure 77 or 84, never 86 — is asserted directly rather than inferred from a ratio.',
         'epaCertStats.certObservation':

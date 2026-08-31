@@ -3,12 +3,17 @@
 // here would silently return null for half of them, rendering 0.0198 as 0.0.
 
 /**
- * One row per bucket: n, and the five-number summary drawn as a box.
+ * One row per bucket: n, the five-number summary in columns, and the same five
+ * numbers drawn as a box.
  *
- * The box is the point. Three numbers in columns invite a reader to compare
+ * The box is still the point. Numbers in columns invite a reader to compare
  * medians and stop; a box across a shared axis shows that Small SUVs and
  * Standard SUVs overlap almost entirely, which is a different — and truer —
- * story than "110 beats 98".
+ * story than "110 beats 98". The columns are for reading an exact figure off a
+ * row once the box has shown which row to look at, so they run in the box's own
+ * order — min, lower quartile, median, upper quartile, max — left to right.
+ * Written in a different order they would have to be re-mapped onto the picture
+ * by eye every time.
  *
  * Drawn with positioned divs against a shared scale rather than a chart
  * library: it is two rectangles and a line per row, and the axis has to match
@@ -27,7 +32,32 @@ function Box({ stats, scale, digits }) {
     );
 }
 
-export default function StatsTable({ rows, measureDef, overall, dimensionLabel }) {
+/**
+ * A column heading that orders the table.
+ *
+ * The arrow marks the active column only. Showing a faint one on every heading
+ * to advertise that they are all clickable makes six arrows compete with the
+ * one that is actually telling you something.
+ */
+function SortTh({ label, sortKey, sort, onSort, className = 'guide-th numeric' }) {
+    const active = sort?.key === sortKey;
+    const dir = active ? sort.dir : null;
+    // Names read naturally A–Z; a measure reads best biggest-first. Either way
+    // clicking the column you are already on reverses it.
+    const next = active ? (dir === 'desc' ? 'asc' : 'desc')
+        : (sortKey === 'bucket' ? 'asc' : 'desc');
+    return (
+        <th className={className} aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+            <button type="button" className={`stats-sort ${active ? 'active' : ''}`}
+                onClick={() => onSort({ key: sortKey, dir: next })}
+                title={`Sort by ${label}`}>
+                {label}{active && <span className="stats-sort-arrow">{dir === 'asc' ? '\u2191' : '\u2193'}</span>}
+            </button>
+        </th>
+    );
+}
+
+export default function StatsTable({ rows, measureDef, overall, dimensionLabel, sort, onSort }) {
     const m = measureDef;
     const digits = m?.digits ?? 1;
 
@@ -47,10 +77,15 @@ export default function StatsTable({ rows, measureDef, overall, dimensionLabel }
             <table className="guide-table stats-table">
                 <thead>
                     <tr>
-                        <th className="guide-th">{dimensionLabel}</th>
-                        <th className="guide-th numeric">n</th>
-                        <th className="guide-th numeric">Median</th>
-                        <th className="guide-th numeric">IQR</th>
+                        <SortTh label={dimensionLabel} sortKey="bucket" sort={sort} onSort={onSort}
+                            className="guide-th" />
+                        <SortTh label="n" sortKey="n" sort={sort} onSort={onSort} />
+                        {/* The box's order, left to right. */}
+                        <SortTh label="Min" sortKey="min" sort={sort} onSort={onSort} />
+                        <SortTh label="Lower Q" sortKey="q1" sort={sort} onSort={onSort} />
+                        <SortTh label="Median" sortKey="median" sort={sort} onSort={onSort} />
+                        <SortTh label="Upper Q" sortKey="q3" sort={sort} onSort={onSort} />
+                        <SortTh label="Max" sortKey="max" sort={sort} onSort={onSort} />
                         {usable && (
                             <th className="guide-th stats-th-dist">
                                 {/* A drawn axis, not a range written out. The boxes below
@@ -75,8 +110,11 @@ export default function StatsTable({ rows, measureDef, overall, dimensionLabel }
                         <tr className="stats-row stats-row-overall">
                             <td className="guide-td">All</td>
                             <td className="guide-td numeric">{overall.n}</td>
+                            <td className="guide-td numeric">{fmt(overall.min)}</td>
+                            <td className="guide-td numeric">{fmt(overall.q1)}</td>
                             <td className="guide-td numeric">{fmt(overall.median)}</td>
-                            <td className="guide-td numeric">{fmt(overall.q1)}–{fmt(overall.q3)}</td>
+                            <td className="guide-td numeric">{fmt(overall.q3)}</td>
+                            <td className="guide-td numeric">{fmt(overall.max)}</td>
                             {usable && <td className="guide-td"><Box stats={overall} scale={scale} digits={digits} /></td>}
                         </tr>
                     )}
@@ -90,8 +128,11 @@ export default function StatsTable({ rows, measureDef, overall, dimensionLabel }
                                 {r.suppressed && <span className="stats-suppressed-flag">n too small</span>}
                             </td>
                             <td className="guide-td numeric">{r.n}</td>
+                            <td className="guide-td numeric">{fmt(r.min)}</td>
+                            <td className="guide-td numeric">{fmt(r.q1)}</td>
                             <td className="guide-td numeric">{fmt(r.median)}</td>
-                            <td className="guide-td numeric">{fmt(r.q1)}–{fmt(r.q3)}</td>
+                            <td className="guide-td numeric">{fmt(r.q3)}</td>
+                            <td className="guide-td numeric">{fmt(r.max)}</td>
                             {usable && <td className="guide-td"><Box stats={r} scale={scale} digits={digits} /></td>}
                         </tr>
                     ))}

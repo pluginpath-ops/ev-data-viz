@@ -28,8 +28,19 @@ import {
     deriveDrivetrainEta, deriveSteadyStateEta, deriveChargerEfficiency,
     deriveEffectiveAdjustmentFactor,
 } from './epaDerivations';
-import { PROC_MCT, PROC_CD_HWY } from '../constants/epa';
+import {
+    PROC_MCT, PROC_CD_HWY, PACK_KWH_BAND, ETA_BAND, CHARGER_EFF_BAND,
+} from '../constants/epa';
 import { bodyClassLabel, driveGroup, resolveBrand } from './feGuideBrowse';
+
+/**
+ * The bucket for a dimension a group cannot report.
+ *
+ * A named bucket rather than null, because `bucketise` skips null and the group
+ * would leave the table without appearing anywhere in it. "Unknown" is an
+ * answer; a silently shorter table is not.
+ */
+export const UNKNOWN_DIMENSION = 'Unknown';
 
 /** Whether a derivation's source means it was actually derived. */
 const isMeasured = (measureKey, source) =>
@@ -113,9 +124,27 @@ export function derivedUsableKwh(group) {
  * One certification group, flattened to measures and the dimensions it can be
  * grouped by.
  *
- * The dimensions come from the LINKED GUIDE ROW, not from the certification
- * record, because the certification record does not know them. That is the
- * whole shape of this dataset: the lab measured it, the guide says what it is.
+ * The dimensions come from the LINKED GUIDE ROW where there is one, because a
+ * certification record does not carry class or drivetrain. That is the shape of
+ * this dataset: the lab measured it, the guide says what it is.
+ *
+ * ── What an unlinked group still knows ──────────────────────────────────────
+ *
+ * It knows its BRAND. `make` is on the certification record — it is how the
+ * manufacturer filed — so brand does not depend on the link, and resolving it
+ * through the same registry as a division puts CHEVROLET in the same bucket as
+ * the guide's Chevrolet rather than beside it.
+ *
+ * Class and drivetrain it genuinely does not know, and those read `Unknown`
+ * instead of null. Null is not a neutral choice here: `bucketise` skips an
+ * observation whose dimension is null, so a null would drop the group from the
+ * table with nothing said, which is the failure this whole change is about.
+ *
+ * Requiring the link cost more than it looked like. 90 of 413 groups have none,
+ * and because they were filtered out before any of this ran, Chevrolet's usable
+ * energy was three cars — a Bolt and a Blazer in two drivetrains — while the
+ * 180 kWh GM trucks sat in the database unread. A distribution over three
+ * points still draws a box.
  */
 export function certObservation(group, brandIndex) {
     const guide = group?.epa_fe_guide ?? null;
@@ -127,7 +156,10 @@ export function certObservation(group, brandIndex) {
 
     const usable = derivedUsableKwh(group);
     const gross = num(guide?.nominal_pack_kwh);
-    const { brand, parent } = resolveBrand(guide?.division, brandIndex);
+    // The division when there is one, the manufacturer's own filing when there
+    // is not. Both go through the registry, so the two spellings land on one
+    // brand instead of splitting it — the bug #243 exists to prevent.
+    const { brand, parent } = resolveBrand(guide?.division ?? group?.make, brandIndex);
 
     return {
         test_group_id: group.test_group_id,
@@ -135,11 +167,16 @@ export function certObservation(group, brandIndex) {
         carline:       guide?.carline ?? group.epa_carline_name ?? group.display_name ?? null,
         division:      guide?.division ?? null,
 
-        // Dimensions, from the guide row.
+        // Dimensions. Brand survives without a link; the other two do not, and
+        // say so rather than going missing.
         brand,
         parent_name: parent,
-        body_class:  bodyClassLabel(guide?.carline_class),
-        drive_group: driveGroup(guide?.drive_desc),
+        body_class:  bodyClassLabel(guide?.carline_class) ?? UNKNOWN_DIMENSION,
+        drive_group: driveGroup(guide?.drive_desc) ?? UNKNOWN_DIMENSION,
+
+        // Whether the guide half of this record exists, so a reader can be told
+        // how much of what they are looking at is missing its other half.
+        _guideLinked: guide != null,
 
         // Measures. A derivation that fell back to its default contributes
         // null, not the default — see CERT_MEASURES.
@@ -198,6 +235,62 @@ export function certObservation(group, brandIndex) {
 const NONPHYSICAL = ['nonphysical-eta', 'nonphysical-consumption'];
 const isPossible = (result) => !(result?.flags ?? []).some(f => NONPHYSICAL.includes(f));
 
+/**
+ * The range outside which a value cannot be a measurement of its quantity.
+ *
+ * Only the three the project already publishes as knobs — this is not a place
+ * to invent bounds. A measure with no entry is still checked for positivity
+ * below, which every quantity here has to satisfy.
+ */
+const MEASURE_BANDS = {
+    usable_kwh:  PACK_KWH_BAND,
+    eta:         ETA_BAND,
+    charger_eff: CHARGER_EFF_BAND,
+};
+
+/**
+ * Whether a number can be a measurement of `measureKey` at all.
+ *
+ * Every measure here is a physical quantity that cannot be zero or negative, so
+ * positivity is checked for all of them; the three with a published band are
+ * checked against it as well.
+ *
+ * This asks a different question from the band evidence in `epaBandEvidence`,
+ * which shows what a band would cut into and therefore has to see the raw
+ * distribution. That is why nothing here happens inside `certObservation` —
+ * tightening a band would otherwise re-tune it against a corpus it had already
+ * filtered, and the constant would drift every time it was read.
+ */
+export function isPossibleValue(measureKey, value) {
+    const v = num(value);
+    if (v == null || v <= 0) return false;
+    const band = MEASURE_BANDS[measureKey];
+    return !band || (v >= band[0] && v <= band[1]);
+}
+
+/**
+ * Observations with an impossible `measureKey` nulled, ready to plot.
+ *
+ * Nulled rather than dropped, and nulled rather than clamped — the same rule
+ * the flag-based check above states. The group is still a group: it keeps its
+ * place in the population, contributes to every other measure, and is counted
+ * by `coverageFor` under its own heading so the caption can say what happened
+ * rather than quietly showing a shorter table.
+ *
+ * Applied at plot time and not at import, because the stored figure is the one
+ * the certificate carries. A value that cannot be true is a fault to correct on
+ * the record — Zoox filed 999.0 for energy, distance AND recharge alike — and
+ * the curator card is where it should be visible. This only stops it reaching a
+ * median, and stops one placeholder setting the axis for every other row.
+ */
+export function nullImpossible(observations, measureKey) {
+    return (observations ?? []).map(o => (
+        o?.[measureKey] != null && !isPossibleValue(measureKey, o[measureKey])
+            ? { ...o, [measureKey]: null, _impossible: measureKey }
+            : o
+    ));
+}
+
 /** Every linked group as an observation. */
 export const certObservations = (groups, brandIndex) =>
     (groups ?? []).map(g => certObservation(g, brandIndex));
@@ -212,14 +305,23 @@ export const certObservations = (groups, brandIndex) =>
  */
 export function coverageFor(observations, measureKey) {
     const measure = certMeasureByKey(measureKey);
-    let usable = 0, assumed = 0, missing = 0;
+    let usable = 0, assumed = 0, missing = 0, unlinked = 0, impossible = 0;
     for (const o of observations) {
+        if (o._guideLinked === false) unlinked += 1;
         if (o[measureKey] != null) { usable += 1; continue; }
+        // Before the fallback check, or a nulled 999 would be filed as a
+        // measurement that could not be derived — which is not what happened.
+        if (o._impossible === measureKey) { impossible += 1; continue; }
         const src = measureKey === 'eta' ? o._etaSource
             : measureKey === 'charger_eff' ? o._chargerSource
                 : null;
         if (measure?.assumedIsNotData && (NOT_MEASURED_SOURCES[measureKey] ?? []).includes(src)) assumed += 1;
         else missing += 1;
     }
-    return { usable, assumed, missing, total: observations.length };
+    // Counted alongside the rest rather than left to the caller, because it is
+    // the same question — how much of this population is not what it looks
+    // like. `unlinked` cuts ACROSS usable/assumed/missing: an unlinked group
+    // usually carries the measure perfectly well and is only missing the guide
+    // half that says what the car is.
+    return { usable, assumed, missing, impossible, unlinked, total: observations.length };
 }
