@@ -1,5 +1,5 @@
 import { sessionLabel, vehiclesInSession, runsInSession } from '../utils/testSessions';
-import { vehicleLabel } from '../utils/specHelpers';
+import VehicleLink from './VehicleLink';
 
 /**
  * The band above the runs of one session in a vehicle's Tests & Data list.
@@ -57,15 +57,7 @@ export default function SessionGroupHeader({
                     {others.map((v, i) => (
                         <span key={v.id}>
                             {i > 0 && ', '}
-                            {onViewVehicle ? (
-                                <button
-                                    onClick={() => onViewVehicle(v)}
-                                    className="session-vehicle-link"
-                                    title={`View ${vehicleLabel(v)} tests & data`}
-                                >
-                                    {v.model || v.name}
-                                </button>
-                            ) : (v.model || v.name)}
+                            <VehicleLink vehicle={v} onView={onViewVehicle} />
                         </span>
                     ))}
                 </span>

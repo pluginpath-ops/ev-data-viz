@@ -15,6 +15,7 @@ import RunSpecRows from './RunSpecRows';
 import SectionHeader, { SectionAction } from './SectionHeader';
 import InfoIcon from './InfoIcon';
 import SessionGroupHeader from './SessionGroupHeader';
+import VehicleLink from './VehicleLink';
 import SessionEditModal from './SessionEditModal';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
@@ -2636,6 +2637,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         <div className="space-y-2 mb-3">
                             {inheritedRuns.map(run => {
                                 const srcName = run._sourceVehicleName || `Vehicle #${run._sourceVehicleId}`;
+                                // The vehicle OBJECT, so the name can be a link.
+                                // Absent when the source is not in the loaded
+                                // list, and VehicleLink falls back to text.
+                                const srcVehicle = (vehicles || [])
+                                    .find(v => String(v.id) === String(run._sourceVehicleId));
                                 const linkId = run._specLinkId;
                                 const isChargingLink = runKindFrom(run) === 'charging';
                                 const runColor = run.color || '#9ca3af';
@@ -2686,7 +2692,23 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5">Estimated</span>
                                                 </div>
                                                 <div className="run-meta">
-                                                    <p className="text-muted">Inherited from: <span className="font-medium text-secondary">{srcName}</span></p>
+                                                    {/* The source is the one thing on this card you
+                                                        cannot act on from here: the run is read-only,
+                                                        its data lives on another vehicle, and every
+                                                        question about it — is the factor right, what
+                                                        did the original actually measure — is answered
+                                                        over there. Landing on Charging & Range rather
+                                                        than the tab you left, because the source OWNS
+                                                        this run and would not list it under Inherited. */}
+                                                    <p className="text-muted">Inherited from:{' '}
+                                                        <VehicleLink
+                                                            vehicle={srcVehicle}
+                                                            name={srcName}
+                                                            onView={(v) => { onViewVehicle?.(v); onSubtabChange?.('tests'); }}
+                                                            className="font-medium text-secondary"
+                                                            title={`View ${srcName} tests & data`}
+                                                        />
+                                                    </p>
                                                     <p>Date: {run.date}</p>
                                                     {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
                                                     {run.conditions && <p>Notes: {run.conditions}</p>}
