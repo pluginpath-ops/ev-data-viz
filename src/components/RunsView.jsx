@@ -2386,11 +2386,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                                     value={row[field] ?? ''}
                                                                                     onChange={e => handleEditDataCell(i, field, e.target.value)}
                                                                                     placeholder="—"
-                                                                                    className={`w-full text-xs p-0.5 rounded outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                                                                                        canEdit(vehicle)
-                                                                                            ? 'bg-transparent hover:bg-white focus:bg-white focus:ring-1 focus:ring-blue-300'
-                                                                                            : 'bg-transparent text-secondary cursor-default'
-                                                                                    }`}
+                                                                                    className="data-cell-input"
                                                                                 />
                                                                             </td>
                                                                         ))}
