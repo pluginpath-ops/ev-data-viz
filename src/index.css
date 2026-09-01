@@ -30,6 +30,36 @@
     --color-warning: rgb(245, 158, 11);
     --color-warning-hover: rgb(217, 119, 6);
 
+    /* ── Callout triad: surface / border / text ────────────────────────────
+       The base colours above are SOLID fills — a button, a filled badge. They
+       cannot describe the other shape a status takes: a tinted panel with a
+       matching border and readable text on it. Every one of those was written
+       as a raw `bg-amber-50 border-amber-200 text-amber-700` cluster with no
+       dark rule, which is how a whole panel of towing inputs came to be
+       unreadable in dark mode.
+
+       `--color-primary-surface` / `-text` already existed under the older
+       `-light` spelling. Both names are kept — `-light` has call sites — but
+       `-surface` is the one to reach for: it says the role rather than the
+       lightness, and in dark mode the value is not light at all.
+
+       Text values are AA against their own surface in both themes; a test
+       asserts it, so a re-tint cannot quietly drop below 4.5:1. */
+    --color-primary-surface: rgb(219, 234, 254);   /* blue-100  */
+    --color-primary-border:  rgb(147, 197, 253);   /* blue-300  */
+
+    --color-warning-surface: rgb(255, 251, 235);   /* amber-50  */
+    --color-warning-border:  rgb(253, 230, 138);   /* amber-200 */
+    --color-warning-text:    rgb(146, 64, 14);     /* amber-800 */
+
+    --color-danger-surface:  rgb(254, 242, 242);   /* red-50    */
+    --color-danger-border:   rgb(254, 202, 202);   /* red-200   */
+    --color-danger-text:     rgb(153, 27, 27);     /* red-800   */
+
+    --color-success-surface: rgb(240, 253, 244);   /* green-50  */
+    --color-success-border:  rgb(187, 247, 208);   /* green-200 */
+    --color-success-text:    rgb(22, 101, 52);     /* green-800 */
+
     /* ── Surface layers (light mode) ── */
     --color-background: rgb(249, 250, 251);   /* gray-50  — page body */
     --color-card:       rgb(255, 255, 255);   /* white    — cards, modals */
@@ -72,6 +102,29 @@
     /* Primary accent: near-white tint for preset buttons & selected chips */
     --color-primary-light: rgba(59, 130, 246, 0.25);
     --color-primary-text:  rgb(226, 232, 240);   /* slate-200 — near white, cool tint */
+
+    /* ── Callout triad (dark) ──────────────────────────────────────────────
+       A translucent wash of the status colour over whatever it sits on, rather
+       than a fixed dark tint: the same panel then reads correctly on a card, a
+       sunken panel or the page body, which a baked-in colour cannot do.
+
+       The text is a LIGHT tint of the status hue, not the dark one from the
+       light theme. That inversion is the whole bug this exists to prevent —
+       amber-800 on a dark wash is the unreadable case. */
+    --color-primary-surface: rgba(59, 130, 246, 0.15);
+    --color-primary-border:  rgba(59, 130, 246, 0.35);
+
+    --color-warning-surface: rgba(245, 158, 11, 0.1);
+    --color-warning-border:  rgba(245, 158, 11, 0.3);
+    --color-warning-text:    rgb(252, 211, 77);    /* amber-300 */
+
+    --color-danger-surface:  rgba(239, 68, 68, 0.1);
+    --color-danger-border:   rgba(239, 68, 68, 0.3);
+    --color-danger-text:     rgb(252, 165, 165);   /* red-300   */
+
+    --color-success-surface: rgba(34, 197, 94, 0.1);
+    --color-success-border:  rgba(34, 197, 94, 0.3);
+    --color-success-text:    rgb(134, 239, 172);   /* green-300 */
 }
 
 /* Nav tabs and chart-mode tabs: near white in dark mode */
@@ -932,12 +985,10 @@ body {
 /* Warning banner for a viewing condition that can't be applied (e.g. EPA
    Curves elevation adjustment missing a required weight for one vehicle) */
 .chart-warning-banner {
-    @apply text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-4;
-}
-[data-theme="dark"] .chart-warning-banner {
-    background-color: rgba(245, 158, 11, 0.1);
-    border-color: rgba(245, 158, 11, 0.3);
-    color: rgb(252, 211, 77);
+    @apply text-sm border rounded px-3 py-2 mb-4;
+    background-color: var(--color-warning-surface);
+    border-color: var(--color-warning-border);
+    color: var(--color-warning-text);
 }
 
 /* An inline panel of settings that only apply in one mode — currently the
@@ -949,28 +1000,22 @@ body {
    the field labels and the values were unreadable. */
 .mode-settings-panel {
     @apply mb-4 p-3 rounded-lg border;
-    background-color: rgb(255, 251, 235);   /* amber-50 */
-    border-color: rgb(253, 230, 138);       /* amber-200 */
+    background-color: var(--color-warning-surface);
+    border-color: var(--color-warning-border);
     color: var(--color-text-primary);
-}
-[data-theme="dark"] .mode-settings-panel {
-    background-color: rgba(245, 158, 11, 0.1);
-    border-color: rgba(245, 158, 11, 0.3);
 }
 .mode-settings-title {
     @apply text-xs font-semibold mb-2 uppercase tracking-wide;
-    color: rgb(180, 83, 9);                 /* amber-700 */
+    color: var(--color-warning-text);
 }
-[data-theme="dark"] .mode-settings-title { color: rgb(252, 211, 77); }
 .mode-settings-note {
+    /* Same colour as the title. It was amber-600, which at text-xs on the pale
+       panel read 3.07:1 — under the 4.5:1 small-text minimum — so hierarchy is
+       carried by weight and caps instead, which this could afford and the
+       contrast could not. */
     @apply text-xs max-w-xs;
-    /* amber-700, not the amber-600 this started as: at text-xs on the amber-50
-       panel that read 3.07:1, under the 4.5:1 small-text minimum. Same colour
-       as the title, which keeps its hierarchy through weight and caps rather
-       than through a contrast the note could not afford. */
-    color: rgb(180, 83, 9);
+    color: var(--color-warning-text);
 }
-[data-theme="dark"] .mode-settings-note { color: rgb(252, 211, 77); }
 
 /* Collapsible "Select Runs" section header button */
 .run-selector-header {
