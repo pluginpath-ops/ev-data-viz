@@ -220,7 +220,7 @@ export default function Playground() {
                     <code>playground.test.js</code>. Owned:{' '}
                     {OWNED_FAMILIES.map(f => f.label).join(', ')}.
                 </p>
-                <button type="button" className="btn btn-sm btn-secondary"
+                <button type="button" className="btn btn-secondary"
                     onClick={() => setSide(s => !s)}>
                     {side ? 'Single column' : 'Compare both themes'}
                 </button>

@@ -41,7 +41,7 @@ function PhaseRow({ phase, canEdit, onSave, onDelete }) {
                     <select
                         value={phase.phase_type ?? ''}
                         onChange={e => onSave({ ...phase, phase_type: e.target.value || null })}
-                        className="form-input text-xs py-0.5 px-1 w-24"
+                        className="form-input w-24"
                     >
                         <option value="">—</option>
                         {PHASE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -75,7 +75,7 @@ function InlineNum({ value, canEdit, step, onSave }) {
             onChange={e => setDraft(e.target.value)}
             onBlur={() => { const v = draft; setDraft(null); if (v !== null && String(value ?? '') !== v.trim()) onSave(v.trim() === '' ? null : Number(v)); }}
             onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setDraft(null); }}
-            className="form-input text-xs py-0.5 px-1 w-24 text-right font-mono"
+            className="form-input w-24 text-right font-mono"
         />
     );
 }
@@ -128,7 +128,7 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
                         <select
                             value={test.procedure_code ?? ''}
                             onChange={e => onSaveTest({ id: test.id, procedure_code: e.target.value ? Number(e.target.value) : null })}
-                            className="form-input text-xs py-0.5"
+                            className="form-input"
                             title="77 = Multi-Cycle Test (preferred — city + highway + totals in one run). 84 = Charge Depleting Highway (fallback). 81 = Charge Depleting UDDS (stored only). 2 = FTP-75."
                         >
                             <option value="">Procedure…</option>
@@ -220,7 +220,7 @@ function EnumField({ label, value, options, tooltip, canEdit, onSave }) {
             <span className="flex items-center gap-1 shrink-0">
                 {canEdit ? (
                     <select value={value ?? ''} onChange={e => onSave(e.target.value || null)}
-                        className="form-input text-xs py-0.5 px-1 w-28">
+                        className="form-input w-28">
                         <option value="">—</option>
                         {options.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>

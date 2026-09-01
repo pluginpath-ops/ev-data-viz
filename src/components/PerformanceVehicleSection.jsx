@@ -258,7 +258,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                                 type="text" autoFocus value={newSource}
                                 onChange={e => setNewSource(e.target.value)}
                                 placeholder="e.g. Out of Spec"
-                                className="form-input text-xs py-1 w-44"
+                                className="form-input w-44"
                             />
                         </label>
                         <label className="text-xs">
@@ -267,7 +267,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                                 type="text" value={newTrim}
                                 onChange={e => setNewTrim(e.target.value)}
                                 placeholder="e.g. Dual Standard LFP"
-                                className="form-input text-xs py-1 w-48"
+                                className="form-input w-48"
                             />
                         </label>
                     </div>

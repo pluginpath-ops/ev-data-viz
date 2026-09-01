@@ -94,15 +94,14 @@ export const SECTIONS = [
         id: 'buttons',
         title: 'Buttons',
         blurb: 'Solid, rectangular actions. `.btn` is the base; add one intent class. '
-             + '`.btn-sm` is the only size modifier.',
+             + 'One size — the compact metrics that used to be `.btn-sm` are now the base, '
+             + 'and the modifier is gone (#277).',
         specimens: [
             { cls: 'btn btn-primary',   as: 'button', label: 'Primary',   note: 'Additive / available actions — Add, Save, View.' },
             { cls: 'btn btn-secondary', as: 'button', label: 'Secondary', note: 'Cancel, Back, and the unselected half of an exclusive pair.' },
             { cls: 'btn btn-edit',      as: 'button', label: 'Edit',      note: 'Edit actions. Currently the same green as success.' },
             { cls: 'btn btn-warning',   as: 'button', label: 'Warning',   note: 'Attention-drawing but not destructive.' },
             { cls: 'btn btn-danger',    as: 'button', label: 'Danger',    note: 'Destructive. Delete, Remove.' },
-            { cls: 'btn btn-sm btn-primary',   as: 'button', label: 'Primary · sm',   note: 'The small modifier — 0.25rem/0.75rem, 12px.' },
-            { cls: 'btn btn-sm btn-secondary', as: 'button', label: 'Secondary · sm', note: 'The pair used for exclusive selection on chart tabs.' },
             { cls: 'btn-tab',        as: 'button', label: 'Nav tab',   note: 'Top-level navigation. Add `.active` for the current one.' },
             { cls: 'btn-tab active', as: 'button', label: 'Nav tab · active' },
             { cls: 'btn-chart-mode',        as: 'button', label: 'Chart mode',   note: 'Chart sub-tab selector.' },
@@ -112,13 +111,14 @@ export const SECTIONS = [
     {
         id: 'pills',
         title: 'Pills, chips & badges',
-        blurb: 'Rounded-full. Three jobs are tangled here today — a filter you toggle, '
-             + 'a selection you can dismiss, and a badge that is only a label. '
-             + 'Compare the sizes: they do not agree. See #277.',
+        blurb: 'Rounded-full, and now ONE size: guide-chip, tag-filter-btn, path-chip, '
+             + 'brand-alias-chip and fe-picker-badge share their metrics and differ only in '
+             + 'colour. Badges keep their own shape — a label you read is not a control you '
+             + 'press. See #277.',
         specimens: [
-            { cls: 'guide-chip',        as: 'button', label: 'Filter chip',  note: 'EPA tab. text-xs, px-2 py-0.5, tokens.' },
+            { cls: 'guide-chip',        as: 'button', label: 'Filter chip',  note: 'The shared chip metrics — text-xs, px-2 py-0.5.' },
             { cls: 'guide-chip active', as: 'button', label: 'Filter chip · active' },
-            { cls: 'tag-filter-btn tag-filter-na',  as: 'button', label: 'Tag filter · off',  note: 'Vehicles tab. text-sm, px-3 py-1 — larger than the EPA chip for the same job.' },
+            { cls: 'tag-filter-btn tag-filter-na',  as: 'button', label: 'Tag filter · off',  note: 'Was text-sm/px-3 py-1; now matches the filter chip.' },
             { cls: 'tag-filter-btn tag-filter-and', as: 'button', label: 'Tag filter · AND',  note: 'Raw bg-blue-500, outside the token system.' },
             { cls: 'tag-filter-btn tag-filter-or',  as: 'button', label: 'Tag filter · OR',   note: 'Raw bg-green-500.' },
             { cls: 'tag-filter-btn tag-filter-not', as: 'button', label: 'Tag filter · NOT',  note: 'Raw bg-red-500.' },

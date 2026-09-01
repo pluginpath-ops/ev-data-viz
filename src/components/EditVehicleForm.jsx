@@ -245,7 +245,7 @@ export default function EditVehicleForm({
                                         if (tag) onAddTag(tag);
                                         e.target.value = '';
                                     }}
-                                    className="form-input w-full text-sm"
+                                    className="form-input w-full"
                                     defaultValue=""
                                 >
                                     <option value="" disabled>Add existing tag…</option>
@@ -262,7 +262,7 @@ export default function EditVehicleForm({
                                 value={newTagName}
                                 onChange={(e) => onNewTagNameChange(e.target.value)}
                                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onCreateTag(); } }}
-                                className="form-input text-sm flex-1"
+                                className="form-input flex-1"
                             />
                             <button type="button" onClick={onCreateTag} className="btn btn-primary text-sm">
                                 Create tag

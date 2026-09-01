@@ -814,7 +814,7 @@ export default function ChargeCompareView({
                             <button
                                 key={o}
                                 onClick={() => setOrientation(o)}
-                                className={`btn btn-sm ${orientation === o ? 'btn-primary' : 'btn-secondary'}`}
+                                className={`btn ${orientation === o ? 'btn-primary' : 'btn-secondary'}`}
                             >
                                 {o === 'vertical' ? '↕ Vertical' : '↔ Horizontal'}
                             </button>

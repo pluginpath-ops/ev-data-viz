@@ -803,7 +803,7 @@ export default function App() {
                                         'evbench-popout',
                                         `width=${window.screen.availWidth},height=${window.screen.availHeight},left=0,top=0`
                                     )}
-                                    className="btn btn-sm btn-primary ml-auto"
+                                    className="btn btn-primary ml-auto"
                                     title="Open chart in a separate window for presentation"
                                 >
                                     ⧉ Open Chart in New Window
@@ -876,7 +876,7 @@ export default function App() {
                                     })}
                                     <button
                                         onClick={clearAllSelections}
-                                        className="btn btn-warning btn-sm"
+                                        className="btn btn-warning"
                                     >
                                         Clear all
                                     </button>

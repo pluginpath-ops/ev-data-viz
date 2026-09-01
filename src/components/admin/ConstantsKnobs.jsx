@@ -301,14 +301,14 @@ function KnobRow({
                             type="number" min={min} max={max} step={step}
                             value={value[0]}
                             onChange={(e) => onChange([numOrNull(e.target.value) ?? def[0], value[1]])}
-                            className="form-input w-20 text-sm"
+                            className="form-input w-20"
                         />
                         <span className="text-faint text-sm">–</span>
                         <input
                             type="number" min={min} max={max} step={step}
                             value={value[1]}
                             onChange={(e) => onChange([value[0], numOrNull(e.target.value) ?? def[1]])}
-                            className="form-input w-20 text-sm"
+                            className="form-input w-20"
                         />
                     </>
                 ) : (
@@ -316,7 +316,7 @@ function KnobRow({
                         type="number" min={min} max={max} step={step}
                         value={value}
                         onChange={(e) => onChange(numOrNull(e.target.value))}
-                        className="form-input w-24 text-sm"
+                        className="form-input w-24"
                     />
                 )}
                 {unit && <span className="text-xs text-faint w-7">{unit}</span>}

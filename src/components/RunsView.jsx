@@ -198,7 +198,7 @@ function PairedChargingControl({ run, vehicle, onSet }) {
             <select
                 value={run.paired_charging_run_id ?? ''}
                 onChange={e => onSet(e.target.value || null)}
-                className="form-input text-sm py-0.5"
+                className="form-input"
             >
                 <option value="">Auto{auto ? ` — ${auto.name}` : ''}</option>
                 {chargingRuns.map(r => (
@@ -325,7 +325,7 @@ const DeriveAxisPanel = ({
                             placeholder="Start SoC (%)"
                             value={startSoc}
                             onChange={e => onChangeStartSoc(e.target.value)}
-                            className="form-input text-xs py-1 w-32"
+                            className="form-input w-32"
                         />
                     )}
 
@@ -339,7 +339,7 @@ const DeriveAxisPanel = ({
                                 type="number" min="0" max="50" step="0.5"
                                 value={chargingLoss}
                                 onChange={e => onChangeChargingLoss(e.target.value)}
-                                className="form-input text-xs py-1 w-16"
+                                className="form-input w-16"
                             />
                             <span>%</span>
                             <span className="text-faint">reported kW is charger-side; ~5% typical</span>
@@ -385,7 +385,7 @@ const DeriveAxisPanel = ({
                                                     next[i] = { ...next[i], [c.key]: e.target.value };
                                                     onChangeAnchors(next);
                                                 }}
-                                                className="form-input text-xs py-1"
+                                                className="form-input"
                                             />
                                         ))}
                                         <button
@@ -1710,7 +1710,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             placeholder={"soc,chargeRate,time\n50,100,0\n80,75,15\n…"}
                                             value={csvText}
                                             onChange={e => handleCsvTextPaste(e.target.value)}
-                                            className="form-input w-full text-xs font-mono resize-y"
+                                            className="form-input w-full font-mono resize-y"
                                         />
                                     </div>
                                 </div>
@@ -2873,7 +2873,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <select
                                         value={newLinkSourceId}
                                         onChange={e => { setNewLinkSourceId(e.target.value); setNewLinkEfficiency(''); setNewLinkCapacity(''); setNewLinkRunIds(null); setNewLinkKind('all'); }}
-                                        className="form-input text-sm flex-1 min-w-48"
+                                        className="form-input flex-1 min-w-48"
                                     >
                                         <option value="">Source vehicle…</option>
                                         {sourceVehicles.map(v => (
@@ -2959,7 +2959,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         onChange={e => setNewLinkCapacity(e.target.value)}
                                         step="0.001"
                                         min="0.001"
-                                        className="form-input text-sm w-44"
+                                        className="form-input w-44"
                                         title={runsToLink.some(r => runKindFrom(r) === 'charging')
                                             ? `${CAPACITY_HELP} ${CHARGING_SCALE_WARNING}`
                                             : CAPACITY_HELP}
@@ -2982,7 +2982,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         onChange={e => setNewLinkEfficiency(e.target.value)}
                                         step="0.001"
                                         min="0.001"
-                                        className="form-input text-sm w-44"
+                                        className="form-input w-44"
                                         title={EFFICIENCY_HELP}
                                     />
                                     <button
@@ -2999,7 +2999,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         placeholder="Notes (optional)"
                                         value={newLinkNotes}
                                         onChange={e => setNewLinkNotes(e.target.value)}
-                                        className="form-input text-sm flex-1 min-w-40"
+                                        className="form-input flex-1 min-w-40"
                                     />
                                     <button
                                         type="button"

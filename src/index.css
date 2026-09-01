@@ -160,7 +160,12 @@
 /* ── Base Button Styles ───────────────────────────────────────────────────── */
 
 .btn {
-    padding: 0.5rem 1rem;
+    /* One size. The base was 0.5rem/1rem with `.btn-sm` as the compact
+       modifier, and the compact one is what the site wanted almost everywhere —
+       so it became the base and the modifier went away (#277). `.btn-tab` keeps
+       its own larger metrics: top-level navigation is not the same control. */
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
     border-radius: 0.375rem;
     font-weight: 500;
     cursor: pointer;
@@ -168,12 +173,6 @@
     border: none;
     display: inline-block;
     text-align: center;
-}
-
-/* Small button modifier — matches vehicle card action button sizing */
-.btn.btn-sm {
-    padding: 0.25rem 0.75rem;
-    font-size: 0.75rem;
 }
 
 /*
@@ -277,6 +276,13 @@
     cursor: pointer;
     color: var(--color-text-secondary);
     background-color: transparent;
+}
+/* A resting background and border, so it reads as a control rather than a line
+   of text. It had neither and only announced itself on hover — which is no
+   announcement at all on a touch screen. */
+.btn-chart-mode {
+    background-color: var(--color-surface-muted);
+    border: 1px solid var(--color-border);
 }
 .btn-chart-mode:hover {
     background-color: var(--color-surface-sunken);
@@ -652,8 +658,12 @@ body {
 }
 
 /* Standard text/select/number input field */
+/* The size call sites were writing by hand. `p-2` was the base and almost
+   nothing used it — 34 sites added py-1, 21 added py-0.5, and the split between
+   text-sm and text-xs ran 43/35. This is the one that read tidiest, so it is
+   the default and the overrides come off (#277). */
 .form-input {
-    @apply p-2 rounded;
+    @apply px-2 py-1 text-sm rounded;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
@@ -711,8 +721,12 @@ body {
 /* ── Badges and Tags ────────────────────────────────────────────────────────── */
 
 /* Base pill — full-radius small badge; color classes added inline */
+/* Call sites usually paint this from the tag's own colour; the fallback is here
+   so one that does not is still a pill rather than floating text. */
 .tag-pill {
     @apply px-2 py-0.5 rounded-full text-xs font-medium;
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-secondary);
 }
 
 /* Square-radius informational badge (blue by default) */
@@ -734,8 +748,13 @@ body {
 }
 
 /* Border-style status badge (full-radius); color classes added inline */
+/* Same shape and metrics as .badge-default and .badge-hidden, in grey. It was
+   the odd one out — a bare outline with no fill and no colour of its own, so it
+   took whatever text colour it inherited and read as stray text, not a badge. */
 .badge-status {
-    @apply text-xs px-1.5 py-0.5 rounded-full border;
+    @apply text-xs px-2 py-0.5 rounded;
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-secondary);
 }
 
 /* Which layer a Model Constants knob's live value came from (#261): this
@@ -844,7 +863,6 @@ body {
 }
 
 /* Quad-state tag filter buttons (N/A → OR → AND → NOT) */
-.tag-filter-btn  { @apply px-3 py-1 rounded-full text-sm font-medium transition border cursor-pointer; }
 .tag-filter-na {
     background-color: var(--color-surface-sunken);
     color: var(--color-text-secondary);
@@ -2101,7 +2119,6 @@ body {
 }
 
 .path-chip {
-    @apply text-xs font-medium rounded-full px-2 py-0.5 border;
     border-color: var(--color-primary);
     background-color: var(--color-primary-light);
     color: var(--color-primary-text);
@@ -2228,7 +2245,6 @@ body {
 }
 
 .fe-picker-badge {
-    @apply text-[10px] font-semibold px-1.5 rounded-full;
     background-color: var(--color-primary-light);
     color: var(--color-primary-text);
 }
@@ -2309,8 +2325,24 @@ body {
    chip filled with it is invisible against the panel it sits on. Dark mode
    therefore gets a light wash instead, following the pattern .btn-tab already
    uses for its hover state, with near-white text like the badges. */
+/* ── One chip ────────────────────────────────────────────────────────────────
+   Every chip-shaped control shares these metrics. They were four sizes doing
+   one job: the EPA filter at text-xs/py-0.5 and the Vehicles tag filter at
+   text-sm/py-1, with path, brand-alias and fe-picker each guessing again. The
+   smallest was the right one, so it won (#277).
+
+   Colour stays per-class below — what a chip MEANS still differs. */
+.guide-chip,
+.tag-filter-btn,
+.path-chip,
+.brand-alias-chip,
+.fe-picker-badge {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs
+           font-medium transition-colors cursor-pointer;
+    border: 1px solid transparent;
+}
+
 .guide-chip {
-    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs transition-colors;
     background-color: var(--color-surface-sunken);
     color: var(--color-text-secondary);
     border: 1px solid var(--color-border);
@@ -2725,7 +2757,6 @@ body {
     border-top: 1px solid var(--color-border);
 }
 .brand-alias-chip {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs;
     background-color: var(--color-surface-sunken);
     color: var(--color-text-secondary);
     border: 1px solid var(--color-border);

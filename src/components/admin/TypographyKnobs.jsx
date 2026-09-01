@@ -97,13 +97,13 @@ function KnobRow({ knob, value, modified, onChange }) {
             <div className="flex items-center gap-2 shrink-0">
                 {kind === 'weight' ? (
                     <select value={value} onChange={(e) => onChange(Number(e.target.value))}
-                        className="form-input w-24 text-sm">
+                        className="form-input w-24">
                         {WEIGHT_OPTIONS.map(w => <option key={w} value={w}>{w}</option>)}
                     </select>
                 ) : (
                     <input type="number" min={min} max={max} step={step} value={value}
                         onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-                        className="form-input w-24 text-sm" />
+                        className="form-input w-24" />
                 )}
                 <span className="text-xs text-faint w-5">{unitFor(kind)}</span>
                 <button onClick={() => onChange(null)} disabled={!modified} title="Reset to default"

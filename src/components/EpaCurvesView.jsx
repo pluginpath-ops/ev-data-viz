@@ -720,7 +720,7 @@ export default function EpaCurvesView({
                                 <button
                                     key={m.key}
                                     type="button"
-                                    className={`btn btn-sm ${yAxis === m.key ? 'btn-primary' : 'btn-secondary'}`}
+                                    className={`btn ${yAxis === m.key ? 'btn-primary' : 'btn-secondary'}`}
                                     onClick={() => setEpaConfig(p => ({ ...p, yAxis: m.key }))}
                                 >
                                     {m.label}
@@ -742,14 +742,14 @@ export default function EpaCurvesView({
                             </span>
                             <button
                                 type="button"
-                                className={`btn btn-sm ${overlayMode === 'corrected' ? 'btn-primary' : 'btn-secondary'}`}
+                                className={`btn ${overlayMode === 'corrected' ? 'btn-primary' : 'btn-secondary'}`}
                                 onClick={() => setOverlayMode(m => m === 'corrected' ? null : 'corrected')}
                             >
                                 Corrected
                             </button>
                             <button
                                 type="button"
-                                className={`btn btn-sm ${overlayMode === 'uncorrected' ? 'btn-primary' : 'btn-secondary'}`}
+                                className={`btn ${overlayMode === 'uncorrected' ? 'btn-primary' : 'btn-secondary'}`}
                                 onClick={() => setOverlayMode(m => m === 'uncorrected' ? null : 'uncorrected')}
                             >
                                 Uncorrected

@@ -325,7 +325,7 @@ function PairRows({
                     <span className="pair-range-control" onClick={e => e.preventDefault()}>
                         <span className="text-label shrink-0">{partnerLabel}</span>
                         <select
-                            className="form-input text-sm py-0.5"
+                            className="form-input"
                             value={partnerId ?? ''}
                             onChange={e => {
                                 const next = e.target.value;

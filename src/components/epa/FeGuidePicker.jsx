@@ -268,7 +268,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                             type="button"
                             onClick={() => handleLink(best.row.id)}
                             disabled={busy}
-                            className="btn btn-primary btn-sm disabled:opacity-60"
+                            className="btn btn-primary disabled:opacity-60"
                         >
                             {busy ? '…' : 'Link'}
                         </button>
@@ -293,7 +293,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                                 value={query}
                                 onChange={e => setQuery(e.target.value)}
                                 placeholder="Filter by carline…"
-                                className="form-input text-xs py-1 w-full mb-2"
+                                className="form-input w-full mb-2"
                             />
                             <div className="fe-candidate-list">
                                 {rest.map(c => (

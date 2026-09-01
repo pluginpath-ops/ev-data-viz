@@ -280,7 +280,7 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange, 
                         value={citation}
                         onChange={e => setCitation(e.target.value)}
                         placeholder="e.g. J1634 sheet p.3 / CSI PDF — applied to edits below"
-                        className="form-input text-xs py-0.5 flex-1"
+                        className="form-input flex-1"
                     />
                 </div>
             )}

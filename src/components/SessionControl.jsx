@@ -85,7 +85,7 @@ export default function SessionControl({
                         if (e.key === 'Escape') setCreating(false);
                     }}
                     placeholder="e.g. OoS 4-car loop"
-                    className="form-input text-sm py-0.5 flex-1 min-w-40"
+                    className="form-input flex-1 min-w-40"
                 />
                 <button onClick={handleCreate} disabled={saving} className="btn btn-primary text-sm py-0.5">
                     {saving ? 'Creating…' : 'Create'}
@@ -101,7 +101,7 @@ export default function SessionControl({
             <select
                 value={run.session_id ?? ''}
                 onChange={e => handleChange(e.target.value)}
-                className="form-input text-sm py-0.5"
+                className="form-input"
             >
                 <option value="">— None —</option>
                 {/* Only this vehicle's sessions. Everything else is behind the

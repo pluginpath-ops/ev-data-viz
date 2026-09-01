@@ -83,7 +83,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                                 setTestType(e.target.value);
                                 setParsed(null); setFileName(null); setMatch(null);
                             }}
-                            className="form-input text-xs py-1 w-32"
+                            className="form-input w-32"
                         >
                             <option value="accel">Acceleration</option>
                             <option value="braking">Braking</option>
@@ -95,7 +95,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                             type="text" value={sourceName}
                             onChange={e => setSourceName(e.target.value)}
                             placeholder="e.g. Out of Spec"
-                            className="form-input text-xs py-1 w-full"
+                            className="form-input w-full"
                         />
                     </label>
                     <label className="text-xs flex-1 min-w-[12rem]">
@@ -104,7 +104,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                             type="text" value={sourceUrl}
                             onChange={e => setSourceUrl(e.target.value)}
                             placeholder="https://…"
-                            className="form-input text-xs py-1 w-full"
+                            className="form-input w-full"
                         />
                     </label>
                 </div>
@@ -121,7 +121,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                     type="file"
                     accept=".csv,text/csv"
                     onChange={e => handleFile(e.target.files?.[0])}
-                    className="form-input text-xs w-full py-1"
+                    className="form-input w-full"
                 />
                 {fileName && <p className="text-[11px] text-faint mt-1">{fileName}</p>}
                 {error && <p className="text-xs text-red-500 mt-2">{error}</p>}

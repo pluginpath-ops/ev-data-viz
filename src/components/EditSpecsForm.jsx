@@ -119,7 +119,7 @@ function SpecField({ field, value, onChange, inheritedValue }) {
         return (
             <div>
                 <select
-                    className="form-input text-sm w-full"
+                    className="form-input w-full"
                     value={selectValue}
                     onChange={e => {
                         const v = e.target.value;
@@ -138,7 +138,7 @@ function SpecField({ field, value, onChange, inheritedValue }) {
         return (
             <div>
                 <select
-                    className="form-input text-sm w-full"
+                    className="form-input w-full"
                     value={value ?? ''}
                     onChange={e => onChange(e.target.value || null)}
                 >
@@ -156,7 +156,7 @@ function SpecField({ field, value, onChange, inheritedValue }) {
             <input
                 type="number"
                 step="1"
-                className="form-input text-sm w-full"
+                className="form-input w-full"
                 value={value ?? ''}
                 placeholder={hint ?? undefined}
                 onChange={e => onChange(e.target.value === '' ? null : parseInt(e.target.value, 10))}
@@ -168,7 +168,7 @@ function SpecField({ field, value, onChange, inheritedValue }) {
             <input
                 type="number"
                 step="any"
-                className="form-input text-sm w-full"
+                className="form-input w-full"
                 value={value ?? ''}
                 placeholder={hint ?? undefined}
                 onChange={e => onChange(e.target.value === '' ? null : parseFloat(e.target.value))}
@@ -179,7 +179,7 @@ function SpecField({ field, value, onChange, inheritedValue }) {
     return (
         <input
             type="text"
-            className="form-input text-sm w-full"
+            className="form-input w-full"
             value={value ?? ''}
             placeholder={hint ?? undefined}
             onChange={e => onChange(e.target.value || null)}
@@ -370,13 +370,13 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                         onChange={e => setParentSearch(e.target.value)}
                                         onBlur={() => setTimeout(() => setShowParentDropdown(false), 150)}
                                         placeholder="Type to filter vehicles…"
-                                        className="form-input text-sm w-full"
+                                        className="form-input w-full"
                                     />
                                 ) : (
                                     <button
                                         type="button"
                                         onClick={() => { setParentSearch(''); setShowParentDropdown(true); }}
-                                        className="form-input text-sm w-full text-left truncate"
+                                        className="form-input w-full text-left truncate"
                                     >
                                         {selectedParentLabel || <span className="text-faint">— None —</span>}
                                     </button>
@@ -510,7 +510,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                                         </span>
                                                         <input
                                                             type="text"
-                                                            className="form-input text-sm flex-1"
+                                                            className="form-input flex-1"
                                                             value={val}
                                                             onChange={e => setCustomValue(cat.key, key, e.target.value)}
                                                         />
@@ -537,7 +537,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                                         type="text"
                                                         list={datalistId}
                                                         placeholder="Field name"
-                                                        className="form-input text-sm flex-1"
+                                                        className="form-input flex-1"
                                                         value={newCustomKey[cat.key] || ''}
                                                         onChange={e => setNewCustomKey(prev => ({ ...prev, [cat.key]: e.target.value }))}
                                                         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomField(cat.key); } }}
@@ -545,7 +545,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                                     <input
                                                         type="text"
                                                         placeholder="Value"
-                                                        className="form-input text-sm flex-1"
+                                                        className="form-input flex-1"
                                                         value={newCustomVal[cat.key] || ''}
                                                         onChange={e => setNewCustomVal(prev => ({ ...prev, [cat.key]: e.target.value }))}
                                                         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomField(cat.key); } }}

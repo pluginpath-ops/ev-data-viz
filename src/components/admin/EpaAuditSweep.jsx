@@ -127,7 +127,7 @@ export default function EpaAuditSweep() {
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Filter by group, make, carline or vehicle…"
-                className="form-input text-caption py-1 w-full mb-3"
+                className="form-input text-caption w-full mb-3"
             />
 
             {!shown.length && (

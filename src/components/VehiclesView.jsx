@@ -565,12 +565,12 @@ export default function VehiclesView({
                     placeholder="Search by name, make, model, year…"
                     value={textFilter}
                     onChange={e => setTextFilter(e.target.value)}
-                    className="form-input text-sm flex-1"
+                    className="form-input flex-1"
                 />
                 <select
                     value={sortBy}
                     onChange={e => setSortBy(e.target.value)}
-                    className="form-input text-sm"
+                    className="form-input"
                 >
                     <option value="default">Default Order</option>
                     <option value="date_newest">Date Added (Newest)</option>
@@ -745,14 +745,14 @@ export default function VehiclesView({
                 <div className="flex justify-end gap-2 mb-4 -mt-3">
                     <button
                         onClick={() => onSelectAllVisible(textFiltered.map(v => v.id))}
-                        className="btn btn-primary btn-sm"
+                        className="btn btn-primary"
                         title="Add all currently visible vehicles to the comparison selection"
                     >
                         Select All Visible ({textFiltered.length})
                     </button>
                     <button
                         onClick={() => onClearAllVisible(textFiltered.map(v => v.id))}
-                        className="btn btn-secondary btn-sm"
+                        className="btn btn-secondary"
                         title="Remove all currently visible vehicles from the comparison selection"
                     >
                         Clear All Visible
