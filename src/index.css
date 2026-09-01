@@ -604,6 +604,37 @@ body {
     border-color: var(--color-primary);
 }
 
+/* A cell of the editable data-points grid.
+   Transparent at rest so the table reads as a table rather than a wall of
+   boxes, and lifts to the input surface on hover or focus. Both surfaces are
+   TOKENS: the lift used to be a hardcoded `bg-white`, which in dark mode put
+   the light body text on a white cell and made whatever you were typing
+   invisible. */
+.data-cell-input {
+    @apply w-full text-xs p-0.5 rounded outline-none;
+    /* Number spinners suppressed — a column of them is unreadable at this size
+       and the arrows sit where the next digit should be. */
+    appearance: textfield;
+    background-color: transparent;
+    color: var(--color-text-primary);
+}
+.data-cell-input::-webkit-inner-spin-button,
+.data-cell-input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.data-cell-input:hover:not(:disabled),
+.data-cell-input:focus:not(:disabled) {
+    background-color: var(--color-surface-input);
+}
+.data-cell-input:focus:not(:disabled) {
+    outline: 1px solid var(--color-primary);
+    outline-offset: -1px;
+}
+/* Read-only for a viewer: still legible, but not offering an edit it cannot do. */
+.data-cell-input:disabled {
+    color: var(--color-text-secondary);
+    @apply cursor-default;
+    opacity: 1;   /* Safari greys a disabled input to near-invisible otherwise. */
+}
+
 /* CSV file upload drag-drop target */
 .csv-drop-zone {
     @apply border-2 border-dashed rounded-lg p-6 text-center;
@@ -793,6 +824,19 @@ body {
     background-color: var(--color-border);
 }
 
+/* The "jump to position N" box between the reorder arrows. Sibling of
+   .reorder-btn and themed the same way — it was a hardcoded `bg-white`, which
+   in dark mode put the light body text on a white box. */
+.reorder-position-input {
+    @apply w-10 h-6 text-center text-xs rounded;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+    appearance: textfield;
+}
+.reorder-position-input::-webkit-inner-spin-button,
+.reorder-position-input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+
 /* Pagination button strip below the vehicle grid */
 .vehicle-pagination {
     @apply flex items-center justify-center gap-2 mt-6;
@@ -895,6 +939,38 @@ body {
     border-color: rgba(245, 158, 11, 0.3);
     color: rgb(252, 211, 77);
 }
+
+/* An inline panel of settings that only apply in one mode — currently the
+   towing efficiency inputs, which appear when Road Trip is switched to towing.
+   Amber because it is a qualifier on everything below it, not a warning.
+
+   Every colour is a token or has a dark override. It was `bg-amber-50` with no
+   dark rule, so in dark mode the light body text sat on a cream panel and both
+   the field labels and the values were unreadable. */
+.mode-settings-panel {
+    @apply mb-4 p-3 rounded-lg border;
+    background-color: rgb(255, 251, 235);   /* amber-50 */
+    border-color: rgb(253, 230, 138);       /* amber-200 */
+    color: var(--color-text-primary);
+}
+[data-theme="dark"] .mode-settings-panel {
+    background-color: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.3);
+}
+.mode-settings-title {
+    @apply text-xs font-semibold mb-2 uppercase tracking-wide;
+    color: rgb(180, 83, 9);                 /* amber-700 */
+}
+[data-theme="dark"] .mode-settings-title { color: rgb(252, 211, 77); }
+.mode-settings-note {
+    @apply text-xs max-w-xs;
+    /* amber-700, not the amber-600 this started as: at text-xs on the amber-50
+       panel that read 3.07:1, under the 4.5:1 small-text minimum. Same colour
+       as the title, which keeps its hierarchy through weight and caps rather
+       than through a contrast the note could not afford. */
+    color: rgb(180, 83, 9);
+}
+[data-theme="dark"] .mode-settings-note { color: rgb(252, 211, 77); }
 
 /* Collapsible "Select Runs" section header button */
 .run-selector-header {

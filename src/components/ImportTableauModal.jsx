@@ -229,7 +229,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                     value={globalPrefix}
                                     onChange={e => setGlobalPrefix(e.target.value)}
                                     placeholder="e.g. 2026 Batch — (optional)"
-                                    className="border rounded px-2 py-1 text-sm flex-1"
+                                    className="form-input py-1 text-sm flex-1"
                                 />
                             </div>
 
@@ -293,7 +293,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                                             type="text"
                                                             value={sessionNames[idx] ?? ''}
                                                             onChange={e => handleNameChange(idx, e.target.value)}
-                                                            className="border rounded px-2 py-1 text-sm flex-1"
+                                                            className="form-input py-1 text-sm flex-1"
                                                         />
                                                         <span className="text-xs text-faint whitespace-nowrap flex-shrink-0">
                                                             {date}
