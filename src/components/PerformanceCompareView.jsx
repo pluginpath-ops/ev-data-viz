@@ -288,7 +288,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                     <div>
                         <label className="block font-medium mb-2">Bars:</label>
                         <select value={barMode} onChange={e => setBarMode(e.target.value)}
-                            className="border p-2 rounded w-full">
+                            className="form-input w-full">
                             <option value="best">Best per vehicle</option>
                             <option value="source">One per source</option>
                         </select>
@@ -296,7 +296,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                     <div>
                         <label className="block font-medium mb-2">Source type:</label>
                         <select value={origin} onChange={e => setOrigin(e.target.value)}
-                            className="border p-2 rounded w-full">
+                            className="form-input w-full">
                             <option value="all">All tested</option>
                             <option value="session">Session-backed only</option>
                             <option value="published">Published only</option>
@@ -305,7 +305,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                     <div>
                         <label className="block font-medium mb-2">Sort:</label>
                         <select value={sortDir} onChange={e => setSortDir(e.target.value)}
-                            className="border p-2 rounded w-full">
+                            className="form-input w-full">
                             <option value="best">Best first</option>
                             <option value="worst">Worst first</option>
                         </select>

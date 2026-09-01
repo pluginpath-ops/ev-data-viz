@@ -52,7 +52,7 @@ export default function TagRegistry() {
                         <div key={tag.id} className="brand-row">
                             <div className="brand-row-main">
                                 <input
-                                    className="brand-input"
+                                    className="form-input brand-input"
                                     value={draft}
                                     onChange={e => setEditing(s => ({ ...s, [tag.id]: e.target.value }))}
                                     aria-label="Tag name"
@@ -69,7 +69,7 @@ export default function TagRegistry() {
                                     )}
                                     <div className="brand-merge">
                                         <select
-                                            className="brand-select"
+                                            className="form-input brand-select"
                                             value={target}
                                             aria-label={`Merge ${tag.name} into`}
                                             onChange={e => setMergeInto(s => ({ ...s, [tag.id]: e.target.value }))}

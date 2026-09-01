@@ -218,7 +218,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
             <div className="specs-chart-controls">
                 <label className="text-sm font-medium text-secondary">Compare:</label>
                 <select
-                    className="specs-chart-field-select"
+                    className="form-input specs-chart-field-select"
                     value={selectedField}
                     onChange={e => setSelectedField(e.target.value)}
                 >

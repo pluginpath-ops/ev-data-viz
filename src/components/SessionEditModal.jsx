@@ -128,7 +128,7 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
                                     value={draft[f.key]}
                                     placeholder={f.placeholder}
                                     onChange={e => set(f.key, e.target.value)}
-                                    className="form-input"
+                                    className="form-input form-input"
                                 />
                             </label>
                         ))}
@@ -160,7 +160,7 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
                                 onChange={e => set('notes', e.target.value)}
                                 rows={3}
                                 placeholder="Conditions, anything the fields cannot say"
-                                className="form-input"
+                                className="form-input form-input"
                             />
                         </label>
                     </div>

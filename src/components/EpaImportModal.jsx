@@ -244,7 +244,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                                             value={linkedVid}
                                                             onChange={e => setVehicleLink(g.test_group_id, e.target.value)}
                                                             disabled={!isSelected}
-                                                            className="form-input w-52"
+                                                            className="form-input form-input w-52"
                                                         >
                                                             <option value="">— Not linked —</option>
                                                             {sortedVehicles.map(v => (

@@ -565,12 +565,12 @@ export default function VehiclesView({
                     placeholder="Search by name, make, model, year…"
                     value={textFilter}
                     onChange={e => setTextFilter(e.target.value)}
-                    className="form-input flex-1"
+                    className="form-input form-input flex-1"
                 />
                 <select
                     value={sortBy}
                     onChange={e => setSortBy(e.target.value)}
-                    className="form-input"
+                    className="form-input form-input"
                 >
                     <option value="default">Default Order</option>
                     <option value="date_newest">Date Added (Newest)</option>
@@ -828,7 +828,7 @@ export default function VehiclesView({
                                                     onClick={e => e.stopPropagation()}
                                                     onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value); if (!isNaN(v)) handleMoveVehicleToIndex(vehicle.id, v - 1); e.target.blur(); } }}
                                                     onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
-                                                    className="reorder-position-input"
+                                                    className="form-input form-input reorder-position-input"
                                                 />
                                                 <button title="Down" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }} disabled={globalPos === totalCount - 1} className="reorder-btn disabled:opacity-30">▼</button>
                                                 <button title="+10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos + 10); }} disabled={globalPos >= totalCount - 1} className="reorder-btn disabled:opacity-30">▼▼</button>
@@ -928,7 +928,7 @@ export default function VehiclesView({
                                                 onClick={e => e.stopPropagation()}
                                                 onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value); if (!isNaN(v)) handleMoveVehicleToIndex(vehicle.id, v - 1); e.target.blur(); } }}
                                                 onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
-                                                className="reorder-position-input"
+                                                className="form-input form-input reorder-position-input"
                                             />
                                             <button title="Down" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }} disabled={globalPos === totalCount - 1} className="reorder-btn disabled:opacity-30">▼</button>
                                             <button title="+10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos + 10); }} disabled={globalPos >= totalCount - 1} className="reorder-btn disabled:opacity-30">▼▼</button>

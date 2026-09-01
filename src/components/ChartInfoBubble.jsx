@@ -101,7 +101,7 @@ export default function ChartInfoBubble({ chartKey }) {
                                 value={draft[key]}
                                 onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))}
                                 rows={rows}
-                                className="form-input w-full mt-1"
+                                className="form-input form-input w-full mt-1"
                             />
                         </label>
                     ))}

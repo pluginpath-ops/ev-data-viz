@@ -165,7 +165,7 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                 {SUBTABS.map(t => (
                     <button
                         key={t.id}
-                        className={`btn-chart-mode ${subtab === t.id ? 'active' : ''}`}
+                        className={`btn-subtab ${subtab === t.id ? 'active' : ''}`}
                         onClick={() => onSubtabChange(t.id)}
                     >
                         {t.label}

@@ -42,7 +42,7 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     placeholder="Make, carline or test group"
-                    className="guide-search-input"
+                    className="form-input guide-search-input"
                 />
             </div>
 

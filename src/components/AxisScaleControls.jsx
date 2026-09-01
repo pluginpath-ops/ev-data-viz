@@ -58,7 +58,7 @@ export default function AxisScaleControls({
                             placeholder="Auto"
                             value={yMax ?? ''}
                             onChange={e => onChange('yMax', e.target.value === '' ? null : Number(e.target.value))}
-                            className="axis-input"
+                            className="form-input axis-input"
                         />
                     </div>
                     <div className="flex items-center gap-2">
@@ -68,7 +68,7 @@ export default function AxisScaleControls({
                             placeholder="Auto"
                             value={yMin ?? ''}
                             onChange={e => onChange('yMin', e.target.value === '' ? null : Number(e.target.value))}
-                            className="axis-input"
+                            className="form-input axis-input"
                         />
                     </div>
                 </div>
@@ -96,7 +96,7 @@ export default function AxisScaleControls({
                                 placeholder="Auto"
                                 value={xMax ?? ''}
                                 onChange={e => onChange('xMax', e.target.value === '' ? null : Number(e.target.value))}
-                                className="axis-input"
+                                className="form-input axis-input"
                             />
                         </div>
                         <div className="inline-row">
@@ -106,7 +106,7 @@ export default function AxisScaleControls({
                                 placeholder="Auto"
                                 value={xMin ?? ''}
                                 onChange={e => onChange('xMin', e.target.value === '' ? null : Number(e.target.value))}
-                                className="axis-input"
+                                className="form-input axis-input"
                             />
                         </div>
                     </div>
@@ -133,7 +133,7 @@ export default function AxisScaleControls({
                                 placeholder="Auto"
                                 value={y2Max ?? ''}
                                 onChange={e => onChange('y2Max', e.target.value === '' ? null : Number(e.target.value))}
-                                className="axis-input"
+                                className="form-input axis-input"
                             />
                         </div>
                         <div className="inline-row">
@@ -143,7 +143,7 @@ export default function AxisScaleControls({
                                 placeholder="Auto"
                                 value={y2Min ?? ''}
                                 onChange={e => onChange('y2Min', e.target.value === '' ? null : Number(e.target.value))}
-                                className="axis-input"
+                                className="form-input axis-input"
                             />
                         </div>
                     </div>

@@ -144,7 +144,7 @@ export default function PerformanceCompareChart({
                         <select
                             value={valueMode}
                             onChange={e => onValueModeChange(e.target.value)}
-                            className="border p-1.5 rounded text-sm"
+                            className="form-input p-1.5"
                         >
                             {valueModes.map(v => (
                                 <option key={v.key} value={v.key}>{v.label}</option>
@@ -155,7 +155,7 @@ export default function PerformanceCompareChart({
                         <select
                             value={metric}
                             onChange={e => onMetricChange(e.target.value)}
-                            className="border p-1.5 rounded text-sm"
+                            className="form-input p-1.5"
                         >
                             {metricOptions.map(m => (
                                 <option key={m.key} value={m.key}>{m.label}</option>

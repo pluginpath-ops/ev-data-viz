@@ -370,7 +370,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                         onChange={e => setParentSearch(e.target.value)}
                                         onBlur={() => setTimeout(() => setShowParentDropdown(false), 150)}
                                         placeholder="Type to filter vehicles…"
-                                        className="form-input w-full"
+                                        className="form-input form-input w-full"
                                     />
                                 ) : (
                                     <button

@@ -83,7 +83,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                                 setTestType(e.target.value);
                                 setParsed(null); setFileName(null); setMatch(null);
                             }}
-                            className="form-input w-32"
+                            className="form-input form-input w-32"
                         >
                             <option value="accel">Acceleration</option>
                             <option value="braking">Braking</option>
@@ -95,7 +95,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                             type="text" value={sourceName}
                             onChange={e => setSourceName(e.target.value)}
                             placeholder="e.g. Out of Spec"
-                            className="form-input w-full"
+                            className="form-input form-input w-full"
                         />
                     </label>
                     <label className="text-xs flex-1 min-w-[12rem]">
@@ -104,7 +104,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                             type="text" value={sourceUrl}
                             onChange={e => setSourceUrl(e.target.value)}
                             placeholder="https://…"
-                            className="form-input w-full"
+                            className="form-input form-input w-full"
                         />
                     </label>
                 </div>

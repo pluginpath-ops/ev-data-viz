@@ -121,7 +121,7 @@ export default function ViewingConditions({ conditions }) {
                         step="100"
                         value={elevationFt}
                         onChange={e => setElevationFt(Number(e.target.value) || 0)}
-                        className="form-input w-24 text-right"
+                        className="form-input form-input w-24 text-right"
                         aria-label="Elevation in feet"
                     />
                     <span className="text-sm text-meta">ft</span>
@@ -145,7 +145,7 @@ export default function ViewingConditions({ conditions }) {
                         value={tempF}
                         onChange={e => setTempF(clampTempF(e.target.value))}
                         placeholder={String(STANDARD_TEMP_F)}
-                        className="form-input w-20 text-right"
+                        className="form-input form-input w-20 text-right"
                         aria-label="Ambient temperature in °F"
                     />
                     <span className="text-sm text-meta">°F</span>
@@ -176,7 +176,7 @@ export default function ViewingConditions({ conditions }) {
                         value={accessoryOverrideW}
                         onChange={e => setAccessoryOverrideW(e.target.value)}
                         placeholder={String(DEFAULT_ACCESSORY_W)}
-                        className="form-input w-24 text-right"
+                        className="form-input form-input w-24 text-right"
                         aria-label="Accessory load override in watts"
                     />
                     <span className="text-sm text-meta">W</span>
@@ -199,7 +199,7 @@ export default function ViewingConditions({ conditions }) {
                         value={windSpeedMph}
                         onChange={e => setWindSpeedMph(e.target.value)}
                         placeholder="0"
-                        className="form-input w-16 text-right"
+                        className="form-input form-input w-16 text-right"
                         aria-label="Wind speed in mph"
                     />
                     <span className="text-sm text-meta">mph @</span>
@@ -211,7 +211,7 @@ export default function ViewingConditions({ conditions }) {
                         value={windDirectionDeg}
                         onChange={e => setWindDirectionDeg(clampWindDirection(e.target.value))}
                         placeholder="180"
-                        className="form-input w-16 text-right"
+                        className="form-input form-input w-16 text-right"
                         aria-label="Wind direction relative to travel, in degrees"
                     />
                     <span className="text-sm text-meta">°{windAdjusted ? ' ▲' : ''}</span>
@@ -257,7 +257,7 @@ export default function ViewingConditions({ conditions }) {
                             value={gradeGainFt}
                             onChange={e => setGradeGainFt(e.target.value)}
                             placeholder="0"
-                            className="form-input w-20 text-right"
+                            className="form-input form-input w-20 text-right"
                             aria-label="Net elevation gain in feet (negative for net descent)"
                         />
                         <span className="text-sm text-meta">ft over</span>
@@ -268,7 +268,7 @@ export default function ViewingConditions({ conditions }) {
                             value={gradeDistanceMiles}
                             onChange={e => setGradeDistanceMiles(e.target.value)}
                             placeholder="0"
-                            className="form-input w-16 text-right"
+                            className="form-input form-input w-16 text-right"
                             aria-label="Distance in miles the elevation change is spread over"
                         />
                         <span className="text-sm text-meta">mi</span>

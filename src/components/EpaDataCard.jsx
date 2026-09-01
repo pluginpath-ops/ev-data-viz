@@ -124,7 +124,7 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                         placeholder="Filter by make, carline, ID, vehicle…"
                         value={query}
                         onChange={e => setQuery(e.target.value)}
-                        className="form-input .5 w-64"
+                        className="form-input form-input .5 w-64"
                     />
                     <button
                         onClick={load}
@@ -212,7 +212,7 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                                         e.target.blur();
                                                     }
                                                 }}
-                                                className="form-input mt-1.5 w-full disabled:opacity-50 placeholder:text-[var(--color-text-meta)] placeholder:italic"
+                                                className="form-input form-input mt-1.5 w-full disabled:opacity-50 placeholder:text-[var(--color-text-meta)] placeholder:italic"
                                                 title="Friendly display name used in charts. Leave blank to use the EPA carline name."
                                             />
                                         </td>

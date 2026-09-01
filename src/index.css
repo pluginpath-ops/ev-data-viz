@@ -246,6 +246,36 @@
     background-color: var(--color-warning-hover);
 }
 
+/* Sub-tab — second-level navigation, inside a section.
+   A smaller .btn-tab and nothing else: same shape, same states, one step down.
+   Runs, EPA and Admin sub-tabs all borrowed .btn-chart-mode, which is a CHART
+   control — so navigation inherited a chart's border and background and read as
+   a row of buttons rather than as tabs (#277). */
+.btn-subtab {
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    background: none;
+    border: none;
+}
+/* Tokens throughout, and NO [data-theme="dark"] block. `.btn-tab` has one and
+   .btn-subtab was written by copying it — which grew the very backlog the
+   playground marker exists to shrink, and the test said so. A class built this
+   way follows a themed subtree; one built the old way only follows the
+   document. */
+.btn-subtab:hover {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-primary);
+}
+.btn-subtab.active {
+    background-color: var(--color-primary-light);
+    color: var(--color-primary-text);
+}
+.btn-subtab:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* Tab/Navigation Button - Used for: Top navigation tabs */
 .btn-tab {
     padding: 0.5rem 1rem;
@@ -942,11 +972,11 @@ body {
 /* The "jump to position N" box between the reorder arrows. Sibling of
    .reorder-btn and themed the same way — it was a hardcoded `bg-white`, which
    in dark mode put the light body text on a white box. */
+/* A modifier on .form-input, not a second definition of one. It had its own
+   copy of the surface, border and text colour, which is three chances to drift
+   from the field it is meant to look like. */
 .reorder-position-input {
-    @apply w-10 h-6 text-center text-xs rounded;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-primary);
+    @apply w-10 h-6 text-center px-0;
     appearance: textfield;
 }
 .reorder-position-input::-webkit-inner-spin-button,

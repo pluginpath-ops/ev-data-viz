@@ -421,7 +421,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                                 // reads as if the low-speed splits had gone missing.
                                 xMax: e.target.value === 'launch' ? 5 : null,
                             }))}
-                            className="border p-2 rounded"
+                            className="form-input"
                         >
                             <option value="full">Full run</option>
                             <option value="launch">Launch (0–5 s)</option>
@@ -432,7 +432,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                         <select
                             value={grouping}
                             onChange={e => setGrouping(e.target.value)}
-                            className="border p-2 rounded"
+                            className="form-input"
                         >
                             <option value="mode">Best per drive mode</option>
                             <option value="vehicle">Best per vehicle</option>

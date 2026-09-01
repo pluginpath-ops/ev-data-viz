@@ -154,7 +154,7 @@ function FactorInput({ label, title, value, onChange, onCommit }) {
                 min="0.001"
                 placeholder="1.0"
                 title={title}
-                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-secondary"
+                className="form-input w-20 .5 font-mono text-secondary"
             />
         </label>
     );
@@ -198,7 +198,7 @@ function PairedChargingControl({ run, vehicle, onSet }) {
             <select
                 value={run.paired_charging_run_id ?? ''}
                 onChange={e => onSet(e.target.value || null)}
-                className="form-input"
+                className="form-input form-input"
             >
                 <option value="">Auto{auto ? ` — ${auto.name}` : ''}</option>
                 {chargingRuns.map(r => (
@@ -325,7 +325,7 @@ const DeriveAxisPanel = ({
                             placeholder="Start SoC (%)"
                             value={startSoc}
                             onChange={e => onChangeStartSoc(e.target.value)}
-                            className="form-input w-32"
+                            className="form-input form-input w-32"
                         />
                     )}
 
@@ -339,7 +339,7 @@ const DeriveAxisPanel = ({
                                 type="number" min="0" max="50" step="0.5"
                                 value={chargingLoss}
                                 onChange={e => onChangeChargingLoss(e.target.value)}
-                                className="form-input w-16"
+                                className="form-input form-input w-16"
                             />
                             <span>%</span>
                             <span className="text-meta">reported kW is charger-side; ~5% typical</span>
@@ -385,7 +385,7 @@ const DeriveAxisPanel = ({
                                                     next[i] = { ...next[i], [c.key]: e.target.value };
                                                     onChangeAnchors(next);
                                                 }}
-                                                className="form-input"
+                                                className="form-input form-input"
                                             />
                                         ))}
                                         <button
@@ -1431,7 +1431,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                     return (
                         <button
                             key={t.id}
-                            className={`btn-chart-mode ${subtab === t.id ? 'active' : ''}`}
+                            className={`btn-subtab ${subtab === t.id ? 'active' : ''}`}
                             onClick={() => onSubtabChange(t.id)}
                         >
                             {t.label}
@@ -1515,26 +1515,26 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             placeholder="Name (e.g., Highway Test - Winter 2024)"
                                             value={runMetadata.name}
                                             onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
-                                            className="form-input w-full"
+                                            className="form-input form-input w-full"
                                             required
                                         />
                                         <input
                                             type="date"
                                             value={runMetadata.date}
                                             onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
-                                            className="form-input w-full"
+                                            className="form-input form-input w-full"
                                         />
                                         <input
                                             placeholder="Software Version (e.g., 2024.1.5)"
                                             value={runMetadata.softwareVersion}
                                             onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
-                                            className="form-input w-full"
+                                            className="form-input form-input w-full"
                                         />
                                         <input
                                             placeholder="Notes (e.g., 20°F, highway speeds)"
                                             value={runMetadata.conditions}
                                             onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
-                                            className="form-input w-full"
+                                            className="form-input form-input w-full"
                                         />
                                         {/* Attribution belongs to the test, not to one of its roles.
                                             It used to be two fields inside the role panels — a
@@ -1545,7 +1545,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             placeholder="Source URL (where this test was published)"
                                             value={runMetadata.sourceUrl}
                                             onChange={(e) => setRunMetadata({...runMetadata, sourceUrl: e.target.value})}
-                                            className="form-input w-full"
+                                            className="form-input form-input w-full"
                                         />
 
                                         {/* Charging energy field (create mode) */}
@@ -1558,7 +1558,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     title="Energy measured at charger or vehicle — energy in"
                                                     value={runMetadata.chargeEnergyKwh}
                                                     onChange={(e) => setRunMetadata({...runMetadata, chargeEnergyKwh: e.target.value})}
-                                                    className="form-input w-full"
+                                                    className="form-input form-input w-full"
                                                 />
                                                 <p className="text-xs text-meta mt-1">
                                                     Energy measured at charger or vehicle — <em>energy in</em>
@@ -1575,14 +1575,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         placeholder="Source (e.g., Out of Spec)"
                                                         value={runMetadata.source}
                                                         onChange={(e) => setRunMetadata({...runMetadata, source: e.target.value})}
-                                                        className="form-input col-span-2"
+                                                        className="form-input form-input col-span-2"
                                                     />
                                                     <input
                                                         type="number"
                                                         placeholder="Start SoC (%)"
                                                         value={runMetadata.startSoc}
                                                         onChange={(e) => setRunMetadata({...runMetadata, startSoc: e.target.value})}
-                                                        className="form-input"
+                                                        className="form-input form-input"
                                                         min="0" max="100"
                                                     />
                                                     <input
@@ -1590,7 +1590,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         placeholder="End SoC (%)"
                                                         value={runMetadata.endSoc}
                                                         onChange={(e) => setRunMetadata({...runMetadata, endSoc: e.target.value})}
-                                                        className="form-input"
+                                                        className="form-input form-input"
                                                         min="0" max="100"
                                                     />
                                                     {runMetadata.startSoc !== '' && runMetadata.endSoc !== '' &&
@@ -1604,14 +1604,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         placeholder="Speed (mph)"
                                                         value={runMetadata.speedMph}
                                                         onChange={(e) => setRunMetadata({...runMetadata, speedMph: e.target.value})}
-                                                        className="form-input"
+                                                        className="form-input form-input"
                                                     />
                                                     <input
                                                         type="number"
                                                         placeholder="Distance (miles)"
                                                         value={runMetadata.distanceMiles}
                                                         onChange={(e) => setRunMetadata({...runMetadata, distanceMiles: e.target.value})}
-                                                        className="form-input"
+                                                        className="form-input form-input"
                                                     />
                                                     <input
                                                         type="number"
@@ -1619,19 +1619,19 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         title="Energy consumed on the drive — energy out"
                                                         value={runMetadata.energyKwh}
                                                         onChange={(e) => setRunMetadata({...runMetadata, energyKwh: e.target.value})}
-                                                        className="form-input"
+                                                        className="form-input form-input"
                                                     />
                                                     <input
                                                         type="number"
                                                         placeholder="Ambient temp (°F)"
                                                         value={runMetadata.temperatureF}
                                                         onChange={(e) => setRunMetadata({...runMetadata, temperatureF: e.target.value})}
-                                                        className="form-input"
+                                                        className="form-input form-input"
                                                     />
                                                     <select
                                                         value={runMetadata.speedBasis || ''}
                                                         onChange={(e) => setRunMetadata({...runMetadata, speedBasis: e.target.value})}
-                                                        className="form-input"
+                                                        className="form-input form-input"
                                                         title="Steady: the car was held at this speed. Mixed: this is an average over a varying-speed cycle, so speed correction is skipped — aero energy goes as the mean of v², not the square of the mean."
                                                     >
                                                         <option value="">Speed basis: unknown</option>
@@ -1644,7 +1644,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         title="Elevation the test was run at — drives air density and so aero drag. Not the same as elevation gain."
                                                         value={runMetadata.altitudeFt}
                                                         onChange={(e) => setRunMetadata({...runMetadata, altitudeFt: e.target.value})}
-                                                        className="form-input"
+                                                        className="form-input form-input"
                                                     />
                                                     <input
                                                         type="number"
@@ -1652,14 +1652,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         title="Net climb over the route — drives the potential-energy term. Not the same as test altitude."
                                                         value={runMetadata.elevationGainFt}
                                                         onChange={(e) => setRunMetadata({...runMetadata, elevationGainFt: e.target.value})}
-                                                        className="form-input"
+                                                        className="form-input form-input"
                                                     />
                                                     <input
                                                         type="number"
                                                         placeholder="Avg wind speed (mph)"
                                                         value={runMetadata.windSpeedMph}
                                                         onChange={(e) => setRunMetadata({...runMetadata, windSpeedMph: e.target.value})}
-                                                        className="form-input"
+                                                        className="form-input form-input"
                                                     />
                                                     <input
                                                         type="number"
@@ -1667,7 +1667,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         title="Direction relative to travel: 0° = tailwind, 180° = headwind, 90/270° = crosswind"
                                                         value={runMetadata.windDirectionDeg}
                                                         onChange={(e) => setRunMetadata({...runMetadata, windDirectionDeg: e.target.value})}
-                                                        className="form-input"
+                                                        className="form-input form-input"
                                                         min="0" max="360"
                                                     />
                                                 </div>
@@ -1710,7 +1710,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             placeholder={"soc,chargeRate,time\n50,100,0\n80,75,15\n…"}
                                             value={csvText}
                                             onChange={e => handleCsvTextPaste(e.target.value)}
-                                            className="form-input w-full font-mono resize-y"
+                                            className="form-input form-input w-full font-mono resize-y"
                                         />
                                     </div>
                                 </div>
@@ -1746,26 +1746,26 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             placeholder="Name (e.g., Highway Test - Winter 2024)"
                                             value={runMetadata.name}
                                             onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
-                                            className="form-input w-full"
+                                            className="form-input form-input w-full"
                                             required
                                         />
                                         <input
                                             type="date"
                                             value={runMetadata.date}
                                             onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
-                                            className="form-input w-full"
+                                            className="form-input form-input w-full"
                                         />
                                         <input
                                             placeholder="Software Version (e.g., 2024.1.5)"
                                             value={runMetadata.softwareVersion}
                                             onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
-                                            className="form-input w-full"
+                                            className="form-input form-input w-full"
                                         />
                                         <input
                                             placeholder="Notes (e.g., 20°F, highway speeds)"
                                             value={runMetadata.conditions}
                                             onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
-                                            className="form-input w-full"
+                                            className="form-input form-input w-full"
                                         />
                                     </div>
                                 </div>
@@ -1787,7 +1787,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <select
                                             value={fieldMapping[field] || ''}
                                             onChange={(e) => setFieldMapping({...fieldMapping, [field]: e.target.value})}
-                                            className="form-input flex-1"
+                                            className="form-input form-input flex-1"
                                         >
                                             <option value="">-- Not mapped --</option>
                                             {availableFields.map((f, i) => (
@@ -1832,7 +1832,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         value={selectedRangeTestRunId ?? rangeTestRuns[0]?.id ?? ''}
                                                         onChange={e => setSelectedRangeTestRunId(Number(e.target.value))}
                                                         onClick={e => e.stopPropagation()}
-                                                        className="mt-1 border p-1 rounded text-xs w-full max-w-xs"
+                                                        className="form-input mt-1 p-1 w-full max-w-xs"
                                                     >
                                                         {rangeTestRuns.map(r => {
                                                             const hasSoc = r.start_soc != null && r.end_soc != null;
@@ -1986,25 +1986,25 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         placeholder="Name"
                                         value={editFormData.name}
                                         onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
-                                        className="form-input w-full"
+                                        className="form-input form-input w-full"
                                     />
                                     <input
                                         type="date"
                                         value={editFormData.date}
                                         onChange={(e) => setEditFormData({...editFormData, date: e.target.value})}
-                                        className="form-input w-full"
+                                        className="form-input form-input w-full"
                                     />
                                     <input
                                         placeholder="Software Version"
                                         value={editFormData.softwareVersion}
                                         onChange={(e) => setEditFormData({...editFormData, softwareVersion: e.target.value})}
-                                        className="form-input w-full"
+                                        className="form-input form-input w-full"
                                     />
                                     <input
                                         placeholder="Notes"
                                         value={editFormData.conditions}
                                         onChange={(e) => setEditFormData({...editFormData, conditions: e.target.value})}
-                                        className="form-input w-full"
+                                        className="form-input form-input w-full"
                                     />
                                     {/* One field for both roles since migration 052 — see the
                                         matching note on the create form. */}
@@ -2013,7 +2013,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         placeholder="Source URL (where this test was published)"
                                         value={editFormData.sourceUrl ?? ''}
                                         onChange={(e) => setEditFormData({...editFormData, sourceUrl: e.target.value})}
-                                        className="form-input w-full"
+                                        className="form-input form-input w-full"
                                     />
                                     {/* Range test fields */}
                                     {(editFormData.dataFlags || ['charging']).includes('range') && (
@@ -2024,14 +2024,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     placeholder="Source (e.g., Out of Spec)"
                                                     value={editFormData.source}
                                                     onChange={(e) => setEditFormData({...editFormData, source: e.target.value})}
-                                                    className="form-input col-span-2"
+                                                    className="form-input form-input col-span-2"
                                                 />
                                                 <input
                                                     type="number"
                                                     placeholder="Start SoC (%)"
                                                     value={editFormData.startSoc}
                                                     onChange={(e) => setEditFormData({...editFormData, startSoc: e.target.value})}
-                                                    className="form-input"
+                                                    className="form-input form-input"
                                                     min="0" max="100"
                                                 />
                                                 <input
@@ -2039,7 +2039,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     placeholder="End SoC (%)"
                                                     value={editFormData.endSoc}
                                                     onChange={(e) => setEditFormData({...editFormData, endSoc: e.target.value})}
-                                                    className="form-input"
+                                                    className="form-input form-input"
                                                     min="0" max="100"
                                                 />
                                                 {editFormData.startSoc !== '' && editFormData.endSoc !== '' &&
@@ -2053,14 +2053,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     placeholder="Speed (mph)"
                                                     value={editFormData.speedMph}
                                                     onChange={(e) => setEditFormData({...editFormData, speedMph: e.target.value})}
-                                                    className="form-input"
+                                                    className="form-input form-input"
                                                 />
                                                 <input
                                                     type="number"
                                                     placeholder="Distance (miles)"
                                                     value={editFormData.distanceMiles}
                                                     onChange={(e) => setEditFormData({...editFormData, distanceMiles: e.target.value})}
-                                                    className="form-input"
+                                                    className="form-input form-input"
                                                 />
                                                 <input
                                                     type="number"
@@ -2068,19 +2068,19 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     title="Energy consumed on the drive — energy out"
                                                     value={editFormData.energyKwh}
                                                     onChange={(e) => setEditFormData({...editFormData, energyKwh: e.target.value})}
-                                                    className="form-input"
+                                                    className="form-input form-input"
                                                 />
                                                 <input
                                                     type="number"
                                                     placeholder="Ambient temp (°F)"
                                                     value={editFormData.temperatureF}
                                                     onChange={(e) => setEditFormData({...editFormData, temperatureF: e.target.value})}
-                                                    className="form-input"
+                                                    className="form-input form-input"
                                                 />
                                                 <select
                                                     value={editFormData.speedBasis || ''}
                                                     onChange={(e) => setEditFormData({...editFormData, speedBasis: e.target.value})}
-                                                    className="form-input"
+                                                    className="form-input form-input"
                                                     title="Steady: the car was held at this speed. Mixed: this is an average over a varying-speed cycle, so speed correction is skipped — aero energy goes as the mean of v², not the square of the mean."
                                                 >
                                                     <option value="">Speed basis: unknown</option>
@@ -2093,7 +2093,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     title="Elevation the test was run at — drives air density and so aero drag. Not the same as elevation gain."
                                                     value={editFormData.altitudeFt}
                                                     onChange={(e) => setEditFormData({...editFormData, altitudeFt: e.target.value})}
-                                                    className="form-input"
+                                                    className="form-input form-input"
                                                 />
                                                 <input
                                                     type="number"
@@ -2101,14 +2101,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     title="Net climb over the route — drives the potential-energy term. Not the same as test altitude."
                                                     value={editFormData.elevationGainFt}
                                                     onChange={(e) => setEditFormData({...editFormData, elevationGainFt: e.target.value})}
-                                                    className="form-input"
+                                                    className="form-input form-input"
                                                 />
                                                 <input
                                                     type="number"
                                                     placeholder="Avg wind speed (mph)"
                                                     value={editFormData.windSpeedMph}
                                                     onChange={(e) => setEditFormData({...editFormData, windSpeedMph: e.target.value})}
-                                                    className="form-input"
+                                                    className="form-input form-input"
                                                 />
                                                 <input
                                                     type="number"
@@ -2116,7 +2116,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     title="Direction relative to travel: 0° = tailwind, 180° = headwind, 90/270° = crosswind"
                                                     value={editFormData.windDirectionDeg}
                                                     onChange={(e) => setEditFormData({...editFormData, windDirectionDeg: e.target.value})}
-                                                    className="form-input"
+                                                    className="form-input form-input"
                                                     min="0" max="360"
                                                 />
                                             </div>
@@ -2132,7 +2132,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 placeholder="Energy added (kWh)"
                                                 value={editFormData.chargeEnergyKwh}
                                                 onChange={(e) => setEditFormData({...editFormData, chargeEnergyKwh: e.target.value})}
-                                                className="form-input w-full"
+                                                className="form-input form-input w-full"
                                             />
                                             <p className="text-xs text-meta mt-1">
                                                 Energy measured at charger or vehicle — <em>energy in</em> (not equal to energy used driving due to charging losses)
@@ -2386,7 +2386,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                                     value={row[field] ?? ''}
                                                                                     onChange={e => handleEditDataCell(i, field, e.target.value)}
                                                                                     placeholder="—"
-                                                                                    className="data-cell-input"
+                                                                                    className="form-input data-cell-input"
                                                                                 />
                                                                             </td>
                                                                         ))}
@@ -2566,7 +2566,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 value={run.color || '#3b82f6'}
                                                 onChange={e => onUpdateRun(run.id, { color: e.target.value })}
                                                 onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRun(run.id, { color: run.color || '#3b82f6' }); }}
-                                                className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-secondary"
+                                                className="form-input w-20 .5 font-mono text-secondary"
                                                 placeholder="#3b82f6"
                                                 maxLength={7}
                                             />
@@ -2752,7 +2752,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             value={runColor}
                                                             onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
                                                             onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) updateRunColor(vehicle.id, run.id, runColor); }}
-                                                            className="w-20 px-1.5 py-0.5 border rounded text-xs font-mono text-secondary"
+                                                            className="form-input w-20 .5 font-mono text-secondary"
                                                             placeholder="#9ca3af"
                                                             maxLength={7}
                                                         />
@@ -2873,7 +2873,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <select
                                         value={newLinkSourceId}
                                         onChange={e => { setNewLinkSourceId(e.target.value); setNewLinkEfficiency(''); setNewLinkCapacity(''); setNewLinkRunIds(null); setNewLinkKind('all'); }}
-                                        className="form-input flex-1 min-w-48"
+                                        className="form-input form-input flex-1 min-w-48"
                                     >
                                         <option value="">Source vehicle…</option>
                                         {sourceVehicles.map(v => (
@@ -2959,7 +2959,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         onChange={e => setNewLinkCapacity(e.target.value)}
                                         step="0.001"
                                         min="0.001"
-                                        className="form-input w-44"
+                                        className="form-input form-input w-44"
                                         title={runsToLink.some(r => runKindFrom(r) === 'charging')
                                             ? `${CAPACITY_HELP} ${CHARGING_SCALE_WARNING}`
                                             : CAPACITY_HELP}
@@ -2982,7 +2982,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         onChange={e => setNewLinkEfficiency(e.target.value)}
                                         step="0.001"
                                         min="0.001"
-                                        className="form-input w-44"
+                                        className="form-input form-input w-44"
                                         title={EFFICIENCY_HELP}
                                     />
                                     <button
@@ -2999,7 +2999,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         placeholder="Notes (optional)"
                                         value={newLinkNotes}
                                         onChange={e => setNewLinkNotes(e.target.value)}
-                                        className="form-input flex-1 min-w-40"
+                                        className="form-input form-input flex-1 min-w-40"
                                     />
                                     <button
                                         type="button"
@@ -3101,7 +3101,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             <select
                                 value={copyingToVehicleId}
                                 onChange={e => setCopyingToVehicleId(e.target.value)}
-                                className="form-input w-full"
+                                className="form-input form-input w-full"
                             >
                                 <option value="" disabled>Choose a vehicle…</option>
                                 {copyTargetVehicles.map(v => (

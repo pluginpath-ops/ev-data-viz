@@ -33,7 +33,7 @@ function MergeControl({ brand, brands, onMerge, busy }) {
         return (
             <div className="brand-merge">
                 <select
-                    className="brand-select"
+                    className="form-input brand-select"
                     value={target}
                     onChange={e => setTarget(e.target.value)}
                     aria-label={`Merge ${brand.name} into`}
@@ -95,9 +95,9 @@ function BrandRow({ brand, brands, usage, aliases, parents, onSave, onMerge, onD
     return (
         <div className="brand-row">
             <div className="brand-row-main">
-                <input className="brand-input" value={name} onChange={e => setName(e.target.value)} aria-label="Brand name" />
+                <input className="form-input brand-input" value={name} onChange={e => setName(e.target.value)} aria-label="Brand name" />
                 <input
-                    className="brand-input"
+                    className="form-input brand-input"
                     value={parent}
                     onChange={e => setParent(e.target.value)}
                     placeholder="Corporate parent"
@@ -153,7 +153,7 @@ function BrandRow({ brand, brands, usage, aliases, parents, onSave, onMerge, onD
                     ))}
                     <div className="brand-alias-add">
                         <input
-                            className="brand-input"
+                            className="form-input brand-input"
                             value={newAlias}
                             onChange={e => setNewAlias(e.target.value)}
                             placeholder="Add a spelling"
@@ -282,7 +282,7 @@ export default function BrandRegistry() {
                                     </div>
                                 </div>
                                 <select
-                                    className="brand-select"
+                                    className="form-input brand-select"
                                     defaultValue=""
                                     disabled={busy}
                                     aria-label={`Map ${d.division} to a brand`}
@@ -332,7 +332,7 @@ function NewBrandFromDivision({ division, onCreate, onCancel, busy }) {
     const [name, setName] = useState(division);
     return (
         <div className="brand-merge">
-            <input className="brand-input" value={name} onChange={e => setName(e.target.value)}
+            <input className="form-input brand-input" value={name} onChange={e => setName(e.target.value)}
                 aria-label="New brand name" />
             <button className="btn btn-primary" disabled={busy || !name.trim()}
                 onClick={() => onCreate(name.trim())}>Create</button>

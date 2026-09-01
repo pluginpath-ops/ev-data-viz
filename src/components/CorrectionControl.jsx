@@ -22,7 +22,7 @@ export default function CorrectionControl({ mode = 'none', setChartConfig }) {
             <select
                 value={mode}
                 onChange={e => setChartConfig(prev => ({ ...prev, correctionMode: e.target.value }))}
-                className="form-input"
+                className="form-input form-input"
             >
                 {CORRECTION_MODES.map(m => (
                     <option key={m.key} value={m.key}>{m.label}</option>

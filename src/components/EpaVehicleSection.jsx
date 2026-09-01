@@ -200,7 +200,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                             onChange={e => setDraftName(e.target.value)}
                             onBlur={handleNameSave}
                             onKeyDown={handleNameKeyDown}
-                            className="form-input font-semibold w-full disabled:opacity-50 placeholder:text-[var(--color-text-meta)] placeholder:font-normal placeholder:italic"
+                            className="form-input form-input font-semibold w-full disabled:opacity-50 placeholder:text-[var(--color-text-meta)] placeholder:font-normal placeholder:italic"
                             title="Friendly display name used in charts. Leave blank to use the EPA carline name."
                         />
                     ) : (
@@ -467,7 +467,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                             onFocus={() => query && setShowDropdown(true)}
                             onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
                             disabled={linking}
-                            className="form-input w-full"
+                            className="form-input form-input w-full"
                         />
                         {linking && (
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-meta">Linking…</span>
@@ -547,7 +547,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                         value={createDraft.test_group_id}
                                         onChange={e => setCreateDraft(d => ({ ...d, test_group_id: e.target.value }))}
                                         placeholder="e.g. SRIVT00.0R2A"
-                                        className="form-input w-full mt-0.5"
+                                        className="form-input form-input w-full mt-0.5"
                                     />
                                 </label>
                                 <label className="text-xs">
@@ -556,7 +556,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                         type="number"
                                         value={createDraft.model_year}
                                         onChange={e => setCreateDraft(d => ({ ...d, model_year: e.target.value }))}
-                                        className="form-input w-full mt-0.5"
+                                        className="form-input form-input w-full mt-0.5"
                                     />
                                 </label>
                                 <label className="text-xs">
@@ -566,7 +566,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                         value={createDraft.make}
                                         onChange={e => setCreateDraft(d => ({ ...d, make: e.target.value }))}
                                         placeholder="e.g. Rivian"
-                                        className="form-input w-full mt-0.5"
+                                        className="form-input form-input w-full mt-0.5"
                                     />
                                 </label>
                                 <label className="text-xs">
@@ -576,7 +576,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                         value={createDraft.epa_carline_name}
                                         onChange={e => setCreateDraft(d => ({ ...d, epa_carline_name: e.target.value }))}
                                         placeholder="e.g. R2"
-                                        className="form-input w-full mt-0.5"
+                                        className="form-input form-input w-full mt-0.5"
                                     />
                                 </label>
                             </div>

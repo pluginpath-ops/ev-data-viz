@@ -243,7 +243,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
 
             {asking && (
                 <div className="sweep-skip-ask">
-                    <input className="brand-input" value={note} onChange={e => setNote(e.target.value)}
+                    <input className="form-input brand-input" value={note} onChange={e => setNote(e.target.value)}
                         placeholder="Why is there nothing to link? (optional)" />
                     <button className="btn btn-warning" disabled={busy}
                         onClick={async () => { await onSkip(g.test_group_id, note.trim() || null); setAsking(false); }}>

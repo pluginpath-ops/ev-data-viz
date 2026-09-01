@@ -83,7 +83,7 @@ export default function CuratorField({
                         onChange={e => setDraft(e.target.value)}
                         onBlur={commit}
                         onKeyDown={onKeyDown}
-                        className="form-input .5 w-28 text-right font-mono disabled:opacity-50"
+                        className="form-input form-input .5 w-28 text-right font-mono disabled:opacity-50"
                     />
                 ) : (
                     <span className="font-mono text-xs text-right w-28">{value ?? '—'}</span>

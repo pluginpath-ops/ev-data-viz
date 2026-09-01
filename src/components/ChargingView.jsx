@@ -729,7 +729,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         <select
                             value={chartConfig.xAxis}
                             onChange={(e) => setChartConfig({ ...chartConfig, xAxis: e.target.value })}
-                            className="axis-select"
+                            className="form-input axis-select"
                         >
                             {axisOptions.map(opt => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -741,7 +741,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         <select
                             value={chartConfig.yAxis}
                             onChange={(e) => setChartConfig({ ...chartConfig, yAxis: e.target.value })}
-                            className="axis-select"
+                            className="form-input axis-select"
                         >
                             {axisOptions.map(opt => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -753,7 +753,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         <select
                             value={chartConfig.y2Axis ?? ''}
                             onChange={(e) => setChartConfig({ ...chartConfig, y2Axis: e.target.value || null })}
-                            className="axis-select"
+                            className="form-input axis-select"
                         >
                             <option value="">— None —</option>
                             {axisOptions.map(opt => (
@@ -784,7 +784,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                     raceThreshold: e.target.value === '' ? null : clampSoc(e.target.value, commonSoc ?? 10),
                                 })}
                                 disabled={chartConfig.alignRaw}
-                                className="soc-input disabled:opacity-50"
+                                className="form-input soc-input disabled:opacity-50"
                             />
                             <span className="text-sm text-secondary">% SoC</span>
                         </span>

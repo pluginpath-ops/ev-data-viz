@@ -104,7 +104,10 @@ export const SECTIONS = [
             { cls: 'btn btn-danger',    as: 'button', label: 'Danger',    note: 'Destructive. Delete, Remove.' },
             { cls: 'btn-tab',        as: 'button', label: 'Nav tab',   note: 'Top-level navigation. Add `.active` for the current one.' },
             { cls: 'btn-tab active', as: 'button', label: 'Nav tab · active' },
-            { cls: 'btn-chart-mode',        as: 'button', label: 'Chart mode',   note: 'Chart sub-tab selector.' },
+            { cls: 'btn-subtab',        as: 'button', label: 'Sub-tab',
+              note: 'Second-level navigation, inside a section. A smaller .btn-tab — Runs, EPA and Admin all used to borrow .btn-chart-mode for this, so navigation wore a chart control\'s border.' },
+            { cls: 'btn-subtab active', as: 'button', label: 'Sub-tab · active' },
+            { cls: 'btn-chart-mode',        as: 'button', label: 'Chart mode',   note: 'Selects what a chart plots — a control, not navigation.' },
             { cls: 'btn-chart-mode active', as: 'button', label: 'Chart mode · active' },
         ],
     },
@@ -148,18 +151,17 @@ export const SECTIONS = [
     {
         id: 'forms',
         title: 'Form controls',
-        blurb: 'One base class, and no size modifier — which is why call sites re-specify '
-             + 'padding and text size ~100 times. The sizes below are what they write, '
-             + 'not what the class provides.',
+        blurb: '.form-input carries its own size, and every text control on the site now '
+             + 'uses it — 148 of them had no styling at all and were rendering as browser '
+             + 'defaults. Width and alignment stay per-field; nothing else does (#277).',
         specimens: [
-            { cls: 'form-input',                as: 'input', label: 'form-input',            note: 'The base. p-2.' },
-            { cls: 'form-input py-1',           as: 'input', label: '+ py-1',                note: '34 call sites.' },
-            { cls: 'form-input py-0.5 text-xs', as: 'input', label: '+ py-0.5 text-xs',      note: '21 call sites.' },
-            { cls: 'form-input text-sm py-1',   as: 'input', label: '+ text-sm py-1',        note: 'The tidy one — the size to standardise on.' },
+            { cls: 'form-input',  as: 'input', label: 'form-input', note: 'The one field style. px-2 py-1, text-sm.' },
             { cls: 'form-input',  as: 'select', label: 'select' },
             { cls: 'form-input',  as: 'textarea', label: 'textarea' },
-            { cls: 'data-cell-input', as: 'input', label: 'Data cell', note: 'Transparent until hover/focus. Hover it.' },
-            { cls: 'reorder-position-input', as: 'input', label: 'Reorder position' },
+            { cls: 'data-cell-input', as: 'input', label: 'Data cell',
+              note: 'The one field that is NOT .form-input, deliberately: it is transparent until hover or focus, because a hundred-row grid of bordered boxes is a wall. Hover it.' },
+            { cls: 'form-input reorder-position-input', as: 'input', label: 'Reorder position',
+              note: 'A modifier ON .form-input now — it only sets width, height and centring. It used to restate the surface, border and text colour, which is three chances to drift from the field it imitates.' },
         ],
     },
     {

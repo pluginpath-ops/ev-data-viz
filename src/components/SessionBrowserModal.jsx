@@ -62,7 +62,7 @@ export default function SessionBrowserModal({
                         value={query}
                         onChange={e => setQuery(e.target.value)}
                         placeholder="e.g. oos r1s"
-                        className="form-input w-full"
+                        className="form-input form-input w-full"
                     />
                 </div>
 

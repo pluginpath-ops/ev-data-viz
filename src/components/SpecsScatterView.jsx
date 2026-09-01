@@ -265,7 +265,7 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
             <div className="specs-chart-controls">
                 <label className="text-sm font-medium text-secondary">X-Axis:</label>
                 <select
-                    className="specs-chart-field-select"
+                    className="form-input specs-chart-field-select"
                     value={xField}
                     onChange={e => setFields(e.target.value, yField)}
                 >
@@ -280,7 +280,7 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
 
                 <label className="text-sm font-medium text-secondary ml-3">Y-Axis:</label>
                 <select
-                    className="specs-chart-field-select"
+                    className="form-input specs-chart-field-select"
                     value={yField}
                     onChange={e => setFields(xField, e.target.value)}
                 >

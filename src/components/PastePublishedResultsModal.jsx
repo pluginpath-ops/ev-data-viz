@@ -108,7 +108,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                     placeholder={PLACEHOLDER}
                     rows={9}
                     autoFocus
-                    className="form-input w-full font-mono"
+                    className="form-input form-input w-full font-mono"
                 />
 
                 {parsed && (
@@ -267,7 +267,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                             type="text" value={sourceName}
                             onChange={e => setSourceName(e.target.value)}
                             placeholder="e.g. Car and Driver"
-                            className="form-input w-44"
+                            className="form-input form-input w-44"
                         />
                     </label>
                     <label className="text-xs">
@@ -276,7 +276,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                             type="text" value={trimLabel}
                             onChange={e => setTrimLabel(e.target.value)}
                             placeholder="e.g. Dual Standard LFP"
-                            className="form-input w-44"
+                            className="form-input form-input w-44"
                         />
                     </label>
                     <label className="text-xs flex-1 min-w-[12rem]">
@@ -285,7 +285,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                             type="url" value={sourceUrl}
                             onChange={e => setSourceUrl(e.target.value)}
                             placeholder="https://…"
-                            className="form-input w-full"
+                            className="form-input form-input w-full"
                         />
                     </label>
                 </div>

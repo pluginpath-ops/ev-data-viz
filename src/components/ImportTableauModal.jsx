@@ -229,7 +229,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                     value={globalPrefix}
                                     onChange={e => setGlobalPrefix(e.target.value)}
                                     placeholder="e.g. 2026 Batch — (optional)"
-                                    className="form-input flex-1"
+                                    className="form-input form-input flex-1"
                                 />
                             </div>
 
@@ -273,7 +273,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                                 value={mappedId}
                                                 onChange={e => handleMapChange(raw, e.target.value)}
                                                 disabled={skipped}
-                                                className="border rounded p-1 text-sm max-w-[200px]"
+                                                className="form-input p-1 max-w-[200px]"
                                             >
                                                 <option value="">✦ Create new vehicle</option>
                                                 {vehicles.map(v => (
@@ -293,7 +293,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                                             type="text"
                                                             value={sessionNames[idx] ?? ''}
                                                             onChange={e => handleNameChange(idx, e.target.value)}
-                                                            className="form-input flex-1"
+                                                            className="form-input form-input flex-1"
                                                         />
                                                         <span className="text-xs text-meta whitespace-nowrap flex-shrink-0">
                                                             {date}

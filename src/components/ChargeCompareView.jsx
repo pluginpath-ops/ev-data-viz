@@ -781,7 +781,7 @@ export default function ChargeCompareView({
                             min={1}
                             max={80}
                             onChange={e => setStartSoc(Math.min(80, Math.max(1, Number(e.target.value))))}
-                            className="w-20 px-2 py-1 border rounded text-sm"
+                            className="form-input w-20"
                         />
                     </label>
                     <label className="flex items-center gap-2 text-sm font-medium text-secondary">
@@ -792,7 +792,7 @@ export default function ChargeCompareView({
                             min={1}
                             max={120}
                             onChange={e => setXMinutes(Math.max(1, Number(e.target.value)))}
-                            className="w-20 px-2 py-1 border rounded text-sm"
+                            className="form-input w-20"
                         />
                     </label>
                     <label className="flex items-center gap-2 text-sm font-medium text-secondary">
@@ -806,7 +806,7 @@ export default function ChargeCompareView({
                                 const v = Math.max(1, Number(e.target.value));
                                 setMMiles(units === 'metric' ? Math.round(v / MI_TO_KM) : v);
                             }}
-                            className="w-20 px-2 py-1 border rounded text-sm"
+                            className="form-input w-20"
                         />
                     </label>
                     <div className="flex items-center gap-1 ml-auto">

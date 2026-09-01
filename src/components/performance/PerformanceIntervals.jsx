@@ -141,7 +141,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                                     to_speed: e.target.value === 'accel' ? d.to_speed : '0',
                                     from_speed: e.target.value === 'accel' ? '0' : d.from_speed,
                                 }))}
-                                className="form-input w-24 mt-0.5"
+                                className="form-input form-input w-24 mt-0.5"
                             >
                                 <option value="braking">Braking</option>
                                 <option value="passing">Passing</option>
@@ -153,7 +153,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                             <input
                                 type="number" value={draft.from_speed} autoFocus
                                 onChange={e => setDraft(d => ({ ...d, from_speed: e.target.value }))}
-                                className="form-input w-16 mt-0.5 font-mono"
+                                className="form-input form-input w-16 mt-0.5 font-mono"
                             />
                         </label>
                         <label className="text-[11px]">
@@ -161,7 +161,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                             <input
                                 type="number" value={draft.to_speed}
                                 onChange={e => setDraft(d => ({ ...d, to_speed: e.target.value }))}
-                                className="form-input w-16 mt-0.5 font-mono"
+                                className="form-input form-input w-16 mt-0.5 font-mono"
                             />
                         </label>
                         <label className="text-[11px]">
@@ -169,7 +169,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                             <select
                                 value={draft.speed_unit}
                                 onChange={e => setDraft(d => ({ ...d, speed_unit: e.target.value }))}
-                                className="form-input w-20 mt-0.5"
+                                className="form-input form-input w-20 mt-0.5"
                             >
                                 <option value="mph">mph</option>
                                 <option value="kph">km/h</option>
@@ -183,7 +183,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                                     <input
                                         type="number" step="0.1" value={draft.distance}
                                         onChange={e => setDraft(d => ({ ...d, distance: e.target.value }))}
-                                        className="form-input w-20 mt-0.5 font-mono"
+                                        className="form-input form-input w-20 mt-0.5 font-mono"
                                     />
                                 </label>
                                 <label className="text-[11px]">
@@ -191,7 +191,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                                     <select
                                         value={draft.distance_unit}
                                         onChange={e => setDraft(d => ({ ...d, distance_unit: e.target.value }))}
-                                        className="form-input w-16 mt-0.5"
+                                        className="form-input form-input w-16 mt-0.5"
                                     >
                                         <option value="ft">ft</option>
                                         <option value="m">m</option>
@@ -204,7 +204,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                                 <input
                                     type="number" step="0.001" value={draft.elapsed_s}
                                     onChange={e => setDraft(d => ({ ...d, elapsed_s: e.target.value }))}
-                                    className="form-input w-20 mt-0.5 font-mono"
+                                    className="form-input form-input w-20 mt-0.5 font-mono"
                                 />
                             </label>
                         )}

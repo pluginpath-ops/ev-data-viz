@@ -293,7 +293,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                                 value={query}
                                 onChange={e => setQuery(e.target.value)}
                                 placeholder="Filter by carline…"
-                                className="form-input w-full mb-2"
+                                className="form-input form-input w-full mb-2"
                             />
                             <div className="fe-candidate-list">
                                 {rest.map(c => (
