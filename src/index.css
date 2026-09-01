@@ -4,7 +4,14 @@
 @variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* ── Color Tokens ─────────────────────────────────────────────────────────── */
-:root {
+
+/* `:root` AND `[data-theme="light"]`, so the light palette can be re-declared on
+   a SUBTREE rather than only on the document. The dark block below is already an
+   attribute selector and scopes naturally; without this the light one did not,
+   and a light-themed panel inside a dark page silently inherited dark values.
+   That is what lets the playground show both themes side by side — and it costs
+   one selector rather than a duplicated palette. */
+:root, [data-theme="light"] {
     /* Primary color (main actions: Add, Save, View) */
     --color-primary: rgb(59, 130, 246);
     --color-primary-hover: rgb(37, 99, 235);
@@ -3104,3 +3111,87 @@ body {
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
+
+/* ── Playground ──────────────────────────────────────────────────────────────
+   The catalogue page. Its own chrome is deliberately plain — anything eye-
+   catching here competes with the specimens, which are the content. */
+
+.pg-root { @apply flex flex-col gap-8; }
+
+.pg-intro { @apply flex flex-col gap-2 items-start; }
+
+.pg-section { @apply flex flex-col gap-2; }
+.pg-blurb { @apply max-w-3xl; }
+
+/* A grid rather than a flex wrap: equal columns put the same control at the
+   same x-position in every row, which is what makes a size difference between
+   two specimens visible instead of merely present. */
+.pg-specimens {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+}
+
+.pg-specimen {
+    @apply flex flex-col gap-1.5 rounded p-2;
+    background-color: var(--color-surface-muted);
+    border: 1px solid var(--color-border);
+}
+/* Fixed height so a tall control does not shunt its neighbours out of line. */
+.pg-specimen-stage { @apply flex items-center min-h-9; }
+.pg-specimen-meta  { @apply flex flex-wrap items-center gap-x-2 gap-y-1; }
+
+.pg-specimen-cls {
+    @apply text-[11px] font-mono;
+    color: var(--color-text-muted);
+}
+.pg-specimen-note {
+    @apply text-[11px] basis-full;
+    color: var(--color-text-faint);
+}
+
+/* The measured ratio. Green and red here are a VERDICT on a number, not decor,
+   which is why they are the only saturated colours on the page. */
+.pg-ratio {
+    @apply text-[10px] font-mono font-bold rounded px-1 py-0.5;
+}
+.pg-ratio.is-pass {
+    background-color: var(--color-success-surface);
+    color: var(--color-success-text);
+}
+.pg-ratio.is-fail {
+    background-color: var(--color-danger-surface);
+    color: var(--color-danger-text);
+}
+
+/* Both themes at once. Each pane re-declares the palette on itself, so the
+   specimens inside are drawn by the real tokens rather than an imitation. */
+.pg-split { @apply grid gap-3; grid-template-columns: 1fr 1fr; }
+.pg-split-pane {
+    @apply rounded p-3;
+    background-color: var(--color-background);
+    border: 1px solid var(--color-border);
+}
+.pg-split-label {
+    @apply text-[10px] uppercase tracking-wide font-bold mb-2;
+    color: var(--color-text-faint);
+}
+/* One column below the width where two panes stop being comparable. */
+@media (max-width: 60rem) {
+    .pg-split { grid-template-columns: 1fr; }
+}
+
+.pg-token-grid {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+}
+.pg-token-card {
+    @apply flex flex-col gap-2 rounded-lg p-3;
+    border: 1px solid;
+}
+.pg-token-name { @apply text-xs font-bold uppercase tracking-wide; }
+.pg-token-swatches { @apply flex gap-1.5; }
+.pg-token-swatch {
+    @apply w-7 h-7 rounded;
+    border: 1px solid var(--color-border);
+}
+.pg-token-sample { @apply text-sm; }
