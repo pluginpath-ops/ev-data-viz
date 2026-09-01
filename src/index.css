@@ -145,16 +145,6 @@
 [data-theme="dark"] .btn-tab.active {
     color: var(--color-primary-text);
 }
-[data-theme="dark"] .btn-chart-mode {
-    color: rgb(226, 232, 240); /* slate-200 */
-}
-[data-theme="dark"] .btn-chart-mode:hover {
-    color: rgb(255, 255, 255);
-    background-color: rgba(255, 255, 255, 0.08);
-}
-[data-theme="dark"] .btn-chart-mode.active {
-    color: var(--color-primary-text);
-}
 
 
 /* ── Base Button Styles ───────────────────────────────────────────────────── */
@@ -246,6 +236,49 @@
     background-color: var(--color-warning-hover);
 }
 
+/* A button that shows an on/off state — currently "Set Default" on a test.
+   Quiet when off so it does not compete with Edit and Delete beside it, and
+   marked with the primary surface when on.
+
+   It used to be `text-sm px-2 py-1 rounded` with the state as raw
+   `bg-blue-100 text-blue-700 border-blue-200`. Two things were wrong with that:
+   the metrics were its own, so it sat at a 4px radius beside 6px buttons, and
+   the palette was a pale saturated blue that read as a sticker rather than as a
+   control. Both are the system's job now. */
+.btn-toggle {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--color-text-secondary);
+}
+.btn-toggle:hover:not(:disabled) {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-primary);
+}
+.btn-toggle.active {
+    background-color: var(--color-primary-surface);
+    border-color: var(--color-primary-border);
+    color: var(--color-primary-text);
+}
+/* Clearing is the action when it is already on, so the hover says so. */
+.btn-toggle.active:hover:not(:disabled) {
+    background-color: var(--color-danger-surface);
+    border-color: var(--color-danger-border);
+    color: var(--color-danger-text);
+}
+/* The clear affordance. Inherits the button's colour rather than shouting in
+   its own red — it was `text-red-500 font-bold`, which is what made the whole
+   control look cartoonish. */
+.btn-toggle-clear { opacity: 0.7; }
+
+/* The undo state of a queued delete — warning, not danger: nothing has been
+   destroyed yet and the click restores. Was raw bg-orange-100/700. */
+.btn-restore {
+    background-color: var(--color-warning-surface);
+    border: 1px solid var(--color-warning-border);
+    color: var(--color-warning-text);
+}
+.btn-restore:hover { background-color: var(--color-warning-border); }
+
 /* Sub-tab — second-level navigation, inside a section.
    A smaller .btn-tab and nothing else: same shape, same states, one step down.
    Runs, EPA and Admin sub-tabs all borrowed .btn-chart-mode, which is a CHART
@@ -271,7 +304,8 @@
     color: var(--color-text-primary);
 }
 .btn-subtab.active {
-    background-color: var(--color-primary-light);
+    background-color: var(--color-primary-surface);
+    border-color: var(--color-primary-border);
     color: var(--color-primary-text);
 }
 .btn-subtab:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -298,30 +332,6 @@
 }
 
 /* Chart mode sub-nav — slightly smaller than .btn-tab */
-.btn-chart-mode {
-    padding: 0.3rem 0.75rem;
-    border-radius: 0.375rem;
-    font-weight: 500;
-    font-size: 0.8125rem;
-    cursor: pointer;
-    color: var(--color-text-secondary);
-    background-color: transparent;
-}
-/* A resting background and border, so it reads as a control rather than a line
-   of text. It had neither and only announced itself on hover — which is no
-   announcement at all on a touch screen. */
-.btn-chart-mode {
-    background-color: var(--color-surface-muted);
-    border: 1px solid var(--color-border);
-}
-.btn-chart-mode:hover {
-    background-color: var(--color-surface-sunken);
-}
-.btn-chart-mode.active {
-    background-color: var(--color-primary-light);
-    color: var(--color-primary-text);
-}
-
 /* Admin sub-tab nav (Roles / EPA Data / Model Constants / Interface) */
 .admin-subtabs {
     display: flex;
@@ -930,14 +940,37 @@ body {
 }
 
 /* Quad-state tag filter buttons (N/A → OR → AND → NOT) */
-.tag-filter-na {
+/* ── One chip ────────────────────────────────────────────────────────────────
+   Every chip-shaped control shares these metrics. They were four sizes doing
+   one job: the EPA filter at text-xs/py-0.5 and the Vehicles tag filter at
+   text-sm/py-1, with path, brand-alias and fe-picker each guessing again. The
+   smallest was the right one, so it won (#277).
+
+   Colour stays per-class below — what a chip MEANS still differs.
+
+   POSITION MATTERS: this must precede every per-chip colour rule. It sets
+   `border: 1px solid transparent`, and while it sat further down the file that
+   shorthand overrode .tag-filter-na's border-color — so the Vehicles filter
+   pills lost their border while the EPA ones, defined later still, kept theirs.
+   Same classes, same intent, different outcome, decided by line number. */
+.guide-chip,
+.tag-filter-btn,
+.path-chip,
+.brand-alias-chip,
+.fe-picker-badge {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs
+           font-medium transition-colors cursor-pointer;
+    /* The neutral appearance too, not just the metrics. The Vehicles pill and
+       the EPA pill each declared their own and landed in different places: the
+       EPA one had a dark-mode override giving near-white text, the Vehicles one
+       took --color-text-secondary and read dimmer beside it. The brighter of
+       the two won — a filter you can toggle should be legible (#277). */
     background-color: var(--color-surface-sunken);
-    color: var(--color-text-secondary);
-    border-color: var(--color-border);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
 }
-.tag-filter-na:hover {
-    background-color: var(--color-border);
-}
+
+
 .tag-filter-or   { @apply bg-green-500 text-white border-green-500 hover:bg-green-600; }
 .tag-filter-and  { @apply bg-blue-500 text-white border-blue-500 hover:bg-blue-600; }
 .tag-filter-not  { @apply bg-red-500 text-white border-red-500 hover:bg-red-600; }
@@ -2186,8 +2219,11 @@ body {
 }
 
 .path-chip {
-    border-color: var(--color-primary);
-    background-color: var(--color-primary-light);
+    /* -border and -surface, not the solid --color-primary and the older
+       -light spelling. A full-strength border on a pale fill read twice as
+       heavy as .guide-chip's, which is the only way these two ever differed. */
+    background-color: var(--color-primary-surface);
+    border-color: var(--color-primary-border);
     color: var(--color-primary-text);
 }
 
@@ -2392,43 +2428,19 @@ body {
    chip filled with it is invisible against the panel it sits on. Dark mode
    therefore gets a light wash instead, following the pattern .btn-tab already
    uses for its hover state, with near-white text like the badges. */
-/* ── One chip ────────────────────────────────────────────────────────────────
-   Every chip-shaped control shares these metrics. They were four sizes doing
-   one job: the EPA filter at text-xs/py-0.5 and the Vehicles tag filter at
-   text-sm/py-1, with path, brand-alias and fe-picker each guessing again. The
-   smallest was the right one, so it won (#277).
 
-   Colour stays per-class below — what a chip MEANS still differs. */
-.guide-chip,
-.tag-filter-btn,
-.path-chip,
-.brand-alias-chip,
-.fe-picker-badge {
-    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs
-           font-medium transition-colors cursor-pointer;
-    border: 1px solid transparent;
-}
-
-.guide-chip {
-    background-color: var(--color-surface-sunken);
-    color: var(--color-text-secondary);
-    border: 1px solid var(--color-border);
-}
 /* `:not(.active)` on every hover rule, and it is load-bearing.
    `[data-theme="dark"] .guide-chip:hover` is (0,4,0) where `.guide-chip.active`
    is (0,2,0), so without the exclusion the hover background beats the selected
    one — and since the cursor is still over a chip you just clicked, the chip
    appears not to have been selected at all. The state only became visible after
    moving the mouse away. */
-.guide-chip:hover:not(:disabled):not(.active) {
+/* One hover, both themes — the dark-only pair that used to sit here was the
+   last of the split between this and .tag-filter-btn. */
+.guide-chip:hover:not(:disabled):not(.active),
+.tag-filter-na:hover {
     border-color: var(--color-border-strong);
-}
-[data-theme="dark"] .guide-chip:not(.active) {
-    background-color: rgba(255, 255, 255, 0.08);
-    color: rgb(241, 245, 249);
-}
-[data-theme="dark"] .guide-chip:hover:not(:disabled):not(.active) {
-    background-color: rgba(255, 255, 255, 0.14);
+    background-color: var(--color-surface-muted);
 }
 /* Hovering something already selected darkens it rather than reverting it. */
 .guide-chip.active:hover:not(:disabled) {

@@ -791,7 +791,7 @@ export default function App() {
                                         <button
                                             key={key}
                                             onClick={() => handleChartModeChange(key)}
-                                            className={`btn-chart-mode ${chartMode === key ? 'active' : ''}`}
+                                            className={`btn-subtab ${chartMode === key ? 'active' : ''}`}
                                         >
                                             {label}
                                         </button>

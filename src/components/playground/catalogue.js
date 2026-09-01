@@ -51,6 +51,7 @@ export const NOT_CATALOGUED = {
     'tag-filter-legend': 'The "AND / OR / NOT" key beside the bar, not a control.',
     'run-stat-badges':   'Layout wrapper — a flex row of badges.',
     'guide-chip-count':  'The count suffix inside .guide-chip; shown as part of that specimen.',
+    'btn-toggle-clear':  'The × inside an active .btn-toggle; shown as part of that specimen.',
 };
 
 /**
@@ -70,7 +71,7 @@ export const NOT_CATALOGUED = {
  */
 export const DARK_OVERRIDE_CLASSES = new Set([
     'app-header-compact', 'badge-default', 'badge-hidden', 'brand-alias-chip',
-    'btn-chart-mode', 'btn-tab', 'chart-copy-btn-active', 'curve-picker-row',
+    'btn-tab', 'chart-copy-btn-active', 'curve-picker-row',
     'curve-tier-badge', 'guide-chip', 'guide-row', 'guide-tested-note',
     'merge-target-banner', 'specs-table-container', 'stats-suppressed-flag',
     'sweep-batch', 'vote-btn-vouch',
@@ -105,10 +106,13 @@ export const SECTIONS = [
             { cls: 'btn-tab',        as: 'button', label: 'Nav tab',   note: 'Top-level navigation. Add `.active` for the current one.' },
             { cls: 'btn-tab active', as: 'button', label: 'Nav tab · active' },
             { cls: 'btn-subtab',        as: 'button', label: 'Sub-tab',
-              note: 'Second-level navigation, inside a section. A smaller .btn-tab — Runs, EPA and Admin all used to borrow .btn-chart-mode for this, so navigation wore a chart control\'s border.' },
+              note: 'All second-level navigation — Runs, EPA, Admin and the chart selector. No border, no resting fill: it is a tab, not a button.' },
             { cls: 'btn-subtab active', as: 'button', label: 'Sub-tab · active' },
-            { cls: 'btn-chart-mode',        as: 'button', label: 'Chart mode',   note: 'Selects what a chart plots — a control, not navigation.' },
-            { cls: 'btn-chart-mode active', as: 'button', label: 'Chart mode · active' },
+            { cls: 'btn btn-toggle',        as: 'button', label: 'Toggle · off',
+              note: 'A button showing an on/off state — "Set Default" on a test. Quiet when off so it does not compete with Edit and Delete beside it.' },
+            { cls: 'btn btn-toggle active', as: 'button', label: 'Toggle · on', note: 'Hover it: clearing is the action when it is already on.' },
+            { cls: 'btn btn-restore',       as: 'button', label: 'Restore',
+              note: 'The undo state of a queued delete. Warning, not danger — nothing is destroyed yet and the click puts it back.' },
         ],
     },
     {

@@ -235,7 +235,7 @@ function offenders() {
  *
  * 79 at the sweep that added this; RunsView holds 31 of them.
  */
-const KNOWN_OFFENDERS = 79;
+const KNOWN_OFFENDERS = 74;
 
 describe('hardcoded light surfaces', () => {
     it('does not grow', () => {

@@ -104,7 +104,7 @@ export default function EpaAuditSweep() {
                 <button
                     type="button"
                     onClick={() => setOnly(null)}
-                    className={`btn-chart-mode ${only === null ? 'active' : ''}`}
+                    className={`guide-chip ${only === null ? 'active' : ''}`}
                 >
                     All {rows.length}
                 </button>
@@ -115,7 +115,7 @@ export default function EpaAuditSweep() {
                         title={v.blurb}
                         disabled={!summary[v.key]}
                         onClick={() => setOnly(only === v.key ? null : v.key)}
-                        className={`btn-chart-mode ${only === v.key ? 'active' : ''} disabled:opacity-40`}
+                        className={`guide-chip ${only === v.key ? 'active' : ''} disabled:opacity-40`}
                     >
                         {v.label} {summary[v.key]}
                     </button>

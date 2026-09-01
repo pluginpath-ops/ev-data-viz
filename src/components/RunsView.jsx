@@ -2475,14 +2475,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <button
                                             onClick={() => run.isDefault ? clearDefaultRun(vehicle.id, run.id) : onSetDefaultRun(run.id)}
                                             title={!canCreate ? 'Sign in to save changes' : run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
-                                            className={`text-sm px-2 py-1 rounded transition-colors ${
-                                                run.isDefault
-                                                    ? 'bg-blue-100 text-blue-700 hover:bg-red-50 hover:text-red-600 border border-blue-200 hover:border-red-200'
-                                                    : 'text-meta hover:text-green-600 hover:bg-green-50'
-                                            }${!canCreate ? ' opacity-50 cursor-not-allowed' : ''}`}
+                                            className={`btn btn-toggle${run.isDefault ? ' active' : ''}`
+                                                + (!canCreate ? ' opacity-50 cursor-not-allowed' : '')}
                                         >
                                             {run.isDefault
-                                                ? <>Default <span className="text-red-500 font-bold">×</span></>
+                                                ? <>Default <span className="btn-toggle-clear">×</span></>
                                                 : 'Set Default'}
                                         </button>
                                         {canEdit(vehicle) && (
@@ -2491,7 +2488,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <button
                                             onClick={() => isPending ? restoreItem(run.id) : queueDelete(run.id)}
                                             title={!canCreate && !isPending ? 'Sign in to save changes' : undefined}
-                                            className={`btn text-sm ${isPending ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-0' : 'btn-danger'}${!canCreate && !isPending ? ' opacity-50 cursor-not-allowed' : ''}`}
+                                            className={`btn text-sm ${isPending ? 'btn-restore' : 'btn-danger'}${!canCreate && !isPending ? ' opacity-50 cursor-not-allowed' : ''}`}
                                         >
                                             {isPending ? '↩ Restore' : 'Delete'}
                                         </button>
@@ -2721,12 +2718,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 : updateSpecLink(linkId, { useAsDefault: true }, vehicle.id)
                                                             }
                                                             title={run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
-                                                            className={`btn text-sm ${run.isDefault ? 'bg-blue-100 text-blue-700 hover:bg-red-50 hover:text-red-600 border border-blue-200 hover:border-red-200' : 'btn-secondary'}`}
+                                                            className={`btn btn-toggle${run.isDefault ? ' active' : ''}`}
                                                         >
-                                                            {run.isDefault ? <>Default <span className="text-red-500 font-bold">×</span></> : 'Set as Default'}
+                                                            {run.isDefault ? <>Default <span className="btn-toggle-clear">×</span></> : 'Set as Default'}
                                                         </button>
                                                     ) : run.isDefault ? (
-                                                        <span className="btn text-sm bg-blue-100 text-blue-700 border border-blue-200">Default</span>
+                                                        <span className="btn btn-toggle active">Default</span>
                                                     ) : null}
                                                     {isContributor && canEdit(vehicle) && (
                                                         <button
