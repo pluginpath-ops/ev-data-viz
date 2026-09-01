@@ -67,14 +67,14 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
             <div className="modal-panel rounded-xl p-5 max-w-2xl w-full max-h-[85vh] overflow-y-auto">
                 <h3 className="section-title mb-1">Import performance testing data</h3>
-                <p className="text-xs text-muted mb-3">
+                <p className="text-xs text-secondary mb-3">
                     For <span className="font-semibold">{vehicle?.name}</span>. Expects a GPS
                     testing export with one column per run.
                 </p>
 
                 <div className="flex flex-wrap items-end gap-3 mb-3">
                     <label className="text-xs">
-                        <span className="text-muted block mb-0.5">Test type</span>
+                        <span className="text-secondary block mb-0.5">Test type</span>
                         <select
                             value={testType}
                             onChange={e => {
@@ -90,7 +90,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                         </select>
                     </label>
                     <label className="text-xs flex-1 min-w-[10rem]">
-                        <span className="text-muted block mb-0.5">Source (optional)</span>
+                        <span className="text-secondary block mb-0.5">Source (optional)</span>
                         <input
                             type="text" value={sourceName}
                             onChange={e => setSourceName(e.target.value)}
@@ -99,7 +99,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                         />
                     </label>
                     <label className="text-xs flex-1 min-w-[12rem]">
-                        <span className="text-muted block mb-0.5">Source link (optional)</span>
+                        <span className="text-secondary block mb-0.5">Source link (optional)</span>
                         <input
                             type="text" value={sourceUrl}
                             onChange={e => setSourceUrl(e.target.value)}
@@ -123,7 +123,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                     onChange={e => handleFile(e.target.files?.[0])}
                     className="form-input w-full"
                 />
-                {fileName && <p className="text-[11px] text-faint mt-1">{fileName}</p>}
+                {fileName && <p className="text-[11px] text-meta mt-1">{fileName}</p>}
                 {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
 
                 {match && (
@@ -131,7 +131,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                         <div className="text-sm font-semibold text-amber-600 dark:text-amber-400 mb-1">
                             These runs are already here
                         </div>
-                        <p className="text-xs text-muted">
+                        <p className="text-xs text-secondary">
                             {match.matched} of {parsed?.runs.length} runs match an existing session by
                             timestamp{match.session.tested_at ? ` (${String(match.session.tested_at).replace('T', ' ')})` : ''}.
                             Testing apps export one file per metric set for the same physical runs, so
@@ -152,12 +152,12 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                     <div className="mt-3 border rounded-lg p-3 border-[var(--color-border)]">
                         <div className="font-semibold text-sm mb-1">
                             {parsed.runs.length} run{parsed.runs.length === 1 ? '' : 's'} found
-                            <span className="text-faint font-normal ml-2 text-xs">
+                            <span className="text-meta font-normal ml-2 text-xs">
                                 {parsed.format === 'distance' ? 'distance splits' :
                                  parsed.format === 'mixed' ? 'speed + distance splits' : 'speed splits'}
                             </span>
                         </div>
-                        <div className="text-xs text-muted mb-2">
+                        <div className="text-xs text-secondary mb-2">
                             {session.locationName && <>{session.locationName} · </>}
                             {session.testedAt?.replace('T', ' ')}
                             {session.temperatureF != null && <> · {Math.round(session.temperatureF)}°F</>}
@@ -166,7 +166,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
 
                         <table className="w-full text-xs">
                             <thead>
-                                <tr className="text-faint text-[10px] uppercase tracking-wide">
+                                <tr className="text-meta text-[10px] uppercase tracking-wide">
                                     <th className="text-left font-semibold py-1">Drive mode</th>
                                     <th className="text-right font-semibold py-1">
                                         {parsed.format === 'distance' ? '¼ mile' : '0–60'}
@@ -181,13 +181,13 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                             <tbody>
                                 {parsed.runs.map(r => (
                                     <tr key={r.sequence} className="border-t border-[var(--color-border)]">
-                                        <td className="py-0.5 text-muted truncate max-w-[12rem]">{r.driveMode || '—'}</td>
+                                        <td className="py-0.5 text-secondary truncate max-w-[12rem]">{r.driveMode || '—'}</td>
                                         <td className="py-0.5 text-right font-mono">
                                             {parsed.format === 'distance'
                                                 ? (r.quarterMileSec != null ? r.quarterMileSec.toFixed(3) : '—')
                                                 : (r.zeroTo60Sec != null ? r.zeroTo60Sec.toFixed(3) : '—')}
                                         </td>
-                                        <td className="py-0.5 text-right font-mono text-muted">
+                                        <td className="py-0.5 text-right font-mono text-secondary">
                                             {parsed.format === 'distance'
                                                 ? (r.quarterMileTrapMph != null ? `${r.quarterMileTrapMph} mph` : '—')
                                                 : (r.zeroTo60RolloutSec != null ? r.zeroTo60RolloutSec.toFixed(3) : '—')}
@@ -195,13 +195,13 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                                         <td className="py-0.5 text-right font-mono">
                                             {r.maxGForce != null ? r.maxGForce.toFixed(3) : '—'}
                                         </td>
-                                        <td className="py-0.5 text-right font-mono text-faint">{r.splits.length}</td>
+                                        <td className="py-0.5 text-right font-mono text-meta">{r.splits.length}</td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
 
-                        <p className="text-[10px] text-faint mt-2">
+                        <p className="text-[10px] text-meta mt-2">
                             Splits found per run: {parsed.runs[0]?.splits.map(s => s.label).join(', ') || 'none'}
                         </p>
 
@@ -210,7 +210,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                                 {parsed.warnings.map((w, i) => <li key={i}>{w}</li>)}
                             </ul>
                         )}
-                        <p className="text-[10px] text-faint mt-2">
+                        <p className="text-[10px] text-meta mt-2">
                             The two 0–60 columns are different conventions, not a duplicate: the first
                             starts the clock at 0 mph, the second allows the 1 ft drag-strip rollout.
                         </p>

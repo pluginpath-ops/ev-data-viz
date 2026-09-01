@@ -884,7 +884,7 @@ export default function ChargeCompareView({
             </div>}
 
             {!hasRangeRuns ? (
-                <div className="card text-center py-12 text-faint">
+                <div className="card text-center py-12 text-meta">
                     <p className="text-lg font-medium">No range test runs found for selected vehicles</p>
                     <p className="text-sm mt-1">Add range test records in Tests &amp; Data to use this chart.</p>
                 </div>
@@ -893,7 +893,7 @@ export default function ChargeCompareView({
                     {/* ── Chart 1: Range Added in X Minutes ── */}
                     <div className="card mb-6">
                         <h4 className="text-base font-semibold mb-3">
-                            Range Added in {xMinutes} Minutes <span className="text-faint font-normal">(from ~{startSoc}% SoC, in {distanceLabel(units)})</span>
+                            Range Added in {xMinutes} Minutes <span className="text-meta font-normal">(from ~{startSoc}% SoC, in {distanceLabel(units)})</span>
                         </h4>
                         <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart1Ref} />
@@ -903,7 +903,7 @@ export default function ChargeCompareView({
                     {/* ── Chart 2: Time to Add M Miles ── */}
                     <div className="card mb-6">
                         <h4 className="text-base font-semibold mb-3">
-                            Time to Add {units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} {distanceLabel(units)} of Range <span className="text-faint font-normal">(from ~{startSoc}% SoC)</span>
+                            Time to Add {units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} {distanceLabel(units)} of Range <span className="text-meta font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
                         <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart2Ref} />

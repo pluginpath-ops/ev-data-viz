@@ -83,7 +83,7 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
 
             <div className="guide-facet curve-picker-list-facet">
                 <div className="guide-facet-label">
-                    Records <span className="text-hint">{shown.length} shown · {selected.length} plotted</span>
+                    Records <span className="text-note">{shown.length} shown · {selected.length} plotted</span>
                 </div>
                 <div className="curve-picker-list">
                     {shown.map(s => (
@@ -95,7 +95,7 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                             />
                             <span className="curve-picker-name">
                                 {s.label}
-                                <span className="text-faint"> · {s.sublabel}</span>
+                                <span className="text-meta"> · {s.sublabel}</span>
                             </span>
                             {/* Named on the row, not only in the filter: once a
                                 mixed set is plotted the tier is the only thing
@@ -108,7 +108,7 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                         </label>
                     ))}
                     {shown.length === 0 && (
-                        <div className="text-caption text-muted p-2">Nothing matches this filter.</div>
+                        <div className="text-note p-2">Nothing matches this filter.</div>
                     )}
                 </div>
                 {selected.length > 0 && (

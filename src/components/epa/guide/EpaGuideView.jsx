@@ -143,7 +143,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
         return (
             <div className="empty-state">
                 The Fuel Economy Guide could not be loaded.
-                <div className="text-caption text-muted mt-1">{String(error.message ?? error)}</div>
+                <div className="text-note mt-1">{String(error.message ?? error)}</div>
             </div>
         );
     }
@@ -155,7 +155,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
         return (
             <div className="empty-state">
                 No Fuel Economy Guide data has been imported yet.
-                <div className="text-caption text-muted mt-1">
+                <div className="text-note mt-1">
                     An admin can load a guide year from Admin → Fuel Economy Guide.
                 </div>
             </div>
@@ -169,7 +169,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
             <div className="section-header">
                 <div>
                     <div className="section-title">EPA Fuel Economy Guide</div>
-                    <div className="text-caption text-secondary">
+                    <div className="text-note">
                         EPA’s published label figures — {rows.length.toLocaleString()} configurations
                         across {facets.years.length} model years.
                     </div>
@@ -237,7 +237,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                     <div className="guide-pager">
                         <button className="btn btn-secondary" disabled={page === 0}
                             onClick={() => setPage(p => p - 1)}>Previous</button>
-                        <span className="text-caption text-secondary">
+                        <span className="text-note">
                             Page {page + 1} of {totalPages}
                         </span>
                         <button className="btn btn-secondary" disabled={page >= totalPages - 1}

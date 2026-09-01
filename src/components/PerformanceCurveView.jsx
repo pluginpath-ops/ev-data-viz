@@ -460,11 +460,11 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             <span className="text-secondary">Show acceleration (g)</span>
                         </label>
                     </div>
-                    <span className="text-xs text-faint pb-1">
+                    <span className="text-xs text-meta pb-1">
                         {series.length} line{series.length === 1 ? '' : 's'} plotted
                     </span>
                 </div>
-                <p className="text-xs text-muted mt-3">
+                <p className="text-xs text-secondary mt-3">
                     Solid lines are traced from imported splits, dashed lines reconstructed
                     from a source’s headline figures. The 1&nbsp;ft-rollout split is left out —
                     it is the same 60&nbsp;mph point on a different clock.
@@ -492,7 +492,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                 <h3 className="text-lg font-semibold mb-3">Speed vs Time</h3>
 
                 {series.length === 0 ? (
-                    <p className="text-sm text-muted py-8 text-center">
+                    <p className="text-sm text-secondary py-8 text-center">
                         No acceleration split data for the selected vehicles. This chart is built
                         from imported testing CSVs — reported figures alone carry no trace to plot.
                     </p>

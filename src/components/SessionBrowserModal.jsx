@@ -49,7 +49,7 @@ export default function SessionBrowserModal({
                 <div className="modal-header px-6 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <div>
                         <h3 className="text-lg font-semibold">All sessions</h3>
-                        <p className="text-sm text-muted">
+                        <p className="text-sm text-secondary">
                             {summaries.length} session{summaries.length === 1 ? '' : 's'} · search by name, vehicle, date, tester or location
                         </p>
                     </div>
@@ -68,7 +68,7 @@ export default function SessionBrowserModal({
 
                 <div className="modal-body">
                     {shown.length === 0 ? (
-                        <p className="text-sm text-faint italic py-6 text-center">
+                        <p className="text-sm text-meta italic py-6 text-center">
                             No session matches “{query}”.
                         </p>
                     ) : (
@@ -80,11 +80,11 @@ export default function SessionBrowserModal({
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-medium">{sessionLabel(session)}</span>
-                                                <span className="text-xs text-muted">
+                                                <span className="text-xs text-secondary">
                                                     {runCount} run{runCount === 1 ? '' : 's'}
                                                 </span>
                                                 {session.location_name && (
-                                                    <span className="text-xs text-faint">· {session.location_name}</span>
+                                                    <span className="text-xs text-meta">· {session.location_name}</span>
                                                 )}
                                             </div>
                                             {inSession.length > 0 ? (
@@ -99,7 +99,7 @@ export default function SessionBrowserModal({
                                                     ))}
                                                 </div>
                                             ) : (
-                                                <p className="text-xs text-faint italic mt-1">No runs attached yet</p>
+                                                <p className="text-xs text-meta italic mt-1">No runs attached yet</p>
                                             )}
                                         </div>
 
@@ -127,7 +127,7 @@ export default function SessionBrowserModal({
 
                 {/* Where rename, merge, delete and bulk assignment will go. */}
                 <div className="modal-footer">
-                    <span className="text-xs text-faint mr-auto self-center">
+                    <span className="text-xs text-meta mr-auto self-center">
                         Showing {shown.length} of {summaries.length}
                     </span>
                     <button onClick={onClose} className="btn btn-secondary text-sm">Done</button>

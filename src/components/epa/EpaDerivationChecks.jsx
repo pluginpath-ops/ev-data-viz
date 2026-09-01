@@ -65,7 +65,7 @@ export default function EpaDerivationChecks({
         <div key={f.code}
              className={`epa-check ${f.severity === 'error' ? 'epa-check-disagrees' : 'epa-check-close'}`}>
             <span className="text-label">{f.label}</span>
-            <span className="text-xs text-faint">{f.detail}</span>
+            <span className="text-xs text-meta">{f.detail}</span>
         </div>
     ))}
     {/* The regulatory invariant, first because it is not a matter of
@@ -80,12 +80,12 @@ export default function EpaDerivationChecks({
             <span className="epa-check-row">
                 Computed
                 <strong className="text-secondary">{mi(invariant.computedMi)}</strong>
-                <span className="text-faint">below the {mi(invariant.labeledMi)} label</span>
+                <span className="text-meta">below the {mi(invariant.labeledMi)} label</span>
                 <span className="epa-check-delta">
                     −{invariant.shortfallMi.toFixed(1)} mi
                 </span>
             </span>
-            <span className="text-xs text-faint">
+            <span className="text-xs text-meta">
                 {invariant.cause === 'adjustment'
                     ? (fromGuide
                         ? `The bags reproduce this record\u2019s own stated ranges, so the phase data is sound, and the guide\u2019s own factor of ${applied.toFixed(4)} is already in use \u2014 yet the label still implies ${invariant.impliedAdjustment?.toFixed(4)}. Nothing here is known to be wrong; the residual is unexplained. Note the guide often reports its \u201cunrounded\u201d adjusted figures rounded to whole MPGe, which puts roughly \u00b10.005 of slack on that factor.`
@@ -113,14 +113,14 @@ export default function EpaDerivationChecks({
                 <span key={c.cycle} className="epa-check-row">
                     {c.label}
                     <strong className="text-secondary">{mi(c.ours)}</strong>
-                    <span className="text-faint">vs {mi(c.stated)} stated</span>
+                    <span className="text-meta">vs {mi(c.stated)} stated</span>
                     <span className="epa-check-delta">
                         {c.deltaPct >= 0 ? '+' : ''}{c.deltaPct.toFixed(2)}%
                     </span>
                 </span>
             ))}
             {rangeCheck.worst !== 'agrees' && (
-                <span className="text-xs text-faint">
+                <span className="text-xs text-meta">
                     The record states its own range, so a gap is in the phase bags we
                     imported for that cycle \u2014 a wrong distance, a mistyped type, or one missing.
                 </span>
@@ -148,13 +148,13 @@ export default function EpaDerivationChecks({
                 <span key={c.cycle} className="epa-check-row">
                     {c.label}
                     <strong className="text-secondary">{c.ours.toFixed(1)}</strong>
-                    <span className="text-faint">vs {c.epa.toFixed(1)}</span>
+                    <span className="text-meta">vs {c.epa.toFixed(1)}</span>
                     <span className="epa-check-delta">
                         {c.deltaPct >= 0 ? '+' : ''}{c.deltaPct.toFixed(2)}%
                     </span>
                 </span>
             ))}
-            <span className="text-xs text-faint">
+            <span className="text-xs text-meta">
                 {check.worst === 'agrees'
                     ? 'The derivation reproduces EPA\u2019s published figures.'
                     : (CHECK_SHAPE_ADVICE[check.shape]

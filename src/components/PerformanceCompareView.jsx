@@ -311,7 +311,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                         </select>
                     </div>
                 </div>
-                <p className="text-xs text-muted">
+                <p className="text-xs text-secondary">
                     Every bar is a tested figure, whoever produced it — results derived from
                     imported sessions rank alongside published ones, marked ✦. Manufacturer
                     claims are excluded. A vehicle keeps its colour across all four charts.
@@ -338,7 +338,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                     return (
                         <div key={cat.key} className="card mb-4">
                             <h3 className="text-lg font-semibold mb-1">{cat.title}</h3>
-                            <p className="text-sm text-muted">
+                            <p className="text-sm text-secondary">
                                 None of the selected vehicles has {cat.title.toLowerCase()} data yet.
                             </p>
                         </div>

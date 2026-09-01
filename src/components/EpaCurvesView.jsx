@@ -186,7 +186,7 @@ function convertYValue(val, yAxis, units) {
 const CONFIDENCE_COLORS = {
     verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
     likely:   'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-700',
-    inferred: 'text-muted bg-[var(--color-surface-muted)] border-[var(--color-border)]',
+    inferred: 'text-secondary bg-[var(--color-surface-muted)] border-[var(--color-border)]',
 };
 
 function ConfidenceBadge({ confidence }) {
@@ -780,7 +780,7 @@ export default function EpaCurvesView({
                             >
                                 <span style={{ display: 'inline-block', transform: selectorExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
                                 Select Vehicle Tests to Display
-                                <span className="text-sm font-normal text-muted">({visibleCount} of {totalMappings} shown)</span>
+                                <span className="text-sm font-normal text-secondary">({visibleCount} of {totalMappings} shown)</span>
                             </button>
                             {setChartConfig && (
                                 <div className="run-selector-actions">
@@ -813,7 +813,7 @@ export default function EpaCurvesView({
                                                         >
                                                             all
                                                         </button>
-                                                        <span className="text-faint text-xs select-none">/</span>
+                                                        <span className="text-meta text-xs select-none">/</span>
                                                         <button
                                                             type="button"
                                                             onClick={() => setVehicleMappings(vehicle.id, false)}
@@ -864,8 +864,8 @@ export default function EpaCurvesView({
                                                                     {/* Label + metadata */}
                                                                     <div className="run-label min-w-0">
                                                                         <span className="font-medium">{epaLabel}</span>
-                                                                        <span className="text-sm text-muted ml-2">{epaGroup.model_year} · {epaGroup.test_group_id}</span>
-                                                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                                                                        <span className="text-sm text-secondary ml-2">{epaGroup.model_year} · {epaGroup.test_group_id}</span>
+                                                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                                                                             <ConfidenceBadge confidence={confidence} />
                                                                             {epaGroup.label_combined_mpge && epaGroup.label_combined_mpge < 500 ? (
                                                                                 <span>EPA rated: {epaGroup.label_combined_mpge} MPGe</span>
@@ -916,7 +916,7 @@ export default function EpaCurvesView({
 
                                     {/* Vehicles without EPA data */}
                                     {vehiclesWithoutEpa.length > 0 && (
-                                        <div className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                                        <div className="mt-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                                             <span className="font-medium">No EPA data:</span>{' '}
                                             {vehiclesWithoutEpa.map(v => vehicleLabel(v)).join(', ')}
                                             {' '}— link a test group via Edit Vehicle.
@@ -929,7 +929,7 @@ export default function EpaCurvesView({
 
                     {/* All selected vehicles lack EPA data */}
                     {vehiclesWithEpa.length === 0 && vehiclesWithoutEpa.length > 0 && (
-                        <div className="mt-4 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                        <div className="mt-4 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                             No EPA test group linked for the selected vehicles. Link one via Edit Vehicle.
                         </div>
                     )}
@@ -946,7 +946,7 @@ export default function EpaCurvesView({
                     {!presentationMode && (
                         <>
                             {/* Legend note */}
-                            <div className="mt-3 flex flex-wrap gap-4 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                            <div className="mt-3 flex flex-wrap gap-4 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                                 <span>
                                     <span className="font-medium">Shaded band</span> — 65–75 mph typical highway
                                 </span>
@@ -976,7 +976,7 @@ export default function EpaCurvesView({
             ) : (
                 <div className="empty-state">
                     <p>No EPA test group data available for the selected vehicles.</p>
-                    <p className="text-sm mt-2" style={{ color: 'var(--color-text-muted)' }}>
+                    <p className="text-sm mt-2" style={{ color: 'var(--color-text-secondary)' }}>
                         Link an EPA test group via Edit Vehicle to enable this chart.
                     </p>
                 </div>
@@ -1003,7 +1003,7 @@ export default function EpaCurvesView({
             {!presentationMode && (
                 <div className="card mt-6">
                     <h3 className="text-lg font-semibold mb-1">EPA range methodology</h3>
-                    <p className="text-sm text-faint mb-2">
+                    <p className="text-sm text-meta mb-2">
                         How each selected vehicle&apos;s label range was produced, from its own
                         certification record. Where a Fuel Economy Guide row is linked, this uses
                         EPA&apos;s adjustment factor for that configuration and shows the flat
@@ -1022,7 +1022,7 @@ export default function EpaCurvesView({
                             <h4 className="text-sm font-semibold text-secondary mb-1">
                                 What the adjustment factor replaces
                             </h4>
-                            <p className="text-xs text-muted mb-3">
+                            <p className="text-xs text-secondary mb-3">
                                 A two-cycle test drives the top two. The other three are the
                                 conditions EPA would otherwise measure directly — the factor is a
                                 blanket 30% reduction standing in for all of them, the same number
@@ -1055,7 +1055,7 @@ export default function EpaCurvesView({
                                 No derivation for {methodologyGaps.length} configuration
                                 {methodologyGaps.length === 1 ? '' : 's'}:
                             </p>
-                            <ul className="text-xs text-muted list-disc pl-5">
+                            <ul className="text-xs text-secondary list-disc pl-5">
                                 {methodologyGaps.map(({ key, vehicleName, epaLabel, reason }) => (
                                     <li key={key}>
                                         <span className="text-secondary">
@@ -1071,7 +1071,7 @@ export default function EpaCurvesView({
                     )}
 
                     {methodologyEntries.length === 0 && (
-                        <p className="text-sm text-muted">
+                        <p className="text-sm text-secondary">
                             None of the selected vehicles has an EPA test group linked. Link one from
                             Tests &amp; Data to see how its label range was produced.
                         </p>

@@ -25,7 +25,7 @@ import { useAppContext } from '../context/AppContext';
 const CONFIDENCE_COLORS = {
     verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
     likely:   'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-700',
-    inferred: 'text-muted bg-[var(--color-surface-muted)] border-[var(--color-border)]',
+    inferred: 'text-secondary bg-[var(--color-surface-muted)] border-[var(--color-border)]',
 };
 
 function ConfidenceBadge({ confidence }) {
@@ -70,8 +70,8 @@ function DataRow({ label, value, muted, always = false }) {
     if (value == null && !always) return null;
     return (
         <div className="flex justify-between gap-4 py-0.5">
-            <span className="text-muted shrink-0">{label}</span>
-            <span className={`font-mono text-right ${muted || value == null ? 'text-faint' : ''}`}>
+            <span className="text-secondary shrink-0">{label}</span>
+            <span className={`font-mono text-right ${muted || value == null ? 'text-meta' : ''}`}>
                 {value ?? '—'}
             </span>
         </div>
@@ -200,7 +200,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                             onChange={e => setDraftName(e.target.value)}
                             onBlur={handleNameSave}
                             onKeyDown={handleNameKeyDown}
-                            className="form-input font-semibold w-full disabled:opacity-50 placeholder:text-[var(--color-text-faint)] placeholder:font-normal placeholder:italic"
+                            className="form-input font-semibold w-full disabled:opacity-50 placeholder:text-[var(--color-text-meta)] placeholder:font-normal placeholder:italic"
                             title="Friendly display name used in charts. Leave blank to use the EPA carline name."
                         />
                     ) : (
@@ -210,16 +210,16 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                     )}
                     {/* Show raw EPA name as subtitle when a display name is set or being edited */}
                     {(g.display_name || draftName !== null) && (
-                        <div className="text-xs text-faint italic truncate mt-0.5">{g.epa_carline_name}</div>
+                        <div className="text-xs text-meta italic truncate mt-0.5">{g.epa_carline_name}</div>
                     )}
-                    <div className="text-xs text-muted mt-0.5">
+                    <div className="text-xs text-secondary mt-0.5">
                         {g.model_year}{g.make ? ` · ${g.make}` : ''}{g.drive ? ` · ${g.drive}` : ''}
                         {g.transmission ? ` · ${g.transmission}` : ''}
                     </div>
-                    <div className="font-mono text-xs text-faint mt-0.5">
+                    <div className="font-mono text-xs text-meta mt-0.5">
                         {g.test_group_id}
                         {g.epa_test_family_id && g.epa_test_family_id !== g.test_group_id && (
-                            <span className="ml-1 text-faint">· family: {g.epa_test_family_id}</span>
+                            <span className="ml-1 text-meta">· family: {g.epa_test_family_id}</span>
                         )}
                     </div>
                 </div>
@@ -266,7 +266,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-1 text-xs">
 
                 <div>
-                    <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
+                    <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">
                         Test Setup
                     </div>
                     <DataRow always label="Test weight" value={coeff.equiv_test_weight_lbs != null ? coeff.equiv_test_weight_lbs.toLocaleString() + ' lbs' : null} />
@@ -279,7 +279,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                 </div>
 
                 <div>
-                    <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
+                    <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">
                         Label Efficiency
                     </div>
                     <DataRow always label="MPGe combined" value={mpge(g.label_combined_mpge)} />
@@ -288,7 +288,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                 </div>
 
                 <div>
-                    <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
+                    <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">
                         Label Range
                     </div>
                     {/* Combined above city and highway, matching the efficiency
@@ -321,7 +321,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
             )}
 
             {mapping.notes && (
-                <p className="mt-2 text-xs text-muted italic border-t pt-2">{mapping.notes}</p>
+                <p className="mt-2 text-xs text-secondary italic border-t pt-2">{mapping.notes}</p>
             )}
 
             {/* Curator form — contributor/admin only */}
@@ -470,12 +470,12 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                             className="form-input w-full"
                         />
                         {linking && (
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-faint">Linking…</span>
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-meta">Linking…</span>
                         )}
                         {showDropdown && (results.length > 0 || searching || searchError) && (
                             <ul className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border shadow-lg bg-[var(--color-surface-input)] border-[var(--color-border)]">
                                 {searching && (
-                                    <li className="px-3 py-2 text-sm text-faint italic">Searching…</li>
+                                    <li className="px-3 py-2 text-sm text-meta italic">Searching…</li>
                                 )}
                                 {!searching && searchError && (
                                     <li className="px-3 py-2 text-sm text-red-500">Error: {searchError}</li>
@@ -487,18 +487,18 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                         onMouseDown={e => { e.preventDefault(); handleSelect(g); }}
                                     >
                                         <span className="font-medium">{g.make} · {g.epa_carline_name}</span>
-                                        <span className="text-faint ml-2 text-xs">
+                                        <span className="text-meta ml-2 text-xs">
                                             {g.model_year}{g.drive ? ` · ${g.drive}` : ''} · {g.test_group_id}
                                         </span>
                                     </li>
                                 ))}
                                 {!searching && !searchError && results.length === 0 && query.trim() && (
-                                    <li className="px-3 py-2 text-sm text-faint italic">No results</li>
+                                    <li className="px-3 py-2 text-sm text-meta italic">No results</li>
                                 )}
                             </ul>
                         )}
                     </div>
-                    <p className="text-xs text-faint mt-1">
+                    <p className="text-xs text-meta mt-1">
                         Import an EPA lab PDF, the Test Car Data CSV (Admin), or create one by hand below.
                     </p>
 
@@ -541,7 +541,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <label className="text-xs">
-                                    <span className="text-muted">Test Group ID *</span>
+                                    <span className="text-secondary">Test Group ID *</span>
                                     <input
                                         type="text" autoFocus
                                         value={createDraft.test_group_id}
@@ -551,7 +551,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                     />
                                 </label>
                                 <label className="text-xs">
-                                    <span className="text-muted">Model year</span>
+                                    <span className="text-secondary">Model year</span>
                                     <input
                                         type="number"
                                         value={createDraft.model_year}
@@ -560,7 +560,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                     />
                                 </label>
                                 <label className="text-xs">
-                                    <span className="text-muted">Manufacturer</span>
+                                    <span className="text-secondary">Manufacturer</span>
                                     <input
                                         type="text"
                                         value={createDraft.make}
@@ -570,7 +570,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                     />
                                 </label>
                                 <label className="text-xs">
-                                    <span className="text-muted">Carline</span>
+                                    <span className="text-secondary">Carline</span>
                                     <input
                                         type="text"
                                         value={createDraft.epa_carline_name}
@@ -581,7 +581,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                 </label>
                             </div>
                             {createError && <p className="text-xs text-red-500 mt-1">{createError}</p>}
-                            <p className="text-[11px] text-faint mt-1">
+                            <p className="text-[11px] text-meta mt-1">
                                 Creates and links the group; add coefficients, tests and phases in the curator fields afterward.
                             </p>
                             <div className="flex gap-2 mt-2">
@@ -601,7 +601,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
 
             {/* Existing mappings */}
             {mappings.length === 0 ? (
-                <p className="text-sm text-muted mb-3">
+                <p className="text-sm text-secondary mb-3">
                     No EPA test group linked yet.
                     {canEdit && ' Use the search below to assign one.'}
                 </p>

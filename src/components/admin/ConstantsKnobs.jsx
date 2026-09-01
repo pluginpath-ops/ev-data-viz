@@ -182,7 +182,7 @@ export default function ConstantsKnobs() {
             {KNOB_GROUPS.map(group => (
                 <div key={group.title} className="mt-4">
                     <h4 className="subsection-title">{group.title}</h4>
-                    {group.blurb && <p className="text-xs text-faint mb-2">{group.blurb}</p>}
+                    {group.blurb && <p className="text-xs text-meta mb-2">{group.blurb}</p>}
                     <div className="divide-y divide-[var(--color-border)] border-t border-[var(--color-border)]">
                         {group.knobs.map(knob => (
                             <KnobRow
@@ -224,7 +224,7 @@ function BandEvidence({ evidence, band }) {
 
     if (!evidence.enough) {
         return (
-            <p className="text-[11px] text-faint mt-0.5">
+            <p className="text-[11px] text-meta mt-0.5">
                 observed: only {evidence.n} of {evidence.total} records carry a measured
                 {' '}{evidence.label.toLowerCase()} — too few to set a bound from.
             </p>
@@ -238,7 +238,7 @@ function BandEvidence({ evidence, band }) {
         : 'var(--color-success)';
 
     return (
-        <p className="text-[11px] text-faint mt-0.5">
+        <p className="text-[11px] text-meta mt-0.5">
             observed: <code>{d(evidence.p5)}–{d(evidence.p95)}</code> p5–p95,
             {' '}median <code>{d(evidence.median)}</code>,
             {' '}full <code>{d(evidence.min)}–{d(evidence.max)}</code>
@@ -278,13 +278,13 @@ function KnobRow({
             <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium">{label}</span>
-                    <code className="text-[11px] text-muted bg-[var(--color-surface-sunken)] px-1.5 py-0.5 rounded">
+                    <code className="text-[11px] text-secondary bg-[var(--color-surface-sunken)] px-1.5 py-0.5 rounded">
                         {key}
                     </code>
                     <SourceBadge source={source} />
                 </div>
-                {help && <p className="text-xs text-faint mt-0.5">{help}</p>}
-                <p className="text-[11px] text-faint mt-0.5">
+                {help && <p className="text-xs text-meta mt-0.5">{help}</p>}
+                <p className="text-[11px] text-meta mt-0.5">
                     default: <code>{show(def)}</code>{unit ? ` ${unit}` : ''}
                     {siteValue != null && (
                         <> {' · '} published: <code>{show(siteValue)}</code>{unit ? ` ${unit}` : ''}</>
@@ -303,7 +303,7 @@ function KnobRow({
                             onChange={(e) => onChange([numOrNull(e.target.value) ?? def[0], value[1]])}
                             className="form-input w-20"
                         />
-                        <span className="text-faint text-sm">–</span>
+                        <span className="text-meta text-sm">–</span>
                         <input
                             type="number" min={min} max={max} step={step}
                             value={value[1]}
@@ -319,7 +319,7 @@ function KnobRow({
                         className="form-input w-24"
                     />
                 )}
-                {unit && <span className="text-xs text-faint w-7">{unit}</span>}
+                {unit && <span className="text-xs text-meta w-7">{unit}</span>}
                 {canPublish && (
                     <button
                         onClick={onPublish}
@@ -327,7 +327,7 @@ function KnobRow({
                         title={publishable
                             ? 'Publish this value site-wide'
                             : 'Already what the site publishes'}
-                        className="text-xs text-faint hover:text-secondary disabled:opacity-30 px-1"
+                        className="text-xs text-meta hover:text-secondary disabled:opacity-30 px-1"
                     >
                         {busy ? '…' : '⇧'}
                     </button>
@@ -336,7 +336,7 @@ function KnobRow({
                     onClick={onReset}
                     disabled={source !== 'local'}
                     title="Drop this browser's override"
-                    className="text-xs text-faint hover:text-secondary disabled:opacity-30 px-1"
+                    className="text-xs text-meta hover:text-secondary disabled:opacity-30 px-1"
                 >
                     ↺
                 </button>

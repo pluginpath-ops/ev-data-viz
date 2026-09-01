@@ -64,7 +64,7 @@ export default function GuideComparePanel({ rows, showAll, onToggleShowAll, onCl
                                             ×
                                         </button>
                                     </div>
-                                    <div className="text-hint">{r.model_year} {r.division}</div>
+                                    <div className="text-note">{r.model_year} {r.division}</div>
                                 </th>
                             ))}
                         </tr>

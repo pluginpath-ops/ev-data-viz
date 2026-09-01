@@ -96,7 +96,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
             <div className="modal-panel rounded-xl p-5 max-w-2xl w-full max-h-[85vh] overflow-y-auto">
                 <h3 className="section-title mb-1">Paste published results</h3>
-                <p className="text-xs text-muted mb-3">
+                <p className="text-xs text-secondary mb-3">
                     For <span className="font-semibold">{vehicle?.name}</span>. Paste a result
                     block from a road test — one figure per line. Nothing is saved until you
                     confirm what was read.
@@ -116,7 +116,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                         <div className="font-semibold text-sm mb-2">
                             {parsed.matched} line{parsed.matched === 1 ? '' : 's'} read
                             {parsed.unmatched.length > 0 && (
-                                <span className="text-faint font-normal ml-2 text-xs">
+                                <span className="text-meta font-normal ml-2 text-xs">
                                     {parsed.unmatched.length} ignored
                                 </span>
                             )}
@@ -134,16 +134,16 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                                                     const isRolloutField = key === 'zero_to_60_rollout_sec' || key === 'zero_to_60_sec';
                                                     return (
                                                         <tr key={key} className="border-b border-[var(--color-border)] last:border-0">
-                                                            <td className="py-0.5 pr-2 text-muted">
+                                                            <td className="py-0.5 pr-2 text-secondary">
                                                                 {fld.label}
                                                                 {isRolloutField && (
-                                                                    <span className="text-faint ml-1 text-[10px]">
+                                                                    <span className="text-meta ml-1 text-[10px]">
                                                                         ← rollout basis
                                                                     </span>
                                                                 )}
                                                             </td>
                                                             <td className="py-0.5 text-right font-mono">
-                                                                {value} <span className="text-faint">{fld.unit}</span>
+                                                                {value} <span className="text-meta">{fld.unit}</span>
                                                             </td>
                                                         </tr>
                                                     );
@@ -154,7 +154,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
 
                                 {payload.intervals.length > 0 && (
                                     <>
-                                        <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
+                                        <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">
                                             Speed windows
                                         </div>
                                         <table className="w-full text-xs mb-2">
@@ -163,8 +163,8 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                                                     const d = describeInterval(row);
                                                     return (
                                                         <tr key={i} className="border-b border-[var(--color-border)] last:border-0">
-                                                            <td className="py-0.5 pr-2 text-muted">{d.window}</td>
-                                                            <td className="py-0.5 pr-2 capitalize text-faint">{d.kind}</td>
+                                                            <td className="py-0.5 pr-2 text-secondary">{d.window}</td>
+                                                            <td className="py-0.5 pr-2 capitalize text-meta">{d.kind}</td>
                                                             <td className="py-0.5 text-right font-mono">{d.value}</td>
                                                         </tr>
                                                     );
@@ -175,16 +175,16 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                                 )}
                             </>
                         ) : (
-                            <p className="text-xs text-muted">Nothing usable found yet.</p>
+                            <p className="text-xs text-secondary">Nothing usable found yet.</p>
                         )}
 
                         {parsed.unmatched.length > 0 && (
                             <details className="mt-1">
-                                <summary className="text-[11px] text-faint cursor-pointer hover:text-secondary">
+                                <summary className="text-[11px] text-meta cursor-pointer hover:text-secondary">
                                     {parsed.unmatched.length} line{parsed.unmatched.length === 1 ? '' : 's'} not
                                     recognised (won’t be imported)
                                 </summary>
-                                <ul className="mt-1 text-[11px] text-faint font-mono list-none">
+                                <ul className="mt-1 text-[11px] text-meta font-mono list-none">
                                     {parsed.unmatched.map((l, i) => <li key={i} className="truncate">{l}</li>)}
                                 </ul>
                             </details>
@@ -213,7 +213,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                             Rollout basis — check before importing
                         </div>
                         {parsed.rollout?.raw ? (
-                            <p className="text-[11px] text-muted mb-2">
+                            <p className="text-[11px] text-secondary mb-2">
                                 This block says: <span className="font-mono">“{parsed.rollout.raw}”</span>
                             </p>
                         ) : (
@@ -245,13 +245,13 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                                 <span>
                                     <span className="font-medium">{opt.title}</span>
                                     {footnoteBasis === opt.key && (
-                                        <span className="text-faint ml-1 text-[10px]">(this block’s footnote)</span>
+                                        <span className="text-meta ml-1 text-[10px]">(this block’s footnote)</span>
                                     )}
-                                    <span className="block text-faint text-[11px]">{opt.detail}</span>
+                                    <span className="block text-meta text-[11px]">{opt.detail}</span>
                                 </span>
                             </label>
                         ))}
-                        <p className="text-[10px] text-faint mt-1">
+                        <p className="text-[10px] text-meta mt-1">
                             Only the figure the source printed is saved. The implied one is shown to
                             make the choice concrete — it isn’t written, since a computed number in
                             that column couldn’t later be told apart from a reported one.
@@ -262,7 +262,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                 {/* ── Attribution ─────────────────────────────────────────── */}
                 <div className="flex flex-wrap items-end gap-3 mt-3">
                     <label className="text-xs">
-                        <span className="text-muted block mb-0.5">Source</span>
+                        <span className="text-secondary block mb-0.5">Source</span>
                         <input
                             type="text" value={sourceName}
                             onChange={e => setSourceName(e.target.value)}
@@ -271,7 +271,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                         />
                     </label>
                     <label className="text-xs">
-                        <span className="text-muted block mb-0.5">Trim / config</span>
+                        <span className="text-secondary block mb-0.5">Trim / config</span>
                         <input
                             type="text" value={trimLabel}
                             onChange={e => setTrimLabel(e.target.value)}
@@ -280,7 +280,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                         />
                     </label>
                     <label className="text-xs flex-1 min-w-[12rem]">
-                        <span className="text-muted block mb-0.5">Source link</span>
+                        <span className="text-secondary block mb-0.5">Source link</span>
                         <input
                             type="url" value={sourceUrl}
                             onChange={e => setSourceUrl(e.target.value)}
@@ -310,7 +310,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                 </div>
 
                 {errors.length > 0 && (
-                    <p className="text-[11px] text-muted mt-2">
+                    <p className="text-[11px] text-secondary mt-2">
                         The flagged figure will be imported as written — fix it on the result card
                         afterwards, or correct the paste above and re-read it.
                     </p>

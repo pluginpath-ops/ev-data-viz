@@ -132,7 +132,7 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
     const legGlobal   = units === 'metric' ? Math.round(global.legDistance * MI_TO_KM) : global.legDistance;
     const amountLabel = mode === 'distance' ? `Leg Distance (${dl})` : 'Charge Time (min)';
 
-    const cell = 'px-3 py-2 text-left font-semibold text-muted whitespace-nowrap';
+    const cell = 'px-3 py-2 text-left font-semibold text-secondary whitespace-nowrap';
     const inputCls = 'form-input w-20';
 
     return (
@@ -140,7 +140,7 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
             <button onClick={() => setOpen(o => !o)} className="run-selector-header">
                 <span style={{ display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
                 Customize routing
-                <span className="text-sm font-normal text-muted">
+                <span className="text-sm font-normal text-secondary">
                     {customized ? `(${customized} customized)` : '(optional — per test)'}
                 </span>
             </button>
@@ -167,9 +167,9 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
                                             <span className="flex items-center gap-2">
                                                 <span className="inline-block w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
                                                 <span className="text-secondary">{vehicleLabel(e.vehicle)}</span>
-                                                <span className="text-muted">· {e.rangeRun?.name ?? e.run.name}</span>
+                                                <span className="text-secondary">· {e.rangeRun?.name ?? e.run.name}</span>
                                                 {e.rangeRun && e.run?.name && (
-                                                    <span className="text-faint">· {e.run.name}</span>
+                                                    <span className="text-meta">· {e.run.name}</span>
                                                 )}
                                             </span>
                                         </td>
@@ -209,7 +209,7 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
                             })}
                         </tbody>
                     </table>
-                    <p className="text-xs text-muted mt-2">Blank fields use the global value shown as a placeholder.</p>
+                    <p className="text-xs text-secondary mt-2">Blank fields use the global value shown as a placeholder.</p>
                 </div>
             )}
         </div>
@@ -1657,7 +1657,7 @@ export default function RoadTripView({
                                     ? `${fmtSpeed(entry.testSpeedMph, units)}`
                                     : '70 mph (assumed)';
                                 return (
-                                    <span className="text-xs text-faint ml-1">
+                                    <span className="text-xs text-meta ml-1">
                                         {eff} {units === 'metric' ? 'km/kWh' : 'mi/kWh'} @ {spd}
                                         {entry.efficiencyNote && ` · ${entry.efficiencyNote}`}
                                     </span>
@@ -1697,13 +1697,13 @@ export default function RoadTripView({
 
             {/* ── Chart ────────────────────────────────────────────────── */}
             {loading && (
-                <div className="text-center py-8 text-muted">Loading charging data…</div>
+                <div className="text-center py-8 text-secondary">Loading charging data…</div>
             )}
 
             {!loading && validEntries.length === 0 && (
                 <div className="empty-state">
                     <p className="text-lg">No runs with usable charging and efficiency data.</p>
-                    <p className="text-sm text-muted mt-2">
+                    <p className="text-sm text-secondary mt-2">
                         Each run needs charging data, and either its own range test result
                         or another run from the same vehicle with distance &amp; energy data.
                     </p>
@@ -1763,10 +1763,10 @@ export default function RoadTripView({
                             </button>
                         )}
                     </div>
-                    <p className="text-xs text-faint mt-1">Drag to box-zoom · Reset Zoom to restore</p>
+                    <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset Zoom to restore</p>
                     {chartImage && (
                         <div className="mt-3">
-                            <p className="text-xs text-faint mb-1.5">Right-click or long-press to copy / save</p>
+                            <p className="text-xs text-meta mb-1.5">Right-click or long-press to copy / save</p>
                             <img src={chartImage} alt="Chart export" className="w-full rounded border border-[var(--color-border)]" />
                         </div>
                     )}
@@ -1807,7 +1807,7 @@ export default function RoadTripView({
                                     >
                                         <span className="flex items-center gap-1">
                                             {children}
-                                            <span className={`text-xs ${active ? 'text-blue-500' : 'text-faint'}`}>{arrow}</span>
+                                            <span className={`text-xs ${active ? 'text-blue-500' : 'text-meta'}`}>{arrow}</span>
                                         </span>
                                     </th>
                                 );
@@ -1878,7 +1878,7 @@ export default function RoadTripView({
                                                           style={{ backgroundColor: entry.color }} />
                                                     <div>
                                                         <div className="font-medium">{vehicleLabel(entry.vehicle)}</div>
-                                                        <div className="text-xs text-faint">{entry.label}</div>
+                                                        <div className="text-xs text-meta">{entry.label}</div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -1899,12 +1899,12 @@ export default function RoadTripView({
                                                     <>
                                                         {entry.miPerKwh.toFixed(1)} {effLabel}
                                                         {entry.testSpeedMph ? (
-                                                            <span className="text-faint ml-1">@ {fmtSpeed(entry.testSpeedMph, units)}</span>
+                                                            <span className="text-meta ml-1">@ {fmtSpeed(entry.testSpeedMph, units)}</span>
                                                         ) : (
                                                             <span className="text-amber-500 ml-1" title="Set Speed (mph) on the run in Tests &amp; Data for accurate speed correction">@ 70 mph (assumed)</span>
                                                         )}
                                                         {entry.efficiencyNote && (
-                                                            <span className="block text-xs text-faint">{entry.efficiencyNote}</span>
+                                                            <span className="block text-xs text-meta">{entry.efficiencyNote}</span>
                                                         )}
                                                     </>
                                                 )}
@@ -1921,7 +1921,7 @@ export default function RoadTripView({
                                                 )}
                                             </td>
                                             <td className="px-3 py-2 font-medium">
-                                                {sim.completed === false ? <span className="text-faint">—</span> : (() => {
+                                                {sim.completed === false ? <span className="text-meta">—</span> : (() => {
                                                     const absDelta = Math.abs(vsIce);
                                                     const h = Math.floor(absDelta / 60);
                                                     const m = Math.round(absDelta % 60);

@@ -296,7 +296,7 @@ export default function EditVehicleForm({
                                 disabled={imageUploading}
                             />
                         </label>
-                        <p className="text-xs text-faint mt-1">16:9 crop · max 1600×900 · saved as JPEG</p>
+                        <p className="text-xs text-meta mt-1">16:9 crop · max 1600×900 · saved as JPEG</p>
                     </div>
                 )}
 
@@ -319,7 +319,7 @@ export default function EditVehicleForm({
                     <div className="crop-modal-panel">
                         <div className="crop-modal-header">
                             <h3 className="font-semibold text-base">Crop Image (16:9)</h3>
-                            <p className="text-xs text-muted mt-0.5">Drag to reposition · resize handles to adjust · max output 1600×900</p>
+                            <p className="text-xs text-secondary mt-0.5">Drag to reposition · resize handles to adjust · max output 1600×900</p>
                         </div>
                         <div className="crop-modal-body">
                             <ReactCrop

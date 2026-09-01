@@ -215,7 +215,7 @@ export default function Playground() {
                     measured contrast against what it actually sits on, in the theme you
                     are currently in; it turns red below the WCAG AA floor for that size.
                 </p>
-                <p className="text-hint">
+                <p className="text-note">
                     A class in an owned family that is missing here fails{' '}
                     <code>playground.test.js</code>. Owned:{' '}
                     {OWNED_FAMILIES.map(f => f.label).join(', ')}.
@@ -228,7 +228,7 @@ export default function Playground() {
 
             <section className="pg-section">
                 <h3 className="section-title">Status colour tokens</h3>
-                <p className="text-hint pg-blurb">
+                <p className="text-note pg-blurb">
                     The triad each status carries: a solid fill, and a tinted surface with
                     a matching border and readable text. Every card below is drawn from its
                     own tokens.
@@ -239,7 +239,7 @@ export default function Playground() {
             {SECTIONS.map(section => (
                 <section key={section.id} className="pg-section">
                     <h3 className="section-title">{section.title}</h3>
-                    {section.blurb && <p className="text-hint pg-blurb">{section.blurb}</p>}
+                    {section.blurb && <p className="text-note pg-blurb">{section.blurb}</p>}
                     <SpecimenSet specimens={section.specimens} split={side} />
                 </section>
             ))}

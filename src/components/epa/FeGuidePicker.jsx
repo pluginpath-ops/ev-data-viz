@@ -39,7 +39,7 @@ import { guideConflicts } from '../../utils/feGuidePromotion';
  */
 function CandidateFacts({ row, exactYear, score }) {
     return (
-        <div className="text-xs text-faint">
+        <div className="text-xs text-meta">
             {row.label_comb_range_mi} mi
             {row.label_comb_mpge != null && ` · ${row.label_comb_mpge} MPGe`}
             {row.motor_count != null && ` · ${row.motor_count} motor${row.motor_count === 1 ? '' : 's'}`}
@@ -186,7 +186,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                     <span className="text-xs font-semibold text-secondary">Fuel Economy Guide</span>
                     <span className="fe-picker-badge">linked</span>
                 </div>
-                <p className="text-xs text-muted">
+                <p className="text-xs text-secondary">
                     {linkedRow?.id === feRowId ? linkedRow.carline : 'Linked to the published guide.'}
                     {linkedRow?.id === feRowId && linkedRow.model_year != null && ` · ${linkedRow.model_year}`}
                 </p>
@@ -210,7 +210,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                         </div>
                         {conflicts.map(c => (
                             <div key={c.column} className="fe-conflict-row">
-                                <span className="text-xs text-muted truncate">{FIELD_LABELS[c.column] ?? c.column}</span>
+                                <span className="text-xs text-secondary truncate">{FIELD_LABELS[c.column] ?? c.column}</span>
                                 <span className="text-xs font-mono text-secondary whitespace-nowrap">
                                     {String(c.ours ?? '—')} → {String(c.theirs)}
                                 </span>
@@ -247,11 +247,11 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
         <div className="fe-picker">
             <div className="fe-picker-head">
                 <span className="text-xs font-semibold text-secondary">Fuel Economy Guide</span>
-                {loading && <span className="text-xs text-faint">searching…</span>}
+                {loading && <span className="text-xs text-meta">searching…</span>}
             </div>
 
             {!loading && candidates?.length === 0 && (
-                <p className="text-xs text-muted">
+                <p className="text-xs text-secondary">
                     No staged guide rows for {group.make || 'this make'} in any imported year.
                     Import a guide under Admin → Fuel Economy Guide.
                 </p>
@@ -315,7 +315,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                                     </div>
                                 ))}
                                 {rest.length === 0 && (
-                                    <p className="text-xs text-faint">Nothing matches that filter.</p>
+                                    <p className="text-xs text-meta">Nothing matches that filter.</p>
                                 )}
                             </div>
                         </div>

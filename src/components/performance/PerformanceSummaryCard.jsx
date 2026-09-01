@@ -69,7 +69,7 @@ export default function PerformanceSummaryCard({
             <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="min-w-0 flex-1">
                     <div className="font-semibold text-sm truncate">
-                        {shown('source_name') || <span className="text-faint italic">Unattributed source</span>}
+                        {shown('source_name') || <span className="text-meta italic">Unattributed source</span>}
                         {dirty && (
                             <span className="ml-2 text-amber-500 text-[10px] font-normal" title="Unsaved edits">
                                 ● unsaved
@@ -77,7 +77,7 @@ export default function PerformanceSummaryCard({
                         )}
                     </div>
                     {shown('trim_label') && (
-                        <div className="text-xs text-muted mt-0.5">{shown('trim_label')}</div>
+                        <div className="text-xs text-secondary mt-0.5">{shown('trim_label')}</div>
                     )}
                 </div>
                 {canEdit && (

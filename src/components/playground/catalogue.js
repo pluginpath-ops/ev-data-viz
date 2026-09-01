@@ -35,7 +35,7 @@ export const OWNED_FAMILIES = [
       match: (n) => /(chip|badge|pill)/.test(n) || /^tag-(filter|pill)/.test(n) },
     { id: 'forms',   label: 'Form controls', match: (n) => /^form-input$/.test(n) },
     { id: 'type',    label: 'Typography',
-      match: (n) => /^(text-(body|caption|data|faint|hint|label|muted|secondary)|page-title|section-title|subsection-title)$/.test(n) },
+      match: (n) => /^(text-(body|data|label|meta|note|secondary)|page-title|section-title|subsection-title)$/.test(n) },
 ];
 
 /**
@@ -165,22 +165,22 @@ export const SECTIONS = [
     {
         id: 'type',
         title: 'Typography',
-        blurb: 'The semantic text scale. Never reach for text-gray-* — these carry the '
-             + 'dark theme with them.',
+        blurb: 'ONE axis: a role carries its own size, weight and colour, and you pick '
+             + 'exactly one. The colour tiers are gone — text-muted folded into '
+             + 'text-secondary, text-faint into text-meta, text-caption dissolved. Sizes '
+             + 'derive from --fs-body through --fs-step, so one dial moves the scale (#277).',
         specimens: [
             { cls: 'page-title',       as: 'div', label: 'page-title' },
             { cls: 'section-title',    as: 'div', label: 'section-title' },
             { cls: 'subsection-title', as: 'div', label: 'subsection-title' },
-            { cls: 'text-body',      as: 'div', label: 'text-body' },
-            { cls: 'text-secondary', as: 'div', label: 'text-secondary' },
-            { cls: 'text-muted',     as: 'div', label: 'text-muted' },
-            { cls: 'text-faint', as: 'div', label: 'text-faint', minRatio: 3,
-              note: 'Deliberately quiet — a row number, a placeholder. Held to 3:1, not 4.5:1, and dense tables become noise if it is raised.' },
-            { cls: 'text-label',   as: 'div', label: 'text-label' },
-            { cls: 'text-caption', as: 'div', label: 'text-caption' },
-            { cls: 'text-hint', as: 'div', label: 'text-hint', minRatio: 3,
-              note: 'Also on --color-text-faint, so the same allowance applies.' },
-            { cls: 'text-data',    as: 'div', label: 'text-data', note: 'Tabular figures for numbers in tables.' },
+            { cls: 'text-body',      as: 'div', label: 'text-body', note: 'The anchor. Every other size derives from it through --fs-step.' },
+            { cls: 'text-secondary', as: 'div', label: 'text-secondary', note: 'Body size, quieter. Supporting copy. Absorbed the old text-muted.' },
+            { cls: 'text-note',      as: 'div', label: 'text-note',
+              note: 'A gloss on the thing beside it — helper text, a status line. Italic because it is commentary, not content. Absorbed text-hint and most of text-caption.' },
+            { cls: 'text-meta',      as: 'div', label: 'text-meta',
+              note: 'Counts, ids, glyphs, parentheticals. Roman, not italic — never italicise a chevron. Absorbed text-faint, and gained contrast doing it: 2.43:1 to 4.63:1, so it no longer needs the large-text exemption it used to carry.' },
+            { cls: 'text-label',     as: 'div', label: 'text-label', note: 'Form and field labels. One step down, heavier.' },
+            { cls: 'text-data',      as: 'div', label: 'text-data', note: 'Tabular figures for numbers in tables.' },
         ],
     },
 ];

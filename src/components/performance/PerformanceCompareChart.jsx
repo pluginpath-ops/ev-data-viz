@@ -166,7 +166,7 @@ export default function PerformanceCompareChart({
             </div>
 
             {withData.length === 0 ? (
-                <p className="text-sm text-muted py-6 text-center">
+                <p className="text-sm text-secondary py-6 text-center">
                     No tested figure for this among the selected vehicles.
                 </p>
             ) : (
@@ -175,10 +175,10 @@ export default function PerformanceCompareChart({
                 </div>
             )}
 
-            {note && <p className="text-xs text-faint mt-2">{note}</p>}
+            {note && <p className="text-xs text-meta mt-2">{note}</p>}
 
             {withoutData.length > 0 && withData.length > 0 && (
-                <p className="text-xs text-faint mt-2">
+                <p className="text-xs text-meta mt-2">
                     {withoutData.length <= 5
                         ? `No figure for: ${withoutData.map(r => r.name).join(', ')}`
                         : `${withoutData.length} other selected vehicles have no figure here.`}

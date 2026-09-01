@@ -25,10 +25,10 @@ const SOURCE_LABEL = {
 
 function DerivedRow({ label, tooltip, result, format }) {
     const { value, source, certain, flags = [] } = result || {};
-    const meta = SOURCE_LABEL[source] || { text: source || '—', cls: 'text-faint' };
+    const meta = SOURCE_LABEL[source] || { text: source || '—', cls: 'text-meta' };
     return (
         <div className="flex items-center justify-between gap-2 py-0.5">
-            <span className="text-muted flex items-center gap-1">
+            <span className="text-secondary flex items-center gap-1">
                 {label}
                 {tooltip && <InfoIcon text={tooltip} position="right" />}
             </span>
@@ -49,7 +49,7 @@ export default function DerivedValues({ group, vehicle = null }) {
     const d = deriveAll(group);
     return (
         <div>
-            <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
+            <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">
                 Derived Values
             </div>
             <DerivedRow

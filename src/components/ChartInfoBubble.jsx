@@ -122,7 +122,7 @@ export default function ChartInfoBubble({ chartKey }) {
                         >
                             Cancel
                         </button>
-                        <span className="text-hint ml-auto">Visible to everyone · editable by contributors</span>
+                        <span className="text-note ml-auto">Visible to everyone · editable by contributors</span>
                     </div>
                 </div>
             )}

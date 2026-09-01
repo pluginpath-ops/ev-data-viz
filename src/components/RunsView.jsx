@@ -142,7 +142,7 @@ export const DEFAULT_RUNS_SUBTAB = 'tests';
  */
 function FactorInput({ label, title, value, onChange, onCommit }) {
     return (
-        <label className="flex items-center gap-1 text-xs text-muted">
+        <label className="flex items-center gap-1 text-xs text-secondary">
             <span title={title}>{label} ×</span>
             <input
                 type="number"
@@ -284,7 +284,7 @@ const DeriveAxisPanel = ({
         <div className="mt-2 border rounded bg-[var(--color-surface-muted)] p-3 space-y-3">
             {/* Mode selector */}
             <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-xs text-muted mr-1">Derive:</span>
+                <span className="text-xs text-secondary mr-1">Derive:</span>
                 {Object.entries(DERIVE_MODES).map(([key, m]) => (
                     <button
                         key={key}
@@ -296,7 +296,7 @@ const DeriveAxisPanel = ({
                         title={`from ${m.source}`}
                     >{m.label}</button>
                 ))}
-                <span className="text-xs text-faint ml-1">from {cfg.source}</span>
+                <span className="text-xs text-meta ml-1">from {cfg.source}</span>
             </div>
 
             {batteryMissing && (
@@ -304,12 +304,12 @@ const DeriveAxisPanel = ({
                     ⚠ Set the battery capacity (kWh) on this vehicle to derive charging axes.
                 </p>
             )}
-            {editDataLoading && <p className="text-xs text-faint">Loading data…</p>}
+            {editDataLoading && <p className="text-xs text-meta">Loading data…</p>}
             {!editDataLoading && (
                 <>
                     {/* Default: derive straight from the populated columns */}
                     {!usingAnchors && (
-                        <p className="text-xs text-muted">
+                        <p className="text-xs text-secondary">
                             {mode === 'time' && 'Elapsed time is integrated from the populated SoC + power columns (t=0 at the first point).'}
                             {mode === 'power' && 'Power is averaged across each SoC interval from the elapsed-time delta. Needs ≥2 points with both SoC and time.'}
                             {mode === 'soc' && (originRow
@@ -342,7 +342,7 @@ const DeriveAxisPanel = ({
                                 className="form-input w-16"
                             />
                             <span>%</span>
-                            <span className="text-faint">reported kW is charger-side; ~5% typical</span>
+                            <span className="text-meta">reported kW is charger-side; ~5% typical</span>
                         </div>
                     )}
 
@@ -362,12 +362,12 @@ const DeriveAxisPanel = ({
 
                     {usingAnchors && (
                         <div>
-                            <p className="text-xs text-muted mb-1">
+                            <p className="text-xs text-secondary mb-1">
                                 {mode === 'soc'
                                     ? 'Start SoC anchors the origin; the end SoC calibrates capacity/efficiency.'
                                     : 'Known (SoC, elapsed-time) reference points.'}
                             </p>
-                            <div className={`grid ${gridCols} gap-1 text-xs text-muted px-1 mb-1`}>
+                            <div className={`grid ${gridCols} gap-1 text-xs text-secondary px-1 mb-1`}>
                                 {cfg.anchorCols.map(c => <span key={c.key}>{c.label}</span>)}
                             </div>
                             <div className="space-y-1">
@@ -391,7 +391,7 @@ const DeriveAxisPanel = ({
                                         <button
                                             type="button"
                                             onClick={() => onChangeAnchors(anchors.filter((_, j) => j !== i))}
-                                            className="text-faint hover:text-red-500 font-bold leading-none"
+                                            className="text-meta hover:text-red-500 font-bold leading-none"
                                             title="Remove anchor"
                                         >✕</button>
                                     </div>
@@ -430,10 +430,10 @@ const DeriveAxisPanel = ({
                             className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                         >{applying ? 'Applying…' : 'Apply'}</button>
                         {!batteryMissing && usingAnchors && validAnchors.length < cfg.calibMinAnchors && (
-                            <span className="text-xs text-faint">Need ≥{cfg.calibMinAnchors} anchors to preview</span>
+                            <span className="text-xs text-meta">Need ≥{cfg.calibMinAnchors} anchors to preview</span>
                         )}
                         {!batteryMissing && !usingAnchors && mode === 'soc' && !startSocOk && (
-                            <span className="text-xs text-faint">Enter a start SoC to preview</span>
+                            <span className="text-xs text-meta">Enter a start SoC to preview</span>
                         )}
                     </div>
 
@@ -468,7 +468,7 @@ const DeriveAxisPanel = ({
                                     </tbody>
                                 </table>
                             </div>
-                            <p className="text-xs text-muted font-medium">
+                            <p className="text-xs text-secondary font-medium">
                                 Apply will write {preview.points.length} {cfg.write} values to this run.
                             </p>
                         </div>
@@ -1368,7 +1368,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 </div>
                 <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-lg leading-tight">{vehicle.name}</h3>
-                    <p className="text-muted text-sm">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
+                    <p className="text-secondary text-sm">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                     <div className="text-sm text-secondary mt-0.5 flex flex-wrap gap-x-3">
                         {vehicle.battery && <span>Battery: {vehicle.battery} kWh</span>}
                         {vehicle.range && <span>Range: {vehicle.range} mi</span>}
@@ -1381,12 +1381,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         return canPublish() ? (
                             <button
                                 onClick={() => onToggleVehicleVisibility(vehicle.id, isPublic ? 'private' : 'public')}
-                                className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200' : 'bg-[var(--color-surface-sunken)] text-muted border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]'}`}
+                                className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200' : 'bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]'}`}
                             >
                                 {isPublic ? '🌐 Public' : '🔒 Private'}
                             </button>
                         ) : (
-                            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-[var(--color-surface-sunken)] text-muted border-[var(--color-border)]'}`}>
+                            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)]'}`}>
                                 {isPublic ? '🌐 Public' : '🔒 Private'}
                             </span>
                         );
@@ -1435,7 +1435,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             onClick={() => onSubtabChange(t.id)}
                         >
                             {t.label}
-                            {count != null && <span className="text-xs text-muted ml-1.5">{count}</span>}
+                            {count != null && <span className="text-xs text-secondary ml-1.5">{count}</span>}
                         </button>
                     );
                 })}
@@ -1491,7 +1491,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <>
                                         {/* Role — exactly one. A run is a charging test or a range test. */}
                                         <div>
-                                            <p className="text-xs text-muted mb-1">Data type</p>
+                                            <p className="text-xs text-secondary mb-1">Data type</p>
                                             <div className="data-type-flags">
                                                 {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
                                                     const active = runMetadata.dataFlags.includes(key);
@@ -1501,7 +1501,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             type="button"
                                                             title={desc}
                                                             onClick={() => setRunMetadata(m => ({ ...m, dataFlags: [key] }))}
-                                                            className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-faint border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
+                                                            className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-meta border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
                                                         >
                                                             {label}
                                                         </button>
@@ -1551,7 +1551,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         {/* Charging energy field (create mode) */}
                                         {runMetadata.dataFlags.includes('charging') && (
                                             <div className="data-subpanel p-3">
-                                                <p className="text-sm font-semibold text-secondary mb-2">Charging Energy <span className="font-normal text-faint">(optional)</span></p>
+                                                <p className="text-sm font-semibold text-secondary mb-2">Charging Energy <span className="font-normal text-meta">(optional)</span></p>
                                                 <input
                                                     type="number"
                                                     placeholder="Energy added (kWh)"
@@ -1560,7 +1560,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     onChange={(e) => setRunMetadata({...runMetadata, chargeEnergyKwh: e.target.value})}
                                                     className="form-input w-full"
                                                 />
-                                                <p className="text-xs text-faint mt-1">
+                                                <p className="text-xs text-meta mt-1">
                                                     Energy measured at charger or vehicle — <em>energy in</em>
                                                 </p>
                                             </div>
@@ -1694,7 +1694,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <div className="csv-drop-zone">
                                         <label className="cursor-pointer">
                                             <span className="text-blue-600 font-medium">Click to upload CSV file</span>
-                                            <span className="block text-xs text-faint mt-1">Optional — attach data points to this record</span>
+                                            <span className="block text-xs text-meta mt-1">Optional — attach data points to this record</span>
                                             <input
                                                 type="file"
                                                 accept=".csv"
@@ -1704,7 +1704,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         </label>
                                     </div>
                                     <div className="mt-3">
-                                        <p className="text-xs text-faint mb-1">Or paste CSV text directly:</p>
+                                        <p className="text-xs text-meta mb-1">Or paste CSV text directly:</p>
                                         <textarea
                                             rows={4}
                                             placeholder={"soc,chargeRate,time\n50,100,0\n80,75,15\n…"}
@@ -1879,12 +1879,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 <label className="flex items-center gap-2 cursor-pointer text-sm">
                                                     <input type="radio" name="joinKey" value="soc" checked={joinKey === 'soc'} onChange={() => setJoinKey('soc')} />
                                                     <span className="font-medium">SoC</span>
-                                                    <span className="text-muted">(charging curves, SoC-based data)</span>
+                                                    <span className="text-secondary">(charging curves, SoC-based data)</span>
                                                 </label>
                                                 <label className="flex items-center gap-2 cursor-pointer text-sm">
                                                     <input type="radio" name="joinKey" value="time" checked={joinKey === 'time'} onChange={() => setJoinKey('time')} />
                                                     <span className="font-medium">Time</span>
-                                                    <span className="text-muted">(time-series, e.g. Time+Power → Time+SoC)</span>
+                                                    <span className="text-secondary">(time-series, e.g. Time+Power → Time+SoC)</span>
                                                 </label>
                                             </div>
                                         </>
@@ -1964,7 +1964,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 <div className="space-y-3">
                                     {/* Role — exactly one. A run is a charging test or a range test. */}
                                     <div>
-                                        <p className="text-xs text-muted mb-1">Data type</p>
+                                        <p className="text-xs text-secondary mb-1">Data type</p>
                                         <div className="data-type-flags">
                                             {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
                                                 const active = (editFormData.dataFlags || ['charging']).includes(key);
@@ -1974,7 +1974,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         type="button"
                                                         title={desc}
                                                         onClick={() => setEditFormData(f => ({ ...f, dataFlags: [key] }))}
-                                                        className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-faint border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
+                                                        className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-meta border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
                                                     >
                                                         {label}
                                                     </button>
@@ -2134,7 +2134,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 onChange={(e) => setEditFormData({...editFormData, chargeEnergyKwh: e.target.value})}
                                                 className="form-input w-full"
                                             />
-                                            <p className="text-xs text-faint mt-1">
+                                            <p className="text-xs text-meta mt-1">
                                                 Energy measured at charger or vehicle — <em>energy in</em> (not equal to energy used driving due to charging losses)
                                             </p>
                                         </div>
@@ -2204,7 +2204,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     >
                                         <span className="font-semibold">{showDataTable ? '▴ Hide data' : '▾ Show data'}</span>
                                         {editData !== null && !editDataLoading && (
-                                            <span className="text-xs text-faint">({editData.length} rows)</span>
+                                            <span className="text-xs text-meta">({editData.length} rows)</span>
                                         )}
                                         {editDataDirty && (
                                             <span className="ml-1 text-xs text-orange-500 font-medium">● unsaved changes</span>
@@ -2273,9 +2273,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         <span className="text-xs text-secondary">
                                                             {editCalcKwh != null && <>⚡ <strong>Data points → {editCalcKwh} kWh</strong> · </>}
                                                             {packE != null
-                                                                ? <>pack ≈ {packE} kWh <span className="text-muted">({dSoC}% × {cap} kWh)</span></>
-                                                                : <span className="text-muted">add SoC data + battery capacity to validate energy</span>}
-                                                            {hasManual && <span className="text-muted"> · entered {manual} kWh</span>}
+                                                                ? <>pack ≈ {packE} kWh <span className="text-secondary">({dSoC}% × {cap} kWh)</span></>
+                                                                : <span className="text-secondary">add SoC data + battery capacity to validate energy</span>}
+                                                            {hasManual && <span className="text-secondary"> · entered {manual} kWh</span>}
                                                         </span>
                                                         {excess != null && good && (
                                                             <span className="text-xs bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full font-medium">
@@ -2288,23 +2288,23 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             </span>
                                                         )}
                                                         {packE != null && !hasManual && (
-                                                            <span className="text-xs text-faint">Enter energy added above to validate</span>
+                                                            <span className="text-xs text-meta">Enter energy added above to validate</span>
                                                         )}
                                                     </div>
                                                 );
                                             })()}
                                             {editDataLoading ? (
-                                                <p className="text-sm text-muted py-4 text-center">Loading…</p>
+                                                <p className="text-sm text-secondary py-4 text-center">Loading…</p>
                                             ) : (
                                                 <>
                                                     <div className="overflow-auto rounded border" style={{ maxHeight: 360 }}>
                                                         <table className="w-full text-xs border-collapse">
                                                             <thead className="bg-[var(--color-surface-muted)] sticky top-0 z-10 border-b">
                                                                 <tr>
-                                                                    <th className="px-2 py-1.5 text-left text-muted font-medium w-8">#</th>
+                                                                    <th className="px-2 py-1.5 text-left text-secondary font-medium w-8">#</th>
                                                                     {/* Read-only timestamp column — only rendered when data has timestamps */}
                                                                     {editData?.some(r => r.timestamp != null) && (
-                                                                        <th className="px-2 py-1.5 text-left text-muted font-medium whitespace-nowrap">
+                                                                        <th className="px-2 py-1.5 text-left text-secondary font-medium whitespace-nowrap">
                                                                             Timestamp
                                                                         </th>
                                                                     )}
@@ -2313,7 +2313,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                         const isActive   = sortField === field;
                                                                         const indicator  = isActive ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
                                                                         return (
-                                                                        <th key={field} className="px-2 py-1.5 text-left text-muted font-medium">
+                                                                        <th key={field} className="px-2 py-1.5 text-left text-secondary font-medium">
                                                                             <div className="flex flex-col gap-0.5">
                                                                                 <button
                                                                                     onClick={() => handleSortByField(field)}
@@ -2342,7 +2342,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                                         <button
                                                                                             onClick={() => handleClearColumn(field)}
                                                                                             title={`Clear all ${label} values`}
-                                                                                            className="text-[10px] font-normal rounded px-1 leading-tight w-fit text-faint border border-transparent hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors"
+                                                                                            className="text-[10px] font-normal rounded px-1 leading-tight w-fit text-meta border border-transparent hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors"
                                                                                         >
                                                                                             ×clr
                                                                                         </button>
@@ -2358,12 +2358,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 {(editData || []).map((row, i) => (
                                                                     <tr key={i} className={`border-t ${i % 2 !== 0 ? 'bg-[var(--color-surface-muted)]' : ''}`}>
                                                                         {/* Row # + delete button share the first cell */}
-                                                                        <td className="px-1 py-0.5 text-faint select-none whitespace-nowrap">
+                                                                        <td className="px-1 py-0.5 text-meta select-none whitespace-nowrap">
                                                                             <div className="flex items-center gap-1">
                                                                                 {canEdit(vehicle) && (
                                                                                     <button
                                                                                         onClick={() => handleDeleteDataRow(i)}
-                                                                                        className="w-5 h-5 flex items-center justify-center rounded text-faint hover:text-red-500 hover:bg-red-50 transition-colors leading-none flex-shrink-0"
+                                                                                        className="w-5 h-5 flex items-center justify-center rounded text-meta hover:text-red-500 hover:bg-red-50 transition-colors leading-none flex-shrink-0"
                                                                                         title="Remove row"
                                                                                     >×</button>
                                                                                 )}
@@ -2372,10 +2372,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                         </td>
                                                                         {/* Timestamp cell — read-only, only rendered when column is visible */}
                                                                         {editData?.some(r => r.timestamp != null) && (
-                                                                            <td className="px-2 py-0.5 text-muted whitespace-nowrap text-[11px] font-mono select-all">
+                                                                            <td className="px-2 py-0.5 text-secondary whitespace-nowrap text-[11px] font-mono select-all">
                                                                                 {row.timestamp
                                                                                     ? new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                                                                                    : <span className="text-faint">—</span>}
+                                                                                    : <span className="text-meta">—</span>}
                                                                             </td>
                                                                         )}
                                                                         {['soc','chargeRate','time','range','temperature'].map(field => (
@@ -2430,7 +2430,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             date for a grouped run; repeating it puts
                                             the same fact on screen twice. */}
                                         {run.date && run.session_id == null && (
-                                            <span className="text-sm text-faint">{run.date}</span>
+                                            <span className="text-sm text-meta">{run.date}</span>
                                         )}
                                         <RunVoteButtons
                                             vouch={votes.vouch}
@@ -2478,7 +2478,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             className={`text-sm px-2 py-1 rounded transition-colors ${
                                                 run.isDefault
                                                     ? 'bg-blue-100 text-blue-700 hover:bg-red-50 hover:text-red-600 border border-blue-200 hover:border-red-200'
-                                                    : 'text-faint hover:text-green-600 hover:bg-green-50'
+                                                    : 'text-meta hover:text-green-600 hover:bg-green-50'
                                             }${!canCreate ? ' opacity-50 cursor-not-allowed' : ''}`}
                                         >
                                             {run.isDefault
@@ -2553,7 +2553,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     </div>
                                     {/* Color picker — lower right */}
                                     <div className="run-actions-row">
-                                        <label className="flex items-center gap-1 text-xs text-faint cursor-pointer">
+                                        <label className="flex items-center gap-1 text-xs text-meta cursor-pointer">
                                             <input
                                                 type="color"
                                                 value={run.color || '#3b82f6'}
@@ -2620,7 +2620,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             {subtab === 'inherited' && inheritedRuns.length === 0 && !(isContributor && canEdit(vehicle)) && (
                 <div className="empty-state">
                     <p className="text-lg">No inherited tests.</p>
-                    <p className="text-sm text-muted mt-1">
+                    <p className="text-sm text-secondary mt-1">
                         A vehicle can borrow another's tests when they share a battery or a body — sign in as a contributor to link some.
                     </p>
                 </div>
@@ -2696,7 +2696,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         over there. Landing on Charging & Range rather
                                                         than the tab you left, because the source OWNS
                                                         this run and would not list it under Inherited. */}
-                                                    <p className="text-muted">Inherited from:{' '}
+                                                    <p className="text-secondary">Inherited from:{' '}
                                                         <VehicleLink
                                                             vehicle={srcVehicle}
                                                             name={srcName}
@@ -2739,7 +2739,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 </div>
                                                 {/* Row 2: Color Picker | Scale × */}
                                                 <div className="run-actions-row flex-wrap">
-                                                    <label className="flex items-center gap-1 text-xs text-muted">
+                                                    <label className="flex items-center gap-1 text-xs text-secondary">
                                                         <input
                                                             type="color"
                                                             value={runColor}
@@ -2768,7 +2768,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         />
                                                     ) : (
                                                         f.stored !== 1 && f.stored != null && (
-                                                            <span key={f.key} className="text-xs font-mono text-muted" title={f.title}>
+                                                            <span key={f.key} className="text-xs font-mono text-secondary" title={f.title}>
                                                                 {f.label.toLowerCase()} ×{f.stored}
                                                             </span>
                                                         )
@@ -2882,12 +2882,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     </select>
                                 </div>
                                 {sourceVehicles.length === 0 && (
-                                    <p className="text-xs text-faint mt-1">
+                                    <p className="text-xs text-meta mt-1">
                                         No other vehicles have unlinked tests.
                                     </p>
                                 )}
                                 {selectedSrc && runsToLink.length === 0 && (
-                                    <p className="text-xs text-faint mt-1">
+                                    <p className="text-xs text-meta mt-1">
                                         All tests from {selectedSrc.name} are already linked.
                                     </p>
                                 )}
@@ -2912,16 +2912,16 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     {opt.label}
                                                 </button>
                                             ))}
-                                            <span className="text-faint text-xs select-none">·</span>
+                                            <span className="text-meta text-xs select-none">·</span>
                                             <button type="button" className="run-bulk-link"
                                                 onClick={() => setNewLinkRunIds(null)}>all</button>
-                                            <span className="text-faint text-xs select-none">/</span>
+                                            <span className="text-meta text-xs select-none">/</span>
                                             <button type="button" className="run-bulk-link"
                                                 onClick={() => setNewLinkRunIds([])}>none</button>
                                         </div>
 
                                         {candidates.length === 0 ? (
-                                            <p className="text-xs text-faint mt-1 italic">
+                                            <p className="text-xs text-meta mt-1 italic">
                                                 No {newLinkKind === 'all' ? '' : `${newLinkKind} `}tests left to link from {selectedSrc.name}.
                                             </p>
                                         ) : (
@@ -2938,13 +2938,13 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             {runKindFrom(r) === 'charging' ? '⚡' : '📏'}
                                                         </span>
                                                         <span className="truncate">{r.name}</span>
-                                                        {r.date && <span className="text-xs text-faint shrink-0">{r.date}</span>}
+                                                        {r.date && <span className="text-xs text-meta shrink-0">{r.date}</span>}
                                                     </label>
                                                 ))}
                                             </div>
                                         )}
 
-                                        <p className="text-xs text-muted mt-1">
+                                        <p className="text-xs text-secondary mt-1">
                                             {runsToLink.length === 0
                                                 ? 'Nothing selected — pick at least one test.'
                                                 : `Will link ${runsToLink.length} test${runsToLink.length !== 1 ? 's' : ''}.`}
@@ -3094,7 +3094,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                     <div className="copy-to-modal-panel">
                         <div className="modal-header px-5 py-4 border-b">
                             <h3 className="font-semibold text-base">Copy test to another vehicle</h3>
-                            <p className="text-xs text-muted mt-0.5">"{copyToRun.name}" will be copied as an independent run</p>
+                            <p className="text-xs text-secondary mt-0.5">"{copyToRun.name}" will be copied as an independent run</p>
                         </div>
                         <div className="px-5 py-4">
                             <label className="block text-sm font-medium mb-2">Select destination vehicle</label>

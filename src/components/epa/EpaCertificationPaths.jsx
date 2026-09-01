@@ -111,7 +111,7 @@ export default function EpaCertificationPaths({ models = [] }) {
                                 .filter(Boolean).join(' ')}
                         >
                             <span className="font-semibold text-secondary">{m.title}</span>
-                            <span className="text-xs text-muted">{m.detail}</span>
+                            <span className="text-xs text-secondary">{m.detail}</span>
                             <span className="cert-cell-effort">{PATH_EFFORT[m.key]} of lab time</span>
                         </div>
                     );
@@ -122,7 +122,7 @@ export default function EpaCertificationPaths({ models = [] }) {
                 <div className="cert-grid-label">Adjustment</div>
                 <div className="cert-cell">
                     <span className="font-semibold text-secondary">× {LABEL_ADJUSTMENT} fixed factor</span>
-                    <span className="text-xs text-muted">
+                    <span className="text-xs text-secondary">
                         EPA-allowed value to replace 5-cycle testing
                     </span>
                 </div>
@@ -151,7 +151,7 @@ export default function EpaCertificationPaths({ models = [] }) {
                             </span>
                         </InfoIcon>
                     </span>
-                    <span className="text-xs text-muted">
+                    <span className="text-xs text-secondary">
                         EPA mathematical regression to estimate 5-cycle — returns a worse result
                         than × {LABEL_ADJUSTMENT} once a vehicle is above ~{crossover.toFixed(0)} MPGe
                         unadjusted city
@@ -159,12 +159,12 @@ export default function EpaCertificationPaths({ models = [] }) {
                 </div>
                 <div className="cert-cell">
                     <span className="font-semibold text-secondary">Measured 5-cycle factor</span>
-                    <span className="text-xs text-muted">
+                    <span className="text-xs text-secondary">
                         Generated from the three cycles above rather than assumed — per vehicle,
                         and the only route that measures the conditions instead of pricing them.
                         The R2 20&quot; is {R2_EXAMPLE_FACTOR}, not {LABEL_ADJUSTMENT}.
                     </span>
-                    <span className="text-xs text-faint">
+                    <span className="text-xs text-meta">
                         Requires EPA approval to use SAE J1634 App B/C (40 CFR 600.116-12)
                     </span>
                 </div>
@@ -174,13 +174,13 @@ export default function EpaCertificationPaths({ models = [] }) {
                 <div />
                 <div className="cert-cell cert-cell-result">
                     <span className="font-semibold text-secondary">Combined label range</span>
-                    <span className="text-xs text-muted">
+                    <span className="text-xs text-secondary">
                         {LABEL_WEIGHT_CITY} city + {LABEL_WEIGHT_HWY} highway
                     </span>
                 </div>
             </div>
 
-            <p className="text-xs text-faint mt-3">
+            <p className="text-xs text-meta mt-3">
                 Lab times are approximate and <strong>per configuration</strong>, not per model —
                 certification is keyed to a test group and vehicle configuration, so a model line
                 with several packs, drive layouts and wheel sizes multiplies every figure above.

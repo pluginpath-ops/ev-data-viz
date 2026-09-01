@@ -33,9 +33,9 @@ function VerdictPill({ verdict }) {
     const colour = meta.tone === 'disagrees' ? 'var(--color-danger)'
         : meta.tone === 'close' ? 'var(--color-warning)'
         : meta.tone === 'agrees' ? 'var(--color-success)'
-        : 'var(--color-text-faint)';
+        : 'var(--color-text-meta)';
     return (
-        <span className="text-caption font-medium whitespace-nowrap" style={{ color: colour }}>
+        <span className="text-note font-medium whitespace-nowrap" style={{ color: colour }}>
             {meta.label}
         </span>
     );
@@ -45,13 +45,13 @@ function VerdictPill({ verdict }) {
 function Findings({ row }) {
     const findings = auditFindings(row);
     if (!findings.length) {
-        return <p className="text-caption text-faint">Everything checkable was checked and agreed.</p>;
+        return <p className="text-note">Everything checkable was checked and agreed.</p>;
     }
     return (
         <div className="flex flex-col gap-1">
             {findings.map((f, i) => (
                 <div key={i} className={`epa-check ${TONE_CLASS[f.severity] ?? ''}`}>
-                    <span className="text-caption text-secondary">{f.text}</span>
+                    <span className="text-note">{f.text}</span>
                 </div>
             ))}
         </div>
@@ -92,7 +92,7 @@ export default function EpaAuditSweep() {
     return (
         <div className="card p-4">
             <h3 className="section-title mb-1">Reconciliation sweep</h3>
-            <p className="text-caption text-muted mb-3">
+            <p className="text-note mb-3">
                 Every EPA test group against the same four checks the curator card runs, worst
                 first. Read-only — nothing here recomputes or writes, because derivations are
                 already computed at read time.
@@ -127,11 +127,11 @@ export default function EpaAuditSweep() {
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Filter by group, make, carline or vehicle…"
-                className="form-input text-caption w-full mb-3"
+                className="form-input w-full mb-3"
             />
 
             {!shown.length && (
-                <p className="text-caption text-faint">Nothing matches that filter.</p>
+                <p className="text-note">Nothing matches that filter.</p>
             )}
 
             <div className="flex flex-col gap-1">
@@ -145,9 +145,9 @@ export default function EpaAuditSweep() {
                             <span className="min-w-0">
                                 <span className="text-secondary truncate block">
                                     {r.make} {r.carline}
-                                    {r.modelYear && <span className="text-faint"> · {r.modelYear}</span>}
+                                    {r.modelYear && <span className="text-meta"> · {r.modelYear}</span>}
                                 </span>
-                                <span className="text-caption text-faint block truncate">
+                                <span className="text-meta block truncate">
                                     <span className="font-mono">{r.testGroupId}</span>
                                     {r.vehicles.length > 0 && ` · ${r.vehicles.map(v => v.name).join(', ')}`}
                                     {r.notes.length > 0 && ` · ${r.notes.join(' · ')}`}

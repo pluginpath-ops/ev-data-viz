@@ -326,7 +326,7 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
             </div>
             {chartImage && (
                 <div className="mt-3">
-                    <p className="text-xs text-faint mb-1.5">Right-click or long-press to copy / save</p>
+                    <p className="text-xs text-meta mb-1.5">Right-click or long-press to copy / save</p>
                     <img src={chartImage} alt="Chart export" className="w-full rounded border border-[var(--color-border)]" />
                 </div>
             )}

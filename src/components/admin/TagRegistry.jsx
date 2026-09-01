@@ -38,7 +38,7 @@ export default function TagRegistry() {
         <section>
             <div className="section-header">
                 <div className="section-header-title">Tags</div>
-                <div className="section-header-actions text-caption text-secondary">
+                <div className="section-header-actions text-note">
                     {(tags ?? []).length} tags
                 </div>
             </div>
@@ -57,7 +57,7 @@ export default function TagRegistry() {
                                     onChange={e => setEditing(s => ({ ...s, [tag.id]: e.target.value }))}
                                     aria-label="Tag name"
                                 />
-                                <div className="brand-counts text-caption text-secondary">
+                                <div className="brand-counts text-meta">
                                     {count} vehicle{count === 1 ? '' : 's'}
                                 </div>
                                 <div className="brand-row-actions">
@@ -99,7 +99,7 @@ export default function TagRegistry() {
                                         carries no other data and removing it from vehicles loses
                                         nothing but the label. The count is shown so the choice is
                                         informed rather than blocked. */}
-                                    <div className="text-caption">
+                                    <div className="text-note">
                                         Delete <strong>{tag.name}</strong>
                                         {count > 0 && <> and remove it from {count} vehicle{count === 1 ? '' : 's'}</>}?
                                         {count > 0 && <> Merging keeps them tagged.</>}

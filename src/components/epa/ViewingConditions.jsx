@@ -124,7 +124,7 @@ export default function ViewingConditions({ conditions }) {
                         className="form-input w-24 text-right"
                         aria-label="Elevation in feet"
                     />
-                    <span className="text-sm text-faint">ft</span>
+                    <span className="text-sm text-meta">ft</span>
                 </div>
 
                 {/* Temperature — viewing condition, applies to all curves */}
@@ -148,9 +148,9 @@ export default function ViewingConditions({ conditions }) {
                         className="form-input w-20 text-right"
                         aria-label="Ambient temperature in °F"
                     />
-                    <span className="text-sm text-faint">°F</span>
+                    <span className="text-sm text-meta">°F</span>
                     <span
-                        className={`text-xs whitespace-nowrap ${densityAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-faint'}`}
+                        className={`text-xs whitespace-nowrap ${densityAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-meta'}`}
                         title="Combined air-density ratio (altitude × temperature) applied to the aerodynamic (C) term"
                     >
                         → ρ {densityRatio.toFixed(2)}{densityAdjusted ? ' ▲' : ''}
@@ -179,7 +179,7 @@ export default function ViewingConditions({ conditions }) {
                         className="form-input w-24 text-right"
                         aria-label="Accessory load override in watts"
                     />
-                    <span className="text-sm text-faint">W</span>
+                    <span className="text-sm text-meta">W</span>
                 </div>
 
                 {/* Wind — viewing condition, applies to all curves */}
@@ -202,7 +202,7 @@ export default function ViewingConditions({ conditions }) {
                         className="form-input w-16 text-right"
                         aria-label="Wind speed in mph"
                     />
-                    <span className="text-sm text-faint">mph @</span>
+                    <span className="text-sm text-meta">mph @</span>
                     <input
                         type="number"
                         step="15"
@@ -214,7 +214,7 @@ export default function ViewingConditions({ conditions }) {
                         className="form-input w-16 text-right"
                         aria-label="Wind direction relative to travel, in degrees"
                     />
-                    <span className="text-sm text-faint">°{windAdjusted ? ' ▲' : ''}</span>
+                    <span className="text-sm text-meta">°{windAdjusted ? ' ▲' : ''}</span>
                 </div>
 
                 {/* The elevation-gain disclosure. Turning it OFF clears the inputs
@@ -260,7 +260,7 @@ export default function ViewingConditions({ conditions }) {
                             className="form-input w-20 text-right"
                             aria-label="Net elevation gain in feet (negative for net descent)"
                         />
-                        <span className="text-sm text-faint">ft over</span>
+                        <span className="text-sm text-meta">ft over</span>
                         <input
                             type="number"
                             step="5"
@@ -271,9 +271,9 @@ export default function ViewingConditions({ conditions }) {
                             className="form-input w-16 text-right"
                             aria-label="Distance in miles the elevation change is spread over"
                         />
-                        <span className="text-sm text-faint">mi</span>
+                        <span className="text-sm text-meta">mi</span>
                         <span
-                            className={`text-xs whitespace-nowrap ${gradeAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-faint'}`}
+                            className={`text-xs whitespace-nowrap ${gradeAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-meta'}`}
                             title="Average grade over the distance above"
                         >
                             → {avgGradePercent.toFixed(1)}% grade{gradeAdjusted ? ' ▲' : ''}

@@ -149,9 +149,9 @@ export default function RunSelector({
             >
                 <span style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
                 Select vehicles &amp; tests
-                <span className="text-sm font-normal text-muted">({selectedCount} selected)</span>
+                <span className="text-sm font-normal text-secondary">({selectedCount} selected)</span>
                 {expanded && (
-                    <span className="text-xs font-normal text-faint ml-2">· Drag the pills above to reorder</span>
+                    <span className="text-xs font-normal text-meta ml-2">· Drag the pills above to reorder</span>
                 )}
             </button>
                 {headerActions && <div className="run-selector-actions">{headerActions}</div>}
@@ -171,7 +171,7 @@ export default function RunSelector({
                                             className="flex items-center gap-1.5 text-left group"
                                             title={isVehicleExpanded(vehicle.id) ? 'Collapse' : 'Expand'}
                                         >
-                                            <span style={{ display: 'inline-block', transform: isVehicleExpanded(vehicle.id) ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} className="text-faint group-hover:text-secondary">&#9660;</span>
+                                            <span style={{ display: 'inline-block', transform: isVehicleExpanded(vehicle.id) ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} className="text-meta group-hover:text-secondary">&#9660;</span>
                                             <h4 className="text-sm font-semibold text-secondary">{vehicle.name}</h4>
                                         </button>
                                         {/* Bulk helpers — a vehicle can contribute a dozen rows,
@@ -183,7 +183,7 @@ export default function RunSelector({
                                         >
                                             all
                                         </button>
-                                        <span className="text-faint text-xs select-none">/</span>
+                                        <span className="text-meta text-xs select-none">/</span>
                                         <button
                                             type="button"
                                             onClick={() => setVehicleSelection(vehicle, false)}
@@ -195,7 +195,7 @@ export default function RunSelector({
 
                                     {isVehicleExpanded(vehicle.id) && (
                                         filteredRuns.length === 0 ? (
-                                            <p className="text-sm text-faint italic">{emptyMessage}</p>
+                                            <p className="text-sm text-meta italic">{emptyMessage}</p>
                                         ) : (
                                             <div className="run-items">
                                                 {filteredRuns.map(run => pairMode ? (
@@ -318,7 +318,7 @@ function PairRows({
                             {renderRunMeta?.(run)}
                         </span>
                     ) : (
-                        <span className="pair-charging-label text-faint">↳</span>
+                        <span className="pair-charging-label text-meta">↳</span>
                     )}
 
                     {/* The range basis for this pair */}
@@ -473,7 +473,7 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRun
                 <span>
                     {run.name}
                     <RunSourceLinks run={run} />
-                    <span className="text-sm text-muted"> ({run.date})</span>
+                    <span className="text-sm text-secondary"> ({run.date})</span>
                 </span>
                 {renderRunMeta?.(run)}
             </span>

@@ -347,7 +347,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                     <h3 className="section-title mb-0">Edit Specs — {vehicle.name}</h3>
                     <button
                         onClick={onClose}
-                        className="text-faint hover:text-secondary text-xl leading-none"
+                        className="text-meta hover:text-secondary text-xl leading-none"
                         aria-label="Close"
                     >
                         ×
@@ -378,13 +378,13 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                         onClick={() => { setParentSearch(''); setShowParentDropdown(true); }}
                                         className="form-input w-full text-left truncate"
                                     >
-                                        {selectedParentLabel || <span className="text-faint">— None —</span>}
+                                        {selectedParentLabel || <span className="text-meta">— None —</span>}
                                     </button>
                                 )}
                                 {showParentDropdown && (
                                     <ul className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border shadow-lg bg-[var(--color-surface-input)] border-[var(--color-border)]">
                                         <li
-                                            className="px-3 py-2 text-sm cursor-pointer text-faint hover:bg-[var(--color-surface-sunken)]"
+                                            className="px-3 py-2 text-sm cursor-pointer text-meta hover:bg-[var(--color-surface-sunken)]"
                                             onMouseDown={() => {
                                                 setInheritFromId('');
                                                 setShowParentDropdown(false);
@@ -407,7 +407,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                             </li>
                                         ))}
                                         {filteredParents.length === 0 && (
-                                            <li className="px-3 py-2 text-sm text-faint italic">No matches</li>
+                                            <li className="px-3 py-2 text-sm text-meta italic">No matches</li>
                                         )}
                                     </ul>
                                 )}
@@ -416,7 +416,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                 <button
                                     type="button"
                                     onClick={() => setInheritFromId('')}
-                                    className="text-faint hover:text-secondary text-lg leading-none flex-shrink-0"
+                                    className="text-meta hover:text-secondary text-lg leading-none flex-shrink-0"
                                     title="Clear inheritance"
                                 >×</button>
                             )}
@@ -429,7 +429,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                     </div>
 
                     <div className="flex items-center justify-between mb-4">
-                        <p className="text-sm text-muted">Fields left blank are not saved.</p>
+                        <p className="text-sm text-secondary">Fields left blank are not saved.</p>
                         <button
                             type="button"
                             onClick={() => {
@@ -478,7 +478,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                                     : undefined;
                                                 return (
                                                     <div key={field.key}>
-                                                        <label className="block text-xs text-muted mb-0.5 flex items-center gap-1">
+                                                        <label className="block text-xs text-secondary mb-0.5 flex items-center gap-1">
                                                             {field.label}
                                                             {isFlagged && (
                                                                 <SpecFieldFlagButton
@@ -502,10 +502,10 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                         {/* Custom fields */}
                                         {(
                                             <div className="mt-3 pt-2 border-t">
-                                                <p className="text-xs text-faint mb-1.5">Custom fields</p>
+                                                <p className="text-xs text-meta mb-1.5">Custom fields</p>
                                                 {customEntries.map(([key, val]) => (
                                                     <div key={key} className="specs-custom-row mb-1.5">
-                                                        <span className="text-xs text-muted w-32 flex-shrink-0 truncate" title={formatCustomKey(key)}>
+                                                        <span className="text-xs text-secondary w-32 flex-shrink-0 truncate" title={formatCustomKey(key)}>
                                                             {formatCustomKey(key)}
                                                         </span>
                                                         <input

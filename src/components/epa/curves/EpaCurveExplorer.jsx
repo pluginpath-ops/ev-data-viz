@@ -217,7 +217,7 @@ export default function EpaCurveExplorer() {
             <div className="section-header">
                 <div>
                     <div className="section-title">Speed-consumption curves</div>
-                    <div className="text-caption text-secondary">
+                    <div className="text-note">
                         Efficiency against steady speed, computed from each record’s own road-load
                         coefficients. {subjects.length} records can be plotted — most belong to no
                         vehicle in the database, which is why this view does not use the vehicle selection.

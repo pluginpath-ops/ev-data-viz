@@ -53,7 +53,7 @@ export default function EpaCycleSpeedChart({ ranCycleKeys = [] }) {
                             vocabulary: a cert record says UDDS and HWY, the
                             label says FTP-75 city and HWFET highway, and
                             they are the same driving. */}
-                        <span className="text-xs text-faint">
+                        <span className="text-xs text-meta">
                             {c.schedule} · {c.tempF}°F, {c.condition}
                         </span>
                     </div>,

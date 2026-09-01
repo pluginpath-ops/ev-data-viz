@@ -86,7 +86,7 @@ export default function FeGuideImport() {
     return (
         <div className="card">
             <h3 className="text-lg font-semibold mb-1">Fuel Economy Guide import</h3>
-            <p className="text-sm text-muted mb-4">
+            <p className="text-sm text-secondary mb-4">
                 EPA publishes one guide per model year. Staged here as published-label
                 candidates; attaching one to a test group is a separate step.
             </p>
@@ -108,7 +108,7 @@ export default function FeGuideImport() {
                 <span className="text-sm text-secondary">
                     {parsing ? 'Reading…' : 'Drop a guide CSV here, or click to choose'}
                 </span>
-                <span className="text-xs text-faint">Exported from the EPA Fuel Economy Guide</span>
+                <span className="text-xs text-meta">Exported from the EPA Fuel Economy Guide</span>
             </div>
 
             {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
@@ -126,7 +126,7 @@ export default function FeGuideImport() {
                     <p className="text-xs font-medium" style={{ color: 'var(--color-warning)' }}>
                         {parsed.warnings.length} column(s) not found — those values will be empty:
                     </p>
-                    <ul className="text-xs text-muted list-disc pl-5 mt-1">
+                    <ul className="text-xs text-secondary list-disc pl-5 mt-1">
                         {parsed.warnings.map(w => <li key={w}>{w}</li>)}
                     </ul>
                 </div>
@@ -142,12 +142,12 @@ export default function FeGuideImport() {
                     <p className="text-xs font-medium" style={{ color: 'var(--color-warning)' }}>
                         {parsed.flagged.length} row(s) import with implausible figures:
                     </p>
-                    <ul className="text-xs text-muted list-disc pl-5 mt-1">
+                    <ul className="text-xs text-secondary list-disc pl-5 mt-1">
                         {parsed.flagged.map(f => (
                             <li key={`${f.modelYear}|${f.division}|${f.carline}`}>
                                 {f.modelYear} {f.division} {f.carline}
                                 {f.flags.map(code => (
-                                    <span key={code} className="block text-faint">
+                                    <span key={code} className="block text-meta">
                                         {PLAUSIBILITY_MESSAGES[code] ?? code}
                                     </span>
                                 ))}
@@ -222,7 +222,7 @@ function Stat({ label, value, strong }) {
     return (
         <span className="fe-stat">
             <span className={`fe-stat-value ${strong ? 'fe-stat-value-strong' : ''}`}>{value}</span>
-            <span className="text-xs text-muted">{label}</span>
+            <span className="text-xs text-secondary">{label}</span>
         </span>
     );
 }

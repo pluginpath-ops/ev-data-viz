@@ -18,7 +18,7 @@ function List({ title, items, measure, digits, unit }) {
                     <span className="stats-extreme-name">{observationLabel(o)}</span>
                     <span className="text-data">
                         {Number(o[measure]).toFixed(digits)}
-                        {unit && <span className="text-faint"> {unit}</span>}
+                        {unit && <span className="text-meta"> {unit}</span>}
                     </span>
                 </div>
             ))}

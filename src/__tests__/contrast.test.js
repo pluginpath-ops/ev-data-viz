@@ -106,10 +106,14 @@ const PAIRINGS = [
 /**
  * Text that is deliberately quiet, held to the 3:1 large-text bar instead.
  *
- * `--color-text-faint` is for a row number or a placeholder — text that must
- * recede or the dense tables become unreadable noise. Recorded here as a
- * decision rather than left to fail, so raising it stays a choice someone makes
- * on purpose.
+ * `--color-text-faint` no longer has a class: the typography pass folded
+ * `.text-faint` into `.text-meta`, which draws on `--color-text-muted` and
+ * clears the full 4.5:1 — 282 sites of chrome that had been sitting at 2.43:1
+ * in light mode.
+ *
+ * The token stays, and stays exempt, because it is still used for chart axes
+ * and disabled states. Those are not body text and the large-text floor is the
+ * right bar for them; what changed is that prose can no longer reach for it.
  */
 const LARGE_TEXT_ONLY = new Set(['--color-text-faint']);
 

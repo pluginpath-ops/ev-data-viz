@@ -52,7 +52,7 @@ export default function GuideColumnPicker({ visible, onChange }) {
                                         onChange={() => toggle(col.key)}
                                     />
                                     <span>{col.label}</span>
-                                    {col.unit && <span className="text-faint">{col.unit}</span>}
+                                    {col.unit && <span className="text-meta">{col.unit}</span>}
                                 </label>
                             ))}
                         </div>

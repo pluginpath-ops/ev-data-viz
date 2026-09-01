@@ -54,7 +54,7 @@ function MergeControl({ brand, brands, onMerge, busy }) {
 
     return (
         <div className="brand-merge-confirm">
-            <div className="text-caption">
+            <div className="text-note">
                 Move everything from <strong>{brand.name}</strong> to <strong>{targetBrand?.name}</strong>?
                 {' '}<strong>{brand.name}</strong> is deleted and becomes an alias of{' '}
                 <strong>{targetBrand?.name}</strong>, so a re-import of the old spelling resolves
@@ -104,7 +104,7 @@ function BrandRow({ brand, brands, usage, aliases, parents, onSave, onMerge, onD
                     list="brand-parent-options"
                     aria-label="Corporate parent"
                 />
-                <div className="brand-counts text-caption text-secondary">
+                <div className="brand-counts text-meta">
                     {known ? (
                         <>
                             {use.vehicles} vehicle{use.vehicles === 1 ? '' : 's'}
@@ -143,11 +143,11 @@ function BrandRow({ brand, brands, usage, aliases, parents, onSave, onMerge, onD
 
             {showAliases && (
                 <div className="brand-aliases">
-                    {aliases.length === 0 && <div className="text-caption text-muted">No aliases.</div>}
+                    {aliases.length === 0 && <div className="text-note">No aliases.</div>}
                     {aliases.map(a => (
                         <span key={a.id} className="brand-alias-chip">
                             {a.alias}
-                            <span className="text-faint"> · {a.source.replace('_', ' ')}</span>
+                            <span className="text-meta"> · {a.source.replace('_', ' ')}</span>
                             <button type="button" onClick={() => onDeleteAlias(a.id)} aria-label={`Remove alias ${a.alias}`}>×</button>
                         </span>
                     ))}
@@ -233,7 +233,7 @@ export default function BrandRegistry() {
             <section>
                 <div className="section-header">
                     <div className="section-header-title">Brands</div>
-                    <div className="section-header-actions text-caption text-secondary">
+                    <div className="section-header-actions text-note">
                         {(manufacturers ?? []).length} brands
                     </div>
                 </div>
@@ -260,7 +260,7 @@ export default function BrandRegistry() {
             <section>
                 <div className="section-header">
                     <div className="section-header-title">EPA divisions awaiting a decision</div>
-                    <div className="section-header-actions text-caption text-secondary">
+                    <div className="section-header-actions text-note">
                         {unmapped.length} unmapped
                     </div>
                 </div>
@@ -268,7 +268,7 @@ export default function BrandRegistry() {
                     manufacturer appearing in a new import is exactly the case
                     this panel exists to catch. */}
                 {unmapped.length === 0 ? (
-                    <div className="text-caption text-secondary">
+                    <div className="text-note">
                         Every division EPA has filed resolves to a brand.
                     </div>
                 ) : (
@@ -277,7 +277,7 @@ export default function BrandRegistry() {
                             <div key={d.division} className="brand-row brand-row-main">
                                 <div>
                                     <div>{d.division}</div>
-                                    <div className="text-caption text-faint">
+                                    <div className="text-meta">
                                         {d.rowCount} configuration{d.rowCount === 1 ? '' : 's'}
                                     </div>
                                 </div>

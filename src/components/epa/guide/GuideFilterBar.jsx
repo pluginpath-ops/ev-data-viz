@@ -20,7 +20,7 @@ function FacetGroup({ label, hint, values, selected, onToggle, onClear, countFor
         <div className="guide-facet">
             <div className="guide-facet-label">
                 {label}
-                {hint && <span className="text-hint ml-1">{hint}</span>}
+                {hint && <span className="text-note ml-1">{hint}</span>}
             </div>
             <div className="guide-facet-values">
                 {values.map((v) => {
@@ -76,11 +76,11 @@ function RangeInput({ label, unit, minKey, maxKey, filters, onChange }) {
     };
     return (
         <div className="guide-facet">
-            <div className="guide-facet-label">{label} <span className="text-hint">{unit}</span></div>
+            <div className="guide-facet-label">{label} <span className="text-note">{unit}</span></div>
             <div className="guide-range-inputs">
                 <input type="number" inputMode="numeric" placeholder="min"
                     value={filters[minKey] ?? ''} onChange={set(minKey)} className="guide-range-input" />
-                <span className="text-faint">–</span>
+                <span className="text-meta">–</span>
                 <input type="number" inputMode="numeric" placeholder="max"
                     value={filters[maxKey] ?? ''} onChange={set(maxKey)} className="guide-range-input" />
             </div>

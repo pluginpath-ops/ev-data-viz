@@ -40,7 +40,7 @@ function downloadText(filename, text, mime) {
  */
 function RowNotes({ row }) {
     if (row.coercions.length === 0 && row.fieldSkips.length === 0) {
-        return <span className="text-faint">—</span>;
+        return <span className="text-meta">—</span>;
     }
 
     // Two names inline, the rest as "+n" — keeps the column from wrapping.
@@ -126,7 +126,7 @@ function RowDetail({ row }) {
             {row.specSkips.length > 0 && (
                 <>
                     <p className="font-medium mt-1">Kept (already set)</p>
-                    <ul className="import-detail-list text-faint">
+                    <ul className="import-detail-list text-meta">
                         {row.specSkips.map(s => (
                             <li key={s.path}>
                                 {fieldPathLabel(s.path)} — keeping <span className="font-mono">{String(s.current)}</span>,
@@ -240,7 +240,7 @@ export default function ImportVehiclesModal({ onClose }) {
             >
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="section-title mb-0">Bulk Import Vehicles</h3>
-                    <button onClick={onClose} className="text-faint hover:text-secondary text-xl leading-none" aria-label="Close">×</button>
+                    <button onClick={onClose} className="text-meta hover:text-secondary text-xl leading-none" aria-label="Close">×</button>
                 </div>
 
                 {error && (
@@ -255,7 +255,7 @@ export default function ImportVehiclesModal({ onClose }) {
                             onDragLeave={() => setDragOver(false)}
                             className={`border-2 border-dashed rounded-lg p-10 text-center ${dragOver ? 'border-indigo-400 bg-indigo-50/40' : 'border-[var(--color-border)]'}`}
                         >
-                            <p className="text-body text-muted mb-3">
+                            <p className="text-body text-secondary mb-3">
                                 {busy ? 'Reading file…' : 'Drop a CSV or JSON file here, or'}
                             </p>
                             <label className="btn btn-secondary text-sm cursor-pointer">
@@ -267,7 +267,7 @@ export default function ImportVehiclesModal({ onClose }) {
                                     onChange={e => { processFile(e.target.files[0]); e.target.value = ''; }}
                                 />
                             </label>
-                            <p className="text-hint mt-3">Parsed in your browser — nothing is uploaded until you confirm.</p>
+                            <p className="text-note mt-3">Parsed in your browser — nothing is uploaded until you confirm.</p>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 mt-4">
@@ -304,7 +304,7 @@ export default function ImportVehiclesModal({ onClose }) {
                                     <li><span className="font-mono">powertrain._custom.gear_ratio</span> — free-form custom fields</li>
                                     <li>JSON may also nest specs under <span className="font-mono">specs: {'{'} category: {'{'} field: value {'}}'}</span></li>
                                 </ul>
-                                <p className="mt-2 text-hint">
+                                <p className="mt-2 text-note">
                                     Values already set on a vehicle are never overwritten — an import only fills blanks.
                                 </p>
                             </div>
@@ -314,7 +314,7 @@ export default function ImportVehiclesModal({ onClose }) {
 
                 {step === 'review' && plan && (
                     <>
-                        <p className="text-body text-muted mb-2">
+                        <p className="text-body text-secondary mb-2">
                             <span className="font-medium">{fileName}</span> · {parsed.format.toUpperCase()} ·{' '}
                             {plan.summary.total} row(s)
                         </p>
@@ -327,7 +327,7 @@ export default function ImportVehiclesModal({ onClose }) {
                         </div>
 
                         {(plan.summary.coercions > 0 || plan.summary.fieldSkips > 0) && (
-                            <p className="text-hint mt-2">
+                            <p className="text-note mt-2">
                                 {plan.summary.coercions > 0 && <>ⓘ {plan.summary.coercions} value(s) adjusted to a schema option. </>}
                                 {plan.summary.fieldSkips > 0 && <>⚠ {plan.summary.fieldSkips} value(s) couldn't be read and will be left blank. </>}
                                 <button type="button" onClick={toggleAllNoted} className="import-link-button">
@@ -337,7 +337,7 @@ export default function ImportVehiclesModal({ onClose }) {
                         )}
 
                         {(summary.newManufacturers.length > 0 || summary.newTags.length > 0) && (
-                            <p className="text-hint mt-2">
+                            <p className="text-note mt-2">
                                 Will also create
                                 {summary.newManufacturers.length > 0 && <> brand(s): <span className="font-medium">{summary.newManufacturers.join(', ')}</span></>}
                                 {summary.newManufacturers.length > 0 && summary.newTags.length > 0 && ' and'}
@@ -346,7 +346,7 @@ export default function ImportVehiclesModal({ onClose }) {
                         )}
 
                         {parsed.columnIssues.length > 0 && (
-                            <ul className="mt-2 text-caption text-amber-600 dark:text-amber-400 list-disc pl-5">
+                            <ul className="mt-2 import-note-info text-note list-disc pl-5">
                                 {parsed.columnIssues.map((issue, i) => (
                                     <li key={i}>
                                         {issue.kind === 'ambiguous'
@@ -358,9 +358,9 @@ export default function ImportVehiclesModal({ onClose }) {
                         )}
 
                         <div className="import-table-container mt-3">
-                            <table className="w-full text-caption">
+                            <table className="w-full text-meta">
                                 <thead className="bg-[var(--color-surface-muted)] sticky top-0">
-                                    <tr className="text-left text-muted">
+                                    <tr className="text-left text-secondary">
                                         <th className="p-2 w-8">
                                             <input
                                                 type="checkbox"
@@ -400,10 +400,10 @@ export default function ImportVehiclesModal({ onClose }) {
                                                     </td>
                                                     <td className="p-2">{row.label}</td>
                                                     <td className="p-2"><span className={style.className}>{style.label}</span></td>
-                                                    <td className="p-2 text-muted">{row.matchedBy ?? '—'}</td>
+                                                    <td className="p-2 text-secondary">{row.matchedBy ?? '—'}</td>
                                                     <td className="p-2 font-mono">
                                                         {fills || '—'}
-                                                        {row.tagNames.length > 0 && <span className="text-muted"> +{row.tagNames.length} tag</span>}
+                                                        {row.tagNames.length > 0 && <span className="text-secondary"> +{row.tagNames.length} tag</span>}
                                                     </td>
                                                     <td className="p-2">
                                                         <RowNotes row={row} />
@@ -427,7 +427,7 @@ export default function ImportVehiclesModal({ onClose }) {
                         </div>
 
                         <div className="flex items-center gap-2 mt-4">
-                            <span className="text-hint flex-1">
+                            <span className="text-note flex-1">
                                 {summary.fieldWrites > 0
                                     ? 'Only blank fields are filled — existing values stay as they are.'
                                     : 'Nothing selected to write.'}
@@ -449,7 +449,7 @@ export default function ImportVehiclesModal({ onClose }) {
                             {result.created} vehicle(s) created · {result.updated} updated.
                         </p>
                         {result.failures.length > 0 && (
-                            <ul className="mt-3 text-caption text-red-600 dark:text-red-400 list-disc pl-5 text-left">
+                            <ul className="mt-3 import-note-warn text-note list-disc pl-5 text-left">
                                 {result.failures.map((f, i) => <li key={i}>{f.label}: {f.message}</li>)}
                             </ul>
                         )}

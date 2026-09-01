@@ -28,9 +28,11 @@ or body line needs *no* color class unless you want it dimmer.
 | `.section-title` | h3 | Card / section heading |
 | `.subsection-title` | h4 | Group heading inside a card |
 | `.text-body` | p, span | Default body copy (`text-sm`) |
-| `.text-caption` | p, span | Small secondary copy (`text-xs`) |
+| `.text-secondary` | p, span | Supporting copy — body size, quieter |
+| `.text-note` | p, span | A gloss on the thing beside it — helper text, a status line. *Italic* |
+| `.text-meta` | span | Counts, ids, glyphs, parentheticals. Roman |
 | `.text-label` | label | Form / field labels |
-| `.text-hint` | p, span | Helper text under a control (faint) |
+
 | `.text-data` | span | Numeric / monospace values (tabular) |
 
 ### Color tiers (theme-aware)
@@ -39,8 +41,8 @@ Use to dim text below primary. They adapt to light/dark automatically.
 | Class | Light | Dark |
 |---|---|---|
 | `.text-secondary` | gray-600 | slate-300 |
-| `.text-muted` | gray-500 | slate-400 |
-| `.text-faint` | gray-400 | slate-500 |
+
+
 
 ## Examples
 
@@ -49,7 +51,7 @@ Use to dim text below primary. They adapt to light/dark automatically.
 <p className="text-body text-secondary">Tune the EPA math on this browser only.</p>
 
 <label className="text-label">Accessory load</label>
-<p className="text-hint">Constant parasitic draw assumed in the back-solve.</p>
+<p className="text-note">Constant parasitic draw assumed in the back-solve.</p>
 
 <span className="text-data">0.88</span>
 ```
@@ -66,8 +68,8 @@ Rough mapping when migrating a file:
 | `text-gray-900` / `text-gray-800` (heading) | a role class (no color) |
 | `text-gray-700` | `.text-secondary` (or role + secondary) |
 | `text-gray-600` | `.text-secondary` |
-| `text-gray-500` | `.text-muted` |
-| `text-gray-400` | `.text-faint` |
+| `text-gray-500` | `.text-secondary` |
+| `text-gray-400` | `.text-meta` |
 | `text-[10px]` / `[11px]` / `[13px]` | nearest role / `text-xs` |
 | `bg-gray-*`, `border-gray-*` | `var(--color-surface-*)`, `var(--color-border)` |
 

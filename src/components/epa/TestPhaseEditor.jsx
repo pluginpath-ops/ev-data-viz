@@ -35,7 +35,7 @@ function PhaseRow({ phase, canEdit, onSave, onDelete }) {
 
     return (
         <tr className="border-t border-[var(--color-border)]">
-            <td className="py-1 pr-2 text-faint font-mono">{phase.phase_index}</td>
+            <td className="py-1 pr-2 text-meta font-mono">{phase.phase_index}</td>
             <td className="py-1 pr-2">
                 {canEdit ? (
                     <select
@@ -54,7 +54,7 @@ function PhaseRow({ phase, canEdit, onSave, onDelete }) {
             <td className="py-1 pr-2">
                 <InlineNum value={phase.dc_energy_kwh} canEdit={canEdit} step="0.001" onSave={set('dc_energy_kwh')} />
             </td>
-            <td className="py-1 pr-2 text-right font-mono text-muted">{consumption ? `${consumption} Wh/mi` : '—'}</td>
+            <td className="py-1 pr-2 text-right font-mono text-secondary">{consumption ? `${consumption} Wh/mi` : '—'}</td>
             <td className="py-1 text-right">
                 {canEdit && (
                     <button onClick={() => onDelete(phase)} className="text-red-500 hover:text-red-600 text-xs" title="Delete phase">✕</button>
@@ -137,7 +137,7 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
                     ) : (
                         <span className="text-xs font-semibold">proc {test.procedure_code ?? '—'}</span>
                     )}
-                    <span className="font-mono text-xs text-faint">{test.test_number}</span>
+                    <span className="font-mono text-xs text-meta">{test.test_number}</span>
                 </div>
                 {canEdit && (
                     <button onClick={() => onDeleteTest(test)} className="btn btn-secondary text-xs py-0.5 px-2">Delete test</button>
@@ -160,7 +160,7 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
             {/* Phases */}
             <table className="w-full text-xs">
                 <thead>
-                    <tr className="text-faint text-[10px] uppercase tracking-wide text-left">
+                    <tr className="text-meta text-[10px] uppercase tracking-wide text-left">
                         <th className="font-semibold pr-2" title="Position in the test sequence (Bag/Phase number). Identity comes from procedure order, not the data.">#</th>
                         <th className="font-semibold pr-2" title="UDDS / HWY / SS / Cold-UDDS / US06 / SC03. SS = steady-state depletion at a lab-chosen speed — stored for energy totals but NOT a valid efficiency anchor.">Phase</th>
                         <th className="font-semibold pr-2" title="Actual distance driven for this phase (miles).">Dist (mi)</th>
@@ -175,7 +175,7 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
                             onSave={handleSavePhase} onDelete={onDeletePhase} />
                     ))}
                     {phases.length === 0 && (
-                        <tr><td colSpan={6} className="py-1 text-faint italic text-[11px]">No phases yet. Add the HWY phase to enable measured η.</td></tr>
+                        <tr><td colSpan={6} className="py-1 text-meta italic text-[11px]">No phases yet. Add the HWY phase to enable measured η.</td></tr>
                     )}
                 </tbody>
             </table>
@@ -213,7 +213,7 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
 function EnumField({ label, value, options, tooltip, canEdit, onSave }) {
     return (
         <div className="flex items-center justify-between gap-2 py-0.5">
-            <span className="text-muted flex items-center gap-1">
+            <span className="text-secondary flex items-center gap-1">
                 {label}
                 {tooltip && <InfoIcon text={tooltip} position="right" />}
             </span>
@@ -235,7 +235,7 @@ export default function TestPhaseEditor({ tests, canEdit, onSaveTest, onDeleteTe
     const sorted = [...(tests || [])].sort((a, b) => (a.procedure_code ?? 99) - (b.procedure_code ?? 99));
     return (
         <div>
-            <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
+            <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">
                 Tests &amp; Phases
             </div>
             {sorted.map(t => (
@@ -244,7 +244,7 @@ export default function TestPhaseEditor({ tests, canEdit, onSaveTest, onDeleteTe
                     onSavePhase={onSavePhase} onDeletePhase={onDeletePhase} onAddPhase={onAddPhase} />
             ))}
             {sorted.length === 0 && (
-                <p className="text-xs text-faint italic mb-2">No tests entered. Add a Multi-Cycle Test (proc 77) and its HWY phase to compute a measured η.</p>
+                <p className="text-xs text-meta italic mb-2">No tests entered. Add a Multi-Cycle Test (proc 77) and its HWY phase to compute a measured η.</p>
             )}
             {canEdit && (
                 <button onClick={onAddTest} className="btn btn-secondary text-xs py-1 px-2">+ Add test</button>

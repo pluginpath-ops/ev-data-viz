@@ -41,7 +41,7 @@ import { wheelSizeIn } from '../../utils/feGuideBrowse';
 function CandidateFacts({ row, score, exactYear }) {
     const implied = impliedUsableKwh(row);
     return (
-        <span className="text-caption text-faint">
+        <span className="text-meta">
             {row.label_comb_range_mi} mi
             {row.label_comb_mpge != null && ` · ${row.label_comb_mpge} MPGe`}
             {/* Pulled out of the carline, where it is easy to miss when three
@@ -75,7 +75,7 @@ function GroupEnergyFacts({ group }) {
     const est = estimatedAdjustedRange(group);
     if (f.dcEnergyKwh == null && f.etwLbs == null && f.useableKwh == null && est == null) return null;
     return (
-        <div className="text-caption text-secondary">
+        <div className="text-note">
             {/* The strongest hint when it exists: the group's own unadjusted
                 range on a label basis, directly comparable with a candidate's. */}
             {est && (
@@ -132,9 +132,9 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                         "Lucid Air Touring AWD" — and the score only makes sense
                         against the text that produced it. */}
                     {g.display_name && g.epa_carline_name && g.display_name !== g.epa_carline_name && (
-                        <div className="text-caption text-secondary">matched as “{g.epa_carline_name}”</div>
+                        <div className="text-note">matched as “{g.epa_carline_name}”</div>
                     )}
-                    <div className="text-caption text-faint">
+                    <div className="text-meta">
                         {g.model_year} {g.make} · {g.test_group_id}
                         {/* A carryover states which year the test actually came
                             from, which is usually why a candidate's year differs. */}
@@ -148,7 +148,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                         because the note itself is a paragraph of axle ratios and
                         N/V figures around one useful clause. */}
                     {(coveredWheels.length > 0 || covered.length > 0) && (
-                        <div className="text-caption text-secondary">
+                        <div className="text-note">
                             covers {covered.length} config{covered.length === 1 ? '' : 's'}
                             {coveredWheels.length > 0 && ` · ${coveredWheels.map(w => `${w}"`).join(', ')}`}
                         </div>
@@ -198,7 +198,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                                 exactYear={item.proposal.exactYear} />
                         </>
                     ) : (
-                        <div className="text-caption text-secondary">
+                        <div className="text-note">
                             {NO_PROPOSAL_REASONS[item.reason] ?? 'No proposal.'}
                             {/* The unanswerable case, named. Without this a
                                 curator hunts for a distinguishing fact that does
@@ -238,7 +238,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
             </div>
 
             {skipped && g.fe_guide_skip_note && (
-                <div className="text-caption text-muted">Skipped: {g.fe_guide_skip_note}</div>
+                <div className="text-note">Skipped: {g.fe_guide_skip_note}</div>
             )}
 
             {asking && (
@@ -266,12 +266,12 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                             <div className="text-label">From the certification (CSI)</div>
                             {g.epa_covered_models?.length > 0 && (
                                 <>
-                                    <div className="text-caption text-secondary">This certificate covers</div>
+                                    <div className="text-note">This certificate covers</div>
                                     <div className="sweep-covered-list">
                                         {[...new Map(g.epa_covered_models.map(cm =>
                                             [cm.carline_name, cm])).values()].map(cm => (
                                             <span key={cm.carline_name} className="brand-alias-chip">
-                                                {cm.carline_number && <span className="text-faint">{cm.carline_number} · </span>}
+                                                {cm.carline_number && <span className="text-meta">{cm.carline_number} · </span>}
                                                 {cm.carline_name}
                                             </span>
                                         ))}
@@ -298,7 +298,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                     {/* A borrowed year is a legitimate link, not a weaker one:
                         a configuration often has no row in its own year. */}
                     {item.ranked.some(c => !c.exactYear) && (
-                        <div className="text-hint">
+                        <div className="text-note">
                             Rows from another model year are marked in amber. Borrowing one is legitimate —
                             a configuration often has no row in its own year — but the figures may have moved.
                         </div>
@@ -372,7 +372,7 @@ export default function FeGuideLinkSweep() {
         setResult(res);
     });
 
-    if (loading) return <div className="text-caption text-secondary">Loading groups…</div>;
+    if (loading) return <div className="text-note">Loading groups…</div>;
     if (error) return <div className="empty-state">Could not load the sweep: {String(error.message ?? error)}</div>;
 
     const tierDef = TIERS.find(t => t.key === tier);
@@ -383,20 +383,20 @@ export default function FeGuideLinkSweep() {
                 <div>
                     <div className="section-header-title">Link certification groups to guide rows</div>
                     {progress && (
-                        <div className="text-caption text-secondary">
+                        <div className="text-note">
                             {progress.linked} linked · {progress.awaiting} awaiting a decision
                             {progress.skipped > 0 && ` · ${progress.skipped} skipped`}
                             {' '}of {progress.total}
                         </div>
                     )}
                     {progress === null && (
-                        <div className="text-caption text-muted">
+                        <div className="text-note">
                             Skips cannot be recorded until migration 058 is applied.
                         </div>
                     )}
                 </div>
                 <div className="section-header-actions">
-                    <label className="text-caption flex items-center gap-1.5">
+                    <label className="text-note flex items-center gap-1.5">
                         <input type="checkbox" checked={includeSkipped}
                             onChange={e => setIncludeSkipped(e.target.checked)} />
                         Show skipped
@@ -432,7 +432,7 @@ export default function FeGuideLinkSweep() {
                 ))}
             </div>
 
-            <div className="text-hint">
+            <div className="text-note">
                 {tierDef?.why}
                 {needsCsi > 0 && (
                     <> {needsCsi} of these {needsCsi === 1 ? 'has' : 'have'} no CSI certificate imported,
@@ -443,7 +443,7 @@ export default function FeGuideLinkSweep() {
 
             {batch.length > 0 && (
                 <div className="sweep-batch">
-                    <div className="text-caption">
+                    <div className="text-note">
                         <strong>{batch.length}</strong> of these have a single unambiguous same-year
                         match. Ties, borrowed years and weak matches are excluded and need a look.
                     </div>
@@ -459,8 +459,8 @@ export default function FeGuideLinkSweep() {
                 label rows it might correspond to on the right. */}
             {shown.length > 0 && (
                 <div className="sweep-legend">
-                    <div>Certification record <span className="text-faint">— from the EPA cert / CSI import</span></div>
-                    <div>Proposed match <span className="text-faint">— from the Fuel Economy Guide</span></div>
+                    <div>Certification record <span className="text-meta">— from the EPA cert / CSI import</span></div>
+                    <div>Proposed match <span className="text-meta">— from the Fuel Economy Guide</span></div>
                     <div />
                 </div>
             )}
