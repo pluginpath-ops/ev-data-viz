@@ -70,11 +70,11 @@ export const NOT_CATALOGUED = {
  * and cannot silently grow.
  */
 export const DARK_OVERRIDE_CLASSES = new Set([
-    'app-header-compact', 'badge-default', 'badge-hidden', 'brand-alias-chip',
-    'btn-tab', 'chart-copy-btn-active', 'curve-picker-row',
-    'curve-tier-badge', 'guide-chip', 'guide-row', 'guide-tested-note',
+    'app-header-compact', 'badge-default', 'badge-hidden',
+    'brand-alias-chip', 'btn-tab', 'chart-copy-btn-active',
+    'curve-picker-row', 'curve-tier-badge', 'guide-row', 'guide-tested-note',
     'merge-target-banner', 'specs-table-container', 'stats-suppressed-flag',
-    'sweep-batch', 'vote-btn-vouch',
+    'sweep-batch', 'vote-btn-vouch'
 ]);
 
 /** Whether a specimen's class list contains one that cannot scope. */

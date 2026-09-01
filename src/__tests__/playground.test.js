@@ -83,9 +83,18 @@ describe('the catalogue covers every control it claims to own', () => {
 });
 
 describe('the classes that cannot follow a themed subtree', () => {
-    /** Classes the stylesheet styles via `[data-theme="dark"] .foo`. */
+    /**
+     * Classes the stylesheet styles via `[data-theme="dark"] .foo`.
+     *
+     * Comments stripped FIRST. A comment explaining why a dark override once
+     * existed still contains the selector, so scanning the raw text counted the
+     * explanation as an occurrence — `.guide-chip` stayed on this list after its
+     * last real rule was deleted, purely because the note about it survived. A
+     * backlog metric that a paragraph of prose can inflate is not a metric.
+     */
     const actual = new Set(
-        [...CSS.matchAll(/\[data-theme="dark"\]\s+\.([a-z][a-z0-9-]*)/g)].map(m => m[1]),
+        [...CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+            .matchAll(/\[data-theme="dark"\]\s+\.([a-z][a-z0-9-]*)/g)].map(m => m[1]),
     );
 
     it('matches what the stylesheet actually does', () => {
@@ -103,9 +112,9 @@ describe('the classes that cannot follow a themed subtree', () => {
     });
 
     it('is a backlog that should shrink, never grow', () => {
-        // 17 when the marker was added. Lower it as classes move to tokens; a
-        // rise means a new class was written the old way.
-        expect(actual.size).toBeLessThanOrEqual(17);
+        // 17 when the marker was added, 15 now. Lower it as classes move to
+        // tokens; a rise means a new class was written the old way.
+        expect(actual.size).toBeLessThanOrEqual(15);
     });
 });
 
