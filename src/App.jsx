@@ -16,6 +16,7 @@ import EpaCurvesView from './components/EpaCurvesView';
 import PerformanceCompareView from './components/PerformanceCompareView';
 import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/AdminView';
+import Playground from './components/playground/Playground';
 import EpaSection from './components/epa/EpaSection';
 import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory } from './constants/chartNav';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
@@ -266,6 +267,12 @@ export default function App() {
             if (vid) pendingRunsVehicleId.current = isNaN(Number(vid)) ? vid : Number(vid);
             const sub = p.get('sub');
             if (RUNS_SUBTAB_IDS.includes(sub)) pendingRunsSubtab.current = sub;
+            return;
+        }
+        // Unlinked, but a real route: nothing here needs a role or a selection
+        // resolved first, because the page reads no data at all.
+        if (tab === 'playground') {
+            setView('playground');
             return;
         }
         if (tab === 'epa') {
@@ -1044,6 +1051,34 @@ export default function App() {
                         />
                     )}
                     {view === 'epa' && <EpaSection />}
+
+                    {/* The playground, ungated and unlinked.
+                      *
+                      * Reachable by anyone who types `?tab=playground`, and by
+                      * nothing else — no nav entry points at it. That is safe
+                      * only because the page is INERT: it renders specimens of
+                      * classes and reads computed styles, and touches no
+                      * vehicle, no run and no request. `playground.test.js`
+                      * asserts that rather than trusting it, because the day a
+                      * specimen gains a real action is the day obscurity stops
+                      * being enough.
+                      *
+                      * Ungated because the thing it is FOR — judging spacing,
+                      * contrast and focus states — happens wherever the site is
+                      * actually rendering, including a phone and the deployed
+                      * build. Gating it to admins would put it behind a sign-in
+                      * the local preview does not have, which is exactly where
+                      * it is most useful. Admins also get it as a linked tab
+                      * under Admin > Playground. */}
+                    {view === 'playground' && (
+                        <div className="card">
+                            <h2 className="page-title">Playground</h2>
+                            <p className="text-hint mb-4">
+                                Every catalogued control, live. Unlinked — reached by URL, or via Admin &gt; Playground.
+                            </p>
+                            <Playground />
+                        </div>
+                    )}
 
                     {view === 'admin' && isAdmin && (
                         <AdminView

@@ -6,6 +6,7 @@ import EpaDataCard from './EpaDataCard';
 import RolesPermissions from './admin/RolesPermissions';
 import ConstantsKnobs from './admin/ConstantsKnobs';
 import InterfaceSettings from './admin/InterfaceSettings';
+import Playground from './playground/Playground';
 import FeGuideImport from './admin/FeGuideImport';
 import FeGuideLinkSweep from './admin/FeGuideLinkSweep';
 import EpaAuditSweep from './admin/EpaAuditSweep';
@@ -19,6 +20,7 @@ const SUBTABS = [
     { id: 'brands',    label: 'Brands & Tags' },
     { id: 'constants', label: 'Model Constants' },
     { id: 'interface', label: 'Interface Settings' },
+    { id: 'playground', label: 'Playground' },
 ];
 
 /** Valid sub-tab ids, for App.jsx to validate the ?sub= URL param against. */
@@ -34,6 +36,7 @@ const SUBTITLES = {
     brands:    'One brand list for vehicles and EPA filings. Rename, merge, and map EPA\'s division spellings.',
     constants: 'Tune the EPA model math (local sandbox).',
     interface: 'Site-wide appearance settings.',
+    playground: 'Every catalogued control, live, with its measured contrast. The menu a new feature picks from.',
 };
 
 export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId, subtab, onSubtabChange }) {
@@ -218,6 +221,8 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
             {subtab === 'constants' && <ConstantsKnobs />}
 
             {subtab === 'interface' && <InterfaceSettings />}
+
+            {subtab === 'playground' && <Playground />}
         </div>
     );
 }

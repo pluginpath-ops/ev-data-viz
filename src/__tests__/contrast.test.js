@@ -39,9 +39,16 @@ const CSS = readFileSync(join(ROOT, 'src', 'index.css'), 'utf8');
  * catch rather than commit.
  */
 function tokensFor(theme) {
+    // Anchored to the start of a line, and not allowed to cross `;` or `}`.
+    // Line 4 declares `@variant dark (&:where([data-theme="dark"], …))`, so a
+    // pattern that may skip any characters up to the next `{` matches THERE and
+    // then runs on into the light block — handing back the light palette
+    // labelled as dark. The selector list itself is matched loosely, since
+    // light is `:root, [data-theme="light"]` and pinning the exact text broke
+    // twenty assertions when that gained a second selector.
     const block = theme === 'dark'
-        ? CSS.match(/\[data-theme="dark"\]\s*\{([\s\S]*?)\n\}/)
-        : CSS.match(/(?:^|\n):root\s*\{([\s\S]*?)\n\}/);
+        ? CSS.match(/\n\[data-theme="dark"\][^{;}]*\{([\s\S]*?)\n\}/)
+        : CSS.match(/\n:root[^{;}]*\{([\s\S]*?)\n\}/);
     if (!block) throw new Error(`no ${theme} token block found in index.css`);
 
     const out = {};
@@ -105,6 +112,24 @@ const PAIRINGS = [
  * on purpose.
  */
 const LARGE_TEXT_ONLY = new Set(['--color-text-faint']);
+
+describe('the token blocks were actually found', () => {
+    // A regex that silently matches the wrong block hands back a palette that
+    // looks plausible and is simply the other theme's — which is exactly what
+    // happened once, and every pairing still passed because light-on-light is
+    // perfectly legible. Two cheap assertions make that failure loud.
+    it('reads two DIFFERENT palettes', () => {
+        expect(THEMES.light['--color-card']).toBeTruthy();
+        expect(THEMES.dark['--color-card']).toBeTruthy();
+        expect(THEMES.dark['--color-card']).not.toBe(THEMES.light['--color-card']);
+    });
+
+    it('does not mistake the @variant declaration for the dark block', () => {
+        // Line 4 is `@variant dark (&:where([data-theme="dark"], …))`, which
+        // contains the dark selector but declares no tokens.
+        expect(THEMES.dark['--color-text-primary']).not.toBe(THEMES.light['--color-text-primary']);
+    });
+});
 
 describe('every intended text/surface pairing is readable, in both themes', () => {
     for (const theme of ['light', 'dark']) {
