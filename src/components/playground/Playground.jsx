@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { SECTIONS, OWNED_FAMILIES } from './catalogue';
+import { SECTIONS, OWNED_FAMILIES, hasDarkOverride } from './catalogue';
 import { parseColor, compositeStack, contrastRatio, AA_NORMAL, AA_LARGE } from '../../utils/contrast';
 
 /**
@@ -118,6 +118,13 @@ function Specimen({ spec }) {
                             + (reading.relaxed ? ' (deliberately quiet, held to the large-text floor)' : '')}>
                         {reading.ratio.toFixed(2)}:1
                     </span>
+                )}
+                {hasDarkOverride(spec.cls) && (
+                    <span className="pg-unscoped" title={
+                        'Styled by a [data-theme="dark"] override rather than tokens, so it '
+                        + 'cannot follow a themed subtree — in the side-by-side view below it '
+                        + 'keeps the document theme. This is the #277 migration backlog.'
+                    }>doc-theme only</span>
                 )}
                 {spec.note && <span className="pg-specimen-note">{spec.note}</span>}
             </div>

@@ -3170,6 +3170,13 @@ body {
     @apply rounded p-3;
     background-color: var(--color-background);
     border: 1px solid var(--color-border);
+    /* The pane re-declares the palette, but a token is not a colour until
+       something applies it. Without this, `color` kept INHERITING from body —
+       so the light pane drew light-mode backgrounds under dark-mode text and
+       every class that sets no colour of its own (page-title, section-title,
+       text-body, badge-status, tag-pill) went invisible. Read as those classes
+       being broken; they were not, the pane was. */
+    color: var(--color-text-primary);
 }
 .pg-split-label {
     @apply text-[10px] uppercase tracking-wide font-bold mb-2;
@@ -3195,3 +3202,13 @@ body {
     border: 1px solid var(--color-border);
 }
 .pg-token-sample { @apply text-sm; }
+
+/* Marks a specimen whose colours come from a `[data-theme="dark"]` override
+   instead of tokens — it cannot follow a themed subtree, so the side-by-side
+   view shows it in the document's theme regardless of the pane. Amber because
+   it is a caveat on the specimen, not a fault in it. */
+.pg-unscoped {
+    @apply text-[10px] font-mono rounded px-1 py-0.5;
+    background-color: var(--color-warning-surface);
+    color: var(--color-warning-text);
+}

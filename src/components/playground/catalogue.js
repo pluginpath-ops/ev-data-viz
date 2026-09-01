@@ -54,6 +54,34 @@ export const NOT_CATALOGUED = {
 };
 
 /**
+ * Classes styled by a `[data-theme="dark"] .foo` override rather than by tokens.
+ *
+ * These CANNOT scope to a subtree. The selector is a descendant of the document
+ * root, so a `.badge-default` inside a `[data-theme="light"]` pane is still
+ * inside `html[data-theme="dark"]` and keeps the dark styling — light-mode
+ * background under dark-mode text, at 1.38:1. The side-by-side view is telling
+ * the truth about the CSS and lying about the theme.
+ *
+ * So it is marked rather than hidden. This list IS the migration backlog for
+ * #277: a class drawn from tokens works in both panes and under any future
+ * reskin; one of these works only at the document root. `playground.test.js`
+ * keeps it honest against the stylesheet, so the list shrinks as classes move
+ * and cannot silently grow.
+ */
+export const DARK_OVERRIDE_CLASSES = new Set([
+    'app-header-compact', 'badge-default', 'badge-hidden', 'brand-alias-chip',
+    'btn-chart-mode', 'btn-tab', 'chart-copy-btn-active', 'curve-picker-row',
+    'curve-tier-badge', 'guide-chip', 'guide-row', 'guide-tested-note',
+    'merge-target-banner', 'specs-table-container', 'stats-suppressed-flag',
+    'sweep-batch', 'vote-btn-vouch',
+]);
+
+/** Whether a specimen's class list contains one that cannot scope. */
+export function hasDarkOverride(cls) {
+    return cls.split(/\s+/).some(c => DARK_OVERRIDE_CLASSES.has(c));
+}
+
+/**
  * The specimens, by section.
  *
  * `cls` is what a call site would write. `as` picks the element so the specimen
