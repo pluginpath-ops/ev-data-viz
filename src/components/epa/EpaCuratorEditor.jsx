@@ -51,7 +51,7 @@ function FuelEconomyLookup({ group, vehicle }) {
 function Section({ title, children }) {
     return (
         <div className="mb-4">
-            <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">{title}</div>
+            <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">{title}</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 text-xs">{children}</div>
         </div>
     );
@@ -159,7 +159,7 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange, 
         [group?.label_range_published, vehicle?.range],
     );
 
-    if (loading) return <p className="text-xs text-faint italic py-2">Loading curator data…</p>;
+    if (loading) return <p className="text-xs text-meta italic py-2">Loading curator data…</p>;
     if (error)   return <p className="text-xs text-red-500 py-2">Error: {error}</p>;
     if (!group)  return null;
 
@@ -257,7 +257,7 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange, 
     return (
         <div className="border-t border-[var(--color-border)] mt-3 pt-3">
             <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="text-[10px] text-faint italic">
+                <p className="text-[10px] text-meta italic">
                     Editing shared EPA reference data — changes apply to every vehicle linked to this test group.
                 </p>
                 <a
@@ -274,13 +274,13 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange, 
             {/* Optional source citation applied to subsequent edits' audit entries */}
             {canEdit && (
                 <div className="flex items-center gap-2 mb-3 text-xs">
-                    <span className="text-muted shrink-0">Source citation</span>
+                    <span className="text-secondary shrink-0">Source citation</span>
                     <input
                         type="text"
                         value={citation}
                         onChange={e => setCitation(e.target.value)}
                         placeholder="e.g. J1634 sheet p.3 / CSI PDF — applied to edits below"
-                        className="form-input text-xs py-0.5 flex-1"
+                        className="form-input form-input flex-1"
                     />
                 </div>
             )}
@@ -333,13 +333,13 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange, 
                 shown for reference. The steady-state curve uses the City/Highway set. */}
             {otherSets.length > 0 && (
                 <div className="mb-4">
-                    <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
+                    <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">
                         Other Coefficient Sets
                         <span className="normal-case font-normal"> — reference only (Cold-CO / US06; not used by the curve)</span>
                     </div>
                     <table className="w-full text-xs">
                         <thead>
-                            <tr className="text-faint text-[10px] uppercase tracking-wide text-left">
+                            <tr className="text-meta text-[10px] uppercase tracking-wide text-left">
                                 <th className="font-semibold pr-3">Category</th>
                                 <th className="font-semibold pr-3">Target A / B / C</th>
                                 <th className="font-semibold">Set A / B / C</th>
@@ -350,7 +350,7 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange, 
                                 <tr key={s.id ?? s.category} className="border-t border-[var(--color-border)]">
                                     <td className="pr-3 py-0.5 font-sans">{s.category}</td>
                                     <td className="pr-3">{coef(s.target_a)} / {coef(s.target_b)} / {coef(s.target_c)}</td>
-                                    <td className="text-muted">{coef(s.set_a)} / {coef(s.set_b)} / {coef(s.set_c)}</td>
+                                    <td className="text-secondary">{coef(s.set_a)} / {coef(s.set_b)} / {coef(s.set_c)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -421,7 +421,7 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange, 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 text-xs">
                 <DerivedValues group={group} />
             </div>
-            <p className="text-[10px] text-faint mt-1">
+            <p className="text-[10px] text-meta mt-1">
                 <span className="text-indigo-500">∗</span> feeds a derived calculation below.
             </p>
 

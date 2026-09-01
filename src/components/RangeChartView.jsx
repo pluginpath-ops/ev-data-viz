@@ -653,7 +653,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         style={{ display: plottableRuns.length > 0 ? 'block' : 'none' }}
                     />
                     {plottableRuns.length === 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center text-faint">
+                        <div className="absolute inset-0 flex items-center justify-center text-meta">
                             <div className="text-center">
                                 <p className="text-lg font-medium">
                                     {selectedRangeRuns.length === 0
@@ -661,7 +661,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                                         : 'Selected runs are missing required fields for this chart type'}
                                 </p>
                                 {selectedRangeRuns.length > 0 && (
-                                    <p className="text-sm mt-1 text-faint">
+                                    <p className="text-sm mt-1 text-meta">
                                         {CHART_TYPES.find(t => t.key === chartType)?.desc}
                                     </p>
                                 )}

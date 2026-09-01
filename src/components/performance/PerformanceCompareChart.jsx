@@ -144,7 +144,7 @@ export default function PerformanceCompareChart({
                         <select
                             value={valueMode}
                             onChange={e => onValueModeChange(e.target.value)}
-                            className="border p-1.5 rounded text-sm"
+                            className="form-input p-1.5"
                         >
                             {valueModes.map(v => (
                                 <option key={v.key} value={v.key}>{v.label}</option>
@@ -155,7 +155,7 @@ export default function PerformanceCompareChart({
                         <select
                             value={metric}
                             onChange={e => onMetricChange(e.target.value)}
-                            className="border p-1.5 rounded text-sm"
+                            className="form-input p-1.5"
                         >
                             {metricOptions.map(m => (
                                 <option key={m.key} value={m.key}>{m.label}</option>
@@ -166,7 +166,7 @@ export default function PerformanceCompareChart({
             </div>
 
             {withData.length === 0 ? (
-                <p className="text-sm text-muted py-6 text-center">
+                <p className="text-sm text-secondary py-6 text-center">
                     No tested figure for this among the selected vehicles.
                 </p>
             ) : (
@@ -175,10 +175,10 @@ export default function PerformanceCompareChart({
                 </div>
             )}
 
-            {note && <p className="text-xs text-faint mt-2">{note}</p>}
+            {note && <p className="text-xs text-meta mt-2">{note}</p>}
 
             {withoutData.length > 0 && withData.length > 0 && (
-                <p className="text-xs text-faint mt-2">
+                <p className="text-xs text-meta mt-2">
                     {withoutData.length <= 5
                         ? `No figure for: ${withoutData.map(r => r.name).join(', ')}`
                         : `${withoutData.length} other selected vehicles have no figure here.`}

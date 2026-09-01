@@ -32,7 +32,7 @@ const Item = ({ children, title, className = 'text-secondary' }) => (
 // its shape from card to card and an unrecorded figure is visibly unrecorded
 // — the correction skips exactly these, and silence looked like zero.
 const Missing = ({ what }) => (
-    <span className="text-faint" title={`No ${what} recorded — correction skips this axis`}>—</span>
+    <span className="text-meta" title={`No ${what} recorded — correction skips this axis`}>—</span>
 );
 
 function Row({ label, items }) {
@@ -134,12 +134,12 @@ export default function RunSpecRows({ run, units, socRange, fieldMeta = [], calc
     // what it holds — "overnight, 20in AT tyres", "lots of elevation gain/loss".
     // It belongs beside the measured conditions rather than on a line of its own.
     if (run.conditions) {
-        conditions.push(<Item key="notes" className="text-muted italic">{run.conditions}</Item>);
+        conditions.push(<Item key="notes" className="text-secondary italic">{run.conditions}</Item>);
     }
     const software = run.softwareVersion || run.software_version;
     if (software) {
         conditions.push(
-            <Item key="sw" className="text-muted" title="Vehicle software version at the time of the test">
+            <Item key="sw" className="text-secondary" title="Vehicle software version at the time of the test">
                 sw {software}
             </Item>);
     }
@@ -180,10 +180,10 @@ export default function RunSpecRows({ run, units, socRange, fieldMeta = [], calc
             if (!check) {
                 results.push(
                     <button key="cmp" onClick={() => onCheckKwh(run)}
-                        className="text-faint hover:text-secondary border border-[var(--color-border)] rounded px-1.5 py-0.5 transition-colors text-xs"
+                        className="text-meta hover:text-secondary border border-[var(--color-border)] rounded px-1.5 py-0.5 transition-colors text-xs"
                         title="Calculate kWh from data points and compare">Compare ↔</button>);
             } else if (check.loading) {
-                results.push(<Item key="cmp" className="text-faint text-xs">Calculating…</Item>);
+                results.push(<Item key="cmp" className="text-meta text-xs">Calculating…</Item>);
             } else if (check.kwh != null) {
                 const pct = Math.abs(run.charge_energy_kwh - check.kwh) / Math.max(run.charge_energy_kwh, check.kwh) * 100;
                 results.push(

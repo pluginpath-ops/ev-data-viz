@@ -32,7 +32,7 @@ export default function RolesPermissions({ users, loading, saving, currentUserId
                             {users.map(u => (
                                 <tr key={u.id} className="border-t hover:bg-[var(--color-surface-muted)] transition">
                                     <td className="px-4 py-3 font-medium text-[var(--color-text-primary)]">{u.email}</td>
-                                    <td className="px-4 py-3 text-muted">
+                                    <td className="px-4 py-3 text-secondary">
                                         {new Date(u.created_at).toLocaleDateString()}
                                     </td>
                                     <td className="px-4 py-3">
@@ -45,7 +45,7 @@ export default function RolesPermissions({ users, loading, saving, currentUserId
                                     </td>
                                     <td className="px-4 py-3">
                                         {u.id === currentUserId ? (
-                                            <span className="text-xs text-faint italic">can't change own role</span>
+                                            <span className="text-xs text-meta italic">can't change own role</span>
                                         ) : (
                                             <div className="flex gap-1 flex-wrap">
                                                 {ROLES.map(role => (

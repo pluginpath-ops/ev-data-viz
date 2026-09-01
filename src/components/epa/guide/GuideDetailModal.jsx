@@ -49,7 +49,7 @@ export default function GuideDetailModal({ row, vehicles, onClose }) {
                 <div className="modal-header px-6 py-4">
                     <div>
                         <div className="section-title">{row.carline}</div>
-                        <div className="text-caption text-secondary">
+                        <div className="text-note">
                             {row.model_year} {row.division}
                             {row.body_class && ` · ${row.body_class}`}
                             {row.smog_test_group && ` · test group ${row.smog_test_group}`}
@@ -81,7 +81,7 @@ export default function GuideDetailModal({ row, vehicles, onClose }) {
                                 <dl className="guide-detail-grid">
                                     {cols.map(col => (
                                         <div key={col.key} className="guide-detail-item" title={col.hint || ''}>
-                                            <dt className="text-caption text-secondary">
+                                            <dt className="text-label">
                                                 {col.label}{col.unit ? ` (${col.unit})` : ''}
                                             </dt>
                                             <dd className="text-data">{formatCell(row, col)}</dd>
@@ -103,11 +103,11 @@ export default function GuideDetailModal({ row, vehicles, onClose }) {
                         </button>
                         {showRaw && (
                             <div className="guide-raw">
-                                {rawError && <div className="text-caption text-muted">The source row could not be loaded.</div>}
-                                {!rawError && raw == null && <div className="text-caption text-muted">Loading…</div>}
+                                {rawError && <div className="text-note">The source row could not be loaded.</div>}
+                                {!rawError && raw == null && <div className="text-note">Loading…</div>}
                                 {rawEntries.map(([k, v]) => (
                                     <div key={k} className="guide-raw-row">
-                                        <span className="text-caption text-secondary">{k}</span>
+                                        <span className="text-label">{k}</span>
                                         <span className="text-data">{v == null || v === '' ? '—' : String(v)}</span>
                                     </div>
                                 ))}

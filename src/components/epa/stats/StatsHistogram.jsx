@@ -26,7 +26,7 @@ export default function StatsHistogram({ data, measureDef }) {
                     />
                 ))}
             </div>
-            <div className="stats-histogram-axis text-hint">
+            <div className="stats-histogram-axis text-note">
                 <span>{data.bins[0].from.toFixed(digits)}</span>
                 {/* The unit only when the label does not already carry it —
                     the measures are named in full now, so "Combined MPGe

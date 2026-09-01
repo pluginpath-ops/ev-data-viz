@@ -781,7 +781,7 @@ export default function ChargeCompareView({
                             min={1}
                             max={80}
                             onChange={e => setStartSoc(Math.min(80, Math.max(1, Number(e.target.value))))}
-                            className="w-20 px-2 py-1 border rounded text-sm"
+                            className="form-input w-20"
                         />
                     </label>
                     <label className="flex items-center gap-2 text-sm font-medium text-secondary">
@@ -792,7 +792,7 @@ export default function ChargeCompareView({
                             min={1}
                             max={120}
                             onChange={e => setXMinutes(Math.max(1, Number(e.target.value)))}
-                            className="w-20 px-2 py-1 border rounded text-sm"
+                            className="form-input w-20"
                         />
                     </label>
                     <label className="flex items-center gap-2 text-sm font-medium text-secondary">
@@ -806,7 +806,7 @@ export default function ChargeCompareView({
                                 const v = Math.max(1, Number(e.target.value));
                                 setMMiles(units === 'metric' ? Math.round(v / MI_TO_KM) : v);
                             }}
-                            className="w-20 px-2 py-1 border rounded text-sm"
+                            className="form-input w-20"
                         />
                     </label>
                     <div className="flex items-center gap-1 ml-auto">
@@ -814,7 +814,7 @@ export default function ChargeCompareView({
                             <button
                                 key={o}
                                 onClick={() => setOrientation(o)}
-                                className={`btn btn-sm ${orientation === o ? 'btn-primary' : 'btn-secondary'}`}
+                                className={`btn ${orientation === o ? 'btn-primary' : 'btn-secondary'}`}
                             >
                                 {o === 'vertical' ? '↕ Vertical' : '↔ Horizontal'}
                             </button>
@@ -884,7 +884,7 @@ export default function ChargeCompareView({
             </div>}
 
             {!hasRangeRuns ? (
-                <div className="card text-center py-12 text-faint">
+                <div className="card text-center py-12 text-meta">
                     <p className="text-lg font-medium">No range test runs found for selected vehicles</p>
                     <p className="text-sm mt-1">Add range test records in Tests &amp; Data to use this chart.</p>
                 </div>
@@ -893,7 +893,7 @@ export default function ChargeCompareView({
                     {/* ── Chart 1: Range Added in X Minutes ── */}
                     <div className="card mb-6">
                         <h4 className="text-base font-semibold mb-3">
-                            Range Added in {xMinutes} Minutes <span className="text-faint font-normal">(from ~{startSoc}% SoC, in {distanceLabel(units)})</span>
+                            Range Added in {xMinutes} Minutes <span className="text-meta font-normal">(from ~{startSoc}% SoC, in {distanceLabel(units)})</span>
                         </h4>
                         <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart1Ref} />
@@ -903,7 +903,7 @@ export default function ChargeCompareView({
                     {/* ── Chart 2: Time to Add M Miles ── */}
                     <div className="card mb-6">
                         <h4 className="text-base font-semibold mb-3">
-                            Time to Add {units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} {distanceLabel(units)} of Range <span className="text-faint font-normal">(from ~{startSoc}% SoC)</span>
+                            Time to Add {units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} {distanceLabel(units)} of Range <span className="text-meta font-normal">(from ~{startSoc}% SoC)</span>
                         </h4>
                         <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart2Ref} />

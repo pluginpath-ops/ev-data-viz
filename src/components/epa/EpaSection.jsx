@@ -64,7 +64,7 @@ export default function EpaSection() {
                 {EPA_SUBTABS.map(t => (
                     <button
                         key={t.id}
-                        className={`btn-chart-mode ${subtab === t.id ? 'active' : ''}`}
+                        className={`btn-subtab ${subtab === t.id ? 'active' : ''}`}
                         onClick={() => setSubtab(t.id)}
                     >
                         {t.label}

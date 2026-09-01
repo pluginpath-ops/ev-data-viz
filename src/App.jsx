@@ -791,7 +791,7 @@ export default function App() {
                                         <button
                                             key={key}
                                             onClick={() => handleChartModeChange(key)}
-                                            className={`btn-chart-mode ${chartMode === key ? 'active' : ''}`}
+                                            className={`btn-subtab ${chartMode === key ? 'active' : ''}`}
                                         >
                                             {label}
                                         </button>
@@ -803,7 +803,7 @@ export default function App() {
                                         'evbench-popout',
                                         `width=${window.screen.availWidth},height=${window.screen.availHeight},left=0,top=0`
                                     )}
-                                    className="btn btn-sm btn-primary ml-auto"
+                                    className="btn btn-primary ml-auto"
                                     title="Open chart in a separate window for presentation"
                                 >
                                     ⧉ Open Chart in New Window
@@ -818,7 +818,7 @@ export default function App() {
                         <div className="inline-row flex-wrap">
                             <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Selected:</span>
                             {selectedVehicles.length === 0 ? (
-                                <div className="px-3 py-1 rounded-full text-sm" style={{ backgroundColor: 'var(--color-surface-sunken)', color: 'var(--color-text-muted)' }}>
+                                <div className="px-3 py-1 rounded-full text-sm" style={{ backgroundColor: 'var(--color-surface-sunken)', color: 'var(--color-text-secondary)' }}>
                                     None
                                 </div>
                             ) : (
@@ -876,7 +876,7 @@ export default function App() {
                                     })}
                                     <button
                                         onClick={clearAllSelections}
-                                        className="btn btn-warning btn-sm"
+                                        className="btn btn-warning"
                                     >
                                         Clear all
                                     </button>
@@ -1073,7 +1073,7 @@ export default function App() {
                     {view === 'playground' && (
                         <div className="card">
                             <h2 className="page-title">Playground</h2>
-                            <p className="text-hint mb-4">
+                            <p className="text-note mb-4">
                                 Every catalogued control, live. Unlinked — reached by URL, or via Admin &gt; Playground.
                             </p>
                             <Playground />

@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { OWNED_FAMILIES, NOT_CATALOGUED, SECTIONS, cataloguedClasses } from '../components/playground/catalogue';
+import { OWNED_FAMILIES, NOT_CATALOGUED, SECTIONS, cataloguedClasses, DARK_OVERRIDE_CLASSES } from '../components/playground/catalogue';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CSS = readFileSync(join(ROOT, 'src', 'index.css'), 'utf8');
@@ -79,6 +79,42 @@ describe('the catalogue covers every control it claims to own', () => {
         // has renders an unstyled box that looks like a design decision.
         const orphans = [...catalogued].filter(n => !definedClasses().has(n));
         expect(orphans, `Catalogued but not defined in index.css: ${orphans.join(', ')}`).toEqual([]);
+    });
+});
+
+describe('the classes that cannot follow a themed subtree', () => {
+    /**
+     * Classes the stylesheet styles via `[data-theme="dark"] .foo`.
+     *
+     * Comments stripped FIRST. A comment explaining why a dark override once
+     * existed still contains the selector, so scanning the raw text counted the
+     * explanation as an occurrence — `.guide-chip` stayed on this list after its
+     * last real rule was deleted, purely because the note about it survived. A
+     * backlog metric that a paragraph of prose can inflate is not a metric.
+     */
+    const actual = new Set(
+        [...CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+            .matchAll(/\[data-theme="dark"\]\s+\.([a-z][a-z0-9-]*)/g)].map(m => m[1]),
+    );
+
+    it('matches what the stylesheet actually does', () => {
+        // Kept in step with index.css rather than remembered. A stale list marks
+        // the wrong specimens and, worse, stops marking the right ones — and the
+        // marker is the only thing telling a reader that the side-by-side view
+        // is showing them the document theme rather than the pane's.
+        const missing = [...actual].filter(c => !DARK_OVERRIDE_CLASSES.has(c));
+        const stale = [...DARK_OVERRIDE_CLASSES].filter(c => !actual.has(c));
+
+        expect(missing, `Gained a [data-theme="dark"] override — add to DARK_OVERRIDE_CLASSES, `
+            + `or better, move it onto tokens: ${missing.join(', ')}`).toEqual([]);
+        expect(stale, `No longer has a dark override — remove from DARK_OVERRIDE_CLASSES `
+            + `(it moved onto tokens, which is the point): ${stale.join(', ')}`).toEqual([]);
+    });
+
+    it('is a backlog that should shrink, never grow', () => {
+        // 17 when the marker was added, 15 now. Lower it as classes move to
+        // tokens; a rise means a new class was written the old way.
+        expect(actual.size).toBeLessThanOrEqual(15);
     });
 });
 

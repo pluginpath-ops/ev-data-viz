@@ -25,7 +25,7 @@ export default function SessionGroupHeader({
                     <span className={`session-group-chevron${collapsed ? '' : ' is-open'}`}>▶</span>
                     <span className="text-secondary">No session</span>
                 </button>
-                <span className="text-xs text-faint">
+                <span className="text-xs text-meta">
                     {runsHere} run{runsHere === 1 ? '' : 's'}
                 </span>
             </div>
@@ -43,7 +43,7 @@ export default function SessionGroupHeader({
                 <span className="font-semibold">{sessionLabel(session)}</span>
             </button>
 
-            <span className="text-xs text-muted">
+            <span className="text-xs text-secondary">
                 {runsHere} here
                 {total > runsHere && ` · ${total} in session`}
             </span>
@@ -63,8 +63,8 @@ export default function SessionGroupHeader({
                 </span>
             )}
 
-            {session.location_name && <span className="text-xs text-faint">· {session.location_name}</span>}
-            {session.temperature_f != null && <span className="text-xs text-faint">· {session.temperature_f}°F</span>}
+            {session.location_name && <span className="text-xs text-meta">· {session.location_name}</span>}
+            {session.temperature_f != null && <span className="text-xs text-meta">· {session.temperature_f}°F</span>}
 
             {session.url && (
                 <a

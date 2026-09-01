@@ -71,7 +71,7 @@ export default function ChartInfoBubble({ chartKey }) {
                     <button
                         type="button"
                         onClick={startEditing}
-                        className="btn btn-sm btn-secondary ml-auto"
+                        className="btn btn-secondary ml-auto"
                         title="Edit this explanation"
                     >
                         ✏️ Edit
@@ -101,7 +101,7 @@ export default function ChartInfoBubble({ chartKey }) {
                                 value={draft[key]}
                                 onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))}
                                 rows={rows}
-                                className="form-input w-full mt-1 text-sm"
+                                className="form-input form-input w-full mt-1"
                             />
                         </label>
                     ))}
@@ -110,7 +110,7 @@ export default function ChartInfoBubble({ chartKey }) {
                             type="button"
                             onClick={handleSave}
                             disabled={saving}
-                            className="btn btn-sm btn-primary disabled:opacity-50"
+                            className="btn btn-primary disabled:opacity-50"
                         >
                             {saving ? 'Saving…' : 'Save'}
                         </button>
@@ -118,11 +118,11 @@ export default function ChartInfoBubble({ chartKey }) {
                             type="button"
                             onClick={() => { setEditing(false); setDraft(null); }}
                             disabled={saving}
-                            className="btn btn-sm btn-secondary"
+                            className="btn btn-secondary"
                         >
                             Cancel
                         </button>
-                        <span className="text-hint ml-auto">Visible to everyone · editable by contributors</span>
+                        <span className="text-note ml-auto">Visible to everyone · editable by contributors</span>
                     </div>
                 </div>
             )}

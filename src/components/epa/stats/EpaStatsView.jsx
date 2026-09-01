@@ -304,7 +304,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
         return (
             <div className="empty-state">
                 No Fuel Economy Guide data has been imported yet.
-                <div className="text-caption text-muted mt-1">
+                <div className="text-note mt-1">
                     An admin can load a guide year from Admin → Fuel Economy Guide.
                 </div>
             </div>
@@ -320,10 +320,10 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
             <div className="section-header">
                 <div>
                     <div className="section-title">{dsDef?.label}</div>
-                    <div className="text-caption text-secondary">
+                    <div className="text-note">
                         {dsDef?.source}
                     </div>
-                    <div className="text-caption text-secondary">
+                    <div className="text-note">
                         {/* The unit clause is the guide's question. On the
                             certification side there is no choice to report —
                             the record is the unit — so it states that rather
@@ -365,7 +365,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
                             </button>
                         ))}
                     </div>
-                    <div className="text-hint">{unitDef?.answers}</div>
+                    <div className="text-note">{unitDef?.answers}</div>
                 </div>
                 )}
 
@@ -386,7 +386,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
                         is typical is a different one, and the reader should be
                         told which they are looking at. */}
                     {selectedYears.length !== 1 && (
-                        <div className="text-hint">
+                        <div className="text-note">
                             A configuration that appears in several years is counted once per year.
                         </div>
                     )}
@@ -445,7 +445,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
                 over a population padded with a fallback constant looks exactly
                 like one over 73 real derivations. */}
             {coverage && (
-                <div className="text-hint">
+                <div className="text-note">
                     {coverage.usable} of {coverage.total} certification groups carry this figure
                     {coverage.assumed > 0 && `; ${coverage.assumed} could not be derived and fall back to a default, so they are excluded rather than counted`}
                     {coverage.missing > 0 && `; ${coverage.missing} do not report it`}
@@ -479,7 +479,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
                 </div>
             </div>
 
-            <div className="text-hint">
+            <div className="text-note">
                 Buckets with fewer than {MIN_N} observations are marked rather than dropped.
                 Medians and quartiles throughout — these distributions are small and skewed,
                 and one long-range outlier moves a mean in a way it does not move a median.

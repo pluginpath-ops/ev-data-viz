@@ -35,8 +35,8 @@ function compass(deg) {
 function Condition({ label, value }) {
     if (value == null) return null;
     return (
-        <span className="text-xs text-muted">
-            <span className="text-faint">{label}</span> {value}
+        <span className="text-xs text-secondary">
+            <span className="text-meta">{label}</span> {value}
         </span>
     );
 }
@@ -86,19 +86,19 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
                         <span className="font-semibold text-sm">
                             {formatTestedAt(session.tested_at) || 'Undated session'}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium capitalize text-muted bg-[var(--color-surface-muted)] border-[var(--color-border)]">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium capitalize text-secondary bg-[var(--color-surface-muted)] border-[var(--color-border)]">
                             {session.test_type}
                         </span>
-                        <span className="text-xs text-faint">{runs.length} runs</span>
+                        <span className="text-xs text-meta">{runs.length} runs</span>
                     </div>
                     {session.location_name && (
-                        <div className="text-xs text-muted mt-0.5">{session.location_name}</div>
+                        <div className="text-xs text-secondary mt-0.5">{session.location_name}</div>
                     )}
                     {/* Attribution. source_url was captured on import but never
                         shown until now — a session with no visible provenance is
                         just a number you have to take on trust. */}
                     <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium text-muted bg-[var(--color-surface-muted)] border-[var(--color-border)]">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium text-secondary bg-[var(--color-surface-muted)] border-[var(--color-border)]">
                             {shown('source_name') || 'Unattributed'}
                         </span>
                         {shown('source_url') && (
@@ -179,15 +179,15 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
             {/* Best per drive mode — the headline comparison for an accel session */}
             {groups.length > 0 && (
                 <div className="mt-2 pt-2 border-t border-[var(--color-border)]">
-                    <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
+                    <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">
                         Best 0–60 by drive mode
                     </div>
                     {groups.map(g => (
                         <div key={g.driveMode} className="flex justify-between gap-4 text-xs py-0.5">
-                            <span className="text-muted truncate">{g.driveMode}</span>
+                            <span className="text-secondary truncate">{g.driveMode}</span>
                             <span className="font-mono shrink-0">
                                 {g.best.toFixed(3)} s
-                                <span className="text-faint ml-1">({g.count})</span>
+                                <span className="text-meta ml-1">({g.count})</span>
                             </span>
                         </div>
                     ))}
@@ -206,7 +206,7 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
                 <div className="mt-2 overflow-x-auto">
                     <table className="w-full text-xs">
                         <thead>
-                            <tr className="text-faint text-[10px] uppercase tracking-wide">
+                            <tr className="text-meta text-[10px] uppercase tracking-wide">
                                 <th className="text-left font-semibold py-1">#</th>
                                 <th className="text-left font-semibold py-1">Mode</th>
                                 <th className="text-right font-semibold py-1">
@@ -221,28 +221,28 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
                         <tbody>
                             {runs.map(r => (
                                 <tr key={r.id} className="border-t border-[var(--color-border)]">
-                                    <td className="py-0.5 text-faint">{(r.sequence ?? 0) + 1}</td>
-                                    <td className="py-0.5 text-muted truncate max-w-[10rem]">{r.drive_mode || '—'}</td>
+                                    <td className="py-0.5 text-meta">{(r.sequence ?? 0) + 1}</td>
+                                    <td className="py-0.5 text-secondary truncate max-w-[10rem]">{r.drive_mode || '—'}</td>
                                     <td className="py-0.5 text-right font-mono">
                                         {isAccel ? fmt(r.zero_to_60_sec, 3, ' s') : fmt(r.braking_distance_ft, 1, ' ft')}
                                     </td>
                                     {isAccel && (
-                                        <td className="py-0.5 text-right font-mono text-muted">
+                                        <td className="py-0.5 text-right font-mono text-secondary">
                                             {fmt(r.zero_to_60_rollout_sec, 3) ?? '—'}
                                         </td>
                                     )}
                                     <td className="py-0.5 text-right font-mono">{fmt(r.max_g_force, 3) ?? '—'}</td>
-                                    <td className="py-0.5 text-right font-mono text-muted">
+                                    <td className="py-0.5 text-right font-mono text-secondary">
                                         {r.slope_pct == null ? '—' : `${r.slope_pct > 0 ? '+' : ''}${Number(r.slope_pct).toFixed(2)}%`}
                                     </td>
-                                    <td className="py-0.5 text-right font-mono text-muted">
+                                    <td className="py-0.5 text-right font-mono text-secondary">
                                         {fmt(r.altitude_ft, 0) ?? '—'}
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    <p className="text-[10px] text-faint mt-1">
+                    <p className="text-[10px] text-meta mt-1">
                         Grade is signed: + is uphill. Runs on a steeper grade flatter or penalise
                         the result and are flagged when used as a measured figure.
                     </p>

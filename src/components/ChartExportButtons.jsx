@@ -82,11 +82,11 @@ export default function ChartExportButtons({ chartRef, isDark, buildParams, note
                 )}
             </div>
 
-            {note && <p className="text-xs text-faint mt-1">{note}</p>}
+            {note && <p className="text-xs text-meta mt-1">{note}</p>}
 
             {chartImage && (
                 <div className="mt-3">
-                    <p className="text-xs text-faint mb-1.5">Right-click or long-press to copy / save</p>
+                    <p className="text-xs text-meta mb-1.5">Right-click or long-press to copy / save</p>
                     <img
                         src={chartImage}
                         alt="Chart export"

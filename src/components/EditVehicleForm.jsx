@@ -142,7 +142,7 @@ export default function EditVehicleForm({
                         placeholder="Display Name (e.g., Model 3 LR 2024)"
                         value={formData.name}
                         onChange={(e) => onFormChange({ ...formData, name: e.target.value })}
-                        className="form-input col-span-2"
+                        className="form-input form-input col-span-2"
                         required
                     />
 
@@ -178,13 +178,13 @@ export default function EditVehicleForm({
                                     value={newMfgName}
                                     onChange={e => setNewMfgName(e.target.value)}
                                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreateManufacturer(); } if (e.key === 'Escape') setShowNewMfg(false); }}
-                                    className="form-input flex-1"
+                                    className="form-input form-input flex-1"
                                 />
                                 <input
                                     placeholder="Country (optional)"
                                     value={newMfgCountry}
                                     onChange={e => setNewMfgCountry(e.target.value)}
-                                    className="form-input w-32"
+                                    className="form-input form-input w-32"
                                 />
                                 <button
                                     type="button"
@@ -205,11 +205,11 @@ export default function EditVehicleForm({
                         )}
                     </div>
 
-                    <input placeholder="Model"          value={formData.model}   onChange={(e) => onFormChange({ ...formData, model: e.target.value })}   className="form-input" />
-                    <input placeholder="Trim"           value={formData.trim ?? ''}  onChange={(e) => onFormChange({ ...formData, trim: e.target.value })}    className="form-input" />
-                    <input placeholder="Year"           value={formData.year}    onChange={(e) => onFormChange({ ...formData, year: e.target.value })}    className="form-input" />
-                    <input placeholder="Battery (kWh)"  value={formData.battery} onChange={(e) => onFormChange({ ...formData, battery: e.target.value })} className="form-input" />
-                    <input placeholder="EPA Range (mi)" value={formData.range}   onChange={(e) => onFormChange({ ...formData, range: e.target.value })}   className="form-input" />
+                    <input placeholder="Model"          value={formData.model}   onChange={(e) => onFormChange({ ...formData, model: e.target.value })}   className="form-input form-input" />
+                    <input placeholder="Trim"           value={formData.trim ?? ''}  onChange={(e) => onFormChange({ ...formData, trim: e.target.value })}    className="form-input form-input" />
+                    <input placeholder="Year"           value={formData.year}    onChange={(e) => onFormChange({ ...formData, year: e.target.value })}    className="form-input form-input" />
+                    <input placeholder="Battery (kWh)"  value={formData.battery} onChange={(e) => onFormChange({ ...formData, battery: e.target.value })} className="form-input form-input" />
+                    <input placeholder="EPA Range (mi)" value={formData.range}   onChange={(e) => onFormChange({ ...formData, range: e.target.value })}   className="form-input form-input" />
                 </div>
 
                 {/* Tags — edit mode only */}
@@ -245,7 +245,7 @@ export default function EditVehicleForm({
                                         if (tag) onAddTag(tag);
                                         e.target.value = '';
                                     }}
-                                    className="form-input w-full text-sm"
+                                    className="form-input form-input w-full"
                                     defaultValue=""
                                 >
                                     <option value="" disabled>Add existing tag…</option>
@@ -262,7 +262,7 @@ export default function EditVehicleForm({
                                 value={newTagName}
                                 onChange={(e) => onNewTagNameChange(e.target.value)}
                                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onCreateTag(); } }}
-                                className="form-input text-sm flex-1"
+                                className="form-input form-input flex-1"
                             />
                             <button type="button" onClick={onCreateTag} className="btn btn-primary text-sm">
                                 Create tag
@@ -296,7 +296,7 @@ export default function EditVehicleForm({
                                 disabled={imageUploading}
                             />
                         </label>
-                        <p className="text-xs text-faint mt-1">16:9 crop · max 1600×900 · saved as JPEG</p>
+                        <p className="text-xs text-meta mt-1">16:9 crop · max 1600×900 · saved as JPEG</p>
                     </div>
                 )}
 
@@ -319,7 +319,7 @@ export default function EditVehicleForm({
                     <div className="crop-modal-panel">
                         <div className="crop-modal-header">
                             <h3 className="font-semibold text-base">Crop Image (16:9)</h3>
-                            <p className="text-xs text-muted mt-0.5">Drag to reposition · resize handles to adjust · max output 1600×900</p>
+                            <p className="text-xs text-secondary mt-0.5">Drag to reposition · resize handles to adjust · max output 1600×900</p>
                         </div>
                         <div className="crop-modal-body">
                             <ReactCrop

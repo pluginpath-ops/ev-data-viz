@@ -110,7 +110,7 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
                 <div className="modal-header px-6 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <div>
                         <h3 className="text-lg font-semibold">Edit session</h3>
-                        <p className="text-sm text-muted">
+                        <p className="text-sm text-secondary">
                             {members.length} run{members.length === 1 ? '' : 's'}
                             {cars.length > 0 && ` · ${cars.map(v => v.model || v.name).join(', ')}`}
                         </p>
@@ -128,7 +128,7 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
                                     value={draft[f.key]}
                                     placeholder={f.placeholder}
                                     onChange={e => set(f.key, e.target.value)}
-                                    className="form-input text-sm"
+                                    className="form-input form-input"
                                 />
                             </label>
                         ))}
@@ -145,7 +145,7 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
                                     >
                                         {copying ? 'Copying…' : 'Copy URL to all tests'}
                                     </button>
-                                    <span className="text-xs text-muted">
+                                    <span className="text-xs text-secondary">
                                         {copyResult
                                             ? `Copied to ${copyResult.copied} test${copyResult.copied === 1 ? '' : 's'}${copyResult.skipped ? `, skipped ${copyResult.skipped}` : ''}.`
                                             : `${withoutUrl} test${withoutUrl === 1 ? '' : 's'} have no source link · ${withUrl} already ${withUrl === 1 ? 'has' : 'have'} one`}
@@ -160,7 +160,7 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
                                 onChange={e => set('notes', e.target.value)}
                                 rows={3}
                                 placeholder="Conditions, anything the fields cannot say"
-                                className="form-input text-sm"
+                                className="form-input form-input"
                             />
                         </label>
                     </div>

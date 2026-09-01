@@ -132,15 +132,15 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
     const legGlobal   = units === 'metric' ? Math.round(global.legDistance * MI_TO_KM) : global.legDistance;
     const amountLabel = mode === 'distance' ? `Leg Distance (${dl})` : 'Charge Time (min)';
 
-    const cell = 'px-3 py-2 text-left font-semibold text-muted whitespace-nowrap';
-    const inputCls = 'form-input w-20 py-1 text-sm';
+    const cell = 'px-3 py-2 text-left font-semibold text-secondary whitespace-nowrap';
+    const inputCls = 'form-input w-20';
 
     return (
         <div className="mt-4">
             <button onClick={() => setOpen(o => !o)} className="run-selector-header">
                 <span style={{ display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
                 Customize routing
-                <span className="text-sm font-normal text-muted">
+                <span className="text-sm font-normal text-secondary">
                     {customized ? `(${customized} customized)` : '(optional — per test)'}
                 </span>
             </button>
@@ -167,9 +167,9 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
                                             <span className="flex items-center gap-2">
                                                 <span className="inline-block w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
                                                 <span className="text-secondary">{vehicleLabel(e.vehicle)}</span>
-                                                <span className="text-muted">· {e.rangeRun?.name ?? e.run.name}</span>
+                                                <span className="text-secondary">· {e.rangeRun?.name ?? e.run.name}</span>
                                                 {e.rangeRun && e.run?.name && (
-                                                    <span className="text-faint">· {e.run.name}</span>
+                                                    <span className="text-meta">· {e.run.name}</span>
                                                 )}
                                             </span>
                                         </td>
@@ -209,7 +209,7 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
                             })}
                         </tbody>
                     </table>
-                    <p className="text-xs text-muted mt-2">Blank fields use the global value shown as a placeholder.</p>
+                    <p className="text-xs text-secondary mt-2">Blank fields use the global value shown as a placeholder.</p>
                 </div>
             )}
         </div>
@@ -1439,13 +1439,13 @@ export default function RoadTripView({
                             <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">Simulation</span>
                             <div className="flex gap-1">
                                 <button
-                                    className={`btn btn-sm ${mode === 'distance' ? 'btn-primary' : 'btn-secondary'}`}
+                                    className={`btn ${mode === 'distance' ? 'btn-primary' : 'btn-secondary'}`}
                                     onClick={() => setField('mode', 'distance')}
                                 >
                                     Fixed Charge Amount
                                 </button>
                                 <button
-                                    className={`btn btn-sm ${mode === 'time' ? 'btn-primary' : 'btn-secondary'}`}
+                                    className={`btn ${mode === 'time' ? 'btn-primary' : 'btn-secondary'}`}
                                     onClick={() => setField('mode', 'time')}
                                 >
                                     Fixed Charge Time
@@ -1455,10 +1455,10 @@ export default function RoadTripView({
                         <div>
                             <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">X Axis</span>
                             <div className="flex gap-1">
-                                <button className={`btn btn-sm ${xAxis === 'totalTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'totalTime')}>Total Time</button>
-                                <button className={`btn btn-sm ${xAxis === 'driveTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'driveTime')}>Drive Time</button>
-                                <button className={`btn btn-sm ${xAxis === 'speed'     ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'speed')}>Travel Speed</button>
-                                <button className={`btn btn-sm ${xAxis === 'tripDist'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'tripDist')}>Trip Distance</button>
+                                <button className={`btn ${xAxis === 'totalTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'totalTime')}>Total Time</button>
+                                <button className={`btn ${xAxis === 'driveTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'driveTime')}>Drive Time</button>
+                                <button className={`btn ${xAxis === 'speed'     ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'speed')}>Travel Speed</button>
+                                <button className={`btn ${xAxis === 'tripDist'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'tripDist')}>Trip Distance</button>
                             </div>
                         </div>
                         <div>
@@ -1466,18 +1466,18 @@ export default function RoadTripView({
                                 <>
                                     <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">Y Axis</span>
                                     <div className="flex gap-1">
-                                        <button className={`btn btn-sm ${sweepYAxis === 'totalTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'totalTime')}>Total Time</button>
-                                        <button className={`btn btn-sm ${sweepYAxis === 'driveTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'driveTime')}>Drive Time</button>
-                                        <button className={`btn btn-sm ${sweepYAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'chargeTime')}>Charge + Stop</button>
+                                        <button className={`btn ${sweepYAxis === 'totalTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'totalTime')}>Total Time</button>
+                                        <button className={`btn ${sweepYAxis === 'driveTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'driveTime')}>Drive Time</button>
+                                        <button className={`btn ${sweepYAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'chargeTime')}>Charge + Stop</button>
                                     </div>
                                 </>
                             ) : (
                                 <>
                                     <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">Y Axis</span>
                                     <div className="flex gap-1">
-                                        <button className={`btn btn-sm ${yAxis === 'distance'   ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'distance')}>Distance</button>
-                                        <button className={`btn btn-sm ${yAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'chargeTime')}>Charge Time</button>
-                                        <button className={`btn btn-sm ${yAxis === 'byTest'     ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'byTest')}>By Test</button>
+                                        <button className={`btn ${yAxis === 'distance'   ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'distance')}>Distance</button>
+                                        <button className={`btn ${yAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'chargeTime')}>Charge Time</button>
+                                        <button className={`btn ${yAxis === 'byTest'     ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'byTest')}>By Test</button>
                                     </div>
                                 </>
                             )}
@@ -1485,7 +1485,7 @@ export default function RoadTripView({
                         <div>
                             <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">Mode</span>
                             <button
-                                className={`btn btn-sm ${towingMode ? 'btn-primary' : 'btn-secondary'}`}
+                                className={`btn ${towingMode ? 'btn-primary' : 'btn-secondary'}`}
                                 onClick={() => setField('towingMode', !towingMode)}
                                 title="Override all vehicle efficiencies with a fixed trailer-system value. Battery capacity and charging curve still vary per vehicle."
                             >
@@ -1501,7 +1501,7 @@ export default function RoadTripView({
                             <div className="flex flex-wrap items-end gap-4">
                                 <label className="text-sm">
                                     <span className="font-medium block mb-1">Efficiency ({towingEffLabel})</span>
-                                    <input type="number" className="form-input w-28 py-1" step="0.1" min="0.3" max="5"
+                                    <input type="number" className="form-input w-28" step="0.1" min="0.3" max="5"
                                         value={dispTowingEff}
                                         onChange={e => {
                                             const val = parseFloat(e.target.value);
@@ -1510,7 +1510,7 @@ export default function RoadTripView({
                                 </label>
                                 <label className="text-sm">
                                     <span className="font-medium block mb-1">Measured at ({sl})</span>
-                                    <input type="number" className="form-input w-24 py-1" min="20"
+                                    <input type="number" className="form-input w-24" min="20"
                                         value={dispTowingRef}
                                         onChange={e => {
                                             const val = Number(e.target.value);
@@ -1527,20 +1527,20 @@ export default function RoadTripView({
                     <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
                         <label className="text-sm">
                             <span className="font-medium block mb-1 whitespace-nowrap">Start SoC (%)</span>
-                            <input type="number" className="form-input w-full py-1"
+                            <input type="number" className="form-input w-full"
                                 min={50} max={100} value={startSoc}
                                 onChange={e => setField('startSoc', Number(e.target.value))} />
                         </label>
                         <label className="text-sm">
                             <span className="font-medium block mb-1 whitespace-nowrap">Min SoC (%)</span>
-                            <input type="number" className="form-input w-full py-1"
+                            <input type="number" className="form-input w-full"
                                 min={0} max={30} value={minSoc}
                                 title="Lowest SoC before charging en route"
                                 onChange={e => setField('minSoc', Number(e.target.value))} />
                         </label>
                         <label className="text-sm">
                             <span className="font-medium block mb-1 whitespace-nowrap">Dest. SoC (%)</span>
-                            <input type="number" className="form-input w-full py-1"
+                            <input type="number" className="form-input w-full"
                                 min={0} max={90} value={destinationMinSoc ?? minSoc}
                                 title="SoC to arrive at the destination with. Higher than Min SoC keeps a bigger buffer for the final leg."
                                 onChange={e => setField('destinationMinSoc', Number(e.target.value))} />
@@ -1548,7 +1548,7 @@ export default function RoadTripView({
                         {mode === 'distance' && !isTripDistMode && (
                             <label className="text-sm">
                                 <span className="font-medium block mb-1 whitespace-nowrap">{dl} between charges</span>
-                                <input type="number" className="form-input w-full py-1"
+                                <input type="number" className="form-input w-full"
                                     min={10} value={dispLeg}
                                     onChange={e => {
                                         const val = Number(e.target.value);
@@ -1559,14 +1559,14 @@ export default function RoadTripView({
                         {mode === 'time' && (
                             <label className="text-sm">
                                 <span className="font-medium block mb-1 whitespace-nowrap">Charge Time (min)</span>
-                                <input type="number" className="form-input w-full py-1"
+                                <input type="number" className="form-input w-full"
                                     min={5} max={120} value={chargeTime}
                                     onChange={e => setField('chargeTime', Number(e.target.value))} />
                             </label>
                         )}
                         <label className="text-sm">
                             <span className="font-medium block mb-1 whitespace-nowrap">Total Dist. ({dl})</span>
-                            <input type="number" className="form-input w-full py-1"
+                            <input type="number" className="form-input w-full"
                                 min={10} value={dispTotal}
                                 onChange={e => {
                                     const val = Number(e.target.value);
@@ -1576,7 +1576,7 @@ export default function RoadTripView({
                         {!isSpeedMode && (
                             <label className="text-sm">
                                 <span className="font-medium block mb-1 whitespace-nowrap">Speed ({sl})</span>
-                                <input type="number" className="form-input w-full py-1"
+                                <input type="number" className="form-input w-full"
                                     min={20} value={dispSpeed}
                                     onChange={e => {
                                         const val = Number(e.target.value);
@@ -1586,7 +1586,7 @@ export default function RoadTripView({
                         )}
                         <label className="text-sm">
                             <span className="font-medium block mb-1 whitespace-nowrap">Stop Overhead (min)</span>
-                            <input type="number" className="form-input w-full py-1"
+                            <input type="number" className="form-input w-full"
                                 min={0} max={60} value={overhead}
                                 title="Extra minutes added to every stop (parking, walk-in, plug-in). Applies to EV charging and ICE fuel stops."
                                 onChange={e => setField('overhead', Number(e.target.value))} />
@@ -1657,7 +1657,7 @@ export default function RoadTripView({
                                     ? `${fmtSpeed(entry.testSpeedMph, units)}`
                                     : '70 mph (assumed)';
                                 return (
-                                    <span className="text-xs text-faint ml-1">
+                                    <span className="text-xs text-meta ml-1">
                                         {eff} {units === 'metric' ? 'km/kWh' : 'mi/kWh'} @ {spd}
                                         {entry.efficiencyNote && ` · ${entry.efficiencyNote}`}
                                     </span>
@@ -1697,13 +1697,13 @@ export default function RoadTripView({
 
             {/* ── Chart ────────────────────────────────────────────────── */}
             {loading && (
-                <div className="text-center py-8 text-muted">Loading charging data…</div>
+                <div className="text-center py-8 text-secondary">Loading charging data…</div>
             )}
 
             {!loading && validEntries.length === 0 && (
                 <div className="empty-state">
                     <p className="text-lg">No runs with usable charging and efficiency data.</p>
-                    <p className="text-sm text-muted mt-2">
+                    <p className="text-sm text-secondary mt-2">
                         Each run needs charging data, and either its own range test result
                         or another run from the same vehicle with distance &amp; energy data.
                     </p>
@@ -1763,10 +1763,10 @@ export default function RoadTripView({
                             </button>
                         )}
                     </div>
-                    <p className="text-xs text-faint mt-1">Drag to box-zoom · Reset Zoom to restore</p>
+                    <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset Zoom to restore</p>
                     {chartImage && (
                         <div className="mt-3">
-                            <p className="text-xs text-faint mb-1.5">Right-click or long-press to copy / save</p>
+                            <p className="text-xs text-meta mb-1.5">Right-click or long-press to copy / save</p>
                             <img src={chartImage} alt="Chart export" className="w-full rounded border border-[var(--color-border)]" />
                         </div>
                     )}
@@ -1807,7 +1807,7 @@ export default function RoadTripView({
                                     >
                                         <span className="flex items-center gap-1">
                                             {children}
-                                            <span className={`text-xs ${active ? 'text-blue-500' : 'text-faint'}`}>{arrow}</span>
+                                            <span className={`text-xs ${active ? 'text-blue-500' : 'text-meta'}`}>{arrow}</span>
                                         </span>
                                     </th>
                                 );
@@ -1878,7 +1878,7 @@ export default function RoadTripView({
                                                           style={{ backgroundColor: entry.color }} />
                                                     <div>
                                                         <div className="font-medium">{vehicleLabel(entry.vehicle)}</div>
-                                                        <div className="text-xs text-faint">{entry.label}</div>
+                                                        <div className="text-xs text-meta">{entry.label}</div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -1899,12 +1899,12 @@ export default function RoadTripView({
                                                     <>
                                                         {entry.miPerKwh.toFixed(1)} {effLabel}
                                                         {entry.testSpeedMph ? (
-                                                            <span className="text-faint ml-1">@ {fmtSpeed(entry.testSpeedMph, units)}</span>
+                                                            <span className="text-meta ml-1">@ {fmtSpeed(entry.testSpeedMph, units)}</span>
                                                         ) : (
                                                             <span className="text-amber-500 ml-1" title="Set Speed (mph) on the run in Tests &amp; Data for accurate speed correction">@ 70 mph (assumed)</span>
                                                         )}
                                                         {entry.efficiencyNote && (
-                                                            <span className="block text-xs text-faint">{entry.efficiencyNote}</span>
+                                                            <span className="block text-xs text-meta">{entry.efficiencyNote}</span>
                                                         )}
                                                     </>
                                                 )}
@@ -1921,7 +1921,7 @@ export default function RoadTripView({
                                                 )}
                                             </td>
                                             <td className="px-3 py-2 font-medium">
-                                                {sim.completed === false ? <span className="text-faint">—</span> : (() => {
+                                                {sim.completed === false ? <span className="text-meta">—</span> : (() => {
                                                     const absDelta = Math.abs(vsIce);
                                                     const h = Math.floor(absDelta / 60);
                                                     const m = Math.round(absDelta % 60);

@@ -56,10 +56,10 @@ export default function PreferredTestPicker({
 
     return (
         <div className="epa-test-picker">
-            <div className="text-caption font-semibold text-secondary mb-1">
+            <div className="text-label font-semibold mb-1">
                 Derive from
             </div>
-            <p className="text-caption text-faint mb-2">
+            <p className="text-note mb-2">
                 This group holds {mcts.length} multi-cycle tests and every figure above comes from
                 one of them. More than one run can be legitimate — the same vehicle is sometimes
                 tested at two laboratories — so this is a choice, not a fault, and the others are
@@ -78,7 +78,7 @@ export default function PreferredTestPicker({
                 />
                 <span className="min-w-0">
                     <span className="text-secondary">Automatic</span>
-                    <span className="text-caption text-faint block">
+                    <span className="text-note block">
                         {/* Named, because "automatic" without saying what it lands on
                             is the same opacity this control exists to remove. */}
                         Most recent — {fallback?.test_number ?? '—'}
@@ -99,9 +99,9 @@ export default function PreferredTestPicker({
                     />
                     <span className="min-w-0">
                         <span className="text-secondary font-mono">{test.test_number ?? '—'}</span>
-                        {test.test_date && <span className="text-faint"> · {test.test_date}</span>}
-                        {test.lab_id && <span className="text-faint truncate"> · {test.lab_id}</span>}
-                        <span className="text-caption text-faint block">
+                        {test.test_date && <span className="text-meta"> · {test.test_date}</span>}
+                        {test.lab_id && <span className="text-meta truncate"> · {test.lab_id}</span>}
+                        <span className="text-note block">
                             {mpge != null ? `highway ${mpge.toFixed(1)} MPGe` : 'highway not derivable'}
                             {eff != null && ` · charging ${(eff * 100).toFixed(1)}%`}
                             {/* The same score the automatic selection ranks on, so a

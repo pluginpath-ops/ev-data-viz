@@ -20,7 +20,7 @@ function FacetGroup({ label, hint, values, selected, onToggle, onClear, countFor
         <div className="guide-facet">
             <div className="guide-facet-label">
                 {label}
-                {hint && <span className="text-hint ml-1">{hint}</span>}
+                {hint && <span className="text-note ml-1">{hint}</span>}
             </div>
             <div className="guide-facet-values">
                 {values.map((v) => {
@@ -76,13 +76,13 @@ function RangeInput({ label, unit, minKey, maxKey, filters, onChange }) {
     };
     return (
         <div className="guide-facet">
-            <div className="guide-facet-label">{label} <span className="text-hint">{unit}</span></div>
+            <div className="guide-facet-label">{label} <span className="text-note">{unit}</span></div>
             <div className="guide-range-inputs">
                 <input type="number" inputMode="numeric" placeholder="min"
-                    value={filters[minKey] ?? ''} onChange={set(minKey)} className="guide-range-input" />
-                <span className="text-faint">–</span>
+                    value={filters[minKey] ?? ''} onChange={set(minKey)} className="form-input guide-range-input" />
+                <span className="text-meta">–</span>
                 <input type="number" inputMode="numeric" placeholder="max"
-                    value={filters[maxKey] ?? ''} onChange={set(maxKey)} className="guide-range-input" />
+                    value={filters[maxKey] ?? ''} onChange={set(maxKey)} className="form-input guide-range-input" />
             </div>
         </div>
     );
@@ -135,7 +135,7 @@ export default function GuideFilterBar({ rows, facets, filters, onChange, onRese
                     value={filters.search}
                     onChange={e => onChange({ search: e.target.value })}
                     placeholder="Make, configuration or test group"
-                    className="guide-search-input"
+                    className="form-input guide-search-input"
                 />
             </div>
 

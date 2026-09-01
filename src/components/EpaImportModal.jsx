@@ -100,11 +100,11 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                 <div className="modal-header flex items-center justify-between">
                     <div>
                         <h2 className="text-lg font-semibold">Import EPA Test Car Data</h2>
-                        <p className="text-sm text-muted mt-0.5">
+                        <p className="text-sm text-secondary mt-0.5">
                             Upload a pre-filtered EPA testcar sheet (TSV) to add road-load coefficients.
                         </p>
                     </div>
-                    <button onClick={onClose} className="text-faint hover:text-secondary text-2xl leading-none ml-4">&times;</button>
+                    <button onClick={onClose} className="text-meta hover:text-secondary text-2xl leading-none ml-4">&times;</button>
                 </div>
 
                 {/* Body — scrollable */}
@@ -123,7 +123,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                             >
                                 <div className="text-4xl mb-3">📂</div>
                                 <p className="font-medium text-secondary">Drop the EPA testcar TSV here, or click to browse</p>
-                                <p className="text-sm text-faint mt-1">Accepts .csv (Excel) or .txt / .tsv (tab-separated) · Pre-filter to your vehicles of interest</p>
+                                <p className="text-sm text-meta mt-1">Accepts .csv (Excel) or .txt / .tsv (tab-separated) · Pre-filter to your vehicles of interest</p>
                                 <input ref={fileRef} type="file" accept=".txt,.tsv,.csv" className="hidden" onChange={handleFilePick} />
                             </div>
                             {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
@@ -148,10 +148,10 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                 <span><strong>{summary.total}</strong> test group{summary.total !== 1 ? 's' : ''} found</span>
                                 {summary.yearMin && <span>MY {summary.yearMin}{summary.yearMax !== summary.yearMin ? `–${summary.yearMax}` : ''}</span>}
                                 <span>{summary.makes.join(', ')}</span>
-                                <span className="text-faint">·</span>
+                                <span className="text-meta">·</span>
                                 <span>{summary.withCoeffs} with A/B/C coefficients</span>
                                 <span>{summary.withMpge} with combined MPGe</span>
-                                <span className="text-faint">·</span>
+                                <span className="text-meta">·</span>
                                 <span>File: <span className="font-mono text-xs">{fileName}</span></span>
                                 {summary.isMasterList && (
                                     <span className="text-amber-700 dark:text-amber-400 font-medium">
@@ -175,12 +175,12 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                                     onChange={e => toggleAll(e.target.checked)}
                                                 />
                                             </th>
-                                            <th className="pb-2 pr-3 text-muted font-semibold whitespace-nowrap">Test Group</th>
-                                            <th className="pb-2 pr-3 text-muted font-semibold whitespace-nowrap">Year · Make · Carline</th>
-                                            <th className="pb-2 pr-3 text-muted font-semibold whitespace-nowrap">Drive / ETW</th>
-                                            <th className="pb-2 pr-3 text-muted font-semibold whitespace-nowrap">A / B / C</th>
-                                            <th className="pb-2 pr-3 text-muted font-semibold whitespace-nowrap">Combined MPGe</th>
-                                            <th className="pb-2 text-muted font-semibold">Link to Vehicle</th>
+                                            <th className="pb-2 pr-3 text-secondary font-semibold whitespace-nowrap">Test Group</th>
+                                            <th className="pb-2 pr-3 text-secondary font-semibold whitespace-nowrap">Year · Make · Carline</th>
+                                            <th className="pb-2 pr-3 text-secondary font-semibold whitespace-nowrap">Drive / ETW</th>
+                                            <th className="pb-2 pr-3 text-secondary font-semibold whitespace-nowrap">A / B / C</th>
+                                            <th className="pb-2 pr-3 text-secondary font-semibold whitespace-nowrap">Combined MPGe</th>
+                                            <th className="pb-2 text-secondary font-semibold">Link to Vehicle</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y">
@@ -203,26 +203,26 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                                     </td>
                                                     <td className="py-2 pr-3">
                                                         <span className="font-medium">{g.model_year}</span>
-                                                        <span className="text-faint mx-1">·</span>
+                                                        <span className="text-meta mx-1">·</span>
                                                         <span>{g.make}</span>
-                                                        <div className="text-muted mt-0.5 max-w-[200px] truncate" title={g.epa_carline_name}>
+                                                        <div className="text-secondary mt-0.5 max-w-[200px] truncate" title={g.epa_carline_name}>
                                                             {g.epa_carline_name}
                                                         </div>
                                                     </td>
                                                     <td className="py-2 pr-3 whitespace-nowrap">
                                                         <div>{g.drive ?? '—'}</div>
-                                                        <div className="text-faint">{cs.equiv_test_weight_lbs != null ? `${cs.equiv_test_weight_lbs.toLocaleString()} lbs` : '—'}</div>
+                                                        <div className="text-meta">{cs.equiv_test_weight_lbs != null ? `${cs.equiv_test_weight_lbs.toLocaleString()} lbs` : '—'}</div>
                                                     </td>
                                                     <td className="py-2 pr-3 font-mono whitespace-nowrap">
                                                         {a != null ? (
                                                             <div>
-                                                                <span className={cs.set_a != null ? '' : 'text-faint'}>{a?.toFixed(2)}</span>
-                                                                <span className="text-faint mx-1">/</span>
-                                                                <span className={cs.set_b != null ? '' : 'text-faint'}>{b?.toFixed(4)}</span>
-                                                                <span className="text-faint mx-1">/</span>
-                                                                <span className={cs.set_c != null ? '' : 'text-faint'}>{c?.toFixed(5)}</span>
+                                                                <span className={cs.set_a != null ? '' : 'text-meta'}>{a?.toFixed(2)}</span>
+                                                                <span className="text-meta mx-1">/</span>
+                                                                <span className={cs.set_b != null ? '' : 'text-meta'}>{b?.toFixed(4)}</span>
+                                                                <span className="text-meta mx-1">/</span>
+                                                                <span className={cs.set_c != null ? '' : 'text-meta'}>{c?.toFixed(5)}</span>
                                                             </div>
-                                                        ) : <span className="text-faint">—</span>}
+                                                        ) : <span className="text-meta">—</span>}
                                                         {cs.set_a == null && a != null && (
                                                             <div className="text-amber-500 text-[10px]">target only</div>
                                                         )}
@@ -233,10 +233,10 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                                         ) : g.label_hwy_mpge != null ? (
                                                             <span title="Highway-only (proc 84); no combined MCT test in file">
                                                                 {g.label_hwy_mpge.toFixed(1)} MPGe
-                                                                <span className="text-faint ml-1 text-[10px]">hwy</span>
+                                                                <span className="text-meta ml-1 text-[10px]">hwy</span>
                                                             </span>
                                                         ) : (
-                                                            <span className="text-faint">—</span>
+                                                            <span className="text-meta">—</span>
                                                         )}
                                                     </td>
                                                     <td className="py-2">
@@ -244,7 +244,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                                             value={linkedVid}
                                                             onChange={e => setVehicleLink(g.test_group_id, e.target.value)}
                                                             disabled={!isSelected}
-                                                            className="form-input text-xs py-1 w-52"
+                                                            className="form-input form-input w-52"
                                                         >
                                                             <option value="">— Not linked —</option>
                                                             {sortedVehicles.map(v => (
@@ -270,7 +270,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                 <strong>{result.testGroupsCount}</strong> test group{result.testGroupsCount !== 1 ? 's' : ''} upserted
                                 {result.mappingsCount > 0 && <>, <strong>{result.mappingsCount}</strong> vehicle link{result.mappingsCount !== 1 ? 's' : ''} created</>}
                             </p>
-                            <p className="text-sm text-faint mt-2">
+                            <p className="text-sm text-meta mt-2">
                                 Vehicles with new EPA data will show a dashed curve on the EPA Curves chart tab.
                                 Confidence is set to "likely" — update it to "verified" via the vehicle edit form if confirmed.
                             </p>
@@ -281,7 +281,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
 
                 {/* Footer */}
                 <div className="modal-footer flex justify-between items-center">
-                    <div className="text-sm text-muted">
+                    <div className="text-sm text-secondary">
                         {step === 'map' && (
                             <span>
                                 {selectedCount} of {parsed.length} selected

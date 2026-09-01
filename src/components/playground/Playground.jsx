@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { SECTIONS, OWNED_FAMILIES } from './catalogue';
+import { SECTIONS, OWNED_FAMILIES, hasDarkOverride } from './catalogue';
 import { parseColor, compositeStack, contrastRatio, AA_NORMAL, AA_LARGE } from '../../utils/contrast';
 
 /**
@@ -119,6 +119,13 @@ function Specimen({ spec }) {
                         {reading.ratio.toFixed(2)}:1
                     </span>
                 )}
+                {hasDarkOverride(spec.cls) && (
+                    <span className="pg-unscoped" title={
+                        'Styled by a [data-theme="dark"] override rather than tokens, so it '
+                        + 'cannot follow a themed subtree — in the side-by-side view below it '
+                        + 'keeps the document theme. This is the #277 migration backlog.'
+                    }>doc-theme only</span>
+                )}
                 {spec.note && <span className="pg-specimen-note">{spec.note}</span>}
             </div>
         </div>
@@ -208,12 +215,12 @@ export default function Playground() {
                     measured contrast against what it actually sits on, in the theme you
                     are currently in; it turns red below the WCAG AA floor for that size.
                 </p>
-                <p className="text-hint">
+                <p className="text-note">
                     A class in an owned family that is missing here fails{' '}
                     <code>playground.test.js</code>. Owned:{' '}
                     {OWNED_FAMILIES.map(f => f.label).join(', ')}.
                 </p>
-                <button type="button" className="btn btn-sm btn-secondary"
+                <button type="button" className="btn btn-secondary"
                     onClick={() => setSide(s => !s)}>
                     {side ? 'Single column' : 'Compare both themes'}
                 </button>
@@ -221,7 +228,7 @@ export default function Playground() {
 
             <section className="pg-section">
                 <h3 className="section-title">Status colour tokens</h3>
-                <p className="text-hint pg-blurb">
+                <p className="text-note pg-blurb">
                     The triad each status carries: a solid fill, and a tinted surface with
                     a matching border and readable text. Every card below is drawn from its
                     own tokens.
@@ -232,7 +239,7 @@ export default function Playground() {
             {SECTIONS.map(section => (
                 <section key={section.id} className="pg-section">
                     <h3 className="section-title">{section.title}</h3>
-                    {section.blurb && <p className="text-hint pg-blurb">{section.blurb}</p>}
+                    {section.blurb && <p className="text-note pg-blurb">{section.blurb}</p>}
                     <SpecimenSet specimens={section.specimens} split={side} />
                 </section>
             ))}

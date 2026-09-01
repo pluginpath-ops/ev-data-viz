@@ -24,10 +24,10 @@ const BLANK = {
 /** Rate cell — braking is trustworthy across windows, timed windows are not. */
 function RateCell({ row }) {
     const n = normaliseInterval(row);
-    if (n.rateG == null) return <span className="text-faint">—</span>;
+    if (n.rateG == null) return <span className="text-meta">—</span>;
     return (
         <span
-            className={n.rateCertain ? 'font-mono' : 'font-mono text-muted italic'}
+            className={n.rateCertain ? 'font-mono' : 'font-mono text-secondary italic'}
             title={n.rateCertain
                 ? 'Average deceleration. Braking is grip-limited, so this is comparable across different speed windows.'
                 : 'Average acceleration — indicative only. The rate falls away at higher speeds, so windows covering different speed ranges are not directly comparable.'}
@@ -74,12 +74,12 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
 
     return (
         <div className="mt-2">
-            <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
+            <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">
                 Speed windows
             </div>
 
             {intervals.length === 0 && !draft && (
-                <p className="text-faint text-[11px] italic">
+                <p className="text-meta text-[11px] italic">
                     No braking, passing or rolling-start figures yet. Fixed headline
                     figures like 0–60 and 0–100 have their own fields above.
                 </p>
@@ -92,8 +92,8 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                             const n = normaliseInterval(iv);
                             return (
                                 <tr key={iv.id} className="border-b border-[var(--color-border)] last:border-0">
-                                    <td className="py-0.5 pr-2 text-muted">{n.label}</td>
-                                    <td className="py-0.5 pr-2 capitalize text-faint">{iv.kind}</td>
+                                    <td className="py-0.5 pr-2 text-secondary">{n.label}</td>
+                                    <td className="py-0.5 pr-2 capitalize text-meta">{iv.kind}</td>
                                     <td className="py-0.5 pr-2 font-mono text-right">
                                         {n.value} {n.displayUnit}
                                     </td>
@@ -103,7 +103,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                                             <button
                                                 type="button"
                                                 onClick={() => onDelete(iv.id)}
-                                                className="text-faint hover:text-red-500"
+                                                className="text-meta hover:text-red-500"
                                                 title="Remove this window"
                                             >
                                                 ×
@@ -131,7 +131,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                 <div className="mt-2 border rounded-lg p-2 border-[var(--color-border)]">
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="text-[11px]">
-                            <span className="text-muted block">Type</span>
+                            <span className="text-secondary block">Type</span>
                             <select
                                 value={draft.kind}
                                 onChange={e => setDraft(d => ({
@@ -141,7 +141,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                                     to_speed: e.target.value === 'accel' ? d.to_speed : '0',
                                     from_speed: e.target.value === 'accel' ? '0' : d.from_speed,
                                 }))}
-                                className="form-input text-xs py-0.5 w-24 mt-0.5"
+                                className="form-input form-input w-24 mt-0.5"
                             >
                                 <option value="braking">Braking</option>
                                 <option value="passing">Passing</option>
@@ -149,27 +149,27 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                             </select>
                         </label>
                         <label className="text-[11px]">
-                            <span className="text-muted block">From</span>
+                            <span className="text-secondary block">From</span>
                             <input
                                 type="number" value={draft.from_speed} autoFocus
                                 onChange={e => setDraft(d => ({ ...d, from_speed: e.target.value }))}
-                                className="form-input text-xs py-0.5 w-16 mt-0.5 font-mono"
+                                className="form-input form-input w-16 mt-0.5 font-mono"
                             />
                         </label>
                         <label className="text-[11px]">
-                            <span className="text-muted block">To</span>
+                            <span className="text-secondary block">To</span>
                             <input
                                 type="number" value={draft.to_speed}
                                 onChange={e => setDraft(d => ({ ...d, to_speed: e.target.value }))}
-                                className="form-input text-xs py-0.5 w-16 mt-0.5 font-mono"
+                                className="form-input form-input w-16 mt-0.5 font-mono"
                             />
                         </label>
                         <label className="text-[11px]">
-                            <span className="text-muted block">Speed unit</span>
+                            <span className="text-secondary block">Speed unit</span>
                             <select
                                 value={draft.speed_unit}
                                 onChange={e => setDraft(d => ({ ...d, speed_unit: e.target.value }))}
-                                className="form-input text-xs py-0.5 w-20 mt-0.5"
+                                className="form-input form-input w-20 mt-0.5"
                             >
                                 <option value="mph">mph</option>
                                 <option value="kph">km/h</option>
@@ -179,19 +179,19 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                         {isBraking ? (
                             <>
                                 <label className="text-[11px]">
-                                    <span className="text-muted block">Distance</span>
+                                    <span className="text-secondary block">Distance</span>
                                     <input
                                         type="number" step="0.1" value={draft.distance}
                                         onChange={e => setDraft(d => ({ ...d, distance: e.target.value }))}
-                                        className="form-input text-xs py-0.5 w-20 mt-0.5 font-mono"
+                                        className="form-input form-input w-20 mt-0.5 font-mono"
                                     />
                                 </label>
                                 <label className="text-[11px]">
-                                    <span className="text-muted block">Unit</span>
+                                    <span className="text-secondary block">Unit</span>
                                     <select
                                         value={draft.distance_unit}
                                         onChange={e => setDraft(d => ({ ...d, distance_unit: e.target.value }))}
-                                        className="form-input text-xs py-0.5 w-16 mt-0.5"
+                                        className="form-input form-input w-16 mt-0.5"
                                     >
                                         <option value="ft">ft</option>
                                         <option value="m">m</option>
@@ -200,17 +200,17 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                             </>
                         ) : (
                             <label className="text-[11px]">
-                                <span className="text-muted block">Time (s)</span>
+                                <span className="text-secondary block">Time (s)</span>
                                 <input
                                     type="number" step="0.001" value={draft.elapsed_s}
                                     onChange={e => setDraft(d => ({ ...d, elapsed_s: e.target.value }))}
-                                    className="form-input text-xs py-0.5 w-20 mt-0.5 font-mono"
+                                    className="form-input form-input w-20 mt-0.5 font-mono"
                                 />
                             </label>
                         )}
                     </div>
 
-                    <p className="text-[10px] text-faint mt-1">
+                    <p className="text-[10px] text-meta mt-1">
                         Entered as reported — a metric 100–0 km/h stays metric, and is converted
                         only when comparing.
                     </p>

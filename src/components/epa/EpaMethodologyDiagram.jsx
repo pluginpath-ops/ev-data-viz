@@ -37,7 +37,7 @@ function Box({ label, value, note, tone = 'plain', ghost = null }) {
                 why the common case stays uncluttered: 57% of configurations are
                 published at exactly 0.700 and the ghost never appears. */}
             {ghost && <span className="epa-flow-ghost">{ghost}</span>}
-            {note && <span className="text-xs text-faint">{note}</span>}
+            {note && <span className="text-xs text-meta">{note}</span>}
         </div>
     );
 }
@@ -72,7 +72,7 @@ export default function EpaMethodologyDiagram({ model }) {
 
     return (
         <div className="epa-methodology">
-            <p className="text-sm text-muted mb-4">{METHOD_LABEL[testMethod]}</p>
+            <p className="text-sm text-secondary mb-4">{METHOD_LABEL[testMethod]}</p>
 
             <div className="epa-flow-columns">
                 {[
@@ -88,7 +88,7 @@ export default function EpaMethodologyDiagram({ model }) {
                             <span className="font-semibold text-secondary">{title}</span>
                             {/* The single most useful fact on the page for anyone
                                 who ran their own test at 70 mph. */}
-                            <span className="text-xs text-faint">
+                            <span className="text-xs text-meta">
                                 {cycleName} · {cycleSpeeds[key]} mph avg
                             </span>
                         </div>
@@ -170,7 +170,7 @@ export default function EpaMethodologyDiagram({ model }) {
                         charging loss added back to get there, and whether that
                         loss was measured or assumed changes how much to trust
                         the figure — so the diagram says which. */}
-                    <span className="text-faint">
+                    <span className="text-meta">
                         (harmonic
                         {cycles.city.energyBasis === 'dc' &&
                             (chargeEfficiency.measured
@@ -184,7 +184,7 @@ export default function EpaMethodologyDiagram({ model }) {
                     <strong className="text-secondary">
                         {chargeEfficiency.value == null ? '—' : `${(chargeEfficiency.value * 100).toFixed(1)}%`}
                     </strong>{' '}
-                    <span className="text-faint">
+                    <span className="text-meta">
                         {chargeEfficiency.measured
                             ? '(measured — AC and DC both reported)'
                             : '(not reported for this test method)'}
@@ -217,7 +217,7 @@ export default function EpaMethodologyDiagram({ model }) {
                                             {/* The cold bag is why city consumption is
                                                 energy-share weighted rather than averaged. */}
                                             {p.wh != null && p.cycle === 'UDDS' && (
-                                                <span className="text-faint"> · cold start</span>
+                                                <span className="text-meta"> · cold start</span>
                                             )}
                                         </td>
                                         <td className="font-mono">{whmi(p.whPerMi)}</td>
@@ -243,7 +243,7 @@ export default function EpaMethodologyDiagram({ model }) {
                         </table>
                     )}
                     {testMethod === 'sct' && (
-                        <p className="text-xs text-faint mt-2">
+                        <p className="text-xs text-meta mt-2">
                             Recharge energy is frequently replicated verbatim across an SCT pair.
                             Matching values are not independent corroboration.
                         </p>

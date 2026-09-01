@@ -186,7 +186,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                     <h3 className="text-lg font-bold">
                         Import EPA Lab PDF{targetVehicle ? ` → ${targetVehicle.name}` : ''}
                     </h3>
-                    <button onClick={onClose} className="text-faint hover:text-secondary text-xl leading-none">×</button>
+                    <button onClick={onClose} className="text-meta hover:text-secondary text-xl leading-none">×</button>
                 </div>
 
                 {error && <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">⚠️ {error}</div>}
@@ -198,7 +198,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                         onDragLeave={() => setDragOver(false)}
                         className={`border-2 border-dashed rounded-lg p-10 text-center ${dragOver ? 'border-indigo-400 bg-indigo-50/40' : 'border-[var(--color-border)]'}`}
                     >
-                        <p className="text-sm text-muted mb-3">
+                        <p className="text-sm text-secondary mb-3">
                             {progress
                                 ? `Reading ${progress.done + 1} of ${progress.total}: ${progress.name}`
                                 : busy
@@ -212,13 +212,13 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                             <input type="file" accept=".pdf" multiple className="hidden"
                                 onChange={e => processFiles(e.target.files)} />
                         </label>
-                        <p className="text-xs text-faint mt-3">Parsed entirely in your browser — nothing is uploaded.</p>
+                        <p className="text-xs text-meta mt-3">Parsed entirely in your browser — nothing is uploaded.</p>
                     </div>
                 )}
 
                 {step === 'review' && (
                     <>
-                        <p className="text-sm text-muted mb-2">
+                        <p className="text-sm text-secondary mb-2">
                             {files.length === 1
                                 ? <><span className="font-medium">{files[0].name}</span> — {groups.length} configuration(s) found.</>
                                 : <>{files.length} files — {groups.length} configuration(s) found.</>}
@@ -232,7 +232,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                 {files.map(f => (
                                     <div key={f.name} className={`pdf-file-row ${f.error ? 'failed' : ''}`}>
                                         <span className="truncate">{f.name}</span>
-                                        <span className="text-caption text-faint shrink-0">
+                                        <span className="text-meta shrink-0">
                                             {f.error ? f.error : `${f.configs} config${f.configs === 1 ? '' : 's'}`}
                                         </span>
                                     </div>
@@ -242,7 +242,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                         <div className="max-h-80 overflow-y-auto border rounded-lg">
                             <table className="w-full text-xs">
                                 <thead className="bg-[var(--color-surface-muted)] sticky top-0">
-                                    <tr className="text-left text-muted">
+                                    <tr className="text-left text-secondary">
                                         <th className="p-2" title="Select all / none">
                                             <input type="checkbox" checked={allSelected} onChange={toggleAllSelect} />
                                         </th>
@@ -277,9 +277,9 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                                     </td>
                                                 )}
                                                 <td className="p-2 font-mono">{id}</td>
-                                                <td className="p-2">{g.make} · <span className="text-muted">{g.epa_carline_name}</span></td>
-                                                <td className="p-2 font-mono text-muted">{g.coefficient_sets.length} / {g.tests.length} / {phaseCount}</td>
-                                                <td className="p-2 font-mono text-muted">
+                                                <td className="p-2">{g.make} · <span className="text-secondary">{g.epa_carline_name}</span></td>
+                                                <td className="p-2 font-mono text-secondary">{g.coefficient_sets.length} / {g.tests.length} / {phaseCount}</td>
+                                                <td className="p-2 font-mono text-secondary">
                                                     {g.covered_models?.length
                                                         ? `${new Set(g.covered_models.map(c => c.carline_name)).size} (${g.covered_models.length} rows)`
                                                         : '—'}
@@ -287,11 +287,11 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                                         this import newly captures, and the only place
                                                         some wheel variants are stated at all. */}
                                                     {g.tests.some(t => t.mfr_test_vehicle_comments) && (
-                                                        <span className="text-faint"> · note</span>
+                                                        <span className="text-meta"> · note</span>
                                                     )}
                                                 </td>
                                                 {files.length > 1 && (
-                                                    <td className="p-2 text-faint truncate" style={{ maxWidth: '11rem' }} title={g.source_file}>{g.source_file}</td>
+                                                    <td className="p-2 text-meta truncate" style={{ maxWidth: '11rem' }} title={g.source_file}>{g.source_file}</td>
                                                 )}
                                                 <td className="p-2">
                                                     {existing.has(id)
@@ -312,7 +312,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                         )}
 
                         <div className="flex items-center gap-2 mt-4">
-                            <span className="text-xs text-muted flex-1">
+                            <span className="text-xs text-secondary flex-1">
                                 {selected.size} selected{overwriteCount ? ` · ${overwriteCount} overwrite` : ''}
                                 {targetVehicle && linkIds.size ? ` · linking ${linkIds.size} to ${targetVehicle.name}` : ''}
                             </span>

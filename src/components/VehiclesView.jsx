@@ -329,7 +329,7 @@ export default function VehiclesView({
         if (!user) return null;
         const base = `flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition${fullWidth ? ' w-full justify-center' : ''}`;
         const pubCls = 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200';
-        const privCls = 'bg-[var(--color-surface-sunken)] text-muted border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]';
+        const privCls = 'bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]';
         const isPublic = vehicle.visibility === 'public';
         if (canPublish()) {
             return (
@@ -343,7 +343,7 @@ export default function VehiclesView({
             );
         }
         return (
-            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-[var(--color-surface-sunken)] text-muted border-[var(--color-border)]'}`}>
+            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)]'}`}>
                 {isPublic ? '🌐 Public' : '🔒 Private'}
             </span>
         );
@@ -565,12 +565,12 @@ export default function VehiclesView({
                     placeholder="Search by name, make, model, year…"
                     value={textFilter}
                     onChange={e => setTextFilter(e.target.value)}
-                    className="form-input text-sm flex-1"
+                    className="form-input form-input flex-1"
                 />
                 <select
                     value={sortBy}
                     onChange={e => setSortBy(e.target.value)}
-                    className="form-input text-sm"
+                    className="form-input form-input"
                 >
                     <option value="default">Default Order</option>
                     <option value="date_newest">Date Added (Newest)</option>
@@ -589,7 +589,7 @@ export default function VehiclesView({
                         className={`text-sm px-3 py-2 rounded border transition flex-shrink-0 ${
                             editingOrder
                                 ? 'bg-blue-50 border-blue-300 text-blue-700'
-                                : 'bg-[var(--color-surface-muted)] border-[var(--color-border)] text-muted hover:bg-[var(--color-surface-sunken)]'
+                                : 'bg-[var(--color-surface-muted)] border-[var(--color-border)] text-secondary hover:bg-[var(--color-surface-sunken)]'
                         }`}
                         style={editingOrder ? { backgroundColor: 'var(--color-primary-light)', borderColor: 'var(--color-primary)', color: 'var(--color-primary-text)' } : {}}
                     >
@@ -626,7 +626,7 @@ export default function VehiclesView({
                     {Object.keys(tagFilterStates).length > 0 && (
                         <button
                             onClick={() => setTagFilterStates({})}
-                            className="text-xs text-faint hover:text-secondary underline ml-1 flex-shrink-0"
+                            className="text-xs text-meta hover:text-secondary underline ml-1 flex-shrink-0"
                         >
                             Clear
                         </button>
@@ -664,7 +664,7 @@ export default function VehiclesView({
                     {Object.keys(mfgFilterStates).length > 0 && (
                         <button
                             onClick={() => { setMfgFilterStates({}); setModelFilter(new Set()); }}
-                            className="text-xs text-faint hover:text-secondary underline ml-1 flex-shrink-0"
+                            className="text-xs text-meta hover:text-secondary underline ml-1 flex-shrink-0"
                         >
                             Clear
                         </button>
@@ -696,7 +696,7 @@ export default function VehiclesView({
                     {modelFilter.size > 0 && (
                         <button
                             onClick={() => setModelFilter(new Set())}
-                            className="text-xs text-faint hover:text-secondary underline ml-1 flex-shrink-0"
+                            className="text-xs text-meta hover:text-secondary underline ml-1 flex-shrink-0"
                         >
                             Clear
                         </button>
@@ -733,7 +733,7 @@ export default function VehiclesView({
                 {Object.keys(dataFilterStates).length > 0 && (
                     <button
                         onClick={() => setDataFilterStates({})}
-                        className="text-xs text-faint hover:text-secondary underline ml-1 flex-shrink-0"
+                        className="text-xs text-meta hover:text-secondary underline ml-1 flex-shrink-0"
                     >
                         Clear
                     </button>
@@ -745,14 +745,14 @@ export default function VehiclesView({
                 <div className="flex justify-end gap-2 mb-4 -mt-3">
                     <button
                         onClick={() => onSelectAllVisible(textFiltered.map(v => v.id))}
-                        className="btn btn-primary btn-sm"
+                        className="btn btn-primary"
                         title="Add all currently visible vehicles to the comparison selection"
                     >
                         Select All Visible ({textFiltered.length})
                     </button>
                     <button
                         onClick={() => onClearAllVisible(textFiltered.map(v => v.id))}
-                        className="btn btn-secondary btn-sm"
+                        className="btn btn-secondary"
                         title="Remove all currently visible vehicles from the comparison selection"
                     >
                         Clear All Visible
@@ -828,7 +828,7 @@ export default function VehiclesView({
                                                     onClick={e => e.stopPropagation()}
                                                     onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value); if (!isNaN(v)) handleMoveVehicleToIndex(vehicle.id, v - 1); e.target.blur(); } }}
                                                     onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
-                                                    className="reorder-position-input"
+                                                    className="form-input form-input reorder-position-input"
                                                 />
                                                 <button title="Down" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }} disabled={globalPos === totalCount - 1} className="reorder-btn disabled:opacity-30">▼</button>
                                                 <button title="+10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos + 10); }} disabled={globalPos >= totalCount - 1} className="reorder-btn disabled:opacity-30">▼▼</button>
@@ -928,7 +928,7 @@ export default function VehiclesView({
                                                 onClick={e => e.stopPropagation()}
                                                 onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value); if (!isNaN(v)) handleMoveVehicleToIndex(vehicle.id, v - 1); e.target.blur(); } }}
                                                 onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
-                                                className="reorder-position-input"
+                                                className="form-input form-input reorder-position-input"
                                             />
                                             <button title="Down" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }} disabled={globalPos === totalCount - 1} className="reorder-btn disabled:opacity-30">▼</button>
                                             <button title="+10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos + 10); }} disabled={globalPos >= totalCount - 1} className="reorder-btn disabled:opacity-30">▼▼</button>

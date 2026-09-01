@@ -51,16 +51,16 @@ export default function TypographyKnobs() {
                 <p className="section-title">Section title</p>
                 <p className="subsection-title">Subsection title</p>
                 <p className="text-body">Body — the quick brown fox jumps over the lazy dog.</p>
-                <p className="text-caption text-secondary">Caption — secondary supporting copy.</p>
+                <p className="text-note">Caption — secondary supporting copy.</p>
                 <p className="text-label">Field label</p>
-                <p className="text-hint">Hint — helper text under a control.</p>
+                <p className="text-note">Hint — helper text under a control.</p>
                 <p className="text-data">Data 1,234.56 kWh · 3.1 mi/kWh</p>
             </div>
 
             {TYPO_GROUPS.map(group => (
                 <div key={group.title} className="mt-4">
                     <h4 className="subsection-title">{group.title}</h4>
-                    {group.blurb && <p className="text-xs text-faint mb-2">{group.blurb}</p>}
+                    {group.blurb && <p className="text-xs text-meta mb-2">{group.blurb}</p>}
                     <div className="divide-y divide-[var(--color-border)] border-t border-[var(--color-border)]">
                         {group.knobs.map(k => (
                             <KnobRow key={k.var} knob={k} value={valueOf(k)}
@@ -82,14 +82,14 @@ function KnobRow({ knob, value, modified, onChange }) {
             <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium">{label}</span>
-                    <code className="text-[11px] text-muted bg-[var(--color-surface-sunken)] px-1.5 py-0.5 rounded">{cssVar}</code>
+                    <code className="text-[11px] text-secondary bg-[var(--color-surface-sunken)] px-1.5 py-0.5 rounded">{cssVar}</code>
                     {modified && (
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">
                             modified
                         </span>
                     )}
                 </div>
-                <p className="text-[11px] text-faint mt-0.5">
+                <p className="text-[11px] text-meta mt-0.5">
                     default: <code>{def}{unitFor(kind)}</code>
                 </p>
             </div>
@@ -97,17 +97,17 @@ function KnobRow({ knob, value, modified, onChange }) {
             <div className="flex items-center gap-2 shrink-0">
                 {kind === 'weight' ? (
                     <select value={value} onChange={(e) => onChange(Number(e.target.value))}
-                        className="form-input w-24 text-sm">
+                        className="form-input form-input w-24">
                         {WEIGHT_OPTIONS.map(w => <option key={w} value={w}>{w}</option>)}
                     </select>
                 ) : (
                     <input type="number" min={min} max={max} step={step} value={value}
                         onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-                        className="form-input w-24 text-sm" />
+                        className="form-input form-input w-24" />
                 )}
-                <span className="text-xs text-faint w-5">{unitFor(kind)}</span>
+                <span className="text-xs text-meta w-5">{unitFor(kind)}</span>
                 <button onClick={() => onChange(null)} disabled={!modified} title="Reset to default"
-                    className="text-xs text-faint hover:text-secondary disabled:opacity-30 px-1">
+                    className="text-xs text-meta hover:text-secondary disabled:opacity-30 px-1">
                     ↺
                 </button>
             </div>

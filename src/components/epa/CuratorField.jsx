@@ -49,7 +49,7 @@ export default function CuratorField({
 
     return (
         <div className="flex items-center justify-between gap-2 py-0.5">
-            <span className={`shrink-0 flex items-center gap-1 ${used ? 'text-secondary font-semibold' : 'text-muted'}`}>
+            <span className={`shrink-0 flex items-center gap-1 ${used ? 'text-secondary font-semibold' : 'text-secondary'}`}>
                 {used && <span title="Used in a derived calculation" className="text-indigo-500">∗</span>}
                 {label}
                 {tooltip && <InfoIcon text={tooltip} position="right" />}
@@ -60,7 +60,7 @@ export default function CuratorField({
                     <span title="Curator-overridden value" className="text-amber-500 text-[9px] font-bold">●</span>
                 )}
                 {overrideSource === 'csv' && (
-                    <span title="Imported from CSV" className="text-faint text-[9px]">csv</span>
+                    <span title="Imported from CSV" className="text-meta text-[9px]">csv</span>
                 )}
                 {/* Advisory only. Sits with the provenance badges because it is
                     the same kind of thing — something to know about this value,
@@ -83,12 +83,12 @@ export default function CuratorField({
                         onChange={e => setDraft(e.target.value)}
                         onBlur={commit}
                         onKeyDown={onKeyDown}
-                        className="form-input text-xs py-0.5 px-1.5 w-28 text-right font-mono disabled:opacity-50"
+                        className="form-input form-input .5 w-28 text-right font-mono disabled:opacity-50"
                     />
                 ) : (
                     <span className="font-mono text-xs text-right w-28">{value ?? '—'}</span>
                 )}
-                <span className="text-faint text-[10px] w-10 shrink-0">{unit || ''}</span>
+                <span className="text-meta text-[10px] w-10 shrink-0">{unit || ''}</span>
             </span>
         </div>
     );

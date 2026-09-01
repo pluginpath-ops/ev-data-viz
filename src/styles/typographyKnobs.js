@@ -26,15 +26,24 @@ export const TYPO_GROUPS = [
     },
     {
         title: 'Role sizes',
-        blurb: 'Font size of each semantic text role. Affects elements using the role classes (.page-title, .text-body, …).',
+        blurb: 'Body is the anchor; every other role derives from it through the step ratio. The per-role dials below pin one role and stop it deriving.',
         knobs: [
+            // Body is the anchor and every other role derives from it — moving
+            // this one moves the whole scale, which is the point of making the
+            // sizes relative (#277).
+            { var: '--fs-body',             label: 'Body (anchor)',    kind: 'size', min: 11, max: 22, step: 1, default: 14 },
+            // The interval between steps. Below 1; smaller = more contrast
+            // between a heading and its body.
+            { var: '--fs-step',             label: 'Step ratio',       kind: 'scale', min: 0.7, max: 0.95, step: 0.007, default: 0.857 },
+
+            // Per-role pins. Each is UNSET by default, so the role derives; set
+            // one and it overrides the derivation for that role alone.
             { var: '--fs-page-title',       label: 'Page title',       kind: 'size', min: 14, max: 48, step: 1, default: 24 },
             { var: '--fs-section-title',    label: 'Section title',    kind: 'size', min: 12, max: 36, step: 1, default: 18 },
             { var: '--fs-subsection-title', label: 'Subsection title', kind: 'size', min: 10, max: 28, step: 1, default: 14 },
-            { var: '--fs-body',             label: 'Body',             kind: 'size', min: 11, max: 22, step: 1, default: 14 },
-            { var: '--fs-caption',          label: 'Caption',          kind: 'size', min: 9,  max: 18, step: 1, default: 12 },
+            { var: '--fs-note',             label: 'Note',             kind: 'size', min: 9,  max: 18, step: 1, default: 12 },
+            { var: '--fs-meta',             label: 'Meta',             kind: 'size', min: 9,  max: 18, step: 1, default: 12 },
             { var: '--fs-label',            label: 'Label',            kind: 'size', min: 9,  max: 18, step: 1, default: 12 },
-            { var: '--fs-hint',             label: 'Hint',             kind: 'size', min: 9,  max: 18, step: 1, default: 12 },
             { var: '--fs-data',             label: 'Data (mono)',      kind: 'size', min: 11, max: 22, step: 1, default: 14 },
         ],
     },

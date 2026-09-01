@@ -41,7 +41,7 @@ function Entry({ entry, unit }) {
 
     return (
         <div className="flex items-center justify-between gap-3 py-0.5 text-xs">
-            <span className="text-muted flex items-center gap-1.5 min-w-0">
+            <span className="text-secondary flex items-center gap-1.5 min-w-0">
                 {entry.url ? (
                     <a href={entry.url} target="_blank" rel="noopener noreferrer"
                         className="text-indigo-600 dark:text-indigo-400 hover:underline truncate">
@@ -51,13 +51,13 @@ function Entry({ entry, unit }) {
                     <span className="truncate">{entry.sourceName}</span>
                 )}
                 <OriginBadge entry={entry} />
-                {detail && <span className="text-faint text-[10px] truncate">{detail}</span>}
+                {detail && <span className="text-meta text-[10px] truncate">{detail}</span>}
                 {flagText && <span className="text-amber-500 text-[9px]" title={flagText}>⚠</span>}
             </span>
             <span className="font-mono shrink-0">
                 {entry.value.toFixed(3)} {unit}
                 {entry.basis?.spread && (
-                    <span className="text-faint ml-1">
+                    <span className="text-meta ml-1">
                         ({entry.basis.spread.min.toFixed(3)}–{entry.basis.spread.max.toFixed(3)})
                     </span>
                 )}
@@ -77,7 +77,7 @@ export default function TestedResults({ sessions = [], summaries = [] }) {
 
     return (
         <div className="card p-3 mb-3">
-            <div className="text-faint text-[10px] uppercase tracking-wide mb-1 font-semibold">
+            <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">
                 Tested results
             </div>
 
@@ -89,7 +89,7 @@ export default function TestedResults({ sessions = [], summaries = [] }) {
                         <div className="flex items-center justify-between gap-2">
                             <span className="text-xs text-secondary font-medium">
                                 {label}
-                                {note && <span className="text-faint font-normal ml-1 text-[10px]">({note})</span>}
+                                {note && <span className="text-meta font-normal ml-1 text-[10px]">({note})</span>}
                             </span>
                             {others > 0 && (
                                 <button
@@ -108,7 +108,7 @@ export default function TestedResults({ sessions = [], summaries = [] }) {
                 );
             })}
 
-            <p className="text-[10px] text-faint mt-2">
+            <p className="text-[10px] text-meta mt-2">
                 Best first. Figures from imported sessions are derived from the run data and
                 marked “full data”; the rest are as published by their source.
             </p>

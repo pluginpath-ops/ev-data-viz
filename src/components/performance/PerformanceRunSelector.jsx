@@ -48,7 +48,7 @@ export default function PerformanceRunSelector({
             <button onClick={() => setExpanded(e => !e)} className="run-selector-header">
                 <span style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
                 Select Runs to Plot
-                <span className="text-sm font-normal text-muted">({effective.length} of {allIds.length})</span>
+                <span className="text-sm font-normal text-secondary">({effective.length} of {allIds.length})</span>
             </button>
 
             {expanded && (
@@ -83,7 +83,7 @@ export default function PerformanceRunSelector({
                                         >
                                             <span
                                                 style={{ display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}
-                                                className="text-faint group-hover:text-secondary"
+                                                className="text-meta group-hover:text-secondary"
                                             >▼</span>
                                             <h4 className="text-sm font-semibold text-secondary">{vehicle.name}</h4>
                                         </button>
@@ -96,12 +96,12 @@ export default function PerformanceRunSelector({
                                             <div key={mode} className="mb-2">
                                                 <button
                                                     onClick={() => setMany(ids, !allOn)}
-                                                    className="text-[11px] text-muted hover:text-secondary mb-1 flex items-center gap-1"
+                                                    className="text-[11px] text-secondary hover:text-secondary mb-1 flex items-center gap-1"
                                                     title={allOn ? 'Deselect this mode' : 'Select this mode'}
                                                 >
-                                                    <span className="text-faint">{allOn ? '☑' : '☐'}</span>
+                                                    <span className="text-meta">{allOn ? '☑' : '☐'}</span>
                                                     {mode}
-                                                    <span className="text-faint">({runs.length})</span>
+                                                    <span className="text-meta">({runs.length})</span>
                                                 </button>
                                                 <div className="run-items">
                                                     {runs.map(run => (
@@ -127,7 +127,7 @@ export default function PerformanceRunSelector({
                                                             <span className="text-secondary">{run.name}</span>
                                                             <RunSourceLinks run={run} />
                                                             {run.zeroTo60 != null && (
-                                                                <span className="font-mono text-faint">
+                                                                <span className="font-mono text-meta">
                                                                     {Number(run.zeroTo60).toFixed(3)} s
                                                                 </span>
                                                             )}
@@ -135,7 +135,7 @@ export default function PerformanceRunSelector({
                                                                 <button
                                                                     type="button"
                                                                     onClick={e => { e.preventDefault(); onUpdateColor(run.id, null); }}
-                                                                    className="text-[10px] text-faint hover:text-secondary"
+                                                                    className="text-[10px] text-meta hover:text-secondary"
                                                                     title="Clear — back to the auto palette"
                                                                 >
                                                                     reset

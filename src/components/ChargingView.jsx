@@ -729,7 +729,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         <select
                             value={chartConfig.xAxis}
                             onChange={(e) => setChartConfig({ ...chartConfig, xAxis: e.target.value })}
-                            className="axis-select"
+                            className="form-input axis-select"
                         >
                             {axisOptions.map(opt => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -741,7 +741,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         <select
                             value={chartConfig.yAxis}
                             onChange={(e) => setChartConfig({ ...chartConfig, yAxis: e.target.value })}
-                            className="axis-select"
+                            className="form-input axis-select"
                         >
                             {axisOptions.map(opt => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -753,7 +753,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         <select
                             value={chartConfig.y2Axis ?? ''}
                             onChange={(e) => setChartConfig({ ...chartConfig, y2Axis: e.target.value || null })}
-                            className="axis-select"
+                            className="form-input axis-select"
                         >
                             <option value="">— None —</option>
                             {axisOptions.map(opt => (
@@ -784,12 +784,12 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                     raceThreshold: e.target.value === '' ? null : clampSoc(e.target.value, commonSoc ?? 10),
                                 })}
                                 disabled={chartConfig.alignRaw}
-                                className="soc-input disabled:opacity-50"
+                                className="form-input soc-input disabled:opacity-50"
                             />
                             <span className="text-sm text-secondary">% SoC</span>
                         </span>
                         {commonSoc != null && chartConfig.raceThreshold == null && (
-                            <span className="text-xs text-faint" title="The lowest SoC every selected run actually reaches — no run is dropped at this value.">
+                            <span className="text-xs text-meta" title="The lowest SoC every selected run actually reaches — no run is dropped at this value.">
                                 lowest common
                             </span>
                         )}
@@ -888,7 +888,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                             no offset
                                         </span>
                                     ) : (
-                                        <span className="badge-status bg-[var(--color-surface-sunken)] text-muted border-[var(--color-border)]" title={`${offset} min of pre-threshold data trimmed`}>
+                                        <span className="badge-status bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)]" title={`${offset} min of pre-threshold data trimmed`}>
                                             −{offset} min offset
                                         </span>
                                     )
@@ -930,7 +930,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 missing its first samples is the same failure as one quietly
                 missing a car. */}
             {raceActive && trimmedRuns.length > 0 && (
-                <p className="text-xs text-faint mb-2"
+                <p className="text-xs text-meta mb-2"
                    title="A session opens with the charger and the BMS negotiating power upward, below what the car can take. Those samples describe the plug rather than the car, and they only appear in runs whose logging started at plug-in — so comparing with them in place penalises exactly those runs.">
                     Opening charge ramp excluded from{' '}
                     {trimmedRuns.map(t => `${t.name} (${t.n} point${t.n === 1 ? '' : 's'})`).join(', ')}
@@ -985,12 +985,12 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     )}
                 </div>
 
-                <p className="text-xs text-faint mt-1">Drag to box-zoom · Reset Zoom to restore</p>
+                <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset Zoom to restore</p>
 
                 {/* Inline image preview — right-click/long-press to copy or save */}
                 {chartImage && (
                     <div className="mt-3">
-                        <p className="text-xs text-faint mb-1.5">Right-click or long-press to copy / save</p>
+                        <p className="text-xs text-meta mb-1.5">Right-click or long-press to copy / save</p>
                         <img
                             src={chartImage}
                             alt="Chart export"
