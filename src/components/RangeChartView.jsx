@@ -20,9 +20,10 @@ import {
 } from '../utils/unitConversions';
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { copyChartAsPng } from '../utils/chartUtils';
-import { chartTheme } from '../utils/chartTheme';
+import { chartTheme, MONO_STACK } from '../utils/chartTheme';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
+import PlotFrame from './charts/PlotFrame';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -263,7 +264,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // ── Render chart ──────────────────────────────────────────────────────────
     useEffect(() => {
         // From the stylesheet, not retyped here — see utils/chartTheme.
-        const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
+        const { tick: tickColor, grid: gridColor, legend: legendColor, axis: axisColor } = chartTheme();
 
         if (chartInstance.current) {
             chartInstance.current.destroy();
@@ -372,7 +373,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
 
                     // Underline spanning the group
                     ctx2.save();
-                    ctx2.strokeStyle = isDark ? 'rgba(203,213,225,0.5)' : 'rgba(107,114,128,0.55)';
+                    ctx2.strokeStyle = axisColor;
                     ctx2.lineWidth   = 1.5;
                     ctx2.beginPath();
                     ctx2.moveTo(x1 + 3, groupLabelY);
@@ -380,14 +381,30 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     ctx2.stroke();
                     ctx2.restore();
 
-                    // Centered bold vehicle name
-                    ctx2.save();
-                    ctx2.font         = 'bold 13px sans-serif';
-                    ctx2.fillStyle    = isDark ? 'rgb(241,245,249)' : '#374151';
-                    ctx2.textAlign    = 'center';
-                    ctx2.textBaseline = 'top';
-                    ctx2.fillText(group.vehicleName, cx, groupLabelY + 4);
-                    ctx2.restore();
+                    // Centered vehicle name, CLAMPED TO ITS GROUP. It was drawn
+                    // at a fixed size with no width to respect, which was
+                    // survivable while the plot was full-bleed and became five
+                    // overlapping names the moment it moved beside a rail.
+                    // Below a floor the name is dropped entirely — the underline
+                    // and the separator still show the grouping, and a smear of
+                    // half-letters shows nothing.
+                    const span = x2 - x1 - 6;
+                    if (span >= 28) {
+                        ctx2.save();
+                        ctx2.font         = `600 12px ${MONO_STACK}`;
+                        ctx2.fillStyle    = legendColor;
+                        ctx2.textAlign    = 'center';
+                        ctx2.textBaseline = 'top';
+                        let label = group.vehicleName;
+                        if (ctx2.measureText(label).width > span) {
+                            while (label.length > 1 && ctx2.measureText(label + '…').width > span) {
+                                label = label.slice(0, -1);
+                            }
+                            label += '…';
+                        }
+                        ctx2.fillText(label, cx, groupLabelY + 4);
+                        ctx2.restore();
+                    }
 
                     // Dashed vertical separator between groups
                     if (gi < groups.length - 1) {
@@ -395,7 +412,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         if (nextStartBar) {
                             const sepX = (x2 + (nextStartBar.x - nextStartBar.width / 2)) / 2;
                             ctx2.save();
-                            ctx2.strokeStyle = isDark ? 'rgba(100,116,139,0.45)' : 'rgba(107,114,128,0.35)';
+                            ctx2.strokeStyle = gridColor;
                             ctx2.lineWidth   = 1;
                             ctx2.setLineDash([5, 4]);
                             ctx2.beginPath();
@@ -424,14 +441,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    title: {
-                        display: true,
-                        text: built.kind === 'bar'
-                            ? built.yLabel.replace(/\s*\(.*?\)$/, '')
-                            : `${built.yLabel.replace(/\s*\(.*?\)$/, '')} vs ${built.xLabel.replace(/\s*\(.*?\)$/, '')}`,
-                        font: { size: 14, weight: 'bold' },
-                    },
-                    legend: { display: built.kind !== 'bar', position: 'top', labels: { color: legendColor } },
+                    // The frame draws the title now, in the DOM, and the export
+                    // draws it onto the PNG. Leaving it on here printed it twice.
+                    title: { display: false },
                     tooltip: {
                         displayColors: false,
                         callbacks: {
@@ -517,11 +529,36 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // every render. Comparing the colours by value redraws only when one moves.
     }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, autoColor, correctionMode]);
 
+    // ── The frame's caption ──────────────────────────────────────────────────
+    // In the frame, so it is in the export: a bar chart pasted into a thread has
+    // to say what the bars are OF and in what unit, without anyone typing a
+    // caption under it.
+    const plotTitle = useMemo(() => {
+        const t = CHART_TYPES.find(x => x.key === chartType);
+        // The emoji belongs on the button, not in the title of an exported
+        // image — it is a wayfinding aid in a list of six, and noise alone.
+        return (t?.label ?? 'Range & Efficiency').replace(/^\W+\s*/, '');
+    }, [chartType]);
+
+    const plotSubtitle = useMemo(() => {
+        const runs = plottableRuns.length;
+        const vehicles = new Set(plottableRuns.map(r => r.vehicleName ?? r.vehicle?.id)).size;
+        const isEff = chartType.startsWith('eff-');
+        const parts = [
+            `${runs} run${runs === 1 ? '' : 's'}`,
+            `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
+        ];
+        if (isEff) parts.push(effOptions(units).find(o => o.value === effUnit)?.label ?? effUnit);
+        parts.push(correctionMode === 'none' ? 'no correction' : `corrected: ${correctionMode}`);
+        parts.push(units === 'metric' ? 'metric' : 'imperial');
+        return parts.join(' · ');
+    }, [plottableRuns, chartType, effUnit, correctionMode, units]);
+
     // ── Copy chart PNG ────────────────────────────────────────────────────────
     const handleCopyImage = async () => {
         if (!chartInstance.current) return;
         try {
-            await copyChartAsPng(chartInstance.current, chartTheme().background);
+            await copyChartAsPng(chartInstance.current, { title: plotTitle, subtitle: plotSubtitle });
             setCopied(true);
             setTimeout(() => setCopied(false), 2500);
         } catch { /* Clipboard API not supported — chart is still visible */ }
@@ -530,64 +567,70 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
-        <div>
-            {/* ── Config card — hidden in presentation mode ── */}
-            {!presentationMode && <div className="card mb-6">
-                {/* Efficiency unit toggle */}
-                <div className="efficiency-unit-toggle mb-4">
-                    {effOptions(units).map(({ value: key, label }) => (
-                        <button
-                            key={key}
-                            type="button"
-                            onClick={() => setEffUnit(key)}
-                            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${effUnit === key ? 'bg-[var(--color-card)] shadow text-[var(--color-text-primary)]' : 'text-secondary hover:text-[var(--color-text-primary)]'}`}
-                        >
-                            {label}
-                        </button>
-                    ))}
+        <div className="chart-layout">
+            {/* ── Left rail: pick here, read on the right. Same rig as Charging,
+              * so the two chart screens read as one family. */}
+            {!presentationMode && <aside className="chart-rail">
+                {/* ── MEASURE ──
+                  * What the bars are OF, and in which unit. The chart-type row
+                  * was five buttons in an accent fill that read as five primary
+                  * actions; as a labelled group of toggles it reads as the one
+                  * choice it is. */}
+                <div className="chart-rail-group">
+                    <span className="text-micro">Measure</span>
+                    <div className="chart-type-buttons">
+                        {CHART_TYPES.map(t => (
+                            <button
+                                key={t.key}
+                                onClick={() => handleChartTypeChange(t.key)}
+                                title={t.desc}
+                                className={`btn btn-toggle${chartType === t.key ? ' active' : ''}`}
+                            >
+                                {t.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                {/* Chart type buttons */}
-                <div className="chart-type-buttons mb-4">
-                    {CHART_TYPES.map(t => (
-                        <button
-                            key={t.key}
-                            onClick={() => handleChartTypeChange(t.key)}
-                            title={t.desc}
-                            className="btn text-sm"
-                            style={
-                                chartType === t.key
-                                    ? { backgroundColor: 'var(--color-primary)', color: 'white' }
-                                    : { backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }
-                            }
-                        >
-                            {t.label}
-                        </button>
-                    ))}
+                <div className="chart-rail-group">
+                    <span className="text-micro">Efficiency unit</span>
+                    <div className="efficiency-unit-toggle">
+                        {effOptions(units).map(({ value: key, label }) => (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setEffUnit(key)}
+                                className={`btn btn-toggle${effUnit === key ? ' active' : ''}`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                {/* Show points + Auto Color toggles */}
-                <div className={`chart-toggles mb-6`}>
-                    {CHART_TYPES.find(t => t.key === chartType)?.kind === 'line' && (
-                        <label className="toggle-label">
-                            <input
-                                type="checkbox"
-                                checked={showPoints}
-                                onChange={e => setShowPoints(e.target.checked)}
-                                className="w-4 h-4"
-                            />
-                            <span className="text-sm font-medium">Show points</span>
-                        </label>
-                    )}
+                {/* ── DISPLAY ── every toggle in one region, as in Charging. */}
+                <div className="chart-rail-group">
+                    <span className="text-micro">Display</span>
+                    <div className="display-grid">
+                        {CHART_TYPES.find(t => t.key === chartType)?.kind === 'line' && (
+                            <label className="toggle-label">
+                                <input
+                                    type="checkbox"
+                                    checked={showPoints}
+                                    onChange={e => setShowPoints(e.target.checked)}
+                                    className="w-4 h-4"
+                                />
+                                <span className="text-sm">Points</span>
+                            </label>
+                        )}
+                        <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                        <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                    </div>
+                    <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                 </div>
 
                 {/* ── Run selector ── */}
                 <RunSelector
-                    headerActions={<>
-                        <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
-                        <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
-                        <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
-                    </>}
                     vehicles={selectedVehicles}
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}
@@ -642,10 +685,39 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         );
                     }}
                 />
-            </div>}
+            </aside>}
 
-            {/* ── Chart card ── */}
-            <div className="card mb-6">
+            <div className="chart-main">
+
+            {/* ── The plot, inside the frame the export captures ── */}
+            <PlotFrame
+                title={plotTitle}
+                subtitle={plotSubtitle}
+                exportControls={!presentationMode && (
+                    <>
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(window.location.href).then(() => {
+                                    setCopiedUrl(true);
+                                    setTimeout(() => setCopiedUrl(false), 2000);
+                                });
+                            }}
+                            className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
+                            title="Copy link to this chart view"
+                        >
+                            {copiedUrl ? '✓ Copied' : '🔗 URL'}
+                        </button>
+                        <button
+                            onClick={handleCopyImage}
+                            disabled={plottableRuns.length === 0}
+                            className={`chart-copy-btn disabled:opacity-40 disabled:cursor-not-allowed ${copied ? 'chart-copy-btn-active' : ''}`}
+                            title="Copy the framed chart as a PNG"
+                        >
+                            {copied ? '✓ Copied' : 'PNG'}
+                        </button>
+                    </>
+                )}
+            >
                 <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px', position: 'relative' }}>
                     {/* Canvas always mounted so ref stays valid */}
                     <canvas
@@ -669,29 +741,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         </div>
                     )}
                 </div>
-                <div className="mt-3 flex gap-2">
-                    <button
-                        onClick={() => {
-                            navigator.clipboard.writeText(window.location.href).then(() => {
-                                setCopiedUrl(true);
-                                setTimeout(() => setCopiedUrl(false), 2000);
-                            });
-                        }}
-                        className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
-                        title="Copy link to this chart view"
-                    >
-                        {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
-                    </button>
-                    <button
-                        onClick={handleCopyImage}
-                        disabled={plottableRuns.length === 0}
-                        className={`chart-copy-btn disabled:opacity-40 disabled:cursor-not-allowed ${copied ? 'chart-copy-btn-active' : ''}`}
-                        title="Export chart as PNG"
-                    >
-                        {copied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
-                    </button>
-                </div>
-            </div>
+            </PlotFrame>
             {/* ── Axis scale controls (card provided by AxisScaleControls) ──
                 Hidden in presentation/pop-out mode — these belong on the main page. */}
             {!presentationMode && (
@@ -704,6 +754,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             )}
 
             {!presentationMode && <ChartInfoBubble chartKey="range" />}
+
+            </div>{/* .chart-main */}
         </div>
     );
 }

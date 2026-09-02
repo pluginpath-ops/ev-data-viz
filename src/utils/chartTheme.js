@@ -32,6 +32,17 @@
  * shipped dark values and nothing more.
  */
 
+/**
+ * The font stacks, for text drawn straight onto a canvas.
+ *
+ * Chart.js and the custom plugins take a CSS font shorthand string, which
+ * cannot read a custom property — so the one place the type system genuinely
+ * cannot reach is here, and these two constants are that boundary rather than a
+ * stack retyped at each draw call.
+ */
+export const MONO_STACK = "'JetBrains Mono Variable', ui-monospace, monospace";
+export const DISPLAY_STACK = "'Space Grotesk Variable', system-ui, sans-serif";
+
 /** The dark palette, for when no stylesheet can be read. */
 const FALLBACK = {
     tick:       'rgb(139, 149, 165)',

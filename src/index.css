@@ -1527,9 +1527,22 @@ body {
     margin: 0;
 }
 
-/* The presets are the one thing that still wants to wrap rather than stack —
-   they are short, and a column of five would be taller than the plot. */
-.chart-rail .chart-type-buttons { gap: 5px; }
+/* Range & Efficiency's measure picker: six choices, each a phrase ("Efficiency
+   by Temperature"), so they stack. Wrapping them would give a ragged two-column
+   block where the eye cannot tell which of six is selected. */
+.chart-rail .chart-type-buttons {
+    flex-direction: column;
+    gap: 3px;
+}
+.chart-rail .chart-type-buttons .btn { text-align: left; }
+
+/* Its unit picker is the opposite shape — three short labels, one row. */
+.chart-rail .efficiency-unit-toggle {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 2px;
+}
 
 /* The run selector's header packs its title and its actions onto one line and
    marks the actions `shrink-0` — correct in a full-width card, and 685px of
