@@ -31,11 +31,25 @@ export default function TestedFigure({ tested, units }) {
                 {distanceValue(tested.distanceMi, units)}
                 <span className="tested-figure-unit">{distanceUnit(units)}</span>
             </span>
-            {!tested.isFullWindow && (
-                <span className="tested-figure-window" title="Distance over a partial state-of-charge window — not a full-pack range">
-                    {tested.startSoc != null
-                        ? `${tested.startSoc}→${tested.endSoc}% only`
-                        : 'window not stated'}
+            {/* The window, whenever the figure is not a full-pack range.
+                Two different messages, because they are two different facts:
+                an 80→10 test is an adequate characterisation whose distance is
+                simply not the whole pack (stated quietly, as context), while a
+                56→10 test did not see enough of the pack to report from at all
+                (stated in warning colour, as a caveat). */}
+            {!tested.isFullPack && tested.startSoc != null && (
+                <span
+                    className={tested.isRepresentative ? 'tested-figure-conditions' : 'tested-figure-window'}
+                    title={tested.isRepresentative
+                        ? 'Distance over this state-of-charge window, not a full-pack range'
+                        : 'Window too narrow to characterise the pack — reported as measured'}
+                >
+                    {tested.startSoc}→{tested.endSoc}%{tested.isRepresentative ? '' : ' only'}
+                </span>
+            )}
+            {!tested.isFullPack && tested.startSoc == null && (
+                <span className="tested-figure-window" title="The run does not record its state-of-charge window">
+                    window not stated
                 </span>
             )}
             {conditions.length > 0 && (

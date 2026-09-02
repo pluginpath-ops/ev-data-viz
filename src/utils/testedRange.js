@@ -48,14 +48,75 @@ export function socWindow(run) {
 }
 
 /**
- * A window this wide or wider is reported as a range; anything narrower is
- * reported as a distance over its window.
+ * What counts as an adequately characterised test.
+ *
+ * ANCHORED AT BOTH ENDS, rather than a minimum span, and the difference
+ * matters. A bare span cannot tell 100→15 (stopped a little early, 85 points)
+ * from 90→20 (missed the top AND the bottom of the pack, 70 points) from 56→10
+ * (only ever saw the middle, 46 points). Anchoring says what the test actually
+ * has to have seen: the top of the pack, and the bottom of the usable range.
+ *
+ * The corpus arrives in three shapes, and the rule is drawn to sort them:
+ *
+ *   · 100→0, or at least to single digits — the full tests
+ *   · the "10% challenge" — driven down to 10% from wherever the car happened
+ *     to be, so the START is whatever it was, often well under 80
+ *   · one-off tests at assorted speeds, with no consistent window at all
+ *
+ * 80→10 is the practical driving band and characterises a vehicle adequately.
+ * 56→10 saw half a pack. Both end at 10; only one is a test you can report a
+ * figure from — which is why the START bound is the one doing the real work.
+ *
+ * See WIDE_SPAN_MIN_PCT below for the second clause, and why anchoring alone is
+ * not enough.
+ */
+export const WINDOW_START_MIN_PCT = 80;
+export const WINDOW_END_MAX_PCT = 10;
+
+/**
+ * The second way a test can be adequate: it simply saw most of the pack.
+ *
+ * Anchoring alone rejects 100→15 — a real shape in the corpus, 85 points of
+ * coverage including the entire top of the pack, where most driving happens —
+ * while accepting 80→10 at 70 points. That is the wrong way round, and the
+ * cause is that anchoring answers "did it see the right PARTS" and says nothing
+ * about "did it see ENOUGH". Both questions are worth asking, so both are.
+ *
+ * 85 rather than 80, so that 90→20 — anchored at neither end and the weakest of
+ * the four shapes — still fails on both counts.
+ */
+export const WIDE_SPAN_MIN_PCT = 85;
+
+/**
+ * A window this wide is near enough to a full pack that its distance IS the
+ * vehicle's range, rather than a distance over part of one.
  *
  * 95 rather than 100 because a real full-pack test rarely ends at a clean zero
  * — a car driven to shutdown reports 3% as often as 0% — and treating 97→2 as
  * "not a range" would discard the best tests in the corpus on a technicality.
  */
 export const FULL_WINDOW_MIN_PCT = 95;
+
+/**
+ * Did this run see the top of the pack and the bottom of the usable range?
+ *
+ * Direction-agnostic: a range test discharges, but nothing stops a row storing
+ * its window either way round, and a rule that silently inverted would be worse
+ * than one that errs.
+ */
+export function coversPracticalPack(run) {
+    const a = run?.start_soc;
+    const b = run?.end_soc;
+    if (a == null || b == null) return false;
+    const hi = Math.max(a, b);
+    const lo = Math.min(a, b);
+
+    // Did it see the right parts of the pack?
+    const anchored = hi >= WINDOW_START_MIN_PCT && lo <= WINDOW_END_MAX_PCT;
+    // Or, failing that, did it simply see enough of it?
+    const wide = (hi - lo) >= WIDE_SPAN_MIN_PCT;
+    return anchored || wide;
+}
 
 /**
  * Which run the CARD should report, which is not always the vehicle's default.
@@ -72,14 +133,16 @@ export const FULL_WINDOW_MIN_PCT = 95;
  * evidence, correctly qualified, beats none.
  */
 function cardRangeRun(vehicle) {
-    const full = (vehicle?.runs || [])
-        .filter(r => r.distance_miles > 0)
-        .filter(r => {
-            const w = socWindow(r);
-            return w != null && w >= FULL_WINDOW_MIN_PCT;
-        })
-        .sort((a, b) => new Date(b.date) - new Date(a.date));
-    return full[0] ?? defaultRangeRun(vehicle);
+    const usable = (vehicle?.runs || []).filter(r => r.distance_miles > 0);
+    const byNewest = (a, b) => new Date(b.date) - new Date(a.date);
+    // A full-pack test first, then any adequately characterised one, then
+    // whatever the default resolves to: some evidence, correctly qualified,
+    // beats none.
+    const fullPack = usable
+        .filter(r => { const w = socWindow(r); return w != null && w >= FULL_WINDOW_MIN_PCT; })
+        .sort(byNewest);
+    const representative = usable.filter(coversPracticalPack).sort(byNewest);
+    return fullPack[0] ?? representative[0] ?? defaultRangeRun(vehicle);
 }
 
 /**
@@ -87,7 +150,8 @@ function cardRangeRun(vehicle) {
  * test.
  *
  * @returns {{
- *   run: object, distanceMi: number, isFullWindow: boolean, windowPct: number|null,
+ *   run: object, distanceMi: number,
+ *   isRepresentative: boolean, isFullPack: boolean, windowPct: number|null,
  *   startSoc: number|null, endSoc: number|null,
  *   speedMph: number|null, temperatureF: number|null, speedNote: string|null,
  * }|null}
@@ -104,10 +168,19 @@ export function testedRangeSummary(vehicle) {
     return {
         run,
         distanceMi,
-        // A missing window is NOT treated as full. An unstated window is an
-        // unknown one, and calling it a range would be the same invention this
-        // module exists to avoid.
-        isFullWindow: windowPct != null && windowPct >= FULL_WINDOW_MIN_PCT,
+        // Two separate questions, and conflating them is what the old single
+        // threshold did:
+        //   isRepresentative — did the test see enough of the pack to be worth
+        //     reporting at all?
+        //   isFullPack — is its distance the vehicle's RANGE, or a distance
+        //     over part of one?
+        // An 80→10 test is the first and not the second.
+        //
+        // A missing window is neither. An unstated window is an unknown one,
+        // and treating it as adequate would be the same invention this module
+        // exists to avoid.
+        isRepresentative: coversPracticalPack(run),
+        isFullPack: windowPct != null && windowPct >= FULL_WINDOW_MIN_PCT,
         windowPct,
         startSoc: run.start_soc ?? null,
         endSoc: run.end_soc ?? null,
