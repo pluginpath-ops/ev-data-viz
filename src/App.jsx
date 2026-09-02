@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
 import AppNav from './components/shell/AppNav';
@@ -211,14 +211,6 @@ export default function App() {
         const valid = remembered && category.modes.some(m => m.key === remembered);
         handleChartModeChange(valid ? remembered : category.modes[0].key);
     };
-
-    // Fleet state for the selection strip. Counted from what is already
-    // loaded rather than fetched — this is a glance, not a report, and it must
-    // not cost a round trip.
-    const totalTests = useMemo(
-        () => vehicles.reduce((n, v) => n + (v.runs?.length ?? 0), 0),
-        [vehicles],
-    );
 
     const { isPopout, sendState } = useChartSync({
         chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings,
@@ -793,15 +785,7 @@ export default function App() {
                                     </button>
                                 </>
                             )}
-                            {/* Fleet state — the one thing the photo hero could
-                              * have said and did not. Counts only: nothing in
-                              * the loaded shape carries a reliable "last
-                              * updated", and inventing one would be worse than
-                              * omitting it. */}
-                            <span className="fleet-state">
-                                {vehicles.length} vehicles · {totalTests} tests
-                            </span>
-                            <button onClick={toggleUnits} className="units-toggle" title="Switch unit system">
+                            <button onClick={toggleUnits} className="units-toggle ml-auto" title="Switch unit system">
                                 ⇄ {units === 'imperial' ? 'IMP' : 'MET'}
                             </button>
                         </div>

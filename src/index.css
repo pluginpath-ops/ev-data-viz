@@ -1281,11 +1281,14 @@ body {
     border-top: 1px solid var(--color-border);
 }
 
-/* Fleet state, right-aligned in the selection strip. This is the half of the
-   photo hero worth keeping: a returning reader wants to know the corpus grew,
-   which is exactly what the hero did not say. */
+/* A survey of the corpus, set beside the heading it describes. This is the half
+   of the photo hero worth keeping: a returning reader wants to know the corpus
+   grew, which is exactly what the hero did not say.
+
+   It is NOT in the nav's selection strip, which is where it started — beside
+   the selected-vehicle chips, "65 vehicles · 129 tests" read as a count of what
+   you had selected. */
 .fleet-state {
-    margin-left: auto;
     flex: none;
     font-family: var(--font-mono);
     font-size: 0.6875rem;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { DATA_CATEGORIES, vehicleDataCategories, hasDataCategory, filterByDataCategories } from '../utils/vehicleDataCategories';
 import { fmtDistance } from '../utils/unitConversions';
@@ -515,11 +515,36 @@ export default function VehiclesView({
 
     const barVisible = pendingDeletes.size > 0 || !!undoState || !!pendingOrder;
 
+    // Counted from what is already loaded rather than fetched: this is a glance
+    // beside the heading, not a report, and it must not cost a round trip. The
+    // whole list, deliberately — a survey that moved when you typed in the
+    // search box would be describing the filter, not the fleet.
+    const totalTests = useMemo(
+        () => vehicles.reduce((n, v) => n + (v.runs?.length ?? 0), 0),
+        [vehicles],
+    );
+
     return (
         <div className={barVisible ? 'pb-20' : ''}>
             {/* Header */}
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold">Vehicles</h2>
+                <div className="flex items-baseline gap-2">
+                    <h2 className="text-2xl font-bold">Vehicles</h2>
+                    {/* A survey of the corpus, not of the selection. It sat in
+                      * the nav's selection strip, where "65 vehicles · 129
+                      * tests" read as a count of what you had selected — a
+                      * category error, not a styling one. Beside the title it
+                      * describes the thing the title names, and it appears on
+                      * this tab only, because nowhere else is looking at the
+                      * whole fleet.
+                      *
+                      * Counts only: nothing in the loaded shape carries a
+                      * reliable "last updated", and inventing one would be
+                      * worse than omitting it. */}
+                    <span className="fleet-state">
+                        {vehicles.length} vehicles · {totalTests} tests
+                    </span>
+                </div>
                 <div className="inline-row">
                     {/* View mode toggle */}
                     <div className="view-toggle">
