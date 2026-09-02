@@ -15,7 +15,23 @@ Prefer:
 ### CSS
 - Use semantic class names defined in `src/index.css` via Tailwind's `@apply` directive
 - Class names should describe *what* an element is, not *how* it looks (e.g. `.vehicle-grid`, `.modal-overlay`)
-- Avoid repeating long Tailwind utility clusters inline; extract them to named classes
+
+**Stop writing new Tailwind utility clusters in JSX.** When you touch markup
+that carries one, convert it to a reusable class in `src/index.css` rather than
+restyling it in place.
+
+An inline cluster is a style with no name, no reuse and no theme awareness. The
+Range & Efficiency run rows drew seven badges in seven different clusters
+(`bg-amber-50`/`bg-orange-50`/`bg-cyan-50`/`bg-green-50`/`bg-blue-50`) — a
+rainbow where no hue meant anything; none of them followed the re-skin when the
+tokens were re-valued, while every semantic class moved for free. The
+`KNOWN_OFFENDERS` ratchet in `src/__tests__/contrast.test.js` exists to count
+what is left, so **lower it whenever a change clears some**.
+
+- Reuse an existing class before inventing one
+- Colours come from tokens; sizes derive from `--fs-body`, never a raw `rem`
+- Never add a `[data-theme="dark"] .foo` rule — it cannot follow a themed
+  subtree. `playground.test.js` caps that backlog and it only goes down
 
 ### Tech Stack
 - React 19 + Vite + Tailwind CSS v4 (`@tailwindcss/vite`, CSS-first, no `tailwind.config.js`)
