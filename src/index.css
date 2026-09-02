@@ -782,13 +782,23 @@ body {
  * itself — see styles/themeBootstrap for why light is deferred.
  */
 
+/* Capped to the same column as the content, not run to the window edge.
+   Full-bleed chrome over a 1280px content column reads as a T — a wide bar on a
+   narrow stem — and it puts the wordmark a long way from the first thing it is
+   meant to sit above. The block is one unit: bar, sub-nav strip and selection
+   strip share the cap, so the whole of the chrome lines up with the page.
+
+   The width and gutter are `.page-container`'s (max-w-7xl / px-6) restated as
+   values rather than @apply'd, because the nav needs the max-width on the
+   OUTER element and the padding on the inner ones — the wordmark and the
+   sub-nav have their own edge padding that has to add up to the same gutter. */
 .app-nav {
+    max-width: 80rem;
+    margin-inline: auto;
     background-color: var(--color-card);
     border-bottom: 1px solid var(--color-border);
 }
 
-/* The bar itself is full-bleed — it is chrome, and chrome runs to the edge of
-   the window. Only the CONTENT below it is held to the page column. */
 .app-nav-bar {
     display: flex;
     align-items: stretch;
@@ -802,7 +812,9 @@ body {
     align-items: center;
     gap: 9px;
     flex: none;
-    padding: 0 20px;
+    /* Left on the page gutter so the mark lines up with the content below it;
+       right is the design's own 20px separation from the first tab. */
+    padding: 0 20px 0 24px;
     border-right: 1px solid var(--color-border);
     background: none;
     border-top: none;
@@ -845,7 +857,7 @@ body {
     gap: 12px;
     flex: none;
     margin-left: auto;
-    padding: 0 18px;
+    padding: 0 24px;
 }
 
 /* ── Sub-nav strip ──────────────────────────────────────────────────────────
@@ -863,6 +875,9 @@ body {
     display: flex;
     align-items: stretch;
     min-width: 0;
+    /* 13 + the button's own 11 = the 24px page gutter, so the first sub-tab's
+       label sits directly above the content's left edge. */
+    padding-left: 13px;
     overflow-x: auto;
     scrollbar-width: none;
 }
@@ -876,7 +891,7 @@ body {
     gap: 10px;
     flex: none;
     margin-left: auto;
-    padding: 0 14px;
+    padding: 0 24px;
     font-family: var(--font-mono);
     font-size: 0.6875rem;
     color: var(--color-text-nav-meta);
