@@ -270,14 +270,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         { value: 'frame',         label: 'Frame' },
     ], [dl, units]);
 
-    const chartPresets = [
-        { emoji: '⚡', name: 'Rate vs SoC',            x: 'soc',  y: 'chargeRate', y2: null       },
-        { emoji: '🛣️', name: 'Range vs Time',           x: 'time', y: 'range',      y2: 'rangeEpa' },
-        { emoji: '⏱️', name: 'Rate vs Time',            x: 'time', y: 'chargeRate', y2: null       },
-        { emoji: '📊', name: 'Rate + SoC vs Time',      x: 'time', y: 'chargeRate', y2: 'deltaSoc'   },
-        { emoji: '📊', name: 'Rate + Range vs Time',    x: 'time', y: 'chargeRate', y2: 'deltaRange' },
-    ];
-
     // Convert a stored (imperial) field value to the current unit system for display.
     const DISTANCE_AXES = new Set(['range', 'deltaRange', 'rangeEpa', 'deltaRangeEpa', 'rangeRate']);
     const convertAxisValue = (value, fieldKey) => {
@@ -759,19 +751,12 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
               * control. The rail sticks; the plot column scrolls past it. */}
             {!presentationMode && <aside className="chart-rail">
                 {loadingData && <LoadingSpinner message="Loading run data…" />}
-                {/* Presets */}
-                <div className="flex flex-wrap gap-2 mb-6">
-                    {chartPresets.map(preset => (
-                        <button
-                            key={preset.name}
-                            onClick={() => setChartConfig({ ...chartConfig, xAxis: preset.x, yAxis: preset.y, y2Axis: preset.y2 ?? null })}
-                            className="btn text-sm"
-                            style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
-                        >
-                            {preset.emoji} {preset.name}
-                        </button>
-                    ))}
-                </div>
+                {/* The axis presets used to sit here. They were the first thing
+                    in the rail and the least explicable — five buttons whose
+                    labels ("Rate + SoC vs Time") only mean something once you
+                    already know what the axes do. Removed rather than
+                    restyled; the functionality wants a home where it can be
+                    explained, not a quieter version of the same puzzle. */}
 
                 {/* ── AXES ── */}
                 <div className="chart-rail-group">
@@ -822,11 +807,17 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     that had to be found and switched on. It sits under them and
                     indented: it modifies X, it is not a fourth axis. */}
                 {isTimeAxis && (
-                    <div className="axis-align-row">
-                        <label className="text-sm font-medium text-secondary" htmlFor="align-soc">
-                            Align start at:
+                    <div className={`race-mode${chartConfig.alignRaw ? '' : ' is-on'}`}>
+                        <label className="race-mode-switch" title="Shift every run so the chosen SoC lands at t = 0, making the curves comparable. Off, each run starts at its own zero.">
+                            <input
+                                type="checkbox"
+                                checked={!chartConfig.alignRaw}
+                                onChange={e => setChartConfig({ ...chartConfig, alignRaw: !e.target.checked })}
+                            />
+                            <span className="race-mode-track" aria-hidden="true" />
+                            <span className="race-mode-label">Race mode</span>
                         </label>
-                        <span className="flex items-center gap-1.5">
+                        <span className="race-mode-start">
                             <input
                                 id="align-soc"
                                 type="number"
@@ -838,26 +829,17 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                     raceThreshold: e.target.value === '' ? null : clampSoc(e.target.value, commonSoc ?? 10),
                                 })}
                                 disabled={chartConfig.alignRaw}
-                                className="form-input soc-input disabled:opacity-50"
+                                className="form-input soc-input"
+                                title={commonSoc != null && chartConfig.raceThreshold == null
+                                    ? `Lowest SoC every selected run reaches (${commonSoc}%) — no run is dropped at this value.`
+                                    : 'The SoC every run is shifted to line up on'}
                             />
-                            <span className="text-sm text-secondary">% SoC</span>
+                            {/* "% start" rather than "Align start at: … % SoC".
+                                The switch beside it already says what is being
+                                aligned, so the field only has to say what its
+                                number IS. */}
+                            <span className="race-mode-unit">% start</span>
                         </span>
-                        {commonSoc != null && chartConfig.raceThreshold == null && (
-                            <span className="text-xs text-meta" title="The lowest SoC every selected run actually reaches — no run is dropped at this value.">
-                                lowest common
-                            </span>
-                        )}
-                        <label className="toggle-label">
-                            <input
-                                type="checkbox"
-                                checked={!!chartConfig.alignRaw}
-                                onChange={e => setChartConfig({ ...chartConfig, alignRaw: e.target.checked })}
-                                className="w-4 h-4"
-                            />
-                            <span className="text-sm text-secondary" title="Show each run's own elapsed time from the start of the test. Runs will start at zero regardless of the SoC they began at, so the curves are not comparable.">
-                                Raw test time (not comparable)
-                            </span>
-                        </label>
                     </div>
                 )}
 
@@ -937,18 +919,18 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                     </span>
                                 )}
                                 {exclusionReason && (
-                                    <span className="badge-status bg-amber-50 text-amber-700 border-amber-200" title={`Hidden in race mode: ${exclusionReason}`}>
-                                        ⚠ {exclusionReason}
+                                    <span className="badge-status is-warning" title={`Hidden in race mode: ${exclusionReason}`}>
+                                        ⚠ excluded
                                     </span>
                                 )}
                                 {!exclusionReason && offset !== null && (
                                     noTrim ? (
-                                        <span className="badge-status bg-red-50 text-red-700 border-red-200" title="Data starts at or above the threshold — no time was trimmed">
-                                            no offset
+                                        <span className="badge-status is-danger" title="Data starts at or above the threshold — no time was trimmed">
+                                            0 min
                                         </span>
                                     ) : (
-                                        <span className="badge-status bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)]" title={`${offset} min of pre-threshold data trimmed`}>
-                                            −{offset} min offset
+                                        <span className="badge-status" title={`${offset} min of pre-threshold data trimmed`}>
+                                            −{offset} min
                                         </span>
                                     )
                                 )}

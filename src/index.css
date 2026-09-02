@@ -480,7 +480,7 @@
     flex: none;
     white-space: nowrap;
     font-weight: 500;
-    font-size: 0.8125rem;
+    font-size: calc(var(--fs-body) * 0.9286);
     cursor: pointer;
     color: var(--color-text-muted);
     background: none;
@@ -526,7 +526,7 @@
     height: 100%;
     flex: none;
     white-space: nowrap;
-    font-size: 0.8125rem;
+    font-size: calc(var(--fs-body) * 0.9286);
     font-weight: 500;
     cursor: pointer;
     color: var(--color-text-muted);
@@ -667,6 +667,14 @@ body {
 :root {
     --fs-body: 0.875rem;   /* 14px */
     --fs-step: 0.857;      /* one step down = 12px; up = 16.3px */
+}
+
+/* The control surfaces — the chart rail and the run rows inside it — run one
+   step below body. DERIVED, not typed: a literal here would stop following
+   --fs-body and stop responding to the --ui-scale knob, which is the whole
+   reason the scale is relative. */
+.text-control {
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
 }
 
 /* `calc()` inside the fallback, so an unset --fs-<role> derives and a set one
@@ -822,7 +830,7 @@ body {
     border-left: none;
     cursor: pointer;
     font-family: var(--font-display);
-    font-size: 1.125rem;
+    font-size: calc(var(--fs-body) * 1.2857);
     font-weight: 700;
     line-height: 1;
     letter-spacing: -0.03em;
@@ -893,7 +901,7 @@ body {
     margin-left: auto;
     padding: 0 24px;
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
     color: var(--color-text-nav-meta);
 }
 
@@ -1172,7 +1180,7 @@ body {
     flex: none;
     border-radius: var(--radius-mark);
     font-family: var(--font-mono);
-    font-size: 0.5625rem;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     font-weight: 600;
     letter-spacing: 0.06em;
     background-color: var(--color-primary-surface);
@@ -1193,10 +1201,31 @@ body {
 /* Same shape and metrics as .badge-default and .badge-hidden, in grey. It was
    the odd one out — a bare outline with no fill and no colour of its own, so it
    took whatever text colour it inherited and read as stray text, not a badge. */
+/* A neutral state marker, with two intents. Every call site used to bring its
+   own raw Tailwind cluster — bg-amber-50/bg-red-50/a var soup — so the same
+   badge looked like three different controls and none of them followed the
+   theme. Mono and nowrap: it carries figures ("−4 min"), and inside a 260px
+   rail row a badge that wraps pushes the run's own name off the line. */
 .badge-status {
-    @apply text-xs px-2 py-0.5 rounded;
+    @apply px-1.5 py-0.5;
+    flex: none;
+    white-space: nowrap;
+    border-radius: var(--radius-mark);
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     background-color: var(--color-surface-sunken);
-    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-meta);
+}
+.badge-status.is-warning {
+    background-color: var(--color-warning-surface);
+    border-color: var(--color-warning-border);
+    color: var(--color-warning-text);
+}
+.badge-status.is-danger {
+    background-color: var(--color-danger-surface);
+    border-color: var(--color-danger-border);
+    color: var(--color-danger-text);
 }
 
 /* Which layer a Model Constants knob's live value came from (#261): this
@@ -1240,7 +1269,7 @@ body {
     border: 1px solid transparent;
     border-radius: var(--radius-control);
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: calc(var(--fs-body) * 0.7857);
     font-weight: 500;
     background: none;
     color: var(--color-text-meta);
@@ -1258,7 +1287,7 @@ body {
     @apply flex items-center gap-2;
     padding: 3px 8px 3px 9px;
     border-radius: var(--radius-track);
-    font-size: 0.75rem;
+    font-size: calc(var(--fs-body) * var(--fs-step));
     background-color: var(--color-popover);
     border-left: 2px solid var(--color-accent-blue);
     color: var(--color-text-secondary);
@@ -1321,20 +1350,20 @@ body {
     align-items: baseline;
     gap: 2px;
     font-family: var(--font-mono);
-    font-size: 0.875rem;
+    font-size: var(--fs-body);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     color: var(--color-text-value);
 }
 .tested-figure-unit {
-    font-size: 0.625rem;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     font-weight: 500;
     color: var(--color-text-meta);
 }
 /* The conditions. Mono because they are readings, not prose. */
 .tested-figure-conditions {
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
     color: var(--color-text-meta);
 }
 /* A derived figure has to say it is derived. Quiet, because it qualifies the
@@ -1342,14 +1371,14 @@ body {
    odometer showed, but the test behind it was a good one. */
 .tested-figure-scaled {
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
     color: var(--color-text-link);
 }
 
 /* A window too narrow to scale from is a caveat, not a qualifier. */
 .tested-figure-window {
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
     color: var(--color-warning-text);
 }
 
@@ -1480,7 +1509,7 @@ body {
     gap: 8px;
     margin-bottom: 0;
 }
-.chart-rail .axis-label { margin-bottom: 2px; font-size: 0.75rem; }
+.chart-rail .axis-label { margin-bottom: 2px; font-size: calc(var(--fs-body) * var(--fs-step)); }
 
 .chart-rail .chart-toggles {
     flex-direction: column;
@@ -1575,6 +1604,92 @@ body {
     }
 }
 
+/* ── Race mode ──────────────────────────────────────────────────────────────
+ *
+ * A switch, not a form field. It was "Align start at: [10] % SoC" beside a
+ * separate "Raw test time" checkbox — two controls for one either/or, with the
+ * awkward label doing the work the switch now does by being a switch. Orange
+ * because it is an active/now state: race mode ON is a thing the chart is
+ * currently doing to the data.
+ */
+.race-mode {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background-color: var(--color-card);
+}
+.race-mode.is-on { border-color: var(--color-accent-orange); }
+
+.race-mode-switch {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    cursor: pointer;
+}
+/* The real checkbox stays in the DOM and keeps its keyboard behaviour and its
+   focus ring; the track is what you see. */
+.race-mode-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+.race-mode-track {
+    position: relative;
+    width: 34px;
+    height: 18px;
+    flex: none;
+    border-radius: 9px;
+    background-color: var(--color-border-strong);
+    transition: background-color 0.15s ease-in-out;
+}
+.race-mode-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s ease-in-out;
+}
+.race-mode.is-on .race-mode-track { background-color: var(--color-accent-orange); }
+.race-mode.is-on .race-mode-track::after { transform: translateX(16px); }
+
+.race-mode-switch input:focus-visible + .race-mode-track {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.race-mode-label {
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    font-weight: 600;
+    color: var(--color-text-meta);
+    white-space: nowrap;
+}
+.race-mode.is-on .race-mode-label { color: var(--color-accent-orange); }
+
+.race-mode-start {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-left: auto;
+    flex: none;
+}
+.race-mode-start .soc-input {
+    width: 42px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+.race-mode-start .soc-input:disabled { opacity: 0.45; }
+.race-mode-unit {
+    font-size: calc(var(--fs-body) * 0.7857);
+    color: var(--color-text-meta);
+    white-space: nowrap;
+}
+
 /* ── Axis rows ──────────────────────────────────────────────────────────────
    `X  [State of Charge (%) ▾]` — the key is one or two characters, so it is a
    fixed column and the control takes the rest. The old form stacked a
@@ -1593,7 +1708,7 @@ body {
 }
 .axis-row-key {
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
     font-weight: 600;
     color: var(--color-text-meta);
 }
@@ -1647,7 +1762,7 @@ body {
 .plot-frame-title {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 1.0625rem;
+    font-size: calc(var(--fs-body) * 1.2143);
     font-weight: 600;
     letter-spacing: -0.02em;
     color: var(--color-text-primary);
@@ -1658,7 +1773,7 @@ body {
 .plot-frame-subtitle {
     margin: 3px 0 0;
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
     color: var(--color-text-meta);
 }
 
@@ -1666,7 +1781,7 @@ body {
 .plot-frame-mark {
     flex: none;
     font-family: var(--font-display);
-    font-size: 0.75rem;
+    font-size: calc(var(--fs-body) * var(--fs-step));
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--color-text-faint);
@@ -1702,7 +1817,7 @@ body {
     border: 1px solid var(--color-border);
 }
 .vehicle-media-thumb .vehicle-media-scrim { display: none; }
-.vehicle-media-thumb .vehicle-media-fallback { font-size: 0.6875rem; }
+.vehicle-media-thumb .vehicle-media-fallback { font-size: calc(var(--fs-body) * 0.7857); }
 
 /* Bottom-up, and stopping short of the top: the picture stays legible in its
    upper half while the name below it sits on something solid enough to read. */
@@ -1728,7 +1843,7 @@ body {
 }
 .vehicle-media-fallback {
     font-family: var(--font-display);
-    font-size: 1.375rem;
+    font-size: calc(var(--fs-body) * 1.5714);
     font-weight: 700;
     letter-spacing: 0.06em;
     color: var(--color-text-faint);
@@ -1747,7 +1862,7 @@ body {
 .vehicle-media-title h3 {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 1.0625rem;
+    font-size: calc(var(--fs-body) * 1.2143);
     font-weight: 600;
     letter-spacing: -0.01em;
     color: #fff;
@@ -1758,7 +1873,7 @@ body {
 }
 .vehicle-media-title p {
     margin: 1px 0 0;
-    font-size: 0.6875rem;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
     color: rgba(255, 255, 255, 0.72);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1774,7 +1889,7 @@ body {
     border: 1px solid transparent;
     border-radius: var(--radius-chip);
     font-family: var(--font-mono);
-    font-size: 0.5625rem;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     font-weight: 600;
     letter-spacing: 0.08em;
     /* A dark plate under the tint, so the badge stays readable over a bright
@@ -1840,7 +1955,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     align-items: baseline;
     gap: 2px;
     font-family: var(--font-mono);
-    font-size: 1rem;
+    font-size: calc(var(--fs-body) * 1.1429);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     color: var(--color-text-value);
@@ -1850,7 +1965,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Small, quiet, and on the value's baseline — a unit is not part of the number
    and should not compete with it, but it must not wrap away from it either. */
 .stat-cell-unit {
-    font-size: 0.625rem;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     font-weight: 500;
     color: var(--color-text-meta);
     white-space: nowrap;
@@ -1860,7 +1975,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    visible instead of invisible. */
 .stat-cell-empty {
     font-family: var(--font-mono);
-    font-size: 1rem;
+    font-size: calc(var(--fs-body) * 1.1429);
     font-weight: 600;
     color: var(--color-text-faint);
     line-height: 1.15;
@@ -1876,7 +1991,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .fleet-state {
     flex: none;
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
     color: var(--color-text-meta);
     white-space: nowrap;
 }
@@ -2176,9 +2291,20 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-card);
 }
 
-/* Run list within a vehicle group */
+/* Run list within a vehicle group. The rows carry their own boxes now, so the
+   list only has to space them. */
 .run-items {
-    @apply space-y-2;
+    @apply flex flex-col gap-0;
+}
+
+/* The selected/available count in the disclosure. Mono, because it is two
+   numbers: "5 / 12" says both how many and how many there are, where
+   "5 selected" said only the first. */
+.run-selector-count {
+    font-family: var(--font-mono);
+    font-size: calc(var(--fs-body) * 0.7857);
+    font-weight: 500;
+    color: var(--color-text-meta);
 }
 
 /* Run name area: text + source link arrows + date/status badges */
@@ -2227,14 +2353,34 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-    gap: 3px 8px;
-    padding: 4px 0;
+    gap: 3px 7px;
+    padding: 5px 7px;
+    /* A faint box, not a rule between rows. Two-line rows separated only by a
+       hairline read as four alternating lines; a box says which two belong
+       together. */
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-chip);
+    background-color: var(--color-surface-muted);
     cursor: pointer;
 }
-.pair-row + .pair-row {
-    border-top: 1px solid var(--color-border-subtle);
-}
+.pair-row + .pair-row { margin-top: 5px; }
+.pair-row:hover { border-color: var(--color-border-strong); }
 .pair-row > input[type="checkbox"] { grid-column: 1; grid-row: 1; }
+
+/* One step below body, and the checkbox shrinks with it. At body size a run
+   row was as loud as the chart title beside it, and four of them filled the
+   rail. Derived from the scale rather than typed, so the --ui-scale knob still
+   moves it. */
+.pair-row,
+.pair-row .form-input,
+.pair-row .text-label {
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+}
+.pair-row > input[type="checkbox"] {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+.pair-row .form-input { padding-top: 1px; padding-bottom: 1px; }
 
 /* Additional partners for the same charging test — indented so the branch
    reads as belonging to the row above, checkbox included. */

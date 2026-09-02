@@ -135,6 +135,15 @@ export default function RunSelector({
         : vehicles.reduce((n, v) =>
             n + (v.runs || []).filter(r => runFilter(r, v)).filter(isSelected).length, 0);
 
+    // The denominator. "5 selected" says nothing about whether that is most of
+    // what there is or a fraction of it — "5 / 12" answers both at once, and
+    // the second number is the one that tells you there is more to look at.
+    const availableCount = pairMode
+        ? vehicles.reduce((n, v) => n + primaryRunsFor(v).reduce(
+            (m, run) => m + (singlePartner ? 1 : partnerRowsFor(run).length), 0), 0)
+        : vehicles.reduce((n, v) =>
+            n + (v.runs || []).filter(r => runFilter(r, v)).length, 0);
+
     return (
         <div>
             {/* Chart-session toggles live here rather than in each chart's own
@@ -146,8 +155,8 @@ export default function RunSelector({
                 className="run-selector-header"
             >
                 <span style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                Select vehicles &amp; tests
-                <span className="text-sm font-normal text-secondary">({selectedCount} selected)</span>
+                <span className="text-control">Select vehicles &amp; tests</span>
+                <span className="run-selector-count">{selectedCount} / {availableCount}</span>
                 {expanded && (
                     <span className="text-xs font-normal text-meta ml-2">· Drag the pills above to reorder</span>
                 )}
@@ -314,7 +323,11 @@ function PairRows({
                                 leaves the page: it is the one thing here that is
                                 not about identifying the run. */}
                             {renderRunMeta?.(run)}
-                            <RunSourceLinks run={run} className="shrink-0" />
+                            {/* Right-aligned: it is the one item on this line
+                                that leaves the page, so it sits at the edge
+                                rather than trailing whatever length the name
+                                happened to be. */}
+                            <RunSourceLinks run={run} className="shrink-0 ml-auto" />
                         </span>
                     ) : (
                         <span className="pair-charging-label text-meta">↳</span>

@@ -378,9 +378,11 @@ function offenders() {
  *
  * 79 at the sweep that added this, 74 after it, 71 once the re-skin's vehicle
  * card dropped the green `bg-green-100` visibility pill and the `bg-blue-50`
- * footer button for tokens. RunsView holds 31 of what is left.
+ * footer button for tokens, 69 once .badge-status gained real intents and
+ * stopped every call site bringing its own bg-amber-50 / bg-red-50 cluster.
+ * RunsView holds 31 of what is left.
  */
-const KNOWN_OFFENDERS = 71;
+const KNOWN_OFFENDERS = 69;
 
 describe('hardcoded light surfaces', () => {
     it('does not grow', () => {
