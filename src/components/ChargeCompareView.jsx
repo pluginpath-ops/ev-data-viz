@@ -19,6 +19,7 @@ import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { resolvePairColors } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
+import { chartTheme } from '../utils/chartTheme';
 
 
 /**
@@ -677,9 +678,8 @@ export default function ChargeCompareView({
 
     // ── Build and render both charts ──────────────────────────────────────────
     useEffect(() => {
-        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
 
         [chart1Instance, chart2Instance].forEach(inst => {
             if (inst.current) { inst.current.destroy(); inst.current = null; }

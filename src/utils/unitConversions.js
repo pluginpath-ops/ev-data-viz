@@ -20,7 +20,14 @@ export {
 // r1 is lossless for anything already at one decimal, so this clamps the
 // computed values without touching the entered ones.
 
-export const fmtDistance  = (mi,   sys) => sys === 'metric' ? `${r1(mi * MI_TO_KM)} km`           : `${r1(mi)} mi`;
+// Split, because a display that wants to set the unit smaller and quieter than
+// the number cannot do it with the two fused into one string — and splitting it
+// at the call site would put the conversion's shape in the component. The
+// formatter is composed from the pair, so there is still one source of truth
+// for what a distance IS; there are now two ways to ask for it.
+export const distanceValue = (mi, sys) => sys === 'metric' ? r1(mi * MI_TO_KM) : r1(mi);
+export const distanceUnit  = (sys)     => sys === 'metric' ? 'km' : 'mi';
+export const fmtDistance  = (mi,   sys) => `${distanceValue(mi, sys)} ${distanceUnit(sys)}`;
 export const fmtSpeed     = (mph,  sys) => sys === 'metric' ? `${r1(mph * MI_TO_KM)} kph`          : `${r1(mph)} mph`;
 /**
  * A run's speed basis, when it needs one: an average over a varying-speed cycle

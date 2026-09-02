@@ -192,6 +192,48 @@ describe('the seams that broke before', () => {
         }
     });
 
+    it('takes chart colours from the stylesheet, not from retyped literals', () => {
+        // The seam this closes: Chart.js takes colours as strings, so every
+        // chart view carried its own `isDark ? 'rgb(226,232,240)' : …` copy of
+        // the theme — eleven files, forty-eight literals, none of them reachable
+        // from the token layer. The re-skin re-valued the tokens and every one
+        // of these kept painting the old palette. All five PNG exports were
+        // still flattening onto rgb(8,12,28), the card colour from before the
+        // re-skin, so an exported chart had a background the site no longer
+        // used anywhere.
+        //
+        // Scoped to the AXIS FURNITURE — ticks, gridlines, the legend and the
+        // export background — because that is what chartTheme resolves. Colours
+        // drawn inside the canvas by a plugin (badge fills, marker strokes,
+        // tooltip boxes) are still literals; they belong to the phases that
+        // rebuild those charts, and adding them here before then would assert a
+        // thing nobody has built yet.
+        // Asserted as the ABSENCE of the old shape, not the presence of the new
+        // one. `toMatch(/chartTheme\(\)/)` over a whole file passes as soon as
+        // the file mentions chartTheme anywhere — a view that took its export
+        // background from the token and went on retyping its axis colours would
+        // have sailed through. Checked by mutating one back; it did not bite.
+        const RETYPED = /\b(tickColor|gridColor|legendColor|tick|grid|legend|text|bgColor|bg)\s*=\s*isDark\s*\?/;
+        const offenders = ALL
+            .filter(x => /\.jsx$/.test(x.file) && RETYPED.test(x.text))
+            .map(x => `${x.file}: ${x.text.match(RETYPED)[0]}…`);
+        expect(offenders,
+            'Chart axis furniture retyped as an isDark ternary. Use chartTheme(), '
+            + 'which reads the same tokens the stylesheet does.')
+            .toEqual([]);
+
+        // Positively: the views that draw axes do call it.
+        const users = ALL.filter(x => /\.jsx$/.test(x.file) && /chartTheme\(\)/.test(x.text));
+        expect(users.length).toBeGreaterThan(5);
+
+        // And nothing anywhere may reach for the pre-re-skin card colour again.
+        const stale = ALL.filter(x => /rgb\(8\s*,\s*12\s*,\s*28\)/.test(x.text)
+            && !/utils\/chartTheme\.js$/.test(x.file));
+        expect(stale.map(x => x.file),
+            'rgb(8,12,28) was the card colour BEFORE the re-skin — use chartTheme().background')
+            .toEqual([]);
+    });
+
     it('composes labels on every chart rather than hand-rolling them', () => {
         const charts = [
             'src/components/ChargingView.jsx',

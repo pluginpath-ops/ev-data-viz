@@ -1281,6 +1281,71 @@ body {
     border-top: 1px solid var(--color-border);
 }
 
+/* ── Stat cell ──────────────────────────────────────────────────────────────
+ *
+ * A measured figure with its name above it and its unit beside it. The design
+ * brief's third diagnosis: this is a measurement tool, but its numbers were set
+ * in the same face and weight as its prose, so the LABELS were the loudest
+ * thing on screen and the data was the quietest.
+ *
+ * The value is mono, heavy and large; the label is a micro-label; the unit is
+ * small and quiet and rides on the value's baseline rather than taking a line
+ * of its own. Vehicle cards, run bands, chart legends and the EPA tables all
+ * draw this same shape, which is why it is one class rather than four.
+ */
+.stat-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 8px 10px;
+    background-color: var(--color-surface-muted);
+}
+
+/* A row of them on a hairline grid: the 1px gaps ARE the rules, so the cells
+   read as one instrument rather than as separate boxes. */
+.stat-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 1px;
+    background-color: var(--color-border);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-chip);
+    overflow: hidden;
+}
+
+.stat-cell-value {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-value);
+    line-height: 1.15;
+}
+
+/* Small, quiet, and on the value's baseline — a unit is not part of the number
+   and should not compete with it, but it must not wrap away from it either. */
+.stat-cell-unit {
+    font-size: 0.625rem;
+    font-weight: 500;
+    color: var(--color-text-meta);
+    white-space: nowrap;
+}
+
+/* Nothing recorded. A dim em dash rather than an empty cell, so missing data is
+   visible instead of invisible. */
+.stat-cell-empty {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-faint);
+    line-height: 1.15;
+}
+
 /* A survey of the corpus, set beside the heading it describes. This is the half
    of the photo hero worth keeping: a returning reader wants to know the corpus
    grew, which is exactly what the hero did not say.

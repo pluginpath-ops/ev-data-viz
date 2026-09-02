@@ -24,6 +24,7 @@ import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '
 import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
 import { resolveRangeSource, epaRangeOption, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
+import { chartTheme } from '../utils/chartTheme';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
@@ -587,9 +588,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             ? `${stripUnits(yLabel)} from ${raceThreshold}% SoC`
             : `${stripUnits(yLabel)} vs ${stripUnits(xLabel)}`;
 
-        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
 
         chartInstance.current = new Chart(ctx, {
             type: 'scatter',
@@ -674,7 +674,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // ── PNG export ───────────────────────────────────────────────────────────
     const handleExportImage = async () => {
         if (!chartInstance.current) return;
-        const bgColor = isDark ? 'rgb(8,12,28)' : '#ffffff';
+        const bgColor = chartTheme().background;
         try {
             const dataUrl = await copyChartAsPng(chartInstance.current, bgColor);
             setChartImage(dataUrl);

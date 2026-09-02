@@ -20,6 +20,7 @@ import {
 } from '../utils/unitConversions';
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { copyChartAsPng } from '../utils/chartUtils';
+import { chartTheme } from '../utils/chartTheme';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
 
@@ -261,9 +262,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
 
     // ── Render chart ──────────────────────────────────────────────────────────
     useEffect(() => {
-        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
 
         if (chartInstance.current) {
             chartInstance.current.destroy();
@@ -521,7 +521,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     const handleCopyImage = async () => {
         if (!chartInstance.current) return;
         try {
-            await copyChartAsPng(chartInstance.current, isDark ? 'rgb(8,12,28)' : '#ffffff');
+            await copyChartAsPng(chartInstance.current, chartTheme().background);
             setCopied(true);
             setTimeout(() => setCopied(false), 2500);
         } catch { /* Clipboard API not supported — chart is still visible */ }

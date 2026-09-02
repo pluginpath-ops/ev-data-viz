@@ -24,6 +24,7 @@ import { TWO_CYCLE_KEYS, CURVE_SPEED_RANGE } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
+import { chartTheme } from '../utils/chartTheme';
 import AutoColorToggle from './AutoColorToggle';
 import { useRunSelection } from '../hooks/useRunSelection';
 import ViewingConditions, { useViewingConditions } from './epa/ViewingConditions';
@@ -483,9 +484,8 @@ export default function EpaCurvesView({
         if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
         if (!datasets.length) return;
 
-        const tickColor   = isDark ? 'rgb(226,232,240)'       : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(100,116,139,0.35)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(241,245,249)'       : 'rgb(55,65,81)';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
 
         const refPlugin     = makeReferencePlugin(HIGHWAY_BAND_MPH, units, isDark);
         // Speed callouts disabled — labels overlap with multiple curves.
@@ -614,7 +614,7 @@ export default function EpaCurvesView({
     const handleCopyPng = async () => {
         if (!chartRef.current) return;
         const canvas = chartRef.current.canvas;
-        const bg  = isDark ? 'rgb(8,12,28)' : '#ffffff';
+        const bg  = chartTheme().background;
         const tmp = document.createElement('canvas');
         tmp.width  = canvas.width;
         tmp.height = canvas.height;

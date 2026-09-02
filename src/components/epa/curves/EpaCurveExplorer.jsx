@@ -13,6 +13,7 @@ import ViewingConditions, { useViewingConditions } from '../ViewingConditions';
 import CollapsibleSection from '../../CollapsibleSection';
 import AxisScaleControls from '../../AxisScaleControls';
 import LoadingSpinner from '../../LoadingSpinner';
+import { chartTheme } from '../../../utils/chartTheme';
 
 /**
  * EPA efficiency curves anchored on certification records (#237).
@@ -133,8 +134,8 @@ export default function EpaCurveExplorer() {
             };
         });
 
-        const grid = isDark ? 'rgba(148,163,184,0.15)' : 'rgba(100,116,139,0.15)';
-        const text = isDark ? 'rgb(226,232,240)' : 'rgb(51,65,85)';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { grid, legend: text } = chartTheme();
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',

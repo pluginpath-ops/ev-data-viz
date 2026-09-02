@@ -3,6 +3,7 @@ import Chart from 'chart.js/auto';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convValue, formatSpecValue } from '../utils/unitConversions';
+import { chartTheme } from '../utils/chartTheme';
 import {
     makeVehicleFields, buildFieldGroups, getFieldDef, extractValue,
     vehicleColor, formatNumericLabel,
@@ -110,9 +111,8 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
     useEffect(() => {
         if (!xField || !yField || !canvasRef.current || !vehicles.length) return;
 
-        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
 
         const xDef = allNumericFields.find(f => f.key === xField) || getFieldDef(xField, vehicleFields);
         const yDef = allNumericFields.find(f => f.key === yField) || getFieldDef(yField, vehicleFields);
@@ -246,7 +246,7 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
         offscreen.width  = src.width;
         offscreen.height = src.height;
         const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
+        ctx2.fillStyle = chartTheme().background;
         ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
         ctx2.drawImage(src, 0, 0);
         const dataUrl = offscreen.toDataURL('image/png');

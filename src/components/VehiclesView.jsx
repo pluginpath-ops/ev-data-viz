@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { DATA_CATEGORIES, vehicleDataCategories, hasDataCategory, filterByDataCategories } from '../utils/vehicleDataCategories';
-import { fmtDistance } from '../utils/unitConversions';
+import { distanceValue, distanceUnit } from '../utils/unitConversions';
+import StatCell from './StatCell';
 import { displayImageUrl } from '../utils/imageRenditions';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
@@ -867,9 +868,24 @@ export default function VehiclesView({
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="text-xl font-bold mb-1">{vehicle.name}</h3>
                                                 <p className="text-secondary mb-2">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
+                                                {/* The figures, set as figures. They were prose —
+                                                    "Battery: 82 kWh" in the same face and weight as
+                                                    the sentence above it — which made the labels the
+                                                    loudest thing on a card whose whole job is to
+                                                    compare numbers. */}
+                                                <div className="stat-grid mb-2">
+                                                    <StatCell label="Battery" value={vehicle.battery} unit="kWh" />
+                                                    <StatCell
+                                                        label="Range"
+                                                        value={vehicle.range ? distanceValue(vehicle.range, units) : null}
+                                                        unit={distanceUnit(units)}
+                                                        title="EPA range"
+                                                    />
+                                                    {vehicle.power != null && (
+                                                        <StatCell label="Power" value={vehicle.power} unit="kW" />
+                                                    )}
+                                                </div>
                                                 <div className="text-sm text-secondary space-y-1">
-                                                    {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
-                                                    {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
                                                     <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
                                                 </div>
                                                 {vehicle.tags?.length > 0 && (
@@ -977,10 +993,16 @@ export default function VehiclesView({
                                     </div>
 
                                     {/* Specs */}
-                                    <div className="text-sm text-secondary space-y-0.5 w-36 flex-shrink-0 hidden sm:block">
-                                        {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
-                                        {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
-                                        {vehicle.power && <p>Power: {vehicle.power} kW</p>}
+                                    <div className="w-44 flex-shrink-0 hidden sm:flex flex-col gap-1.5">
+                                        <div className="stat-grid">
+                                            <StatCell label="Battery" value={vehicle.battery} unit="kWh" />
+                                            <StatCell
+                                                label="Range"
+                                                value={vehicle.range ? distanceValue(vehicle.range, units) : null}
+                                                unit={distanceUnit(units)}
+                                                title="EPA range"
+                                            />
+                                        </div>
                                         <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
                                     </div>
 

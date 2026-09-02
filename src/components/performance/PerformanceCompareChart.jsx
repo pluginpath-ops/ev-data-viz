@@ -10,6 +10,7 @@
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import ChartExportButtons from '../ChartExportButtons';
+import { chartTheme } from '../../utils/chartTheme';
 
 export default function PerformanceCompareChart({
     title,
@@ -40,8 +41,8 @@ export default function PerformanceCompareChart({
         }
         chartRef.current?.destroy();
 
-        const grid = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
-        const tick = isDark ? '#cbd5e1' : '#475569';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { grid, tick } = chartTheme();
 
         const labelPlugin = {
             id: 'perfBarLabels',
@@ -188,7 +189,6 @@ export default function PerformanceCompareChart({
             {!presentationMode && withData.length > 0 && (
                 <ChartExportButtons
                     chartRef={chartRef}
-                    isDark={isDark}
                     buildParams={p => { p.set('tab', 'performance'); p.set('m', 'perfcompare'); }}
                 />
             )}
