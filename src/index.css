@@ -2297,9 +2297,17 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     /* Square on the colour side. A rounded bar reads as a decorative edge on a
        pill; a hard one reads as a rail the row hangs off, which is what it is. */
     border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
-    /* No left padding: the 3px rail IS the inset, so everything inside the
-       group starts on the same edge as the section band above it. */
-    padding: 6px 8px 7px 0;
+    /* The rail sits OUTSIDE the rail's own gutter — half of it, pulled left by
+       the negative margin — and the padding puts the content back on the same
+       27px edge as the section band above. Chrome in the margin, content in the
+       column: the bar identifies the group without eating into the space the
+       group's text has to live in.
+
+       No right padding at all. The group's right edge is the content edge that
+       everything above it lines up on, and a run card inset from that read as a
+       card inside a card — so the rows reach it too. */
+    margin-left: -12px;
+    padding: 6px 0 7px 12px;
     background-color: var(--color-card);
 }
 
@@ -2367,8 +2375,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     align-items: center;
     gap: 3px 7px;
     /* Left padding removed so the checkbox lands on the group's own content
-       edge rather than a step inside it. */
-    padding: 5px 7px 5px 0;
+       edge rather than a step inside it; the right keeps just enough to hold
+       the source link off its own border. */
+    padding: 5px 5px 5px 0;
     /* A faint box, not a rule between rows. Two-line rows separated only by a
        hairline read as four alternating lines; a box says which two belong
        together. */
