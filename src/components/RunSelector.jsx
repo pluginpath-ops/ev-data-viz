@@ -466,29 +466,36 @@ function RunColorControl({ run, vehicleId, onUpdateRunColor, colorMap = {} }) {
     );
 }
 
+/**
+ * Two lines, the same shape as a paired row: what this run IS, then what it
+ * measured. It was one line — checkbox, colour, name, source link, date, and
+ * however many metric badges the view wanted — which wrapped into a ragged
+ * block the moment it met a 320px rail.
+ *
+ * The date is gone. It disambiguated runs back when they were "Charging test"
+ * and "Charging test"; the names carry that now, and in a rail it was spending
+ * a third of the identity line on a fact nobody was comparing.
+ */
 function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunMeta, colorMap = {} }) {
+    const meta = renderRunMeta?.(run);
     return (
-        <label className={`flex items-center gap-2 cursor-pointer ${!isChecked ? 'opacity-60 hover:opacity-100' : ''}`}>
+        <label className={`pair-row ${isChecked ? '' : 'opacity-60 hover:opacity-100'}`}>
             <input
                 type="checkbox"
                 checked={isChecked}
                 onChange={onToggle}
-                className="w-4 h-4 shrink-0"
             />
-            <RunColorControl
-                run={run}
-                vehicleId={vehicle.id}
-                onUpdateRunColor={onUpdateRunColor}
-                colorMap={colorMap}
-            />
-            <span className="run-label">
-                <span>
-                    {run.name}
-                    <RunSourceLinks run={run} />
-                    <span className="text-sm text-secondary"> ({run.date})</span>
-                </span>
-                {renderRunMeta?.(run)}
+            <span className="pair-charging-label">
+                <RunColorControl
+                    run={run}
+                    vehicleId={vehicle.id}
+                    onUpdateRunColor={onUpdateRunColor}
+                    colorMap={colorMap}
+                />
+                <span className="truncate">{run.name}</span>
+                <RunSourceLinks run={run} className="shrink-0 ml-auto" />
             </span>
+            {meta && <span className="run-row-meta">{meta}</span>}
         </label>
     );
 }

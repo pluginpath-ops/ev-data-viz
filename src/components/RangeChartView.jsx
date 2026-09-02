@@ -639,10 +639,14 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     colorMap={colorMap}
                     emptyMessage="No range test records"
                     renderRunMeta={run => {
-                        const eff         = calcEff(run.distance_miles, run.energy_kwh, effUnit, units);
+                        // Speed, temperature, wind, distance — the conditions
+                        // that make one range test comparable to another.
+                        //
+                        // Efficiency is deliberately NOT here: it is what the
+                        // chart plots, so a badge repeating it beside every row
+                        // is the answer printed on the question.
                         const rawRange    = calcRange(run);
                         const range       = rawRange != null ? convDistance(rawRange, units) : null;
-                        const effLabelStr = getEffLabel(effUnit, units);
                         const dl          = distanceLabel(units);
                         const socUsed     = (run.start_soc != null && run.end_soc != null) ? run.start_soc - run.end_soc : null;
                         const isProjected = socUsed != null && socUsed !== 100;
@@ -651,35 +655,44 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         return (
                             <>
                                 {run.speed_mph != null && (
-                                    <span className="text-xs bg-[var(--color-surface-sunken)] text-secondary px-1.5 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
+                                    <span className="badge-micro">{fmtSpeed(run.speed_mph, units)}</span>
                                 )}
+                                {/* A held speed and a mixed cycle averaging the
+                                    same number are different tests, so the
+                                    marker rides with the speed wherever one is
+                                    printed. */}
                                 {speedBasisNote(run) && (
-                                    <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded" title="Average over a varying-speed cycle. Not directly comparable to a steady-state test; speed correction is skipped.">{speedBasisNote(run)}</span>
+                                    <span className="badge-micro is-warning" title="Average over a varying-speed cycle. Not directly comparable to a steady-state test; speed correction is skipped.">
+                                        mixed
+                                    </span>
                                 )}
                                 {run.temperature_f != null && (
-                                    <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>
+                                    <span className="badge-micro">{fmtTemp(run.temperature_f, units)}</span>
                                 )}
                                 {run.avg_wind_speed_mph != null && (
                                     <span
-                                        className="text-xs bg-cyan-50 text-cyan-700 px-1.5 py-0.5 rounded border border-cyan-200"
-                                        title={run.wind_direction_deg != null ? `${run.wind_direction_deg}° vs travel (0°=tailwind, 180°=headwind)` : 'Direction not recorded'}
+                                        className="badge-micro"
+                                        title={run.wind_direction_deg != null
+                                            ? `Wind ${fmtSpeed(run.avg_wind_speed_mph, units)} at ${run.wind_direction_deg}° vs travel (0° tailwind, 180° headwind)`
+                                            : `Wind ${fmtSpeed(run.avg_wind_speed_mph, units)}, direction not recorded`}
                                     >
-                                        💨 {fmtSpeed(run.avg_wind_speed_mph, units)}{run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : ''}
+                                        ~{fmtSpeed(run.avg_wind_speed_mph, units)}
                                     </span>
                                 )}
                                 {range != null && (
                                     <span
-                                        className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200"
-                                        title={isProjected ? `Projected from ${run.distance_miles} mi driven over ${socUsed}% SoC` : 'Measured distance'}
+                                        className="badge-micro"
+                                        title={isProjected
+                                            ? `Projected from ${run.distance_miles} mi driven over ${socUsed}% SoC`
+                                            : 'Measured distance'}
                                     >
                                         {range} {dl}{isProjected ? ' ⟳' : ''}
                                     </span>
                                 )}
-                                {eff != null && (
-                                    <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">{eff} {effLabelStr}</span>
-                                )}
                                 {!canPlot && isChecked && (
-                                    <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200" title="Missing fields required for this chart type">⚠ missing data</span>
+                                    <span className="badge-micro is-warning" title="Missing fields required for this chart type">
+                                        ⚠ no data
+                                    </span>
                                 )}
                             </>
                         );

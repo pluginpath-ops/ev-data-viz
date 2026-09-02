@@ -1170,22 +1170,60 @@ body {
 }
 
 /* Square-radius informational badge (blue by default) */
-/* "DEF" — the vehicle's default test for this kind. Mono and short: it is a
-   marker on an identity line, competing with the name for a 260px rail, and
-   "Default" spelled out cost more room than the thing it qualifies.
-   Token-driven, so it follows a themed subtree — it used to carry a
-   [data-theme="dark"] override, which could not. */
-.badge-default {
-    @apply px-1.5 py-0.5;
+/* ── Micro badges ───────────────────────────────────────────────────────────
+ *
+ * ONE set of metrics, three intents, and every marker on a run row draws from
+ * it. The run rows had seven inline Tailwind clusters instead — bg-amber-50,
+ * bg-orange-50, bg-cyan-50, bg-green-50, bg-blue-50 — a rainbow in which no hue
+ * meant anything, none of them followed the theme, and five were on the
+ * hardcoded-light ratchet.
+ *
+ * Mono because a badge on a run row almost always carries a figure: "70 mph",
+ * "72 °F", "291 mi". Neutral by default, because most of them are readings
+ * rather than states; an intent is for the few that are actually saying
+ * something is wrong.
+ */
+.badge-micro,
+.badge-default,
+.badge-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     flex: none;
+    white-space: nowrap;
+    padding: 1px 5px;
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-mark);
     font-family: var(--font-mono);
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     font-weight: 600;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-meta);
+}
+
+/* "DEF" — the vehicle's default test for this kind. The one accent-coloured
+   marker, because it is the only one that says which row is privileged rather
+   than what a row measured. */
+.badge-micro.is-accent,
+.badge-default {
     background-color: var(--color-primary-surface);
-    border: 1px solid var(--color-primary-border);
+    border-color: var(--color-primary-border);
     color: var(--color-primary-text);
+    letter-spacing: 0.06em;
+}
+
+.badge-micro.is-warning,
+.badge-status.is-warning {
+    background-color: var(--color-warning-surface);
+    border-color: var(--color-warning-border);
+    color: var(--color-warning-text);
+}
+.badge-micro.is-danger,
+.badge-status.is-danger {
+    background-color: var(--color-danger-surface);
+    border-color: var(--color-danger-border);
+    color: var(--color-danger-text);
 }
 
 /* Marks a run hidden from regular viewers (admin/contributor-only visibility) */
@@ -1201,32 +1239,7 @@ body {
 /* Same shape and metrics as .badge-default and .badge-hidden, in grey. It was
    the odd one out — a bare outline with no fill and no colour of its own, so it
    took whatever text colour it inherited and read as stray text, not a badge. */
-/* A neutral state marker, with two intents. Every call site used to bring its
-   own raw Tailwind cluster — bg-amber-50/bg-red-50/a var soup — so the same
-   badge looked like three different controls and none of them followed the
-   theme. Mono and nowrap: it carries figures ("−4 min"), and inside a 260px
-   rail row a badge that wraps pushes the run's own name off the line. */
-.badge-status {
-    @apply px-1.5 py-0.5;
-    flex: none;
-    white-space: nowrap;
-    border-radius: var(--radius-mark);
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    background-color: var(--color-surface-sunken);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-meta);
-}
-.badge-status.is-warning {
-    background-color: var(--color-warning-surface);
-    border-color: var(--color-warning-border);
-    color: var(--color-warning-text);
-}
-.badge-status.is-danger {
-    background-color: var(--color-danger-surface);
-    border-color: var(--color-danger-border);
-    color: var(--color-danger-text);
-}
+/* .badge-status shares the micro-badge metrics and intents defined above. */
 
 /* Which layer a Model Constants knob's live value came from (#261): this
    browser's sandbox, or what the site publishes. No badge means the compiled
@@ -2429,6 +2442,19 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply flex items-center gap-2 min-w-0;
     grid-column: 2;
     grid-row: 1;
+}
+
+/* Line two of an unpaired row: the badges. Wraps, because a run can carry four
+   readings and a rail is 320px — but it wraps HERE, on its own line, rather
+   than dragging the run's name around with it. */
+.run-row-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
 }
 
 /* Line two: what this run is paired with. `shrink-0` is gone — on its own line
