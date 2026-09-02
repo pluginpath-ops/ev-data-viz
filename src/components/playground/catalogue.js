@@ -52,6 +52,10 @@ export const NOT_CATALOGUED = {
     'run-stat-badges':   'Layout wrapper — a flex row of badges.',
     'guide-chip-count':  'The count suffix inside .guide-chip; shown as part of that specimen.',
     'btn-toggle-clear':  'The × inside an active .btn-toggle; shown as part of that specimen.',
+    'vehicle-media-badge':
+        'Absolutely positioned over a vehicle photograph, on a dark plate that only '
+        + 'makes sense against one. A specimen on the flat playground surface would '
+        + 'show the plate and not the thing it exists to survive.',
 };
 
 /**

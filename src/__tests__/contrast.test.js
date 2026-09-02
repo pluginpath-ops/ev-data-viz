@@ -376,9 +376,11 @@ function offenders() {
  * a number derived from the thing it checks always equals itself, so the test
  * passed and could never have failed.
  *
- * 79 at the sweep that added this; RunsView holds 31 of them.
+ * 79 at the sweep that added this, 74 after it, 71 once the re-skin's vehicle
+ * card dropped the green `bg-green-100` visibility pill and the `bg-blue-50`
+ * footer button for tokens. RunsView holds 31 of what is left.
  */
-const KNOWN_OFFENDERS = 74;
+const KNOWN_OFFENDERS = 71;
 
 describe('hardcoded light surfaces', () => {
     it('does not grow', () => {

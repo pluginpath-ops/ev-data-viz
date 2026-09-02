@@ -1281,6 +1281,251 @@ body {
     border-top: 1px solid var(--color-border);
 }
 
+/* ── Tested figure ──────────────────────────────────────────────────────────
+ *
+ * A measurement reported WITH the conditions that produced it, and no verdict.
+ * The handoff's version of this row was `RANGE · TESTED vs EPA  −8.5%` with a
+ * filled bar; see utils/testedRange for why that percentage cannot go on the
+ * front page of a site whose whole argument is that conditions matter.
+ *
+ * The figure is loud, in the same mono as every other measured number. The
+ * conditions are quiet and sit beside it, because they qualify it rather than
+ * competing with it — but they are never optional, which is why they share a
+ * line rather than hiding in a tooltip.
+ */
+.tested-figure {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-top: 2px;
+    border-top: 1px solid var(--color-border);
+}
+/* In a list row it sits inside a column that already has rules around it. */
+.vehicle-row .tested-figure {
+    border-top: none;
+    padding-top: 0;
+}
+.tested-figure-value {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-value);
+}
+.tested-figure-unit {
+    font-size: 0.625rem;
+    font-weight: 500;
+    color: var(--color-text-meta);
+}
+/* The conditions. Mono because they are readings, not prose. */
+.tested-figure-conditions {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--color-text-meta);
+}
+/* A partial window is a distance, not a range, and says so in its own words
+   rather than by being quieter. */
+.tested-figure-window {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--color-warning-text);
+}
+
+/* ── Vehicle card ───────────────────────────────────────────────────────────
+ *
+ * A media band, then the figures, then the actions. It was a single flat box
+ * with the photograph washed out behind everything and a right-hand column of
+ * controls squeezing the content beside them.
+ */
+.vehicle-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    cursor: pointer;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    /* Left edge reserved for the selection bar, so selecting a card does not
+       change its width and reflow the grid. */
+    border-left: 3px solid transparent;
+    transition: border-color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+.vehicle-card:hover { border-color: var(--color-border-strong); }
+
+/* Broadsheet's treatment: a left orange bar and a tinted band, not a full-row
+   wash and not a floating checkmark. Orange because "selected" is the same
+   active/now signal the sub-nav uses — this is the state you are working in. */
+.vehicle-card.is-selected {
+    border-left-color: var(--color-accent-orange);
+    background-color: var(--color-cluster);
+}
+.vehicle-card.is-selected:hover { border-color: var(--color-border-strong); }
+
+/* Queued for deletion: dimmed, and the rail says why. */
+.vehicle-card.is-pending {
+    opacity: 0.6;
+    border-left-color: var(--color-danger);
+}
+
+/* The same object in a different shape, so it takes the same rail rather than
+   a second selection language: one row, horizontal, no media band of its own
+   beyond the thumbnail. */
+.vehicle-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 14px;
+}
+
+.vehicle-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    padding: 12px 14px 13px;
+}
+
+/* The primary action reads first and the per-vehicle controls follow it. */
+.vehicle-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 2px;
+}
+
+/* ── Vehicle media ──────────────────────────────────────────────────────────
+ *
+ * The image is content now, not wallpaper. It used to be the card's background
+ * under an 80% wash — simultaneously the largest thing on the card and
+ * impossible to look at, because anything less than that wash made the text on
+ * top unreadable.
+ */
+.vehicle-media {
+    position: relative;
+    overflow: hidden;
+    flex: none;
+    background-color: var(--color-surface-sunken);
+}
+
+.vehicle-media-image {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+}
+
+/* The list row's crop of the same asset. No scrim: nothing is written on it
+   here, so darkening it would cost legibility and buy nothing. */
+.vehicle-media-thumb {
+    width: 92px;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-border);
+}
+.vehicle-media-thumb .vehicle-media-scrim { display: none; }
+.vehicle-media-thumb .vehicle-media-fallback { font-size: 0.6875rem; }
+
+/* Bottom-up, and stopping short of the top: the picture stays legible in its
+   upper half while the name below it sits on something solid enough to read. */
+.vehicle-media-scrim {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(to top,
+        var(--color-card) 2%,
+        rgba(17, 22, 31, 0.62) 48%,
+        rgba(17, 22, 31, 0.08) 100%);
+}
+
+/* No photograph is a DESIGNED state. A flat panel with the make set large reads
+   as deliberate; an empty box reads as broken. */
+.vehicle-media.is-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-surface-sunken);
+    background-image: repeating-linear-gradient(135deg,
+        rgba(255, 255, 255, 0.03) 0 7px, transparent 7px 14px);
+}
+.vehicle-media-fallback {
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--color-text-faint);
+}
+/* The scrim would grey out the fallback panel for no reason — there is no
+   photograph under it to darken. */
+.vehicle-media.is-empty .vehicle-media-scrim { display: none; }
+
+/* The identity block, sitting on the scrim. */
+.vehicle-media-title {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 9px;
+}
+.vehicle-media-title h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #fff;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vehicle-media-title p {
+    margin: 1px 0 0;
+    font-size: 0.6875rem;
+    color: rgba(255, 255, 255, 0.72);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Top-right of the band, on a dark plate so it stays readable over any photo. */
+.vehicle-media-badge {
+    position: absolute;
+    right: 10px;
+    top: 9px;
+    padding: 2px 7px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-chip);
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    /* A dark plate under the tint, so the badge stays readable over a bright
+       photograph as well as over the fallback panel. */
+    background-color: rgba(8, 12, 18, 0.72);
+    color: var(--color-text-secondary);
+}
+.vehicle-media-badge.is-public {
+    border-color: var(--color-success-border);
+    color: var(--color-success-text);
+}
+.vehicle-media-badge.is-private {
+    border-color: var(--color-border-strong);
+    color: var(--color-text-meta);
+}
+/* Off the photograph — in a list row — it is an ordinary inline badge, so it
+   drops the absolute placement and the plate it no longer needs. */
+.vehicle-media-badge.is-inline {
+    position: static;
+    background-color: transparent;
+}
+
+/* Clickable when the reader can actually change it. */
+button.vehicle-media-badge { cursor: pointer; }
+button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
+
 /* ── Stat cell ──────────────────────────────────────────────────────────────
  *
  * A measured figure with its name above it and its unit beside it. The design
