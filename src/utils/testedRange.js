@@ -23,14 +23,25 @@
  * reader draws the conclusion. That is the difference between publishing a
  * measurement and publishing a verdict.
  *
- * ── The SoC window ──────────────────────────────────────────────────────────
+ * ── The SoC window, and scaling ─────────────────────────────────────────────
  *
  * `distance_miles` is the distance covered over the run's OWN state-of-charge
  * window, not the vehicle's range. A test from 100% to 0% reports both; a test
- * from 90% to 20% reports a distance that is not a range and must never be
- * labelled as one. Rather than extrapolate — which would invent precision the
- * test does not have — a partial window is reported as what it is, and the
- * window travels with the number.
+ * over 80→10% reports 70% of a pack — and the EPA figure sitting beside it on
+ * the same card is a full-pack number, so the two are not comparable as they
+ * stand.
+ *
+ * So an adequately characterised window IS scaled to 100%, and the figure is
+ * marked as scaled wherever it is shown. That is a deliberate trade and it
+ * should be named: scaling assumes consumption is FLAT across the pack, which
+ * it is not exactly. The error is small over a wide window and grows as the
+ * window narrows, which is precisely why scaling is gated on
+ * `coversPracticalPack` rather than applied to anything with two SoC readings.
+ *
+ * A window too narrow to characterise the pack is NOT scaled. Multiplying a
+ * 56→10% test by 2.17 would not be a measurement with a caveat, it would be a
+ * guess with a decimal point. Those are reported as measured, with the window
+ * named, and the reader is told the test cannot answer the question.
  */
 import { defaultRangeRun } from './rangeSource';
 import { speedBasisNote } from './unitConversions';
@@ -150,7 +161,7 @@ function cardRangeRun(vehicle) {
  * test.
  *
  * @returns {{
- *   run: object, distanceMi: number,
+ *   run: object, distanceMi: number, fullPackMi: number|null, isScaled: boolean,
  *   isRepresentative: boolean, isFullPack: boolean, windowPct: number|null,
  *   startSoc: number|null, endSoc: number|null,
  *   speedMph: number|null, temperatureF: number|null, speedNote: string|null,
@@ -164,6 +175,16 @@ export function testedRangeSummary(vehicle) {
     if (distanceMi == null || !(distanceMi > 0)) return null;
 
     const windowPct = socWindow(run);
+    const isRepresentative = coversPracticalPack(run);
+
+    // Linear in state of charge. See the header: the assumption is why this is
+    // gated on an adequate window rather than applied to any two SoC readings.
+    const fullPackMi = isRepresentative && windowPct
+        ? Math.round((distanceMi * 100 / windowPct) * 10) / 10
+        : null;
+    // Half a mile, so a 97→2 test is not annotated for a rounding difference
+    // while a 100→15 one is.
+    const isScaled = fullPackMi != null && Math.abs(fullPackMi - distanceMi) >= 0.5;
 
     return {
         run,
@@ -179,8 +200,13 @@ export function testedRangeSummary(vehicle) {
         // A missing window is neither. An unstated window is an unknown one,
         // and treating it as adequate would be the same invention this module
         // exists to avoid.
-        isRepresentative: coversPracticalPack(run),
+        isRepresentative,
         isFullPack: windowPct != null && windowPct >= FULL_WINDOW_MIN_PCT,
+        // Scaled to a full pack, so the figure is comparable to the EPA number
+        // beside it. Null when the window is unknown or too narrow to scale
+        // from — see the header for why that gate exists.
+        fullPackMi,
+        isScaled,
         windowPct,
         startSoc: run.start_soc ?? null,
         endSoc: run.end_soc ?? null,

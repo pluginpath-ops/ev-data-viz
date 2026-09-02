@@ -1327,8 +1327,16 @@ body {
     font-size: 0.6875rem;
     color: var(--color-text-meta);
 }
-/* A partial window is a distance, not a range, and says so in its own words
-   rather than by being quieter. */
+/* A derived figure has to say it is derived. Quiet, because it qualifies the
+   number rather than warning about it — the reader is looking at something no
+   odometer showed, but the test behind it was a good one. */
+.tested-figure-scaled {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--color-text-link);
+}
+
+/* A window too narrow to scale from is a caveat, not a qualifier. */
 .tested-figure-window {
     font-family: var(--font-mono);
     font-size: 0.6875rem;

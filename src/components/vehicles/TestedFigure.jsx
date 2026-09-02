@@ -16,6 +16,11 @@ import { distanceValue, distanceUnit, fmtSpeed, fmtTemp } from '../../utils/unit
 export default function TestedFigure({ tested, units }) {
     if (!tested) return null;
 
+    // The scaled figure when there is one, because that is what the EPA number
+    // beside it can be compared to. The measured distance stays reachable in
+    // the title — a derived figure must never hide the one it came from.
+    const shown = tested.fullPackMi ?? tested.distanceMi;
+
     const conditions = [
         tested.speedMph != null ? fmtSpeed(tested.speedMph, units) : null,
         // A held 70 mph and a mixed cycle averaging 70 mph are different tests,
@@ -27,27 +32,37 @@ export default function TestedFigure({ tested, units }) {
     return (
         <div className="tested-figure">
             <span className="text-micro">Tested</span>
-            <span className="tested-figure-value">
-                {distanceValue(tested.distanceMi, units)}
+            <span
+                className="tested-figure-value"
+                title={tested.isScaled
+                    ? `${distanceValue(tested.distanceMi, units)} ${distanceUnit(units)} measured over ${tested.startSoc}→${tested.endSoc}%, scaled to a full pack`
+                    : undefined}
+            >
+                {distanceValue(shown, units)}
                 <span className="tested-figure-unit">{distanceUnit(units)}</span>
             </span>
-            {/* The window, whenever the figure is not a full-pack range.
-                Two different messages, because they are two different facts:
-                an 80→10 test is an adequate characterisation whose distance is
-                simply not the whole pack (stated quietly, as context), while a
-                56→10 test did not see enough of the pack to report from at all
-                (stated in warning colour, as a caveat). */}
-            {!tested.isFullPack && tested.startSoc != null && (
+            {/* Two different messages, because they are two different facts.
+                A SCALED figure is derived and has to say so — the reader is
+                looking at a number no odometer showed. An INADEQUATE window is
+                a caveat: the test could not answer the question, and its raw
+                distance is reported unscaled. */}
+            {tested.isScaled && (
                 <span
-                    className={tested.isRepresentative ? 'tested-figure-conditions' : 'tested-figure-window'}
-                    title={tested.isRepresentative
-                        ? 'Distance over this state-of-charge window, not a full-pack range'
-                        : 'Window too narrow to characterise the pack — reported as measured'}
+                    className="tested-figure-scaled"
+                    title="Scaled to a full pack from the window measured, assuming consumption is flat across the pack"
                 >
-                    {tested.startSoc}→{tested.endSoc}%{tested.isRepresentative ? '' : ' only'}
+                    scaled from {tested.startSoc}→{tested.endSoc}%
                 </span>
             )}
-            {!tested.isFullPack && tested.startSoc == null && (
+            {!tested.isRepresentative && tested.startSoc != null && (
+                <span
+                    className="tested-figure-window"
+                    title="Window too narrow to characterise the pack — reported as measured, not scaled"
+                >
+                    {tested.startSoc}→{tested.endSoc}% only
+                </span>
+            )}
+            {tested.startSoc == null && (
                 <span className="tested-figure-window" title="The run does not record its state-of-charge window">
                     window not stated
                 </span>

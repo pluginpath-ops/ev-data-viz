@@ -167,6 +167,57 @@ describe('testedRangeSummary', () => {
         expect(s.isFullPack).toBe(false);
     });
 
+});
+
+describe('scaling to a full pack', () => {
+    it('scales an adequate partial window, so the figure is comparable to EPA', () => {
+        // 220 mi over 70% of a pack is not a range; the EPA number beside it on
+        // the card is. 220 / 0.70 = 314.3.
+        const s = testedRangeSummary(vehicle([rangeRun({ start_soc: 80, end_soc: 10, distance_miles: 220 })]));
+        expect(s.distanceMi).toBe(220);
+        expect(s.fullPackMi).toBeCloseTo(314.3, 1);
+        expect(s.isScaled).toBe(true);
+    });
+
+    it('scales the real Bolt record', () => {
+        // 170 mi over 100→15%: 85 points, adequate by the wide clause.
+        const s = testedRangeSummary(vehicle([rangeRun({ start_soc: 100, end_soc: 15, distance_miles: 170 })]));
+        expect(s.fullPackMi).toBeCloseTo(200, 1);
+        expect(s.isScaled).toBe(true);
+    });
+
+    it('does NOT scale a window too narrow to characterise the pack', () => {
+        // 99.2 / 0.46 = 215.7 — not a measurement with a caveat, a guess with a
+        // decimal point. Reported as measured instead.
+        const s = testedRangeSummary(vehicle([rangeRun({ start_soc: 56, end_soc: 10, distance_miles: 99.2 })]));
+        expect(s.fullPackMi).toBeNull();
+        expect(s.isScaled).toBe(false);
+        expect(s.distanceMi).toBe(99.2);
+    });
+
+    it('does not scale, or annotate, a window that is already the whole pack', () => {
+        const s = testedRangeSummary(vehicle([rangeRun({ start_soc: 100, end_soc: 0, distance_miles: 291 })]));
+        expect(s.fullPackMi).toBe(291);
+        expect(s.isScaled).toBe(false);
+    });
+
+    it('does not annotate a rounding-sized adjustment', () => {
+        // 97→2 scales 300 to 315.8 — worth doing and worth saying. But a window
+        // of 99.9 must not litter every card with a note about 0.1 of a mile.
+        const tiny = testedRangeSummary(vehicle([rangeRun({ start_soc: 100, end_soc: 0.1, distance_miles: 291 })]));
+        expect(tiny.isScaled).toBe(false);
+        const real = testedRangeSummary(vehicle([rangeRun({ start_soc: 97, end_soc: 2, distance_miles: 300 })]));
+        expect(real.isScaled).toBe(true);
+    });
+
+    it('cannot scale a window it does not know', () => {
+        const s = testedRangeSummary(vehicle([rangeRun({ start_soc: null, end_soc: null })]));
+        expect(s.fullPackMi).toBeNull();
+        expect(s.isScaled).toBe(false);
+    });
+});
+
+describe('testedRangeSummary extras', () => {
     it('separates "worth reporting" from "is a full-pack range"', () => {
         // 80→10 is an adequate characterisation whose distance is still not the
         // whole pack. Conflating the two is what the single old threshold did.
