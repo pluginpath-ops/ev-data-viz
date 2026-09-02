@@ -1406,6 +1406,206 @@ body {
     padding-top: 2px;
 }
 
+/* ── Chart layout: rail on the left, plot on the right ─────────────────────
+ *
+ * The controls used to sit in a card ABOVE the plot, which meant they scrolled
+ * away exactly when you were reading the thing they control — you changed an
+ * axis, scrolled down to look, and had to scroll back up to change it again.
+ * Pick on the left, plot on the right, controls above the canvas and never
+ * over it.
+ *
+ * Stacks below 1100px: a 300px rail beside a plot is a 300px rail on top of a
+ * squeezed plot, which is worse than either.
+ */
+.chart-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.chart-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 300px;
+    flex: none;
+    /* Sticks while the plot column scrolls, which is the whole point of moving
+       it here — and scrolls internally when it is taller than the viewport, so
+       a long run list cannot push its own controls off the screen. */
+    position: sticky;
+    top: 12px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 12px;
+    background-color: var(--color-surface-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+}
+
+.chart-main {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ── Controls, re-laid for a 300px column ──────────────────────────────────
+ *
+ * These were written for a full-width card: a three-column axis grid, a
+ * horizontal toggle row, an indented alignment row. Dropped into the rail they
+ * squeezed three <select>s into 90px each and scrolled sideways. Everything
+ * stacks here rather than being rebuilt, so the wide layouts stay available to
+ * whatever still uses them (the pop-out is full-width by definition).
+ *
+ * The margins are reset too. Each was tuned to separate blocks inside one card;
+ * the rail spaces its own children with `gap`, so the inherited mb-6 opened
+ * craters between them. */
+.chart-rail .axis-selectors {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 0;
+}
+.chart-rail .axis-label { margin-bottom: 2px; font-size: 0.75rem; }
+
+.chart-rail .chart-toggles {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 7px;
+    margin-bottom: 0;
+}
+
+.chart-rail .axis-align-row {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-left: 0;
+    margin: 0;
+}
+
+/* The presets are the one thing that still wants to wrap rather than stack —
+   they are short, and a column of five would be taller than the plot. */
+.chart-rail .chart-type-buttons { gap: 5px; }
+
+/* The run selector's header packs its title and its actions onto one line and
+   marks the actions `shrink-0` — correct in a full-width card, and 685px of
+   content in a 298px column. In the rail the actions become their own wrapping
+   row beneath the title. */
+.chart-rail .run-selector-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+    flex-shrink: 1;
+    min-width: 0;
+    width: 100%;
+}
+.chart-rail .run-selector-header { flex-wrap: wrap; }
+
+/* The correction picker stacks its label above its <select>; the checkbox
+   toggles beside it must NOT, because a checkbox above its own words is not a
+   checkbox with a label. Hence the :not() rather than a blanket rule. */
+.chart-rail .run-selector-actions > label:not(.toggle-label) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    width: 100%;
+}
+
+/* Nothing in the rail may scroll sideways: a horizontal scrollbar inside a
+   sticky column is a control you cannot reach.
+ *
+ * `min-width: 0` on everything, not just the top level. A flex item defaults to
+ * min-width:auto, which means "never shrink below my content" — and a <select>'s
+ * content is its WIDEST OPTION, so the correction picker sized itself to
+ * "Speed, altitude & temp (aero only)" and pushed 145px past the rail edge
+ * however narrow its parent was. */
+.chart-rail *,
+.chart-rail > * { min-width: 0; }
+.chart-rail > * { max-width: 100%; }
+.chart-rail select,
+.chart-rail input[type="text"],
+.chart-rail input[type="number"] { max-width: 100%; }
+
+/* A labelled group inside the rail. */
+.chart-rail-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+@media (max-width: 68.75rem) {
+    .chart-layout { flex-direction: column; }
+    .chart-rail {
+        width: 100%;
+        position: static;
+        max-height: none;
+    }
+}
+
+/* ── The export strip and the plot frame ───────────────────────────────────
+ *
+ * The frame IS the PNG boundary, and it holds everything the export should
+ * carry: title, subtitle, wordmark, the canvas, the legend. An export is then
+ * self-describing — a chart of four runs that says which four, under what
+ * conditions, in what units.
+ *
+ * The strip above it says so out loud, because the alternative is a reader
+ * discovering what an export does or does not include after pasting it
+ * somewhere.
+ */
+.chart-export-strip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.chart-export-rule {
+    flex: 1;
+    height: 1px;
+    background-color: var(--color-border);
+}
+
+.plot-frame {
+    padding: 14px 16px 16px;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-card);
+}
+
+.plot-frame-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 10px;
+}
+
+.plot-frame-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--color-text-primary);
+}
+
+/* The conditions the plot was drawn under. Mono, because every item in it is a
+   reading or a count. */
+.plot-frame-subtitle {
+    margin: 3px 0 0;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--color-text-meta);
+}
+
+/* Top-right of the frame, so an exported image carries its source. */
+.plot-frame-mark {
+    flex: none;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-text-faint);
+}
+.plot-frame-mark span { color: var(--color-accent-blue); }
+
 /* ── Vehicle media ──────────────────────────────────────────────────────────
  *
  * The image is content now, not wallpaper. It used to be the card's background

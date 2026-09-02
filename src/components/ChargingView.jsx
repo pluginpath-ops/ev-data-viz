@@ -25,6 +25,7 @@ import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
 import { resolveRangeSource, epaRangeOption, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 import { chartTheme } from '../utils/chartTheme';
+import PlotFrame from './charts/PlotFrame';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
@@ -32,6 +33,10 @@ import ChartInfoBubble from './ChartInfoBubble';
 // A charging line is told apart by its vehicle and its test. One atom, since a
 // series here is a single run rather than a pairing of two.
 const RUN_ATOMS = [{ key: 'test', of: s => s.run?.name }];
+
+/** "Charge Rate (kW)" → "Charge Rate". Axis labels carry their unit; a title
+ *  should not repeat it beside the axis that already says it. */
+const stripUnits = (label) => label.replace(/\s*\(.*?\)$/, '');
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, chartMode, pairings = {}, setPairings = () => {}, presentationMode = false }) {
     const { units, testSessions } = useAppContext();
@@ -45,7 +50,17 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const [imageCopied, setImageCopied] = useState(false);
 
     // Preserve the user's pill order
-    const selectedVehicles = selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean);
+    // Memoised, as every other chart view already does it. Unmemoised this was a
+    // fresh array on every render, and it is a dependency of the chart effect —
+    // so Chart.js destroyed and rebuilt the whole instance whenever ANY state in
+    // this component changed, and the effect's first act, `setChartImage(null)`,
+    // wiped the PNG preview in the same tick it was set. That is why "Copy Chart
+    // as PNG" flashed an image and showed nothing: not an export bug, a
+    // dependency bug two hundred lines away.
+    const selectedVehicles = useMemo(
+        () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
+        [selectedVehicleIds, vehicles],
+    );
 
     // Chart-side colour edits are a SESSION OVERRIDE, never a database write.
     // The durable colour is edited in Tests & Data; changing it while reading a
@@ -237,7 +252,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     }, [missingRunIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const dl = distanceLabel(units);
-    const axisOptions = [
+    // Memoised because the frame's title derives from it: a fresh array every
+    // render made that memo churn, which the lint spotted before anyone noticed
+    // the work. Only the unit system moves it.
+    const axisOptions = useMemo(() => [
         { value: 'soc',           label: 'State of Charge (%)' },
         { value: 'deltaSoc',      label: 'SoC Added (%)' },
         { value: 'chargeRate',    label: 'Charge Rate (kW)' },
@@ -250,7 +268,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         { value: 'cRate',         label: 'C-Rate  (~kW ÷ battery)' },
         { value: 'rangeRate',     label: `Range Rate (${dl}/min)` },
         { value: 'frame',         label: 'Frame' },
-    ];
+    ], [dl, units]);
 
     const chartPresets = [
         { emoji: '⚡', name: 'Rate vs SoC',            x: 'soc',  y: 'chargeRate', y2: null       },
@@ -583,11 +601,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             ? (axisOptions.find(a => a.value === chartConfig.y2Axis)?.label || chartConfig.y2Axis)
             : '';
 
-        const stripUnits = s => s.replace(/\s*\(.*?\)$/, '');
-        const chartTitle = raceActive
-            ? `${stripUnits(yLabel)} from ${raceThreshold}% SoC`
-            : `${stripUnits(yLabel)} vs ${stripUnits(xLabel)}`;
-
         // From the stylesheet, not retyped here — see utils/chartTheme.
         const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
 
@@ -599,7 +612,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    title: { display: true, text: chartTitle, font: { size: 14, weight: 'bold' }, color: legendColor },
+                    // The frame draws the title now, in the DOM, and the export
+                    // draws it onto the PNG. Leaving it on here too would print it twice.
+                    title: { display: false },
                     legend: {
                         position: 'top',
                         labels: {
@@ -671,18 +686,51 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         };
     }, [chartConfig, selectedVehicles, runDataCache, units, isDark, colorMap]);
 
+    // ── The frame's caption ──────────────────────────────────────────────────
+    // Computed here rather than inside the chart effect, because the frame is
+    // DOM. The title used to be drawn by Chart.js INSIDE the canvas, which is
+    // exactly backwards: the export carried it and the page did not.
+    const plotTitle = useMemo(() => {
+        const y = axisOptions.find(a => a.value === chartConfig.yAxis)?.label || chartConfig.yAxis;
+        const x = axisOptions.find(a => a.value === chartConfig.xAxis)?.label || chartConfig.xAxis;
+        return raceActive
+            ? `${stripUnits(y)} from ${raceThreshold}% SoC`
+            : `${stripUnits(y)} vs ${stripUnits(x)}`;
+    }, [chartConfig.xAxis, chartConfig.yAxis, raceActive, raceThreshold, axisOptions]);
+
+    // Everything a reader needs to know what the plot was drawn under. It lives
+    // in the frame, so it lives in the export — which is the whole argument for
+    // the frame. A chart pasted into a thread has to answer "how many runs, on
+    // what, corrected how, in which units" without anyone typing a caption.
+    const plotSubtitle = useMemo(() => {
+        const runs = selectedRuns.length;
+        const vehicles = selectedVehicles.filter(
+            v => (v.runs || []).some(r => selectedRuns.includes(r.id))).length;
+        const parts = [
+            `${runs} run${runs === 1 ? '' : 's'}`,
+            `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
+        ];
+        if (raceActive) parts.push(`race mode from ${raceThreshold}% SoC`);
+        const mode = chartConfig.correctionMode ?? 'none';
+        parts.push(mode === 'none' ? 'no correction' : `corrected: ${mode}`);
+        parts.push(units === 'metric' ? 'metric' : 'imperial');
+        return parts.join(' · ');
+    }, [selectedRuns, selectedVehicles, raceActive, raceThreshold, chartConfig.correctionMode, units]);
+
     // ── PNG export ───────────────────────────────────────────────────────────
     const handleExportImage = async () => {
         if (!chartInstance.current) return;
-        const bgColor = chartTheme().background;
+        // The frame's own caption, so the PNG says what the page says. Without
+        // this the export is four unlabelled curves.
+        const frame = { title: plotTitle, subtitle: plotSubtitle };
         try {
-            const dataUrl = await copyChartAsPng(chartInstance.current, bgColor);
+            const dataUrl = await copyChartAsPng(chartInstance.current, frame);
             setChartImage(dataUrl);
             setImageCopied(true);
             setTimeout(() => setImageCopied(false), 2500);
         } catch {
             // Clipboard API not supported — render inline for manual save
-            setChartImage(chartToPngDataUrl(chartInstance.current));
+            setChartImage(chartToPngDataUrl(chartInstance.current, frame));
         }
     };
 
@@ -704,9 +752,12 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     }
 
     return (
-        <div>
-            {/* ── Top card: presets, axis selectors, run selector — hidden in presentation mode ── */}
-            {!presentationMode && <div className="card mb-6">
+        <div className="chart-layout">
+            {/* ── Left rail: pick here, read on the right ──
+              * These controls used to sit in a card ABOVE the plot, so they
+              * scrolled away exactly when you were reading the thing they
+              * control. The rail sticks; the plot column scrolls past it. */}
+            {!presentationMode && <aside className="chart-rail">
                 {loadingData && <LoadingSpinner message="Loading run data…" />}
                 {/* Presets */}
                 <div className="flex flex-wrap gap-2 mb-6">
@@ -897,7 +948,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         );
                     }}
                 />
-            </div>}
+            </aside>}
+
+            <div className="chart-main">
 
             {/* Runs the alignment could not include, named on the chart itself.
                 The selector carries a badge, but that only helps someone who
@@ -938,67 +991,71 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 </p>
             )}
 
-            {/* ── Chart canvas ── */}
-            <div className="card mb-4">
+            {/* ── The plot, inside the frame the export captures ── */}
+            <PlotFrame
+                title={plotTitle}
+                subtitle={plotSubtitle}
+                exportControls={!presentationMode && (
+                    <>
+                        <button
+                            onClick={() => chartInstance.current?.resetZoom()}
+                            className="chart-copy-btn"
+                            title="Reset zoom to full view"
+                        >
+                            Reset zoom
+                        </button>
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(window.location.href).then(() => {
+                                    setCopied(true);
+                                    setTimeout(() => setCopied(false), 2000);
+                                });
+                            }}
+                            className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
+                            title="Copy link to this chart view"
+                        >
+                            {copied ? '✓ Copied' : '🔗 URL'}
+                        </button>
+                        <button
+                            onClick={handleExportImage}
+                            className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
+                            title="Copy the framed chart as a PNG"
+                        >
+                            {imageCopied ? '✓ Copied' : 'PNG'}
+                        </button>
+                    </>
+                )}
+            >
                 {loadingData && (
                     <div className="text-center py-4 text-secondary text-sm">Loading run data...</div>
                 )}
                 <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px' }}>
                     <canvas ref={chartRef}></canvas>
                 </div>
+            </PlotFrame>
 
-                {/* Export / share buttons */}
-                <div className="mt-3 flex items-center gap-3 flex-wrap">
-                    <button
-                        onClick={() => chartInstance.current?.resetZoom()}
-                        className="chart-copy-btn"
-                        title="Reset zoom to full view"
-                    >
-                        🔍 Reset Zoom
-                    </button>
-                    <button
-                        onClick={() => {
-                            navigator.clipboard.writeText(window.location.href).then(() => {
-                                setCopied(true);
-                                setTimeout(() => setCopied(false), 2000);
-                            });
-                        }}
-                        className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
-                        title="Copy link to this chart view"
-                    >
-                        {copied ? '✓ Copied!' : '🔗 Copy URL'}
-                    </button>
-                    <button
-                        onClick={handleExportImage}
-                        className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                        title="Export chart as PNG"
-                    >
-                        {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
-                    </button>
-                    {chartImage && (
-                        <button
-                            onClick={() => setChartImage(null)}
-                            className="chart-copy-btn"
-                        >
-                            ✕ Dismiss preview
+            {!presentationMode && (
+                <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset zoom to restore</p>
+            )}
+
+            {/* Inline image preview. Kept because the clipboard write fails
+                silently on most mobile browsers, and an image the reader can
+                long-press is the only fallback that works there. */}
+            {chartImage && (
+                <div className="mt-3">
+                    <div className="inline-row mb-1.5">
+                        <p className="text-xs text-meta">Right-click or long-press to copy / save</p>
+                        <button onClick={() => setChartImage(null)} className="chart-copy-btn">
+                            ✕ Dismiss
                         </button>
-                    )}
-                </div>
-
-                <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset Zoom to restore</p>
-
-                {/* Inline image preview — right-click/long-press to copy or save */}
-                {chartImage && (
-                    <div className="mt-3">
-                        <p className="text-xs text-meta mb-1.5">Right-click or long-press to copy / save</p>
-                        <img
-                            src={chartImage}
-                            alt="Chart export"
-                            className="w-full rounded border border-[var(--color-border)]"
-                        />
                     </div>
-                )}
-            </div>
+                    <img
+                        src={chartImage}
+                        alt="Chart export"
+                        className="w-full rounded border border-[var(--color-border)]"
+                    />
+                </div>
+            )}
 
             {/* ── Controls below chart: scale inputs + line toggle + race mode — hidden in presentation mode ── */}
             {!presentationMode && <div className="card mb-6">
@@ -1035,6 +1092,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             )}
 
             {!presentationMode && <ChartInfoBubble chartKey="charging" />}
+
+            </div>{/* .chart-main */}
         </div>
     );
 }
