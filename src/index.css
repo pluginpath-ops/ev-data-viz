@@ -1286,7 +1286,8 @@ body {
 .selected-vehicle-chip {
     @apply flex items-center gap-2;
     padding: 3px 8px 3px 9px;
-    border-radius: var(--radius-track);
+    /* Square on the colour side — see .vehicle-run-group. */
+    border-radius: 0 var(--radius-track) var(--radius-track) 0;
     font-size: calc(var(--fs-body) * var(--fs-step));
     background-color: var(--color-popover);
     border-left: 2px solid var(--color-accent-blue);
@@ -1395,7 +1396,8 @@ body {
     cursor: pointer;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-card);
+    /* Square on the colour side — see .vehicle-run-group. */
+    border-radius: 0 var(--radius-card) var(--radius-card) 0;
     /* Left edge reserved for the selection bar, so selecting a card does not
        change its width and reflow the grid. */
     border-left: 3px solid transparent;
@@ -1466,7 +1468,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 14px;
-    width: 300px;
+    width: 320px;
     flex: none;
     /* Sticks while the plot column scrolls, which is the whole point of moving
        it here — and scrolls internally when it is taller than the viewport, so
@@ -2258,10 +2260,16 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    the margins then extend past it, which is the behaviour wanted. */
 .chart-rail .run-selector-bar { display: block; }
 .chart-rail .run-selector-header {
-    width: auto;
+    /* Explicit width, not `auto`: a <button> sizes to its CONTENT even at
+       display:flex, so collapsed — where the "drag the pills" hint disappears —
+       the band came up 65px short of the rail. The width is the parent's plus
+       the padding the negative margins escape. */
+    width: calc(100% + var(--rail-pad-l) + var(--rail-pad-r));
     margin-left: calc(var(--rail-pad-l) * -1);
     margin-right: calc(var(--rail-pad-r) * -1);
-    padding: 7px var(--rail-pad-r) 7px var(--rail-pad-l);
+    /* +3px so the label sits on the same left edge as the colour-barred rows
+       below it, whose 3px rail comes before their own content. */
+    padding: 7px var(--rail-pad-r) 7px calc(var(--rail-pad-l) + 3px);
     border-radius: 0;
     border-top: 1px solid var(--color-border);
     border-bottom: 1px solid var(--color-border);
@@ -2286,8 +2294,12 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    the only thing in the selector that is also on the plot. */
 .vehicle-run-group {
     border-left: 3px solid;
-    border-radius: var(--radius-chip);
-    padding: 7px 9px;
+    /* Square on the colour side. A rounded bar reads as a decorative edge on a
+       pill; a hard one reads as a rail the row hangs off, which is what it is. */
+    border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
+    /* No left padding: the 3px rail IS the inset, so everything inside the
+       group starts on the same edge as the section band above it. */
+    padding: 6px 8px 7px 0;
     background-color: var(--color-card);
 }
 
@@ -2354,7 +2366,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: 3px 7px;
-    padding: 5px 7px;
+    /* Left padding removed so the checkbox lands on the group's own content
+       edge rather than a step inside it. */
+    padding: 5px 7px 5px 0;
     /* A faint box, not a rule between rows. Two-line rows separated only by a
        hairline read as four alternating lines; a box says which two belong
        together. */
@@ -2969,7 +2983,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* The session card CONTAINS its runs, so collapsing visibly folds them away
    rather than making a band and some cards disappear independently. */
 .session-group {
-    @apply rounded-xl;
+    /* Square on the colour side — see .vehicle-run-group. */
+    border-radius: 0 0.75rem 0.75rem 0;
     border: 1px solid var(--color-border);
     border-left: 3px solid var(--color-primary);
 }
