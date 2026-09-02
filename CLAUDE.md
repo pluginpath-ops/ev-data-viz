@@ -16,22 +16,31 @@ Prefer:
 - Use semantic class names defined in `src/index.css` via Tailwind's `@apply` directive
 - Class names should describe *what* an element is, not *how* it looks (e.g. `.vehicle-grid`, `.modal-overlay`)
 
-**Stop writing new Tailwind utility clusters in JSX.** When you touch markup
-that carries one, convert it to a reusable class in `src/index.css` rather than
-restyling it in place.
+**Tokenise appearance; keep Tailwind for layout.** The line is not "Tailwind
+bad" — a one-off `flex items-center gap-2` is fine inline and extracting it
+would buy nothing. The rule is about *appearance that repeats*:
 
-An inline cluster is a style with no name, no reuse and no theme awareness. The
-Range & Efficiency run rows drew seven badges in seven different clusters
-(`bg-amber-50`/`bg-orange-50`/`bg-cyan-50`/`bg-green-50`/`bg-blue-50`) — a
-rainbow where no hue meant anything; none of them followed the re-skin when the
-tokens were re-valued, while every semantic class moved for free. The
-`KNOWN_OFFENDERS` ratchet in `src/__tests__/contrast.test.js` exists to count
-what is left, so **lower it whenever a change clears some**.
+- **Colour and size never go inline.** Colours come from tokens, sizes derive
+  from `--fs-body` through `--fs-step`. A raw `bg-blue-50` or `text-[11px]` is
+  outside the theme and outside the scale, wherever it is written.
+- **A cluster that describes what something IS wants a name.** When you touch
+  markup carrying one, convert it to a semantic class in `src/index.css` rather
+  than restyling it in place. Reuse an existing class before inventing one.
 
-- Reuse an existing class before inventing one
-- Colours come from tokens; sizes derive from `--fs-body`, never a raw `rem`
+Why it matters concretely: the Range & Efficiency run rows drew seven badges in
+seven different inline clusters (`bg-amber-50`/`bg-orange-50`/`bg-cyan-50`/
+`bg-green-50`/`bg-blue-50`) — a rainbow where no hue meant anything. When the
+re-skin re-valued the tokens, every semantic class moved for free and every
+inline cluster kept painting the old palette.
+
+- The `KNOWN_OFFENDERS` ratchet in `src/__tests__/contrast.test.js` counts what
+  is left. **Lower it whenever a change clears some** — it fails on a fall as
+  well as a rise.
 - Never add a `[data-theme="dark"] .foo` rule — it cannot follow a themed
-  subtree. `playground.test.js` caps that backlog and it only goes down
+  subtree. `playground.test.js` caps that backlog and it only goes down.
+- **Naming is worth stopping for.** A class name is the whole value of
+  extracting one, and a bad name is worse than the cluster it replaced. If the
+  right name isn't obvious, say so and ask rather than guessing.
 
 ### Tech Stack
 - React 19 + Vite + Tailwind CSS v4 (`@tailwindcss/vite`, CSS-first, no `tailwind.config.js`)
