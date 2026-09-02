@@ -32,7 +32,6 @@ import RunSourceLinks from './RunSourceLinks';
  *
  *   pairMode        — enable the above
  *   pairings        — { [primaryRunId]: [partnerRunId, ...] } (utils/pairings.js)
- *   primaryLabel    — prefix before the row's own name, e.g. "Range:"
  *   partnerLabel    — prefix before the dropdown,      e.g. "Charging:"
  *   partnerRunsFor  — (vehicle) => runs offered as partners
  *   extraPrimaryRunsFor — (vehicle) => synthetic primary rows (e.g. EPA range)
@@ -58,7 +57,6 @@ export default function RunSelector({
     // Pair mode
     pairMode = false,
     pairings = {},
-    primaryLabel = null,
     partnerLabel = 'Paired with:',
     // One partner per row, selection still keyed by run id. For views whose
     // subject is the primary run (the charging chart plots one curve per run,
@@ -206,7 +204,6 @@ export default function RunSelector({
                                                         partnerIds={partnerRowsFor(run)}
                                                         partnerRuns={partnerRunsFor?.(vehicle) ?? []}
                                                         resolvePartner={resolvePartner}
-                                                        primaryLabel={primaryLabel}
                                                         partnerLabel={partnerLabel}
                                                         singlePartner={singlePartner}
                                                         selectedRunIds={selectedRunIds}
@@ -253,7 +250,7 @@ export default function RunSelector({
  */
 function PairRows({
     run, vehicle, partnerIds, partnerRuns, resolvePartner,
-    primaryLabel, partnerLabel, singlePartner,
+    partnerLabel, singlePartner,
     selectedRunIds, onToggleRun, onSetPartner, onAddPartner, onRemovePartner,
     onUpdateRunColor, renderRunMeta, colorMap,
 }) {
@@ -310,12 +307,14 @@ function PairRows({
                                 onUpdateRunColor={onUpdateRunColor}
                                 colorMap={colorMap}
                             />
-                            {primaryLabel && <span className="text-label shrink-0">{primaryLabel}</span>}
                             <span className="truncate">{run.name}</span>
-                            {/* Outside the truncate, so a long name never clips
-                                the credit off the end of the row. */}
-                            <RunSourceLinks run={run} className="shrink-0" />
+                            {/* Badges before the link, and both outside the
+                                truncate so a long name never clips either off
+                                the end of the row. The link goes LAST because it
+                                leaves the page: it is the one thing here that is
+                                not about identifying the run. */}
                             {renderRunMeta?.(run)}
+                            <RunSourceLinks run={run} className="shrink-0" />
                         </span>
                     ) : (
                         <span className="pair-charging-label text-meta">↳</span>

@@ -1162,12 +1162,22 @@ body {
 }
 
 /* Square-radius informational badge (blue by default) */
+/* "DEF" — the vehicle's default test for this kind. Mono and short: it is a
+   marker on an identity line, competing with the name for a 260px rail, and
+   "Default" spelled out cost more room than the thing it qualifies.
+   Token-driven, so it follows a themed subtree — it used to carry a
+   [data-theme="dark"] override, which could not. */
 .badge-default {
-    @apply text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded;
-}
-[data-theme="dark"] .badge-default {
-    background-color: rgba(59, 130, 246, 0.2);
-    color: rgb(147, 197, 253);
+    @apply px-1.5 py-0.5;
+    flex: none;
+    border-radius: var(--radius-mark);
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    background-color: var(--color-primary-surface);
+    border: 1px solid var(--color-primary-border);
+    color: var(--color-primary-text);
 }
 
 /* Marks a run hidden from regular viewers (admin/contributor-only visibility) */
@@ -1437,7 +1447,12 @@ body {
     max-height: calc(100vh - 24px);
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 12px;
+    /* Named, so a full-width band inside the rail can escape it by exactly as
+       much as the rail applies — and stay correct when the sidebar media query
+       changes it. */
+    --rail-pad-l: 12px;
+    --rail-pad-r: 12px;
+    padding: 12px var(--rail-pad-r) 12px var(--rail-pad-l);
     background-color: var(--color-surface-muted);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-card);
@@ -1530,6 +1545,27 @@ body {
     gap: 7px;
 }
 
+/* Wide enough for the rail to sit beside the plot, it stops being a card and
+   becomes a SIDEBAR: square, edge to edge, one rule separating it from the
+   content. A rounded panel floating in the margin reads as another card among
+   the cards; a sidebar reads as part of the frame. The negative margins take it
+   out of <main>'s padding so it runs the full height rather than sitting in a
+   well. */
+@media (min-width: 68.8125rem) {
+    .chart-rail {
+        --rail-pad-l: 1.5rem;
+        --rail-pad-r: 16px;
+        margin: -1.5rem 0 -1.5rem -1.5rem;
+        padding: 18px var(--rail-pad-r) 24px var(--rail-pad-l);
+        border: none;
+        border-right: 1px solid var(--color-border);
+        border-radius: 0;
+        top: 0;
+        height: 100vh;
+        max-height: 100vh;
+    }
+}
+
 @media (max-width: 68.75rem) {
     .chart-layout { flex-direction: column; }
     .chart-rail {
@@ -1537,6 +1573,37 @@ body {
         position: static;
         max-height: none;
     }
+}
+
+/* ── Axis rows ──────────────────────────────────────────────────────────────
+   `X  [State of Charge (%) ▾]` — the key is one or two characters, so it is a
+   fixed column and the control takes the rest. The old form stacked a
+   sentence-case label ("Right Axis (Y2):") above each control and cost three
+   lines to say what three characters say. */
+.axis-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.axis-row {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+}
+.axis-row-key {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-text-meta);
+}
+
+/* Two columns of checkboxes: they are peers, and a single column of four made
+   the rail taller than the run list it sits above. */
+.display-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 10px;
 }
 
 /* ── The export strip and the plot frame ───────────────────────────────────
@@ -2048,12 +2115,41 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 /* Collapsible "Select Runs" section header button */
+/* The expand/collapse row reads as a control now, not as a line of text that
+   happens to be clickable. */
 .run-selector-header {
-    @apply flex items-center gap-2 w-full text-left font-medium transition-colors mb-1;
+    @apply flex items-center gap-2 w-full text-left font-medium transition-colors;
+    padding: 6px 9px;
+    margin-bottom: 6px;
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-sunken);
     color: var(--color-text-primary);
 }
 .run-selector-header:hover {
-    color: var(--color-text-secondary);
+    background-color: var(--color-hover-lift);
+    color: var(--color-text-primary);
+}
+
+/* In the rail it is a SECTION BAND, not a card: full width, square, ruled top
+   and bottom. A rounded inset panel here would be a card containing cards —
+   and the vehicles inside it are the things that should read as cards. It
+   escapes the rail's padding by exactly the padding the rail applies, which is
+   what --rail-pad-* exists for. */
+/* The bar is a flex ROW so its header and actions can sit side by side. In the
+   rail the actions have moved into DISPLAY, so it holds only the header — and
+   as a flex item the header's `w-full` pins it to the parent's content box, so
+   the negative margins shifted it without widening it. As a block child of a
+   block parent, `width: auto` on a `display: flex` element fills the parent and
+   the margins then extend past it, which is the behaviour wanted. */
+.chart-rail .run-selector-bar { display: block; }
+.chart-rail .run-selector-header {
+    width: auto;
+    margin-left: calc(var(--rail-pad-l) * -1);
+    margin-right: calc(var(--rail-pad-r) * -1);
+    padding: 7px var(--rail-pad-r) 7px var(--rail-pad-l);
+    border-radius: 0;
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
 }
 
 /* "About this chart" help-bubble disclosure toggle */
@@ -2067,12 +2163,17 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Vehicle group list inside the run selector */
 .runs-list {
-    @apply space-y-4;
+    @apply flex flex-col gap-2;
 }
 
-/* Per-vehicle left-bordered group in the run selector */
+/* Per-vehicle group. A card carrying the vehicle's series colour on its left
+   edge, so the group ties to the same vehicle on every chart — the colour is
+   the only thing in the selector that is also on the plot. */
 .vehicle-run-group {
-    @apply border-l-4 pl-4;
+    border-left: 3px solid;
+    border-radius: var(--radius-chip);
+    padding: 7px 9px;
+    background-color: var(--color-card);
 }
 
 /* Run list within a vehicle group */
@@ -2111,10 +2212,29 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply space-y-1;
 }
 
-/* A single charging × range pair */
+/* A single charging × range pair, over TWO lines.
+ *
+ * One line held the checkbox, the colour, the name, its links AND the range
+ * pairing, so at rail width the name truncated to nothing to keep the <select>
+ * on screen — the row lost the very thing it identifies. Splitting them gives
+ * the identity the full width and the pairing its own line beneath, which is
+ * also the reading order: what this run is, then what it is paired with.
+ *
+ * Grid rather than a wrapping flex, so the second line starts under the NAME
+ * and not under the checkbox — the indent is what makes it read as belonging to
+ * the row above rather than as a third sibling. */
 .pair-row {
-    @apply flex items-center gap-2 cursor-pointer;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 3px 8px;
+    padding: 4px 0;
+    cursor: pointer;
 }
+.pair-row + .pair-row {
+    border-top: 1px solid var(--color-border-subtle);
+}
+.pair-row > input[type="checkbox"] { grid-column: 1; grid-row: 1; }
 
 /* Additional partners for the same charging test — indented so the branch
    reads as belonging to the row above, checkbox included. */
@@ -2122,16 +2242,22 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply pl-8;
 }
 
-/* Charging-test identity; blank on continuation rows so partners line up */
+/* Line one: colour, name, tags, source link. */
 .pair-charging-label {
     @apply flex items-center gap-2 min-w-0;
-    flex: 1 1 40%;
+    grid-column: 2;
+    grid-row: 1;
 }
 
-/* The "Range: [select] +n ＋" cluster on the right of each pair row */
+/* Line two: what this run is paired with. `shrink-0` is gone — on its own line
+   there is nothing to shrink against, and keeping it stopped the <select> ever
+   giving ground. */
 .pair-range-control {
-    @apply flex items-center gap-1.5 shrink-0;
+    @apply flex items-center gap-1.5 min-w-0;
+    grid-column: 2;
+    grid-row: 2;
 }
+.pair-range-control select { min-width: 0; }
 
 /* "+3" — how many other range tests could be paired with this charging test */
 .pair-more-badge {

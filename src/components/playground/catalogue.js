@@ -74,7 +74,7 @@ export const NOT_CATALOGUED = {
  * and cannot silently grow.
  */
 export const DARK_OVERRIDE_CLASSES = new Set([
-    'badge-default', 'badge-hidden',
+    'badge-hidden',
     'brand-alias-chip', 'chart-copy-btn-active',
     'curve-picker-row', 'curve-tier-badge', 'guide-row', 'guide-tested-note',
     'merge-target-banner', 'specs-table-container', 'stats-suppressed-flag',

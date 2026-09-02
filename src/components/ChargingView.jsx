@@ -773,44 +773,47 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     ))}
                 </div>
 
-                {/* Axis selectors */}
-                <div className="axis-selectors">
-                    <div>
-                        <label className="axis-label">X-Axis:</label>
-                        <select
-                            value={chartConfig.xAxis}
-                            onChange={(e) => setChartConfig({ ...chartConfig, xAxis: e.target.value })}
-                            className="form-input axis-select"
-                        >
-                            {axisOptions.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="axis-label">Left Axis (Y):</label>
-                        <select
-                            value={chartConfig.yAxis}
-                            onChange={(e) => setChartConfig({ ...chartConfig, yAxis: e.target.value })}
-                            className="form-input axis-select"
-                        >
-                            {axisOptions.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="axis-label">Right Axis (Y2):</label>
-                        <select
-                            value={chartConfig.y2Axis ?? ''}
-                            onChange={(e) => setChartConfig({ ...chartConfig, y2Axis: e.target.value || null })}
-                            className="form-input axis-select"
-                        >
-                            <option value="">— None —</option>
-                            {axisOptions.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
+                {/* ── AXES ── */}
+                <div className="chart-rail-group">
+                    <span className="text-micro">Axes</span>
+                    <div className="axis-rows">
+                        <label className="axis-row">
+                            <span className="axis-row-key">X</span>
+                            <select
+                                value={chartConfig.xAxis}
+                                onChange={(e) => setChartConfig({ ...chartConfig, xAxis: e.target.value })}
+                                className="form-input"
+                            >
+                                {axisOptions.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="axis-row">
+                            <span className="axis-row-key">Y</span>
+                            <select
+                                value={chartConfig.yAxis}
+                                onChange={(e) => setChartConfig({ ...chartConfig, yAxis: e.target.value })}
+                                className="form-input"
+                            >
+                                {axisOptions.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="axis-row">
+                            <span className="axis-row-key">Y2</span>
+                            <select
+                                value={chartConfig.y2Axis ?? ''}
+                                onChange={(e) => setChartConfig({ ...chartConfig, y2Axis: e.target.value || null })}
+                                className="form-input"
+                            >
+                                <option value="">— None —</option>
+                                {axisOptions.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </label>
                     </div>
                 </div>
 
@@ -858,43 +861,50 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     </div>
                 )}
 
-                {/* ── Line / points toggles ── */}
-                <div className="chart-toggles">
-                    <label className="toggle-label">
-                        <input
-                            type="checkbox"
-                            checked={chartConfig.showLine ?? true}
-                            onChange={e => {
-                                // Must keep at least one of line/points enabled
-                                if (!e.target.checked && !chartConfig.showPoints) return;
-                                setChartConfig({ ...chartConfig, showLine: e.target.checked });
-                            }}
-                            className="w-4 h-4"
-                        />
-                        <span className="text-sm font-medium">Connect points with lines</span>
-                    </label>
-                    <label className="toggle-label">
-                        <input
-                            type="checkbox"
-                            checked={chartConfig.showPoints || false}
-                            onChange={e => {
-                                // Must keep at least one of line/points enabled
-                                if (!e.target.checked && !chartConfig.showLine) return;
-                                setChartConfig({ ...chartConfig, showPoints: e.target.checked });
-                            }}
-                            className="w-4 h-4"
-                        />
-                        <span className="text-sm font-medium">Show points</span>
-                    </label>
+                {/* ── DISPLAY ──
+                  * Every checkbox in one region. Lines and Points lived here;
+                  * Auto color and Full labels were passed into the run
+                  * selector's header and Correct sat beside them — three
+                  * controls of the same kind in two different places, split by
+                  * where they happened to be built rather than by what they
+                  * do. */}
+                <div className="chart-rail-group">
+                    <span className="text-micro">Display</span>
+                    <div className="display-grid">
+                        <label className="toggle-label">
+                            <input
+                                type="checkbox"
+                                checked={chartConfig.showLine ?? true}
+                                onChange={e => {
+                                    // Must keep at least one of line/points enabled
+                                    if (!e.target.checked && !chartConfig.showPoints) return;
+                                    setChartConfig({ ...chartConfig, showLine: e.target.checked });
+                                }}
+                                className="w-4 h-4"
+                            />
+                            <span className="text-sm">Lines</span>
+                        </label>
+                        <AutoColorToggle autoColor={chartConfig.autoColor ?? false} setChartConfig={setChartConfig} />
+                        <label className="toggle-label">
+                            <input
+                                type="checkbox"
+                                checked={chartConfig.showPoints || false}
+                                onChange={e => {
+                                    // Must keep at least one of line/points enabled
+                                    if (!e.target.checked && !chartConfig.showLine) return;
+                                    setChartConfig({ ...chartConfig, showPoints: e.target.checked });
+                                }}
+                                className="w-4 h-4"
+                            />
+                            <span className="text-sm">Points</span>
+                        </label>
+                        <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
+                    </div>
+                    <CorrectionControl mode={chartConfig.correctionMode ?? 'none'} setChartConfig={setChartConfig} />
                 </div>
 
                 {/* ── Collapsible run selector ── */}
                 <RunSelector
-                    headerActions={<>
-                        <CorrectionControl mode={chartConfig.correctionMode ?? 'none'} setChartConfig={setChartConfig} />
-                        <AutoColorToggle autoColor={chartConfig.autoColor ?? false} setChartConfig={setChartConfig} />
-                        <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
-                    </>}
                     vehicles={selectedVehicles}
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}
@@ -905,7 +915,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     pairMode
                     singlePartner
                     pairings={pairings}
-                    primaryLabel="Charging:"
                     partnerLabel="Range:"
                     partnerRunsFor={vehicle => {
                         const epa = epaRangeOption(vehicle);
@@ -923,9 +932,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         return (
                             <>
                                 {run.isDefault && (
-                                    <span className="badge-default ml-2"
-                                        style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
-                                        Default
+                                    <span className="badge-default" title="The vehicle's default charging test">
+                                        DEF
                                     </span>
                                 )}
                                 {exclusionReason && (

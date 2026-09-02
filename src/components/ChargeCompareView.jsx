@@ -843,7 +843,6 @@ export default function ChargeCompareView({
                         emptyMessage="No range test records"
                         pairMode
                         pairings={pairings}
-                        primaryLabel="Range:"
                         partnerLabel="Charging:"
                         partnerRunsFor={vehicle => filterChargingRuns(vehicle.runs)}
                         extraPrimaryRunsFor={vehicle => {

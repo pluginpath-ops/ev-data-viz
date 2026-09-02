@@ -112,11 +112,12 @@ describe('the classes that cannot follow a themed subtree', () => {
     });
 
     it('is a backlog that should shrink, never grow', () => {
-        // 17 when the marker was added, 15 after #277, 13 after the re-skin's
+        // 17 when the marker was added, 15 after #277, 13 once the re-skin's
         // chrome phase rebuilt .btn-tab on tokens and deleted
-        // .app-header-compact with the photo hero. Lower it as classes move;
-        // a rise means a new class was written the old way.
-        expect(actual.size).toBeLessThanOrEqual(13);
+        // .app-header-compact with the photo hero, 12 once .badge-default
+        // became the mono DEF marker. Lower it as classes move; a rise means a
+        // new class was written the old way.
+        expect(actual.size).toBeLessThanOrEqual(12);
     });
 });
 
