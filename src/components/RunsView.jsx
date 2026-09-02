@@ -1425,7 +1425,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 </div>
             </div>
 
-            <div className="admin-subtabs mb-4">
+            <div className="admin-subtabs">
                 {SUBTABS.map(t => {
                     const count = t.count?.({ displayRuns, inheritedRuns, vehicle, performanceCounts });
                     return (

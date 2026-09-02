@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
-import { useTheme } from './hooks/useTheme';
+import AppNav from './components/shell/AppNav';
+import SubTabStrip from './components/shell/SubTabStrip';
 import AuthModal from './components/AuthModal';
 import VehiclesView from './components/VehiclesView';
 import RunsView, { RUNS_SUBTAB_IDS, DEFAULT_RUNS_SUBTAB } from './components/RunsView';
@@ -17,10 +18,14 @@ import PerformanceCompareView from './components/PerformanceCompareView';
 import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/AdminView';
 import Playground from './components/playground/Playground';
-import EpaSection from './components/epa/EpaSection';
+import EpaSection, { EPA_SUBTABS, DEFAULT_EPA_SUBTAB, epaSubtabFromParam } from './components/epa/EpaSection';
 import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory } from './constants/chartNav';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
+
+/* SubTabStrip speaks `key`; the EPA registry has always spoken `id`, and it is
+   read by name in several places, so it is mapped here rather than renamed. */
+const EPA_STRIP_ITEMS = EPA_SUBTABS.map(t => ({ key: t.id, label: t.label }));
 
 export default function App() {
     const {
@@ -35,8 +40,6 @@ export default function App() {
         canDelete,
         canPublish,
         loading,
-        headerImageUrl,
-        uploadHeaderImage,
         toggleVehicleSelection,
         removeVehicleSelection,
         clearAllSelections,
@@ -88,6 +91,11 @@ export default function App() {
     // Same lift for the Admin tab's sub-tabs (Roles / EPA Data / Fuel Economy
     // Guide / Model Constants / Interface Settings).
     const [adminSubtab, setAdminSubtab] = useState(DEFAULT_ADMIN_SUBTAB);
+    // And for EPA (Browse / Label Statistics / Certification Statistics /
+    // Speed-Consumption Curves), which used to own its own state and draw its
+    // own rail below the chrome — the one section whose sub-tabs did not sit in
+    // the nav strip with everything else.
+    const [epaSubtab, setEpaSubtab] = useState(DEFAULT_EPA_SUBTAB);
 
     // Keep activeVehicle in sync with vehicles state. Computed early (rather
     // than just before render) so the URL-sync effects below can depend on it.
@@ -204,9 +212,13 @@ export default function App() {
         handleChartModeChange(valid ? remembered : category.modes[0].key);
     };
 
-    const { theme, cycleTheme, isDark } = useTheme();
-    const themeIcon  = theme === 'dark' ? '🌙' : theme === 'light' ? '☀️' : '💻';
-    const themeTitle = theme === 'dark' ? 'Dark mode (click for system)' : theme === 'light' ? 'Light mode (click for dark)' : 'System theme (click for light)';
+    // Fleet state for the selection strip. Counted from what is already
+    // loaded rather than fetched — this is a glance, not a report, and it must
+    // not cost a round trip.
+    const totalTests = useMemo(
+        () => vehicles.reduce((n, v) => n + (v.runs?.length ?? 0), 0),
+        [vehicles],
+    );
 
     const { isPopout, sendState } = useChartSync({
         chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings,
@@ -277,7 +289,9 @@ export default function App() {
         }
         if (tab === 'epa') {
             // Nothing to wait for — the guide loads its own data and needs no
-            // vehicle, role or selection resolved first.
+            // vehicle, role or selection resolved first, so the sub-tab is set
+            // here rather than parked on a ref the way runs and admin need.
+            setEpaSubtab(epaSubtabFromParam(p.get('sub')));
             setView('epa');
             return;
         }
@@ -555,6 +569,21 @@ export default function App() {
         );
     }, [isPopout, view, currentActiveVehicle, runsSubtab]);
 
+    // ── Keep URL in sync while on the EPA tab ───────────────────────────────
+    // This one PRESERVES the existing query string rather than rebuilding it,
+    // which is the opposite of the runs and admin effects above and deliberate:
+    // each EPA sub-view writes its own filter, sort, page and selection
+    // parameters, so a fresh URLSearchParams here would wipe out whatever the
+    // view had just put there. Only `tab` and `sub` belong to this effect.
+    useEffect(() => {
+        if (isPopout) return;
+        if (view !== 'epa') return;
+        const p = new URLSearchParams(window.location.search);
+        p.set('tab', 'epa');
+        p.set('sub', epaSubtab);
+        history.replaceState({ view: 'epa', subtab: epaSubtab }, '', '?' + p.toString());
+    }, [isPopout, view, epaSubtab]);
+
     // ── Keep URL in sync while on the Admin tab ─────────────────────────────
     useEffect(() => {
         if (isPopout) return;
@@ -636,191 +665,66 @@ export default function App() {
                 />
             )}
             <div className="min-h-screen">
-                {/* ── Header ── */}
-                {view === 'vehicles' ? (
-                    /* Full hero — only on the Vehicles tab */
-                    <header className="relative text-white shadow-lg overflow-hidden">
-                        {/* Full-width base colour — always fills edge to edge.
-                            In dark mode use the page background so the header blends into
-                            the dark navy layout instead of showing a bright blue strip. */}
-                        <div
-                            className="absolute inset-0"
-                            style={{ backgroundColor: isDark ? 'var(--color-background)' : 'var(--color-primary)' }}
-                        />
-                        {/* Image + overlay are both capped to page width (max-w-7xl) so on very
-                            wide monitors the image stays aligned with the content column and more
-                            of it is visible rather than being stretched thin across the viewport */}
-                        {headerImageUrl && (
-                            <div className="absolute inset-0 flex justify-center">
-                                <div className="relative w-full max-w-7xl h-full flex-shrink-0">
-                                    <div
-                                        className="absolute inset-0"
-                                        style={{ backgroundImage: `url(${headerImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-                                    />
-                                    <div
-                                        className="absolute inset-0"
-                                        style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(29,78,216,0.72)' }}
-                                    />
-                                </div>
-                            </div>
-                        )}
-                        <div className="relative page-container py-6">
-                            {/* Clickable title → home */}
-                            <button
-                                onClick={() => navigateTo('vehicles')}
-                                className="text-left group"
-                            >
-                                <h1 className="text-3xl font-bold group-hover:underline decoration-white/60">EVBench</h1>
-                            </button>
-                            <p className="mt-1" style={{color: 'rgba(255,255,255,0.8)'}}>Compare and benchmark electric vehicle performance data</p>
-
-                            {/* Admin-only: change header image */}
-                            {isAdmin && (
-                                <label className="absolute top-3 right-6 cursor-pointer flex items-center gap-1 text-xs text-white/60 hover:text-white/90 transition">
-                                    📷 Change header image
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        onChange={(e) => { e.target.files[0] && uploadHeaderImage(e.target.files[0]); e.target.value = ''; }}
-                                    />
-                                </label>
-                            )}
-                        </div>
-                    </header>
-                ) : (
-                    /* Compact bar — all other tabs */
-                    <header className="app-header-compact">
-                        <div className="page-container flex items-center h-full">
-                            <button
-                                onClick={() => navigateTo('vehicles')}
-                                className="text-lg font-bold text-white hover:underline decoration-white/60"
-                            >
-                                EVBench
-                            </button>
-                        </div>
-                    </header>
-                )}
-
+                {/* ── Chrome ──
+                  * One 50px bar. The photo hero and the compact title bar it
+                  * replaced are gone; see components/shell/AppNav for why. */}
                 <nav className="app-nav">
-                    <div className="page-container pt-3 pb-2">
-                        {/*
-                          * flex-col-reverse on mobile: DOM order is tabs first, actions second,
-                          * but col-reverse flips that so actions render on TOP and tabs below.
-                          * sm:flex-row restores the normal side-by-side layout on wider screens.
-                          */}
-                        <div className={`flex flex-col-reverse gap-y-2 sm:flex-row sm:items-center ${activeChartCategory ? 'mb-1' : 'mb-3'}`}>
-                            {/* Tab group */}
-                            <div className="nav-tab-group">
-                                <button
-                                    onClick={() => navigateTo('vehicles')}
-                                    className={`btn-tab ${view === 'vehicles' ? 'active' : ''}`}
-                                >
-                                    Vehicles
-                                </button>
-                                <button
-                                    onClick={() => currentActiveVehicle && navigateTo('runs')}
-                                    disabled={!currentActiveVehicle}
-                                    className={`btn-tab ${view === 'runs' ? 'active' : ''}`}
-                                >
-                                    Tests &amp; Data {currentActiveVehicle ? `(${currentActiveVehicle.name})` : ''}
-                                </button>
-                                {/* One top-level tab per chart category. All are
-                                    driven by the current vehicle selection, so
-                                    they share the same gate. */}
-                                {CHART_CATEGORIES.map(({ key, label }) => (
-                                    <button
-                                        key={key}
-                                        onClick={() => selectedVehicles.length > 0 && navigateToChartCategory(key)}
-                                        disabled={selectedVehicles.length === 0}
-                                        className={`btn-tab ${view === key ? 'active' : ''}`}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
-                                {/* Reference data, not a chart: the guide covers every EV EPA
-                                    has rated, so it is deliberately NOT gated on a vehicle
-                                    selection the way the chart categories above are. */}
-                                <button
-                                    onClick={() => navigateTo('epa')}
-                                    className={`btn-tab ${view === 'epa' ? 'active' : ''}`}
-                                >
-                                    EPA
-                                </button>
-                                {isAdmin && (
-                                    <button
-                                        onClick={() => navigateTo('admin')}
-                                        className={`btn-tab ${view === 'admin' ? 'active' : ''}`}
-                                    >
-                                        Admin
-                                    </button>
-                                )}
-                            </div>
-                            {/* Action group — right-aligned on desktop, full-width right-justified on mobile */}
-                            <div className="nav-actions sm:ml-auto">
-                                <button onClick={cycleTheme} className="theme-toggle" title={themeTitle}>
-                                    {themeIcon}
-                                </button>
-                                {user ? (
-                                    <>
-                                        <div className="flex flex-col items-end leading-tight text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                                            <span>{user.email}</span>
-                                            {userRole && userRole !== 'user' && (
-                                                <span className="owner-badge mt-0.5">{userRole.toUpperCase()}</span>
-                                            )}
-                                        </div>
-                                        <button onClick={signOut} className="btn btn-secondary">
-                                            Sign Out
-                                        </button>
-                                    </>
-                                ) : (
-                                    <button onClick={() => setShowAuthModal(true)} className="btn btn-primary">
-                                        Sign In
-                                    </button>
-                                )}
-                            </div>
-                        </div>
+                    <AppNav
+                        view={view}
+                        chartCategories={CHART_CATEGORIES}
+                        activeVehicle={currentActiveVehicle}
+                        hasSelection={selectedVehicles.length > 0}
+                        isAdmin={isAdmin}
+                        user={user}
+                        userRole={userRole}
+                        onNavigate={navigateTo}
+                        onNavigateChartCategory={navigateToChartCategory}
+                        onSignIn={() => setShowAuthModal(true)}
+                        onSignOut={signOut}
+                    />
 
-                        {/* Sub-nav for the active chart category — the views within
-                          * whichever of Performance / Charging & Efficiency /
-                          * Specifications is the current top-level tab. */}
-                        {activeChartCategory && (
-                            <div className="flex items-center gap-2 pb-2">
-                                <div className="flex gap-0.5">
-                                    {activeChartCategory.modes.map(({ key, label }) => (
-                                        <button
-                                            key={key}
-                                            onClick={() => handleChartModeChange(key)}
-                                            className={`btn-subtab ${chartMode === key ? 'active' : ''}`}
-                                        >
-                                            {label}
-                                        </button>
-                                    ))}
-                                </div>
+                    {/* Sub-nav for whichever section has one. Every section's
+                      * sub-tabs are drawn HERE, on the active tab's own fill,
+                      * so a sub-tab reads as being inside its parent rather
+                      * than as a second row of buttons on the page.
+                      *
+                      * The strip's right end is where a section's own controls
+                      * belong — the popout button is a control OF the chart
+                      * views, not a peer of their tabs. */}
+                    {view === 'epa' ? (
+                        <SubTabStrip
+                            items={EPA_STRIP_ITEMS}
+                            activeKey={epaSubtab}
+                            onSelect={setEpaSubtab}
+                        />
+                    ) : (
+                        <SubTabStrip
+                            items={activeChartCategory?.modes ?? []}
+                            activeKey={chartMode}
+                            onSelect={handleChartModeChange}
+                            end={activeChartCategory && (
                                 <button
+                                    type="button"
                                     onClick={() => window.open(
                                         window.location.origin + window.location.pathname + window.location.search + '&popout=1',
                                         'evbench-popout',
                                         `width=${window.screen.availWidth},height=${window.screen.availHeight},left=0,top=0`
                                     )}
-                                    className="btn btn-primary ml-auto"
+                                    className="btn btn-primary"
                                     title="Open chart in a separate window for presentation"
                                 >
-                                    ⧉ Open Chart in New Window
+                                    ⧉ Open in new window
                                 </button>
-                            </div>
-                        )}
-
-                    </div>
+                            )}
+                        />
+                    )}
                     <div className="selected-strip">
                         <div className="page-container py-2">
                         {/* Selected vehicles row */}
                         <div className="inline-row flex-wrap">
-                            <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Selected:</span>
+                            <span className="text-micro">Selected</span>
                             {selectedVehicles.length === 0 ? (
-                                <div className="px-3 py-1 rounded-full text-sm" style={{ backgroundColor: 'var(--color-surface-sunken)', color: 'var(--color-text-secondary)' }}>
-                                    None
-                                </div>
+                                <span className="text-meta">None</span>
                             ) : (
                                 <>
                                     {selectedVehicles.map((vehicleId, idx) => {
@@ -874,16 +778,31 @@ export default function App() {
                                             </div>
                                         );
                                     })}
+                                    {/* Not btn-warning. Orange is the single
+                                      * "active / now" signal in this design and
+                                      * nothing else is allowed to use it — that
+                                      * is the only reason it answers "where am
+                                      * I" from across the room. Clearing a
+                                      * selection is neither active nor a
+                                      * warning; it is an ordinary action. */}
                                     <button
                                         onClick={clearAllSelections}
-                                        className="btn btn-warning"
+                                        className="btn btn-secondary"
                                     >
                                         Clear all
                                     </button>
                                 </>
                             )}
-                            <button onClick={toggleUnits} className="units-toggle ml-auto" title="Switch unit system">
-                                ⇄ {units === 'imperial' ? 'Imperial' : 'Metric'}
+                            {/* Fleet state — the one thing the photo hero could
+                              * have said and did not. Counts only: nothing in
+                              * the loaded shape carries a reliable "last
+                              * updated", and inventing one would be worse than
+                              * omitting it. */}
+                            <span className="fleet-state">
+                                {vehicles.length} vehicles · {totalTests} tests
+                            </span>
+                            <button onClick={toggleUnits} className="units-toggle" title="Switch unit system">
+                                ⇄ {units === 'imperial' ? 'IMP' : 'MET'}
                             </button>
                         </div>
                         </div>
@@ -1050,7 +969,7 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                         />
                     )}
-                    {view === 'epa' && <EpaSection />}
+                    {view === 'epa' && <EpaSection subtab={epaSubtab} />}
 
                     {/* The playground, ungated and unlinked.
                       *

@@ -35,7 +35,7 @@ export const OWNED_FAMILIES = [
       match: (n) => /(chip|badge|pill)/.test(n) || /^tag-(filter|pill)/.test(n) },
     { id: 'forms',   label: 'Form controls', match: (n) => /^form-input$/.test(n) },
     { id: 'type',    label: 'Typography',
-      match: (n) => /^(text-(body|data|label|meta|note|secondary)|page-title|section-title|subsection-title)$/.test(n) },
+      match: (n) => /^(text-(body|data|label|meta|micro|nano|note|secondary)|page-title|section-title|subsection-title)$/.test(n) },
 ];
 
 /**
@@ -70,8 +70,8 @@ export const NOT_CATALOGUED = {
  * and cannot silently grow.
  */
 export const DARK_OVERRIDE_CLASSES = new Set([
-    'app-header-compact', 'badge-default', 'badge-hidden',
-    'brand-alias-chip', 'btn-tab', 'chart-copy-btn-active',
+    'badge-default', 'badge-hidden',
+    'brand-alias-chip', 'chart-copy-btn-active',
     'curve-picker-row', 'curve-tier-badge', 'guide-row', 'guide-tested-note',
     'merge-target-banner', 'specs-table-container', 'stats-suppressed-flag',
     'sweep-batch', 'vote-btn-vouch'
@@ -174,7 +174,9 @@ export const SECTIONS = [
         blurb: 'ONE axis: a role carries its own size, weight and colour, and you pick '
              + 'exactly one. The colour tiers are gone — text-muted folded into '
              + 'text-secondary, text-faint into text-meta, text-caption dissolved. Sizes '
-             + 'derive from --fs-body through --fs-step, so one dial moves the scale (#277).',
+             + 'derive from --fs-body through --fs-step, so one dial moves the scale (#277). '
+             + 'The micro tier at the bottom arrived with the re-skin: the scale used to '
+             + 'stop at 12px, so every 9–11px label on the site was a hardcoded text-[10px].',
         specimens: [
             { cls: 'page-title',       as: 'div', label: 'page-title' },
             { cls: 'section-title',    as: 'div', label: 'section-title' },
@@ -187,6 +189,10 @@ export const SECTIONS = [
               note: 'Counts, ids, glyphs, parentheticals. Roman, not italic — never italicise a chevron. Absorbed text-faint, and gained contrast doing it: 2.43:1 to 4.63:1, so it no longer needs the large-text exemption it used to carry.' },
             { cls: 'text-label',     as: 'div', label: 'text-label', note: 'Form and field labels. One step down, heavier.' },
             { cls: 'text-data',      as: 'div', label: 'text-data', note: 'Tabular figures for numbers in tables.' },
+            { cls: 'text-micro',     as: 'div', label: 'text-micro',
+              note: 'A label naming a region — NARROWED BY, AXES, DISTRIBUTION. Mono, uppercased in CSS so the source string stays readable, and tracked so it reads as apparatus rather than as a very small sentence.' },
+            { cls: 'text-nano',      as: 'div', label: 'text-nano',
+              note: 'The same one step down: the legend inside a chip, the caption on a swatch. The handoff sets its colour at #5a6474, which measures 3.07:1 — below AA at this size, so both micro roles resolve to text-meta instead.' },
         ],
     },
 ];

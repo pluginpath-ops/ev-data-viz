@@ -1,7 +1,40 @@
 @import "tailwindcss";
 
+/* ── Typefaces ──────────────────────────────────────────────────────────────
+   Self-hosted rather than a Google Fonts <link>. index.html already carries a
+   deliberate comment about keeping third-party round trips off the critical
+   path, and a stylesheet on another origin is exactly that: the browser cannot
+   discover the woff2 until it has fetched and parsed a file from a host it has
+   not yet connected to.
+
+   The package entry is imported rather than a hand-written latin-only
+   @font-face, because these packages ship no per-subset entry point. Every
+   subset carries a `unicode-range`, so a page of English text still fetches
+   only the latin file and the rest sit in the build unfetched. Hand-pruning to
+   latin would drop latin-ext, and latin-ext is not hypothetical on a site that
+   lists Škoda. */
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource-variable/public-sans";
+@import "@fontsource-variable/jetbrains-mono";
+
 /* Enable dark: Tailwind prefix via data-theme attribute */
 @variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ── Type stacks and radii ──────────────────────────────────────────────────
+   In `@theme` rather than `:root` so Tailwind generates utilities from them —
+   `font-mono` then resolves to JetBrains Mono, which is what makes .text-data's
+   existing `@apply font-mono` pick up the new face with no second declaration.
+
+   Neither families nor radii are theme-scoped: a typeface and a corner do not
+   change between light and dark, and @theme values are static per document, so
+   this is the right side of the line. Colours stay in the :root/[data-theme]
+   blocks below, where they can be re-declared on a subtree. */
+@theme {
+    --font-display: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-sans:    'Public Sans Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-mono:    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 
 /* ── Color Tokens ─────────────────────────────────────────────────────────── */
 
@@ -83,6 +116,43 @@
     /* ── Borders (light mode) ── */
     --color-border:       rgb(229, 231, 235); /* gray-200 */
     --color-border-strong: rgb(209, 213, 219); /* gray-300 */
+    --color-border-subtle: rgb(243, 244, 246); /* provisional — light pass */
+
+    /* ── The re-skin's new roles, light side ────────────────────────────────
+       Every one of these is PROVISIONAL. The design handoff draws dark only, so
+       these are placeholders picked to (a) keep each tier distinguishable and
+       (b) actually pass AA where the contrast sweep pairs them — a placeholder
+       that fails the guard would force the guard to be weakened, and then it
+       stops catching the bug it exists for. They are marked so the light pass
+       can be generated from this file rather than from memory. */
+    --color-cluster:     rgb(243, 244, 246);  /* provisional — light pass */
+    --color-popover:     rgb(255, 255, 255);  /* provisional — light pass */
+    --color-pinned:      rgb(239, 246, 255);  /* provisional — light pass */
+    --color-pinned-head: rgb(219, 234, 254);  /* provisional — light pass */
+    --color-nav-active:  rgb(29, 78, 216);    /* provisional — light pass */
+
+    --color-hover-lift: rgba(0, 0, 0, 0.05);  /* provisional — light pass */
+
+    --color-chart-grid: rgb(229, 231, 235);   /* provisional — light pass */
+    --color-chart-axis: rgb(156, 163, 175);   /* provisional — light pass */
+
+    --color-text-value:        rgb(17, 24, 39);    /* provisional — light pass */
+    --color-text-header-label: rgb(55, 65, 81);    /* provisional — light pass */
+    --color-text-meta:         rgb(107, 114, 128); /* provisional — light pass */
+    --color-text-link:         rgb(29, 78, 216);   /* provisional — light pass */
+    --color-text-accent:       rgb(30, 64, 175);   /* provisional — light pass */
+    /* The nav fill is an accent, not a neutral, and it is DARK in both themes —
+       so its text is near-white in both, and --color-text-primary (which is
+       near-black here) is the wrong token for it. Two tiers, both checked
+       against --color-nav-active by the contrast sweep. */
+    --color-text-on-nav:   rgb(255, 255, 255); /* provisional — light pass */
+    --color-text-nav-meta: rgb(219, 234, 254); /* provisional — light pass */
+
+    --color-accent-blue:   rgb(37, 99, 235);   /* provisional — light pass */
+    --color-accent-orange: rgb(217, 119, 6);   /* provisional — light pass */
+    --color-accent-green:  rgb(5, 150, 105);   /* provisional — light pass */
+    --color-accent-violet: rgb(124, 58, 237);  /* provisional — light pass */
+    --color-accent-grey:   rgb(107, 114, 128); /* provisional — light pass */
 }
 
 /* ── Dark mode overrides ─────────────────────────────────────────────────── */
@@ -91,61 +161,169 @@
  * Page is medium-dark navy; cards/modals are near-black navy.
  * Surfaces within cards are slightly lighter than the card, adding structure.
  */
+/* ── Dark: the designed theme ───────────────────────────────────────────────
+ *
+ * Values from LocalDev/design_handoff (README "Design tokens"). This is the one
+ * theme the re-skin designs and verifies; light is deferred and its values above
+ * are provisional. Token NAMES are unchanged from the pre-re-skin palette
+ * wherever an equivalent existed, so no call site had to move.
+ *
+ * The elevation model is no longer inverted. Cards used to sit DARKER than the
+ * page; the handoff puts the page at #0d1117 and panels one step lighter at
+ * #11161f, which is what lets a table, a rail and a popover stack legibly
+ * without a border on every edge.
+ *
+ * ── One deliberate divergence ──────────────────────────────────────────────
+ * The handoff lists a `#5a6474` micro-label tier for its 9–10px uppercase mono
+ * labels. That measures 3.07:1 on #11161f — below AA for text this size, and
+ * the contrast sweep is right to reject it. Rather than exempt it (it is a
+ * label, not decoration, and it is SMALL, so the large-text allowance does not
+ * apply) the tier merges upward into --color-text-meta at #7c8798, which is the
+ * handoff's own next value up and measures 5.05:1. Eight grey tiers become
+ * seven; nothing else about the palette moves.
+ */
 [data-theme="dark"] {
-    --color-background:     rgb(20, 28, 50);    /* medium dark navy — page body */
-    --color-card:           rgb(8, 12, 28);     /* near-black navy — cards/modals */
-    --color-surface-muted:  rgb(14, 20, 42);    /* slightly above card — sub-panels */
-    --color-surface-sunken: rgb(14, 20, 42);    /* same as muted */
-    --color-surface-input:  rgb(8, 12, 28);     /* same as card */
+    /* ── Accents ────────────────────────────────────────────────────────────
+       Blue leads the chrome. Orange is the single "active / now" signal and
+       NOTHING else on the page may use it — that is what makes "where am I"
+       answerable from across the room. Green stays a data and status colour,
+       never chrome. Violet and grey are series colours only. */
+    --color-accent-blue:   rgb(45, 127, 249);   /* #2d7ff9 */
+    --color-accent-orange: rgb(242, 139, 60);   /* #f28b3c */
+    --color-accent-green:  rgb(35, 180, 126);   /* #23b47e */
+    --color-accent-violet: rgb(155, 140, 240);  /* #9b8cf0 */
+    --color-accent-grey:   rgb(107, 122, 143);  /* #6b7a8f */
 
-    --color-text-primary:   rgb(248, 250, 252); /* slate-50 — near white */
-    --color-text-secondary: rgb(203, 213, 225); /* slate-300 — light */
-    --color-text-muted:     rgb(148, 163, 184); /* slate-400 — medium */
-    --color-text-faint:     rgb(100, 116, 139); /* slate-500 */
+    /* Semantic roles, re-valued onto those accents. The button API
+       (btn-primary / -edit / -danger / -secondary / -warning) is untouched —
+       only what it resolves to. */
+    --color-primary:        rgb(45, 127, 249);
+    --color-primary-hover:  rgb(26, 110, 232);
+    --color-success:        rgb(35, 180, 126);
+    --color-success-hover:  rgb(28, 150, 104);
+    --color-edit:           rgb(35, 180, 126);
+    --color-edit-hover:     rgb(28, 150, 104);
+    /* The handoff pins no solid red — its only red is the rgba(232,90,80) tint
+       behind a NOT chip. Taken at face value that tint measures 3.49:1 under
+       white, which is WORSE than the red-500 it replaces (3.76:1). Two steps
+       darker keeps the family and moves the number the right way. */
+    --color-danger:         rgb(220, 75, 66);
+    --color-danger-hover:   rgb(195, 61, 53);
+    --color-warning:        rgb(242, 139, 60);
+    --color-warning-hover:  rgb(224, 122, 43);
+    /* Darker than --color-accent-grey (#6b7a8f), and deliberately so. The accent
+       grey is a BAR FILL — nothing is written on it. This is a button fill with
+       white text, and at the accent value that pairing measures 4.38:1, which
+       is under AA. The handoff's hue, two steps down. */
+    --color-secondary:      rgb(97, 111, 130);
+    --color-secondary-hover: rgb(80, 92, 108);
 
-    --color-border:        rgb(38, 52, 82);     /* subtle separator */
-    --color-border-strong: rgb(58, 74, 108);    /* more prominent */
+    /* ── Surface layers ── */
+    --color-background:     rgb(13, 17, 23);    /* #0d1117 page, chip-line row */
+    --color-card:           rgb(17, 22, 31);    /* #11161f panels, nav, cards   */
+    --color-surface-muted:  rgb(15, 20, 28);    /* #0f141c zebra row, strips, rails */
+    --color-surface-sunken: rgb(26, 34, 48);    /* #1a2230 table header cells, chips */
+    --color-surface-input:  rgb(15, 20, 28);    /* #0f141c inputs sit BELOW the panel */
 
-    /* Primary accent: near-white tint for preset buttons & selected chips */
-    --color-primary-light: rgba(59, 130, 246, 0.25);
-    --color-primary-text:  rgb(226, 232, 240);   /* slate-200 — near white, cool tint */
+    /* Surfaces with one job each, named for it. A generic name would not
+       survive contact with the screens that need them: a pinned row and a
+       cluster header are both "a tinted row" and must not be the same tint. */
+    --color-cluster:     rgb(21, 29, 43);   /* #151d2b cluster header, stats corpus row */
+    --color-popover:     rgb(21, 27, 37);   /* #151b25 popovers, selected rail row */
+    --color-pinned:      rgb(19, 27, 40);   /* #131b28 pinned comparison rows */
+    --color-pinned-head: rgb(22, 32, 46);   /* #16202e pinned band label row */
+    --color-nav-active:  rgb(23, 50, 87);   /* #173257 active nav item AND the sub-nav
+                                               strip — one fill continued, so a sub-tab
+                                               reads as inside its parent */
 
-    /* ── Callout triad (dark) ──────────────────────────────────────────────
-       A translucent wash of the status colour over whatever it sits on, rather
-       than a fixed dark tint: the same panel then reads correctly on a card, a
-       sunken panel or the page body, which a baked-in colour cannot do.
+    /* ── Text hierarchy ──────────────────────────────────────────────────────
+       Seven tiers, every one AA on the panel it is painted on. See the
+       divergence note above for why there are seven and not eight. */
+    --color-text-primary:      rgb(242, 245, 249); /* #f2f5f9 */
+    --color-text-value:        rgb(230, 235, 242); /* #e6ebf2 measured figures */
+    --color-text-header-label: rgb(195, 204, 216); /* #c3ccd8 column headers */
+    --color-text-secondary:    rgb(168, 178, 193); /* #a8b2c1 */
+    --color-text-muted:        rgb(139, 149, 165); /* #8b95a5 */
+    --color-text-meta:         rgb(124, 135, 152); /* #7c8798 meta AND micro-labels */
+    --color-text-faint:        rgb(61, 74, 90);    /* #3d4a5a disabled; also the chart axis */
 
-       The text is a LIGHT tint of the status hue, not the dark one from the
-       light theme. That inversion is the whole bug this exists to prevent —
-       amber-800 on a dark wash is the unreadable case. */
-    --color-primary-surface: rgba(59, 130, 246, 0.15);
-    --color-primary-border:  rgba(59, 130, 246, 0.35);
+    --color-text-link:     rgb(143, 186, 255); /* #8fbaff */
+    --color-text-accent:   rgb(168, 203, 255); /* #a8cbff text on an accent TINT */
 
-    --color-warning-surface: rgba(245, 158, 11, 0.1);
-    --color-warning-border:  rgba(245, 158, 11, 0.3);
-    --color-warning-text:    rgb(252, 211, 77);    /* amber-300 */
+    /* The nav fill is an accent, not a neutral, and it is dark in both themes,
+       so it carries its own two text tiers rather than borrowing the neutral
+       ones. The handoff's #dce7f7 "active-button text" is not among them: it is
+       drawn on a 20%-blue tint, which --color-text-accent already covers, and
+       on the SOLID #2d7ff9 the handoff itself uses plain white. */
+    --color-text-on-nav:   rgb(255, 255, 255);
+    --color-text-nav-meta: rgb(143, 176, 224); /* #8fb0e0 meta on the sub-nav fill */
 
-    --color-danger-surface:  rgba(239, 68, 68, 0.1);
-    --color-danger-border:   rgba(239, 68, 68, 0.3);
-    --color-danger-text:     rgb(252, 165, 165);   /* red-300   */
+    /* ── Lines ── */
+    --color-border:        rgb(30, 39, 51);  /* #1e2733 structural */
+    --color-border-strong: rgb(42, 52, 65);  /* #2a3441 borders, inputs */
+    --color-border-subtle: rgb(27, 34, 44);  /* #1b222c the rule between table rows */
 
-    --color-success-surface: rgba(34, 197, 94, 0.1);
-    --color-success-border:  rgba(34, 197, 94, 0.3);
-    --color-success-text:    rgb(134, 239, 172);   /* green-300 */
+    /* A hover has to LIFT whatever it lands on, and the chrome sits on three
+       different fills — the #11161f bar, the #173257 nav strip, the page. A
+       named surface cannot do that: --color-surface-muted is DARKER than the
+       bar, so a tab hover reading it went the wrong way and was invisible. A
+       translucent white composes correctly over all three. */
+    --color-hover-lift: rgba(255, 255, 255, 0.07);
+
+    --color-chart-grid: rgb(26, 33, 44);  /* #1a212c */
+    --color-chart-axis: rgb(61, 74, 90);  /* #3d4a5a — the same value as text-faint,
+                                             and correctly so: an axis line and a
+                                             disabled label are the same quietness */
+
+    /* ── Callout triad ──────────────────────────────────────────────────────
+       Still translucent washes rather than fixed tints, so one panel reads
+       correctly on a card, a rail or the page body. Text is a LIGHT tint of the
+       status hue; the sweep asserts that inversion against light, which is the
+       bug this shape exists to prevent. */
+    --color-primary-light:   rgba(45, 127, 249, 0.25);
+    --color-primary-text:    rgb(168, 203, 255);
+    --color-primary-surface: rgba(45, 127, 249, 0.15);
+    --color-primary-border:  rgba(45, 127, 249, 0.35);
+
+    --color-warning-surface: rgba(242, 139, 60, 0.12);
+    --color-warning-border:  rgba(242, 139, 60, 0.35);
+    --color-warning-text:    rgb(245, 176, 119);
+
+    --color-danger-surface:  rgba(232, 90, 80, 0.14);
+    --color-danger-border:   rgba(232, 90, 80, 0.35);
+    --color-danger-text:     rgb(240, 146, 139);
+
+    --color-success-surface: rgba(35, 180, 126, 0.14);
+    --color-success-border:  rgba(35, 180, 126, 0.35);
+    --color-success-text:    rgb(95, 214, 168);
 }
+
+/* ── Radii ──────────────────────────────────────────────────────────────────
+   The handoff's six, named for what they wrap rather than by size, so a call
+   site says `--radius-control` and cannot drift to a neighbouring value. There
+   was no radius token before this: six literal `border-radius` declarations and
+   about a hundred `@apply rounded*`, which is how a 6px button came to sit
+   beside a 4px one.
+
+   In `:root`, NOT in `@theme`, and that is deliberate. Tailwind tree-shakes
+   theme variables nothing references, so a radius used only from a JSX inline
+   style would be shaken out and resolve to nothing — a silently square corner
+   with no error. Declaring them here costs the `rounded-card` utilities, which
+   this codebase would not use anyway: the house style is a semantic class in
+   this file, not a utility cluster in the markup.
+
+   Not theme-scoped: a corner is the same shape in light and dark. */
+:root {
+    --radius-card:    8px;   /* cards, the table frame, the plot frame */
+    --radius-popover: 7px;
+    --radius-control: 5px;   /* buttons, inputs, dropdown chips */
+    --radius-chip:    4px;
+    --radius-mark:    3px;   /* checkboxes, swatches, badges, bar fills */
+    --radius-track:   2px;   /* the track a bar fill sits in */
+}
+
 
 /* Nav tabs and chart-mode tabs: near white in dark mode */
-[data-theme="dark"] .btn-tab {
-    color: rgb(241, 245, 249); /* slate-100 */
-}
-[data-theme="dark"] .btn-tab:hover {
-    color: rgb(255, 255, 255);
-    background-color: rgba(255, 255, 255, 0.08);
-}
-[data-theme="dark"] .btn-tab.active {
-    color: var(--color-primary-text);
-}
-
 
 /* ── Base Button Styles ───────────────────────────────────────────────────── */
 
@@ -156,7 +334,7 @@
        its own larger metrics: top-level navigation is not the same control. */
     padding: 0.25rem 0.75rem;
     font-size: 0.75rem;
-    border-radius: 0.375rem;
+    border-radius: var(--radius-control);
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s ease-in-out;
@@ -284,13 +462,27 @@
    Runs, EPA and Admin sub-tabs all borrowed .btn-chart-mode, which is a CHART
    control — so navigation inherited a chart's border and background and read as
    a row of buttons rather than as tabs (#277). */
+/* A sub-tab appears in TWO contexts and has to read correctly in both: on the
+   nav's blue fill (.subtab-strip), and on the page background inside a section
+   that owns its own strip — Tests & Data, EPA and Admin, whose sub-tabs carry
+   live counts computed from data that only exists inside those views, so they
+   cannot simply be hoisted into the nav.
+
+   The base rule is therefore written for the NEUTRAL case and .subtab-strip
+   overrides the two colours it needs. Writing it the other way round is what
+   briefly turned the EPA sub-tabs into a row of pale blue links on a dark
+   page. */
 .btn-subtab {
-    padding: 0.25rem 0.75rem;
-    border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+    padding: 0 11px;
+    height: 100%;
+    flex: none;
+    white-space: nowrap;
     font-weight: 500;
     font-size: 0.8125rem;
     cursor: pointer;
-    color: var(--color-text-secondary);
+    color: var(--color-text-muted);
     background: none;
     border: none;
 }
@@ -299,32 +491,58 @@
    playground marker exists to shrink, and the test said so. A class built this
    way follows a themed subtree; one built the old way only follows the
    document. */
-.btn-subtab:hover {
-    background-color: var(--color-surface-sunken);
+.btn-subtab:hover:not(:disabled) {
+    background-color: var(--color-hover-lift);
     color: var(--color-text-primary);
 }
+/* Orange, and orange ONLY here and on the other "active / now" signals. It is
+   what makes "which view am I looking at" readable from across the room, and
+   it only works while nothing else on the page is allowed to use it. */
 .btn-subtab.active {
-    background-color: var(--color-primary-surface);
-    border-color: var(--color-primary-border);
-    color: var(--color-primary-text);
+    color: var(--color-text-primary);
+    font-weight: 600;
+    box-shadow: inset 0 -2px 0 var(--color-accent-orange);
 }
+
+/* On the nav fill, the neutral tiers are the wrong ones — see .btn-subtab. */
+.subtab-strip .btn-subtab { color: var(--color-text-nav-meta); }
+.subtab-strip .btn-subtab:hover:not(:disabled),
+.subtab-strip .btn-subtab.active { color: var(--color-text-on-nav); }
+.subtab-strip .btn-subtab:hover:not(:disabled) { background-color: var(--color-hover-lift); }
 .btn-subtab:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Tab/Navigation Button - Used for: Top navigation tabs */
+/* A tab is a full-height BLOCK of the bar, not a pill floating in it. That is
+   the whole difference between "a row of buttons" and navigation: the active
+   tab is a filled region with a hard edge, and the sub-nav strip below it is
+   the same fill continued, so a sub-tab reads as being INSIDE its parent.
+
+   Two levels, two signals, and the rule the rest of the re-skin obeys: blue
+   says which section you are in, orange says which view inside it is live. */
 .btn-tab {
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    height: 100%;
+    flex: none;
+    white-space: nowrap;
+    font-size: 0.8125rem;
     font-weight: 500;
     cursor: pointer;
-    color: var(--color-text-secondary);
+    color: var(--color-text-muted);
     background-color: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
 }
-.btn-tab:hover {
-    background-color: var(--color-surface-sunken);
+.btn-tab:hover:not(:disabled) {
+    background-color: var(--color-hover-lift);
+    color: var(--color-text-primary);
 }
 .btn-tab.active {
-    background-color: var(--color-primary-light);
-    color: var(--color-primary-text);
+    background-color: var(--color-nav-active);
+    border-bottom-color: var(--color-accent-blue);
+    color: var(--color-text-on-nav);
+    font-weight: 600;
 }
 .btn-tab:disabled {
     opacity: 0.5;
@@ -333,14 +551,22 @@
 
 /* Chart mode sub-nav — slightly smaller than .btn-tab */
 /* Admin sub-tab nav (Roles / EPA Data / Model Constants / Interface) */
+/* A section's own sub-tab rail. Same 38px metrics and the same orange active
+   marker as the nav strip, on the page rather than on the fill — so the two
+   read as the same control even though only one of them can live in the
+   chrome. Does not wrap: a rail that reflows changes the height of everything
+   below it. */
 .admin-subtabs {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
+    align-items: stretch;
+    height: 38px;
+    gap: 0;
     border-bottom: 1px solid var(--color-border);
     margin-bottom: 1.25rem;
-    padding-bottom: 0.5rem;
+    overflow-x: auto;
+    scrollbar-width: none;
 }
+.admin-subtabs::-webkit-scrollbar { display: none; }
 
 /* Tighten Tailwind's default line-height (1.5 feels too spacious).
    font-size carries the global UI scale knob (--ui-scale, default 1): scaling the
@@ -354,11 +580,16 @@ html {
 body {
     background-color: var(--color-background);
     color: var(--color-text-primary);
+    /* Diagnosis 01 of the design brief: the stylesheet set no font-family at
+       all, so every screen rendered in Tailwind's stock system stack. One
+       declaration here is the single largest change in the re-skin — it reaches
+       every screen, and no component had to be touched for it. */
+    font-family: var(--font-sans);
 }
 
 .card {
     background-color: var(--color-card);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-card);
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
     padding: 1rem;
 }
@@ -367,7 +598,7 @@ body {
 .list-thumbnail {
     width: 12.5rem;   /* 200px — w-50 equivalent */
     height: 7rem;     /* 112px — h-28 equivalent */
-    border-radius: 0.375rem;
+    border-radius: var(--radius-control);
     overflow: hidden;
     background-color: var(--color-surface-sunken);
     flex-shrink: 0;
@@ -409,6 +640,8 @@ body {
      .text-meta            counts, ids, glyphs, parentheticals. Quietest
      .text-label           form / field labels. One step down, heavier
      .text-data            numeric / monospace values (tabular)
+     .text-micro           a label naming a region. MONO, UPPERCASE, tracked
+     .text-nano            the same, one step down — inside a chip or a swatch
 
    ── Why one axis ────────────────────────────────────────────────────────────
    Two axes meant `text-caption text-secondary` — a size class and a colour
@@ -443,9 +676,12 @@ body {
    a change nobody asked for, smuggled in by the refactor. These ratios ARE the
    current sizes (24/14 and 18/14), so the look is unchanged and the scale still
    moves as one when body moves. */
-.page-title       { @apply text-2xl; font-size: var(--fs-page-title, calc(var(--fs-body) * 1.7143)); font-weight: var(--fw-page-title, 700); }
-.section-title    { @apply text-lg;  font-size: var(--fs-section-title, calc(var(--fs-body) * 1.2857)); font-weight: var(--fw-section-title, 700); }
-.subsection-title { @apply text-sm;  font-size: var(--fs-subsection-title, var(--fs-body)); font-weight: var(--fw-subsection-title, 600); color: var(--color-text-primary); }
+/* Titles carry the display face and its tighter tracking. Only titles do: the
+   display face is a ROLE, not something a component reaches for ad hoc, which
+   is why --font-display gets no Tailwind utility of its own. */
+.page-title       { @apply text-2xl; font-family: var(--font-display); letter-spacing: -0.02em; font-size: var(--fs-page-title, calc(var(--fs-body) * 1.7143)); font-weight: var(--fw-page-title, 700); }
+.section-title    { @apply text-lg;  font-family: var(--font-display); letter-spacing: -0.02em; font-size: var(--fs-section-title, calc(var(--fs-body) * 1.2857)); font-weight: var(--fw-section-title, 700); }
+.subsection-title { @apply text-sm;  font-family: var(--font-display); letter-spacing: -0.01em; font-size: var(--fs-subsection-title, var(--fs-body)); font-weight: var(--fw-subsection-title, 600); color: var(--color-text-primary); }
 
 .text-body        { @apply text-sm;  font-size: var(--fs-body); color: var(--color-text-primary); }
 
@@ -464,6 +700,25 @@ body {
 
 .text-label       { @apply text-xs;  font-size: var(--fs-label, calc(var(--fs-body) * var(--fs-step))); font-weight: var(--fw-label, 500); color: var(--color-text-secondary); }
 .text-data        { @apply text-sm font-mono tabular-nums; font-size: var(--fs-data, var(--fs-body)); color: var(--color-text-primary); }
+
+/* — The micro tier ————————————————————————————————————————————————————————
+   Two roles the scale did not previously reach. It bottomed out at .text-meta
+   (12px), so every 9–11px label on the site was written as a raw
+   `text-[10px]` — and the knob panels that control the type system were
+   themselves built out of hardcoded sizes, which is the tell that the tier was
+   missing rather than unwanted.
+
+   Both are mono, uppercase and letter-spaced, because that is what separates a
+   LABEL NAMING A REGION (`NARROWED BY`, `AXES`, `DISTRIBUTION · 24 BINS`) from
+   a small sentence. Uppercasing happens here rather than in the JSX so the
+   string stays readable in source and to a screen reader.
+
+   Both resolve to --color-text-meta, the quietest tier that still passes AA at
+   this size. See the divergence note on the dark palette. */
+.text-micro       { @apply font-mono uppercase; font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143)); font-weight: var(--fw-micro, 600); letter-spacing: 0.09em; color: var(--color-text-meta); }
+
+/* One step below micro: the legend inside a chip, the caption on a swatch. */
+.text-nano        { @apply font-mono uppercase; font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429)); font-weight: var(--fw-nano, 600); letter-spacing: 0.1em; color: var(--color-text-meta); }
 
 /* — Color tiers (compose with a role) ———————————————————————————————————————
    Prefer these over Tailwind's text-gray-* so text follows the theme. They live
@@ -510,37 +765,121 @@ body {
 
 /* ── Compact header (non-Vehicles tabs) ─────────────────────────────────────── */
 
-.app-header-compact {
-    height: 48px;
-    background-color: var(--color-primary);
-    display: flex;
-    align-items: center;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-[data-theme="dark"] .app-header-compact {
-    background-color: var(--color-background);
-    border-bottom: 1px solid var(--color-border);
-    box-shadow: none;
-}
-
-/* ── App navigation bar ─────────────────────────────────────────────────────── */
+/* ── App chrome ─────────────────────────────────────────────────────────────
+ *
+ * One 50px bar carrying the wordmark, the tabs and the account block, then a
+ * 38px sub-nav strip when the section has one, then the selection strip.
+ *
+ * What this replaced: a ~140px photo hero on the Vehicles tab and a separate
+ * 48px title bar everywhere else, with the nav a third band under whichever of
+ * the two was showing. The hero was the design brief's fourth diagnosis — it
+ * cost the height of a row of cards and told a returning reader nothing they
+ * needed. The height it gave back goes to the content; the one thing it did
+ * carry, "which site am I on", is now the wordmark inside the bar.
+ *
+ * `.app-header-compact` and its dark override are gone with it, which is one
+ * fewer entry in the doc-theme backlog. `.theme-toggle` went with the toggle
+ * itself — see styles/themeBootstrap for why light is deferred.
+ */
 
 .app-nav {
     background-color: var(--color-card);
     border-bottom: 1px solid var(--color-border);
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
-/* Theme toggle button in the nav-actions row */
-.theme-toggle {
-    @apply text-sm px-2.5 py-1 rounded border cursor-pointer transition-colors;
-    background-color: var(--color-surface-sunken);
-    border-color: var(--color-border);
-    color: var(--color-text-secondary);
+/* The bar itself is full-bleed — it is chrome, and chrome runs to the edge of
+   the window. Only the CONTENT below it is held to the page column. */
+.app-nav-bar {
+    display: flex;
+    align-items: stretch;
+    height: 50px;
 }
-.theme-toggle:hover {
-    background-color: var(--color-border);
+
+/* The wordmark block: its own cell of the bar, closed with a rule, so the
+   identity reads as part of the chrome rather than as the first tab. */
+.app-wordmark {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex: none;
+    padding: 0 20px;
+    border-right: 1px solid var(--color-border);
+    background: none;
+    border-top: none;
+    border-bottom: none;
+    border-left: none;
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--color-text-primary);
+}
+/* The one piece of orange that is not an "active now" signal, and it earns the
+   exception by never moving: it is the fixed mark, not a state. */
+.app-wordmark-mark {
+    width: 10px;
+    height: 10px;
+    flex: none;
+    border-radius: var(--radius-track);
+    background-color: var(--color-accent-orange);
+}
+.app-wordmark-bench { color: var(--color-accent-blue); }
+
+/* Tabs scroll rather than wrap. A wrapping nav changes the bar's height, which
+   moves the whole page under the reader on a resize; scrolling keeps 50px at
+   every width. The full sub-1000px treatment is a later phase. */
+.nav-tab-group {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.nav-tab-group::-webkit-scrollbar { display: none; }
+
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: none;
+    margin-left: auto;
+    padding: 0 18px;
+}
+
+/* ── Sub-nav strip ──────────────────────────────────────────────────────────
+   The active tab's fill, continued. That is the whole idea: the strip is not a
+   second row of buttons under the nav, it is the inside of the tab you are
+   standing in. Sections without sub-tabs simply have no strip — the fill ends
+   at the tab. */
+.subtab-strip {
+    display: flex;
+    align-items: stretch;
+    height: 38px;
+    background-color: var(--color-nav-active);
+}
+.subtab-strip-items {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.subtab-strip-items::-webkit-scrollbar { display: none; }
+
+/* The right-hand end of the strip is where the view's own controls and its
+   count live — not a third band. */
+.subtab-strip-end {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+    margin-left: auto;
+    padding: 0 14px;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--color-text-nav-meta);
 }
 
 
@@ -740,7 +1079,8 @@ body {
    text-sm and text-xs ran 43/35. This is the one that read tidiest, so it is
    the default and the overrides come off (#277). */
 .form-input {
-    @apply px-2 py-1 text-sm rounded;
+    @apply px-2 py-1 text-sm;
+    border-radius: var(--radius-control);
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
@@ -866,20 +1206,37 @@ body {
 }
 
 /* Imperial / Metric unit toggle button */
+/* A unit system is a display preference, not an action — it sat in the bar as a
+   bordered blue button, which read as something to DO. Mono, because what it
+   switches is the numbers. */
 .units-toggle {
-    @apply text-xs font-medium border rounded px-3 py-1 cursor-pointer transition-colors;
-    border-color: var(--color-primary);
-    color: var(--color-primary-text);
-    background-color: var(--color-primary-light);
+    @apply cursor-pointer transition-colors;
+    padding: 4px 9px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    background: none;
+    color: var(--color-text-meta);
 }
 .units-toggle:hover {
-    background-color: var(--color-primary);
-    color: white;
+    border-color: var(--color-border-strong);
+    color: var(--color-text-secondary);
 }
 
-/* Selected vehicle chip in the nav selected-vehicles strip */
+/* Selected vehicle chip. The rule down its left edge is the series colour, so
+   the chip ties to the same vehicle on every chart — a left bar and a tinted
+   band rather than a full-row wash, which is what let the old rounded-full
+   pills read as a row of buttons. */
 .selected-vehicle-chip {
-    @apply flex items-center gap-1 px-3 py-1 rounded-full text-sm;
+    @apply flex items-center gap-2;
+    padding: 3px 8px 3px 9px;
+    border-radius: var(--radius-track);
+    font-size: 0.75rem;
+    background-color: var(--color-popover);
+    border-left: 2px solid var(--color-accent-blue);
+    color: var(--color-text-secondary);
 }
 
 /* OWNER role badge next to user email */
@@ -907,6 +1264,18 @@ body {
 .selected-strip {
     background-color: var(--color-surface-muted);
     border-top: 1px solid var(--color-border);
+}
+
+/* Fleet state, right-aligned in the selection strip. This is the half of the
+   photo hero worth keeping: a returning reader wants to know the corpus grew,
+   which is exactly what the hero did not say. */
+.fleet-state {
+    margin-left: auto;
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--color-text-meta);
+    white-space: nowrap;
 }
 
 
@@ -1588,7 +1957,7 @@ body {
     padding: 0.5rem 0.625rem;
     font-size: 0.75rem;
     line-height: 1.4;
-    border-radius: 0.375rem;
+    border-radius: var(--radius-popover);
     pointer-events: none;
     transition: opacity 0.15s;
     background-color: var(--color-surface-sunken);
