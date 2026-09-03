@@ -1,5 +1,20 @@
 import { useState, useMemo } from 'react';
-import { CURVE_TIERS, tierCounts } from '../../../utils/epaCurveSubjects';
+import { CURVE_TIERS, tierByKey, tierCounts } from '../../../utils/epaCurveSubjects';
+
+/**
+ * Tier → the shared badge intent that already means this.
+ *
+ * The tiers used to carry their own four colour rules plus a dark override,
+ * duplicating a badge system that already had exactly these meanings: accent
+ * for the privileged row, `is-qualified` for "true, but read the caveat",
+ * warning for the approximate one, and the plain base for the rest.
+ */
+const TIER_INTENT = {
+    measured:  'is-accent',
+    corrected: 'is-qualified',
+    nominal:   'is-warning',
+    shape:     '',
+};
 import InfoIcon from '../../InfoIcon';
 
 /**
@@ -17,7 +32,11 @@ import InfoIcon from '../../InfoIcon';
  */
 export default function CurveSubjectPicker({ subjects, selected, onToggle, onClear }) {
     const [query, setQuery] = useState('');
-    const [tiers, setTiers] = useState(['measured', 'nominal']);
+    // `corrected` was missing from this default, which hid a tier that is
+    // strictly BETTER than `nominal` — its capacity is the record's own —
+    // while showing the worse one. `shape` stays opt-in: it is the only tier
+    // that cannot answer the range axis at all.
+    const [tiers, setTiers] = useState(['measured', 'corrected', 'nominal']);
 
     const counts = useMemo(() => tierCounts(subjects), [subjects]);
 
@@ -100,10 +119,8 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                             {/* Named on the row, not only in the filter: once a
                                 mixed set is plotted the tier is the only thing
                                 saying which curves carry a measured range. */}
-                            <span className={`curve-tier-badge tier-${s.tier}`}>
-                                {s.tier === 'measured' ? 'test cycle'
-                                    : s.tier === 'nominal' ? 'published pack'
-                                        : 'no range'}
+                            <span className={`badge-micro ${TIER_INTENT[s.tier] ?? ''}`}>
+                                {tierByKey(s.tier)?.badge ?? s.tier}
                             </span>
                         </label>
                     ))}

@@ -4836,27 +4836,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Named on every row, because once a mixed set is plotted this is the only
    thing distinguishing a measured range from a borrowed one. */
-.curve-tier-badge {
-    @apply px-1.5 py-0.5 rounded uppercase shrink-0;
-    font-size: 0.5625rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-}
-.curve-tier-badge.tier-measured {
-    background-color: var(--color-primary);
-    color: rgb(255, 255, 255);
-}
-.curve-tier-badge.tier-nominal {
-    background-color: var(--color-warning);
-    color: rgb(255, 255, 255);
-}
-.curve-tier-badge.tier-shape {
-    background-color: var(--color-surface-sunken);
-    color: var(--color-text-muted);
-}
-[data-theme="dark"] .curve-tier-badge.tier-shape {
-    background-color: rgba(255, 255, 255, 0.1);
-}
+/* The curve tiers used .curve-tier-badge with four bespoke colour rules and a
+   dark override. They now use .badge-micro with the intents that already carry
+   those meanings — see TIER_INTENT in CurveSubjectPicker. Four rules and one
+   un-scopable override deleted, and a tier added later inherits the system
+   instead of needing a fifth rule. */
 
 .curve-canvas-wrap {
     @apply p-3 rounded-lg;
