@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
+import { useChromeHeight } from './hooks/useChromeHeight';
 import AppNav from './components/shell/AppNav';
 import SubTabStrip from './components/shell/SubTabStrip';
 import AuthModal from './components/AuthModal';
@@ -81,6 +82,9 @@ export default function App() {
         const t = setTimeout(clearNotification, 6000);
         return () => clearTimeout(t);
     }, [appNotification, clearNotification]);
+    // Measured, not hardcoded — see hooks/useChromeHeight.
+    const chromeRef = useChromeHeight();
+
 
     const [activeVehicle, setActiveVehicle] = useState(null);
     const [view, setView] = useState('vehicles');
@@ -656,11 +660,11 @@ export default function App() {
                     }}
                 />
             )}
-            <div className="min-h-screen">
+            <div className="min-h-screen flex flex-col">
                 {/* ── Chrome ──
                   * One 50px bar. The photo hero and the compact title bar it
                   * replaced are gone; see components/shell/AppNav for why. */}
-                <nav className="app-nav">
+                <nav className="app-nav" ref={chromeRef}>
                     <AppNav
                         view={view}
                         chartCategories={CHART_CATEGORIES}
@@ -793,7 +797,7 @@ export default function App() {
                     </div>
                 </nav>
 
-                <main className="page-container py-6">
+                <main className="page-container py-6 flex-1 flex flex-col">
                     {view === 'vehicles' && (
                         <VehiclesView
                             vehicles={vehicles}

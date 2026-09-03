@@ -631,6 +631,13 @@ body {
 /* Centered page-width column used in header, nav, main, bars */
 .page-container {
     @apply max-w-7xl mx-auto px-6;
+    /* Explicit, because the shell is a flex column. A block element fills its
+       parent and `max-width` then caps it; a FLEX ITEM with an auto cross-axis
+       margin does the opposite — the auto margin suppresses the stretch and the
+       box shrinks to fit its content. That is why the chart came up narrow on
+       first paint and widened after an interaction: the width was tracking
+       whatever happened to be rendered inside it. */
+    width: 100%;
 }
 
 /* ============================================================================
@@ -811,8 +818,18 @@ body {
 .app-nav {
     max-width: 80rem;
     margin-inline: auto;
+    /* Same reason as .page-container — see the note there. */
+    width: 100%;
     background-color: var(--color-card);
     border-bottom: 1px solid var(--color-border);
+    /* Pinned, so the space above the rail is a CONSTANT rather than something
+       that depends on how far the page has been scrolled. That constant is what
+       lets the sidebar be exactly the height of what is left of the viewport;
+       see the rail's own note. Its measured height is published as
+       --app-chrome-h by hooks/useChromeHeight. */
+    position: sticky;
+    top: 0;
+    z-index: 30;
 }
 
 .app-nav-bar {
@@ -1544,6 +1561,12 @@ body {
     display: flex;
     align-items: flex-start;
     gap: 16px;
+    /* Absorbs the leftover viewport height handed down by <main>, so a short
+       chart leaves no gap between the content and the footer. Without it the
+       rail's own height was the tallest thing on the page and every short
+       chart scrolled. */
+    flex: 1;
+    min-height: 0;
 }
 
 .chart-rail {
@@ -1678,6 +1701,8 @@ body {
    out of <main>'s padding so it runs the full height rather than sitting in a
    well. */
 @media (min-width: 68.8125rem) {
+    .chart-layout { align-items: stretch; }
+
     .chart-rail {
         --rail-pad-l: 1.5rem;
         --rail-pad-r: 16px;
@@ -1686,9 +1711,21 @@ body {
         border: none;
         border-right: 1px solid var(--color-border);
         border-radius: 0;
-        top: 0;
-        height: 100vh;
-        max-height: 100vh;
+        /* The sidebar is exactly the viewport that is LEFT once the pinned
+           chrome has taken its share — never more, so it cannot hang past the
+           fold, and never less, so it reaches the bottom edge.
+           `height: 100vh` was wrong in both directions at once: the rail starts
+           below the chrome, so a full viewport of height overhung by exactly
+           the chrome's height, and the only scroll position where it looked
+           right was one far enough down that the chrome had gone.
+           Pinning the chrome makes that offset a constant; --app-chrome-h is
+           that constant, measured rather than written down because the
+           selection strip wraps to a second row when enough vehicles are
+           picked. The fallback keeps this sane if the hook never runs. */
+        top: var(--app-chrome-h, 0px);
+        align-self: start;
+        height: calc(100vh - var(--app-chrome-h, 0px));
+        max-height: calc(100vh - var(--app-chrome-h, 0px));
     }
 }
 
