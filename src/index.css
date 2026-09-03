@@ -2463,6 +2463,15 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     grid-template-columns: 56px 58px minmax(0, 1fr);
     font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
 }
+/* The placeholder here is the value the run WILL use — the trip setting it
+   inherits — not an empty field waiting to be filled. At the browser's default
+   placeholder dimming it read as disabled beside the bright trip inputs above
+   it, which is the opposite of true: those numbers are live. It stays one tier
+   below a typed override, so "inherited" and "set here" are still distinct. */
+.routing-row-fields .form-input::placeholder {
+    color: var(--color-text-secondary);
+    opacity: 1;
+}
 
 /* Run list within a vehicle group. The rows carry their own boxes now, so the
    list only has to space them. */
@@ -3019,6 +3028,28 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     left: calc(100% + 6px);
     top: 50%;
     transform: translateY(-50%);
+}
+
+/* Inside the rail the tooltip cannot escape.
+ *
+ * The rail scrolls (`overflow-y: auto` for a long run list), which makes it a
+ * clipping context in BOTH directions — so a tooltip anchored to an icon near
+ * the right edge is simply cut off by the sidebar. Rather than fight that with
+ * fixed positioning and JS coordinates, the tooltip anchors to the ROW instead
+ * of the icon and spans its width: it opens downward inside the rail, where
+ * there is always room, and can never reach an edge it would be clipped by.
+ */
+.chart-rail .scenario-row { position: relative; }
+.chart-rail .info-icon { position: static; }
+.chart-rail .info-icon-tooltip {
+    top: calc(100% + 6px);
+    bottom: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: none;
+    transform: none;
+    white-space: normal;
 }
 
 /* Tooltip that opens OVER a muted panel (e.g. a filter bar).

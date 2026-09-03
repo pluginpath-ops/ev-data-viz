@@ -174,7 +174,7 @@ const PALETTE = [
 // of the charging strategy: en-route Charger Arrival SoC (minSoc) and the
 // mode-dependent charge amount (leg distance / charge time). Blank shows the
 // global value greyed as a placeholder; typing overrides just that run.
-function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onChange }) {
+function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, dl, onChange }) {
     const headerRef = useRef(null);
     const [open, setOpen] = useState(false);
     if (!entries.length) return null;
@@ -222,9 +222,17 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
                             <div key={e.key} className={`routing-row${isCustom ? ' is-custom' : ''}`}>
                                 <div className="routing-row-name">
                                     <span className="routing-swatch" style={{ backgroundColor: e.color }} />
-                                    {/* The label the CHART uses, so a row here and
-                                        a line there are recognisably the same run. */}
-                                    <span className="truncate">{e.label}</span>
+                                    {/* The legend's SHORT label — the one actually
+                                        printed on the chart. `full` spells out
+                                        every atom (`2026 · Tesla · Model Y ·
+                                        Standard RWD · OoS 10% Challenge`);
+                                        `short` is what buildSeriesLabels worked
+                                        out is the minimum to tell these series
+                                        apart, which is the whole point of
+                                        matching the legend. */}
+                                    <span className="truncate" title={labels?.get(e.key)?.full}>
+                                        {labels?.get(e.key)?.short ?? vehicleLabel(e.vehicle)}
+                                    </span>
                                 </div>
                                 <div className="routing-row-fields">
                                     <label className="scenario-row">
@@ -722,6 +730,20 @@ export default function RoadTripView({
     }, [selectedRunIds, allPairsInfo, selectedVehicles]);
 
     const validEntries  = runEntries.filter(e => e.miPerKwh && e.batteryKwh);
+
+    // The chart legend's labels, computed once and shared. `buildSeriesLabels`
+    // works out the minimum that makes each series unambiguous — vehicle first,
+    // then the range test, then the charging test, adding a part only when two
+    // series would otherwise collide. Customize routing was printing the range
+    // run alone, which is neither the leading component nor unique: four rows
+    // read "OoS 10% Challenge" against four different vehicles.
+    const seriesLabels = useMemo(() => buildSeriesLabels(validEntries.map(e => ({
+        key:         e.key,
+        vehicle:     e.vehicle,
+        rangeRun:    e.rangeRun,
+        chargingRun: e.run,
+        sessionName: sharedSessionName(e.rangeRun, e.run, testSessions),
+    }))), [validEntries, testSessions]);
     const skippedEntries = runEntries.filter(e => !e.miPerKwh || !e.batteryKwh);
 
     // Vehicles with no charging runs at all (need separate warning)
@@ -901,13 +923,6 @@ export default function RoadTripView({
         // was built from the vehicle's free-text name. Neither belongs on a graph:
         // the year earns its place only when two series share a model, and the
         // free-text name is a selection label, not an identity.
-        const seriesLabels = buildSeriesLabels(validEntries.map(e => ({
-            key:         e.key,
-            vehicle:     e.vehicle,
-            rangeRun:    e.rangeRun,
-            chargingRun: e.run,
-            sessionName: sharedSessionName(e.rangeRun, e.run, testSessions),
-        })));
         const entryLabelFull = e => seriesLabels.get(e.key)?.full ?? vehicleLabel(e.vehicle);
         const entryLabel = e => verboseLabels
             ? entryLabelFull(e)
@@ -1802,6 +1817,7 @@ export default function RoadTripView({
                     {!isSweepMode && (
                         <RoutingOverridesPanel
                             entries={validEntries}
+                            labels={seriesLabels}
                             perRun={roadTripConfig.perRun || {}}
                             mode={mode}
                             global={{ minSoc, legDistance, chargeTime }}
