@@ -117,8 +117,12 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                                 tell three plotted records apart was to read the
                                 legend and come back. */}
                             <span
-                                className={`series-swatch${colors?.get(s.key) ? '' : ' is-empty'}`}
+                                className={`series-swatch${colors?.get(s.key) ? '' : ' is-empty'}`
+                                    + `${s.etaMeasured ? '' : ' is-qualified'}`}
                                 style={colors?.get(s.key) ? { backgroundColor: colors.get(s.key) } : undefined}
+                                title={s.etaMeasured
+                                    ? undefined
+                                    : 'Drivetrain efficiency is assumed, not measured — the curve\'s shape is real, its magnitude scales with η'}
                             />
                             <span className="curve-picker-name">
                                 {s.label}

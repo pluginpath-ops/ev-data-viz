@@ -2653,6 +2653,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    was .routing-swatch, scoped to Road Trip, while the curve picker had no way
    at all to tell a reader which record was which line. */
 .series-swatch {
+    position: relative;
     width: 10px;
     height: 10px;
     flex: none;
@@ -2663,6 +2664,22 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .series-swatch.is-empty {
     background-color: transparent;
     border: 1px solid var(--color-border-strong);
+}
+/* This series rests on an assumption. Deliberately NOT the same statement as
+   the tier badge beside it: the tier mixes where the ENERGY came from with
+   where the EFFICIENCY came from, so a record can read "published pack" and
+   still have its own measured η — which is the half that matters on every axis
+   but range. Orange because it is a callout, and this is the one thing on the
+   row that qualifies the number. */
+.series-swatch.is-qualified::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: var(--color-accent-orange);
 }
 
 .routing-row-fields {
