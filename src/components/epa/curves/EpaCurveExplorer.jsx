@@ -10,10 +10,14 @@ import { PALETTE } from '../../../utils/specHelpers';
 import { convSpeed, speedLabel } from '../../../utils/unitConversions';
 import CurveSubjectPicker from './CurveSubjectPicker';
 import ViewingConditions, { useViewingConditions } from '../ViewingConditions';
-import CollapsibleSection from '../../CollapsibleSection';
 import AxisScaleControls from '../../AxisScaleControls';
 import LoadingSpinner from '../../LoadingSpinner';
 import { chartTheme, applyChartDefaults } from '../../../utils/chartTheme';
+import PlotFrame from '../../charts/PlotFrame';
+import { useChartPng } from '../../../hooks/useChartPng';
+import InfoIcon from '../../InfoIcon';
+import { EPA_EXPLAINERS } from '../../../utils/epaExplainers';
+import { fmtTemp, fmtSpeed } from '../../../utils/unitConversions';
 
 /**
  * EPA efficiency curves anchored on certification records (#237).
@@ -92,6 +96,42 @@ export default function EpaCurveExplorer() {
     const assumedEta = axis.etaSensitive ? plotted.filter(s => !s.etaMeasured) : [];
 
     const displayNames = useMemo(() => disambiguateLabels(plotted), [plotted]);
+
+    // ── The frame's caption ─────────────────────────────────────────────────
+    // Deliberately the same shape as EpaCurvesView's: a modelled curve with no
+    // statement of what it was modelled AT is not a chart anyone can act on,
+    // and these two screens plot the same maths from different subjects.
+    const plotTitle = useMemo(
+        () => `${axis.label} vs steady speed`,
+        [axis],
+    );
+
+    const plotSubtitle = useMemo(() => {
+        const n = plotted.length;
+        const parts = [
+            `${n} record${n === 1 ? '' : 's'}`,
+            'from EPA road-load coefficients A, B, C',
+        ];
+        // Condition values are TEXT INPUT state, so an unset field is '' — and
+        // `'' != null` is true, so a `!= null` guard lets the empty string
+        // through and fmtTemp renders it as 0 °F. Absent has to read as absent
+        // on a chart whose whole subject is the conditions it was drawn under.
+        const c = conditions.values ?? {};
+        const num = v => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
+        const t = num(c.tempF);
+        const w = num(c.windSpeedMph);
+        const el = num(c.elevationFt);
+        if (t != null) parts.push(fmtTemp(t, units));
+        parts.push(w ? `${fmtSpeed(w, units)} wind` : 'still air');
+        if (el) parts.push(`${Math.round(el)} ft`);
+        parts.push(gradeGainFtNum ? 'graded' : 'level');
+        parts.push(units === 'metric' ? 'metric' : 'imperial');
+        return parts.join(' · ');
+    }, [plotted, conditions, units, gradeGainFtNum]);
+
+    const { copyPng, copied: pngCopied, preview, dismissPreview } =
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
+    const [urlCopied, setUrlCopied] = useState(false);
 
     useEffect(() => {
         const p = new URLSearchParams(window.location.search);
@@ -216,122 +256,169 @@ export default function EpaCurveExplorer() {
 
     return (
         <div className="stats-view">
-            <div className="section-header">
-                <div>
-                    <div className="section-title">Speed-consumption curves</div>
-                    <div className="text-note">
-                        Efficiency against steady speed, computed from each record’s own road-load
-                        coefficients. {subjects.length} records can be plotted — most belong to no
-                        vehicle in the database, which is why this view does not use the vehicle selection.
+            {/* One line, not a section header block: the layout below is the
+                screen, and the only thing worth saying up front is why this
+                view ignores the vehicle selection. */}
+            <p className="text-note mb-3">
+                Efficiency against steady speed, computed from each record’s own road-load
+                coefficients. {subjects.length} records can be plotted — most belong to no
+                vehicle in the database, which is why this view does not use the vehicle selection.
+            </p>
+
+            <div className="chart-layout">
+                <aside className="chart-rail">
+                    {/* Every class here is Phase 4's. The controls were a stack
+                        of chip walls above the plot; the maths is untouched. */}
+                    <div className="chart-rail-group">
+                        <span className="text-micro">Axes</span>
+                        <div className="axis-rows">
+                            {/* Stated as a value, not a disabled <input>: a field
+                                box says "type here" and then refuses, and greying
+                                it only turns that into "type here later". This
+                                axis is never anything else. */}
+                            <div className="axis-row">
+                                <span className="axis-row-key">X</span>
+                                <span className="axis-row-fixed">
+                                    Steady speed ({speedLabel(units)})
+                                    <span className="text-nano">fixed</span>
+                                </span>
+                            </div>
+                            <label className="axis-row">
+                                <span className="axis-row-key">Y</span>
+                                <select
+                                    className="form-input"
+                                    value={yAxis}
+                                    onChange={e => setYAxis(e.target.value)}
+                                >
+                                    {Y_AXES.map(a => (
+                                        <option key={a.key} value={a.key}>
+                                            {a.label} ({a.unit})
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+                        {/* The module this text comes from was already written
+                            and already imported by the vehicle-driven curves.
+                            This screen explained nothing at all. */}
+                        <span className="text-note">
+                            How this is calculated
+                            <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" />
+                        </span>
                     </div>
-                </div>
-            </div>
 
-            <CurveSubjectPicker
-                subjects={subjects}
-                selected={selected}
-                onToggle={(key) => setSelected(prev =>
-                    prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])}
-                onClear={() => setSelected([])}
-            />
-
-            {/* Two different caveats, and they belong to different axes.
-                Missing energy REMOVES a curve from the range axis; an assumed η
-                leaves the curve drawn and makes every point on it an estimate.
-                Reporting them the same way would flatten that difference. */}
-            {/* Chart options in one card, Y axis above the adjustments —
-                the same shape as the vehicle-driven curves, so the two tabs do
-                not present the same controls in two different arrangements. */}
-            <div className="card mb-4">
-                <div className="guide-facet">
-                    <div className="guide-facet-label">Y axis</div>
-                    <div className="guide-facet-values">
-                        {Y_AXES.map(a => (
-                            <button key={a.key} type="button"
-                                className={`guide-chip ${yAxis === a.key ? 'active' : ''}`}
-                                onClick={() => setYAxis(a.key)}
-                                title={a.needsEnergy ? 'Needs usable energy — records without it cannot be drawn on this axis' : undefined}>
-                                {a.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Between the search and the graph, collapsed by default: these
-                    scale the curve at plot time and are almost always left alone,
-                    but a reader who has set one needs to see that from the header
-                    without opening it. */}
-                <CollapsibleSection
-                    className="collapsible-section--flush"
-                    title="Environmental Conditions"
-                    subtitle={conditions.anyAdjusted
-                        ? 'adjusted — the curves below are not at standard conditions'
-                        : 'standard conditions'}
-                >
-                    <div className="chart-controls-row">
+                    <div className="chart-rail-group">
+                        <span className="text-micro">Viewing conditions</span>
                         <ViewingConditions conditions={conditions} />
                     </div>
-                </CollapsibleSection>
-            </div>
 
-            {withoutRange.length > 0 && (
-                <div className="guide-warning">
-                    {withoutRange.length === 1 ? (
-                        <>
-                            One selected record has no usable energy, so it is absent from the range axis:
-                            {' '}<strong>{withoutRange[0].label}</strong>. Its consumption curve is unaffected.
-                        </>
+                    <div className="chart-rail-group">
+                        <span className="text-micro">Records</span>
+                        <CurveSubjectPicker
+                            subjects={subjects}
+                            selected={selected}
+                            onToggle={(key) => setSelected(prev =>
+                                prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])}
+                            onClear={() => setSelected([])}
+                        />
+                    </div>
+                </aside>
+
+                <div className="chart-main">
+                    {plotted.length === 0 ? (
+                        <div className="empty-state">Choose one or more certification records to plot.</div>
                     ) : (
                         <>
-                            {withoutRange.length} selected records have no usable energy, so they are absent
-                            from the range axis: <strong>{withoutRange.map(s => s.label).join(', ')}</strong>.
-                            Their consumption curves are unaffected.
+                            <PlotFrame
+                                title={plotTitle}
+                                subtitle={plotSubtitle}
+                                preview={preview}
+                                onDismissPreview={dismissPreview}
+                                exportControls={(
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(window.location.href).then(() => {
+                                                    setUrlCopied(true);
+                                                    setTimeout(() => setUrlCopied(false), 2000);
+                                                });
+                                            }}
+                                            className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
+                                            title="Copy link to this chart view"
+                                        >
+                                            {urlCopied ? '✓ Copied' : '🔗 URL'}
+                                        </button>
+                                        <button
+                                            onClick={copyPng}
+                                            className={`chart-copy-btn ${pngCopied ? 'chart-copy-btn-active' : ''}`}
+                                            title="Copy the framed chart as a PNG"
+                                        >
+                                            {pngCopied ? '✓ Copied' : 'PNG'}
+                                        </button>
+                                    </>
+                                )}
+                            >
+                                <div style={{ height: 460, position: 'relative' }}>
+                                    <canvas ref={canvasRef} />
+                                </div>
+                            </PlotFrame>
+
+                            {/* Caveats below the figure, where a footnote goes.
+                                Two of them, and they belong to different axes:
+                                missing energy REMOVES a curve from the range
+                                axis; an assumed η leaves it drawn and makes every
+                                point on it an estimate. */}
+                            {withoutRange.length > 0 && (
+                                <div className="guide-warning">
+                                    {withoutRange.length === 1 ? (
+                                        <>
+                                            One selected record has no usable energy, so it is absent from the range axis:
+                                            {' '}<strong>{withoutRange[0].label}</strong>. Its consumption curve is unaffected.
+                                        </>
+                                    ) : (
+                                        <>
+                                            {withoutRange.length} selected records have no usable energy, so they are absent
+                                            from the range axis: <strong>{withoutRange.map(s => s.label).join(', ')}</strong>.
+                                            Their consumption curves are unaffected.
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {assumedEta.length > 0 && (
+                                <div className="guide-warning">
+                                    {/* The affected records are NOT listed. The ⚠ in the
+                                        legend already points at them, and repeating the
+                                        names turned a caveat into a paragraph nobody
+                                        finishes. */}
+                                    <strong>
+                                        ⚠ {assumedEta.length} curve{assumedEta.length === 1 ? ' is' : 's are'} using
+                                        an assumed drivetrain efficiency (η).
+                                    </strong>
+                                    <div className="mt-1">
+                                        {axis.label} requires an η in addition to the EPA provided road load. These
+                                        records currently do not have test data to estimate η from, so a universal
+                                        estimate of {DEFAULT_SS_ETA} is used instead — the cruise-basis fallback,
+                                        because every point on these curves is a constant speed.
+                                    </div>
+                                    <div className="mt-1">
+                                        The SHAPE of each curve is real, but its magnitude scales with η.
+                                        Estimated entries are marked ⚠ in the legend.
+                                    </div>
+                                </div>
+                            )}
+
+                            <AxisScaleControls
+                                xMin={scale.xMin} xMax={scale.xMax}
+                                yMin={scale.yMin} yMax={scale.yMax}
+                                xAxisLabel={`Speed (${speedLabel(units)})`}
+                                yAxisLabel={`${axis.label} (${axis.unit})`}
+                                onChange={(key, value) => setScale(p => ({ ...p, [key]: value }))}
+                            />
                         </>
                     )}
                 </div>
-            )}
-
-            {assumedEta.length > 0 && (
-                <div className="guide-warning">
-                    {/* The affected records are NOT listed. The ⚠ in the legend
-                        already points at them, and repeating the names here
-                        turned a caveat into a paragraph nobody finishes. */}
-                    <strong>
-                        ⚠ {assumedEta.length} curve{assumedEta.length === 1 ? ' is' : 's are'} using
-                        an assumed drivetrain efficiency (η).
-                    </strong>
-                    <div className="mt-1">
-                        {axis.label} requires an η in addition to the EPA provided road load. These
-                        records currently do not have test data to estimate η from, so a universal
-                        estimate of {DEFAULT_SS_ETA} is used instead — the cruise-basis fallback,
-                        because every point on these curves is a constant speed.
-                    </div>
-                    <div className="mt-1">
-                        The SHAPE of each curve is real, but its magnitude scales with η.
-                        Estimated entries are marked ⚠ in the legend.
-                    </div>
-                </div>
-            )}
-
-            {plotted.length === 0 ? (
-                <div className="empty-state">Choose one or more certification records to plot.</div>
-            ) : (
-                <>
-                    <div className="curve-canvas-wrap">
-                        <canvas ref={canvasRef} />
-                    </div>
-
-                    {/* Below the chart, as in every other chart view. The card
-                        comes from AxisScaleControls itself. */}
-                    <AxisScaleControls
-                        xMin={scale.xMin} xMax={scale.xMax}
-                        yMin={scale.yMin} yMax={scale.yMax}
-                        xAxisLabel={`Speed (${speedLabel(units)})`}
-                        yAxisLabel={`${axis.label} (${axis.unit})`}
-                        onChange={(key, value) => setScale(p => ({ ...p, [key]: value }))}
-                    />
-                </>
-            )}
+            </div>
         </div>
     );
 }
