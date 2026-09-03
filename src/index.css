@@ -2405,6 +2405,65 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-card);
 }
 
+/* ── Customize routing ──────────────────────────────────────────────────────
+ *
+ * Per-run overrides of the charging strategy. It was a four-column table with
+ * horizontal scroll, which in a 320px rail is a table you cannot read; two rows
+ * per entry costs no width — the name, then the numbers that override it, which
+ * is the same identity-then-values shape a run row uses, so the two lists read
+ * as one kind of thing.
+ */
+.routing-panel { margin-top: 14px; }
+
+.routing-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 6px;
+}
+
+.routing-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 7px;
+    border: 1px solid var(--color-border);
+    border-left: 3px solid transparent;
+    border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
+    background-color: var(--color-surface-muted);
+}
+/* A row carrying an override is doing something the trip settings above are
+   not, so it says so on the same rail every other state uses. */
+.routing-row.is-custom {
+    border-left-color: var(--color-accent-orange);
+    background-color: var(--color-accent-orange-surface);
+}
+
+.routing-row-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+}
+.routing-swatch {
+    width: 10px;
+    height: 10px;
+    flex: none;
+    border-radius: var(--radius-track);
+}
+
+.routing-row-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.routing-row-fields .scenario-row {
+    grid-template-columns: 56px 58px minmax(0, 1fr);
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+}
+
 /* Run list within a vehicle group. The rows carry their own boxes now, so the
    list only has to space them. */
 .run-items {
@@ -2499,10 +2558,29 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .pair-row .form-input { padding-top: 1px; padding-bottom: 1px; }
 
-/* Additional partners for the same charging test — indented so the branch
-   reads as belonging to the row above, checkbox included. */
-.pair-row-child {
-    @apply pl-8;
+/* An ADDED pairing: one flat row, not the three-row shape.
+ *
+ * It has no identity of its own to state — it is the row above, plotted against
+ * a different partner — so a grid that reserves a name line and a conditions
+ * line for it reserves two empty lines. Everything it needs fits on one:
+ * branch, checkbox, swatch, the partner control, its source, and the remove. */
+.pair-row.is-child {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 16px;
+    padding: 4px 5px 4px 6px;
+    background-color: var(--color-card);
+}
+.pair-row.is-child .pair-range-control {
+    flex: 1;
+    min-width: 0;
+}
+.pair-branch {
+    flex: none;
+    font-family: var(--font-mono);
+    color: var(--color-text-faint);
+    line-height: 1;
 }
 
 /* Line one: colour, name, tags, source link. */
@@ -2888,6 +2966,16 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .info-icon:hover .info-icon-glyph {
     opacity: 0.9;
 }
+
+/* On an override panel the glyph carries the panel's own accent and drops the
+   dimming: inside a box that is already saying "this is changing your data",
+   the explanation of WHAT it is changing should not be the quietest thing
+   there. */
+.info-icon.is-accent .info-icon-glyph {
+    color: var(--color-accent-orange);
+    opacity: 0.85;
+}
+.info-icon.is-accent:hover .info-icon-glyph { opacity: 1; }
 
 .info-icon-tooltip {
     visibility: hidden;

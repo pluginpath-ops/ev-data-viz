@@ -82,6 +82,7 @@ export default function RunSelector({
     onAddPartner = null,
     onRemovePartner = null,
 }) {
+    const headerRef = useRef(null);
     const [expanded, setExpanded] = useState(false);
     // Default all vehicles to expanded; track explicit collapses
     const [collapsedVehicles, setCollapsedVehicles] = useState({});
@@ -159,7 +160,20 @@ export default function RunSelector({
                 chart had drifted into putting them somewhere different. */}
             <div className="run-selector-bar">
             <button
-                onClick={() => setExpanded(prev => !prev)}
+                ref={headerRef}
+                onClick={() => {
+                    const next = !expanded;
+                    setExpanded(next);
+                    // Nudge the header into view on OPEN. A disclosure whose
+                    // content appears below the fold looks like a control that
+                    // did nothing — you click, the page does not move, and the
+                    // thing you asked for is off-screen. `nearest` so an already
+                    // visible header does not jump.
+                    if (next) {
+                        requestAnimationFrame(() =>
+                            headerRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+                    }
+                }}
                 className="run-selector-header"
             >
                 <span style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
@@ -306,14 +320,28 @@ function PairRows({
             {partnerIds.map((partnerId, idx) => (
                 <label
                     key={partnerId ?? 'auto'}
-                    className={`pair-row ${idx > 0 ? 'pair-row-child' : ''} ${isSelected(partnerId) ? '' : 'opacity-60 hover:opacity-100'}`}
+                    className={`pair-row ${idx > 0 ? 'is-child' : ''} ${isSelected(partnerId) ? '' : 'opacity-60 hover:opacity-100'}`}
                 >
+                    {/* The branch glyph leads on an added pairing, so the eye
+                        finds the indent before it finds the control. */}
+                    {idx > 0 && <span className="pair-branch" aria-hidden="true">↳</span>}
                     <input
                         type="checkbox"
                         checked={isSelected(partnerId)}
                         onChange={() => onToggleRun(singlePartner ? run.id : rowKey(partnerId))}
-                        className="w-4 h-4 shrink-0"
                     />
+                    {/* An added pairing is its own plotted series, so it carries
+                        its own swatch. It plots the same charging run against a
+                        different partner, which is exactly what the swatch and
+                        the dropdown beside it say together. */}
+                    {idx > 0 && (
+                        <RunColorControl
+                            run={run}
+                            vehicleId={vehicle.id}
+                            onUpdateRunColor={onUpdateRunColor}
+                            colorMap={colorMap}
+                        />
+                    )}
 
                     {/* Charging test identity — only on the first row of the group.
                         No date or speed here: speed belongs to the range test, and
@@ -338,9 +366,7 @@ function PairRows({
                                 happened to be. */}
                             <RunSourceLinks run={run} className="shrink-0 ml-auto" />
                         </span>
-                    ) : (
-                        <span className="pair-charging-label text-meta">↳</span>
-                    )}
+                    ) : null}
 
                     {/* Row two: what this run measured. */}
                     {idx === 0 && renderRunMeta && (
@@ -349,7 +375,7 @@ function PairRows({
 
                     {/* The range basis for this pair */}
                     <span className="pair-range-control" onClick={e => e.preventDefault()}>
-                        <span className="text-label shrink-0">{partnerLabel}</span>
+                        {idx === 0 && <span className="text-label shrink-0">{partnerLabel}</span>}
                         <select
                             className="form-input"
                             value={partnerId ?? ''}

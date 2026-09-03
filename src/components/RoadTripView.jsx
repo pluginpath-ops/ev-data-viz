@@ -5,7 +5,7 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { dataService } from '../services/DataService';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
-import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
+import { MI_TO_KM, convDistance, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
@@ -27,7 +27,9 @@ import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { resolvePairColors } from '../utils/colorUtils';
 import { chartTheme } from '../utils/chartTheme';
 import ChartInfoBubble from './ChartInfoBubble';
+import InfoIcon from './InfoIcon';
 import PlotFrame from './charts/PlotFrame';
+import SpeedBadge from './charts/SpeedBadge';
 import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 
 Chart.register(ZoomPlugin);
@@ -89,6 +91,13 @@ function isSimUnrealistic(sim) {
  * different regions. (This works because the product is small; a third
  * orthogonal flag would need the controls split back apart.)
  */
+/** What towing actually does to the simulation. Shown on the ⓘ beside each of
+ *  its two fields rather than as a paragraph under them: the panel is in a
+ *  320px rail, and three lines of prose there pushed the run list off the
+ *  screen to explain two numbers. */
+const TOWING_NOTE = 'Full system efficiency (vehicle + trailer), replacing every '
+    + "vehicle's measured figure. Battery capacity and charging speed still vary per vehicle.";
+
 const SIM_MODES = [
     { value: 'distance',     mode: 'distance', towing: false, label: 'Fixed charge amount' },
     { value: 'time',         mode: 'time',     towing: false, label: 'Fixed charge time' },
@@ -166,91 +175,104 @@ const PALETTE = [
 // mode-dependent charge amount (leg distance / charge time). Blank shows the
 // global value greyed as a placeholder; typing overrides just that run.
 function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onChange }) {
+    const headerRef = useRef(null);
     const [open, setOpen] = useState(false);
     if (!entries.length) return null;
 
     const customized  = entries.filter(e => Object.keys(perRun[e.key] || {}).length).length;
     const legGlobal   = units === 'metric' ? Math.round(global.legDistance * MI_TO_KM) : global.legDistance;
-    const amountLabel = mode === 'distance' ? `Leg Distance (${dl})` : 'Charge Time (min)';
-
-    const cell = 'px-3 py-2 text-left font-semibold text-secondary whitespace-nowrap';
-    const inputCls = 'form-input w-20';
 
     return (
-        <div className="mt-4">
-            <button onClick={() => setOpen(o => !o)} className="run-selector-header">
+        <div className="routing-panel">
+            <button
+                ref={headerRef}
+                onClick={() => {
+                    const next = !open;
+                    setOpen(next);
+                    // Same nudge as the run selector: a disclosure whose content
+                    // opens below the fold reads as a control that did nothing.
+                    if (next) {
+                        requestAnimationFrame(() =>
+                            headerRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+                    }
+                }}
+                className="run-selector-header"
+            >
                 <span style={{ display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                Customize routing
-                <span className="text-sm font-normal text-secondary">
-                    {customized ? `(${customized} customized)` : '(optional — per test)'}
+                <span className="text-control">Customize routing</span>
+                <span className="run-selector-count">
+                    {customized ? `${customized} / ${entries.length}` : `0 / ${entries.length}`}
                 </span>
             </button>
 
+            {/* A table needed four columns and horizontal scroll in a 320px
+                rail. Two rows per entry costs no width: the name, then the two
+                numbers that can override it — the same identity-then-values
+                shape a run row uses, so the two lists read as one kind of
+                thing. */}
             {open && (
-                <div className="mt-3 overflow-x-auto">
-                    <table className="text-sm">
-                        <thead className="bg-[var(--color-surface-muted)]">
-                            <tr>
-                                <th className={cell}>Test</th>
-                                <th className={cell}>Charger Arrival SoC (%)</th>
-                                <th className={cell}>{amountLabel}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y dark:divide-slate-700">
-                            {entries.map(e => {
-                                const ov = perRun[e.key] || {};
-                                const legValue = ov.legDistance != null
-                                    ? (units === 'metric' ? Math.round(ov.legDistance * MI_TO_KM) : ov.legDistance)
-                                    : '';
-                                return (
-                                    <tr key={e.key}>
-                                        <td className="px-3 py-2">
-                                            <span className="flex items-center gap-2">
-                                                <span className="inline-block w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
-                                                <span className="text-secondary">{vehicleLabel(e.vehicle)}</span>
-                                                <span className="text-secondary">· {e.rangeRun?.name ?? e.run.name}</span>
-                                                {e.rangeRun && e.run?.name && (
-                                                    <span className="text-meta">· {e.run.name}</span>
-                                                )}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2">
+                <div className="routing-rows">
+                    {entries.map(e => {
+                        const ov = perRun[e.key] || {};
+                        const legValue = ov.legDistance != null
+                            ? (units === 'metric' ? Math.round(ov.legDistance * MI_TO_KM) : ov.legDistance)
+                            : '';
+                        const isCustom = Object.keys(ov).length > 0;
+                        return (
+                            <div key={e.key} className={`routing-row${isCustom ? ' is-custom' : ''}`}>
+                                <div className="routing-row-name">
+                                    <span className="routing-swatch" style={{ backgroundColor: e.color }} />
+                                    {/* The label the CHART uses, so a row here and
+                                        a line there are recognisably the same run. */}
+                                    <span className="truncate">{e.label}</span>
+                                </div>
+                                <div className="routing-row-fields">
+                                    <label className="scenario-row">
+                                        <span className="scenario-key">Charger</span>
+                                        <input
+                                            type="number" min={0} max={100}
+                                            className="form-input"
+                                            placeholder={`${global.minSoc}`}
+                                            value={ov.minSoc ?? ''}
+                                            onChange={ev => onChange(e.key, 'minSoc', ev.target.value)}
+                                        />
+                                        <span className="scenario-unit">% arrival</span>
+                                    </label>
+                                    {mode === 'distance' ? (
+                                        <label className="scenario-row">
+                                            <span className="scenario-key">Leg</span>
                                             <input
-                                                type="number" min={0} max={100}
-                                                className={inputCls}
-                                                placeholder={`${global.minSoc}`}
-                                                value={ov.minSoc ?? ''}
-                                                onChange={ev => onChange(e.key, 'minSoc', ev.target.value)}
+                                                type="number" min={0}
+                                                className="form-input"
+                                                placeholder={`${legGlobal}`}
+                                                value={legValue}
+                                                onChange={ev => {
+                                                    const v = ev.target.value;
+                                                    onChange(e.key, 'legDistance', v === '' ? '' : (units === 'metric' ? Number(v) / MI_TO_KM : Number(v)));
+                                                }}
                                             />
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            {mode === 'distance' ? (
-                                                <input
-                                                    type="number" min={0}
-                                                    className={inputCls}
-                                                    placeholder={`${legGlobal}`}
-                                                    value={legValue}
-                                                    onChange={ev => {
-                                                        const v = ev.target.value;
-                                                        onChange(e.key, 'legDistance', v === '' ? '' : (units === 'metric' ? Number(v) / MI_TO_KM : Number(v)));
-                                                    }}
-                                                />
-                                            ) : (
-                                                <input
-                                                    type="number" min={0}
-                                                    className={inputCls}
-                                                    placeholder={`${global.chargeTime}`}
-                                                    value={ov.chargeTime ?? ''}
-                                                    onChange={ev => onChange(e.key, 'chargeTime', ev.target.value)}
-                                                />
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                    <p className="text-xs text-secondary mt-2">Blank fields use the global value shown as a placeholder.</p>
+                                            <span className="scenario-unit">{dl}</span>
+                                        </label>
+                                    ) : (
+                                        <label className="scenario-row">
+                                            <span className="scenario-key">Charge</span>
+                                            <input
+                                                type="number" min={0}
+                                                className="form-input"
+                                                placeholder={`${global.chargeTime}`}
+                                                value={ov.chargeTime ?? ''}
+                                                onChange={ev => onChange(e.key, 'chargeTime', ev.target.value)}
+                                            />
+                                            <span className="scenario-unit">min</span>
+                                        </label>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                    <p className="text-note">
+                        Blank uses the trip setting above. A value here overrides it for that run only.
+                    </p>
                 </div>
             )}
         </div>
@@ -1665,7 +1687,10 @@ export default function RoadTripView({
                                                 const val = parseFloat(e.target.value);
                                                 setField('towingEfficiency', units === 'metric' ? val / MI_TO_KM : val);
                                             }} />
-                                        <span className="scenario-unit">{towingEffLabel}</span>
+                                        <span className="scenario-unit">
+                                            {towingEffLabel}
+                                            <InfoIcon className="is-accent" position="right" text={TOWING_NOTE} />
+                                        </span>
                                     </label>
                                     <label className="scenario-row">
                                         <span className="scenario-key">At</span>
@@ -1675,13 +1700,11 @@ export default function RoadTripView({
                                                 const val = Number(e.target.value);
                                                 setField('towingRefSpeedMph', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
                                             }} />
-                                        <span className="scenario-unit">{sl}</span>
+                                        <span className="scenario-unit">
+                                            {sl}
+                                            <InfoIcon className="is-accent" position="right" text={TOWING_NOTE} />
+                                        </span>
                                     </label>
-                                    <p className="text-note">
-                                        Full system efficiency (vehicle + trailer), replacing every
-                                        vehicle's measured figure. Battery capacity and charging
-                                        speed still vary per vehicle.
-                                    </p>
                                 </div>
                             )}
                         </div>
@@ -1756,19 +1779,18 @@ export default function RoadTripView({
                                 setPairings(prev => removePartner(prev, rangeId, chargingId))}
                             renderRunMeta={run => {
                                 const entry = [...allPairsInfo.values()].find(e => e.rangeRun.id === run.id);
-                                if (!entry) return null;
-                                if (!entry.miPerKwh) {
-                                    return <span className="text-xs text-red-400 ml-1">⚠ No range data</span>;
-                                }
-                                const eff = entry.miPerKwh.toFixed(1);
-                                const spd = entry.testSpeedMph
-                                    ? `${fmtSpeed(entry.testSpeedMph, units)}`
-                                    : '70 mph (assumed)';
                                 return (
-                                    <span className="text-xs text-meta ml-1">
-                                        {eff} {units === 'metric' ? 'km/kWh' : 'mi/kWh'} @ {spd}
-                                        {entry.efficiencyNote && ` · ${entry.efficiencyNote}`}
-                                    </span>
+                                    <>
+                                        <SpeedBadge run={run} units={units} />
+                                        {run.temperature_f != null && (
+                                            <span className="badge-micro">{fmtTemp(run.temperature_f, units)}</span>
+                                        )}
+                                        {entry && !entry.miPerKwh && (
+                                            <span className="badge-micro is-danger" title="This run has no distance and energy to derive an efficiency from, so it cannot be simulated">
+                                                ⚠ no range data
+                                            </span>
+                                        )}
+                                    </>
                                 );
                             }}
                     />
