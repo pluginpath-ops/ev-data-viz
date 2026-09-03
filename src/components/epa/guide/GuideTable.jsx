@@ -108,6 +108,22 @@ export default function GuideTable({
                                                         </span>
                                                     )}
                                                 </span>
+                                            ) : pct != null ? (
+                                                /* The value, then its bar beneath
+                                                   it. It used to be painted as a
+                                                   cell BACKGROUND — cheaper in
+                                                   DOM, but a wash behind a number
+                                                   reads as a highlight rather than
+                                                   as a measurement, and it could
+                                                   not be given a track. */
+                                                <span className="guide-cell-stack">
+                                                    <span>{formatCell(row, col)}</span>
+                                                    <span
+                                                        className="guide-spark"
+                                                        style={{ '--bar-fill': `${pct}%` }}
+                                                        aria-hidden="true"
+                                                    />
+                                                </span>
                                             ) : formatCell(row, col)}
                                         </td>
                                     );

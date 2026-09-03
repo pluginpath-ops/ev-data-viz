@@ -4581,52 +4581,48 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply truncate;
 }
 
-/* ── Magnitude bars ──────────────────────────────────────────────────────────
-   A fill behind the number showing its share of the largest value in the
-   current filter, so a column can be read as a shape before it is read as
-   numbers.
-
-   Three layers, and each earns its place:
-
-   1. A TRACK across the full cell — the 100% extent. Without it a 27% fill has
-      no frame: you can see the bar but not what it is a fraction OF, so short
-      bars all look alike and the reader cannot tell 27% from 40%.
-   2. A GRADIENT fill, strongest at the left and fading rightward, so the bar
-      reads as having a direction and does not sit as a flat slab behind text.
-   3. A crisp EDGE CAP at the leading edge. The fade in (2) makes the endpoint
-      indistinct exactly where precision matters, so the last 2px are painted
-      back in at full strength.
-
-   Painted as background layers rather than elements, so it costs no extra DOM
-   across ~500 cells, and composites over whatever the row's hover or selected
-   background happens to be.
-
-   Deliberately low-contrast throughout: this sits BEHIND a number that still
-   has to be the thing you read. */
-.guide-td.has-bar {
-    background-image:
-        linear-gradient(
-            to right,
-            var(--bar-strong) 0,
-            var(--bar-soft)  calc(var(--bar-fill, 0%) - 2px),
-            var(--bar-edge)  calc(var(--bar-fill, 0%) - 2px),
-            var(--bar-edge)  var(--bar-fill, 0%),
-            transparent      var(--bar-fill, 0%)
-        ),
-        linear-gradient(to right, var(--bar-track) 0 100%);
+/* A value's bar, under the value.
+ *
+ * It was painted as three background layers on the CELL — cheaper in DOM across
+ * ~500 cells, and the right call while it was a wash. But a wash behind a
+ * number reads as a highlight on the row rather than as a measurement of the
+ * figure, and a background cannot carry a track: an empty bar and a missing bar
+ * looked the same.
+ *
+ * The gradient runs soft-to-strong left to right, so a short bar is dimmer as
+ * well as shorter — it reads as short at a glance rather than on comparison.
+ * A minimum of 4% means a real value never renders as nothing. */
+.guide-cell-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+}
+.guide-td:not(.numeric) .guide-cell-stack { align-items: flex-start; }
+.guide-spark {
+    display: block;
+    width: 100%;
+    height: 3px;
+    border-radius: var(--radius-track);
+    background-color: var(--bar-track);
+    background-image: linear-gradient(to right, var(--bar-soft), var(--bar-edge));
+    background-size: var(--bar-fill, 0%) 100%;
     background-repeat: no-repeat;
 }
+/* --bar-strong is NOT the table's; the stats IQR box, the histogram bars and
+   the sweep note all fill with it. It stays at its old value rather than
+   following the sparkline, which needs a stronger edge than a filled box does. */
 :root {
     --bar-strong: rgba(59, 130, 246, 0.28);
-    --bar-soft:   rgba(59, 130, 246, 0.10);
-    --bar-edge:   rgba(59, 130, 246, 0.45);
-    --bar-track:  rgba(100, 116, 139, 0.07);
+    --bar-soft:   rgba(59, 130, 246, 0.35);
+    --bar-edge:   rgba(59, 130, 246, 0.85);
+    --bar-track:  rgba(100, 116, 139, 0.18);
 }
 [data-theme="dark"] {
     --bar-strong: rgba(96, 165, 250, 0.34);
-    --bar-soft:   rgba(96, 165, 250, 0.12);
-    --bar-edge:   rgba(96, 165, 250, 0.55);
-    --bar-track:  rgba(148, 163, 184, 0.10);
+    --bar-soft:   rgba(96, 165, 250, 0.30);
+    --bar-edge:   rgba(96, 165, 250, 0.95);
+    --bar-track:  rgba(148, 163, 184, 0.16);
 }
 
 /* Badges ride on the configuration name rather than holding their own columns. */

@@ -544,6 +544,15 @@ export function computeBarMaxima(rows) {
     return maxima;
 }
 
+/**
+ * The smallest bar a real value may draw.
+ *
+ * Below this a measurement renders as an empty track, which is what an ABSENT
+ * value looks like — and the distinction between "short" and "not measured" is
+ * the one this column has to keep.
+ */
+export const BAR_MIN_PCT = 4;
+
 /** A value's share of its unit's maximum, 0–100, or null when there is no bar. */
 export function barPercent(row, col, maxima) {
     if (!col.bar) return null;
@@ -554,5 +563,5 @@ export function barPercent(row, col, maxima) {
     if (v == null || v === '') return null;
     const n = Number(v);
     if (!Number.isFinite(n) || !(max > 0)) return null;
-    return Math.max(0, Math.min(100, (n / max) * 100));
+    return Math.max(BAR_MIN_PCT, Math.min(100, (n / max) * 100));
 }
