@@ -1213,6 +1213,15 @@ body {
     letter-spacing: 0.06em;
 }
 
+/* A reading that is true but carries a caveat — a cycle average where the
+   column means a held speed. Quieter than a full intent: the figure is still
+   the point, and the dagger beside it says to read the tooltip. The background
+   stays neutral because nothing is wrong with the number. */
+.badge-micro.is-qualified {
+    border-color: var(--color-warning-border);
+    color: var(--color-warning-text);
+}
+
 .badge-micro.is-warning,
 .badge-status.is-warning {
     background-color: var(--color-warning-surface);

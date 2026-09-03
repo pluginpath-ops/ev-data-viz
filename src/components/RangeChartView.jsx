@@ -24,6 +24,7 @@ import { chartTheme, MONO_STACK } from '../utils/chartTheme';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
+import SpeedBadge from './charts/SpeedBadge';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -654,18 +655,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         const isChecked   = selectedRuns.some(id => String(id) === String(run.id));
                         return (
                             <>
-                                {run.speed_mph != null && (
-                                    <span className="badge-micro">{fmtSpeed(run.speed_mph, units)}</span>
-                                )}
-                                {/* A held speed and a mixed cycle averaging the
-                                    same number are different tests, so the
-                                    marker rides with the speed wherever one is
-                                    printed. */}
-                                {speedBasisNote(run) && (
-                                    <span className="badge-micro is-warning" title="Average over a varying-speed cycle. Not directly comparable to a steady-state test; speed correction is skipped.">
-                                        mixed
-                                    </span>
-                                )}
+                                {/* Carries its own basis — see SpeedBadge. */}
+                                <SpeedBadge run={run} units={units} />
                                 {run.temperature_f != null && (
                                     <span className="badge-micro">{fmtTemp(run.temperature_f, units)}</span>
                                 )}

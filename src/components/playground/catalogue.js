@@ -143,6 +143,8 @@ export const SECTIONS = [
             { cls: 'guide-badge guide-badge-multi',  as: 'span', label: 'Guide badge · multi' },
             { cls: 'badge-micro',            as: 'span', label: 'Micro badge',
               note: 'The metrics every run-row marker shares. Mono, because a badge on a run row almost always carries a figure — "70 mph", "72 °F", "291 mi". Neutral by default: most are readings, not states.' },
+            { cls: 'badge-micro is-qualified', as: 'span', label: 'Micro badge · qualified',
+              note: 'A reading that is true but carries a caveat — a cycle average where the column means a held speed. Neutral background, because nothing is wrong with the number; the dagger beside it does the rest, since a marker that exists only as a hue is invisible to a reader who cannot see the hue.' },
             { cls: 'badge-micro is-warning', as: 'span', label: 'Micro badge · warning' },
             { cls: 'badge-micro is-danger',  as: 'span', label: 'Micro badge · danger' },
             { cls: 'badge-default',   as: 'span', label: 'Default',

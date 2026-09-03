@@ -20,6 +20,7 @@ import { resolvePairColors } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
+import SpeedBadge from './charts/SpeedBadge';
 import { chartTheme, MONO_STACK } from '../utils/chartTheme';
 import { copyChartAsPng } from '../utils/chartUtils';
 
@@ -935,14 +936,8 @@ export default function ChargeCompareView({
                             // enumerates range tests: they are what distinguishes
                             // one range test from another. Date is still omitted.
                             <>
-                                {run.speed_mph != null && (
-                                    <span className="badge-micro">{fmtSpeed(run.speed_mph, units)}</span>
-                                )}
-                                {speedBasisNote(run) && (
-                                    <span className="badge-micro is-warning" title="Average over a varying-speed cycle. Not directly comparable to a steady-state test; speed correction is skipped.">
-                                        mixed
-                                    </span>
-                                )}
+                                {/* Carries its own basis — see SpeedBadge. */}
+                                <SpeedBadge run={run} units={units} />
                                 {run.temperature_f != null && (
                                     <span className="badge-micro">{fmtTemp(run.temperature_f, units)}</span>
                                 )}
