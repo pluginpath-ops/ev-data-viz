@@ -3269,9 +3269,21 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .info-icon.is-accent:hover .info-icon-glyph { opacity: 1; }
 
+/* `display: none`, not just `visibility: hidden`.
+ *
+ * A hidden-but-displayed absolute box still contributes to the scrollable
+ * overflow of every ancestor that can scroll. In the chart sidebar that meant
+ * ~234px of invisible tooltip hanging below the last control, so the rail grew
+ * a scrollbar for content nobody could see — a second scrollbar beside the
+ * record list's own, which is what made the column feel sloppy.
+ *
+ * The fade survives where `allow-discrete` is supported and degrades to an
+ * instant show where it is not. */
 .info-icon-tooltip {
+    display: none;
     visibility: hidden;
     opacity: 0;
+    transition-behavior: allow-discrete;
     position: absolute;
     z-index: 100;
     width: 240px;
@@ -3290,8 +3302,12 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 .info-icon:hover .info-icon-tooltip {
+    display: block;
     visibility: visible;
     opacity: 1;
+}
+@starting-style {
+    .info-icon:hover .info-icon-tooltip { opacity: 0; }
 }
 
 /* Tooltip placement variants */
@@ -3328,12 +3344,28 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    Anchoring ONLY to .scenario-row was the bug: a viewing-conditions icon then
    had no positioned ancestor inside the rail and its tooltip resolved against
    something far up the tree. */
-/* The ROW is the anchor wherever there is one, so a tooltip opens under the
-   control it explains rather than under the whole section. The group is the
-   fallback for anything that has no row of its own. */
+/* The element that CONTAINS the icon is the anchor, so a tooltip opens under
+   the label it explains.
+ *
+ * The group used to be the fallback, and that held only while groups were
+ * short. Once one of them grew to fill the sidebar — 750px of record list —
+ * `top: calc(100% + 6px)` put its tooltip 750px down, below the fold, and
+ * opening it scrolled the page. Anchoring to whatever directly holds the glyph
+ * is independent of how tall its section happens to be.
+ *
+ * The row anchors stay: rows hold several controls, and a tooltip should open
+ * under its own row rather than under whichever element inside it won. */
 .chart-rail-group { position: relative; }
 .chart-rail .scenario-row,
 .chart-rail .viewing-row { position: relative; }
+.chart-rail :has(> .info-icon) { position: relative; }
+/* …unless a ROW already anchors it. Without this the label became the anchor
+   and `left: 0; right: 0` resolved against ITS width — turning a viewing
+   condition's tooltip into a 92px column 400px tall. The row is the right
+   anchor wherever there is one; the container is only the fallback for icons
+   that sit in a section header with no row of their own. */
+.chart-rail .viewing-row :has(> .info-icon),
+.chart-rail .scenario-row :has(> .info-icon) { position: static; }
 .chart-rail .info-icon { position: static; }
 .chart-rail .info-icon-tooltip {
     top: calc(100% + 6px);
@@ -3344,6 +3376,20 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     max-width: none;
     transform: none;
     white-space: normal;
+}
+
+/* Capped, because the rail is exactly one viewport tall and no longer scrolls:
+   anything taller than the space below its glyph opens into somewhere the
+   reader cannot reach. One of these carries a reference table and is ~800px —
+   which overflows in EITHER direction, so flipping it upward only moved the
+   unreachable part to the top.
+   `pointer-events: auto` is what makes the cap usable: the tooltip is a
+   DESCENDANT of .info-icon, so moving onto it keeps :hover true and it can be
+   scrolled without vanishing under the cursor. */
+.chart-rail .info-icon-tooltip {
+    max-height: 40vh;
+    overflow-y: auto;
+    pointer-events: auto;
 }
 
 /* Tooltip that opens OVER a muted panel (e.g. a filter bar).
@@ -4946,6 +4992,27 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .curve-picker-row input,
 .curve-picker-row .series-swatch { margin-top: 3px; }
+
+/* The crossover, stated rather than stumbled into.
+ *
+ * Above this the sidebar holds its controls AND a usable list, so the list
+ * takes the leftover height and is the only scroller. Below it there is no
+ * height to give, and forcing a floor on the list just pushes the rail into
+ * overflow — two scrollbars in one column again. So the list stops being a
+ * scroller and the rail becomes one instead.
+ *
+ * 46rem is measured, not picked: 131px of header plus 413px of sidebar controls
+ * plus roughly six rows of list. */
+@media (max-height: 46rem) {
+    .chart-rail-group.is-fill > .guide-filter-bar,
+    .chart-rail-group.is-fill .curve-picker-list-facet { flex: none; }
+    .curve-picker-list {
+        flex: none;
+        min-height: 0;
+        overflow-y: visible;
+    }
+}
+
 .curve-picker-row:hover    { background-color: var(--color-surface-muted); }
 /* --color-popover, not --color-primary-light: the light value needed a dark
    override to be legible, and a token that reads correctly in both themes is
