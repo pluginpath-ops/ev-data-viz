@@ -4855,10 +4855,18 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .curve-picker-list-facet {
     @apply w-full;
 }
+/* No border and no fill: the sidebar group around it is already the panel, and
+   a bordered box inside a bordered panel spends a gutter on each side to say
+   something the panel has said. The rows run to the group's own edges, the way
+   the run selector's do. */
 .curve-picker-list {
-    @apply flex flex-col gap-px max-h-64 overflow-y-auto rounded;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-border);
+    @apply flex flex-col gap-px overflow-y-auto;
+    max-height: 40vh;
+    margin: 0 calc(var(--rail-pad-r) * -1) 0 calc(var(--rail-pad-l) * -1);
+}
+.curve-picker-list .curve-picker-row {
+    padding-left: var(--rail-pad-l);
+    padding-right: var(--rail-pad-r);
 }
 .curve-picker-row {
     @apply flex items-center gap-2 px-2 py-1 text-sm cursor-pointer;
