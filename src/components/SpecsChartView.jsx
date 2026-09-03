@@ -9,6 +9,8 @@ import {
     detectMode, formatNumericLabel, vehicleColor,
 } from '../utils/specHelpers';
 import ChartInfoBubble from './ChartInfoBubble';
+import PlotFrame from './charts/PlotFrame';
+import { useChartPng } from '../hooks/useChartPng';
 
 // ── Inside-bar label afterDraw plugin ─────────────────────────────────────────
 
@@ -57,8 +59,6 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
 
     const [localField,   setLocalField]   = useState('');
     const [copiedUrl,    setCopiedUrl]    = useState(false);
-    const [imageCopied,  setImageCopied]  = useState(false);
-    const [chartImage,   setChartImage]   = useState(null);
     const selectedField = controlledField || localField;
 
     const setSelectedField = (field) => {
@@ -194,29 +194,30 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
         };
     }, [selectedField, vehicles, allFields, units, isDark]);
 
-    const handleCopyImage = async () => {
-        if (!chartRef.current) return;
-        const src = chartRef.current.canvas;
-        const offscreen = document.createElement('canvas');
-        offscreen.width  = src.width;
-        offscreen.height = src.height;
-        const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = chartTheme().background;
-        ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
-        ctx2.drawImage(src, 0, 0);
-        const dataUrl = offscreen.toDataURL('image/png');
-        setChartImage(dataUrl);
-        try {
-            const blob = await (await fetch(dataUrl)).blob();
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-            setImageCopied(true);
-            setTimeout(() => setImageCopied(false), 2500);
-        } catch { /* Clipboard API not supported — image shown inline */ }
-    };
+    // ── The frame's caption, and its export ─────────────────────────────────
+    // The chart answered "which vehicle has the most of X" without ever saying
+    // what X was: the field name lived in a <select> above the canvas, and the
+    // export flattened the canvas alone, so a pasted image was a row of bars
+    // with vehicle names and no measure.
+    const plotTitle = useMemo(
+        () => allFields.find(f => f.key === selectedField)?.label || 'Compare specs',
+        [allFields, selectedField],
+    );
+
+    const plotSubtitle = useMemo(() => {
+        const n = vehicles.length;
+        return [
+            `${n} vehicle${n === 1 ? '' : 's'}`,
+            units === 'metric' ? 'metric' : 'imperial',
+        ].join(' · ');
+    }, [vehicles, units]);
+
+    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
 
     return (
         <>
-        <div className="specs-chart-card">
+        <div className="specs-chart-card mb-4">
             <div className="specs-chart-controls">
                 <label className="text-sm font-medium text-secondary">Compare:</label>
                 <select
@@ -234,42 +235,41 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                 </select>
             </div>
 
+        </div>
+
+        <PlotFrame
+            title={plotTitle}
+            subtitle={plotSubtitle}
+            preview={preview}
+            onDismissPreview={dismissPreview}
+            exportControls={!presentationMode && (
+                <>
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(window.location.href).then(() => {
+                                setCopiedUrl(true);
+                                setTimeout(() => setCopiedUrl(false), 2000);
+                            });
+                        }}
+                        className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
+                        title="Copy link to this chart view"
+                    >
+                        {copiedUrl ? '✓ Copied' : '🔗 URL'}
+                    </button>
+                    <button
+                        onClick={copyPng}
+                        className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
+                        title="Copy the framed chart as a PNG"
+                    >
+                        {imageCopied ? '✓ Copied' : 'PNG'}
+                    </button>
+                </>
+            )}
+        >
             <div style={{ height: `${Math.max(220, vehicles.length * 52)}px`, position: 'relative' }}>
                 <canvas ref={canvasRef} />
             </div>
-            <div className="mt-3 flex gap-2 flex-wrap">
-                <button
-                    onClick={() => {
-                        navigator.clipboard.writeText(window.location.href).then(() => {
-                            setCopiedUrl(true);
-                            setTimeout(() => setCopiedUrl(false), 2000);
-                        });
-                    }}
-                    className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
-                    title="Copy link to this chart view"
-                >
-                    {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
-                </button>
-                <button
-                    onClick={handleCopyImage}
-                    className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                    title="Copy chart as PNG"
-                >
-                    {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
-                </button>
-                {chartImage && (
-                    <button onClick={() => setChartImage(null)} className="chart-copy-btn">
-                        ✕ Dismiss preview
-                    </button>
-                )}
-            </div>
-            {chartImage && (
-                <div className="mt-3">
-                    <p className="text-xs text-meta mb-1.5">Right-click or long-press to copy / save</p>
-                    <img src={chartImage} alt="Chart export" className="w-full rounded border border-[var(--color-border)]" />
-                </div>
-            )}
-        </div>
+        </PlotFrame>
         {!presentationMode && <ChartInfoBubble chartKey="specs" />}
         </>
     );
