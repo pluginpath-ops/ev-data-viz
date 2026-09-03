@@ -1741,6 +1741,32 @@ body {
     color: var(--color-text-meta);
 }
 
+/* A scenario parameter: a short key, a number, its unit. Same shape as an axis
+   row, but the value is typed rather than chosen, so the field sizes to the two
+   or three digits it will ever hold instead of stretching. */
+.scenario-row {
+    display: grid;
+    grid-template-columns: 42px 62px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+}
+.scenario-key {
+    font-family: var(--font-mono);
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    font-weight: 600;
+    color: var(--color-text-meta);
+}
+.scenario-row .form-input {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+.scenario-unit {
+    font-size: calc(var(--fs-body) * 0.7857);
+    color: var(--color-text-meta);
+    white-space: nowrap;
+}
+
 /* Two columns of checkboxes: they are peers, and a single column of four made
    the rail taller than the run list it sits above. */
 .display-grid {

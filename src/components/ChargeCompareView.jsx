@@ -19,7 +19,9 @@ import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { resolvePairColors } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
-import { chartTheme } from '../utils/chartTheme';
+import PlotFrame from './charts/PlotFrame';
+import { chartTheme, MONO_STACK } from '../utils/chartTheme';
+import { copyChartAsPng } from '../utils/chartUtils';
 
 
 /**
@@ -70,7 +72,12 @@ function topAlertAmt(overshoot, total) {
 }
 
 // ── Bar label plugin (same style as RangeChartView barGroupPlugin) ────────────
-function makeBarPlugin(flatRuns, isHorizontal, units, isDark) {
+function makeBarPlugin(flatRuns, isHorizontal, units) {
+    // Read once per plugin build rather than per draw call. The plugin is
+    // rebuilt whenever the chart is, and the chart is rebuilt on a theme flip
+    // (`isDark` is one of its dependencies), so this follows the theme without
+    // re-reading computed styles on every frame.
+    const { tick: tickColor, grid: gridColor, legend: legendColor, axis: axisColor } = chartTheme();
     return {
         id: 'compareBarLabels',
         afterDatasetsDraw(chart) {
@@ -188,7 +195,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units, isDark) {
                     if (!bar) return;
                     ctx2.save();
                     ctx2.font         = '12px sans-serif';
-                    ctx2.fillStyle    = isDark ? 'rgb(203,213,225)' : '#6b7280';
+                    ctx2.fillStyle    = tickColor;
                     ctx2.textAlign    = 'left';
                     ctx2.textBaseline = 'middle';
                     ctx2.fillText(run.name, bar.x + 8, bar.y);
@@ -206,7 +213,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units, isDark) {
                     const cy = (y1 + y2) / 2;
 
                     ctx2.save();
-                    ctx2.strokeStyle = isDark ? 'rgba(203,213,225,0.5)' : 'rgba(107,114,128,0.55)';
+                    ctx2.strokeStyle = axisColor;
                     ctx2.lineWidth   = 1.5;
                     ctx2.beginPath();
                     ctx2.moveTo(area.left - 6, y1 + 3);
@@ -214,12 +221,25 @@ function makeBarPlugin(flatRuns, isHorizontal, units, isDark) {
                     ctx2.stroke();
                     ctx2.restore();
 
+                    // Clamped to the gutter reserved for it. `layout.padding`
+                    // gives this label a fixed 140px however long the name is,
+                    // so "Model Y Standard · Standard RWD" ran off the left edge
+                    // of the canvas and was clipped to "ndard · Standard RWD" —
+                    // the half that identifies nothing.
                     ctx2.save();
-                    ctx2.font         = 'bold 13px sans-serif';
-                    ctx2.fillStyle    = isDark ? 'rgb(241,245,249)' : '#374151';
+                    ctx2.font         = `600 12px ${MONO_STACK}`;
+                    ctx2.fillStyle    = legendColor;
                     ctx2.textAlign    = 'right';
                     ctx2.textBaseline = 'middle';
-                    ctx2.fillText(group.vehicleName, area.left - 10, cy);
+                    let vLabel = group.vehicleName;
+                    const vRoom = area.left - 16;
+                    if (ctx2.measureText(vLabel).width > vRoom) {
+                        while (vLabel.length > 1 && ctx2.measureText(vLabel + '…').width > vRoom) {
+                            vLabel = vLabel.slice(0, -1);
+                        }
+                        vLabel += '…';
+                    }
+                    ctx2.fillText(vLabel, area.left - 10, cy);
                     ctx2.restore();
 
                     if (gi < groups.length - 1) {
@@ -227,7 +247,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units, isDark) {
                         if (nextStartBar) {
                             const sepY = (y2 + (nextStartBar.y - nextStartBar.height / 2)) / 2;
                             ctx2.save();
-                            ctx2.strokeStyle = isDark ? 'rgba(100,116,139,0.45)' : 'rgba(107,114,128,0.35)';
+                            ctx2.strokeStyle = gridColor;
                             ctx2.lineWidth   = 1;
                             ctx2.setLineDash([5, 4]);
                             ctx2.beginPath();
@@ -251,7 +271,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units, isDark) {
                     const cx = (x1 + x2) / 2;
 
                     ctx2.save();
-                    ctx2.strokeStyle = isDark ? 'rgba(203,213,225,0.5)' : 'rgba(107,114,128,0.55)';
+                    ctx2.strokeStyle = axisColor;
                     ctx2.lineWidth   = 1.5;
                     ctx2.beginPath();
                     ctx2.moveTo(x1 + 3, groupLabelY);
@@ -261,7 +281,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units, isDark) {
 
                     ctx2.save();
                     ctx2.font         = 'bold 13px sans-serif';
-                    ctx2.fillStyle    = isDark ? 'rgb(241,245,249)' : '#374151';
+                    ctx2.fillStyle    = legendColor;
                     ctx2.textAlign    = 'center';
                     ctx2.textBaseline = 'top';
                     ctx2.fillText(group.vehicleName, cx, groupLabelY + 4);
@@ -272,7 +292,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units, isDark) {
                         if (nextStartBar) {
                             const sepX = (x2 + (nextStartBar.x - nextStartBar.width / 2)) / 2;
                             ctx2.save();
-                            ctx2.strokeStyle = isDark ? 'rgba(100,116,139,0.45)' : 'rgba(107,114,128,0.35)';
+                            ctx2.strokeStyle = gridColor;
                             ctx2.lineWidth   = 1;
                             ctx2.setLineDash([5, 4]);
                             ctx2.beginPath();
@@ -514,6 +534,34 @@ export default function ChargeCompareView({
         }));
     }, [resolvedPairs, selectedRuns, verboseLabels, colorMap]);
 
+    // ── The frames' caption, and their exports ───────────────────────────────
+    // This view had no PNG export at all — only a Copy URL — so the one chart
+    // most likely to be pasted into a comparison thread was the one that could
+    // not be. Each frame exports itself: a reader wanting "time to add 200 mi"
+    // should not have to crop it out of an image answering a different question.
+    const [pngCopied, setPngCopied] = useState(0);
+
+    const plotSubtitle = useMemo(() => {
+        const pairs = activePairs.length;
+        const vehicles = new Set(activePairs.map(p2 => p2.vehicleName ?? p2.vehicle?.id)).size;
+        return [
+            `${pairs} pair${pairs === 1 ? '' : 's'}`,
+            `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
+            `from ~${startSoc}% SoC`,
+            correctionMode === 'none' ? 'no correction' : `corrected: ${correctionMode}`,
+            units === 'metric' ? 'metric' : 'imperial',
+        ].join(' · ');
+    }, [activePairs, startSoc, correctionMode, units]);
+
+    const copyFramed = async (instanceRef, title) => {
+        if (!instanceRef.current) return;
+        try {
+            await copyChartAsPng(instanceRef.current, { title, subtitle: plotSubtitle });
+            setPngCopied(instanceRef === chart1Instance ? 1 : 2);
+            setTimeout(() => setPngCopied(0), 2500);
+        } catch { /* Clipboard API not supported — the chart is still on screen */ }
+    };
+
     // ── Compute bars for one chart type ──────────────────────────────────────
     // chartType: 'range_added' | 'time_to_range'
     const buildBars = (chartType) => {
@@ -693,7 +741,7 @@ export default function ChargeCompareView({
             instanceRef.current = new Chart(canvasRef.current.getContext('2d'), {
                 type:    'bar',
                 data:    built.data,
-                plugins: [makeBarPlugin(built.flatRuns, isHorizontal, units, isDark)],
+                plugins: [makeBarPlugin(built.flatRuns, isHorizontal, units)],
                 options: {
                     indexAxis: isHorizontal ? 'y' : undefined,
                     layout: { padding: isHorizontal ? { top: 0, left: 140, right: 10 } : { top: 0, bottom: 55 } },
@@ -768,66 +816,86 @@ export default function ChargeCompareView({
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
-        <div>
-            {/* ── Controls card — hidden in presentation/pop-out mode ── */}
-            {!presentationMode && <div className="card mb-6">
+        <div className="chart-layout">
+            {/* ── Left rail: same rig as Charging and Range & Efficiency ── */}
+            {!presentationMode && <aside className="chart-rail">
                 {loading && <LoadingSpinner message="Loading charging data…" />}
-                <div className="flex flex-wrap items-center gap-6">
-                    <label className="flex items-center gap-2 text-sm font-medium text-secondary">
-                        Starting SoC (%):
-                        <input
-                            type="number"
-                            value={startSoc}
-                            min={1}
-                            max={80}
-                            onChange={e => setStartSoc(Math.min(80, Math.max(1, Number(e.target.value))))}
-                            className="form-input w-20"
-                        />
-                    </label>
-                    <label className="flex items-center gap-2 text-sm font-medium text-secondary">
-                        Charging Time (minutes):
-                        <input
-                            type="number"
-                            value={xMinutes}
-                            min={1}
-                            max={120}
-                            onChange={e => setXMinutes(Math.max(1, Number(e.target.value)))}
-                            className="form-input w-20"
-                        />
-                    </label>
-                    <label className="flex items-center gap-2 text-sm font-medium text-secondary">
-                        Range to add ({distanceLabel(units)}):
-                        <input
-                            type="number"
-                            value={units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles}
-                            min={1}
-                            max={units === 'metric' ? 650 : 400}
-                            onChange={e => {
-                                const v = Math.max(1, Number(e.target.value));
-                                setMMiles(units === 'metric' ? Math.round(v / MI_TO_KM) : v);
-                            }}
-                            className="form-input w-20"
-                        />
-                    </label>
-                    <div className="flex items-center gap-1 ml-auto">
+
+                {/* ── SCENARIO ──
+                  * The three numbers that define the question both charts
+                  * answer. They were a wrapping row of "Label: [input]" pairs
+                  * that read as a form; as a labelled group of short rows they
+                  * read as the parameters they are. */}
+                <div className="chart-rail-group">
+                    <span className="text-micro">Scenario</span>
+                    <div className="axis-rows">
+                        <label className="scenario-row">
+                            <span className="scenario-key">Start</span>
+                            <input
+                                type="number"
+                                value={startSoc}
+                                min={1}
+                                max={80}
+                                onChange={e => setStartSoc(Math.min(80, Math.max(1, Number(e.target.value))))}
+                                className="form-input"
+                            />
+                            <span className="scenario-unit">% SoC</span>
+                        </label>
+                        <label className="scenario-row">
+                            <span className="scenario-key">For</span>
+                            <input
+                                type="number"
+                                value={xMinutes}
+                                min={1}
+                                max={120}
+                                onChange={e => setXMinutes(Math.max(1, Number(e.target.value)))}
+                                className="form-input"
+                            />
+                            <span className="scenario-unit">min</span>
+                        </label>
+                        <label className="scenario-row">
+                            <span className="scenario-key">Add</span>
+                            <input
+                                type="number"
+                                value={units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles}
+                                min={1}
+                                max={units === 'metric' ? 650 : 400}
+                                onChange={e => {
+                                    const v = Math.max(1, Number(e.target.value));
+                                    setMMiles(units === 'metric' ? Math.round(v / MI_TO_KM) : v);
+                                }}
+                                className="form-input"
+                            />
+                            <span className="scenario-unit">{distanceLabel(units)}</span>
+                        </label>
+                    </div>
+                </div>
+
+                {/* ── DISPLAY ── as in the other two charts. */}
+                <div className="chart-rail-group">
+                    <span className="text-micro">Display</span>
+                    <div className="efficiency-unit-toggle">
                         {['vertical', 'horizontal'].map(o => (
                             <button
                                 key={o}
                                 onClick={() => setOrientation(o)}
-                                className={`btn ${orientation === o ? 'btn-primary' : 'btn-secondary'}`}
+                                className={`btn btn-toggle${orientation === o ? ' active' : ''}`}
                             >
                                 {o === 'vertical' ? '↕ Vertical' : '↔ Horizontal'}
                             </button>
                         ))}
                     </div>
+                    {setChartConfig && (
+                        <>
+                            <div className="display-grid">
+                                <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                            </div>
+                            <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
+                        </>
+                    )}
                 </div>
 
-                <div className="mt-4">
-                    <RunSelector
-                        headerActions={setChartConfig ? <>
-                            <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
-                            <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
-                        </> : null}
+                <RunSelector
                         vehicles={selectedVehicles}
                         selectedRunIds={selectedRuns}
                         onToggleRun={toggleRun}
@@ -868,19 +936,22 @@ export default function ChargeCompareView({
                             // one range test from another. Date is still omitted.
                             <>
                                 {run.speed_mph != null && (
-                                    <span className="text-xs bg-[var(--color-surface-sunken)] text-secondary px-1.5 py-0.5 rounded shrink-0">{fmtSpeed(run.speed_mph, units)}</span>
+                                    <span className="badge-micro">{fmtSpeed(run.speed_mph, units)}</span>
                                 )}
                                 {speedBasisNote(run) && (
-                                    <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded shrink-0" title="Average over a varying-speed cycle. Not directly comparable to a steady-state test; speed correction is skipped.">{speedBasisNote(run)}</span>
+                                    <span className="badge-micro is-warning" title="Average over a varying-speed cycle. Not directly comparable to a steady-state test; speed correction is skipped.">
+                                        mixed
+                                    </span>
                                 )}
                                 {run.temperature_f != null && (
-                                    <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200 shrink-0">{fmtTemp(run.temperature_f, units)}</span>
+                                    <span className="badge-micro">{fmtTemp(run.temperature_f, units)}</span>
                                 )}
                             </>
                         )}
                     />
-                </div>
-            </div>}
+            </aside>}
+
+            <div className="chart-main">
 
             {!hasRangeRuns ? (
                 <div className="card text-center py-12 text-meta">
@@ -889,38 +960,61 @@ export default function ChargeCompareView({
                 </div>
             ) : (
                 <>
-                    {/* ── Chart 1: Range Added in X Minutes ── */}
-                    <div className="card mb-6">
-                        <h4 className="text-base font-semibold mb-3">
-                            Range Added in {xMinutes} Minutes <span className="text-meta font-normal">(from ~{startSoc}% SoC, in {distanceLabel(units)})</span>
-                        </h4>
+                    {/* Two frames, because they are two exports. A reader
+                        pasting "time to add 200 mi" should not have to crop it
+                        out of an image that also answers a different question. */}
+                    <PlotFrame
+                        title={`Range added in ${xMinutes} minutes`}
+                        subtitle={plotSubtitle}
+                        exportControls={!presentationMode && (
+                            <>
+                                <button
+                                    onClick={handleCopyUrl}
+                                    className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
+                                    title="Copy link to this chart view"
+                                >
+                                    {copied ? '✓ Copied' : '🔗 URL'}
+                                </button>
+                                <button
+                                    onClick={() => copyFramed(chart1Instance, `Range added in ${xMinutes} minutes`)}
+                                    className={`chart-copy-btn ${pngCopied === 1 ? 'chart-copy-btn-active' : ''}`}
+                                    title="Copy the framed chart as a PNG"
+                                >
+                                    {pngCopied === 1 ? '✓ Copied' : 'PNG'}
+                                </button>
+                            </>
+                        )}
+                    >
                         <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart1Ref} />
                         </div>
-                    </div>
+                    </PlotFrame>
 
-                    {/* ── Chart 2: Time to Add M Miles ── */}
-                    <div className="card mb-6">
-                        <h4 className="text-base font-semibold mb-3">
-                            Time to Add {units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} {distanceLabel(units)} of Range <span className="text-meta font-normal">(from ~{startSoc}% SoC)</span>
-                        </h4>
-                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
-                            <canvas ref={chart2Ref} />
-                        </div>
-                        <div className="mt-3 flex gap-2">
-                            <button
-                                onClick={handleCopyUrl}
-                                className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
-                                title="Copy link to this chart view"
-                            >
-                                {copied ? '✓ Copied!' : '🔗 Copy URL'}
-                            </button>
-                        </div>
+                    <div className="mt-4">
+                        <PlotFrame
+                            title={`Time to add ${units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} ${distanceLabel(units)}`}
+                            subtitle={plotSubtitle}
+                            exportControls={!presentationMode && (
+                                <button
+                                    onClick={() => copyFramed(chart2Instance, `Time to add ${units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} ${distanceLabel(units)}`)}
+                                    className={`chart-copy-btn ${pngCopied === 2 ? 'chart-copy-btn-active' : ''}`}
+                                    title="Copy the framed chart as a PNG"
+                                >
+                                    {pngCopied === 2 ? '✓ Copied' : 'PNG'}
+                                </button>
+                            )}
+                        >
+                            <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
+                                <canvas ref={chart2Ref} />
+                            </div>
+                        </PlotFrame>
                     </div>
                 </>
             )}
 
             {!presentationMode && <ChartInfoBubble chartKey="compare" />}
+
+            </div>{/* .chart-main */}
         </div>
     );
 }

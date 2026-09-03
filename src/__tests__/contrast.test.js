@@ -382,7 +382,7 @@ function offenders() {
  * stopped every call site bringing its own bg-amber-50 / bg-red-50 cluster.
  * RunsView holds 31 of what is left.
  */
-const KNOWN_OFFENDERS = 63;
+const KNOWN_OFFENDERS = 61;
 
 describe('hardcoded light surfaces', () => {
     it('does not grow', () => {
