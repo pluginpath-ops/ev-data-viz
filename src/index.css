@@ -1755,6 +1755,31 @@ body {
 /* An axis with only one possible value. Reads as a stated fact — the value,
    then why there is no control — rather than as a field that will not let you
    type in it. */
+/* A viewing condition: label, its field, its unit. Its own class now — the rows
+   were bare flex divs, which is why a tooltip inside one had nothing to anchor
+   to and resolved against the section instead. */
+.viewing-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.viewing-label {
+    display: flex;
+    align-items: center;
+    flex: none;
+    min-width: 92px;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    font-weight: 500;
+    color: var(--color-text-secondary);
+}
+/* A figure the inputs above imply rather than one you set. */
+.viewing-derived {
+    font-family: var(--font-mono);
+    color: var(--color-text-meta);
+}
+.viewing-derived.is-active { color: var(--color-accent-orange); }
+
 .axis-row-fixed {
     display: flex;
     align-items: baseline;
@@ -3097,8 +3122,12 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    Anchoring ONLY to .scenario-row was the bug: a viewing-conditions icon then
    had no positioned ancestor inside the rail and its tooltip resolved against
    something far up the tree. */
+/* The ROW is the anchor wherever there is one, so a tooltip opens under the
+   control it explains rather than under the whole section. The group is the
+   fallback for anything that has no row of its own. */
 .chart-rail-group { position: relative; }
-.chart-rail .scenario-row { position: relative; }
+.chart-rail .scenario-row,
+.chart-rail .viewing-row { position: relative; }
 .chart-rail .info-icon { position: static; }
 .chart-rail .info-icon-tooltip {
     top: calc(100% + 6px);

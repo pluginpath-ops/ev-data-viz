@@ -810,6 +810,18 @@ export default function EpaCurvesView({
                         </div>
                     </div>
 
+                    {/* ── DISPLAY ── where every other chart in this section
+                      * keeps Auto Color, rather than tucked into the subject
+                      * selector's header. */}
+                    {setChartConfig && (
+                        <div className="chart-rail-group">
+                            <span className="text-micro">Display</span>
+                            <div className="display-grid">
+                                <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                            </div>
+                        </div>
+                    )}
+
                     {/* The viewing-condition controls, shared with the
                         certification-anchored curves (#237). The overlay above
                         stays here: it plots a VEHICLE's own range runs, which
@@ -828,21 +840,16 @@ export default function EpaCurvesView({
 
                     {/* Collapsible EPA test selector */}
                     {vehiclesWithEpa.length > 0 && (
-                        <div className="mt-4">
+                        <div>
                             <div className="run-selector-bar">
                             <button
                                 onClick={() => setSelectorExpanded(p => !p)}
                                 className="run-selector-header"
                             >
                                 <span style={{ display: 'inline-block', transform: selectorExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                                Select Vehicle Tests to Display
-                                <span className="text-sm font-normal text-secondary">({visibleCount} of {totalMappings} shown)</span>
+                                <span className="text-control">Select vehicle tests</span>
+                                <span className="run-selector-count">{visibleCount} / {totalMappings}</span>
                             </button>
-                            {setChartConfig && (
-                                <div className="run-selector-actions">
-                                    <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
-                                </div>
-                            )}
                             </div>
 
                             {selectorExpanded && (
@@ -854,9 +861,9 @@ export default function EpaCurvesView({
                                                 specs: resolveEffectiveSpecs(vehicle, vehicles),
                                             };
                                             return (
-                                                <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <h4 className="text-sm font-semibold text-secondary">
+                                                <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: vehicleColorMap[vehicle.id] || 'var(--color-primary)' }}>
+                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                        <h4 className="text-sm font-semibold text-secondary truncate">
                                                             {vehicleLabel(vehicle)}
                                                         </h4>
                                                         {/* Bulk helpers, same as the shared run selector: a vehicle
