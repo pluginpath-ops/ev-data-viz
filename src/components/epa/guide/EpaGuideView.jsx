@@ -58,7 +58,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
     const [filters, setFilters]   = useState(initial.filters);
     const [sortKey, setSortKey]   = useState(initial.sortKey);
     const [sortDir, setSortDir]   = useState(initial.sortDir);
-    const [columns, setColumns]   = useState(DEFAULT_COLUMNS);
+    const [columns, setColumns]   = useState(initial.columns);
     const [page, setPage]         = useState(initial.page);
     const [selectedIds, setSelectedIds] = useState(initial.selectedIds);
     const [openRow, setOpenRow]   = useState(null);
@@ -68,7 +68,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
     // filter click is a refinement, and pushing would make Back walk through
     // every keystroke of the search box instead of leaving the tab.
     useEffect(() => {
-        const p = encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds });
+        const p = encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds, columns });
         p.set('tab', 'epa');
         // Re-set the sub-tab the section owns. encodeGuideParams builds a fresh
         // URLSearchParams from this view's state alone, so anything not written
@@ -76,7 +76,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
         // the default tab.
         p.set('sub', subtab);
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [filters, sortKey, sortDir, page, selectedIds, subtab]);
+    }, [filters, sortKey, sortDir, page, selectedIds, columns, subtab]);
 
     // NOT `.map(decorateRow)` — Array.map passes the index as the second
     // argument, which would arrive as the brand index and resolve nothing.

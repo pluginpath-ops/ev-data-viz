@@ -440,7 +440,7 @@ const NUM_PARAMS = {
 };
 const NUMERIC_LISTS = new Set(['years', 'motorCounts', 'wheelSizes']);
 
-export function encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds }) {
+export function encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds, columns }) {
     const p = new URLSearchParams();
     for (const [key, param] of Object.entries(LIST_PARAMS)) {
         const v = filters[key];
@@ -459,7 +459,19 @@ export function encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds
     // the import upserts on the natural key rather than reinserting — so a
     // link keeps working across re-imports of the same model year.
     if (selectedIds?.length) p.set('sel', selectedIds.join(','));
+    // The columns and their ORDER. It is the one piece of browse state that did
+    // not round-trip: a link reproduced someone's filters, sort and selection
+    // and then showed them a different set of columns. Omitted when it matches
+    // the default, so an ordinary link does not carry ten keys.
+    if (columns?.length && !sameColumns(columns, DEFAULT_COLUMNS)) {
+        p.set('cols', columns.join(','));
+    }
     return p;
+}
+
+/** Same keys in the same order. Order matters — it is half of what is stored. */
+function sameColumns(a, b) {
+    return a.length === b.length && a.every((k, i) => k === b[i]);
 }
 
 export function decodeGuideParams(search) {
@@ -492,12 +504,17 @@ export function decodeGuideParams(search) {
         // ids, so a string would silently match nothing and the comparison
         // would come back empty with no explanation.
         .filter(Number.isFinite);
+    // Unknown keys are dropped rather than trusted: a renamed column would
+    // otherwise render an empty header that sorts by nothing. An empty result
+    // falls back to the default rather than showing a table with no columns.
+    const cols = (p.get('cols') ?? '').split(',').filter(k => columnByKey(k));
     return {
         filters,
         sortKey,
         sortDir: p.get('dir') === 'asc' ? 'asc' : 'desc',
         page: Number.isFinite(pageNum) && pageNum > 1 ? pageNum - 1 : 0,
         selectedIds,
+        columns: cols.length ? cols : DEFAULT_COLUMNS,
     };
 }
 

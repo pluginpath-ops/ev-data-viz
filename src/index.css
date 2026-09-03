@@ -4323,6 +4323,52 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-meta);
 }
 
+/* The column list. Wider than a facet menu because a column carries a label
+   AND a unit AND a control, where a facet value carries a name and a count. */
+.guide-column-panel { width: 220px; }
+.guide-column-picker { position: relative; }
+.guide-column-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 3px 4px;
+    border-radius: var(--radius-mark);
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-primary);
+    text-align: left;
+    cursor: grab;
+}
+.guide-column-row:hover { background-color: var(--color-hover-lift); }
+.guide-column-row.dragging { opacity: 0.5; }
+.guide-column-row.is-hidden {
+    color: var(--color-text-meta);
+    cursor: pointer;
+}
+.guide-column-grip {
+    flex: none;
+    width: 12px;
+    font-family: var(--font-mono);
+    color: var(--color-text-faint);
+}
+.guide-column-name { @apply truncate flex-1 min-w-0; }
+.guide-column-unit {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+.guide-column-drop {
+    flex: none;
+    color: var(--color-text-faint);
+}
+.guide-column-drop:hover { color: var(--color-danger-text); }
+.guide-column-divider {
+    padding: 6px 4px 3px;
+    border-top: 1px solid var(--color-border);
+    margin-top: 4px;
+}
+
 /* A range's bounds, in the same button-and-panel shape as a facet so the row
    reads as one kind of control. <details> rather than the facet's own state:
    there is nothing to filter or count inside, so it needs no JavaScript. */

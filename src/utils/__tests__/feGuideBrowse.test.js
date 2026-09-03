@@ -247,6 +247,34 @@ describe('shareable comparison', () => {
     it('drops junk ids rather than carrying them into a lookup', () => {
         expect(decodeGuideParams('sel=12,abc,,47').selectedIds).toEqual([12, 47]);
     });
+
+describe('the column list round-trips through the URL', () => {
+    const base = { filters: EMPTY_FILTERS, sortKey: null, sortDir: 'desc', page: 0 };
+
+    it('carries the order, not just the set', () => {
+        // Order is half of what is stored: two people ticking the same ten
+        // columns should still be able to arrange them differently.
+        const columns = ['carline', 'label_comb_range_mi', 'brand', 'model_year'];
+        const p = encodeGuideParams({ ...base, columns });
+        expect(decodeGuideParams(p.toString()).columns).toEqual(columns);
+    });
+
+    it('says nothing when the columns are the default', () => {
+        // An ordinary link should not carry ten keys nobody changed.
+        expect(encodeGuideParams({ ...base, columns: DEFAULT_COLUMNS }).has('cols')).toBe(false);
+        expect(decodeGuideParams('').columns).toEqual(DEFAULT_COLUMNS);
+    });
+
+    it('drops a key that no longer exists rather than rendering a dead column', () => {
+        const d = decodeGuideParams('cols=carline,not_a_column,brand');
+        expect(d.columns).toEqual(['carline', 'brand']);
+    });
+
+    it('falls back to the default when nothing survives', () => {
+        // A table with no columns is worse than the wrong columns.
+        expect(decodeGuideParams('cols=gone,also_gone').columns).toEqual(DEFAULT_COLUMNS);
+    });
+});
 });
 
 describe('brand resolution', () => {

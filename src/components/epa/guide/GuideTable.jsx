@@ -1,4 +1,4 @@
-import { GUIDE_COLUMNS, formatCell, barPercent } from '../../../utils/feGuideBrowse';
+import { columnByKey, formatCell, barPercent } from '../../../utils/feGuideBrowse';
 
 /**
  * The browse table (#235).
@@ -47,7 +47,10 @@ export default function GuideTable({
     rows, visibleColumns, sortKey, sortDir, onSort,
     selectedIds, onToggleSelect, onOpenRow, vehicleLinks, barMaxima,
 }) {
-    const cols = GUIDE_COLUMNS.filter(c => visibleColumns.includes(c.key));
+    // Mapped from the visible list rather than filtered out of GUIDE_COLUMNS:
+    // the order the reader arranged is the order they get, and filtering would
+    // silently restore the constant's.
+    const cols = visibleColumns.map(columnByKey).filter(Boolean);
 
     return (
         <div className="guide-table-container">
