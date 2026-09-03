@@ -174,7 +174,7 @@ const PALETTE = [
 // of the charging strategy: en-route Charger Arrival SoC (minSoc) and the
 // mode-dependent charge amount (leg distance / charge time). Blank shows the
 // global value greyed as a placeholder; typing overrides just that run.
-function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, dl, onChange }) {
+function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, dl, onChange, onReset }) {
     const headerRef = useRef(null);
     const [open, setOpen] = useState(false);
     if (!entries.length) return null;
@@ -212,6 +212,14 @@ function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, d
                 thing. */}
             {open && (
                 <div className="routing-rows">
+                    {/* Only once something is overridden. A reset that is always
+                        there implies there is always something to undo, and it
+                        is the one control here that discards work. */}
+                    {customized > 0 && (
+                        <button type="button" onClick={onReset} className="routing-reset">
+                            Reset {customized} override{customized === 1 ? '' : 's'}
+                        </button>
+                    )}
                     {entries.map(e => {
                         const ov = perRun[e.key] || {};
                         const legValue = ov.legDistance != null
@@ -1428,6 +1436,11 @@ export default function RoadTripView({
     // Per-row override setter, keyed by pair key. Empty/invalid clears the
     // override (falls back to global); prunes empty entries so unset rows use
     // globals cleanly.
+    // Drop every per-run override at once. A separate action rather than a loop
+    // over setRunOverride: that would be one state update per field per run, and
+    // each one rebuilds the simulation.
+    const clearRunOverrides = () => setRoadTripConfig(prev => ({ ...prev, perRun: {} }));
+
     const setRunOverride = (runId, key, rawVal) => setRoadTripConfig(prev => {
         const perRun = { ...(prev.perRun || {}) };
         const cur = { ...(perRun[runId] || {}) };
@@ -1824,6 +1837,7 @@ export default function RoadTripView({
                             units={units}
                             dl={dl}
                             onChange={setRunOverride}
+                            onReset={clearRunOverrides}
                         />
                     )}
 

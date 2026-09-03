@@ -2422,6 +2422,21 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     margin-top: 6px;
 }
 
+/* Discards work, so it says how much it will discard rather than just "reset",
+   and it carries the same orange as the rows it clears. Quiet: it is an escape
+   hatch, not the thing you came here to do. */
+.routing-reset {
+    align-self: flex-start;
+    padding: 2px 7px;
+    border: 1px solid var(--color-accent-orange);
+    border-radius: var(--radius-control);
+    background-color: transparent;
+    font-size: calc(var(--fs-body) * 0.7857);
+    color: var(--color-accent-orange);
+    cursor: pointer;
+}
+.routing-reset:hover { background-color: var(--color-accent-orange-surface); }
+
 .routing-row {
     display: flex;
     flex-direction: column;
