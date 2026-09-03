@@ -170,7 +170,7 @@ function scanCss(key, test) {
 export const LEDGER = [
     {
         key: 'palette-text',
-        count: 272,
+        count: 270,
         scope: 'src/**/*.jsx',
         what: 'Text colours written as Tailwind palette utilities. These sit outside '
             + 'the theme: when the re-skin re-valued the tokens, every one of these '

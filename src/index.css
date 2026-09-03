@@ -1875,9 +1875,21 @@ body {
     font-weight: 500;
     color: var(--color-text-secondary);
 }
+/* The unit that follows an input. Its own name because it repeats seven times
+   in one panel and was seven copies of `text-sm text-meta`. */
+.viewing-unit {
+    flex: none;
+    white-space: nowrap;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-meta);
+}
+
 /* A figure the inputs above imply rather than one you set. */
 .viewing-derived {
+    flex: none;
+    white-space: nowrap;
     font-family: var(--font-mono);
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
     color: var(--color-text-meta);
 }
 .viewing-derived.is-active { color: var(--color-accent-orange); }
