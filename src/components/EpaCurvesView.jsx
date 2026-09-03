@@ -810,18 +810,6 @@ export default function EpaCurvesView({
                         </div>
                     </div>
 
-                    {/* ── DISPLAY ── where every other chart in this section
-                      * keeps Auto Color, rather than tucked into the subject
-                      * selector's header. */}
-                    {setChartConfig && (
-                        <div className="chart-rail-group">
-                            <span className="text-micro">Display</span>
-                            <div className="display-grid">
-                                <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
-                            </div>
-                        </div>
-                    )}
-
                     {/* The viewing-condition controls, shared with the
                         certification-anchored curves (#237). The overlay above
                         stays here: it plots a VEHICLE's own range runs, which
@@ -835,6 +823,18 @@ export default function EpaCurvesView({
                     {missingWeightWarnings.length > 0 && (
                         <div className="chart-warning-banner">
                             ⚠ Elevation Gain/Loss can't be applied for {missingWeightWarnings.map(w => `${w.vehicleName} (${w.epaLabel})`).join(', ')} — no EPA equivalent test weight on file. That curve is hidden while an elevation adjustment is active.
+                        </div>
+                    )}
+
+                    {/* ── DISPLAY ── where every other chart in this section
+                      * keeps Auto Color, rather than tucked into the subject
+                      * selector's header. */}
+                    {setChartConfig && (
+                        <div className="chart-rail-group">
+                            <span className="text-micro">Display</span>
+                            <div className="display-grid">
+                                <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                            </div>
                         </div>
                     )}
 
