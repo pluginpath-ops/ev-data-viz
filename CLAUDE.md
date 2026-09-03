@@ -33,11 +33,17 @@ seven different inline clusters (`bg-amber-50`/`bg-orange-50`/`bg-cyan-50`/
 re-skin re-valued the tokens, every semantic class moved for free and every
 inline cluster kept painting the old palette.
 
-- The `KNOWN_OFFENDERS` ratchet in `src/__tests__/contrast.test.js` counts what
-  is left. **Lower it whenever a change clears some** — it fails on a fall as
-  well as a rise.
+- **`npm run drift` is the ledger of what is left** — 699 things across nine
+  probes, each with a count, what the number means, and where the drift is
+  supposed to go. `npm run drift <probe>` lists the sites. It is asserted in
+  `src/__tests__/drift.test.js` and **fails on a fall as well as a rise**:
+  clearing some is not silently absorbed, you lower the count in
+  `scripts/driftProbes.js`. A rise needs a reason in the PR.
+- Two ratchets predate it and stay in their own suites: `KNOWN_OFFENDERS`
+  (`contrast.test.js`, light surfaces with no dark counterpart) and the
+  dark-override cap (`playground.test.js`). Lower those the same way.
 - Never add a `[data-theme="dark"] .foo` rule — it cannot follow a themed
-  subtree. `playground.test.js` caps that backlog and it only goes down.
+  subtree.
 - **Naming is worth stopping for.** A class name is the whole value of
   extracting one, and a bad name is worse than the cluster it replaced. If the
   right name isn't obvious, say so and ask rather than guessing.
@@ -112,6 +118,27 @@ found by hand in one week were all "built, unit-tested, never connected". The
 wiring suite reads source text to assert the seams hold: that a note written to
 every run is read somewhere, that every chart showing a test speed also marks a
 mixed cycle, that a tunable constant reaches the Admin knobs.
+
+### The drift ledger
+
+`npm run drift` prints what the codebase still paints outside the theme —
+palette utilities by property, `text-[Npx]` literals, raw hex and rgb, `@apply`
+lines reaching for a palette colour, off-scale `font-size`. `npm run drift
+<probe>` lists the sites behind one number.
+
+The probes and their counts live together in `scripts/driftProbes.js`, so
+adding a probe, recording its count and writing down why a match is legitimate
+are one edit. `drift.test.js` asserts each count with `toBe` — **a fall fails
+too**, because a cap absorbs cleanups silently and six months later nobody can
+tell whether the backlog shrank or the probe broke.
+
+Two probes were deliberately NOT built, and the reasoning is the useful part: a
+ledger that counts correct code teaches people to ignore it. Literal colours in
+inline `style={{…}}` measured at zero — all 91 blocks hold runtime values like
+`backgroundColor: run.color`, which can never be a class. Three-digit hex was
+half issue references in comments (`#221`). Anything genuinely un-tokenisable
+goes in `EXEMPT` with a reason, and a test fails when an exemption stops
+matching anything.
 
 When adding a utility for the UI, expect the wiring suite to fail until
 something consumes it. If it is deliberately unused, add it to `ALLOWED_UNUSED`
