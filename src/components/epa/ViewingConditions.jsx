@@ -107,7 +107,7 @@ export default function ViewingConditions({ conditions }) {
         <>
             <div className="chart-viewing-conditions">
                 {/* Altitude — viewing condition, applies to all curves */}
-                <div className="flex items-center gap-1.5">
+                <div className="viewing-row">
                     <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
                         Altitude
                         <InfoIcon
@@ -128,7 +128,7 @@ export default function ViewingConditions({ conditions }) {
                 </div>
 
                 {/* Temperature — viewing condition, applies to all curves */}
-                <div className="flex items-center gap-1.5">
+                <div className="viewing-row">
                     <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
                         Temp
                         <InfoIcon
@@ -158,7 +158,7 @@ export default function ViewingConditions({ conditions }) {
                 </div>
 
                 {/* Accessory load — viewing condition, applies to all curves */}
-                <div className="flex items-center gap-1.5">
+                <div className="viewing-row">
                     <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
                         Accessory Load
                         <InfoIcon
@@ -183,7 +183,7 @@ export default function ViewingConditions({ conditions }) {
                 </div>
 
                 {/* Wind — viewing condition, applies to all curves */}
-                <div className="flex items-center gap-1.5">
+                <div className="viewing-row">
                     <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
                         Wind
                         <InfoIcon
@@ -220,44 +220,53 @@ export default function ViewingConditions({ conditions }) {
                 {/* The elevation-gain disclosure. Turning it OFF clears the inputs
                     rather than only hiding them — a hidden adjustment that keeps
                     applying is the worst of both. */}
-                <button
-                    type="button"
-                    className={`btn ${gradeExpanded ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => setGradeExpanded(e => {
-                        const next = !e;
-                        if (!next) {
-                            setGradeGainFt('');
-                            setGradeDistanceMiles('');
-                        }
-                        return next;
-                    })}
-                    title="Adjust for a net elevation gain/loss over a route (advanced — usually 0)"
-                >
-                    Adj. Elevation
-                </button>
             </div>
+
+            {/* A disclosure, not a button. It reveals two fields rather than
+                doing something, and as a filled primary button it read as an
+                action — and as the only accent-coloured control in the row, as
+                the most important one. Orange when open, because an elevation
+                adjustment IS changing the curve. */}
+            <button
+                type="button"
+                className={`subgroup-header${gradeExpanded ? ' is-open' : ''}`}
+                onClick={() => setGradeExpanded(e => {
+                    const next = !e;
+                    if (!next) {
+                        setGradeGainFt('');
+                        setGradeDistanceMiles('');
+                    }
+                    return next;
+                })}
+                title="Adjust for a net elevation gain/loss over a route (advanced — usually 0)"
+            >
+                <span style={{ display: 'inline-block', transform: gradeExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
+                Elevation gain / loss
+                <InfoIcon
+                    position="right"
+                    text="Adds a fixed energy cost or credit for a net climb or descent over a given distance — a route effect, distinct from static altitude, which is air density. Climbing uses full physics from vehicle weight; descending assumes only ~70% of the theoretical energy comes back through regen. Usually 0 — most tests are round trips or flat routes."
+                />
+            </button>
 
             {/* Elevation gain/loss panel — a route/grade effect (distinct from static
                 altitude). Its own row, toggled by the "Adj. Elevation" button above, so
                 opening/closing it never reflows the altitude/temp/wind row. */}
             {gradeExpanded && (
                 <div className="chart-viewing-conditions">
-                    <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
-                            Elevation Gain/Loss
-                            <InfoIcon
-                                text="Adds a fixed energy cost/credit for a net climb or descent over a given distance — a route effect, distinct from static altitude (air density). Climbing: full physics based on vehicle weight. Descending: only ~70% of the theoretical energy is assumed recovered via regen. Usually 0 — most tests are round trips or flat routes."
-                                position="right"
-                                className="ml-1"
-                            />
-                        </span>
+                    {/* The inputs read as the sentence they are — "gain N ft
+                        over M mi" — rather than a label followed by two boxes.
+                        The grade they imply is a RESULT, so it gets its own row
+                        below rather than trailing the fields it is derived
+                        from. */}
+                    <div className="viewing-row">
+                        <span className="viewing-label">Gain</span>
                         <input
                             type="number"
                             step="50"
                             value={gradeGainFt}
                             onChange={e => setGradeGainFt(e.target.value)}
                             placeholder="0"
-                            className="form-input form-input w-20 text-right"
+                            className="form-input w-20 text-right"
                             aria-label="Net elevation gain in feet (negative for net descent)"
                         />
                         <span className="text-sm text-meta">ft over</span>
@@ -268,15 +277,18 @@ export default function ViewingConditions({ conditions }) {
                             value={gradeDistanceMiles}
                             onChange={e => setGradeDistanceMiles(e.target.value)}
                             placeholder="0"
-                            className="form-input form-input w-16 text-right"
+                            className="form-input w-16 text-right"
                             aria-label="Distance in miles the elevation change is spread over"
                         />
                         <span className="text-sm text-meta">mi</span>
+                    </div>
+                    <div className="viewing-row">
+                        <span className="viewing-label">Grade</span>
                         <span
-                            className={`text-xs whitespace-nowrap ${gradeAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-meta'}`}
+                            className={`text-sm whitespace-nowrap ${gradeAdjusted ? 'viewing-derived is-active' : 'viewing-derived'}`}
                             title="Average grade over the distance above"
                         >
-                            → {avgGradePercent.toFixed(1)}% grade{gradeAdjusted ? ' ▲' : ''}
+                            {avgGradePercent.toFixed(1)}%{gradeAdjusted ? ' ▲' : ''}
                         </span>
                     </div>
                 </div>

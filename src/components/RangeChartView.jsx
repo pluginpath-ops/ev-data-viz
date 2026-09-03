@@ -19,9 +19,12 @@ import {
     fmtSpeed, speedBasisNote, fmtTemp,
 } from '../utils/unitConversions';
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
-import { copyChartAsPng } from '../utils/chartUtils';
+import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
+import PlotFrame from './charts/PlotFrame';
+import { useChartPng } from '../hooks/useChartPng';
+import SpeedBadge from './charts/SpeedBadge';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -70,7 +73,6 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     const chartInstance = useRef(null);
     const [chartType,    setChartType]    = useState('range-vehicle-bar');
     const [effUnit,      setEffUnit]      = useState('mi_kwh'); // 'mi_kwh' | 'wh_mi'
-    const [copied,       setCopied]       = useState(false);
     const [copiedUrl,    setCopiedUrl]    = useState(false);
 
     // ── Axis scale state — yMin defaults to 0, rest auto ─────────────────────
@@ -261,9 +263,10 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
 
     // ── Render chart ──────────────────────────────────────────────────────────
     useEffect(() => {
-        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { tick: tickColor, grid: gridColor, legend: legendColor, axis: axisColor } = chartTheme();
+        const fonts = chartFonts();
+        applyChartDefaults(Chart);
 
         if (chartInstance.current) {
             chartInstance.current.destroy();
@@ -324,7 +327,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         if (drawY + pillH > bar.base - topPad) return;
 
                         ctx2.save();
-                        ctx2.font = primary ? 'bold 11px sans-serif' : '10px sans-serif';
+                        ctx2.font = primary
+                            ? `600 ${fonts.badge}px ${fonts.sans}`
+                            : `${fonts.micro}px ${fonts.sans}`;
                         const tw = ctx2.measureText(text).width;
                         const pw = tw + pillPad * 2;
 
@@ -372,7 +377,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
 
                     // Underline spanning the group
                     ctx2.save();
-                    ctx2.strokeStyle = isDark ? 'rgba(203,213,225,0.5)' : 'rgba(107,114,128,0.55)';
+                    ctx2.strokeStyle = axisColor;
                     ctx2.lineWidth   = 1.5;
                     ctx2.beginPath();
                     ctx2.moveTo(x1 + 3, groupLabelY);
@@ -380,14 +385,30 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     ctx2.stroke();
                     ctx2.restore();
 
-                    // Centered bold vehicle name
-                    ctx2.save();
-                    ctx2.font         = 'bold 13px sans-serif';
-                    ctx2.fillStyle    = isDark ? 'rgb(241,245,249)' : '#374151';
-                    ctx2.textAlign    = 'center';
-                    ctx2.textBaseline = 'top';
-                    ctx2.fillText(group.vehicleName, cx, groupLabelY + 4);
-                    ctx2.restore();
+                    // Centered vehicle name, CLAMPED TO ITS GROUP. It was drawn
+                    // at a fixed size with no width to respect, which was
+                    // survivable while the plot was full-bleed and became five
+                    // overlapping names the moment it moved beside a rail.
+                    // Below a floor the name is dropped entirely — the underline
+                    // and the separator still show the grouping, and a smear of
+                    // half-letters shows nothing.
+                    const span = x2 - x1 - 6;
+                    if (span >= 28) {
+                        ctx2.save();
+                        ctx2.font         = `600 ${fonts.label}px ${fonts.mono}`;
+                        ctx2.fillStyle    = legendColor;
+                        ctx2.textAlign    = 'center';
+                        ctx2.textBaseline = 'top';
+                        let label = group.vehicleName;
+                        if (ctx2.measureText(label).width > span) {
+                            while (label.length > 1 && ctx2.measureText(label + '…').width > span) {
+                                label = label.slice(0, -1);
+                            }
+                            label += '…';
+                        }
+                        ctx2.fillText(label, cx, groupLabelY + 4);
+                        ctx2.restore();
+                    }
 
                     // Dashed vertical separator between groups
                     if (gi < groups.length - 1) {
@@ -395,7 +416,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         if (nextStartBar) {
                             const sepX = (x2 + (nextStartBar.x - nextStartBar.width / 2)) / 2;
                             ctx2.save();
-                            ctx2.strokeStyle = isDark ? 'rgba(100,116,139,0.45)' : 'rgba(107,114,128,0.35)';
+                            ctx2.strokeStyle = gridColor;
                             ctx2.lineWidth   = 1;
                             ctx2.setLineDash([5, 4]);
                             ctx2.beginPath();
@@ -424,14 +445,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    title: {
-                        display: true,
-                        text: built.kind === 'bar'
-                            ? built.yLabel.replace(/\s*\(.*?\)$/, '')
-                            : `${built.yLabel.replace(/\s*\(.*?\)$/, '')} vs ${built.xLabel.replace(/\s*\(.*?\)$/, '')}`,
-                        font: { size: 14, weight: 'bold' },
-                    },
-                    legend: { display: built.kind !== 'bar', position: 'top', labels: { color: legendColor } },
+                    // The frame draws the title now, in the DOM, and the export
+                    // draws it onto the PNG. Leaving it on here printed it twice.
+                    title: { display: false },
                     tooltip: {
                         displayColors: false,
                         callbacks: {
@@ -517,77 +533,99 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // every render. Comparing the colours by value redraws only when one moves.
     }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, autoColor, correctionMode]);
 
-    // ── Copy chart PNG ────────────────────────────────────────────────────────
-    const handleCopyImage = async () => {
-        if (!chartInstance.current) return;
-        try {
-            await copyChartAsPng(chartInstance.current, isDark ? 'rgb(8,12,28)' : '#ffffff');
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2500);
-        } catch { /* Clipboard API not supported — chart is still visible */ }
-    };
+    // ── The frame's caption ──────────────────────────────────────────────────
+    // In the frame, so it is in the export: a bar chart pasted into a thread has
+    // to say what the bars are OF and in what unit, without anyone typing a
+    // caption under it.
+    const plotTitle = useMemo(() => {
+        const t = CHART_TYPES.find(x => x.key === chartType);
+        // The emoji belongs on the button, not in the title of an exported
+        // image — it is a wayfinding aid in a list of six, and noise alone.
+        return (t?.label ?? 'Range & Efficiency').replace(/^\W+\s*/, '');
+    }, [chartType]);
 
+    const plotSubtitle = useMemo(() => {
+        const runs = plottableRuns.length;
+        const vehicles = new Set(plottableRuns.map(r => r.vehicleName ?? r.vehicle?.id)).size;
+        const isEff = chartType.startsWith('eff-');
+        const parts = [
+            `${runs} run${runs === 1 ? '' : 's'}`,
+            `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
+        ];
+        if (isEff) parts.push(effOptions(units).find(o => o.value === effUnit)?.label ?? effUnit);
+        parts.push(correctionMode === 'none' ? 'no correction' : `corrected: ${correctionMode}`);
+        parts.push(units === 'metric' ? 'metric' : 'imperial');
+        return parts.join(' · ');
+    }, [plottableRuns, chartType, effUnit, correctionMode, units]);
 
-    // ── Render ────────────────────────────────────────────────────────────────
+    const { copyPng, copied, preview, dismissPreview } =
+        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle });
+
     return (
-        <div>
-            {/* ── Config card — hidden in presentation mode ── */}
-            {!presentationMode && <div className="card mb-6">
-                {/* Efficiency unit toggle */}
-                <div className="efficiency-unit-toggle mb-4">
-                    {effOptions(units).map(({ value: key, label }) => (
-                        <button
-                            key={key}
-                            type="button"
-                            onClick={() => setEffUnit(key)}
-                            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${effUnit === key ? 'bg-[var(--color-card)] shadow text-[var(--color-text-primary)]' : 'text-secondary hover:text-[var(--color-text-primary)]'}`}
-                        >
-                            {label}
-                        </button>
-                    ))}
+        <div className="chart-layout">
+            {/* ── Left rail: pick here, read on the right. Same rig as Charging,
+              * so the two chart screens read as one family. */}
+            {!presentationMode && <aside className="chart-rail">
+                {/* ── MEASURE ──
+                  * What the bars are OF, and in which unit. The chart-type row
+                  * was five buttons in an accent fill that read as five primary
+                  * actions; as a labelled group of toggles it reads as the one
+                  * choice it is. */}
+                <div className="chart-rail-group">
+                    <span className="text-micro">Measure</span>
+                    <div className="chart-type-buttons">
+                        {CHART_TYPES.map(t => (
+                            <button
+                                key={t.key}
+                                onClick={() => handleChartTypeChange(t.key)}
+                                title={t.desc}
+                                className={`btn btn-toggle${chartType === t.key ? ' active' : ''}`}
+                            >
+                                {t.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                {/* Chart type buttons */}
-                <div className="chart-type-buttons mb-4">
-                    {CHART_TYPES.map(t => (
-                        <button
-                            key={t.key}
-                            onClick={() => handleChartTypeChange(t.key)}
-                            title={t.desc}
-                            className="btn text-sm"
-                            style={
-                                chartType === t.key
-                                    ? { backgroundColor: 'var(--color-primary)', color: 'white' }
-                                    : { backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }
-                            }
-                        >
-                            {t.label}
-                        </button>
-                    ))}
+                <div className="chart-rail-group">
+                    <span className="text-micro">Efficiency unit</span>
+                    <div className="efficiency-unit-toggle">
+                        {effOptions(units).map(({ value: key, label }) => (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setEffUnit(key)}
+                                className={`btn btn-toggle${effUnit === key ? ' active' : ''}`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                {/* Show points + Auto Color toggles */}
-                <div className={`chart-toggles mb-6`}>
-                    {CHART_TYPES.find(t => t.key === chartType)?.kind === 'line' && (
-                        <label className="toggle-label">
-                            <input
-                                type="checkbox"
-                                checked={showPoints}
-                                onChange={e => setShowPoints(e.target.checked)}
-                                className="w-4 h-4"
-                            />
-                            <span className="text-sm font-medium">Show points</span>
-                        </label>
-                    )}
+                {/* ── DISPLAY ── every toggle in one region, as in Charging. */}
+                <div className="chart-rail-group">
+                    <span className="text-micro">Display</span>
+                    <div className="display-grid">
+                        {CHART_TYPES.find(t => t.key === chartType)?.kind === 'line' && (
+                            <label className="toggle-label">
+                                <input
+                                    type="checkbox"
+                                    checked={showPoints}
+                                    onChange={e => setShowPoints(e.target.checked)}
+                                    className="w-4 h-4"
+                                />
+                                <span className="text-sm">Points</span>
+                            </label>
+                        )}
+                        <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                        <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                    </div>
+                    <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                 </div>
 
                 {/* ── Run selector ── */}
                 <RunSelector
-                    headerActions={<>
-                        <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
-                        <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
-                        <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
-                    </>}
                     vehicles={selectedVehicles}
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}
@@ -596,10 +634,14 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     colorMap={colorMap}
                     emptyMessage="No range test records"
                     renderRunMeta={run => {
-                        const eff         = calcEff(run.distance_miles, run.energy_kwh, effUnit, units);
+                        // Speed, temperature, wind, distance — the conditions
+                        // that make one range test comparable to another.
+                        //
+                        // Efficiency is deliberately NOT here: it is what the
+                        // chart plots, so a badge repeating it beside every row
+                        // is the answer printed on the question.
                         const rawRange    = calcRange(run);
                         const range       = rawRange != null ? convDistance(rawRange, units) : null;
-                        const effLabelStr = getEffLabel(effUnit, units);
                         const dl          = distanceLabel(units);
                         const socUsed     = (run.start_soc != null && run.end_soc != null) ? run.start_soc - run.end_soc : null;
                         const isProjected = socUsed != null && socUsed !== 100;
@@ -607,45 +649,75 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         const isChecked   = selectedRuns.some(id => String(id) === String(run.id));
                         return (
                             <>
-                                {run.speed_mph != null && (
-                                    <span className="text-xs bg-[var(--color-surface-sunken)] text-secondary px-1.5 py-0.5 rounded">{fmtSpeed(run.speed_mph, units)}</span>
-                                )}
-                                {speedBasisNote(run) && (
-                                    <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded" title="Average over a varying-speed cycle. Not directly comparable to a steady-state test; speed correction is skipped.">{speedBasisNote(run)}</span>
-                                )}
+                                {/* Carries its own basis — see SpeedBadge. */}
+                                <SpeedBadge run={run} units={units} />
                                 {run.temperature_f != null && (
-                                    <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">{fmtTemp(run.temperature_f, units)}</span>
+                                    <span className="badge-micro">{fmtTemp(run.temperature_f, units)}</span>
                                 )}
                                 {run.avg_wind_speed_mph != null && (
                                     <span
-                                        className="text-xs bg-cyan-50 text-cyan-700 px-1.5 py-0.5 rounded border border-cyan-200"
-                                        title={run.wind_direction_deg != null ? `${run.wind_direction_deg}° vs travel (0°=tailwind, 180°=headwind)` : 'Direction not recorded'}
+                                        className="badge-micro"
+                                        title={run.wind_direction_deg != null
+                                            ? `Wind ${fmtSpeed(run.avg_wind_speed_mph, units)} at ${run.wind_direction_deg}° vs travel (0° tailwind, 180° headwind)`
+                                            : `Wind ${fmtSpeed(run.avg_wind_speed_mph, units)}, direction not recorded`}
                                     >
-                                        💨 {fmtSpeed(run.avg_wind_speed_mph, units)}{run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : ''}
+                                        ~{fmtSpeed(run.avg_wind_speed_mph, units)}
                                     </span>
                                 )}
                                 {range != null && (
                                     <span
-                                        className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200"
-                                        title={isProjected ? `Projected from ${run.distance_miles} mi driven over ${socUsed}% SoC` : 'Measured distance'}
+                                        className="badge-micro"
+                                        title={isProjected
+                                            ? `Projected from ${run.distance_miles} mi driven over ${socUsed}% SoC`
+                                            : 'Measured distance'}
                                     >
                                         {range} {dl}{isProjected ? ' ⟳' : ''}
                                     </span>
                                 )}
-                                {eff != null && (
-                                    <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">{eff} {effLabelStr}</span>
-                                )}
                                 {!canPlot && isChecked && (
-                                    <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200" title="Missing fields required for this chart type">⚠ missing data</span>
+                                    <span className="badge-micro is-warning" title="Missing fields required for this chart type">
+                                        ⚠ no data
+                                    </span>
                                 )}
                             </>
                         );
                     }}
                 />
-            </div>}
+            </aside>}
 
-            {/* ── Chart card ── */}
-            <div className="card mb-6">
+            <div className="chart-main">
+
+            {/* ── The plot, inside the frame the export captures ── */}
+            <PlotFrame
+                title={plotTitle}
+                subtitle={plotSubtitle}
+                preview={preview}
+                onDismissPreview={dismissPreview}
+                exportControls={!presentationMode && (
+                    <>
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(window.location.href).then(() => {
+                                    setCopiedUrl(true);
+                                    setTimeout(() => setCopiedUrl(false), 2000);
+                                });
+                            }}
+                            className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
+                            title="Copy link to this chart view"
+                        >
+                            {copiedUrl ? '✓ Copied' : '🔗 URL'}
+                        </button>
+                        <button
+                            onClick={copyPng}
+                            disabled={plottableRuns.length === 0}
+                            className={`chart-copy-btn disabled:opacity-40 disabled:cursor-not-allowed ${copied ? 'chart-copy-btn-active' : ''}`}
+                            title="Copy the framed chart as a PNG"
+                        >
+                            {copied ? '✓ Copied' : 'PNG'}
+                        </button>
+                    </>
+                )}
+            >
                 <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px', position: 'relative' }}>
                     {/* Canvas always mounted so ref stays valid */}
                     <canvas
@@ -669,29 +741,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         </div>
                     )}
                 </div>
-                <div className="mt-3 flex gap-2">
-                    <button
-                        onClick={() => {
-                            navigator.clipboard.writeText(window.location.href).then(() => {
-                                setCopiedUrl(true);
-                                setTimeout(() => setCopiedUrl(false), 2000);
-                            });
-                        }}
-                        className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
-                        title="Copy link to this chart view"
-                    >
-                        {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
-                    </button>
-                    <button
-                        onClick={handleCopyImage}
-                        disabled={plottableRuns.length === 0}
-                        className={`chart-copy-btn disabled:opacity-40 disabled:cursor-not-allowed ${copied ? 'chart-copy-btn-active' : ''}`}
-                        title="Export chart as PNG"
-                    >
-                        {copied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
-                    </button>
-                </div>
-            </div>
+            </PlotFrame>
             {/* ── Axis scale controls (card provided by AxisScaleControls) ──
                 Hidden in presentation/pop-out mode — these belong on the main page. */}
             {!presentationMode && (
@@ -704,6 +754,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             )}
 
             {!presentationMode && <ChartInfoBubble chartKey="range" />}
+
+            </div>{/* .chart-main */}
         </div>
     );
 }

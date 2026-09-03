@@ -15,7 +15,53 @@ Prefer:
 ### CSS
 - Use semantic class names defined in `src/index.css` via Tailwind's `@apply` directive
 - Class names should describe *what* an element is, not *how* it looks (e.g. `.vehicle-grid`, `.modal-overlay`)
-- Avoid repeating long Tailwind utility clusters inline; extract them to named classes
+
+**Tokenise appearance; keep Tailwind for layout.** The line is not "Tailwind
+bad" — a one-off `flex items-center gap-2` is fine inline and extracting it
+would buy nothing. The rule is about *appearance that repeats*:
+
+- **Colour and size never go inline.** Colours come from tokens, sizes derive
+  from `--fs-body` through `--fs-step`. A raw `bg-blue-50` or `text-[11px]` is
+  outside the theme and outside the scale, wherever it is written.
+- **A cluster that describes what something IS wants a name.** When you touch
+  markup carrying one, convert it to a semantic class in `src/index.css` rather
+  than restyling it in place. Reuse an existing class before inventing one.
+
+Why it matters concretely: the Range & Efficiency run rows drew seven badges in
+seven different inline clusters (`bg-amber-50`/`bg-orange-50`/`bg-cyan-50`/
+`bg-green-50`/`bg-blue-50`) — a rainbow where no hue meant anything. When the
+re-skin re-valued the tokens, every semantic class moved for free and every
+inline cluster kept painting the old palette.
+
+- **`npm run drift` is the ledger of what is left** — 699 things across ten
+  probes, each with a count, what the number means, and where the drift is
+  supposed to go. `npm run drift <probe>` lists the sites. It is asserted in
+  `src/__tests__/drift.test.js` and **fails on a fall as well as a rise**:
+  clearing some is not silently absorbed, you lower the count in
+  `scripts/driftProbes.js`. A rise needs a reason in the PR.
+- Two ratchets predate it and stay in their own suites: `KNOWN_OFFENDERS`
+  (`contrast.test.js`, light surfaces with no dark counterpart) and the
+  dark-override cap (`playground.test.js`). Lower those the same way.
+- Never add a `[data-theme="dark"] .foo` rule — it cannot follow a themed
+  subtree.
+
+### Naming
+
+**One name per thing — `docs/vocabulary.md` is the list.** Read it before
+naming anything new, and use the standard term it gives rather than inventing a
+house one.
+
+It exists because three words drifted: "rail" meant the chart sidebar, the
+sub-nav AND a card's coloured left edge; "chrome" meant both a category and one
+specific region. A word with no fixed referent attracts whatever needs naming
+next. The short version — **chrome** is the category (furniture, not data),
+**header** is the pinned block at the top, **sidebar** is the chart's control
+column, **accent border** is a card's coloured left edge, **chips** are the
+selected-vehicle pills.
+
+**Naming is worth stopping for.** A class name is the whole value of extracting
+one, and a bad name is worse than the cluster it replaced. If the right name
+isn't obvious, say so and ask rather than guessing.
 
 ### Tech Stack
 - React 19 + Vite + Tailwind CSS v4 (`@tailwindcss/vite`, CSS-first, no `tailwind.config.js`)
@@ -87,6 +133,28 @@ found by hand in one week were all "built, unit-tested, never connected". The
 wiring suite reads source text to assert the seams hold: that a note written to
 every run is read somewhere, that every chart showing a test speed also marks a
 mixed cycle, that a tunable constant reaches the Admin knobs.
+
+### The drift ledger
+
+`npm run drift` prints what the codebase still paints outside the theme —
+palette utilities by property, `text-[Npx]` literals, raw hex and rgb, canvas
+font shorthands, `@apply` lines reaching for a palette colour, off-scale
+`font-size`. `npm run drift
+<probe>` lists the sites behind one number.
+
+The probes and their counts live together in `scripts/driftProbes.js`, so
+adding a probe, recording its count and writing down why a match is legitimate
+are one edit. `drift.test.js` asserts each count with `toBe` — **a fall fails
+too**, because a cap absorbs cleanups silently and six months later nobody can
+tell whether the backlog shrank or the probe broke.
+
+Two probes were deliberately NOT built, and the reasoning is the useful part: a
+ledger that counts correct code teaches people to ignore it. Literal colours in
+inline `style={{…}}` measured at zero — all 91 blocks hold runtime values like
+`backgroundColor: run.color`, which can never be a class. Three-digit hex was
+half issue references in comments (`#221`). Anything genuinely un-tokenisable
+goes in `EXEMPT` with a reason, and a test fails when an exemption stops
+matching anything.
 
 When adding a utility for the UI, expect the wiring suite to fail until
 something consumes it. If it is deliberately unused, add it to `ALLOWED_UNUSED`

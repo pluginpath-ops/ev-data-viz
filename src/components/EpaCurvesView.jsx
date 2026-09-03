@@ -2,7 +2,7 @@ import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import Chart from 'chart.js/auto';
 import { useTheme } from '../hooks/useTheme';
 import { useAppContext } from '../context/AppContext';
-import { convSpeed, speedLabel, distanceLabel } from '../utils/unitConversions';
+import { convSpeed, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
 import { PALETTE } from '../utils/specHelpers';
 import { resolveChartColors } from '../utils/colorUtils';
@@ -16,6 +16,8 @@ import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import ChartInfoBubble from './ChartInfoBubble';
+import PlotFrame from './charts/PlotFrame';
+import { useChartPng } from '../hooks/useChartPng';
 import EpaMethodologyDiagram from './epa/EpaMethodologyDiagram';
 import EpaCertificationPaths from './epa/EpaCertificationPaths';
 import EpaCycleSpeedChart from './epa/EpaCycleSpeedChart';
@@ -24,6 +26,7 @@ import { TWO_CYCLE_KEYS, CURVE_SPEED_RANGE } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
+import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import AutoColorToggle from './AutoColorToggle';
 import { useRunSelection } from '../hooks/useRunSelection';
 import ViewingConditions, { useViewingConditions } from './epa/ViewingConditions';
@@ -53,7 +56,8 @@ function makeReferencePlugin(bandMph, units, isDark) {
             ctx.fillStyle = bandColor;
             ctx.fillRect(xBand0, area.top, xBand1 - xBand0, area.bottom - area.top);
 
-            ctx.font = '9px system-ui, sans-serif';
+            const fonts = chartFonts();
+            ctx.font = `${fonts.nano}px ${fonts.sans}`;
             ctx.fillStyle = textColor;
             ctx.textAlign = 'center';
             ctx.fillText('Hwy', (xBand0 + xBand1) / 2, area.top + 10);
@@ -113,7 +117,8 @@ function makeCalloutPlugin(calloutMphs, yAxis, units, isDark) {
                             ? `${(pt.rangeMi * 1.60934).toFixed(0)} km`
                             : `${pt.rangeMi.toFixed(0)} mi`;
 
-                        ctx.font = '10px system-ui, sans-serif';
+                        const fonts = chartFonts();
+                        ctx.font = `${fonts.micro}px ${fonts.sans}`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'alphabetic';
 
@@ -240,7 +245,6 @@ export default function EpaCurvesView({
     // ── UI state ──────────────────────────────────────────────────────────────
     const [selectorExpanded, setSelectorExpanded] = useState(false);
     const [urlCopied,        setUrlCopied]        = useState(false);
-    const [imageCopied,      setImageCopied]      = useState(false);
     // Altitude, temperature, and accessory load are viewing conditions (like the
     // unit toggle): they scale the plotted curve at plot time for ALL curves.
     // Never persisted; never affect stored coefficients, accessory fields, or
@@ -483,9 +487,9 @@ export default function EpaCurvesView({
         if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
         if (!datasets.length) return;
 
-        const tickColor   = isDark ? 'rgb(226,232,240)'       : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(100,116,139,0.35)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(241,245,249)'       : 'rgb(55,65,81)';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
+        applyChartDefaults(Chart);
 
         const refPlugin     = makeReferencePlugin(HIGHWAY_BAND_MPH, units, isDark);
         // Speed callouts disabled — labels overlap with multiple curves.
@@ -610,29 +614,40 @@ export default function EpaCurvesView({
         return () => { chartRef.current?.destroy(); chartRef.current = null; };
     }, [datasets, yAxis, units, isDark, xMin, xMax, yMin, yMax]);
 
-    // ── Copy PNG ──────────────────────────────────────────────────────────────
-    const handleCopyPng = async () => {
-        if (!chartRef.current) return;
-        const canvas = chartRef.current.canvas;
-        const bg  = isDark ? 'rgb(8,12,28)' : '#ffffff';
-        const tmp = document.createElement('canvas');
-        tmp.width  = canvas.width;
-        tmp.height = canvas.height;
-        const ctx2 = tmp.getContext('2d');
-        ctx2.fillStyle = bg;
-        ctx2.fillRect(0, 0, tmp.width, tmp.height);
-        ctx2.drawImage(canvas, 0, 0);
-        try {
-            const blob = await new Promise(res => tmp.toBlob(res, 'image/png'));
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-            setImageCopied(true);
-            setTimeout(() => setImageCopied(false), 2000);
-        } catch {
-            window.open(tmp.toDataURL('image/png'));
-        }
-    };
+    // ── The frame's caption, and its export ─────────────────────────────────
+    // The export was a hand-rolled copy of chartToPngDataUrl that drew the
+    // canvas alone: a modelled curve with no statement of what it was modelled
+    // AT is not a chart anyone can act on, and the conditions are the whole
+    // point of this screen.
+    const plotTitle = useMemo(
+        () => `${yAxisLabel(yAxis, units)} vs steady speed`,
+        [yAxis, units],
+    );
 
-    // ── Copy URL ──────────────────────────────────────────────────────────────
+    const plotSubtitle = useMemo(() => {
+        const n = datasets.filter(d => !d._isOverlay).length;
+        const parts = [`${n} curve${n === 1 ? '' : 's'}`, 'from EPA road-load coefficients'];
+        const c = conditions?.values ?? {};
+        // These are TEXT INPUT values, so an empty field is '' rather than null
+        // — and `'' != null` is true, so a `!= null` guard let the empty string
+        // through and fmtTemp rendered it as 0 °F. An unset condition has to
+        // read as absent, not as zero, on a chart whose whole subject is the
+        // conditions it was drawn under.
+        const num = v => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
+        const t = num(c.tempF);
+        const w = num(c.windSpeedMph);
+        const el = num(c.elevationFt);
+        if (t != null) parts.push(fmtTemp(t, units));
+        parts.push(w ? `${fmtSpeed(w, units)} wind` : 'still air');
+        if (el) parts.push(`${Math.round(el)} ft`);
+        if (overlayMode) parts.push(`${overlayMode === 'corrected' ? 'corrected' : 'raw'} tests overlaid`);
+        parts.push(units === 'metric' ? 'metric' : 'imperial');
+        return parts.join(' · ');
+    }, [datasets, conditions, overlayMode, units]);
+
+    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
+
     const handleCopyUrl = () => {
         navigator.clipboard.writeText(window.location.href).then(() => {
             setUrlCopied(true);
@@ -706,62 +721,97 @@ export default function EpaCurvesView({
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
-        <div>
-            {/* ── Chart Options card ────────────────────────────────────────── */}
+        <div className="chart-layout">
+            {/* ── Left rail: the same rig as the four charts beside it. The
+              * subject list is EPA test groups rather than runs, but the shape
+              * of the screen is the same — pick on the left, plot on the
+              * right. */}
             {!presentationMode && (
-                <div className="card mb-6">
-                    {/* Y-axis toggle + Auto Color */}
-                    <div className="chart-toggles mb-4">
-                        <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-                            Y axis: <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" className="ml-1" />
-                        </span>
-                        <div className="chart-type-buttons">
-                            {Y_MODES.map(m => (
-                                <button
-                                    key={m.key}
-                                    type="button"
-                                    className={`btn ${yAxis === m.key ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={() => setEpaConfig(p => ({ ...p, yAxis: m.key }))}
+                <aside className="chart-rail">
+                    {/* ── AXES ── X is fixed: this chart is consumption against
+                      * steady speed, and the speed axis is the whole premise. */}
+                    <div className="chart-rail-group">
+                        <span className="text-micro">Axes</span>
+                        <div className="axis-rows">
+                            {/* Not a disabled <input>. A field box says "you may
+                                type here" and then refuses, and greying it only
+                                turns that into "you may type here later" — this
+                                axis is never anything else. Stated as a value
+                                with the reason beside it. */}
+                            <div className="axis-row">
+                                <span className="axis-row-key">X</span>
+                                <span className="axis-row-fixed">
+                                    Steady speed ({speedLabel(units)})
+                                    <span className="text-nano">fixed</span>
+                                </span>
+                            </div>
+                            <label className="axis-row">
+                                <span className="axis-row-key">Y</span>
+                                <select
+                                    className="form-input"
+                                    value={yAxis}
+                                    onChange={e => setEpaConfig(p => ({ ...p, yAxis: e.target.value }))}
                                 >
-                                    {m.label}
-                                </button>
-                            ))}
+                                    {Y_MODES.map(m => (
+                                        <option key={m.key} value={m.key}>{m.label}</option>
+                                    ))}
+                                </select>
+                            </label>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
-                                Overlay Real World Tests
-                                <InfoIcon
-                                    tooltipClassName="info-icon-tooltip--wide"
-                                    position="right"
-                                    className="ml-1"
-                                >
+                        <span className="text-note">
+                            How this is calculated
+                            <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" />
+                        </span>
+                    </div>
+
+                    {/* ── OVERLAY ── the vehicle's own measured points, on top of
+                      * the modelled curve. Three states, so a segmented row
+                      * rather than two toggles that can both look off. */}
+                    <div className="chart-rail-group">
+                        <span className="text-micro">
+                            Overlay real-world tests
+                            <InfoIcon
+                                tooltipClassName="info-icon-tooltip--wide"
+                                position="right"
+                            >
                                     <p>Plot this vehicle's own range-test points on top of its curve.</p>
                                     <p className="mt-1.5"><strong>Corrected:</strong> scaled by temperature, wind, and elevation gain/loss to match the curve's current viewing conditions above — an apples-to-apples comparison.</p>
                                     <p className="mt-1.5"><strong>Uncorrected:</strong> the raw measured value as recorded, unadjusted — not a valid comparison across different test conditions, but useful to see the true recorded data.</p>
-                                </InfoIcon>
-                            </span>
+                            </InfoIcon>
+                        </span>
+                        <div className="efficiency-unit-toggle">
                             <button
                                 type="button"
-                                className={`btn ${overlayMode === 'corrected' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setOverlayMode(m => m === 'corrected' ? null : 'corrected')}
+                                className={`btn btn-toggle${overlayMode === null ? ' active' : ''}`}
+                                onClick={() => setOverlayMode(null)}
+                            >
+                                Off
+                            </button>
+                            <button
+                                type="button"
+                                className={`btn btn-toggle${overlayMode === 'corrected' ? ' active' : ''}`}
+                                onClick={() => setOverlayMode('corrected')}
                             >
                                 Corrected
                             </button>
                             <button
                                 type="button"
-                                className={`btn ${overlayMode === 'uncorrected' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setOverlayMode(m => m === 'uncorrected' ? null : 'uncorrected')}
+                                className={`btn btn-toggle${overlayMode === 'uncorrected' ? ' active' : ''}`}
+                                onClick={() => setOverlayMode('uncorrected')}
                             >
-                                Uncorrected
+                                Raw
                             </button>
                         </div>
-                        {/* The viewing-condition controls, shared with the
-                            certification-anchored curves (#237). The overlay above
-                            stays here: it plots a VEHICLE's own range runs, which
-                            that view has no way to reach. */}
                     </div>
 
-                    <ViewingConditions conditions={conditions} />
+                    {/* The viewing-condition controls, shared with the
+                        certification-anchored curves (#237). The overlay above
+                        stays here: it plots a VEHICLE's own range runs, which
+                        that view has no way to reach. */}
+                    <div className="chart-rail-group">
+                        <span className="text-micro">Viewing conditions</span>
+                        <ViewingConditions conditions={conditions} />
+                    </div>
 
 
                     {missingWeightWarnings.length > 0 && (
@@ -770,23 +820,30 @@ export default function EpaCurvesView({
                         </div>
                     )}
 
+                    {/* ── DISPLAY ── where every other chart in this section
+                      * keeps Auto Color, rather than tucked into the subject
+                      * selector's header. */}
+                    {setChartConfig && (
+                        <div className="chart-rail-group">
+                            <span className="text-micro">Display</span>
+                            <div className="display-grid">
+                                <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                            </div>
+                        </div>
+                    )}
+
                     {/* Collapsible EPA test selector */}
                     {vehiclesWithEpa.length > 0 && (
-                        <div className="mt-4">
+                        <div>
                             <div className="run-selector-bar">
                             <button
                                 onClick={() => setSelectorExpanded(p => !p)}
                                 className="run-selector-header"
                             >
                                 <span style={{ display: 'inline-block', transform: selectorExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                                Select Vehicle Tests to Display
-                                <span className="text-sm font-normal text-secondary">({visibleCount} of {totalMappings} shown)</span>
+                                <span className="text-control">Select vehicle tests</span>
+                                <span className="run-selector-count">{visibleCount} / {totalMappings}</span>
                             </button>
-                            {setChartConfig && (
-                                <div className="run-selector-actions">
-                                    <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
-                                </div>
-                            )}
                             </div>
 
                             {selectorExpanded && (
@@ -798,9 +855,9 @@ export default function EpaCurvesView({
                                                 specs: resolveEffectiveSpecs(vehicle, vehicles),
                                             };
                                             return (
-                                                <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <h4 className="text-sm font-semibold text-secondary">
+                                                <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: vehicleColorMap[vehicle.id] || 'var(--color-primary)' }}>
+                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                        <h4 className="text-sm font-semibold text-secondary truncate">
                                                             {vehicleLabel(vehicle)}
                                                         </h4>
                                                         {/* Bulk helpers, same as the shared run selector: a vehicle
@@ -933,46 +990,43 @@ export default function EpaCurvesView({
                             No EPA test group linked for the selected vehicles. Link one via Edit Vehicle.
                         </div>
                     )}
-                </div>
+                </aside>
             )}
 
-            {/* ── Chart card ────────────────────────────────────────────────── */}
+            <div className="chart-main">
+
+            {/* ── The plot, inside the frame the export captures ── */}
             {datasets.length > 0 ? (
-                <div className="card mb-4">
+                <PlotFrame
+                    title={plotTitle}
+                    subtitle={plotSubtitle}
+                    preview={preview}
+                    onDismissPreview={dismissPreview}
+                    exportControls={!presentationMode && (
+                        <>
+                            <button
+                                onClick={handleCopyUrl}
+                                className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
+                                title="Copy link to this chart view"
+                            >
+                                {urlCopied ? '✓ Copied' : '🔗 URL'}
+                            </button>
+                            <button
+                                onClick={copyPng}
+                                disabled={!datasets.length}
+                                className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
+                                title="Copy the framed chart as a PNG"
+                            >
+                                {imageCopied ? '✓ Copied' : 'PNG'}
+                            </button>
+                        </>
+                    )}
+                >
                     <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 500 }}>
                         <canvas ref={canvasRef} />
                     </div>
-
-                    {!presentationMode && (
-                        <>
-                            {/* Legend note */}
-                            <div className="mt-3 flex flex-wrap gap-4 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                                <span>
-                                    <span className="font-medium">Shaded band</span> — 65–75 mph typical highway
-                                </span>
-                            </div>
-
-                            {/* Action buttons */}
-                            <div className="mt-3 flex items-center gap-3 flex-wrap">
-                                <button
-                                    onClick={handleCopyUrl}
-                                    className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
-                                    title="Copy link to this chart view"
-                                >
-                                    {urlCopied ? '✓ Copied!' : '🔗 Copy URL'}
-                                </button>
-                                <button
-                                    onClick={handleCopyPng}
-                                    disabled={!datasets.length}
-                                    className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                                    title="Copy chart as PNG"
-                                >
-                                    {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
-                                </button>
-                            </div>
-                        </>
-                    )}
-                </div>
+                    <p className="text-note mt-2">Shaded band — 65–75 mph typical highway</p>
+                </PlotFrame>
             ) : (
                 <div className="empty-state">
                     <p>No EPA test group data available for the selected vehicles.</p>
@@ -1082,6 +1136,8 @@ export default function EpaCurvesView({
             {/* Always last on the page — the convention every other chart view
                 already follows. */}
             {!presentationMode && <ChartInfoBubble chartKey="epacurves" />}
+
+            </div>{/* .chart-main */}
         </div>
     );
 }

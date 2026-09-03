@@ -13,7 +13,14 @@ import RunSourceLinks from './RunSourceLinks';
  *   onUpdateRunColor — (vehicleId, runId, color) => void, or null to hide color inputs
  *   runFilter       — (run, vehicle) => boolean — which runs to show per vehicle
  *   emptyMessage    — string shown when no runs pass the filter for a vehicle
- *   renderRunMeta   — optional (run) => ReactNode — extra badges after name/date
+ *   renderRunBadges — optional (run) => ReactNode — IDENTITY markers, on the
+ *                     name's own row. "DEF" is the one: it says which run is
+ *                     privileged, which is part of naming it.
+ *   renderRunMeta   — optional (run) => ReactNode — CONDITIONS, on their own
+ *                     row beneath. Speed, temperature, wind, distance: what the
+ *                     run measured, not what it is called. They were on the
+ *                     name's row, which worked until a row also had to carry a
+ *                     pairing control and the name lost.
  *
  * ── Pair mode (opt-in) ───────────────────────────────────────────────────────
  *
@@ -32,7 +39,6 @@ import RunSourceLinks from './RunSourceLinks';
  *
  *   pairMode        — enable the above
  *   pairings        — { [primaryRunId]: [partnerRunId, ...] } (utils/pairings.js)
- *   primaryLabel    — prefix before the row's own name, e.g. "Range:"
  *   partnerLabel    — prefix before the dropdown,      e.g. "Charging:"
  *   partnerRunsFor  — (vehicle) => runs offered as partners
  *   extraPrimaryRunsFor — (vehicle) => synthetic primary rows (e.g. EPA range)
@@ -51,6 +57,7 @@ export default function RunSelector({
     onUpdateRunColor = null,
     runFilter,
     emptyMessage = 'No runs',
+    renderRunBadges = null,
     renderRunMeta = null,
     colorMap = {},
     // Rendered to the right of the header — the chart-session toggles.
@@ -58,7 +65,6 @@ export default function RunSelector({
     // Pair mode
     pairMode = false,
     pairings = {},
-    primaryLabel = null,
     partnerLabel = 'Paired with:',
     // One partner per row, selection still keyed by run id. For views whose
     // subject is the primary run (the charging chart plots one curve per run,
@@ -76,6 +82,7 @@ export default function RunSelector({
     onAddPartner = null,
     onRemovePartner = null,
 }) {
+    const headerRef = useRef(null);
     const [expanded, setExpanded] = useState(false);
     // Default all vehicles to expanded; track explicit collapses
     const [collapsedVehicles, setCollapsedVehicles] = useState({});
@@ -137,6 +144,15 @@ export default function RunSelector({
         : vehicles.reduce((n, v) =>
             n + (v.runs || []).filter(r => runFilter(r, v)).filter(isSelected).length, 0);
 
+    // The denominator. "5 selected" says nothing about whether that is most of
+    // what there is or a fraction of it — "5 / 12" answers both at once, and
+    // the second number is the one that tells you there is more to look at.
+    const availableCount = pairMode
+        ? vehicles.reduce((n, v) => n + primaryRunsFor(v).reduce(
+            (m, run) => m + (singlePartner ? 1 : partnerRowsFor(run).length), 0), 0)
+        : vehicles.reduce((n, v) =>
+            n + (v.runs || []).filter(r => runFilter(r, v)).length, 0);
+
     return (
         <div>
             {/* Chart-session toggles live here rather than in each chart's own
@@ -144,12 +160,25 @@ export default function RunSelector({
                 chart had drifted into putting them somewhere different. */}
             <div className="run-selector-bar">
             <button
-                onClick={() => setExpanded(prev => !prev)}
+                ref={headerRef}
+                onClick={() => {
+                    const next = !expanded;
+                    setExpanded(next);
+                    // Nudge the header into view on OPEN. A disclosure whose
+                    // content appears below the fold looks like a control that
+                    // did nothing — you click, the page does not move, and the
+                    // thing you asked for is off-screen. `nearest` so an already
+                    // visible header does not jump.
+                    if (next) {
+                        requestAnimationFrame(() =>
+                            headerRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+                    }
+                }}
                 className="run-selector-header"
             >
                 <span style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                Select vehicles &amp; tests
-                <span className="text-sm font-normal text-secondary">({selectedCount} selected)</span>
+                <span className="text-control">Select vehicles &amp; tests</span>
+                <span className="run-selector-count">{selectedCount} / {availableCount}</span>
                 {expanded && (
                     <span className="text-xs font-normal text-meta ml-2">· Drag the pills above to reorder</span>
                 )}
@@ -206,7 +235,6 @@ export default function RunSelector({
                                                         partnerIds={partnerRowsFor(run)}
                                                         partnerRuns={partnerRunsFor?.(vehicle) ?? []}
                                                         resolvePartner={resolvePartner}
-                                                        primaryLabel={primaryLabel}
                                                         partnerLabel={partnerLabel}
                                                         singlePartner={singlePartner}
                                                         selectedRunIds={selectedRunIds}
@@ -215,6 +243,7 @@ export default function RunSelector({
                                                         onAddPartner={onAddPartner}
                                                         onRemovePartner={onRemovePartner}
                                                         onUpdateRunColor={onUpdateRunColor}
+                                                        renderRunBadges={renderRunBadges}
                                                         renderRunMeta={renderRunMeta}
                                                         colorMap={colorMap}
                                                     />
@@ -226,6 +255,7 @@ export default function RunSelector({
                                                         isChecked={isSelected(run)}
                                                         onToggle={() => onToggleRun(run.id)}
                                                         onUpdateRunColor={onUpdateRunColor}
+                                                        renderRunBadges={renderRunBadges}
                                                         renderRunMeta={renderRunMeta}
                                                         colorMap={colorMap}
                                                     />
@@ -253,9 +283,9 @@ export default function RunSelector({
  */
 function PairRows({
     run, vehicle, partnerIds, partnerRuns, resolvePartner,
-    primaryLabel, partnerLabel, singlePartner,
+    partnerLabel, singlePartner,
     selectedRunIds, onToggleRun, onSetPartner, onAddPartner, onRemovePartner,
-    onUpdateRunColor, renderRunMeta, colorMap,
+    onUpdateRunColor, renderRunBadges, renderRunMeta, colorMap,
 }) {
     // What the resolver would pick with nothing pinned — shown as the dropdown's
     // placeholder so an unpaired row still says where its miles come from.
@@ -290,14 +320,28 @@ function PairRows({
             {partnerIds.map((partnerId, idx) => (
                 <label
                     key={partnerId ?? 'auto'}
-                    className={`pair-row ${idx > 0 ? 'pair-row-child' : ''} ${isSelected(partnerId) ? '' : 'opacity-60 hover:opacity-100'}`}
+                    className={`pair-row ${idx > 0 ? 'is-child' : ''} ${isSelected(partnerId) ? '' : 'opacity-60 hover:opacity-100'}`}
                 >
+                    {/* The branch glyph leads on an added pairing, so the eye
+                        finds the indent before it finds the control. */}
+                    {idx > 0 && <span className="pair-branch" aria-hidden="true">↳</span>}
                     <input
                         type="checkbox"
                         checked={isSelected(partnerId)}
                         onChange={() => onToggleRun(singlePartner ? run.id : rowKey(partnerId))}
-                        className="w-4 h-4 shrink-0"
                     />
+                    {/* An added pairing is its own plotted series, so it carries
+                        its own swatch. It plots the same charging run against a
+                        different partner, which is exactly what the swatch and
+                        the dropdown beside it say together. */}
+                    {idx > 0 && (
+                        <RunColorControl
+                            run={run}
+                            vehicleId={vehicle.id}
+                            onUpdateRunColor={onUpdateRunColor}
+                            colorMap={colorMap}
+                        />
+                    )}
 
                     {/* Charging test identity — only on the first row of the group.
                         No date or speed here: speed belongs to the range test, and
@@ -310,20 +354,28 @@ function PairRows({
                                 onUpdateRunColor={onUpdateRunColor}
                                 colorMap={colorMap}
                             />
-                            {primaryLabel && <span className="text-label shrink-0">{primaryLabel}</span>}
                             <span className="truncate">{run.name}</span>
-                            {/* Outside the truncate, so a long name never clips
-                                the credit off the end of the row. */}
-                            <RunSourceLinks run={run} className="shrink-0" />
-                            {renderRunMeta?.(run)}
+                            {/* Identity markers only. Conditions moved to their
+                                own row: a paired row already spends a line on
+                                the pairing, so name + chips + control on one
+                                line meant the name lost every time. */}
+                            {renderRunBadges?.(run)}
+                            {/* Right-aligned: it is the one item on this line
+                                that leaves the page, so it sits at the edge
+                                rather than trailing whatever length the name
+                                happened to be. */}
+                            <RunSourceLinks run={run} className="shrink-0 ml-auto" />
                         </span>
-                    ) : (
-                        <span className="pair-charging-label text-meta">↳</span>
+                    ) : null}
+
+                    {/* Row two: what this run measured. */}
+                    {idx === 0 && renderRunMeta && (
+                        <span className="run-row-meta">{renderRunMeta(run)}</span>
                     )}
 
                     {/* The range basis for this pair */}
                     <span className="pair-range-control" onClick={e => e.preventDefault()}>
-                        <span className="text-label shrink-0">{partnerLabel}</span>
+                        {idx === 0 && <span className="text-label shrink-0">{partnerLabel}</span>}
                         <select
                             className="form-input"
                             value={partnerId ?? ''}
@@ -454,29 +506,37 @@ function RunColorControl({ run, vehicleId, onUpdateRunColor, colorMap = {} }) {
     );
 }
 
-function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunMeta, colorMap = {} }) {
+/**
+ * Two lines, the same shape as a paired row: what this run IS, then what it
+ * measured. It was one line — checkbox, colour, name, source link, date, and
+ * however many metric badges the view wanted — which wrapped into a ragged
+ * block the moment it met a 320px rail.
+ *
+ * The date is gone. It disambiguated runs back when they were "Charging test"
+ * and "Charging test"; the names carry that now, and in a rail it was spending
+ * a third of the identity line on a fact nobody was comparing.
+ */
+function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunBadges, renderRunMeta, colorMap = {} }) {
+    const meta = renderRunMeta?.(run);
     return (
-        <label className={`flex items-center gap-2 cursor-pointer ${!isChecked ? 'opacity-60 hover:opacity-100' : ''}`}>
+        <label className={`pair-row ${isChecked ? '' : 'opacity-60 hover:opacity-100'}`}>
             <input
                 type="checkbox"
                 checked={isChecked}
                 onChange={onToggle}
-                className="w-4 h-4 shrink-0"
             />
-            <RunColorControl
-                run={run}
-                vehicleId={vehicle.id}
-                onUpdateRunColor={onUpdateRunColor}
-                colorMap={colorMap}
-            />
-            <span className="run-label">
-                <span>
-                    {run.name}
-                    <RunSourceLinks run={run} />
-                    <span className="text-sm text-secondary"> ({run.date})</span>
-                </span>
-                {renderRunMeta?.(run)}
+            <span className="pair-charging-label">
+                <RunColorControl
+                    run={run}
+                    vehicleId={vehicle.id}
+                    onUpdateRunColor={onUpdateRunColor}
+                    colorMap={colorMap}
+                />
+                <span className="truncate">{run.name}</span>
+                {renderRunBadges?.(run)}
+                <RunSourceLinks run={run} className="shrink-0 ml-auto" />
             </span>
+            {meta && <span className="run-row-meta">{meta}</span>}
         </label>
     );
 }

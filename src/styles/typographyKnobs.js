@@ -45,6 +45,12 @@ export const TYPO_GROUPS = [
             { var: '--fs-meta',             label: 'Meta',             kind: 'size', min: 9,  max: 18, step: 1, default: 12 },
             { var: '--fs-label',            label: 'Label',            kind: 'size', min: 9,  max: 18, step: 1, default: 12 },
             { var: '--fs-data',             label: 'Data (mono)',      kind: 'size', min: 11, max: 22, step: 1, default: 14 },
+            // The micro tier, added with the re-skin. Before it the scale
+            // bottomed out at 12px, so every 9-11px label was written as a raw
+            // `text-[10px]` — including the labels in THIS panel, which is the
+            // tell that the tier was missing rather than unwanted.
+            { var: '--fs-micro',            label: 'Micro label',      kind: 'size', min: 8,  max: 14, step: 1, default: 10 },
+            { var: '--fs-nano',             label: 'Nano label',       kind: 'size', min: 8,  max: 13, step: 1, default: 9 },
         ],
     },
     {
@@ -55,6 +61,8 @@ export const TYPO_GROUPS = [
             { var: '--fw-section-title',    label: 'Section title',    kind: 'weight', default: 700 },
             { var: '--fw-subsection-title', label: 'Subsection title', kind: 'weight', default: 600 },
             { var: '--fw-label',            label: 'Label',            kind: 'weight', default: 500 },
+            { var: '--fw-micro',            label: 'Micro label',      kind: 'weight', default: 600 },
+            { var: '--fw-nano',             label: 'Nano label',       kind: 'weight', default: 600 },
         ],
     },
 ];

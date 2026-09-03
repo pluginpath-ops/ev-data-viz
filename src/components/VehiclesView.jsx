@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { DATA_CATEGORIES, vehicleDataCategories, hasDataCategory, filterByDataCategories } from '../utils/vehicleDataCategories';
-import { fmtDistance } from '../utils/unitConversions';
-import { displayImageUrl } from '../utils/imageRenditions';
+import { distanceValue, distanceUnit } from '../utils/unitConversions';
+import StatCell from './StatCell';
+import VehicleMedia from './vehicles/VehicleMedia';
+import TestedFigure from './vehicles/TestedFigure';
+import { testedRangeSummary } from '../utils/testedRange';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 import EditSpecsForm from './EditSpecsForm';
@@ -325,28 +328,29 @@ export default function VehiclesView({
 
     // ── Shared sub-components ────────────────────────────────────────────────
 
-    const VisibilityPill = ({ vehicle, fullWidth }) => {
+    // `onMedia` places it on the photograph's top-right corner, on the dark
+    // plate that keeps it readable over any image. Off the media it is an
+    // ordinary inline badge. The emoji are gone: a lock and a globe were doing
+    // the work of a word, at the cost of rendering differently on every
+    // platform and carrying no meaning to a screen reader.
+    const VisibilityPill = ({ vehicle, onMedia }) => {
         if (!user) return null;
-        const base = `flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition${fullWidth ? ' w-full justify-center' : ''}`;
-        const pubCls = 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200';
-        const privCls = 'bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]';
         const isPublic = vehicle.visibility === 'public';
+        const cls = `vehicle-media-badge ${isPublic ? 'is-public' : 'is-private'}`
+            + (onMedia ? '' : ' is-inline');
+        const label = isPublic ? 'PUBLIC' : 'PRIVATE';
         if (canPublish()) {
             return (
                 <button
                     onClick={(e) => { e.stopPropagation(); onToggleVisibility(vehicle.id, isPublic ? 'private' : 'public'); }}
                     title={`Click to make ${isPublic ? 'private' : 'public'}`}
-                    className={`${base} ${isPublic ? pubCls : privCls}`}
+                    className={cls}
                 >
-                    {isPublic ? '🌐 Public' : '🔒 Private'}
+                    {label}
                 </button>
             );
         }
-        return (
-            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)]'}`}>
-                {isPublic ? '🌐 Public' : '🔒 Private'}
-            </span>
-        );
+        return <span className={cls}>{label}</span>;
     };
 
     const ActionButtons = ({ vehicle }) => {
@@ -515,11 +519,36 @@ export default function VehiclesView({
 
     const barVisible = pendingDeletes.size > 0 || !!undoState || !!pendingOrder;
 
+    // Counted from what is already loaded rather than fetched: this is a glance
+    // beside the heading, not a report, and it must not cost a round trip. The
+    // whole list, deliberately — a survey that moved when you typed in the
+    // search box would be describing the filter, not the fleet.
+    const totalTests = useMemo(
+        () => vehicles.reduce((n, v) => n + (v.runs?.length ?? 0), 0),
+        [vehicles],
+    );
+
     return (
         <div className={barVisible ? 'pb-20' : ''}>
             {/* Header */}
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold">Vehicles</h2>
+                <div className="flex items-baseline gap-2">
+                    <h2 className="text-2xl font-bold">Vehicles</h2>
+                    {/* A survey of the corpus, not of the selection. It sat in
+                      * the nav's selection strip, where "65 vehicles · 129
+                      * tests" read as a count of what you had selected — a
+                      * category error, not a styling one. Beside the title it
+                      * describes the thing the title names, and it appears on
+                      * this tab only, because nowhere else is looking at the
+                      * whole fleet.
+                      *
+                      * Counts only: nothing in the loaded shape carries a
+                      * reliable "last updated", and inventing one would be
+                      * worse than omitting it. */}
+                    <span className="fleet-state">
+                        {vehicles.length} vehicles · {totalTests} tests
+                    </span>
+                </div>
                 <div className="inline-row">
                     {/* View mode toggle */}
                     <div className="view-toggle">
@@ -783,38 +812,21 @@ export default function VehiclesView({
                                 )}
                                 <div
                                     onClick={() => handleCardClick(vehicle)}
-                                    className={`card hover:shadow-lg transition cursor-pointer relative overflow-hidden flex flex-col${isPending ? ' opacity-60' : ''}`}
-                                    style={{
-                                        borderWidth: '2px',
-                                        borderStyle: 'solid',
-                                        borderColor: isPending ? 'rgb(252,165,165)' : isSelected ? 'var(--color-primary)' : 'transparent'
-                                    }}
+                                    className={`vehicle-card${isSelected ? ' is-selected' : ''}${isPending ? ' is-pending' : ''}`}
                                 >
-                                    {/* Background image + overlay — purely decorative, must not intercept clicks */}
-                                    {displayImageUrl(vehicle) && (
-                                        <>
-                                            <div
-                                                className="absolute inset-0 pointer-events-none"
-                                                style={{
-                                                    backgroundImage: `url(${displayImageUrl(vehicle)})`,
-                                                    backgroundSize: 'cover',
-                                                    backgroundPosition: 'center',
-                                                }}
-                                            />
-                                            <div className="absolute inset-0 bg-white/80 dark:bg-black/65 pointer-events-none" />
-                                        </>
-                                    )}
+                                    {/* The photograph as content: a band with a
+                                        scrim carrying the identity, rather than a
+                                        full-card background under an 80% wash that
+                                        made it unreadable AND unlookable-at. */}
+                                    <VehicleMedia vehicle={vehicle}>
+                                        <div className="vehicle-media-title">
+                                            <h3>{vehicle.name}</h3>
+                                            <p>{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
+                                        </div>
+                                        <VisibilityPill vehicle={vehicle} onMedia />
+                                    </VehicleMedia>
 
-                                    <div className="relative z-10 flex flex-col flex-1">
-                                        {isSelected && (
-                                            <div
-                                                className="absolute -top-5 -right-5 w-6 h-6 rounded-full flex items-center justify-center text-white font-bold"
-                                                style={{ backgroundColor: 'var(--color-primary)' }}
-                                            >
-                                                &#10003;
-                                            </div>
-                                        )}
-
+                                    <div className="vehicle-card-body">
                                         {/* Reorder controls — shown in edit order mode */}
                                         {showReorderButtons && (
                                             <div className="reorder-controls mb-2 flex-wrap" onClick={e => e.stopPropagation()}>
@@ -836,38 +848,44 @@ export default function VehiclesView({
                                             </div>
                                         )}
 
-                                        {/* Main row: left content + right action column */}
-                                        <div className="flex flex-1 gap-3">
-                                            {/* Left: vehicle info */}
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="text-xl font-bold mb-1">{vehicle.name}</h3>
-                                                <p className="text-secondary mb-2">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
-                                                <div className="text-sm text-secondary space-y-1">
-                                                    {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
-                                                    {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
-                                                    <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
-                                                </div>
-                                                {vehicle.tags?.length > 0 && (
-                                                    <div className="mt-2">
-                                                        <TagPills vehicle={vehicle} />
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {/* Right: vertical action column */}
-                                            <div className="flex flex-col gap-1 flex-shrink-0 items-stretch" onClick={e => e.stopPropagation()}>
-                                                <VisibilityPill vehicle={vehicle} fullWidth />
-                                                <ActionButtons vehicle={vehicle} />
-                                            </div>
+                                        {/* The figures, set as figures. They were prose —
+                                            "Battery: 82 kWh" in the same face and weight
+                                            as the sentence beside it — which made the
+                                            LABELS the loudest thing on a card whose whole
+                                            job is to compare numbers. */}
+                                        <div className="stat-grid">
+                                            <StatCell label="Battery" value={vehicle.battery} unit="kWh" />
+                                            <StatCell
+                                                label="EPA range"
+                                                value={vehicle.range ? distanceValue(vehicle.range, units) : null}
+                                                unit={distanceUnit(units)}
+                                            />
+                                            {vehicle.power != null && (
+                                                <StatCell label="Power" value={vehicle.power} unit="kW" />
+                                            )}
                                         </div>
 
-                                        {/* Footer: View Tests & Data full width */}
-                                        <div className="mt-auto pt-3" onClick={e => e.stopPropagation()}>
+                                        {/* The measurement, with the conditions that
+                                            produced it and no verdict attached. */}
+                                        <TestedFigure tested={testedRangeSummary(vehicle)} units={units} />
+
+                                        <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
+
+                                        {vehicle.tags?.length > 0 && <TagPills vehicle={vehicle} />}
+
+                                        {/* Actions sit at the foot of the card, on one
+                                            row: the primary action reads first and the
+                                            per-vehicle controls follow it, rather than
+                                            occupying a column that squeezed the content
+                                            beside them. */}
+                                        <div className="vehicle-card-actions" onClick={e => e.stopPropagation()}>
                                             <button
                                                 onClick={() => onViewRuns(vehicle)}
-                                                className="w-full px-3 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-900/50 transition"
+                                                className="btn btn-primary flex-1"
                                             >
                                                 View Tests &amp; Data →
                                             </button>
+                                            <ActionButtons vehicle={vehicle} />
                                         </div>
                                     </div>
                                 </div>
@@ -899,21 +917,8 @@ export default function VehiclesView({
                                 )}
                                 <div
                                     onClick={() => handleCardClick(vehicle)}
-                                    className={`card hover:shadow-lg transition cursor-pointer flex items-center gap-4 py-3 px-4 relative overflow-hidden${isPending ? ' opacity-60' : ''}`}
-                                    style={{
-                                        borderWidth: '2px',
-                                        borderStyle: 'solid',
-                                        borderColor: isPending ? 'rgb(252,165,165)' : isSelected ? 'var(--color-primary)' : 'transparent'
-                                    }}
+                                    className={`vehicle-card vehicle-row${isSelected ? ' is-selected' : ''}${isPending ? ' is-pending' : ''}`}
                                 >
-                                    {isSelected && (
-                                        <div
-                                            className="absolute -top-5 -right-5 w-6 h-6 rounded-full flex items-center justify-center text-white font-bold z-10"
-                                            style={{ backgroundColor: 'var(--color-primary)' }}
-                                        >
-                                            &#10003;
-                                        </div>
-                                    )}
 
                                     {/* Reorder controls — owner only, default sort, no filters */}
                                     {showReorderButtons && (
@@ -936,40 +941,51 @@ export default function VehiclesView({
                                         </div>
                                     )}
 
-                                    {/* Thumbnail */}
-                                    <div className="list-thumbnail">
-                                        {displayImageUrl(vehicle)
-                                            ? <img src={displayImageUrl(vehicle)} alt={vehicle.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                                            : <span>🚗</span>
-                                        }
-                                    </div>
+                                    {/* Thumbnail — the same component the card uses, so
+                                        a photoless vehicle reads identically in both
+                                        views. The 🚗 it replaced said "broken image". */}
+                                    <VehicleMedia
+                                        vehicle={vehicle}
+                                        height={54}
+                                        className="vehicle-media-thumb"
+                                    />
 
                                     {/* Name + make + tags */}
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-lg leading-tight truncate">{vehicle.name}</h3>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <h3 className="font-bold text-lg leading-tight truncate">{vehicle.name}</h3>
+                                            <VisibilityPill vehicle={vehicle} />
+                                        </div>
                                         <p className="text-secondary text-sm mb-1">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                                         <TagPills vehicle={vehicle} />
                                     </div>
 
                                     {/* Specs */}
-                                    <div className="text-sm text-secondary space-y-0.5 w-36 flex-shrink-0 hidden sm:block">
-                                        {vehicle.battery && <p>Battery: {vehicle.battery} kWh</p>}
-                                        {vehicle.range && <p>Range: {fmtDistance(vehicle.range, units)}</p>}
-                                        {vehicle.power && <p>Power: {vehicle.power} kW</p>}
+                                    <div className="w-64 flex-shrink-0 hidden md:flex flex-col gap-1.5">
+                                        <div className="stat-grid">
+                                            <StatCell label="Battery" value={vehicle.battery} unit="kWh" />
+                                            <StatCell
+                                                label="Range"
+                                                value={vehicle.range ? distanceValue(vehicle.range, units) : null}
+                                                unit={distanceUnit(units)}
+                                                title="EPA range"
+                                            />
+                                        </div>
+                                        <TestedFigure tested={testedRangeSummary(vehicle)} units={units} />
                                         <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
                                     </div>
 
-                                    {/* View Tests & Data — dedicated column */}
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); onViewRuns(vehicle); }}
-                                        className="px-4 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition flex-shrink-0"
-                                    >
-                                        View Tests &amp; Data →
-                                    </button>
-
-                                    {/* Action column: Visibility → Edit → Copy → Delete */}
-                                    <div className="flex flex-col gap-1 flex-shrink-0 items-stretch w-28" onClick={e => e.stopPropagation()}>
-                                        <VisibilityPill vehicle={vehicle} fullWidth />
+                                    {/* Actions. Visibility moved up beside the name —
+                                        it describes the vehicle, not what you can do
+                                        to it, and stacking it above the buttons made
+                                        it read as a fourth one. */}
+                                    <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                                        <button
+                                            onClick={() => onViewRuns(vehicle)}
+                                            className="btn btn-primary"
+                                        >
+                                            Tests &amp; Data →
+                                        </button>
                                         <ActionButtons vehicle={vehicle} />
                                     </div>
                                 </div>

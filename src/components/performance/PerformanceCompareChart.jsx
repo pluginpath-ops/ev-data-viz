@@ -10,6 +10,7 @@
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import ChartExportButtons from '../ChartExportButtons';
+import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 
 export default function PerformanceCompareChart({
     title,
@@ -40,13 +41,15 @@ export default function PerformanceCompareChart({
         }
         chartRef.current?.destroy();
 
-        const grid = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
-        const tick = isDark ? '#cbd5e1' : '#475569';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { grid, tick } = chartTheme();
+        applyChartDefaults(Chart);
 
         const labelPlugin = {
             id: 'perfBarLabels',
             afterDatasetsDraw(chart) {
                 const ctx = chart.ctx;
+                const fonts = chartFonts();
                 const meta = chart.getDatasetMeta(0);
                 meta.data.forEach((bar, i) => {
                     const row = withData[i];
@@ -61,7 +64,9 @@ export default function PerformanceCompareChart({
                     const y = bar.y - 7;
                     pills.forEach((text, idx) => {
                         ctx.save();
-                        ctx.font = idx === 0 ? 'bold 11px sans-serif' : '10px sans-serif';
+                        ctx.font = idx === 0
+                            ? `600 ${fonts.badge}px ${fonts.sans}`
+                            : `${fonts.micro}px ${fonts.sans}`;
                         const w = ctx.measureText(text).width + 10;
                         if (x + w > bar.x - 2) { ctx.restore(); return; }
                         ctx.fillStyle = 'rgba(0,0,0,0.28)';
@@ -188,7 +193,6 @@ export default function PerformanceCompareChart({
             {!presentationMode && withData.length > 0 && (
                 <ChartExportButtons
                     chartRef={chartRef}
-                    isDark={isDark}
                     buildParams={p => { p.set('tab', 'performance'); p.set('m', 'perfcompare'); }}
                 />
             )}

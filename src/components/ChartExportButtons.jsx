@@ -17,8 +17,12 @@
  *   note         — optional hint line shown under the buttons
  */
 import { useState } from 'react';
+import { chartTheme } from '../utils/chartTheme';
 
-export default function ChartExportButtons({ chartRef, isDark, buildParams, note }) {
+// `isDark` used to be a prop, purely so this could pick the export background.
+// chartTheme() reads it from the stylesheet instead, so the caller no longer has
+// to know the theme in order to ask for a PNG.
+export default function ChartExportButtons({ chartRef, buildParams, note }) {
     const [urlCopied, setUrlCopied]     = useState(false);
     const [imageCopied, setImageCopied] = useState(false);
     const [chartImage, setChartImage]   = useState(null);
@@ -42,7 +46,7 @@ export default function ChartExportButtons({ chartRef, isDark, buildParams, note
         off.width = src.width;
         off.height = src.height;
         const ctx = off.getContext('2d');
-        ctx.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
+        ctx.fillStyle = chartTheme().background;
         ctx.fillRect(0, 0, off.width, off.height);
         ctx.drawImage(src, 0, 0);
 

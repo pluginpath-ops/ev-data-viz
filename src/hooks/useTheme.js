@@ -1,35 +1,24 @@
 import { useState, useEffect } from 'react';
-
-// Resolve system preference to 'light' | 'dark'
-function getSystemTheme() {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-// Apply the effective theme to the document root as data-theme="light|dark".
-// Always sets an explicit attribute so CSS only needs [data-theme="dark"].
-function applyTheme(stored) {
-    const effective = stored === 'system' ? getSystemTheme() : stored;
-    document.documentElement.setAttribute('data-theme', effective);
-    return effective;
-}
+import { applyTheme, storedTheme, DEV_OVERRIDE_KEY } from '../styles/themeBootstrap';
 
 /**
  * Theme management hook.
  *
+ * The resolution and application logic lives in `styles/themeBootstrap`, not
+ * here, because `main.jsx` has to apply the theme before React exists — see
+ * that module's header for why light is deferred and why the stored preference
+ * key changed.
+ *
  * Returns:
- *   theme    — stored preference: 'light' | 'dark' | 'system'
+ *   theme    — effective preference: 'light' | 'dark' | 'system'. 'dark' unless
+ *              the developer escape hatch says otherwise.
  *   setTheme — set one of the three values explicitly
  *   cycleTheme — cycle light → dark → system → light
  *   isDark   — boolean, effective resolved state (useful for JS-driven UI like Chart.js)
  */
 export function useTheme() {
-    const [stored, setStoredState] = useState(
-        () => localStorage.getItem('evbench_theme') || 'system',
-    );
-    const [isDark, setIsDark] = useState(() => {
-        const s = localStorage.getItem('evbench_theme') || 'system';
-        return applyTheme(s) === 'dark';
-    });
+    const [stored, setStoredState] = useState(storedTheme);
+    const [isDark, setIsDark] = useState(() => applyTheme(storedTheme()) === 'dark');
 
     // Re-apply when stored preference changes
     useEffect(() => {
@@ -38,8 +27,10 @@ export function useTheme() {
     }, [stored]);
 
     // Watch the data-theme attribute so ALL hook instances update when ANY
-    // component changes the theme — e.g. App.jsx's toggle re-renders chart
-    // components that have their own useTheme() instance.
+    // component changes the theme. The nav toggle that used to drive this is
+    // gone for the duration of the re-skin, but the observer stays: it is how
+    // the chart components — each holding their own useTheme() — learn about a
+    // flip made from the console, and it is what the light pass will need back.
     useEffect(() => {
         const observer = new MutationObserver(() => {
             setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
@@ -64,7 +55,7 @@ export function useTheme() {
     }, [stored]);
 
     const setTheme = (next) => {
-        localStorage.setItem('evbench_theme', next);
+        localStorage.setItem(DEV_OVERRIDE_KEY, next);
         setStoredState(next);
     };
 

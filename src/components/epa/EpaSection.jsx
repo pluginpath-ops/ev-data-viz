@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import EpaGuideView from './guide/EpaGuideView';
 import EpaStatsView from './stats/EpaStatsView';
 import EpaCurveExplorer from './curves/EpaCurveExplorer';
@@ -42,36 +41,30 @@ export const DEFAULT_EPA_SUBTAB = 'browse';
 /** Links shared before the split named the statistics tab `stats`. */
 const LEGACY_SUBTABS = { stats: 'labelstats' };
 
-export default function EpaSection() {
-    const [subtab, setSubtab] = useState(() => {
-        const raw = new URLSearchParams(window.location.search).get('sub');
-        const sub = LEGACY_SUBTABS[raw] ?? raw;
-        return EPA_SUBTAB_IDS.includes(sub) ? sub : DEFAULT_EPA_SUBTAB;
-    });
+/**
+ * Resolve the `sub` parameter to a real sub-tab id, honouring the legacy spelling.
+ *
+ * Exported because the state now lives in App.jsx — see the component below.
+ */
+export function epaSubtabFromParam(raw) {
+    const sub = LEGACY_SUBTABS[raw] ?? raw;
+    return EPA_SUBTAB_IDS.includes(sub) ? sub : DEFAULT_EPA_SUBTAB;
+}
 
-    // Keep `sub` current even before a child writes its own parameters, so
-    // switching tabs and copying the URL gives the tab you are looking at.
-    useEffect(() => {
-        const p = new URLSearchParams(window.location.search);
-        p.set('tab', 'epa');
-        p.set('sub', subtab);
-        window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [subtab]);
-
+/**
+ * The sub-tab STRIP is not here.
+ *
+ * It is rendered by App.jsx into the nav, on the active tab's own fill, exactly
+ * as the chart categories are — which is what makes a sub-tab read as being
+ * inside its section rather than as a second row of buttons on the page. EPA
+ * drew its own rail below the chrome and was the odd one out.
+ *
+ * The state went with it, to App.jsx, alongside the runs and admin sub-tabs
+ * that were already lifted for the same reason: the URL is owned up there.
+ */
+export default function EpaSection({ subtab = DEFAULT_EPA_SUBTAB }) {
     return (
         <div className="flex flex-col gap-4">
-            <div className="admin-subtabs">
-                {EPA_SUBTABS.map(t => (
-                    <button
-                        key={t.id}
-                        className={`btn-subtab ${subtab === t.id ? 'active' : ''}`}
-                        onClick={() => setSubtab(t.id)}
-                    >
-                        {t.label}
-                    </button>
-                ))}
-            </div>
-
             {subtab === 'browse'     && <EpaGuideView subtab={subtab} />}
             {subtab === 'labelstats' && <EpaStatsView subtab={subtab} dataset="guide" />}
             {subtab === 'certstats'  && <EpaStatsView subtab={subtab} dataset="cert" />}

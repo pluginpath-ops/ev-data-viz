@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Chart from 'chart.js/auto';
 import ZoomPlugin from 'chartjs-plugin-zoom';
-Chart.defaults.font.size = 13;
 Chart.register(ZoomPlugin);
 import { dataService } from '../services/DataService';
 import RunSelector from './RunSelector';
@@ -23,7 +22,9 @@ import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitC
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
 import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
 import { resolveRangeSource, epaRangeOption, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
-import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
+import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
+import PlotFrame from './charts/PlotFrame';
+import { useChartPng } from '../hooks/useChartPng';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
@@ -31,6 +32,10 @@ import ChartInfoBubble from './ChartInfoBubble';
 // A charging line is told apart by its vehicle and its test. One atom, since a
 // series here is a single run rather than a pairing of two.
 const RUN_ATOMS = [{ key: 'test', of: s => s.run?.name }];
+
+/** "Charge Rate (kW)" → "Charge Rate". Axis labels carry their unit; a title
+ *  should not repeat it beside the axis that already says it. */
+const stripUnits = (label) => label.replace(/\s*\(.*?\)$/, '');
 
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, chartMode, pairings = {}, setPairings = () => {}, presentationMode = false }) {
     const { units, testSessions } = useAppContext();
@@ -40,11 +45,19 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const [runDataCache, setRunDataCache] = useState({});
     const [loadingData, setLoadingData] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [chartImage, setChartImage] = useState(null);
-    const [imageCopied, setImageCopied] = useState(false);
 
     // Preserve the user's pill order
-    const selectedVehicles = selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean);
+    // Memoised, as every other chart view already does it. Unmemoised this was a
+    // fresh array on every render, and it is a dependency of the chart effect —
+    // so Chart.js destroyed and rebuilt the whole instance whenever ANY state in
+    // this component changed, and the effect's first act, `setChartImage(null)`,
+    // wiped the PNG preview in the same tick it was set. That is why "Copy Chart
+    // as PNG" flashed an image and showed nothing: not an export bug, a
+    // dependency bug two hundred lines away.
+    const selectedVehicles = useMemo(
+        () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
+        [selectedVehicleIds, vehicles],
+    );
 
     // Chart-side colour edits are a SESSION OVERRIDE, never a database write.
     // The durable colour is edited in Tests & Data; changing it while reading a
@@ -236,7 +249,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     }, [missingRunIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const dl = distanceLabel(units);
-    const axisOptions = [
+    // Memoised because the frame's title derives from it: a fresh array every
+    // render made that memo churn, which the lint spotted before anyone noticed
+    // the work. Only the unit system moves it.
+    const axisOptions = useMemo(() => [
         { value: 'soc',           label: 'State of Charge (%)' },
         { value: 'deltaSoc',      label: 'SoC Added (%)' },
         { value: 'chargeRate',    label: 'Charge Rate (kW)' },
@@ -249,15 +265,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         { value: 'cRate',         label: 'C-Rate  (~kW ÷ battery)' },
         { value: 'rangeRate',     label: `Range Rate (${dl}/min)` },
         { value: 'frame',         label: 'Frame' },
-    ];
-
-    const chartPresets = [
-        { emoji: '⚡', name: 'Rate vs SoC',            x: 'soc',  y: 'chargeRate', y2: null       },
-        { emoji: '🛣️', name: 'Range vs Time',           x: 'time', y: 'range',      y2: 'rangeEpa' },
-        { emoji: '⏱️', name: 'Rate vs Time',            x: 'time', y: 'chargeRate', y2: null       },
-        { emoji: '📊', name: 'Rate + SoC vs Time',      x: 'time', y: 'chargeRate', y2: 'deltaSoc'   },
-        { emoji: '📊', name: 'Rate + Range vs Time',    x: 'time', y: 'chargeRate', y2: 'deltaRange' },
-    ];
+    ], [dl, units]);
 
     // Convert a stored (imperial) field value to the current unit system for display.
     const DISTANCE_AXES = new Set(['range', 'deltaRange', 'rangeEpa', 'deltaRangeEpa', 'rangeRate']);
@@ -459,9 +467,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
     useEffect(() => {
         if (!chartRef.current) return;
-        setChartImage(null); // clear stale preview whenever chart redraws
 
         const ctx = chartRef.current.getContext('2d');
+        applyChartDefaults(Chart);
 
         if (chartInstance.current) {
             chartInstance.current.destroy();
@@ -582,14 +590,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             ? (axisOptions.find(a => a.value === chartConfig.y2Axis)?.label || chartConfig.y2Axis)
             : '';
 
-        const stripUnits = s => s.replace(/\s*\(.*?\)$/, '');
-        const chartTitle = raceActive
-            ? `${stripUnits(yLabel)} from ${raceThreshold}% SoC`
-            : `${stripUnits(yLabel)} vs ${stripUnits(xLabel)}`;
-
-        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
 
         chartInstance.current = new Chart(ctx, {
             type: 'scatter',
@@ -599,7 +601,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    title: { display: true, text: chartTitle, font: { size: 14, weight: 'bold' }, color: legendColor },
+                    // The frame draws the title now, in the DOM, and the export
+                    // draws it onto the PNG. Leaving it on here too would print it twice.
+                    title: { display: false },
                     legend: {
                         position: 'top',
                         labels: {
@@ -671,20 +675,40 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         };
     }, [chartConfig, selectedVehicles, runDataCache, units, isDark, colorMap]);
 
+    // ── The frame's caption ──────────────────────────────────────────────────
+    // Computed here rather than inside the chart effect, because the frame is
+    // DOM. The title used to be drawn by Chart.js INSIDE the canvas, which is
+    // exactly backwards: the export carried it and the page did not.
+    const plotTitle = useMemo(() => {
+        const y = axisOptions.find(a => a.value === chartConfig.yAxis)?.label || chartConfig.yAxis;
+        const x = axisOptions.find(a => a.value === chartConfig.xAxis)?.label || chartConfig.xAxis;
+        return raceActive
+            ? `${stripUnits(y)} from ${raceThreshold}% SoC`
+            : `${stripUnits(y)} vs ${stripUnits(x)}`;
+    }, [chartConfig.xAxis, chartConfig.yAxis, raceActive, raceThreshold, axisOptions]);
+
+    // Everything a reader needs to know what the plot was drawn under. It lives
+    // in the frame, so it lives in the export — which is the whole argument for
+    // the frame. A chart pasted into a thread has to answer "how many runs, on
+    // what, corrected how, in which units" without anyone typing a caption.
+    const plotSubtitle = useMemo(() => {
+        const runs = selectedRuns.length;
+        const vehicles = selectedVehicles.filter(
+            v => (v.runs || []).some(r => selectedRuns.includes(r.id))).length;
+        const parts = [
+            `${runs} run${runs === 1 ? '' : 's'}`,
+            `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
+        ];
+        if (raceActive) parts.push(`race mode from ${raceThreshold}% SoC`);
+        const mode = chartConfig.correctionMode ?? 'none';
+        parts.push(mode === 'none' ? 'no correction' : `corrected: ${mode}`);
+        parts.push(units === 'metric' ? 'metric' : 'imperial');
+        return parts.join(' · ');
+    }, [selectedRuns, selectedVehicles, raceActive, raceThreshold, chartConfig.correctionMode, units]);
+
     // ── PNG export ───────────────────────────────────────────────────────────
-    const handleExportImage = async () => {
-        if (!chartInstance.current) return;
-        const bgColor = isDark ? 'rgb(8,12,28)' : '#ffffff';
-        try {
-            const dataUrl = await copyChartAsPng(chartInstance.current, bgColor);
-            setChartImage(dataUrl);
-            setImageCopied(true);
-            setTimeout(() => setImageCopied(false), 2500);
-        } catch {
-            // Clipboard API not supported — render inline for manual save
-            setChartImage(chartToPngDataUrl(chartInstance.current));
-        }
-    };
+    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle });
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -704,62 +728,61 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     }
 
     return (
-        <div>
-            {/* ── Top card: presets, axis selectors, run selector — hidden in presentation mode ── */}
-            {!presentationMode && <div className="card mb-6">
+        <div className="chart-layout">
+            {/* ── Left rail: pick here, read on the right ──
+              * These controls used to sit in a card ABOVE the plot, so they
+              * scrolled away exactly when you were reading the thing they
+              * control. The rail sticks; the plot column scrolls past it. */}
+            {!presentationMode && <aside className="chart-rail">
                 {loadingData && <LoadingSpinner message="Loading run data…" />}
-                {/* Presets */}
-                <div className="flex flex-wrap gap-2 mb-6">
-                    {chartPresets.map(preset => (
-                        <button
-                            key={preset.name}
-                            onClick={() => setChartConfig({ ...chartConfig, xAxis: preset.x, yAxis: preset.y, y2Axis: preset.y2 ?? null })}
-                            className="btn text-sm"
-                            style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
-                        >
-                            {preset.emoji} {preset.name}
-                        </button>
-                    ))}
-                </div>
+                {/* The axis presets used to sit here. They were the first thing
+                    in the rail and the least explicable — five buttons whose
+                    labels ("Rate + SoC vs Time") only mean something once you
+                    already know what the axes do. Removed rather than
+                    restyled; the functionality wants a home where it can be
+                    explained, not a quieter version of the same puzzle. */}
 
-                {/* Axis selectors */}
-                <div className="axis-selectors">
-                    <div>
-                        <label className="axis-label">X-Axis:</label>
-                        <select
-                            value={chartConfig.xAxis}
-                            onChange={(e) => setChartConfig({ ...chartConfig, xAxis: e.target.value })}
-                            className="form-input axis-select"
-                        >
-                            {axisOptions.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="axis-label">Left Axis (Y):</label>
-                        <select
-                            value={chartConfig.yAxis}
-                            onChange={(e) => setChartConfig({ ...chartConfig, yAxis: e.target.value })}
-                            className="form-input axis-select"
-                        >
-                            {axisOptions.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="axis-label">Right Axis (Y2):</label>
-                        <select
-                            value={chartConfig.y2Axis ?? ''}
-                            onChange={(e) => setChartConfig({ ...chartConfig, y2Axis: e.target.value || null })}
-                            className="form-input axis-select"
-                        >
-                            <option value="">— None —</option>
-                            {axisOptions.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
+                {/* ── AXES ── */}
+                <div className="chart-rail-group">
+                    <span className="text-micro">Axes</span>
+                    <div className="axis-rows">
+                        <label className="axis-row">
+                            <span className="axis-row-key">X</span>
+                            <select
+                                value={chartConfig.xAxis}
+                                onChange={(e) => setChartConfig({ ...chartConfig, xAxis: e.target.value })}
+                                className="form-input"
+                            >
+                                {axisOptions.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="axis-row">
+                            <span className="axis-row-key">Y</span>
+                            <select
+                                value={chartConfig.yAxis}
+                                onChange={(e) => setChartConfig({ ...chartConfig, yAxis: e.target.value })}
+                                className="form-input"
+                            >
+                                {axisOptions.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="axis-row">
+                            <span className="axis-row-key">Y2</span>
+                            <select
+                                value={chartConfig.y2Axis ?? ''}
+                                onChange={(e) => setChartConfig({ ...chartConfig, y2Axis: e.target.value || null })}
+                                className="form-input"
+                            >
+                                <option value="">— None —</option>
+                                {axisOptions.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </label>
                     </div>
                 </div>
 
@@ -768,11 +791,17 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     that had to be found and switched on. It sits under them and
                     indented: it modifies X, it is not a fourth axis. */}
                 {isTimeAxis && (
-                    <div className="axis-align-row">
-                        <label className="text-sm font-medium text-secondary" htmlFor="align-soc">
-                            Align start at:
+                    <div className={`race-mode${chartConfig.alignRaw ? '' : ' is-on'}`}>
+                        <label className="race-mode-switch" title="Shift every run so the chosen SoC lands at t = 0, making the curves comparable. Off, each run starts at its own zero.">
+                            <input
+                                type="checkbox"
+                                checked={!chartConfig.alignRaw}
+                                onChange={e => setChartConfig({ ...chartConfig, alignRaw: !e.target.checked })}
+                            />
+                            <span className="race-mode-track" aria-hidden="true" />
+                            <span className="race-mode-label">Race mode</span>
                         </label>
-                        <span className="flex items-center gap-1.5">
+                        <span className="race-mode-start">
                             <input
                                 id="align-soc"
                                 type="number"
@@ -784,66 +813,64 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                     raceThreshold: e.target.value === '' ? null : clampSoc(e.target.value, commonSoc ?? 10),
                                 })}
                                 disabled={chartConfig.alignRaw}
-                                className="form-input soc-input disabled:opacity-50"
+                                className="form-input soc-input"
+                                title={commonSoc != null && chartConfig.raceThreshold == null
+                                    ? `Lowest SoC every selected run reaches (${commonSoc}%) — no run is dropped at this value.`
+                                    : 'The SoC every run is shifted to line up on'}
                             />
-                            <span className="text-sm text-secondary">% SoC</span>
+                            {/* "% start" rather than "Align start at: … % SoC".
+                                The switch beside it already says what is being
+                                aligned, so the field only has to say what its
+                                number IS. */}
+                            <span className="race-mode-unit">% start</span>
                         </span>
-                        {commonSoc != null && chartConfig.raceThreshold == null && (
-                            <span className="text-xs text-meta" title="The lowest SoC every selected run actually reaches — no run is dropped at this value.">
-                                lowest common
-                            </span>
-                        )}
-                        <label className="toggle-label">
-                            <input
-                                type="checkbox"
-                                checked={!!chartConfig.alignRaw}
-                                onChange={e => setChartConfig({ ...chartConfig, alignRaw: e.target.checked })}
-                                className="w-4 h-4"
-                            />
-                            <span className="text-sm text-secondary" title="Show each run's own elapsed time from the start of the test. Runs will start at zero regardless of the SoC they began at, so the curves are not comparable.">
-                                Raw test time (not comparable)
-                            </span>
-                        </label>
                     </div>
                 )}
 
-                {/* ── Line / points toggles ── */}
-                <div className="chart-toggles">
-                    <label className="toggle-label">
-                        <input
-                            type="checkbox"
-                            checked={chartConfig.showLine ?? true}
-                            onChange={e => {
-                                // Must keep at least one of line/points enabled
-                                if (!e.target.checked && !chartConfig.showPoints) return;
-                                setChartConfig({ ...chartConfig, showLine: e.target.checked });
-                            }}
-                            className="w-4 h-4"
-                        />
-                        <span className="text-sm font-medium">Connect points with lines</span>
-                    </label>
-                    <label className="toggle-label">
-                        <input
-                            type="checkbox"
-                            checked={chartConfig.showPoints || false}
-                            onChange={e => {
-                                // Must keep at least one of line/points enabled
-                                if (!e.target.checked && !chartConfig.showLine) return;
-                                setChartConfig({ ...chartConfig, showPoints: e.target.checked });
-                            }}
-                            className="w-4 h-4"
-                        />
-                        <span className="text-sm font-medium">Show points</span>
-                    </label>
+                {/* ── DISPLAY ──
+                  * Every checkbox in one region. Lines and Points lived here;
+                  * Auto color and Full labels were passed into the run
+                  * selector's header and Correct sat beside them — three
+                  * controls of the same kind in two different places, split by
+                  * where they happened to be built rather than by what they
+                  * do. */}
+                <div className="chart-rail-group">
+                    <span className="text-micro">Display</span>
+                    <div className="display-grid">
+                        <label className="toggle-label">
+                            <input
+                                type="checkbox"
+                                checked={chartConfig.showLine ?? true}
+                                onChange={e => {
+                                    // Must keep at least one of line/points enabled
+                                    if (!e.target.checked && !chartConfig.showPoints) return;
+                                    setChartConfig({ ...chartConfig, showLine: e.target.checked });
+                                }}
+                                className="w-4 h-4"
+                            />
+                            <span className="text-sm">Lines</span>
+                        </label>
+                        <AutoColorToggle autoColor={chartConfig.autoColor ?? false} setChartConfig={setChartConfig} />
+                        <label className="toggle-label">
+                            <input
+                                type="checkbox"
+                                checked={chartConfig.showPoints || false}
+                                onChange={e => {
+                                    // Must keep at least one of line/points enabled
+                                    if (!e.target.checked && !chartConfig.showLine) return;
+                                    setChartConfig({ ...chartConfig, showPoints: e.target.checked });
+                                }}
+                                className="w-4 h-4"
+                            />
+                            <span className="text-sm">Points</span>
+                        </label>
+                        <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
+                    </div>
+                    <CorrectionControl mode={chartConfig.correctionMode ?? 'none'} setChartConfig={setChartConfig} />
                 </div>
 
                 {/* ── Collapsible run selector ── */}
                 <RunSelector
-                    headerActions={<>
-                        <CorrectionControl mode={chartConfig.correctionMode ?? 'none'} setChartConfig={setChartConfig} />
-                        <AutoColorToggle autoColor={chartConfig.autoColor ?? false} setChartConfig={setChartConfig} />
-                        <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
-                    </>}
                     vehicles={selectedVehicles}
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}
@@ -854,7 +881,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     pairMode
                     singlePartner
                     pairings={pairings}
-                    primaryLabel="Charging:"
                     partnerLabel="Range:"
                     partnerRunsFor={vehicle => {
                         const epa = epaRangeOption(vehicle);
@@ -865,31 +891,33 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         resolveRangeSource(chargingRun, { vehicle })}
                     onSetPartner={(chargingId, _old, newRangeId) =>
                         setPairings(prev => setChargingPartner(prev, chargingId, newRangeId))}
+                    // Identity: which run is the default. It belongs beside the
+                    // name, because it says which run this IS.
+                    renderRunBadges={run => run.isDefault && (
+                        <span className="badge-default" title="The vehicle's default charging test">
+                            DEF
+                        </span>
+                    )}
+                    // Conditions: what race-mode alignment did to this run.
                     renderRunMeta={run => {
                         const exclusionReason = getRaceExclusionReason(run.id);
                         const offset = getRaceOffset(run.id);
                         const noTrim = offset !== null && offset === 0;
                         return (
                             <>
-                                {run.isDefault && (
-                                    <span className="badge-default ml-2"
-                                        style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>
-                                        Default
-                                    </span>
-                                )}
                                 {exclusionReason && (
-                                    <span className="badge-status bg-amber-50 text-amber-700 border-amber-200" title={`Hidden in race mode: ${exclusionReason}`}>
-                                        ⚠ {exclusionReason}
+                                    <span className="badge-status is-warning" title={`Hidden in race mode: ${exclusionReason}`}>
+                                        ⚠ excluded
                                     </span>
                                 )}
                                 {!exclusionReason && offset !== null && (
                                     noTrim ? (
-                                        <span className="badge-status bg-red-50 text-red-700 border-red-200" title="Data starts at or above the threshold — no time was trimmed">
-                                            no offset
+                                        <span className="badge-status is-danger" title="Data starts at or above the threshold — no time was trimmed">
+                                            0 min
                                         </span>
                                     ) : (
-                                        <span className="badge-status bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)]" title={`${offset} min of pre-threshold data trimmed`}>
-                                            −{offset} min offset
+                                        <span className="badge-status" title={`${offset} min of pre-threshold data trimmed`}>
+                                            −{offset} min
                                         </span>
                                     )
                                 )}
@@ -897,7 +925,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         );
                     }}
                 />
-            </div>}
+            </aside>}
+
+            <div className="chart-main">
 
             {/* Runs the alignment could not include, named on the chart itself.
                 The selector carries a badge, but that only helps someone who
@@ -938,67 +968,54 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 </p>
             )}
 
-            {/* ── Chart canvas ── */}
-            <div className="card mb-4">
+            {/* ── The plot, inside the frame the export captures ── */}
+            <PlotFrame
+                title={plotTitle}
+                subtitle={plotSubtitle}
+                preview={preview}
+                onDismissPreview={dismissPreview}
+                exportControls={!presentationMode && (
+                    <>
+                        <button
+                            onClick={() => chartInstance.current?.resetZoom()}
+                            className="chart-copy-btn"
+                            title="Reset zoom to full view"
+                        >
+                            Reset zoom
+                        </button>
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(window.location.href).then(() => {
+                                    setCopied(true);
+                                    setTimeout(() => setCopied(false), 2000);
+                                });
+                            }}
+                            className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
+                            title="Copy link to this chart view"
+                        >
+                            {copied ? '✓ Copied' : '🔗 URL'}
+                        </button>
+                        <button
+                            onClick={copyPng}
+                            className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
+                            title="Copy the framed chart as a PNG"
+                        >
+                            {imageCopied ? '✓ Copied' : 'PNG'}
+                        </button>
+                    </>
+                )}
+            >
                 {loadingData && (
                     <div className="text-center py-4 text-secondary text-sm">Loading run data...</div>
                 )}
                 <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px' }}>
                     <canvas ref={chartRef}></canvas>
                 </div>
+            </PlotFrame>
 
-                {/* Export / share buttons */}
-                <div className="mt-3 flex items-center gap-3 flex-wrap">
-                    <button
-                        onClick={() => chartInstance.current?.resetZoom()}
-                        className="chart-copy-btn"
-                        title="Reset zoom to full view"
-                    >
-                        🔍 Reset Zoom
-                    </button>
-                    <button
-                        onClick={() => {
-                            navigator.clipboard.writeText(window.location.href).then(() => {
-                                setCopied(true);
-                                setTimeout(() => setCopied(false), 2000);
-                            });
-                        }}
-                        className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
-                        title="Copy link to this chart view"
-                    >
-                        {copied ? '✓ Copied!' : '🔗 Copy URL'}
-                    </button>
-                    <button
-                        onClick={handleExportImage}
-                        className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                        title="Export chart as PNG"
-                    >
-                        {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
-                    </button>
-                    {chartImage && (
-                        <button
-                            onClick={() => setChartImage(null)}
-                            className="chart-copy-btn"
-                        >
-                            ✕ Dismiss preview
-                        </button>
-                    )}
-                </div>
-
-                <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset Zoom to restore</p>
-
-                {/* Inline image preview — right-click/long-press to copy or save */}
-                {chartImage && (
-                    <div className="mt-3">
-                        <p className="text-xs text-meta mb-1.5">Right-click or long-press to copy / save</p>
-                        <img
-                            src={chartImage}
-                            alt="Chart export"
-                            className="w-full rounded border border-[var(--color-border)]"
-                        />
-                    </div>
-                )}
-            </div>
+            {!presentationMode && (
+                <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset zoom to restore</p>
+            )}
 
             {/* ── Controls below chart: scale inputs + line toggle + race mode — hidden in presentation mode ── */}
             {!presentationMode && <div className="card mb-6">
@@ -1035,6 +1052,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             )}
 
             {!presentationMode && <ChartInfoBubble chartKey="charging" />}
+
+            </div>{/* .chart-main */}
         </div>
     );
 }

@@ -35,7 +35,7 @@ export const OWNED_FAMILIES = [
       match: (n) => /(chip|badge|pill)/.test(n) || /^tag-(filter|pill)/.test(n) },
     { id: 'forms',   label: 'Form controls', match: (n) => /^form-input$/.test(n) },
     { id: 'type',    label: 'Typography',
-      match: (n) => /^(text-(body|data|label|meta|note|secondary)|page-title|section-title|subsection-title)$/.test(n) },
+      match: (n) => /^(text-(body|data|label|meta|micro|nano|note|secondary)|page-title|section-title|subsection-title)$/.test(n) },
 ];
 
 /**
@@ -52,6 +52,10 @@ export const NOT_CATALOGUED = {
     'run-stat-badges':   'Layout wrapper — a flex row of badges.',
     'guide-chip-count':  'The count suffix inside .guide-chip; shown as part of that specimen.',
     'btn-toggle-clear':  'The × inside an active .btn-toggle; shown as part of that specimen.',
+    'vehicle-media-badge':
+        'Absolutely positioned over a vehicle photograph, on a dark plate that only '
+        + 'makes sense against one. A specimen on the flat playground surface would '
+        + 'show the plate and not the thing it exists to survive.',
 };
 
 /**
@@ -70,8 +74,8 @@ export const NOT_CATALOGUED = {
  * and cannot silently grow.
  */
 export const DARK_OVERRIDE_CLASSES = new Set([
-    'app-header-compact', 'badge-default', 'badge-hidden',
-    'brand-alias-chip', 'btn-tab', 'chart-copy-btn-active',
+    'badge-hidden',
+    'brand-alias-chip', 'chart-copy-btn-active',
     'curve-picker-row', 'curve-tier-badge', 'guide-row', 'guide-tested-note',
     'merge-target-banner', 'specs-table-container', 'stats-suppressed-flag',
     'sweep-batch', 'vote-btn-vouch'
@@ -137,7 +141,14 @@ export const SECTIONS = [
             { cls: 'guide-badge',        as: 'span', label: 'Guide badge', note: 'Base carries no background of its own — it needs a state below.' },
             { cls: 'guide-badge guide-badge-tested', as: 'span', label: 'Guide badge · tested' },
             { cls: 'guide-badge guide-badge-multi',  as: 'span', label: 'Guide badge · multi' },
-            { cls: 'badge-default',   as: 'span', label: 'Default' },
+            { cls: 'badge-micro',            as: 'span', label: 'Micro badge',
+              note: 'The metrics every run-row marker shares. Mono, because a badge on a run row almost always carries a figure — "70 mph", "72 °F", "291 mi". Neutral by default: most are readings, not states.' },
+            { cls: 'badge-micro is-qualified', as: 'span', label: 'Micro badge · qualified',
+              note: 'A reading that is true but carries a caveat — a cycle average where the column means a held speed. Neutral background, because nothing is wrong with the number; the dagger beside it does the rest, since a marker that exists only as a hue is invisible to a reader who cannot see the hue.' },
+            { cls: 'badge-micro is-warning', as: 'span', label: 'Micro badge · warning' },
+            { cls: 'badge-micro is-danger',  as: 'span', label: 'Micro badge · danger' },
+            { cls: 'badge-default',   as: 'span', label: 'Default',
+              note: 'DEF. The one accent-coloured marker, because it is the only one saying which row is privileged rather than what a row measured.' },
             { cls: 'badge-hidden',    as: 'span', label: 'Hidden' },
             { cls: 'badge-status',    as: 'span', label: 'Status' },
             { cls: 'owner-badge',     as: 'span', label: 'Owner' },
@@ -174,7 +185,9 @@ export const SECTIONS = [
         blurb: 'ONE axis: a role carries its own size, weight and colour, and you pick '
              + 'exactly one. The colour tiers are gone — text-muted folded into '
              + 'text-secondary, text-faint into text-meta, text-caption dissolved. Sizes '
-             + 'derive from --fs-body through --fs-step, so one dial moves the scale (#277).',
+             + 'derive from --fs-body through --fs-step, so one dial moves the scale (#277). '
+             + 'The micro tier at the bottom arrived with the re-skin: the scale used to '
+             + 'stop at 12px, so every 9–11px label on the site was a hardcoded text-[10px].',
         specimens: [
             { cls: 'page-title',       as: 'div', label: 'page-title' },
             { cls: 'section-title',    as: 'div', label: 'section-title' },
@@ -187,6 +200,10 @@ export const SECTIONS = [
               note: 'Counts, ids, glyphs, parentheticals. Roman, not italic — never italicise a chevron. Absorbed text-faint, and gained contrast doing it: 2.43:1 to 4.63:1, so it no longer needs the large-text exemption it used to carry.' },
             { cls: 'text-label',     as: 'div', label: 'text-label', note: 'Form and field labels. One step down, heavier.' },
             { cls: 'text-data',      as: 'div', label: 'text-data', note: 'Tabular figures for numbers in tables.' },
+            { cls: 'text-micro',     as: 'div', label: 'text-micro',
+              note: 'A label naming a region — NARROWED BY, AXES, DISTRIBUTION. Mono, uppercased in CSS so the source string stays readable, and tracked so it reads as apparatus rather than as a very small sentence.' },
+            { cls: 'text-nano',      as: 'div', label: 'text-nano',
+              note: 'The same one step down: the legend inside a chip, the caption on a swatch. The handoff sets its colour at #5a6474, which measures 3.07:1 — below AA at this size, so both micro roles resolve to text-meta instead.' },
         ],
     },
 ];

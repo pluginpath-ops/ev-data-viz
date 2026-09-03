@@ -3,6 +3,7 @@ import Chart from 'chart.js/auto';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convValue, formatSpecValue } from '../utils/unitConversions';
+import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import {
     makeVehicleFields, buildFieldGroups, getFieldDef, extractValue,
     detectMode, formatNumericLabel, vehicleColor,
@@ -16,6 +17,7 @@ function makeInsideLabelPlugin(getLabelFn) {
         id: 'insideBarLabels',
         afterDatasetsDraw(chart) {
             const ctx = chart.ctx;
+            const fonts = chartFonts();
             chart.data.datasets.forEach((_, di) => {
                 chart.getDatasetMeta(di).data.forEach((bar, bi) => {
                     const text = getLabelFn(bi);
@@ -24,7 +26,7 @@ function makeInsideLabelPlugin(getLabelFn) {
                     const barLen = Math.abs(bar.x - bar.base);
                     if (barLen < 20) return;
                     ctx.save();
-                    ctx.font = 'bold 12px system-ui, sans-serif';
+                    ctx.font = `600 ${fonts.label}px ${fonts.sans}`;
                     ctx.fillStyle = '#fff';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
@@ -82,9 +84,9 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
     useEffect(() => {
         if (!selectedField || !canvasRef.current || !vehicles.length) return;
 
-        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
+        const fonts = applyChartDefaults(Chart);
 
         const fieldDef  = allFields.find(f => f.key === selectedField) || getFieldDef(selectedField, vehicleFields);
         const mode      = detectMode(vehicles, selectedField, fieldDef);
@@ -179,7 +181,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                     x: valueAxisOptions,
                     y: {
                         grid: { display: false },
-                        ticks: { font: { size: 13 }, color: tickColor },
+                        ticks: { font: { size: fonts.axis }, color: tickColor },
                     },
                 },
             },
@@ -199,7 +201,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
         offscreen.width  = src.width;
         offscreen.height = src.height;
         const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
+        ctx2.fillStyle = chartTheme().background;
         ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
         ctx2.drawImage(src, 0, 0);
         const dataUrl = offscreen.toDataURL('image/png');

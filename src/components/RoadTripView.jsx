@@ -5,7 +5,7 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { dataService } from '../services/DataService';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
-import { convDistance, distanceLabel, speedLabel, fmtSpeed, MI_TO_KM } from '../utils/unitConversions';
+import { MI_TO_KM, convDistance, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
@@ -25,7 +25,12 @@ import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { resolvePairColors } from '../utils/colorUtils';
+import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import ChartInfoBubble from './ChartInfoBubble';
+import InfoIcon from './InfoIcon';
+import PlotFrame from './charts/PlotFrame';
+import { useChartPng } from '../hooks/useChartPng';
+import SpeedBadge from './charts/SpeedBadge';
 
 Chart.register(ZoomPlugin);
 
@@ -76,6 +81,51 @@ function isSimUnrealistic(sim) {
 }
 
 /** Y-value for one sweep sim result (shared by speed and distance sweeps). */
+/**
+ * Simulation mode × towing.
+ *
+ * `mode` and `towingMode` are independent flags in the config, and the UI used
+ * to present them that way — a two-button group and a separate checkbox. But
+ * there are only four combinations and all four are meaningful, so naming each
+ * one is clearer than asking a reader to assemble it from two controls in
+ * different regions. (This works because the product is small; a third
+ * orthogonal flag would need the controls split back apart.)
+ */
+/** What towing actually does to the simulation. Shown on the ⓘ beside each of
+ *  its two fields rather than as a paragraph under them: the panel is in a
+ *  320px rail, and three lines of prose there pushed the run list off the
+ *  screen to explain two numbers. */
+const TOWING_NOTE = 'Full system efficiency (vehicle + trailer), replacing every '
+    + "vehicle's measured figure. Battery capacity and charging speed still vary per vehicle.";
+
+const SIM_MODES = [
+    { value: 'distance',     mode: 'distance', towing: false, label: 'Fixed charge amount' },
+    { value: 'time',         mode: 'time',     towing: false, label: 'Fixed charge time' },
+    { value: 'distance-tow', mode: 'distance', towing: true,  label: 'Fixed charge amount — towing' },
+    { value: 'time-tow',     mode: 'time',     towing: true,  label: 'Fixed charge time — towing' },
+];
+
+const X_AXES = [
+    { value: 'totalTime', label: 'Total time' },
+    { value: 'driveTime', label: 'Drive time' },
+    { value: 'speed',     label: 'Travel speed (sweep)' },
+    { value: 'tripDist',  label: 'Trip distance (sweep)' },
+];
+
+/** Y over a speed or trip-distance sweep: every option is a duration. */
+const SWEEP_Y_AXES = [
+    { value: 'totalTime',  label: 'Total time' },
+    { value: 'driveTime',  label: 'Driving time' },
+    { value: 'chargeTime', label: 'Charge + stop time' },
+];
+
+/** Y over a completed trip: what the trip produced. */
+const TRIP_Y_AXES = [
+    { value: 'distance',   label: 'Distance' },
+    { value: 'chargeTime', label: 'Charge time' },
+    { value: 'byTest',     label: 'By test' },
+];
+
 function getSweepY(sim, mph, totalDistanceMi, sweepYAxis) {
     const driveMin = (totalDistanceMi / mph) * 60;
     if (sweepYAxis === 'driveTime')  return driveMin;
@@ -124,92 +174,121 @@ const PALETTE = [
 // of the charging strategy: en-route Charger Arrival SoC (minSoc) and the
 // mode-dependent charge amount (leg distance / charge time). Blank shows the
 // global value greyed as a placeholder; typing overrides just that run.
-function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onChange }) {
+function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, dl, onChange, onReset }) {
+    const headerRef = useRef(null);
     const [open, setOpen] = useState(false);
     if (!entries.length) return null;
 
     const customized  = entries.filter(e => Object.keys(perRun[e.key] || {}).length).length;
     const legGlobal   = units === 'metric' ? Math.round(global.legDistance * MI_TO_KM) : global.legDistance;
-    const amountLabel = mode === 'distance' ? `Leg Distance (${dl})` : 'Charge Time (min)';
-
-    const cell = 'px-3 py-2 text-left font-semibold text-secondary whitespace-nowrap';
-    const inputCls = 'form-input w-20';
 
     return (
-        <div className="mt-4">
-            <button onClick={() => setOpen(o => !o)} className="run-selector-header">
+        <div className="routing-panel">
+            <button
+                ref={headerRef}
+                onClick={() => {
+                    const next = !open;
+                    setOpen(next);
+                    // Same nudge as the run selector: a disclosure whose content
+                    // opens below the fold reads as a control that did nothing.
+                    if (next) {
+                        requestAnimationFrame(() =>
+                            headerRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+                    }
+                }}
+                className="run-selector-header"
+            >
                 <span style={{ display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                Customize routing
-                <span className="text-sm font-normal text-secondary">
-                    {customized ? `(${customized} customized)` : '(optional — per test)'}
+                <span className="text-control">Customize routing</span>
+                <span className="run-selector-count">
+                    {customized ? `${customized} / ${entries.length}` : `0 / ${entries.length}`}
                 </span>
             </button>
 
+            {/* A table needed four columns and horizontal scroll in a 320px
+                rail. Two rows per entry costs no width: the name, then the two
+                numbers that can override it — the same identity-then-values
+                shape a run row uses, so the two lists read as one kind of
+                thing. */}
             {open && (
-                <div className="mt-3 overflow-x-auto">
-                    <table className="text-sm">
-                        <thead className="bg-[var(--color-surface-muted)]">
-                            <tr>
-                                <th className={cell}>Test</th>
-                                <th className={cell}>Charger Arrival SoC (%)</th>
-                                <th className={cell}>{amountLabel}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y dark:divide-slate-700">
-                            {entries.map(e => {
-                                const ov = perRun[e.key] || {};
-                                const legValue = ov.legDistance != null
-                                    ? (units === 'metric' ? Math.round(ov.legDistance * MI_TO_KM) : ov.legDistance)
-                                    : '';
-                                return (
-                                    <tr key={e.key}>
-                                        <td className="px-3 py-2">
-                                            <span className="flex items-center gap-2">
-                                                <span className="inline-block w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
-                                                <span className="text-secondary">{vehicleLabel(e.vehicle)}</span>
-                                                <span className="text-secondary">· {e.rangeRun?.name ?? e.run.name}</span>
-                                                {e.rangeRun && e.run?.name && (
-                                                    <span className="text-meta">· {e.run.name}</span>
-                                                )}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2">
+                <div className="routing-rows">
+                    {/* Only once something is overridden. A reset that is always
+                        there implies there is always something to undo, and it
+                        is the one control here that discards work. */}
+                    {customized > 0 && (
+                        <button type="button" onClick={onReset} className="routing-reset">
+                            Reset {customized} override{customized === 1 ? '' : 's'}
+                        </button>
+                    )}
+                    {entries.map(e => {
+                        const ov = perRun[e.key] || {};
+                        const legValue = ov.legDistance != null
+                            ? (units === 'metric' ? Math.round(ov.legDistance * MI_TO_KM) : ov.legDistance)
+                            : '';
+                        const isCustom = Object.keys(ov).length > 0;
+                        return (
+                            <div key={e.key} className={`routing-row${isCustom ? ' is-custom' : ''}`}>
+                                <div className="routing-row-name">
+                                    <span className="routing-swatch" style={{ backgroundColor: e.color }} />
+                                    {/* The legend's SHORT label — the one actually
+                                        printed on the chart. `full` spells out
+                                        every atom (`2026 · Tesla · Model Y ·
+                                        Standard RWD · OoS 10% Challenge`);
+                                        `short` is what buildSeriesLabels worked
+                                        out is the minimum to tell these series
+                                        apart, which is the whole point of
+                                        matching the legend. */}
+                                    <span className="truncate" title={labels?.get(e.key)?.full}>
+                                        {labels?.get(e.key)?.short ?? vehicleLabel(e.vehicle)}
+                                    </span>
+                                </div>
+                                <div className="routing-row-fields">
+                                    <label className="scenario-row">
+                                        <span className="scenario-key">Charger</span>
+                                        <input
+                                            type="number" min={0} max={100}
+                                            className="form-input"
+                                            placeholder={`${global.minSoc}`}
+                                            value={ov.minSoc ?? ''}
+                                            onChange={ev => onChange(e.key, 'minSoc', ev.target.value)}
+                                        />
+                                        <span className="scenario-unit">% arrival</span>
+                                    </label>
+                                    {mode === 'distance' ? (
+                                        <label className="scenario-row">
+                                            <span className="scenario-key">Leg</span>
                                             <input
-                                                type="number" min={0} max={100}
-                                                className={inputCls}
-                                                placeholder={`${global.minSoc}`}
-                                                value={ov.minSoc ?? ''}
-                                                onChange={ev => onChange(e.key, 'minSoc', ev.target.value)}
+                                                type="number" min={0}
+                                                className="form-input"
+                                                placeholder={`${legGlobal}`}
+                                                value={legValue}
+                                                onChange={ev => {
+                                                    const v = ev.target.value;
+                                                    onChange(e.key, 'legDistance', v === '' ? '' : (units === 'metric' ? Number(v) / MI_TO_KM : Number(v)));
+                                                }}
                                             />
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            {mode === 'distance' ? (
-                                                <input
-                                                    type="number" min={0}
-                                                    className={inputCls}
-                                                    placeholder={`${legGlobal}`}
-                                                    value={legValue}
-                                                    onChange={ev => {
-                                                        const v = ev.target.value;
-                                                        onChange(e.key, 'legDistance', v === '' ? '' : (units === 'metric' ? Number(v) / MI_TO_KM : Number(v)));
-                                                    }}
-                                                />
-                                            ) : (
-                                                <input
-                                                    type="number" min={0}
-                                                    className={inputCls}
-                                                    placeholder={`${global.chargeTime}`}
-                                                    value={ov.chargeTime ?? ''}
-                                                    onChange={ev => onChange(e.key, 'chargeTime', ev.target.value)}
-                                                />
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                    <p className="text-xs text-secondary mt-2">Blank fields use the global value shown as a placeholder.</p>
+                                            <span className="scenario-unit">{dl}</span>
+                                        </label>
+                                    ) : (
+                                        <label className="scenario-row">
+                                            <span className="scenario-key">Charge</span>
+                                            <input
+                                                type="number" min={0}
+                                                className="form-input"
+                                                placeholder={`${global.chargeTime}`}
+                                                value={ov.chargeTime ?? ''}
+                                                onChange={ev => onChange(e.key, 'chargeTime', ev.target.value)}
+                                            />
+                                            <span className="scenario-unit">min</span>
+                                        </label>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                    <p className="text-note">
+                        Blank uses the trip setting above. A value here overrides it for that run only.
+                    </p>
                 </div>
             )}
         </div>
@@ -218,6 +297,10 @@ function RoutingOverridesPanel({ entries, perRun, mode, global, units, dl, onCha
 
 // ── Chart.js plugin: charging badges + finish labels ─────────────────────────
 function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo) {
+    // Read once per plugin build, like the palette above it: the plugin is
+    // rebuilt whenever the chart is, so this follows a scale change without
+    // re-measuring on every frame.
+    const fonts = chartFonts();
     return {
         id: 'roadTripLabels',
 
@@ -282,7 +365,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                         : null;
 
                     ctx.save();
-                    ctx.font         = 'bold 11px system-ui, sans-serif';
+                    ctx.font         = `600 ${fonts.badge}px ${fonts.sans}`;
                     ctx.textAlign    = 'left';
                     ctx.textBaseline = 'middle';
 
@@ -295,7 +378,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
 
                     // vs ICE delta below, in amber (slower) or green (faster)
                     if (vsIce) {
-                        ctx.font      = '10px system-ui, sans-serif';
+                        ctx.font      = `${fonts.micro}px ${fonts.sans}`;
                         ctx.fillStyle = deltaMin > 0 ? '#d97706' : '#16a34a'; // amber-600 / green-600
                         ctx.fillText(vsIce, lastPt.x + 6, labelY + 13);
                     }
@@ -311,7 +394,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                         if (lastPt) {
                             const labelY = lastPt.y - 13;
                             ctx.save();
-                            ctx.font         = 'bold 11px system-ui, sans-serif';
+                            ctx.font         = `600 ${fonts.badge}px ${fonts.sans}`;
                             ctx.fillStyle    = '#6b7280'; // gray-500
                             ctx.textAlign    = 'left';
                             ctx.textBaseline = 'middle';
@@ -352,7 +435,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                             const label = `${seg.startSoc}→${seg.endSoc}% +${Math.round(convDistance(rangeAdded, units))}${distanceLabel(units)} ${chargeMin}m`;
 
                             ctx.save();
-                            ctx.font = '10px system-ui, sans-serif';
+                            ctx.font = `${fonts.micro}px ${fonts.sans}`;
                             const tw = ctx.measureText(label).width;
                             if (tw < segWidth - 8) {
                                 ctx.fillStyle = ds.borderColor + '22';
@@ -437,7 +520,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
             }
 
             ctx.save();
-            ctx.font = 'bold 11px system-ui, sans-serif';
+            ctx.font = `600 ${fonts.badge}px ${fonts.sans}`;
 
             finishLabels.forEach((l, i) => {
                 const adjY      = adjYs[i];
@@ -508,8 +591,6 @@ export default function RoadTripView({
     ).current;
     const [axisScale, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
     const [copiedUrl, setCopiedUrl] = useState(false);
-    const [imageCopied, setImageCopied] = useState(false);
-    const [chartImage, setChartImage]   = useState(null);
     const [sortCol, setSortCol] = useState(null);   // column key or null
     const [sortDir, setSortDir] = useState('asc');  // 'asc' | 'desc'
     const onAxisChange = (key, val) => setAxisScale(prev => ({ ...prev, [key]: val }));
@@ -659,6 +740,20 @@ export default function RoadTripView({
     }, [selectedRunIds, allPairsInfo, selectedVehicles]);
 
     const validEntries  = runEntries.filter(e => e.miPerKwh && e.batteryKwh);
+
+    // The chart legend's labels, computed once and shared. `buildSeriesLabels`
+    // works out the minimum that makes each series unambiguous — vehicle first,
+    // then the range test, then the charging test, adding a part only when two
+    // series would otherwise collide. Customize routing was printing the range
+    // run alone, which is neither the leading component nor unique: four rows
+    // read "OoS 10% Challenge" against four different vehicles.
+    const seriesLabels = useMemo(() => buildSeriesLabels(validEntries.map(e => ({
+        key:         e.key,
+        vehicle:     e.vehicle,
+        rangeRun:    e.rangeRun,
+        chargingRun: e.run,
+        sessionName: sharedSessionName(e.rangeRun, e.run, testSessions),
+    }))), [validEntries, testSessions]);
     const skippedEntries = runEntries.filter(e => !e.miPerKwh || !e.batteryKwh);
 
     // Vehicles with no charging runs at all (need separate warning)
@@ -820,9 +915,9 @@ export default function RoadTripView({
             if (!simResults.some(Boolean)) return;
         }
 
-        const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
-        const gridColor   = isDark ? 'rgba(100,116,139,0.4)' : 'rgba(229,231,235,0.8)';
-        const legendColor = isDark ? 'rgb(241,245,249)' : 'rgb(55,65,81)';
+        // From the stylesheet, not retyped here — see utils/chartTheme.
+        const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
+        const fonts = applyChartDefaults(Chart);
 
         if (chartRef.current) {
             chartRef.current.destroy();
@@ -839,13 +934,6 @@ export default function RoadTripView({
         // was built from the vehicle's free-text name. Neither belongs on a graph:
         // the year earns its place only when two series share a model, and the
         // free-text name is a selection label, not an identity.
-        const seriesLabels = buildSeriesLabels(validEntries.map(e => ({
-            key:         e.key,
-            vehicle:     e.vehicle,
-            rangeRun:    e.rangeRun,
-            chargingRun: e.run,
-            sessionName: sharedSessionName(e.rangeRun, e.run, testSessions),
-        })));
         const entryLabelFull = e => seriesLabels.get(e.key)?.full ?? vehicleLabel(e.vehicle);
         const entryLabel = e => verboseLabels
             ? entryLabelFull(e)
@@ -914,14 +1002,14 @@ export default function RoadTripView({
                             type: 'linear',
                             min: axisScale.xMin ?? sweepMinDisplay,
                             max: axisScale.xMax ?? sweepMaxDisplay,
-                            title: { display: true, text: `Travel Speed (${sl})`, font: { size: 13 }, color: legendColor },
+                            title: { display: true, text: `Travel Speed (${sl})`, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: sweepStepDisplay, color: tickColor },
                             grid: { color: gridColor },
                         },
                         y: {
                             min: axisScale.yMin != null ? axisScale.yMin * 60 : iceSpeedYMin,
                             max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
-                            title: { display: true, text: speedYLabel, font: { size: 13 }, color: legendColor },
+                            title: { display: true, text: speedYLabel, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: 30, callback: val => formatTime(val), color: tickColor },
                             grid: { color: gridColor },
                         },
@@ -1012,14 +1100,14 @@ export default function RoadTripView({
                             type: 'linear',
                             min: axisScale.xMin ?? legMinDisplay,
                             max: axisScale.xMax ?? legMaxDisplay,
-                            title: { display: true, text: `${dl} Between Charges`, font: { size: 13 }, color: legendColor },
+                            title: { display: true, text: `${dl} Between Charges`, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: legStepDisplay, color: tickColor },
                             grid: { color: gridColor },
                         },
                         y: {
                             min: axisScale.yMin != null ? axisScale.yMin * 60 : iceDistYMin,
                             max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
-                            title: { display: true, text: sweepLabel, font: { size: 13 }, color: legendColor },
+                            title: { display: true, text: sweepLabel, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: 30, callback: val => formatTime(val), color: tickColor },
                             grid: { color: gridColor },
                         },
@@ -1206,7 +1294,7 @@ export default function RoadTripView({
                 scales: {
                     x: {
                         type: 'linear',
-                        title: { display: true, text: isDriveTimeXAxis ? 'Drive Time' : 'Elapsed Time', font: { size: 13 }, color: legendColor },
+                        title: { display: true, text: isDriveTimeXAxis ? 'Drive Time' : 'Elapsed Time', font: { size: fonts.axis }, color: legendColor },
                         min: axisScale.xMin != null ? axisScale.xMin * 60 : autoXMin,
                         max: axisScale.xMax != null ? axisScale.xMax * 60 : autoXMax,
                         ticks: {
@@ -1258,14 +1346,14 @@ export default function RoadTripView({
                         },
                     } : isChargeTimeMode ? {
                         reverse: true,
-                        title: { display: true, text: 'Cumulative Charge Time (min)', font: { size: 13 }, color: legendColor },
+                        title: { display: true, text: 'Cumulative Charge Time (min)', font: { size: fonts.axis }, color: legendColor },
                         min: axisScale.yMin ?? 0,
                         max: axisScale.yMax ?? autoYMax,
                         ticks: { color: tickColor },
                         grid: { color: gridColor },
                     } : {
                         reverse: true,
-                        title: { display: true, text: `Distance Traveled (${dl})`, font: { size: 13 }, color: legendColor },
+                        title: { display: true, text: `Distance Traveled (${dl})`, font: { size: fonts.axis }, color: legendColor },
                         min: axisScale.yMin ?? 0,
                         max: axisScale.yMax ?? autoYMax,
                         ticks: { color: tickColor },
@@ -1351,6 +1439,11 @@ export default function RoadTripView({
     // Per-row override setter, keyed by pair key. Empty/invalid clears the
     // override (falls back to global); prunes empty entries so unset rows use
     // globals cleanly.
+    // Drop every per-run override at once. A separate action rather than a loop
+    // over setRunOverride: that would be one state update per field per run, and
+    // each one rebuilds the simulation.
+    const clearRunOverrides = () => setRoadTripConfig(prev => ({ ...prev, perRun: {} }));
+
     const setRunOverride = (runId, key, rawVal) => setRoadTripConfig(prev => {
         const perRun = { ...(prev.perRun || {}) };
         const cur = { ...(perRun[runId] || {}) };
@@ -1368,26 +1461,6 @@ export default function RoadTripView({
     });
 
     // ── PNG export ────────────────────────────────────────────────────────────
-    const handleCopyImage = async () => {
-        if (!chartRef.current) return;
-        const src = chartRef.current.canvas;
-        const offscreen = document.createElement('canvas');
-        offscreen.width  = src.width;
-        offscreen.height = src.height;
-        const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = isDark ? 'rgb(8,12,28)' : '#ffffff';
-        ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
-        ctx2.drawImage(src, 0, 0);
-        const dataUrl = offscreen.toDataURL('image/png');
-        setChartImage(dataUrl);
-        try {
-            const blob = await (await fetch(dataUrl)).blob();
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-            setImageCopied(true);
-            setTimeout(() => setImageCopied(false), 2500);
-        } catch { /* Clipboard API not supported — image shown inline */ }
-    };
-
     // ── Render ───────────────────────────────────────────────────────────────
     const {
         startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance, speed, mode, yAxis, xAxis, sweepYAxis, overhead,
@@ -1420,6 +1493,51 @@ export default function RoadTripView({
     }, [totalDistance, speed, overhead]);
 
     // Display values in current units
+    // The Sim dropdown's value is the PRODUCT of two config flags, so it is
+    // derived rather than stored — nothing new to keep in sync, and a config
+    // arriving from a URL resolves to the right option by construction.
+    const simMode = (SIM_MODES.find(m => m.mode === mode && m.towing === !!towingMode)
+        ?? SIM_MODES[0]).value;
+
+    // ── Axis registries ─────────────────────────────────────────────────────
+    // Y depends on X. Over a speed or trip-distance SWEEP the y-axis is a
+    // duration — the chart asks "how long does this trip take at each speed" —
+    // while over a completed trip it is what the trip produced. One combined
+    // list would offer options that silently do nothing on half the x-axes,
+    // which is what four separate button groups were quietly doing.
+    const yAxisOptions = useMemo(
+        () => (isSweepMode ? SWEEP_Y_AXES : TRIP_Y_AXES),
+        [isSweepMode],
+    );
+
+    // ── The frame's caption, and its export ─────────────────────────────────
+    // The title was an <h3> above the card and the export was a hand-rolled
+    // copy of chartToPngDataUrl that drew the canvas alone — so the page said
+    // "Road Trip — 500 mi at 70 mph" and the PNG said nothing.
+    const plotTitle = useMemo(() => (
+        isSpeedMode ? 'Trip time vs travel speed'
+            : isTripDistMode ? 'Trip time vs leg distance'
+                : 'Road trip'
+    ), [isSpeedMode, isTripDistMode]);
+
+    const plotSubtitle = useMemo(() => {
+        const runs = validEntries.length;
+        const parts = [`${runs} run${runs === 1 ? '' : 's'}`];
+        if (!isSpeedMode) parts.push(`${Math.round(convDistance(totalDistance, units))} ${dl}`);
+        if (!isSpeedMode) parts.push(`${Math.round(convDistance(speed, units))} ${sl}`);
+        parts.push(mode === 'distance'
+            ? `${Math.round(convDistance(legDistance, units))} ${dl} per charge`
+            : `${chargeTime} min per stop`);
+        parts.push(`${startSoc}→${minSoc}% SoC`);
+        if (towingMode) parts.push('towing');
+        parts.push(units === 'metric' ? 'metric' : 'imperial');
+        return parts.join(' · ');
+    }, [validEntries, isSpeedMode, totalDistance, speed, mode, legDistance, chargeTime,
+        startSoc, minSoc, towingMode, units, dl, sl]);
+
+    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
+
     const dispLeg          = units === 'metric' ? Math.round(legDistance * MI_TO_KM) : legDistance;
     const dispTotal        = units === 'metric' ? Math.round(totalDistance * MI_TO_KM) : totalDistance;
     const dispSpeed        = units === 'metric' ? Math.round(speed * MI_TO_KM) : speed;
@@ -1428,169 +1546,210 @@ export default function RoadTripView({
     const towingEffLabel   = units === 'metric' ? 'km/kWh' : 'mi/kWh';
 
     return (
-        <div>
-            {/* ── Controls ─────────────────────────────────────────────── */}
+        <div className="chart-layout">
+            {/* ── Left rail: same rig as the other three chart screens ── */}
             {!presentationMode && (
-                <div className="card mb-6">
+                <aside className="chart-rail">
                     {loading && <LoadingSpinner message="Loading charging data…" />}
-                    {/* Toggles row */}
-                    <div className="flex flex-wrap gap-6 mb-4">
-                        <div>
-                            <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">Simulation</span>
-                            <div className="flex gap-1">
-                                <button
-                                    className={`btn ${mode === 'distance' ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={() => setField('mode', 'distance')}
+
+                    {/* ── AXES ──
+                      * Four button groups became three dropdowns. As buttons
+                      * they read as twelve actions and took four rows; the
+                      * charging charts already say a choice of axis looks like
+                      * `X [select]`, and this is the same kind of choice.
+                      *
+                      * Y is rebuilt from X because the two sweep axes plot a
+                      * different quantity: over a speed or distance SWEEP the
+                      * y-axis is a duration, and over a completed trip it is
+                      * what the trip produced. Keeping one list would have
+                      * offered options that silently do nothing. */}
+                    <div className="chart-rail-group">
+                        <span className="text-micro">Axes</span>
+                        <div className="axis-rows">
+                            <label className="axis-row">
+                                <span className="axis-row-key">X</span>
+                                <select
+                                    className="form-input"
+                                    value={xAxis}
+                                    onChange={e => setField('xAxis', e.target.value)}
                                 >
-                                    Fixed Charge Amount
-                                </button>
-                                <button
-                                    className={`btn ${mode === 'time' ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={() => setField('mode', 'time')}
+                                    {X_AXES.map(o => (
+                                        <option key={o.value} value={o.value}>{o.label}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="axis-row">
+                                <span className="axis-row-key">Y</span>
+                                <select
+                                    className="form-input"
+                                    value={isSweepMode ? sweepYAxis : yAxis}
+                                    onChange={e => setField(isSweepMode ? 'sweepYAxis' : 'yAxis', e.target.value)}
                                 >
-                                    Fixed Charge Time
-                                </button>
-                            </div>
-                        </div>
-                        <div>
-                            <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">X Axis</span>
-                            <div className="flex gap-1">
-                                <button className={`btn ${xAxis === 'totalTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'totalTime')}>Total Time</button>
-                                <button className={`btn ${xAxis === 'driveTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'driveTime')}>Drive Time</button>
-                                <button className={`btn ${xAxis === 'speed'     ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'speed')}>Travel Speed</button>
-                                <button className={`btn ${xAxis === 'tripDist'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('xAxis', 'tripDist')}>Trip Distance</button>
-                            </div>
-                        </div>
-                        <div>
-                            {isSweepMode ? (
-                                <>
-                                    <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">Y Axis</span>
-                                    <div className="flex gap-1">
-                                        <button className={`btn ${sweepYAxis === 'totalTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'totalTime')}>Total Time</button>
-                                        <button className={`btn ${sweepYAxis === 'driveTime'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'driveTime')}>Drive Time</button>
-                                        <button className={`btn ${sweepYAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('sweepYAxis', 'chargeTime')}>Charge + Stop</button>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">Y Axis</span>
-                                    <div className="flex gap-1">
-                                        <button className={`btn ${yAxis === 'distance'   ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'distance')}>Distance</button>
-                                        <button className={`btn ${yAxis === 'chargeTime' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'chargeTime')}>Charge Time</button>
-                                        <button className={`btn ${yAxis === 'byTest'     ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setField('yAxis', 'byTest')}>By Test</button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                        <div>
-                            <span className="text-xs font-semibold text-secondary uppercase tracking-wide block mb-1">Mode</span>
-                            <button
-                                className={`btn ${towingMode ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setField('towingMode', !towingMode)}
-                                title="Override all vehicle efficiencies with a fixed trailer-system value. Battery capacity and charging curve still vary per vehicle."
-                            >
-                                🚐 Towing
-                            </button>
+                                    {yAxisOptions.map(o => (
+                                        <option key={o.value} value={o.value}>{o.label}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="axis-row">
+                                <span className="axis-row-key">Sim</span>
+                                <select
+                                    className="form-input"
+                                    value={simMode}
+                                    onChange={e => {
+                                        const next = SIM_MODES.find(m => m.value === e.target.value);
+                                        // One update, not two: the pair is a single
+                                        // choice here, and setting them separately
+                                        // would rebuild the simulation twice.
+                                        setRoadTripConfig(prev => ({
+                                            ...prev, mode: next.mode, towingMode: next.towing,
+                                        }));
+                                    }}
+                                    title="What is held fixed at each stop, and whether every vehicle's efficiency is overridden with a towing figure"
+                                >
+                                    {SIM_MODES.map(m => (
+                                        <option key={m.value} value={m.value}>{m.label}</option>
+                                    ))}
+                                </select>
+                            </label>
                         </div>
                     </div>
 
-                    {/* Towing inputs — only visible when towing mode is on */}
-                    {towingMode && (
-                        <div className="mode-settings-panel">
-                            <p className="mode-settings-title">Towing System Efficiency</p>
-                            <div className="flex flex-wrap items-end gap-4">
-                                <label className="text-sm">
-                                    <span className="font-medium block mb-1">Efficiency ({towingEffLabel})</span>
-                                    <input type="number" className="form-input w-28" step="0.1" min="0.3" max="5"
-                                        value={dispTowingEff}
-                                        onChange={e => {
-                                            const val = parseFloat(e.target.value);
-                                            setField('towingEfficiency', units === 'metric' ? val / MI_TO_KM : val);
-                                        }} />
-                                </label>
-                                <label className="text-sm">
-                                    <span className="font-medium block mb-1">Measured at ({sl})</span>
-                                    <input type="number" className="form-input w-24" min="20"
-                                        value={dispTowingRef}
+                    {/* ── TRIP ──
+                      * The scenario, on Charge Compare's key/value/unit rows.
+                      * It was a seven-column grid of stacked label-over-input
+                      * pairs, which at rail width is seven columns of nothing. */}
+                    <div className="chart-rail-group">
+                        <span className="text-micro">Trip</span>
+                        <div className="axis-rows">
+                            <label className="scenario-row">
+                                <span className="scenario-key">Start</span>
+                                <input type="number" className="form-input"
+                                    value={startSoc}
+                                    onChange={e => setField('startSoc', Number(e.target.value))} />
+                                <span className="scenario-unit">% SoC</span>
+                            </label>
+                            <label className="scenario-row">
+                                <span className="scenario-key">Min</span>
+                                <input type="number" className="form-input"
+                                    value={minSoc}
+                                    onChange={e => setField('minSoc', Number(e.target.value))} />
+                                <span className="scenario-unit">% SoC</span>
+                            </label>
+                            <label className="scenario-row">
+                                <span className="scenario-key">Dest</span>
+                                <input type="number" className="form-input"
+                                    value={destinationMinSoc}
+                                    onChange={e => setField('destinationMinSoc', Number(e.target.value))} />
+                                <span className="scenario-unit">% SoC</span>
+                            </label>
+                            {mode === 'distance' ? (
+                                <label className="scenario-row">
+                                    <span className="scenario-key">Leg</span>
+                                    <input type="number" className="form-input"
+                                        value={dispLeg}
                                         onChange={e => {
                                             const val = Number(e.target.value);
-                                            setField('towingRefSpeedMph', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
+                                            setField('legDistance', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
                                         }} />
+                                    <span className="scenario-unit">{dl}/charge</span>
                                 </label>
-                                <p className="mode-settings-note">
-                                    Enter full system efficiency (vehicle + trailer). Battery capacity and charging speed still vary per vehicle.
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                            ) : (
+                                <label className="scenario-row">
+                                    <span className="scenario-key">Charge</span>
+                                    <input type="number" className="form-input"
+                                        value={chargeTime}
+                                        onChange={e => setField('chargeTime', Number(e.target.value))} />
+                                    <span className="scenario-unit">min/stop</span>
+                                </label>
+                            )}
+                            <label className="scenario-row">
+                                <span className="scenario-key">Total</span>
+                                <input type="number" className="form-input"
+                                    value={dispTotal}
+                                    onChange={e => {
+                                        const val = Number(e.target.value);
+                                        setField('totalDistance', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
+                                    }} />
+                                <span className="scenario-unit">{dl}</span>
+                            </label>
+                            {!isSpeedMode && (
+                                <label className="scenario-row">
+                                    <span className="scenario-key">Speed</span>
+                                    <input type="number" className="form-input"
+                                        value={dispSpeed}
+                                        onChange={e => {
+                                            const val = Number(e.target.value);
+                                            setField('speed', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
+                                        }} />
+                                    <span className="scenario-unit">{sl}</span>
+                                </label>
+                            )}
+                            <label className="scenario-row">
+                                <span className="scenario-key">Stop</span>
+                                <input type="number" className="form-input"
+                                    value={overhead}
+                                    onChange={e => setField('overhead', Number(e.target.value))} />
+                                <span className="scenario-unit">min overhead</span>
+                            </label>
 
-                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
-                        <label className="text-sm">
-                            <span className="font-medium block mb-1 whitespace-nowrap">Start SoC (%)</span>
-                            <input type="number" className="form-input w-full"
-                                min={50} max={100} value={startSoc}
-                                onChange={e => setField('startSoc', Number(e.target.value))} />
-                        </label>
-                        <label className="text-sm">
-                            <span className="font-medium block mb-1 whitespace-nowrap">Min SoC (%)</span>
-                            <input type="number" className="form-input w-full"
-                                min={0} max={30} value={minSoc}
-                                title="Lowest SoC before charging en route"
-                                onChange={e => setField('minSoc', Number(e.target.value))} />
-                        </label>
-                        <label className="text-sm">
-                            <span className="font-medium block mb-1 whitespace-nowrap">Dest. SoC (%)</span>
-                            <input type="number" className="form-input w-full"
-                                min={0} max={90} value={destinationMinSoc ?? minSoc}
-                                title="SoC to arrive at the destination with. Higher than Min SoC keeps a bigger buffer for the final leg."
-                                onChange={e => setField('destinationMinSoc', Number(e.target.value))} />
-                        </label>
-                        {mode === 'distance' && !isTripDistMode && (
-                            <label className="text-sm">
-                                <span className="font-medium block mb-1 whitespace-nowrap">{dl} between charges</span>
-                                <input type="number" className="form-input w-full"
-                                    min={10} value={dispLeg}
-                                    onChange={e => {
-                                        const val = Number(e.target.value);
-                                        setField('legDistance', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
-                                    }} />
-                            </label>
+                            {/* Towing's two numbers belong with the trip, not in
+                                DISPLAY: they are parameters of the simulation,
+                                not of how it is drawn. Orange because towing
+                                OVERRIDES every vehicle's measured efficiency —
+                                the same "this is active now, and it is changing
+                                your data" signal race mode uses. */}
+                            {towingMode && (
+                                <div className="override-panel">
+                                    <label className="scenario-row">
+                                        <span className="scenario-key">Tow eff</span>
+                                        <input type="number" className="form-input" step="0.1" min="0.3" max="5"
+                                            value={dispTowingEff}
+                                            onChange={e => {
+                                                const val = parseFloat(e.target.value);
+                                                setField('towingEfficiency', units === 'metric' ? val / MI_TO_KM : val);
+                                            }} />
+                                        <span className="scenario-unit">
+                                            {towingEffLabel}
+                                            <InfoIcon className="is-accent" position="right" text={TOWING_NOTE} />
+                                        </span>
+                                    </label>
+                                    <label className="scenario-row">
+                                        <span className="scenario-key">At</span>
+                                        <input type="number" className="form-input" min="20"
+                                            value={dispTowingRef}
+                                            onChange={e => {
+                                                const val = Number(e.target.value);
+                                                setField('towingRefSpeedMph', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
+                                            }} />
+                                        <span className="scenario-unit">
+                                            {sl}
+                                            <InfoIcon className="is-accent" position="right" text={TOWING_NOTE} />
+                                        </span>
+                                    </label>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* ── DISPLAY ──
+                      * Towing joins the checkboxes rather than being a lone
+                      * accent-filled button in a "Mode" group of one: it is a
+                      * thing that is either on or off, which is what every
+                      * other control in this region already is. */}
+                    <div className="chart-rail-group">
+                        <span className="text-micro">Display</span>
+                        <div className="display-grid">
+                            {setChartConfig && (
+                                <>
+                                    <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                                    <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                                </>
+                            )}
+                        </div>
+                        {setChartConfig && (
+                            <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                         )}
-                        {mode === 'time' && (
-                            <label className="text-sm">
-                                <span className="font-medium block mb-1 whitespace-nowrap">Charge Time (min)</span>
-                                <input type="number" className="form-input w-full"
-                                    min={5} max={120} value={chargeTime}
-                                    onChange={e => setField('chargeTime', Number(e.target.value))} />
-                            </label>
-                        )}
-                        <label className="text-sm">
-                            <span className="font-medium block mb-1 whitespace-nowrap">Total Dist. ({dl})</span>
-                            <input type="number" className="form-input w-full"
-                                min={10} value={dispTotal}
-                                onChange={e => {
-                                    const val = Number(e.target.value);
-                                    setField('totalDistance', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
-                                }} />
-                        </label>
-                        {!isSpeedMode && (
-                            <label className="text-sm">
-                                <span className="font-medium block mb-1 whitespace-nowrap">Speed ({sl})</span>
-                                <input type="number" className="form-input w-full"
-                                    min={20} value={dispSpeed}
-                                    onChange={e => {
-                                        const val = Number(e.target.value);
-                                        setField('speed', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
-                                    }} />
-                            </label>
-                        )}
-                        <label className="text-sm">
-                            <span className="font-medium block mb-1 whitespace-nowrap">Stop Overhead (min)</span>
-                            <input type="number" className="form-input w-full"
-                                min={0} max={60} value={overhead}
-                                title="Extra minutes added to every stop (parking, walk-in, plug-in). Applies to EV charging and ICE fuel stops."
-                                onChange={e => setField('overhead', Number(e.target.value))} />
-                        </label>
+
                     </div>
 
                     {/* Simulation result warnings — shown here so they're near the controls that triggered them */}
@@ -1609,13 +1768,7 @@ export default function RoadTripView({
                     )}
 
                     {/* Run selector */}
-                    <div className="mt-4">
-                        <RunSelector
-                            headerActions={setChartConfig ? <>
-                                <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
-                                <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
-                                <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
-                            </> : null}
+                    <RunSelector
                             vehicles={selectedVehicles.filter(v =>
                                 filterChargingRuns(v.runs).length > 0
                             )}
@@ -1628,7 +1781,6 @@ export default function RoadTripView({
                             emptyMessage="No range test records"
                             pairMode
                             pairings={pairings}
-                            primaryLabel="Range:"
                             partnerLabel="Charging:"
                             partnerRunsFor={vehicle => filterChargingRuns(vehicle.runs)}
                             extraPrimaryRunsFor={vehicle => {
@@ -1648,34 +1800,37 @@ export default function RoadTripView({
                                 setPairings(prev => removePartner(prev, rangeId, chargingId))}
                             renderRunMeta={run => {
                                 const entry = [...allPairsInfo.values()].find(e => e.rangeRun.id === run.id);
-                                if (!entry) return null;
-                                if (!entry.miPerKwh) {
-                                    return <span className="text-xs text-red-400 ml-1">⚠ No range data</span>;
-                                }
-                                const eff = entry.miPerKwh.toFixed(1);
-                                const spd = entry.testSpeedMph
-                                    ? `${fmtSpeed(entry.testSpeedMph, units)}`
-                                    : '70 mph (assumed)';
                                 return (
-                                    <span className="text-xs text-meta ml-1">
-                                        {eff} {units === 'metric' ? 'km/kWh' : 'mi/kWh'} @ {spd}
-                                        {entry.efficiencyNote && ` · ${entry.efficiencyNote}`}
-                                    </span>
+                                    <>
+                                        <SpeedBadge run={run} units={units} />
+                                        {run.temperature_f != null && (
+                                            <span className="badge-micro">{fmtTemp(run.temperature_f, units)}</span>
+                                        )}
+                                        {entry && !entry.miPerKwh && (
+                                            <span className="badge-micro is-danger" title="This run has no distance and energy to derive an efficiency from, so it cannot be simulated">
+                                                ⚠ no range data
+                                            </span>
+                                        )}
+                                    </>
                                 );
                             }}
-                        />
-                    </div>
+                    />
 
-                    {/* Per-run routing overrides */}
+                    {/* Per-run routing overrides. Left as it is: a per-run table
+                        of SoC and leg overrides does not fold into a 320px rail
+                        without a redesign, and it wants its own thinking rather
+                        than a squeeze. It sits below the rail for now. */}
                     {!isSweepMode && (
                         <RoutingOverridesPanel
                             entries={validEntries}
+                            labels={seriesLabels}
                             perRun={roadTripConfig.perRun || {}}
                             mode={mode}
                             global={{ minSoc, legDistance, chargeTime }}
                             units={units}
                             dl={dl}
                             onChange={setRunOverride}
+                            onReset={clearRunOverrides}
                         />
                     )}
 
@@ -1692,8 +1847,10 @@ export default function RoadTripView({
                             ))}
                         </div>
                     )}
-                </div>
+                </aside>
             )}
+
+            <div className="chart-main">
 
             {/* ── Chart ────────────────────────────────────────────────── */}
             {loading && (
@@ -1711,66 +1868,59 @@ export default function RoadTripView({
             )}
 
             {!loading && validEntries.length > 0 && (
-                <div className="card mb-6">
-                    <h3 className="text-lg font-bold mb-2">
-                        Road Trip{towingMode ? ' (Towing)' : ''}
-                        {isSpeedMode   ? ` · Speed vs. Time`
-                         : isTripDistMode ? ` — ${Math.round(convDistance(totalDistance, units))} ${dl} · Leg Distance vs. Time at ${Math.round(convDistance(speed, units))} ${sl}`
-                         : ` — ${Math.round(convDistance(totalDistance, units))} ${dl} at ${Math.round(convDistance(speed, units))} ${sl}`}
-                    </h3>
+                <PlotFrame
+                    title={plotTitle}
+                    subtitle={plotSubtitle}
+                    preview={preview}
+                    onDismissPreview={dismissPreview}
+                    exportControls={!presentationMode && (
+                        <>
+                            <button
+                                onClick={() => chartRef.current?.resetZoom()}
+                                className="chart-copy-btn"
+                                title="Reset zoom to full view"
+                            >
+                                Reset zoom
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const p = new URLSearchParams(window.location.search);
+                                    if (selectedRunIds.length) p.set('rt_r', selectedRunIds.join(','));
+                                    else p.delete('rt_r');
+                                    const url = `${window.location.origin}${window.location.pathname}?${p.toString()}`;
+                                    navigator.clipboard.writeText(url).then(() => {
+                                        setCopiedUrl(true);
+                                        setTimeout(() => setCopiedUrl(false), 2000);
+                                    });
+                                }}
+                                className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
+                                title="Copy link to this Road Trip chart"
+                            >
+                                {copiedUrl ? '✓ Copied' : '🔗 URL'}
+                            </button>
+                            <button
+                                onClick={copyPng}
+                                className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
+                                title="Copy the framed chart as a PNG"
+                            >
+                                {imageCopied ? '✓ Copied' : 'PNG'}
+                            </button>
+                        </>
+                    )}
+                >
                     <div style={{ height: `${isSweepMode ? 400 : yAxis === 'byTest' ? Math.max(300, validEntries.length * 120) : Math.max(400, validEntries.length * 40 + 200)}px`, position: 'relative' }}>
                         <canvas ref={canvasRef} />
                     </div>
                     {isSweepMode && hasUnrealisticPoints && (
-                        <p className="text-xs text-amber-600 mt-1 text-center">
+                        <p className="text-note text-center mt-1">
                             Lines end where a charge stop would exceed {CHARGE_CEIL_SOC}% SoC — unrealistic at that {isSpeedMode ? 'speed' : 'leg distance'}.
                         </p>
                     )}
-                    <div className="mt-3 flex gap-2 flex-wrap items-center">
-                        <button
-                            onClick={() => chartRef.current?.resetZoom()}
-                            className="chart-copy-btn"
-                            title="Reset zoom to full view"
-                        >
-                            🔍 Reset Zoom
-                        </button>
-                        <button
-                            onClick={() => {
-                                const p = new URLSearchParams(window.location.search);
-                                if (selectedRunIds.length) p.set('rt_r', selectedRunIds.join(','));
-                                else p.delete('rt_r');
-                                const url = `${window.location.origin}${window.location.pathname}?${p.toString()}`;
-                                navigator.clipboard.writeText(url).then(() => {
-                                    setCopiedUrl(true);
-                                    setTimeout(() => setCopiedUrl(false), 2000);
-                                });
-                            }}
-                            className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
-                            title="Copy link to this Road Trip chart"
-                        >
-                            {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
-                        </button>
-                        <button
-                            onClick={handleCopyImage}
-                            className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                            title="Copy chart as PNG"
-                        >
-                            {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
-                        </button>
-                        {chartImage && (
-                            <button onClick={() => setChartImage(null)} className="chart-copy-btn">
-                                ✕ Dismiss preview
-                            </button>
-                        )}
-                    </div>
-                    <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset Zoom to restore</p>
-                    {chartImage && (
-                        <div className="mt-3">
-                            <p className="text-xs text-meta mb-1.5">Right-click or long-press to copy / save</p>
-                            <img src={chartImage} alt="Chart export" className="w-full rounded border border-[var(--color-border)]" />
-                        </div>
-                    )}
-                </div>
+                </PlotFrame>
+            )}
+
+            {!presentationMode && !loading && validEntries.length > 0 && (
+                <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset zoom to restore</p>
             )}
 
             {/* ── Axis Scale Controls (card provided by AxisScaleControls) ─ */}
@@ -1944,6 +2094,8 @@ export default function RoadTripView({
             )}
 
             {!presentationMode && <ChartInfoBubble chartKey="roadtrip" />}
+
+            </div>{/* .chart-main */}
         </div>
     );
 }
