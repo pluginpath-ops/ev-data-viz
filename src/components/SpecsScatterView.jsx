@@ -9,6 +9,8 @@ import {
     vehicleColor, formatNumericLabel,
 } from '../utils/specHelpers';
 import ChartInfoBubble from './ChartInfoBubble';
+import PlotFrame from './charts/PlotFrame';
+import { useChartPng } from '../hooks/useChartPng';
 
 // ── Linear regression ─────────────────────────────────────────────────────────
 
@@ -80,8 +82,6 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
     const [localX, setLocalX] = useState('');
     const [localY, setLocalY] = useState('');
     const [copiedUrl,   setCopiedUrl]   = useState(false);
-    const [imageCopied, setImageCopied] = useState(false);
-    const [chartImage,  setChartImage]  = useState(null);
 
     const xField = xProp || localX;
     const yField = yProp || localY;
@@ -241,29 +241,30 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
         };
     }, [xField, yField, vehicles, allNumericFields, vehicleFields, units, isDark]);
 
-    const handleCopyImage = async () => {
-        if (!chartRef.current) return;
-        const src = chartRef.current.canvas;
-        const offscreen = document.createElement('canvas');
-        offscreen.width  = src.width;
-        offscreen.height = src.height;
-        const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = chartTheme().background;
-        ctx2.fillRect(0, 0, offscreen.width, offscreen.height);
-        ctx2.drawImage(src, 0, 0);
-        const dataUrl = offscreen.toDataURL('image/png');
-        setChartImage(dataUrl);
-        try {
-            const blob = await (await fetch(dataUrl)).blob();
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-            setImageCopied(true);
-            setTimeout(() => setImageCopied(false), 2500);
-        } catch { /* Clipboard API not supported — image shown inline */ }
-    };
+    // ── The frame's caption, and its export ─────────────────────────────────
+    // Both axes lived in <select>s above the canvas and the export flattened
+    // the canvas alone, so a pasted scatter was a cloud of dots with tick
+    // numbers and no statement of what was plotted against what.
+    const plotTitle = useMemo(() => {
+        const x = allNumericFields.find(f => f.key === xField)?.label || xField;
+        const y = allNumericFields.find(f => f.key === yField)?.label || yField;
+        return x && y ? `${y} vs ${x}` : 'Compare specs';
+    }, [allNumericFields, xField, yField]);
+
+    const plotSubtitle = useMemo(() => {
+        const n = vehicles.length;
+        return [
+            `${n} vehicle${n === 1 ? '' : 's'}`,
+            units === 'metric' ? 'metric' : 'imperial',
+        ].join(' · ');
+    }, [vehicles, units]);
+
+    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
 
     return (
         <>
-        <div className="specs-chart-card">
+        <div className="specs-chart-card mb-4">
             <div className="specs-chart-controls">
                 <label className="text-sm font-medium text-secondary">X-Axis:</label>
                 <select
@@ -296,43 +297,41 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
                 </select>
             </div>
 
+        </div>
+
+        <PlotFrame
+            title={plotTitle}
+            subtitle={plotSubtitle}
+            preview={preview}
+            onDismissPreview={dismissPreview}
+            exportControls={!presentationMode && (
+                <>
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(window.location.href).then(() => {
+                                setCopiedUrl(true);
+                                setTimeout(() => setCopiedUrl(false), 2000);
+                            });
+                        }}
+                        className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
+                        title="Copy link to this chart view"
+                    >
+                        {copiedUrl ? '✓ Copied' : '🔗 URL'}
+                    </button>
+                    <button
+                        onClick={copyPng}
+                        className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
+                        title="Copy the framed chart as a PNG"
+                    >
+                        {imageCopied ? '✓ Copied' : 'PNG'}
+                    </button>
+                </>
+            )}
+        >
             <div style={{ height: `${Math.max(400, vehicles.length * 40)}px`, position: 'relative' }}>
                 <canvas ref={canvasRef} />
             </div>
-
-            <div className="mt-3 flex gap-2 flex-wrap">
-                <button
-                    onClick={() => {
-                        navigator.clipboard.writeText(window.location.href).then(() => {
-                            setCopiedUrl(true);
-                            setTimeout(() => setCopiedUrl(false), 2000);
-                        });
-                    }}
-                    className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
-                    title="Copy link to this chart view"
-                >
-                    {copiedUrl ? '✓ Copied!' : '🔗 Copy URL'}
-                </button>
-                <button
-                    onClick={handleCopyImage}
-                    className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                    title="Copy chart as PNG"
-                >
-                    {imageCopied ? '✓ Copied to clipboard!' : '📋 Copy Chart as PNG'}
-                </button>
-                {chartImage && (
-                    <button onClick={() => setChartImage(null)} className="chart-copy-btn">
-                        ✕ Dismiss preview
-                    </button>
-                )}
-            </div>
-            {chartImage && (
-                <div className="mt-3">
-                    <p className="text-xs text-meta mb-1.5">Right-click or long-press to copy / save</p>
-                    <img src={chartImage} alt="Chart export" className="w-full rounded border border-[var(--color-border)]" />
-                </div>
-            )}
-        </div>
+        </PlotFrame>
         {!presentationMode && <ChartInfoBubble chartKey="specscatter" />}
         </>
     );

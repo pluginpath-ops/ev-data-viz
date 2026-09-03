@@ -21,7 +21,8 @@ import AxisScaleControls from './AxisScaleControls';
 import PerformanceRunSelector from './performance/PerformanceRunSelector';
 import { buildSyntheticCurve, tracedCurvePoints, segmentAccelerationG } from '../utils/performanceDerivations';
 import { resolveChartColors } from '../utils/colorUtils';
-import ChartExportButtons from './ChartExportButtons';
+import PlotFrame from './charts/PlotFrame';
+import { useChartPng } from '../hooks/useChartPng';
 import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 
 /** Okabe-Ito, matching the palette the other charts use for run colours. */
@@ -406,6 +407,24 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         return () => { chartRef.current?.destroy(); chartRef.current = null; };
     }, [series, isDark, presentationMode, scale, colorMap, showG]);
 
+    // ── The frame's caption, and its export ─────────────────────────────────
+    // The title was an <h3> above the card and the export flattened the canvas
+    // alone, so a pasted PNG was a set of curves with no statement of how many
+    // vehicles were on it or whether the dotted g-force overlay was on.
+    const plotTitle = 'Speed vs time';
+
+    const plotSubtitle = useMemo(() => {
+        const n = series.length;
+        const parts = [`${n} run${n === 1 ? '' : 's'}`, 'from imported split data'];
+        if (showG) parts.push('acceleration overlay');
+        return parts.join(' · ');
+    }, [series, showG]);
+
+    const { copyPng, copied, preview, dismissPreview } =
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
+
+    const [urlCopied, setUrlCopied] = useState(false);
+
     if (loading) return <LoadingSpinner />;
 
     return (
@@ -490,29 +509,54 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                 )}
             </div>}
 
-            <div className="card mb-4">
-                <h3 className="text-lg font-semibold mb-3">Speed vs Time</h3>
-
-                {series.length === 0 ? (
+            {series.length === 0 ? (
+                <div className="card mb-4">
+                    <h3 className="text-lg font-semibold mb-3">Speed vs Time</h3>
                     <p className="text-sm text-secondary py-8 text-center">
                         No acceleration split data for the selected vehicles. This chart is built
                         from imported testing CSVs — reported figures alone carry no trace to plot.
                     </p>
-                ) : (
+                </div>
+            ) : (
+                <PlotFrame
+                    title={plotTitle}
+                    subtitle={plotSubtitle}
+                    preview={preview}
+                    onDismissPreview={dismissPreview}
+                    exportControls={!presentationMode && (
+                        <>
+                            <button
+                                onClick={() => {
+                                    const p = new URLSearchParams(window.location.search);
+                                    p.set('tab', 'performance');
+                                    p.set('m', 'perfcurve');
+                                    navigator.clipboard.writeText(
+                                        `${window.location.origin}${window.location.pathname}?${p}`
+                                    ).then(() => {
+                                        setUrlCopied(true);
+                                        setTimeout(() => setUrlCopied(false), 2000);
+                                    });
+                                }}
+                                className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
+                                title="Copy link to this chart view"
+                            >
+                                {urlCopied ? '✓ Copied' : '🔗 URL'}
+                            </button>
+                            <button
+                                onClick={copyPng}
+                                className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
+                                title="Copy the framed chart as a PNG"
+                            >
+                                {copied ? '✓ Copied' : 'PNG'}
+                            </button>
+                        </>
+                    )}
+                >
                     <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460 }}>
                         <canvas ref={canvasRef} />
                     </div>
-                )}
-                {!presentationMode && series.length > 0 && (
-                    <ChartExportButtons
-                        chartRef={chartRef}
-                        buildParams={p => {
-                            p.set('tab', 'performance');
-                            p.set('m', 'perfcurve');
-                        }}
-                    />
-                )}
-            </div>
+                </PlotFrame>
+            )}
 
             {/* Scale controls sit BELOW the chart in their own card, matching every
                 other chart view. X and Y value pickers are omitted: the split

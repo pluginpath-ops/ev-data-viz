@@ -7,10 +7,11 @@
  * once, and a single chart behind a dropdown made that a sequence of clicks and
  * a memory test.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import Chart from 'chart.js/auto';
-import ChartExportButtons from '../ChartExportButtons';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
+import PlotFrame from '../charts/PlotFrame';
+import { useChartPng } from '../../hooks/useChartPng';
 
 export default function PerformanceCompareChart({
     title,
@@ -32,6 +33,29 @@ export default function PerformanceCompareChart({
 
     const withData    = rows.filter(r => r.value != null);
     const withoutData = rows.filter(r => r.value == null);
+
+    // The caption the export carries. `title` was an <h3> above the card and the
+    // measure lived in a <select> beside it, so a pasted PNG was a row of bars
+    // labelled with vehicle names and a bare axis — no statement of which
+    // metric, in which mode, over how many vehicles.
+    const plotSubtitle = useMemo(() => {
+        const n = withData.length;
+        const parts = [`${n} vehicle${n === 1 ? '' : 's'}`];
+        // The mode is frequently the first word of the axis label ("Distance" /
+        // "Distance (ft)"), and "distance · Distance (ft)" reads as a stutter
+        // rather than as two facts.
+        const mode = valueModes?.find(v => v.key === valueMode)?.label;
+        const axis = axisLabel || '';
+        if (mode && !axis.toLowerCase().startsWith(mode.toLowerCase())) {
+            parts.push(mode.toLowerCase());
+        }
+        if (axis) parts.push(axis);
+        return parts.join(' · ');
+    }, [withData, valueModes, valueMode, axisLabel]);
+
+    const [urlCopied, setUrlCopied] = useState(false);
+    const { copyPng, copied, preview, dismissPreview } =
+        useChartPng(chartRef, { title, subtitle: plotSubtitle });
 
     useEffect(() => {
         if (!canvasRef.current || withData.length === 0) {
@@ -141,9 +165,13 @@ export default function PerformanceCompareChart({
     }, [withData, isDark, axisLabel, barMode]);
 
     return (
+        <>
         <div className="card mb-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <h3 className="text-lg font-semibold">{title}</h3>
+            {/* No heading here: PlotFrame below carries the title, and it has to
+                — a title outside the frame is a title the PNG does not have.
+                Repeating it made every Performance chart say its own name
+                twice. */}
+            <div className="flex flex-wrap items-center justify-end gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                     {!presentationMode && valueModes && (
                         <select
@@ -170,32 +198,66 @@ export default function PerformanceCompareChart({
                 </div>
             </div>
 
-            {withData.length === 0 ? (
+            {withData.length === 0 && (
                 <p className="text-sm text-secondary py-6 text-center">
                     No tested figure for this among the selected vehicles.
                 </p>
-            ) : (
+            )}
+
+        </div>
+
+        {withData.length > 0 && (
+            <PlotFrame
+                title={title}
+                subtitle={plotSubtitle}
+                preview={preview}
+                onDismissPreview={dismissPreview}
+                exportControls={!presentationMode && (
+                    <>
+                    <button
+                        onClick={() => {
+                            const p = new URLSearchParams(window.location.search);
+                            p.set('tab', 'performance');
+                            p.set('m', 'perfcompare');
+                            navigator.clipboard.writeText(
+                                `${window.location.origin}${window.location.pathname}?${p}`
+                            ).then(() => {
+                                setUrlCopied(true);
+                                setTimeout(() => setUrlCopied(false), 2000);
+                            });
+                        }}
+                        className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
+                        title="Copy link to this chart view"
+                    >
+                        {urlCopied ? '✓ Copied' : '🔗 URL'}
+                    </button>
+                    <button
+                        onClick={copyPng}
+                        className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
+                        title="Copy the framed chart as a PNG"
+                    >
+                        {copied ? '✓ Copied' : 'PNG'}
+                    </button>
+                    </>
+                )}
+            >
                 <div style={{ height: Math.max(140, withData.length * 42) }}>
                     <canvas ref={canvasRef} />
                 </div>
-            )}
+            </PlotFrame>
+        )}
 
-            {note && <p className="text-xs text-meta mt-2">{note}</p>}
-
-            {withoutData.length > 0 && withData.length > 0 && (
-                <p className="text-xs text-meta mt-2">
-                    {withoutData.length <= 5
-                        ? `No figure for: ${withoutData.map(r => r.name).join(', ')}`
-                        : `${withoutData.length} other selected vehicles have no figure here.`}
-                </p>
-            )}
-
-            {!presentationMode && withData.length > 0 && (
-                <ChartExportButtons
-                    chartRef={chartRef}
-                    buildParams={p => { p.set('tab', 'performance'); p.set('m', 'perfcompare'); }}
-                />
-            )}
-        </div>
+        {/* Under the figure, not above it: both lines are commentary on what the
+            chart shows, and above the frame they read as belonging to the
+            controls instead. */}
+        {note && <p className="text-xs text-meta mt-2">{note}</p>}
+        {withoutData.length > 0 && withData.length > 0 && (
+            <p className="text-xs text-meta mt-2">
+                {withoutData.length <= 5
+                    ? `No figure for: ${withoutData.map(r => r.name).join(', ')}`
+                    : `${withoutData.length} other selected vehicles have no figure here.`}
+            </p>
+        )}
+        </>
     );
 }
