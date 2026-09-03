@@ -4,16 +4,21 @@ import { useTheme } from '../../../hooks/useTheme';
 import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
 import { buildEpaCurveFromModel } from '../../../utils/epaDerivations';
-import { DEFAULT_SS_ETA, CURVE_SPEED_RANGE } from '../../../constants/epa';
+import { DEFAULT_SS_ETA, CURVE_SPEED_RANGE, CURVE_REFERENCE_MPH } from '../../../constants/epa';
 import { curveSubjects, curveTooltipLines, disambiguateLabels } from '../../../utils/epaCurveSubjects';
 import { PALETTE } from '../../../utils/specHelpers';
 import { convSpeed, speedLabel } from '../../../utils/unitConversions';
 import CurveSubjectPicker from './CurveSubjectPicker';
 import ViewingConditions, { useViewingConditions } from '../ViewingConditions';
-import CollapsibleSection from '../../CollapsibleSection';
 import AxisScaleControls from '../../AxisScaleControls';
 import LoadingSpinner from '../../LoadingSpinner';
-import { chartTheme, applyChartDefaults } from '../../../utils/chartTheme';
+import CollapsibleSection from '../../CollapsibleSection';
+import { chartTheme, chartFonts, applyChartDefaults } from '../../../utils/chartTheme';
+import PlotFrame from '../../charts/PlotFrame';
+import { useChartPng } from '../../../hooks/useChartPng';
+import InfoIcon from '../../InfoIcon';
+import { EPA_EXPLAINERS } from '../../../utils/epaExplainers';
+import { fmtTemp, fmtSpeed } from '../../../utils/unitConversions';
 
 /**
  * EPA efficiency curves anchored on certification records (#237).
@@ -43,6 +48,91 @@ const Y_AXES = [
     { key: 'mpge',     label: 'MPGe',        unit: 'MPGe',      digits: 1, needsEnergy: false, etaSensitive: true },
     { key: 'rangeMi',  label: 'Range',       unit: 'mi',        digits: 0, needsEnergy: true,  etaSensitive: false },
 ];
+
+/** Linear interpolation of a sorted {x, y} series at `x`. */
+function valueAt(points, x) {
+    if (!points?.length) return null;
+    const before = [...points].filter(p => p.x <= x).at(-1);
+    const after = points.find(p => p.x > x);
+    if (before && after) {
+        const t = (x - before.x) / (after.x - before.x);
+        return before.y + t * (after.y - before.y);
+    }
+    return before?.y ?? after?.y ?? null;
+}
+
+/**
+ * The reference-speed rule, its crossings, and the axis captions.
+ *
+ * One speed is called out because comparing curves means comparing them
+ * SOMEWHERE, and a reader picking their own point off two crossing lines is
+ * doing arithmetic the chart should have done. It is drawn rather than written
+ * beside the chart so that it survives the PNG export, which is the only form
+ * most of these ever get read in.
+ *
+ * Colours come from chartTheme(), including the callout orange — the canvas is
+ * the one surface the stylesheet cannot reach, and the alternative is the hex
+ * literal this file used to carry.
+ */
+function makeReferencePlugin(refX, refLabel, xCaption, yCaption) {
+    return {
+        id: 'curveReference',
+        afterDatasetsDraw(chart) {
+            const { ctx, chartArea: area, scales } = chart;
+            if (!area || !scales.x) return;
+            const { callout, tick } = chartTheme();
+            const fonts = chartFonts();
+            const px = scales.x.getPixelForValue(refX);
+
+            ctx.save();
+
+            if (px >= area.left && px <= area.right) {
+                ctx.strokeStyle = callout;
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(px, area.top);
+                ctx.lineTo(px, area.bottom);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.font = `${fonts.nano}px ${fonts.mono}`;
+                ctx.fillStyle = callout;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(refLabel, px + 5, area.top + 2);
+
+                // A dot where each curve crosses, so the legend's figure has a
+                // visible anchor rather than being a number to take on trust.
+                chart.data.datasets.forEach((ds, i) => {
+                    const meta = chart.getDatasetMeta(i);
+                    if (meta.hidden) return;
+                    const y = valueAt(ds.data, refX);
+                    if (y == null) return;
+                    const py = scales.y.getPixelForValue(y);
+                    if (py < area.top || py > area.bottom) return;
+                    ctx.fillStyle = ds.borderColor;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+
+            // Axis captions, replacing Chart.js's centred titles: the units
+            // belong at the ends of the axes they describe, where the eye
+            // already is when it reaches the last tick.
+            ctx.font = `${fonts.nano}px ${fonts.mono}`;
+            ctx.fillStyle = tick;
+            ctx.textBaseline = 'alphabetic';
+            ctx.textAlign = 'left';
+            ctx.fillText(xCaption, area.left, chart.height - 2);
+            ctx.textAlign = 'right';
+            ctx.fillText(yCaption, area.right, chart.height - 2);
+
+            ctx.restore();
+        },
+    };
+}
 
 export default function EpaCurveExplorer() {
     const { getCertGroupsForCurves, units } = useAppContext();
@@ -93,6 +183,50 @@ export default function EpaCurveExplorer() {
 
     const displayNames = useMemo(() => disambiguateLabels(plotted), [plotted]);
 
+    // One assignment, read by the chart and by the picker's swatches. Computing
+    // it twice from the same index arithmetic would agree right up until one of
+    // them changed.
+    const colorByKey = useMemo(
+        () => new Map(plotted.map((s, i) => [s.key, PALETTE[i % PALETTE.length]])),
+        [plotted],
+    );
+
+    // ── The frame's caption ─────────────────────────────────────────────────
+    // Deliberately the same shape as EpaCurvesView's: a modelled curve with no
+    // statement of what it was modelled AT is not a chart anyone can act on,
+    // and these two screens plot the same maths from different subjects.
+    const plotTitle = useMemo(
+        () => `${axis.label} vs steady speed`,
+        [axis],
+    );
+
+    const plotSubtitle = useMemo(() => {
+        const n = plotted.length;
+        const parts = [
+            `${n} record${n === 1 ? '' : 's'}`,
+            'from EPA road-load coefficients A, B, C',
+        ];
+        // Condition values are TEXT INPUT state, so an unset field is '' — and
+        // `'' != null` is true, so a `!= null` guard lets the empty string
+        // through and fmtTemp renders it as 0 °F. Absent has to read as absent
+        // on a chart whose whole subject is the conditions it was drawn under.
+        const c = conditions.values ?? {};
+        const num = v => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
+        const t = num(c.tempF);
+        const w = num(c.windSpeedMph);
+        const el = num(c.elevationFt);
+        if (t != null) parts.push(fmtTemp(t, units));
+        parts.push(w ? `${fmtSpeed(w, units)} wind` : 'still air');
+        if (el) parts.push(`${Math.round(el)} ft`);
+        parts.push(gradeGainFtNum ? 'graded' : 'level');
+        parts.push(units === 'metric' ? 'metric' : 'imperial');
+        return parts.join(' · ');
+    }, [plotted, conditions, units, gradeGainFtNum]);
+
+    const { copyPng, copied: pngCopied, preview, dismissPreview } =
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
+    const [urlCopied, setUrlCopied] = useState(false);
+
     useEffect(() => {
         const p = new URLSearchParams(window.location.search);
         p.set('tab', 'epa');
@@ -107,7 +241,7 @@ export default function EpaCurveExplorer() {
         chartRef.current?.destroy();
         if (!plotted.length) return;
 
-        const datasets = plotted.map((s, i) => {
+        const datasets = plotted.map((s) => {
             const curve = buildEpaCurveFromModel(
                 s.group, s.useableKwh ?? 0, densityRatio, accessoryOverrideWNum,
                 windSpeedMphNum, windDirectionDegNum, gradeGainFtNum, gradeDistanceMilesNum,
@@ -121,18 +255,25 @@ export default function EpaCurveExplorer() {
                 data: curve
                     .filter(pt => pt[yAxis] != null)
                     .map(pt => ({ x: convSpeed(pt.mph, units), y: pt[yAxis] })),
-                borderColor: PALETTE[i % PALETTE.length],
-                backgroundColor: PALETTE[i % PALETTE.length],
-                // A borrowed-energy curve is drawn dashed on the range axis
-                // only. Its shape is measured, so on the consumption axes there
-                // is nothing to qualify — dashing it everywhere would imply the
-                // whole curve is soft when only its scale is.
-                borderDash: (axis.needsEnergy && s.tier === 'nominal') ? [6, 4] : undefined,
+                borderColor: colorByKey.get(s.key),
+                backgroundColor: colorByKey.get(s.key),
+                // Dashed means one thing: the SHAPE is measured and the
+                // MAGNITUDE is estimated. Two cases reach it — a borrowed pack
+                // capacity on the range axis, and an assumed η on the axes that
+                // divide by it — and they were drawn differently for no reason a
+                // reader could act on. Neither is dashed where it does not
+                // apply, which is what keeps the mark meaningful.
+                borderDash: ((axis.needsEnergy && s.tier === 'nominal')
+                    || (axis.etaSensitive && !s.etaMeasured)) ? [7, 5] : undefined,
                 pointRadius: 0,
-                borderWidth: 2,
+                borderWidth: 2.5,
                 tension: 0.2,
             };
         });
+
+        // One number, drawn on the plot, labelled, and read back in the legend.
+        const refX = convSpeed(CURVE_REFERENCE_MPH, units);
+        const refLabel = `${Math.round(refX)} ${speedLabel(units).toUpperCase()}`;
 
         // From the stylesheet, not retyped here — see utils/chartTheme.
         const { grid, legend: text } = chartTheme();
@@ -141,6 +282,12 @@ export default function EpaCurveExplorer() {
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
             data: { datasets },
+            plugins: [makeReferencePlugin(
+                refX,
+                refLabel,
+                `SPEED · ${speedLabel(units)}`,
+                `${axis.label.toUpperCase()} · ${axis.unit}`,
+            )],
             options: {
                 /* The whole chart is rebuilt on every conditions change, so an
                    animation replays from scratch each time — which hides the
@@ -149,11 +296,16 @@ export default function EpaCurveExplorer() {
                 animation: false,
                 responsive: true,
                 maintainAspectRatio: false,
+                // Room under the plot for the axis captions the plugin draws.
+                layout: { padding: { bottom: 16 } },
                 interaction: { mode: 'nearest', intersect: false },
                 scales: {
                     x: {
                         type: 'linear',
-                        title: { display: true, text: speedLabel(units), color: text },
+                        // Titles off: the plugin draws both captions at the ends
+                        // of their axes instead, which is where the eye already
+                        // is when it reaches the last tick.
+                        title: { display: false },
                         // The default window is the curve's own domain rather
                         // than a literal 5–120: CURVE_SPEED_RANGE is an Admin
                         // knob, and a hardcoded bound would stop tracking the
@@ -163,7 +315,7 @@ export default function EpaCurveExplorer() {
                         grid: { color: grid }, ticks: { color: text },
                     },
                     y: {
-                        title: { display: true, text: `${axis.label} (${axis.unit})`, color: text },
+                        title: { display: false },
                         min: scale.yMin ?? undefined,
                         max: scale.yMax ?? undefined,
                         grid: { color: grid }, ticks: { color: text },
@@ -174,14 +326,21 @@ export default function EpaCurveExplorer() {
                         labels: {
                             color: text,
                             boxHeight: 2,
-                            // ⚠ on the curves the current axis qualifies, so a
-                            // mixed plot says which lines rest on an assumption
-                            // without the reader consulting the picker.
+                            // Each entry carries its own value at the reference
+                            // speed. Comparing curves means comparing them
+                            // somewhere, and reading two crossing lines off a
+                            // shared tick is arithmetic the chart should have
+                            // done. ⚠ still marks the curves this axis
+                            // qualifies, so a mixed plot says which figures rest
+                            // on an assumption.
                             generateLabels(chart) {
                                 const base = Chart.defaults.plugins.legend.labels.generateLabels(chart);
                                 return base.map(item => {
                                     const ds = chart.data.datasets[item.datasetIndex];
-                                    return ds?._flagged ? { ...item, text: `⚠ ${item.text}` } : item;
+                                    const v = valueAt(ds?.data, refX);
+                                    const suffix = v == null ? '' : `  ${v.toFixed(axis.digits)} @ ${Math.round(refX)}`;
+                                    const text = `${ds?._flagged ? '⚠ ' : ''}${item.text}${suffix}`;
+                                    return { ...item, text };
                                 });
                             },
                         },
@@ -207,7 +366,7 @@ export default function EpaCurveExplorer() {
             },
         });
         return () => chartRef.current?.destroy();
-    }, [plotted, yAxis, axis, units, isDark, displayNames, scale,
+    }, [plotted, yAxis, axis, units, isDark, displayNames, scale, colorByKey,
         densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum,
         gradeGainFtNum, gradeDistanceMilesNum]);
 
@@ -216,122 +375,187 @@ export default function EpaCurveExplorer() {
 
     return (
         <div className="stats-view">
-            <div className="section-header">
-                <div>
-                    <div className="section-title">Speed-consumption curves</div>
-                    <div className="text-note">
-                        Efficiency against steady speed, computed from each record’s own road-load
-                        coefficients. {subjects.length} records can be plotted — most belong to no
-                        vehicle in the database, which is why this view does not use the vehicle selection.
+            <div className="chart-layout">
+                <aside className="chart-rail">
+                    {/* Every class here is Phase 4's. The controls were a stack
+                        of chip walls above the plot; the maths is untouched. */}
+                    <div className="chart-rail-group">
+                        <span className="text-micro">Axes</span>
+                        <div className="axis-rows">
+                            {/* Stated as a value, not a disabled <input>: a field
+                                box says "type here" and then refuses, and greying
+                                it only turns that into "type here later". This
+                                axis is never anything else. */}
+                            <div className="axis-row">
+                                <span className="axis-row-key">X</span>
+                                <span className="axis-row-fixed">
+                                    Steady speed ({speedLabel(units)})
+                                    <span className="text-nano">fixed</span>
+                                </span>
+                            </div>
+                            <label className="axis-row">
+                                <span className="axis-row-key">Y</span>
+                                <select
+                                    className="form-input"
+                                    value={yAxis}
+                                    onChange={e => setYAxis(e.target.value)}
+                                >
+                                    {Y_AXES.map(a => (
+                                        <option key={a.key} value={a.key}>
+                                            {a.label} ({a.unit})
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+                        {/* The module this text comes from was already written
+                            and already imported by the vehicle-driven curves.
+                            This screen explained nothing at all. */}
+                        <span className="text-note">
+                            How this is calculated
+                            <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" />
+                        </span>
                     </div>
-                </div>
-            </div>
 
-            <CurveSubjectPicker
-                subjects={subjects}
-                selected={selected}
-                onToggle={(key) => setSelected(prev =>
-                    prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])}
-                onClear={() => setSelected([])}
-            />
-
-            {/* Two different caveats, and they belong to different axes.
-                Missing energy REMOVES a curve from the range axis; an assumed η
-                leaves the curve drawn and makes every point on it an estimate.
-                Reporting them the same way would flatten that difference. */}
-            {/* Chart options in one card, Y axis above the adjustments —
-                the same shape as the vehicle-driven curves, so the two tabs do
-                not present the same controls in two different arrangements. */}
-            <div className="card mb-4">
-                <div className="guide-facet">
-                    <div className="guide-facet-label">Y axis</div>
-                    <div className="guide-facet-values">
-                        {Y_AXES.map(a => (
-                            <button key={a.key} type="button"
-                                className={`guide-chip ${yAxis === a.key ? 'active' : ''}`}
-                                onClick={() => setYAxis(a.key)}
-                                title={a.needsEnergy ? 'Needs usable energy — records without it cannot be drawn on this axis' : undefined}>
-                                {a.label}
-                            </button>
-                        ))}
+                    {/* Closed by default, so the sidebar's height goes to the
+                        record list instead. These scale the curve at plot time
+                        and are almost always left alone — but a reader who HAS
+                        set one has to see that without opening it, which is
+                        what the subtitle is for. */}
+                    <div className="chart-rail-group">
+                        <CollapsibleSection
+                            className="collapsible-section--flush"
+                            title={<span className="text-micro">Viewing conditions</span>}
+                            subtitle={conditions.anyAdjusted
+                                ? 'adjusted — not standard conditions'
+                                : 'standard'}
+                        >
+                            <ViewingConditions conditions={conditions} />
+                        </CollapsibleSection>
                     </div>
-                </div>
 
-                {/* Between the search and the graph, collapsed by default: these
-                    scale the curve at plot time and are almost always left alone,
-                    but a reader who has set one needs to see that from the header
-                    without opening it. */}
-                <CollapsibleSection
-                    className="collapsible-section--flush"
-                    title="Environmental Conditions"
-                    subtitle={conditions.anyAdjusted
-                        ? 'adjusted — the curves below are not at standard conditions'
-                        : 'standard conditions'}
-                >
-                    <div className="chart-controls-row">
-                        <ViewingConditions conditions={conditions} />
+                    {/* The last group takes whatever height is left, so the
+                        record list is the sidebar's only scroller. */}
+                    <div className="chart-rail-group is-fill">
+                        {/* Behind the glyph, not printed above the list. It
+                            answers a first-visit question — why this view has no
+                            vehicle selection — and then costs four lines of a
+                            300px column on every visit after that. */}
+                        <span className="text-micro">
+                            Records
+                            <InfoIcon
+                                position="right"
+                                text={`${subjects.length} certification records carry road-load `
+                                    + 'coefficients. Most belong to no vehicle in the database, '
+                                    + 'which is why this view does not use the vehicle selection.'}
+                            />
+                        </span>
+                        <CurveSubjectPicker
+                            subjects={subjects}
+                            selected={selected}
+                            onToggle={(key) => setSelected(prev =>
+                                prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])}
+                            onClear={() => setSelected([])}
+                            colors={colorByKey}
+                        />
                     </div>
-                </CollapsibleSection>
-            </div>
+                </aside>
 
-            {withoutRange.length > 0 && (
-                <div className="guide-warning">
-                    {withoutRange.length === 1 ? (
-                        <>
-                            One selected record has no usable energy, so it is absent from the range axis:
-                            {' '}<strong>{withoutRange[0].label}</strong>. Its consumption curve is unaffected.
-                        </>
+                <div className="chart-main">
+                    {plotted.length === 0 ? (
+                        <div className="empty-state">Choose one or more certification records to plot.</div>
                     ) : (
                         <>
-                            {withoutRange.length} selected records have no usable energy, so they are absent
-                            from the range axis: <strong>{withoutRange.map(s => s.label).join(', ')}</strong>.
-                            Their consumption curves are unaffected.
+                            <PlotFrame
+                                title={plotTitle}
+                                subtitle={plotSubtitle}
+                                preview={preview}
+                                onDismissPreview={dismissPreview}
+                                exportControls={(
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(window.location.href).then(() => {
+                                                    setUrlCopied(true);
+                                                    setTimeout(() => setUrlCopied(false), 2000);
+                                                });
+                                            }}
+                                            className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
+                                            title="Copy link to this chart view"
+                                        >
+                                            {urlCopied ? '✓ Copied' : '🔗 URL'}
+                                        </button>
+                                        <button
+                                            onClick={copyPng}
+                                            className={`chart-copy-btn ${pngCopied ? 'chart-copy-btn-active' : ''}`}
+                                            title="Copy the framed chart as a PNG"
+                                        >
+                                            {pngCopied ? '✓ Copied' : 'PNG'}
+                                        </button>
+                                    </>
+                                )}
+                            >
+                                <div style={{ height: 460, position: 'relative' }}>
+                                    <canvas ref={canvasRef} />
+                                </div>
+                            </PlotFrame>
+
+                            {/* Caveats below the figure, where a footnote goes.
+                                Two of them, and they belong to different axes:
+                                missing energy REMOVES a curve from the range
+                                axis; an assumed η leaves it drawn and makes every
+                                point on it an estimate. */}
+                            {withoutRange.length > 0 && (
+                                <div className="guide-warning">
+                                    {withoutRange.length === 1 ? (
+                                        <>
+                                            One selected record has no usable energy, so it is absent from the range axis:
+                                            {' '}<strong>{withoutRange[0].label}</strong>. Its consumption curve is unaffected.
+                                        </>
+                                    ) : (
+                                        <>
+                                            {withoutRange.length} selected records have no usable energy, so they are absent
+                                            from the range axis: <strong>{withoutRange.map(s => s.label).join(', ')}</strong>.
+                                            Their consumption curves are unaffected.
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {assumedEta.length > 0 && (
+                                <div className="guide-warning">
+                                    {/* The affected records are NOT listed. The ⚠ in the
+                                        legend already points at them, and repeating the
+                                        names turned a caveat into a paragraph nobody
+                                        finishes. */}
+                                    <strong>
+                                        ⚠ {assumedEta.length} curve{assumedEta.length === 1 ? ' is' : 's are'} using
+                                        an assumed drivetrain efficiency (η).
+                                    </strong>
+                                    <div className="mt-1">
+                                        {axis.label} requires an η in addition to the EPA provided road load. These
+                                        records currently do not have test data to estimate η from, so a universal
+                                        estimate of {DEFAULT_SS_ETA} is used instead — the cruise-basis fallback,
+                                        because every point on these curves is a constant speed.
+                                    </div>
+                                    <div className="mt-1">
+                                        The SHAPE of each curve is real, but its magnitude scales with η.
+                                        Estimated entries are marked ⚠ in the legend.
+                                    </div>
+                                </div>
+                            )}
+
+                            <AxisScaleControls
+                                xMin={scale.xMin} xMax={scale.xMax}
+                                yMin={scale.yMin} yMax={scale.yMax}
+                                xAxisLabel={`Speed (${speedLabel(units)})`}
+                                yAxisLabel={`${axis.label} (${axis.unit})`}
+                                onChange={(key, value) => setScale(p => ({ ...p, [key]: value }))}
+                            />
                         </>
                     )}
                 </div>
-            )}
-
-            {assumedEta.length > 0 && (
-                <div className="guide-warning">
-                    {/* The affected records are NOT listed. The ⚠ in the legend
-                        already points at them, and repeating the names here
-                        turned a caveat into a paragraph nobody finishes. */}
-                    <strong>
-                        ⚠ {assumedEta.length} curve{assumedEta.length === 1 ? ' is' : 's are'} using
-                        an assumed drivetrain efficiency (η).
-                    </strong>
-                    <div className="mt-1">
-                        {axis.label} requires an η in addition to the EPA provided road load. These
-                        records currently do not have test data to estimate η from, so a universal
-                        estimate of {DEFAULT_SS_ETA} is used instead — the cruise-basis fallback,
-                        because every point on these curves is a constant speed.
-                    </div>
-                    <div className="mt-1">
-                        The SHAPE of each curve is real, but its magnitude scales with η.
-                        Estimated entries are marked ⚠ in the legend.
-                    </div>
-                </div>
-            )}
-
-            {plotted.length === 0 ? (
-                <div className="empty-state">Choose one or more certification records to plot.</div>
-            ) : (
-                <>
-                    <div className="curve-canvas-wrap">
-                        <canvas ref={canvasRef} />
-                    </div>
-
-                    {/* Below the chart, as in every other chart view. The card
-                        comes from AxisScaleControls itself. */}
-                    <AxisScaleControls
-                        xMin={scale.xMin} xMax={scale.xMax}
-                        yMin={scale.yMin} yMax={scale.yMax}
-                        xAxisLabel={`Speed (${speedLabel(units)})`}
-                        yAxisLabel={`${axis.label} (${axis.unit})`}
-                        onChange={(key, value) => setScale(p => ({ ...p, [key]: value }))}
-                    />
-                </>
-            )}
+            </div>
         </div>
     );
 }

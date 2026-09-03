@@ -49,17 +49,24 @@ const num = (v) => {
  * curve is not a less precise measurement, it is a measured shape scaled by a
  * borrowed number.
  */
+/**
+ * `badge` is the row-level short form, and it lives HERE rather than in the
+ * picker because the picker used to map the tiers by hand with a three-way
+ * ternary over four tiers: a `corrected` subject — which measured its own
+ * capacity and CAN plot range — fell through the else and was labelled
+ * `no range`, which is not a shorter way of saying its tier, it is false.
+ */
 export const CURVE_TIERS = [
-    { key: 'measured', label: 'Full test cycle',
+    { key: 'measured', label: 'Full test cycle', badge: 'test cycle',
       tooltip: 'efficiency and capacity both come from this record’s own phases.',
       hint: 'This record ran a constant-speed section, so η is back-solved from it at 65 mph — the same steady cruise this curve plots — and usable capacity is the DC actually discharged to depletion. Both halves of the energy model are this vehicle\'s own.' },
-    { key: 'corrected', label: 'Corrected efficiency',
+    { key: 'corrected', label: 'Corrected efficiency', badge: 'corrected',
       tooltip: 'capacity is this record’s own; efficiency is its highway figure scaled to a cruise basis.',
       hint: 'This record measured its capacity but never ran a constant-speed section, so η comes from its highway phase scaled by the fleet median of the ratio between the two. Half the fleet sits within a few percent of that ratio. It is a real improvement on the highway figure for a cruise curve — which reads about 13% low — and it is still borrowed from other vehicles.' },
-    { key: 'nominal', label: 'Published battery capacity',
+    { key: 'nominal', label: 'Published battery capacity', badge: 'published pack',
       tooltip: 'efficiency is the model default; capacity is the guide’s gross pack, a few percent above what is usable.',
       hint: 'No test phases, so η falls back to the universal default. Capacity comes from the Fuel Economy Guide’s gross pack — voltage × amp-hours, which runs a few percent above real usable energy. Range is drawable but doubly approximate.' },
-    { key: 'shape', label: 'Road load only',
+    { key: 'shape', label: 'Road load only', badge: 'road load',
       tooltip: 'same default efficiency as above, but no capacity at all, so these plot consumption and not range.',
       hint: 'Coefficients and nothing else. η falls back to the default and there is no capacity at all, so consumption is drawable and range is not.' },
 ];
@@ -138,13 +145,6 @@ export function curveSubjects(groups) {
         .map(curveSubject)
         .filter(Boolean)
         .sort((a, b) => rank[a.tier] - rank[b.tier] || a.label.localeCompare(b.label));
-}
-
-/** How many subjects sit in each tier, for the filter's counts. */
-export function tierCounts(subjects) {
-    const out = Object.fromEntries(CURVE_TIERS.map(t => [t.key, 0]));
-    for (const s of subjects) out[s.tier] += 1;
-    return out;
 }
 
 // ── Chart labelling ──────────────────────────────────────────────────────────

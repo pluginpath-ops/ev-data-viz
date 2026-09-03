@@ -76,7 +76,7 @@ export const NOT_CATALOGUED = {
 export const DARK_OVERRIDE_CLASSES = new Set([
     'badge-hidden',
     'brand-alias-chip', 'chart-copy-btn-active',
-    'curve-picker-row', 'curve-tier-badge', 'guide-row', 'guide-tested-note',
+    'guide-row', 'guide-tested-note',
     'merge-target-banner', 'specs-table-container', 'stats-suppressed-flag',
     'sweep-batch', 'vote-btn-vouch'
 ]);
@@ -152,7 +152,7 @@ export const SECTIONS = [
             { cls: 'badge-hidden',    as: 'span', label: 'Hidden' },
             { cls: 'badge-status',    as: 'span', label: 'Status' },
             { cls: 'owner-badge',     as: 'span', label: 'Owner' },
-            { cls: 'curve-tier-badge', as: 'span', label: 'Curve tier' },
+            { cls: 'badge-micro is-qualified', as: 'span', label: 'Corrected' },
             { cls: 'fe-picker-badge', as: 'span', label: 'FE picker' },
             { cls: 'pair-more-badge', as: 'span', label: '+2 more' },
             { cls: 'spec-link-kind-pill', as: 'span', label: 'Link kind' },

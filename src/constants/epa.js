@@ -17,6 +17,10 @@ export const HWFET_AVG_MPH    = 48.3;        // HWFET cycle average speed (η an
 export const UDDS_AVG_MPH     = 19.6;        // UDDS cycle average speed
 export const US06_AVG_MPH     = 48.4;
 export const HIGHWAY_BAND_MPH = [65, 75];    // reference band drawn on the curve
+// The single speed the curve screens call out: the midpoint of the band above,
+// and the one number a reader compares vehicles at. Named because it is drawn,
+// labelled AND read back in the legend — three places that must agree.
+export const CURVE_REFERENCE_MPH = 70;
 
 // EPA label arithmetic (#206). Regulatory definitions, so they live up here with
 // the physical facts rather than in the tunable block below — changing them does

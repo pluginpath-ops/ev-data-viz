@@ -115,9 +115,11 @@ describe('the classes that cannot follow a themed subtree', () => {
         // 17 when the marker was added, 15 after #277, 13 once the re-skin's
         // chrome phase rebuilt .btn-tab on tokens and deleted
         // .app-header-compact with the photo hero, 12 once .badge-default
-        // became the mono DEF marker. Lower it as classes move; a rise means a
-        // new class was written the old way.
-        expect(actual.size).toBeLessThanOrEqual(12);
+        // became the mono DEF marker, 11 once the curve tier badges moved onto
+        // .badge-micro's intents, 10 once the curve picker's selected row took
+        // --color-popover. Lower it as classes move; a rise means a new class
+        // was written the old way.
+        expect(actual.size).toBeLessThanOrEqual(10);
     });
 });
 

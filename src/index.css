@@ -1687,6 +1687,49 @@ body {
 .chart-rail input[type="text"],
 .chart-rail input[type="number"] { max-width: 100%; }
 
+/* The record picker was built for EPA Browse's filter bar, which is a panel on
+   a page. Dropped into the sidebar it brought that panel with it — a bordered,
+   filled box with 16px of its own padding, inside a group that is already the
+   panel. Same treatment every other borrowed control gets here: keep the
+   layout, drop the chrome. */
+.chart-rail .guide-filter-bar {
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 10px;
+    min-height: 0;
+}
+
+/* ── One scroller per sidebar ───────────────────────────────────────────────
+ *
+ * A rail that scrolls AND a list inside it that scrolls is two scrollbars in
+ * one 320px column, and the outer one carries the controls away while you use
+ * the inner one. A group marked `is-fill` takes the leftover height instead, so
+ * the axes and conditions stay put and the list is the only thing that moves.
+ *
+ * The rail keeps `overflow-y: auto` as a FALLBACK. Forcing it to hidden was a
+ * bug: in a viewport too short for the controls themselves, the leftover height
+ * goes negative and hidden clips them with no way to reach them. Letting the
+ * rail scroll in that one case degrades to two scrollbars instead of to
+ * unreachable controls.
+ */
+.chart-rail-group.is-fill {
+    flex: 1;
+    min-height: 0;
+}
+/* Only the parts that must SHRINK get min-height: 0. Applying it to every
+   child let the group's own label and note collapse below their text and
+   overlap each other — flex will happily shrink a paragraph to nothing once
+   you tell it the content size is not a floor. */
+.chart-rail-group.is-fill > .guide-filter-bar,
+.chart-rail-group.is-fill .curve-picker-list-facet {
+    flex: 1;
+    min-height: 0;
+}
+
 /* A labelled group inside the rail. */
 .chart-rail-group {
     display: flex;
@@ -1875,9 +1918,21 @@ body {
     font-weight: 500;
     color: var(--color-text-secondary);
 }
+/* The unit that follows an input. Its own name because it repeats seven times
+   in one panel and was seven copies of `text-sm text-meta`. */
+.viewing-unit {
+    flex: none;
+    white-space: nowrap;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-meta);
+}
+
 /* A figure the inputs above imply rather than one you set. */
 .viewing-derived {
+    flex: none;
+    white-space: nowrap;
     font-family: var(--font-mono);
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
     color: var(--color-text-meta);
 }
 .viewing-derived.is-active { color: var(--color-accent-orange); }
@@ -2648,11 +2703,38 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
     color: var(--color-text-secondary);
 }
-.routing-swatch {
+/* The colour of a plotted series, wherever a row has to say which line it is.
+   Named for what it IS rather than for the first screen that needed one: it
+   was .routing-swatch, scoped to Road Trip, while the curve picker had no way
+   at all to tell a reader which record was which line. */
+.series-swatch {
+    position: relative;
     width: 10px;
     height: 10px;
     flex: none;
     border-radius: var(--radius-track);
+}
+/* Unplotted: the row can still be read, and the swatch says "not on the chart"
+   rather than claiming a colour it does not have. */
+.series-swatch.is-empty {
+    background-color: transparent;
+    border: 1px solid var(--color-border-strong);
+}
+/* This series rests on an assumption. Deliberately NOT the same statement as
+   the tier badge beside it: the tier mixes where the ENERGY came from with
+   where the EFFICIENCY came from, so a record can read "published pack" and
+   still have its own measured η — which is the half that matters on every axis
+   but range. Orange because it is a callout, and this is the one thing on the
+   row that qualifies the number. */
+.series-swatch.is-qualified::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: var(--color-accent-orange);
 }
 
 .routing-row-fields {
@@ -3187,9 +3269,21 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .info-icon.is-accent:hover .info-icon-glyph { opacity: 1; }
 
+/* `display: none`, not just `visibility: hidden`.
+ *
+ * A hidden-but-displayed absolute box still contributes to the scrollable
+ * overflow of every ancestor that can scroll. In the chart sidebar that meant
+ * ~234px of invisible tooltip hanging below the last control, so the rail grew
+ * a scrollbar for content nobody could see — a second scrollbar beside the
+ * record list's own, which is what made the column feel sloppy.
+ *
+ * The fade survives where `allow-discrete` is supported and degrades to an
+ * instant show where it is not. */
 .info-icon-tooltip {
+    display: none;
     visibility: hidden;
     opacity: 0;
+    transition-behavior: allow-discrete;
     position: absolute;
     z-index: 100;
     width: 240px;
@@ -3208,8 +3302,12 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 .info-icon:hover .info-icon-tooltip {
+    display: block;
     visibility: visible;
     opacity: 1;
+}
+@starting-style {
+    .info-icon:hover .info-icon-tooltip { opacity: 0; }
 }
 
 /* Tooltip placement variants */
@@ -3246,12 +3344,28 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    Anchoring ONLY to .scenario-row was the bug: a viewing-conditions icon then
    had no positioned ancestor inside the rail and its tooltip resolved against
    something far up the tree. */
-/* The ROW is the anchor wherever there is one, so a tooltip opens under the
-   control it explains rather than under the whole section. The group is the
-   fallback for anything that has no row of its own. */
+/* The element that CONTAINS the icon is the anchor, so a tooltip opens under
+   the label it explains.
+ *
+ * The group used to be the fallback, and that held only while groups were
+ * short. Once one of them grew to fill the sidebar — 750px of record list —
+ * `top: calc(100% + 6px)` put its tooltip 750px down, below the fold, and
+ * opening it scrolled the page. Anchoring to whatever directly holds the glyph
+ * is independent of how tall its section happens to be.
+ *
+ * The row anchors stay: rows hold several controls, and a tooltip should open
+ * under its own row rather than under whichever element inside it won. */
 .chart-rail-group { position: relative; }
 .chart-rail .scenario-row,
 .chart-rail .viewing-row { position: relative; }
+.chart-rail :has(> .info-icon) { position: relative; }
+/* …unless a ROW already anchors it. Without this the label became the anchor
+   and `left: 0; right: 0` resolved against ITS width — turning a viewing
+   condition's tooltip into a 92px column 400px tall. The row is the right
+   anchor wherever there is one; the container is only the fallback for icons
+   that sit in a section header with no row of their own. */
+.chart-rail .viewing-row :has(> .info-icon),
+.chart-rail .scenario-row :has(> .info-icon) { position: static; }
 .chart-rail .info-icon { position: static; }
 .chart-rail .info-icon-tooltip {
     top: calc(100% + 6px);
@@ -3262,6 +3376,20 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     max-width: none;
     transform: none;
     white-space: normal;
+}
+
+/* Capped, because the rail is exactly one viewport tall and no longer scrolls:
+   anything taller than the space below its glyph opens into somewhere the
+   reader cannot reach. One of these carries a reference table and is ~800px —
+   which overflows in EITHER direction, so flipping it upward only moved the
+   unreachable part to the top.
+   `pointer-events: auto` is what makes the cap usable: the tooltip is a
+   DESCENDANT of .info-icon, so moving onto it keeps :hover true and it can be
+   scrolled without vanishing under the cursor. */
+.chart-rail .info-icon-tooltip {
+    max-height: 40vh;
+    overflow-y: auto;
+    pointer-events: auto;
 }
 
 /* Tooltip that opens OVER a muted panel (e.g. a filter bar).
@@ -4816,47 +4944,104 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .curve-picker-list-facet {
     @apply w-full;
 }
+/* No border and no fill: the sidebar group around it is already the panel, and
+   a bordered box inside a bordered panel spends a gutter on each side to say
+   something the panel has said. The rows run to the group's own edges, the way
+   the run selector's do. */
 .curve-picker-list {
-    @apply flex flex-col gap-px max-h-64 overflow-y-auto rounded;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-border);
+    @apply flex flex-col gap-px overflow-y-auto;
+    flex: 1;
+    min-height: 120px;
+    margin: 0 calc(var(--rail-pad-r) * -1) 0 calc(var(--rail-pad-l) * -1);
 }
+.curve-picker-list .curve-picker-row {
+    padding-left: var(--rail-pad-l);
+    padding-right: var(--rail-pad-r);
+}
+/* A tier's divider, sticky inside the scroller: with 377 records across four
+   tiers, a header that scrolls away leaves you reading rows whose grounding you
+   can no longer see. Opaque for the same reason — rows must not show through
+   it. Not collapsible: hiding a tier is the filter chips' job, and two
+   mechanisms for the same thing is how a control panel becomes a puzzle. */
+.curve-picker-group {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px var(--rail-pad-r) 4px var(--rail-pad-l);
+    background-color: var(--color-surface-sunken);
+    border-bottom: 1px solid var(--color-border);
+}
+.curve-picker-group + .curve-picker-row { margin-top: 2px; }
+.curve-picker-group-count {
+    font-family: var(--font-mono);
+    color: var(--color-text-faint);
+}
+
+/* Two lines, because one line had to hold a name, a year, a make and a badge
+   inside a 320px sidebar and gave the name whatever was left — which was
+   "500e All Sea…". `align-items: start` so the checkbox and swatch sit against
+   the name rather than centring on the pair. */
 .curve-picker-row {
-    @apply flex items-center gap-2 px-2 py-1 text-sm cursor-pointer;
+    @apply flex gap-2 py-1 cursor-pointer;
+    align-items: flex-start;
     color: var(--color-text-primary);
 }
-.curve-picker-row:hover    { background-color: var(--color-surface-muted); }
-.curve-picker-row.selected { background-color: var(--color-primary-light); }
-[data-theme="dark"] .curve-picker-row.selected {
-    background-color: rgba(59, 130, 246, 0.18);
+.curve-picker-row input,
+.curve-picker-row .series-swatch { margin-top: 3px; }
+
+/* The crossover, stated rather than stumbled into.
+ *
+ * Above this the sidebar holds its controls AND a usable list, so the list
+ * takes the leftover height and is the only scroller. Below it there is no
+ * height to give, and forcing a floor on the list just pushes the rail into
+ * overflow — two scrollbars in one column again. So the list stops being a
+ * scroller and the rail becomes one instead.
+ *
+ * 46rem is measured, not picked: 131px of header plus 413px of sidebar controls
+ * plus roughly six rows of list. */
+@media (max-height: 46rem) {
+    .chart-rail-group.is-fill > .guide-filter-bar,
+    .chart-rail-group.is-fill .curve-picker-list-facet { flex: none; }
+    .curve-picker-list {
+        flex: none;
+        min-height: 0;
+        overflow-y: visible;
+    }
 }
+
+.curve-picker-row:hover    { background-color: var(--color-surface-muted); }
+/* --color-popover, not --color-primary-light: the light value needed a dark
+   override to be legible, and a token that reads correctly in both themes is
+   the whole point of having one. */
+.curve-picker-row.selected { background-color: var(--color-popover); }
 .curve-picker-name {
-    @apply truncate flex-1 min-w-0;
+    @apply flex flex-col flex-1 min-w-0;
+    line-height: 1.25;
+}
+.curve-picker-title {
+    @apply truncate;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+}
+/* The record's identity beneath its name — mono, because a model year and a
+   make read as a record's coordinates rather than as prose. */
+.curve-picker-meta {
+    @apply truncate;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
 }
 
 /* Named on every row, because once a mixed set is plotted this is the only
    thing distinguishing a measured range from a borrowed one. */
-.curve-tier-badge {
-    @apply px-1.5 py-0.5 rounded uppercase shrink-0;
-    font-size: 0.5625rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-}
-.curve-tier-badge.tier-measured {
-    background-color: var(--color-primary);
-    color: rgb(255, 255, 255);
-}
-.curve-tier-badge.tier-nominal {
-    background-color: var(--color-warning);
-    color: rgb(255, 255, 255);
-}
-.curve-tier-badge.tier-shape {
-    background-color: var(--color-surface-sunken);
-    color: var(--color-text-muted);
-}
-[data-theme="dark"] .curve-tier-badge.tier-shape {
-    background-color: rgba(255, 255, 255, 0.1);
-}
+/* The curve tiers used .curve-tier-badge with four bespoke colour rules and a
+   dark override. They now use .badge-micro with the intents that already carry
+   those meanings — see TIER_INTENT in CurveSubjectPicker. Four rules and one
+   un-scopable override deleted, and a tier added later inherits the system
+   instead of needing a fifth rule. */
 
 .curve-canvas-wrap {
     @apply p-3 rounded-lg;

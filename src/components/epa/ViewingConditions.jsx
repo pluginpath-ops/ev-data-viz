@@ -108,7 +108,7 @@ export default function ViewingConditions({ conditions }) {
             <div className="chart-viewing-conditions">
                 {/* Altitude — viewing condition, applies to all curves */}
                 <div className="viewing-row">
-                    <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                    <span className="viewing-label">
                         Altitude
                         <InfoIcon
                             text="Adjusts aerodynamic drag for air density at this elevation. Models air density only — does not capture battery, regen, or cabin-heating effects. Curve is the standard-condition baseline scaled for thinner air."
@@ -124,12 +124,12 @@ export default function ViewingConditions({ conditions }) {
                         className="form-input form-input w-24 text-right"
                         aria-label="Elevation in feet"
                     />
-                    <span className="text-sm text-meta">ft</span>
+                    <span className="viewing-unit">ft</span>
                 </div>
 
                 {/* Temperature — viewing condition, applies to all curves */}
                 <div className="viewing-row">
-                    <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                    <span className="viewing-label">
                         Temp
                         <InfoIcon
                             text={`Adjusts aerodynamic drag for air density at this ambient temperature (colder air is denser). Standard condition is ${STANDARD_TEMP_F}°F. Models air density only — does not capture battery, HVAC, or cold-tire effects.`}
@@ -148,9 +148,9 @@ export default function ViewingConditions({ conditions }) {
                         className="form-input form-input w-20 text-right"
                         aria-label="Ambient temperature in °F"
                     />
-                    <span className="text-sm text-meta">°F</span>
+                    <span className="viewing-unit">°F</span>
                     <span
-                        className={`text-xs whitespace-nowrap ${densityAdjusted ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-meta'}`}
+                        className={`viewing-derived${densityAdjusted ? ' is-active' : ''}`}
                         title="Combined air-density ratio (altitude × temperature) applied to the aerodynamic (C) term"
                     >
                         → ρ {densityRatio.toFixed(2)}{densityAdjusted ? ' ▲' : ''}
@@ -159,7 +159,7 @@ export default function ViewingConditions({ conditions }) {
 
                 {/* Accessory load — viewing condition, applies to all curves */}
                 <div className="viewing-row">
-                    <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                    <span className="viewing-label">
                         Accessory Load
                         <InfoIcon
                             tooltipClassName="info-icon-tooltip--wide"
@@ -179,12 +179,12 @@ export default function ViewingConditions({ conditions }) {
                         className="form-input form-input w-24 text-right"
                         aria-label="Accessory load override in watts"
                     />
-                    <span className="text-sm text-meta">W</span>
+                    <span className="viewing-unit">W</span>
                 </div>
 
                 {/* Wind — viewing condition, applies to all curves */}
                 <div className="viewing-row">
-                    <span className="text-sm font-medium flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
+                    <span className="viewing-label">
                         Wind
                         <InfoIcon
                             text="Scales aerodynamic drag by apparent (relative) airspeed — a headwind raises effective drag speed, a tailwind lowers it, a pure crosswind raises it slightly. Direction is relative to travel: 0°=tailwind, 180°=headwind, 90°/270°=crosswind. Models relative-airspeed magnitude only — does not capture yaw-angle sensitivity of drag coefficient."
@@ -202,7 +202,7 @@ export default function ViewingConditions({ conditions }) {
                         className="form-input form-input w-16 text-right"
                         aria-label="Wind speed in mph"
                     />
-                    <span className="text-sm text-meta">mph @</span>
+                    <span className="viewing-unit">mph @</span>
                     <input
                         type="number"
                         step="15"
@@ -214,7 +214,7 @@ export default function ViewingConditions({ conditions }) {
                         className="form-input form-input w-16 text-right"
                         aria-label="Wind direction relative to travel, in degrees"
                     />
-                    <span className="text-sm text-meta">°{windAdjusted ? ' ▲' : ''}</span>
+                    <span className="viewing-unit">°{windAdjusted ? ' ▲' : ''}</span>
                 </div>
 
                 {/* The elevation-gain disclosure. Turning it OFF clears the inputs
@@ -269,7 +269,7 @@ export default function ViewingConditions({ conditions }) {
                             className="form-input w-20 text-right"
                             aria-label="Net elevation gain in feet (negative for net descent)"
                         />
-                        <span className="text-sm text-meta">ft over</span>
+                        <span className="viewing-unit">ft over</span>
                         <input
                             type="number"
                             step="5"
@@ -280,7 +280,7 @@ export default function ViewingConditions({ conditions }) {
                             className="form-input w-16 text-right"
                             aria-label="Distance in miles the elevation change is spread over"
                         />
-                        <span className="text-sm text-meta">mi</span>
+                        <span className="viewing-unit">mi</span>
                     </div>
                     <div className="viewing-row">
                         <span className="viewing-label">Grade</span>
