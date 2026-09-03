@@ -1730,7 +1730,18 @@ body {
 }
 
 @media (max-width: 68.75rem) {
-    .chart-layout { flex-direction: column; }
+    .chart-layout {
+        flex-direction: column;
+        /* `column` flips the cross axis to HORIZONTAL, which changes what the
+           base `align-items: flex-start` means. Beside the plot it says "do not
+           stretch the rail to the row's height"; stacked above it, the same
+           declaration says "shrink every child to its content width" — so the
+           plot sized itself to the export strip's label and buttons and came up
+           at 439-551px inside an 852px column. Road Trip and EPA Curves looked
+           fine only because their controls happen to be wide enough to fill it,
+           which hid the same bug rather than avoiding it. */
+        align-items: stretch;
+    }
     .chart-rail {
         width: 100%;
         position: static;
