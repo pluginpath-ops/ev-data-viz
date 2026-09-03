@@ -86,10 +86,22 @@ export function chartToPngDataUrl(chartInstance, options = {}) {
             ctx.fillText(subtitle, pad, y);
         }
         if (wordmark) {
+            // Two fills, not one. On screen the mark is an element with an
+            // inner span — `EV` faint, `BENCH` accent (.plot-frame-mark) — and
+            // canvas has no span, so a single fillText silently flattened the
+            // accent half to grey. Drawn right-to-left: BENCH sits against the
+            // padding and EV is offset by its measured width, so the pair lands
+            // exactly where the one string used to.
             ctx.font = `700 ${px(MARK_SIZE)}px ${DISPLAY}`;
             ctx.textAlign = 'right';
+            const right = offscreen.width - pad;
+            const markY = pad + px(MARK_SIZE);
+            ctx.fillStyle = theme.accent;
+            ctx.fillText('BENCH', right, markY);
+            // theme.axis is --color-chart-axis, which carries the same value as
+            // the --color-text-faint the frame uses, in both themes.
             ctx.fillStyle = theme.axis;
-            ctx.fillText('EVBENCH', offscreen.width - pad, pad + px(MARK_SIZE));
+            ctx.fillText('EV', right - ctx.measureText('BENCH').width, markY);
         }
     }
 

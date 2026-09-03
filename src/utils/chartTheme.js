@@ -142,17 +142,20 @@ const FALLBACK = {
     legend:     'rgb(168, 178, 193)',
     grid:       'rgb(26, 33, 44)',
     axis:       'rgb(61, 74, 90)',
+    accent:     'rgb(45, 127, 249)',
     background: 'rgb(17, 22, 31)',
 };
 
 /**
  * Resolve the chart palette for whatever theme is currently applied.
  *
- * @returns {{tick: string, legend: string, grid: string, axis: string, background: string}}
+ * @returns {{tick: string, legend: string, grid: string, axis: string, accent: string,
+ *   background: string}}
  *   tick       — axis tick labels
  *   legend     — legend entries, axis titles and the chart title
  *   grid       — gridlines inside the plot area
  *   axis       — the axis lines themselves, a step stronger than the grid
+ *   accent     — the site's blue, for canvas text that is branding rather than data
  *   background — the flat fill a PNG export is composited onto
  */
 export function chartTheme() {
@@ -169,6 +172,10 @@ export function chartTheme() {
         legend:     read('--color-text-secondary', FALLBACK.legend),
         grid:       read('--color-chart-grid', FALLBACK.grid),
         axis:       read('--color-chart-axis', FALLBACK.axis),
+        // Not a data colour. The one canvas surface that needs it is the
+        // wordmark on a PNG export, whose second half is the same accent the
+        // frame paints on screen — see .plot-frame-mark in index.css.
+        accent:     read('--color-accent-blue', FALLBACK.accent),
         // The panel, not the page: a chart is exported as the thing it sits in,
         // and the frame it will gain in a later phase is that same panel.
         background: read('--color-card', FALLBACK.background),
