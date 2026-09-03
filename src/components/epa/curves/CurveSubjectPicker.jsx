@@ -1,20 +1,6 @@
-import { useState, useMemo } from 'react';
+import { Fragment, useState, useMemo } from 'react';
 import { CURVE_TIERS, tierByKey, tierCounts } from '../../../utils/epaCurveSubjects';
 
-/**
- * Tier → the shared badge intent that already means this.
- *
- * The tiers used to carry their own four colour rules plus a dark override,
- * duplicating a badge system that already had exactly these meanings: accent
- * for the privileged row, `is-qualified` for "true, but read the caveat",
- * warning for the approximate one, and the plain base for the rest.
- */
-const TIER_INTENT = {
-    measured:  'is-accent',
-    corrected: 'is-qualified',
-    nominal:   'is-warning',
-    shape:     '',
-};
 import InfoIcon from '../../InfoIcon';
 
 /**
@@ -48,6 +34,24 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
             return `${s.label} ${s.sublabel} ${s.key}`.toLowerCase().includes(needle);
         });
     }, [subjects, tiers, query]);
+
+    /**
+     * The shown records, cut into runs by tier.
+     *
+     * Walked in order rather than grouped-and-sorted, because `curveSubjects`
+     * already returns them best-grounded first and re-deriving that here would
+     * be a second opinion on the same question. A tier can therefore only
+     * appear once, which is what makes the divider a divider.
+     */
+    const groups = useMemo(() => {
+        const out = [];
+        for (const s of shown) {
+            const last = out[out.length - 1];
+            if (last && last.tier === s.tier) last.rows.push(s);
+            else out.push({ tier: s.tier, rows: [s] });
+        }
+        return out;
+    }, [shown]);
 
     const toggleTier = (key) =>
         setTiers(prev => (prev.includes(key) ? prev.filter(t => t !== key) : [...prev, key]));
@@ -105,36 +109,41 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                     Records <span className="text-note">{shown.length} shown · {selected.length} plotted</span>
                 </div>
                 <div className="curve-picker-list">
-                    {shown.map(s => (
-                        <label key={s.key} className={`curve-picker-row ${selected.includes(s.key) ? 'selected' : ''}`}>
-                            <input
-                                type="checkbox"
-                                checked={selected.includes(s.key)}
-                                onChange={() => onToggle(s.key)}
-                            />
-                            {/* The colour the curve is drawn in, so a row and a
-                                line can be matched. Without it the only way to
-                                tell three plotted records apart was to read the
-                                legend and come back. */}
-                            <span
-                                className={`series-swatch${colors?.get(s.key) ? '' : ' is-empty'}`
-                                    + `${s.etaMeasured ? '' : ' is-qualified'}`}
-                                style={colors?.get(s.key) ? { backgroundColor: colors.get(s.key) } : undefined}
-                                title={s.etaMeasured
-                                    ? undefined
-                                    : 'Drivetrain efficiency is assumed, not measured — the curve\'s shape is real, its magnitude scales with η'}
-                            />
-                            <span className="curve-picker-name">
-                                {s.label}
-                                <span className="text-meta"> · {s.sublabel}</span>
-                            </span>
-                            {/* Named on the row, not only in the filter: once a
-                                mixed set is plotted the tier is the only thing
-                                saying which curves carry a measured range. */}
-                            <span className={`badge-micro ${TIER_INTENT[s.tier] ?? ''}`}>
-                                {tierByKey(s.tier)?.badge ?? s.tier}
-                            </span>
-                        </label>
+                    {groups.map(g => (
+                        <Fragment key={g.tier}>
+                            {/* The tier, said once for everything beneath it.
+                                It used to be a badge on every row, which was
+                                repeating what the row's POSITION already said —
+                                the list is sorted best-grounded first — while
+                                taking the width the record's name needed. */}
+                            <div className="curve-picker-group text-micro">
+                                {tierByKey(g.tier)?.label ?? g.tier}
+                                <span className="curve-picker-group-count">{g.rows.length}</span>
+                            </div>
+                            {g.rows.map(s => (
+                                <label key={s.key} className={`curve-picker-row ${selected.includes(s.key) ? 'selected' : ''}`}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selected.includes(s.key)}
+                                        onChange={() => onToggle(s.key)}
+                                    />
+                                    {/* The colour the curve is drawn in, so a row
+                                        and a line can be matched. */}
+                                    <span
+                                        className={`series-swatch${colors?.get(s.key) ? '' : ' is-empty'}`
+                                            + `${s.etaMeasured ? '' : ' is-qualified'}`}
+                                        style={colors?.get(s.key) ? { backgroundColor: colors.get(s.key) } : undefined}
+                                        title={s.etaMeasured
+                                            ? undefined
+                                            : 'Drivetrain efficiency is assumed, not measured — the curve\'s shape is real, its magnitude scales with η'}
+                                    />
+                                    <span className="curve-picker-name">
+                                        <span className="curve-picker-title">{s.label}</span>
+                                        <span className="curve-picker-meta">{s.sublabel}</span>
+                                    </span>
+                                </label>
+                            ))}
+                        </Fragment>
                     ))}
                     {shown.length === 0 && (
                         <div className="text-note p-2">Nothing matches this filter.</div>

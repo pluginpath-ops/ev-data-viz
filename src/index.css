@@ -4868,17 +4868,60 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     padding-left: var(--rail-pad-l);
     padding-right: var(--rail-pad-r);
 }
+/* A tier's divider, sticky inside the scroller: with 377 records across four
+   tiers, a header that scrolls away leaves you reading rows whose grounding you
+   can no longer see. Opaque for the same reason — rows must not show through
+   it. Not collapsible: hiding a tier is the filter chips' job, and two
+   mechanisms for the same thing is how a control panel becomes a puzzle. */
+.curve-picker-group {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px var(--rail-pad-r) 4px var(--rail-pad-l);
+    background-color: var(--color-surface-sunken);
+    border-bottom: 1px solid var(--color-border);
+}
+.curve-picker-group + .curve-picker-row { margin-top: 2px; }
+.curve-picker-group-count {
+    font-family: var(--font-mono);
+    color: var(--color-text-faint);
+}
+
+/* Two lines, because one line had to hold a name, a year, a make and a badge
+   inside a 320px sidebar and gave the name whatever was left — which was
+   "500e All Sea…". `align-items: start` so the checkbox and swatch sit against
+   the name rather than centring on the pair. */
 .curve-picker-row {
-    @apply flex items-center gap-2 px-2 py-1 text-sm cursor-pointer;
+    @apply flex gap-2 py-1 cursor-pointer;
+    align-items: flex-start;
     color: var(--color-text-primary);
 }
+.curve-picker-row input,
+.curve-picker-row .series-swatch { margin-top: 3px; }
 .curve-picker-row:hover    { background-color: var(--color-surface-muted); }
 /* --color-popover, not --color-primary-light: the light value needed a dark
    override to be legible, and a token that reads correctly in both themes is
    the whole point of having one. */
 .curve-picker-row.selected { background-color: var(--color-popover); }
 .curve-picker-name {
-    @apply truncate flex-1 min-w-0;
+    @apply flex flex-col flex-1 min-w-0;
+    line-height: 1.25;
+}
+.curve-picker-title {
+    @apply truncate;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+}
+/* The record's identity beneath its name — mono, because a model year and a
+   make read as a record's coordinates rather than as prose. */
+.curve-picker-meta {
+    @apply truncate;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
 }
 
 /* Named on every row, because once a mixed set is plotted this is the only
