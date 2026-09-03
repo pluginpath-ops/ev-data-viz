@@ -2469,6 +2469,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     grid-column: 2;
     grid-row: 1;
 }
+/* Auto-placed rows stack under the identity line in source order. */
+.pair-row { grid-auto-rows: min-content; }
 
 /* Line two of an unpaired row: the badges. Wraps, because a run can carry four
    readings and a rail is 320px — but it wraps HERE, on its own line, rather
@@ -2479,17 +2481,19 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     gap: 4px;
     flex-wrap: wrap;
     grid-column: 2;
-    grid-row: 2;
     min-width: 0;
 }
 
-/* Line two: what this run is paired with. `shrink-0` is gone — on its own line
+/* Row THREE: what this run is paired with. `shrink-0` is gone — on its own line
    there is nothing to shrink against, and keeping it stopped the <select> ever
-   giving ground. */
+   giving ground.
+
+   Row 3 rather than 2 because the conditions now sit between: identity, then
+   what the run measured, then what it is paired with. Auto-placement puts each
+   in order, so a row without conditions simply closes up. */
 .pair-range-control {
     @apply flex items-center gap-1.5 min-w-0;
     grid-column: 2;
-    grid-row: 2;
 }
 .pair-range-control select { min-width: 0; }
 

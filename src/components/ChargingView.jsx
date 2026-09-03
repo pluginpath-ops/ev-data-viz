@@ -907,17 +907,20 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         resolveRangeSource(chargingRun, { vehicle })}
                     onSetPartner={(chargingId, _old, newRangeId) =>
                         setPairings(prev => setChargingPartner(prev, chargingId, newRangeId))}
+                    // Identity: which run is the default. It belongs beside the
+                    // name, because it says which run this IS.
+                    renderRunBadges={run => run.isDefault && (
+                        <span className="badge-default" title="The vehicle's default charging test">
+                            DEF
+                        </span>
+                    )}
+                    // Conditions: what race-mode alignment did to this run.
                     renderRunMeta={run => {
                         const exclusionReason = getRaceExclusionReason(run.id);
                         const offset = getRaceOffset(run.id);
                         const noTrim = offset !== null && offset === 0;
                         return (
                             <>
-                                {run.isDefault && (
-                                    <span className="badge-default" title="The vehicle's default charging test">
-                                        DEF
-                                    </span>
-                                )}
                                 {exclusionReason && (
                                     <span className="badge-status is-warning" title={`Hidden in race mode: ${exclusionReason}`}>
                                         ⚠ excluded

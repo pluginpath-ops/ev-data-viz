@@ -13,7 +13,14 @@ import RunSourceLinks from './RunSourceLinks';
  *   onUpdateRunColor — (vehicleId, runId, color) => void, or null to hide color inputs
  *   runFilter       — (run, vehicle) => boolean — which runs to show per vehicle
  *   emptyMessage    — string shown when no runs pass the filter for a vehicle
- *   renderRunMeta   — optional (run) => ReactNode — extra badges after name/date
+ *   renderRunBadges — optional (run) => ReactNode — IDENTITY markers, on the
+ *                     name's own row. "DEF" is the one: it says which run is
+ *                     privileged, which is part of naming it.
+ *   renderRunMeta   — optional (run) => ReactNode — CONDITIONS, on their own
+ *                     row beneath. Speed, temperature, wind, distance: what the
+ *                     run measured, not what it is called. They were on the
+ *                     name's row, which worked until a row also had to carry a
+ *                     pairing control and the name lost.
  *
  * ── Pair mode (opt-in) ───────────────────────────────────────────────────────
  *
@@ -50,6 +57,7 @@ export default function RunSelector({
     onUpdateRunColor = null,
     runFilter,
     emptyMessage = 'No runs',
+    renderRunBadges = null,
     renderRunMeta = null,
     colorMap = {},
     // Rendered to the right of the header — the chart-session toggles.
@@ -221,6 +229,7 @@ export default function RunSelector({
                                                         onAddPartner={onAddPartner}
                                                         onRemovePartner={onRemovePartner}
                                                         onUpdateRunColor={onUpdateRunColor}
+                                                        renderRunBadges={renderRunBadges}
                                                         renderRunMeta={renderRunMeta}
                                                         colorMap={colorMap}
                                                     />
@@ -232,6 +241,7 @@ export default function RunSelector({
                                                         isChecked={isSelected(run)}
                                                         onToggle={() => onToggleRun(run.id)}
                                                         onUpdateRunColor={onUpdateRunColor}
+                                                        renderRunBadges={renderRunBadges}
                                                         renderRunMeta={renderRunMeta}
                                                         colorMap={colorMap}
                                                     />
@@ -261,7 +271,7 @@ function PairRows({
     run, vehicle, partnerIds, partnerRuns, resolvePartner,
     partnerLabel, singlePartner,
     selectedRunIds, onToggleRun, onSetPartner, onAddPartner, onRemovePartner,
-    onUpdateRunColor, renderRunMeta, colorMap,
+    onUpdateRunColor, renderRunBadges, renderRunMeta, colorMap,
 }) {
     // What the resolver would pick with nothing pinned — shown as the dropdown's
     // placeholder so an unpaired row still says where its miles come from.
@@ -317,12 +327,11 @@ function PairRows({
                                 colorMap={colorMap}
                             />
                             <span className="truncate">{run.name}</span>
-                            {/* Badges before the link, and both outside the
-                                truncate so a long name never clips either off
-                                the end of the row. The link goes LAST because it
-                                leaves the page: it is the one thing here that is
-                                not about identifying the run. */}
-                            {renderRunMeta?.(run)}
+                            {/* Identity markers only. Conditions moved to their
+                                own row: a paired row already spends a line on
+                                the pairing, so name + chips + control on one
+                                line meant the name lost every time. */}
+                            {renderRunBadges?.(run)}
                             {/* Right-aligned: it is the one item on this line
                                 that leaves the page, so it sits at the edge
                                 rather than trailing whatever length the name
@@ -331,6 +340,11 @@ function PairRows({
                         </span>
                     ) : (
                         <span className="pair-charging-label text-meta">↳</span>
+                    )}
+
+                    {/* Row two: what this run measured. */}
+                    {idx === 0 && renderRunMeta && (
+                        <span className="run-row-meta">{renderRunMeta(run)}</span>
                     )}
 
                     {/* The range basis for this pair */}
@@ -476,7 +490,7 @@ function RunColorControl({ run, vehicleId, onUpdateRunColor, colorMap = {} }) {
  * and "Charging test"; the names carry that now, and in a rail it was spending
  * a third of the identity line on a fact nobody was comparing.
  */
-function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunMeta, colorMap = {} }) {
+function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunBadges, renderRunMeta, colorMap = {} }) {
     const meta = renderRunMeta?.(run);
     return (
         <label className={`pair-row ${isChecked ? '' : 'opacity-60 hover:opacity-100'}`}>
@@ -493,6 +507,7 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRun
                     colorMap={colorMap}
                 />
                 <span className="truncate">{run.name}</span>
+                {renderRunBadges?.(run)}
                 <RunSourceLinks run={run} className="shrink-0 ml-auto" />
             </span>
             {meta && <span className="run-row-meta">{meta}</span>}
