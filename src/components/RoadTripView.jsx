@@ -25,7 +25,7 @@ import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { resolvePairColors } from '../utils/colorUtils';
-import { chartTheme } from '../utils/chartTheme';
+import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
 import PlotFrame from './charts/PlotFrame';
@@ -297,6 +297,10 @@ function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, d
 
 // ── Chart.js plugin: charging badges + finish labels ─────────────────────────
 function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo) {
+    // Read once per plugin build, like the palette above it: the plugin is
+    // rebuilt whenever the chart is, so this follows a scale change without
+    // re-measuring on every frame.
+    const fonts = chartFonts();
     return {
         id: 'roadTripLabels',
 
@@ -361,7 +365,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                         : null;
 
                     ctx.save();
-                    ctx.font         = 'bold 11px system-ui, sans-serif';
+                    ctx.font         = `600 ${fonts.badge}px ${fonts.sans}`;
                     ctx.textAlign    = 'left';
                     ctx.textBaseline = 'middle';
 
@@ -374,7 +378,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
 
                     // vs ICE delta below, in amber (slower) or green (faster)
                     if (vsIce) {
-                        ctx.font      = '10px system-ui, sans-serif';
+                        ctx.font      = `${fonts.micro}px ${fonts.sans}`;
                         ctx.fillStyle = deltaMin > 0 ? '#d97706' : '#16a34a'; // amber-600 / green-600
                         ctx.fillText(vsIce, lastPt.x + 6, labelY + 13);
                     }
@@ -390,7 +394,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                         if (lastPt) {
                             const labelY = lastPt.y - 13;
                             ctx.save();
-                            ctx.font         = 'bold 11px system-ui, sans-serif';
+                            ctx.font         = `600 ${fonts.badge}px ${fonts.sans}`;
                             ctx.fillStyle    = '#6b7280'; // gray-500
                             ctx.textAlign    = 'left';
                             ctx.textBaseline = 'middle';
@@ -431,7 +435,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                             const label = `${seg.startSoc}→${seg.endSoc}% +${Math.round(convDistance(rangeAdded, units))}${distanceLabel(units)} ${chargeMin}m`;
 
                             ctx.save();
-                            ctx.font = '10px system-ui, sans-serif';
+                            ctx.font = `${fonts.micro}px ${fonts.sans}`;
                             const tw = ctx.measureText(label).width;
                             if (tw < segWidth - 8) {
                                 ctx.fillStyle = ds.borderColor + '22';
@@ -516,7 +520,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
             }
 
             ctx.save();
-            ctx.font = 'bold 11px system-ui, sans-serif';
+            ctx.font = `600 ${fonts.badge}px ${fonts.sans}`;
 
             finishLabels.forEach((l, i) => {
                 const adjY      = adjYs[i];
@@ -913,6 +917,7 @@ export default function RoadTripView({
 
         // From the stylesheet, not retyped here — see utils/chartTheme.
         const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
+        const fonts = applyChartDefaults(Chart);
 
         if (chartRef.current) {
             chartRef.current.destroy();
@@ -997,14 +1002,14 @@ export default function RoadTripView({
                             type: 'linear',
                             min: axisScale.xMin ?? sweepMinDisplay,
                             max: axisScale.xMax ?? sweepMaxDisplay,
-                            title: { display: true, text: `Travel Speed (${sl})`, font: { size: 13 }, color: legendColor },
+                            title: { display: true, text: `Travel Speed (${sl})`, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: sweepStepDisplay, color: tickColor },
                             grid: { color: gridColor },
                         },
                         y: {
                             min: axisScale.yMin != null ? axisScale.yMin * 60 : iceSpeedYMin,
                             max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
-                            title: { display: true, text: speedYLabel, font: { size: 13 }, color: legendColor },
+                            title: { display: true, text: speedYLabel, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: 30, callback: val => formatTime(val), color: tickColor },
                             grid: { color: gridColor },
                         },
@@ -1095,14 +1100,14 @@ export default function RoadTripView({
                             type: 'linear',
                             min: axisScale.xMin ?? legMinDisplay,
                             max: axisScale.xMax ?? legMaxDisplay,
-                            title: { display: true, text: `${dl} Between Charges`, font: { size: 13 }, color: legendColor },
+                            title: { display: true, text: `${dl} Between Charges`, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: legStepDisplay, color: tickColor },
                             grid: { color: gridColor },
                         },
                         y: {
                             min: axisScale.yMin != null ? axisScale.yMin * 60 : iceDistYMin,
                             max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
-                            title: { display: true, text: sweepLabel, font: { size: 13 }, color: legendColor },
+                            title: { display: true, text: sweepLabel, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: 30, callback: val => formatTime(val), color: tickColor },
                             grid: { color: gridColor },
                         },
@@ -1289,7 +1294,7 @@ export default function RoadTripView({
                 scales: {
                     x: {
                         type: 'linear',
-                        title: { display: true, text: isDriveTimeXAxis ? 'Drive Time' : 'Elapsed Time', font: { size: 13 }, color: legendColor },
+                        title: { display: true, text: isDriveTimeXAxis ? 'Drive Time' : 'Elapsed Time', font: { size: fonts.axis }, color: legendColor },
                         min: axisScale.xMin != null ? axisScale.xMin * 60 : autoXMin,
                         max: axisScale.xMax != null ? axisScale.xMax * 60 : autoXMax,
                         ticks: {
@@ -1341,14 +1346,14 @@ export default function RoadTripView({
                         },
                     } : isChargeTimeMode ? {
                         reverse: true,
-                        title: { display: true, text: 'Cumulative Charge Time (min)', font: { size: 13 }, color: legendColor },
+                        title: { display: true, text: 'Cumulative Charge Time (min)', font: { size: fonts.axis }, color: legendColor },
                         min: axisScale.yMin ?? 0,
                         max: axisScale.yMax ?? autoYMax,
                         ticks: { color: tickColor },
                         grid: { color: gridColor },
                     } : {
                         reverse: true,
-                        title: { display: true, text: `Distance Traveled (${dl})`, font: { size: 13 }, color: legendColor },
+                        title: { display: true, text: `Distance Traveled (${dl})`, font: { size: fonts.axis }, color: legendColor },
                         min: axisScale.yMin ?? 0,
                         max: axisScale.yMax ?? autoYMax,
                         ticks: { color: tickColor },

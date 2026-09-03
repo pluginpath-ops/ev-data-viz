@@ -33,7 +33,7 @@ seven different inline clusters (`bg-amber-50`/`bg-orange-50`/`bg-cyan-50`/
 re-skin re-valued the tokens, every semantic class moved for free and every
 inline cluster kept painting the old palette.
 
-- **`npm run drift` is the ledger of what is left** — 699 things across nine
+- **`npm run drift` is the ledger of what is left** — 699 things across ten
   probes, each with a count, what the number means, and where the drift is
   supposed to go. `npm run drift <probe>` lists the sites. It is asserted in
   `src/__tests__/drift.test.js` and **fails on a fall as well as a rise**:
@@ -122,8 +122,9 @@ mixed cycle, that a tunable constant reaches the Admin knobs.
 ### The drift ledger
 
 `npm run drift` prints what the codebase still paints outside the theme —
-palette utilities by property, `text-[Npx]` literals, raw hex and rgb, `@apply`
-lines reaching for a palette colour, off-scale `font-size`. `npm run drift
+palette utilities by property, `text-[Npx]` literals, raw hex and rgb, canvas
+font shorthands, `@apply` lines reaching for a palette colour, off-scale
+`font-size`. `npm run drift
 <probe>` lists the sites behind one number.
 
 The probes and their counts live together in `scripts/driftProbes.js`, so

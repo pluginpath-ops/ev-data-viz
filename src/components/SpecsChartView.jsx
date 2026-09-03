@@ -3,7 +3,7 @@ import Chart from 'chart.js/auto';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convValue, formatSpecValue } from '../utils/unitConversions';
-import { chartTheme } from '../utils/chartTheme';
+import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import {
     makeVehicleFields, buildFieldGroups, getFieldDef, extractValue,
     detectMode, formatNumericLabel, vehicleColor,
@@ -17,6 +17,7 @@ function makeInsideLabelPlugin(getLabelFn) {
         id: 'insideBarLabels',
         afterDatasetsDraw(chart) {
             const ctx = chart.ctx;
+            const fonts = chartFonts();
             chart.data.datasets.forEach((_, di) => {
                 chart.getDatasetMeta(di).data.forEach((bar, bi) => {
                     const text = getLabelFn(bi);
@@ -25,7 +26,7 @@ function makeInsideLabelPlugin(getLabelFn) {
                     const barLen = Math.abs(bar.x - bar.base);
                     if (barLen < 20) return;
                     ctx.save();
-                    ctx.font = 'bold 12px system-ui, sans-serif';
+                    ctx.font = `600 ${fonts.label}px ${fonts.sans}`;
                     ctx.fillStyle = '#fff';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
@@ -85,6 +86,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
 
         // From the stylesheet, not retyped here — see utils/chartTheme.
         const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
+        const fonts = applyChartDefaults(Chart);
 
         const fieldDef  = allFields.find(f => f.key === selectedField) || getFieldDef(selectedField, vehicleFields);
         const mode      = detectMode(vehicles, selectedField, fieldDef);
@@ -179,7 +181,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                     x: valueAxisOptions,
                     y: {
                         grid: { display: false },
-                        ticks: { font: { size: 13 }, color: tickColor },
+                        ticks: { font: { size: fonts.axis }, color: tickColor },
                     },
                 },
             },

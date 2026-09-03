@@ -11,17 +11,12 @@
 // on how the page happened to be laid out at that moment. Six draw calls are
 // deterministic and cost nothing.
 
-import { chartTheme } from './chartTheme';
+import { chartTheme, chartFonts } from './chartTheme';
 
 /** Frame metrics, in CSS pixels — scaled by the canvas's device ratio below. */
 const PAD = 16;
-const TITLE_SIZE = 17;
-const SUB_SIZE = 11;
-const MARK_SIZE = 12;
 const GAP = 10;
 
-const DISPLAY = "'Space Grotesk Variable', system-ui, sans-serif";
-const MONO = "'JetBrains Mono Variable', ui-monospace, monospace";
 
 /**
  * Render a Chart.js instance onto an offscreen canvas and return a PNG data URL.
@@ -49,6 +44,15 @@ export function chartToPngDataUrl(chartInstance, options = {}) {
     // half-size beside the plot on a HiDPI screen.
     const dpr = src.width / (src.clientWidth || src.width) || 1;
     const px = (n) => n * dpr;
+
+    // Derived rather than typed, so the export chrome follows --fs-body and the
+    // --ui-scale knob like the rest of the site's type. The ratios reproduce
+    // 17 / 11 / 12 at the default 14px body, so no exported image moves today.
+    // Read HERE and not at module load: a value captured at import pins the
+    // chrome to whatever the scale was when the module first loaded, which in a
+    // test environment is before any stylesheet exists.
+    const { frame: TITLE_SIZE, badge: SUB_SIZE, label: MARK_SIZE,
+            display: DISPLAY, mono: MONO } = chartFonts();
 
     const hasChrome = Boolean(title || subtitle || wordmark);
     const headerH = hasChrome

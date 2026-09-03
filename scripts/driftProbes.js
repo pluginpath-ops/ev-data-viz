@@ -80,6 +80,8 @@ function walk(dir, ext, acc = []) {
 }
 
 const jsxFiles = () => walk(join(ROOT, 'src'), '.jsx');
+/** Canvas drawing lives in .js utilities as well as components. */
+const chartJsFiles = () => [...jsxFiles(), join(ROOT, 'src', 'utils', 'chartUtils.js')];
 const cssFile = () => join(ROOT, 'src', 'index.css');
 
 /**
@@ -120,6 +122,23 @@ function scanJsx(key, pattern) {
             for (const hit of hits) {
                 if (exempts.some(e => e.pattern.test(hit) || e.pattern.test(line))) continue;
                 found.push({ file: relative(ROOT, file), line: i + 1, hit });
+            }
+        });
+    }
+    return found;
+}
+
+function scanJs(key, pattern) {
+    const found = [];
+    for (const file of chartJsFiles()) {
+        const src = readFileSync(file, 'utf8');
+        const exempts = exemptions(key, file);
+        src.split('\n').forEach((line, i) => {
+            const hits = line.match(pattern);
+            if (!hits) return;
+            for (const hit of hits) {
+                if (exempts.some(e => e.pattern.test(hit) || e.pattern.test(line))) continue;
+                found.push({ file: relative(ROOT, file), line: i + 1, hit: line.trim().slice(0, 90) });
             }
         });
     }
@@ -230,6 +249,20 @@ export const LEDGER = [
         fix: 'chartTheme(), or a token read through getComputedStyle at plugin-build '
             + 'time the way the bar plugins already do.',
         scan: () => scanJsx('rgb-literal', /\b(?:rgba?|hsla?)\(\s*\d/g),
+    },
+    {
+        key: 'canvas-font-literal',
+        count: 0,
+        scope: 'src/**/*.jsx, src/utils/chartUtils.js',
+        what: 'Canvas text drawn with a hardcoded font shorthand. Held at ZERO — it '
+            + 'was 15 across seven files, every chart on the site labelling itself in '
+            + '`11px system-ui` while the page around it rendered in Public Sans, and '
+            + 'none of them moving when the --ui-scale knob did. This is the one probe '
+            + 'that guards a surface already clean, because canvas is where the '
+            + 'stylesheet cannot reach and drift here is invisible to every other '
+            + 'guard in the repo.',
+        fix: 'chartFonts() — family and size, both derived from --fs-body.',
+        scan: () => scanJs('canvas-font-literal', /\.font\s*=\s*['"`][^'"`]*\d\s*px\s+(?!\$\{)/g),
     },
     {
         key: 'apply-palette',

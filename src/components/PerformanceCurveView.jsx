@@ -22,7 +22,7 @@ import PerformanceRunSelector from './performance/PerformanceRunSelector';
 import { buildSyntheticCurve, tracedCurvePoints, segmentAccelerationG } from '../utils/performanceDerivations';
 import { resolveChartColors } from '../utils/colorUtils';
 import ChartExportButtons from './ChartExportButtons';
-import { chartTheme } from '../utils/chartTheme';
+import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 
 /** Okabe-Ito, matching the palette the other charts use for run colours. */
 const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
@@ -248,6 +248,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
 
         // From the stylesheet, not retyped here — see utils/chartTheme.
         const { grid, tick } = chartTheme();
+        const fonts = applyChartDefaults(Chart);
 
         // Traced runs take their resolved colour first; reconstructed curves then
         // fill from the palette AROUND those, so a dashed line can't land on the
@@ -329,7 +330,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             usePointStyle: true,
                             boxWidth: 8,
                             padding: 8,
-                            font: { size: 10 },
+                            font: { size: fonts.micro },
                             generateLabels: (chart) => Chart.defaults.plugins.legend.labels
                                 .generateLabels(chart)
                                 .map(l => ({

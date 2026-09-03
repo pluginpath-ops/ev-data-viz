@@ -22,7 +22,7 @@ import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
-import { chartTheme, MONO_STACK } from '../utils/chartTheme';
+import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 
 
 /**
@@ -79,6 +79,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
     // (`isDark` is one of its dependencies), so this follows the theme without
     // re-reading computed styles on every frame.
     const { tick: tickColor, grid: gridColor, legend: legendColor, axis: axisColor } = chartTheme();
+    const fonts = chartFonts();
     return {
         id: 'compareBarLabels',
         afterDatasetsDraw(chart) {
@@ -157,7 +158,9 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
 
                     displayBadges.forEach(({ text, primary, alertAmt }) => {
                         ctx2.save();
-                        ctx2.font = primary ? 'bold 11px sans-serif' : '10px sans-serif';
+                        ctx2.font = primary
+                            ? `600 ${fonts.badge}px ${fonts.sans}`
+                            : `${fonts.micro}px ${fonts.sans}`;
                         const tw = ctx2.measureText(text).width;
                         const pw = tw + pillPad * 2;
                         if (drawX + pw > bar.x - 4) { ctx2.restore(); return; }
@@ -176,7 +179,9 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     badges.forEach(({ text, primary, alertAmt }) => {
                         if (drawY + pillH > bar.base - topPad) return;
                         ctx2.save();
-                        ctx2.font = primary ? 'bold 11px sans-serif' : '10px sans-serif';
+                        ctx2.font = primary
+                            ? `600 ${fonts.badge}px ${fonts.sans}`
+                            : `${fonts.micro}px ${fonts.sans}`;
                         const tw = ctx2.measureText(text).width;
                         const pw = tw + pillPad * 2;
                         if (pw > barW - 4) { ctx2.restore(); drawY += pillH + gap; return; }
@@ -195,7 +200,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     const bar = meta.data[i];
                     if (!bar) return;
                     ctx2.save();
-                    ctx2.font         = '12px sans-serif';
+                    ctx2.font         = `${fonts.label}px ${fonts.sans}`;
                     ctx2.fillStyle    = tickColor;
                     ctx2.textAlign    = 'left';
                     ctx2.textBaseline = 'middle';
@@ -228,7 +233,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     // of the canvas and was clipped to "ndard · Standard RWD" —
                     // the half that identifies nothing.
                     ctx2.save();
-                    ctx2.font         = `600 12px ${MONO_STACK}`;
+                    ctx2.font         = `600 ${fonts.label}px ${fonts.mono}`;
                     ctx2.fillStyle    = legendColor;
                     ctx2.textAlign    = 'right';
                     ctx2.textBaseline = 'middle';
@@ -281,7 +286,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     ctx2.restore();
 
                     ctx2.save();
-                    ctx2.font         = 'bold 13px sans-serif';
+                    ctx2.font         = `600 ${fonts.axis}px ${fonts.display}`;
                     ctx2.fillStyle    = legendColor;
                     ctx2.textAlign    = 'center';
                     ctx2.textBaseline = 'top';
@@ -734,6 +739,7 @@ export default function ChargeCompareView({
         const bars2 = buildBars('time_to_range');
 
         const createChart = (canvasRef, instanceRef, built) => {
+            applyChartDefaults(Chart);
             if (!canvasRef.current || !built) return;
             instanceRef.current = new Chart(canvasRef.current.getContext('2d'), {
                 type:    'bar',

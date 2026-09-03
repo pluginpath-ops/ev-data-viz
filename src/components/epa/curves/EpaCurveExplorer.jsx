@@ -13,7 +13,7 @@ import ViewingConditions, { useViewingConditions } from '../ViewingConditions';
 import CollapsibleSection from '../../CollapsibleSection';
 import AxisScaleControls from '../../AxisScaleControls';
 import LoadingSpinner from '../../LoadingSpinner';
-import { chartTheme } from '../../../utils/chartTheme';
+import { chartTheme, applyChartDefaults } from '../../../utils/chartTheme';
 
 /**
  * EPA efficiency curves anchored on certification records (#237).
@@ -136,6 +136,7 @@ export default function EpaCurveExplorer() {
 
         // From the stylesheet, not retyped here — see utils/chartTheme.
         const { grid, legend: text } = chartTheme();
+        applyChartDefaults(Chart);
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',

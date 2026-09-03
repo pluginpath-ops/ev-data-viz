@@ -19,7 +19,7 @@ import {
     fmtSpeed, speedBasisNote, fmtTemp,
 } from '../utils/unitConversions';
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
-import { chartTheme, MONO_STACK } from '../utils/chartTheme';
+import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
@@ -265,6 +265,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     useEffect(() => {
         // From the stylesheet, not retyped here — see utils/chartTheme.
         const { tick: tickColor, grid: gridColor, legend: legendColor, axis: axisColor } = chartTheme();
+        const fonts = chartFonts();
+        applyChartDefaults(Chart);
 
         if (chartInstance.current) {
             chartInstance.current.destroy();
@@ -325,7 +327,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         if (drawY + pillH > bar.base - topPad) return;
 
                         ctx2.save();
-                        ctx2.font = primary ? 'bold 11px sans-serif' : '10px sans-serif';
+                        ctx2.font = primary
+                            ? `600 ${fonts.badge}px ${fonts.sans}`
+                            : `${fonts.micro}px ${fonts.sans}`;
                         const tw = ctx2.measureText(text).width;
                         const pw = tw + pillPad * 2;
 
@@ -391,7 +395,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     const span = x2 - x1 - 6;
                     if (span >= 28) {
                         ctx2.save();
-                        ctx2.font         = `600 12px ${MONO_STACK}`;
+                        ctx2.font         = `600 ${fonts.label}px ${fonts.mono}`;
                         ctx2.fillStyle    = legendColor;
                         ctx2.textAlign    = 'center';
                         ctx2.textBaseline = 'top';

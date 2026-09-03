@@ -26,7 +26,7 @@ import { TWO_CYCLE_KEYS, CURVE_SPEED_RANGE } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
-import { chartTheme } from '../utils/chartTheme';
+import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import AutoColorToggle from './AutoColorToggle';
 import { useRunSelection } from '../hooks/useRunSelection';
 import ViewingConditions, { useViewingConditions } from './epa/ViewingConditions';
@@ -56,7 +56,8 @@ function makeReferencePlugin(bandMph, units, isDark) {
             ctx.fillStyle = bandColor;
             ctx.fillRect(xBand0, area.top, xBand1 - xBand0, area.bottom - area.top);
 
-            ctx.font = '9px system-ui, sans-serif';
+            const fonts = chartFonts();
+            ctx.font = `${fonts.nano}px ${fonts.sans}`;
             ctx.fillStyle = textColor;
             ctx.textAlign = 'center';
             ctx.fillText('Hwy', (xBand0 + xBand1) / 2, area.top + 10);
@@ -116,7 +117,8 @@ function makeCalloutPlugin(calloutMphs, yAxis, units, isDark) {
                             ? `${(pt.rangeMi * 1.60934).toFixed(0)} km`
                             : `${pt.rangeMi.toFixed(0)} mi`;
 
-                        ctx.font = '10px system-ui, sans-serif';
+                        const fonts = chartFonts();
+                        ctx.font = `${fonts.micro}px ${fonts.sans}`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'alphabetic';
 
@@ -487,6 +489,7 @@ export default function EpaCurvesView({
 
         // From the stylesheet, not retyped here — see utils/chartTheme.
         const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
+        applyChartDefaults(Chart);
 
         const refPlugin     = makeReferencePlugin(HIGHWAY_BAND_MPH, units, isDark);
         // Speed callouts disabled — labels overlap with multiple curves.

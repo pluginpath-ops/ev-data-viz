@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Chart from 'chart.js/auto';
 import ZoomPlugin from 'chartjs-plugin-zoom';
-Chart.defaults.font.size = 13;
 Chart.register(ZoomPlugin);
 import { dataService } from '../services/DataService';
 import RunSelector from './RunSelector';
@@ -23,7 +22,7 @@ import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitC
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
 import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
 import { resolveRangeSource, epaRangeOption, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
-import { chartTheme } from '../utils/chartTheme';
+import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import LoadingSpinner from './LoadingSpinner';
@@ -470,6 +469,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         if (!chartRef.current) return;
 
         const ctx = chartRef.current.getContext('2d');
+        applyChartDefaults(Chart);
 
         if (chartInstance.current) {
             chartInstance.current.destroy();
