@@ -43,14 +43,85 @@ function SortHeader({ col, sortKey, sortDir, onSort }) {
     );
 }
 
+/**
+ * One configuration. Rendered by the pinned band and by the body from the same
+ * component, so a pinned row cannot drift into looking like a different thing
+ * from the row it was pinned out of.
+ */
+function GuideRow({ row, cols, selectedIds, onToggleSelect, onOpenRow, vehicleLinks, barMaxima, pinned }) {
+    const vehicles = vehicleLinks[row.id]?.vehicles ?? [];
+    return (
+        <tr
+            className={`guide-row${selectedIds.includes(row.id) ? ' selected' : ''}${pinned ? ' pinned' : ''}`}
+            onClick={() => onOpenRow(row)}
+        >
+            <td className="guide-td guide-td-select sticky-select" onClick={e => e.stopPropagation()}>
+                <input
+                    type="checkbox"
+                    checked={selectedIds.includes(row.id)}
+                    onChange={() => onToggleSelect(row.id)}
+                    aria-label={`Compare ${row.carline}`}
+                />
+            </td>
+            {cols.map((col) => {
+                const pct = barPercent(row, col, barMaxima);
+                return (
+                    <td
+                        key={col.key}
+                        className={`guide-td ${col.numeric ? 'numeric' : ''} ${col.sticky ? 'sticky-name' : ''}`}
+                    >
+                        {col.key === 'carline' ? (
+                            <span className="guide-carline">
+                                <span className="guide-carline-name">{row.carline}</span>
+                                {/* Badges ride on the name rather than holding columns of
+                                    their own — at 30 columns the horizontal budget is the
+                                    scarce one. */}
+                                {vehicles.length > 0 && (
+                                    <span
+                                        className="guide-badge guide-badge-tested"
+                                        title={`We hold test data for ${vehicles.map(v => `${v.year} ${v.name}`).join(', ')}`}
+                                    >
+                                        tested
+                                    </span>
+                                )}
+                                {row.is_collapsed && (
+                                    <span
+                                        className="guide-badge guide-badge-multi"
+                                        title="EPA collapsed several configurations into this row — its motor count and power are a union, not one vehicle"
+                                    >
+                                        multi
+                                    </span>
+                                )}
+                            </span>
+                        ) : pct != null ? (
+                            /* The value, then its bar beneath it. */
+                            <span className="guide-cell-stack">
+                                <span>{formatCell(row, col)}</span>
+                                <span
+                                    className="guide-spark"
+                                    style={{ '--bar-fill': `${pct}%` }}
+                                    aria-hidden="true"
+                                />
+                            </span>
+                        ) : formatCell(row, col)}
+                    </td>
+                );
+            })}
+        </tr>
+    );
+}
+
 export default function GuideTable({
     rows, visibleColumns, sortKey, sortDir, onSort,
     selectedIds, onToggleSelect, onOpenRow, vehicleLinks, barMaxima,
+    pinnedRows = [], onUnpinAll, onOpenCompare,
 }) {
     // Mapped from the visible list rather than filtered out of GUIDE_COLUMNS:
     // the order the reader arranged is the order they get, and filtering would
     // silently restore the constant's.
     const cols = visibleColumns.map(columnByKey).filter(Boolean);
+    const span = cols.length + 1;
+    const rowProps = { cols, selectedIds, onToggleSelect, onOpenRow, vehicleLinks, barMaxima };
 
     return (
         <div className="guide-table-container">
@@ -64,79 +135,56 @@ export default function GuideTable({
                     </tr>
                 </thead>
                 <tbody>
-                    {rows.map((row) => {
-                        const vehicles = vehicleLinks[row.id]?.vehicles ?? [];
-                        return (
-                            <tr
-                                key={row.id}
-                                className={`guide-row ${selectedIds.includes(row.id) ? 'selected' : ''}`}
-                                onClick={() => onOpenRow(row)}
-                            >
-                                <td className="guide-td guide-td-select sticky-select" onClick={e => e.stopPropagation()}>
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedIds.includes(row.id)}
-                                        onChange={() => onToggleSelect(row.id)}
-                                        aria-label={`Compare ${row.carline}`}
-                                    />
+                    {/* Pinned rows sit above the sort and outside it, and are
+                        NOT repeated in the body below — a row in two places at
+                        once reads as two configurations, and unticking one of
+                        them would look like it failed. */}
+                    {pinnedRows.length > 0 && (
+                        <>
+                            <tr className="guide-pinned-head">
+                                {/* The flex lives on a div INSIDE the cell. On the
+                                    <td> itself it replaces `display: table-cell`,
+                                    which is what makes colSpan work — the band
+                                    collapsed to the width of the first column. */}
+                                <td colSpan={span}>
+                                    <div className="guide-pinned-head-inner">
+                                        <span className="text-nano">
+                                            Pinned for comparison · {pinnedRows.length}
+                                        </span>
+                                        <span className="text-note">
+                                            kept at the top through filters and sorting
+                                        </span>
+                                        <span className="guide-pinned-actions">
+                                            {onOpenCompare && (
+                                                <button type="button" className="section-action" onClick={onOpenCompare}>
+                                                    open in Compare ↗
+                                                </button>
+                                            )}
+                                            {onUnpinAll && (
+                                                <button type="button" className="section-action" onClick={onUnpinAll}>
+                                                    unpin all
+                                                </button>
+                                            )}
+                                        </span>
+                                    </div>
                                 </td>
-                                {cols.map((col) => {
-                                    const pct = barPercent(row, col, barMaxima);
-                                    return (
-                                        <td
-                                            key={col.key}
-                                            className={`guide-td ${col.numeric ? 'numeric' : ''} ${col.sticky ? 'sticky-name' : ''} ${pct != null ? 'has-bar' : ''}`}
-                                            style={pct != null ? { '--bar-fill': `${pct}%` } : undefined}
-                                        >
-                                            {col.key === 'carline' ? (
-                                                <span className="guide-carline">
-                                                    <span className="guide-carline-name">{row.carline}</span>
-                                                    {/* Badges ride on the name rather than holding columns of
-                                                        their own — at 30 columns the horizontal budget is the
-                                                        scarce one. */}
-                                                    {vehicles.length > 0 && (
-                                                        <span
-                                                            className="guide-badge guide-badge-tested"
-                                                            title={`We hold test data for ${vehicles.map(v => `${v.year} ${v.name}`).join(', ')}`}
-                                                        >
-                                                            tested
-                                                        </span>
-                                                    )}
-                                                    {row.is_collapsed && (
-                                                        <span
-                                                            className="guide-badge guide-badge-multi"
-                                                            title="EPA collapsed several configurations into this row — its motor count and power are a union, not one vehicle"
-                                                        >
-                                                            multi
-                                                        </span>
-                                                    )}
-                                                </span>
-                                            ) : pct != null ? (
-                                                /* The value, then its bar beneath
-                                                   it. It used to be painted as a
-                                                   cell BACKGROUND — cheaper in
-                                                   DOM, but a wash behind a number
-                                                   reads as a highlight rather than
-                                                   as a measurement, and it could
-                                                   not be given a track. */
-                                                <span className="guide-cell-stack">
-                                                    <span>{formatCell(row, col)}</span>
-                                                    <span
-                                                        className="guide-spark"
-                                                        style={{ '--bar-fill': `${pct}%` }}
-                                                        aria-hidden="true"
-                                                    />
-                                                </span>
-                                            ) : formatCell(row, col)}
-                                        </td>
-                                    );
-                                })}
                             </tr>
-                        );
-                    })}
+                            {pinnedRows.map(row => (
+                                <GuideRow key={`pin-${row.id}`} row={row} pinned {...rowProps} />
+                            ))}
+                            {/* A gap, not a rule: the band and the body are the
+                                same table and a border would read as the end of
+                                one table and the start of another. */}
+                            <tr className="guide-pinned-spacer"><td colSpan={span} /></tr>
+                        </>
+                    )}
+
+                    {rows.map(row => (
+                        <GuideRow key={row.id} row={row} {...rowProps} />
+                    ))}
                 </tbody>
             </table>
-            {rows.length === 0 && (
+            {rows.length === 0 && pinnedRows.length === 0 && (
                 <div className="empty-state">No configurations match these filters.</div>
             )}
         </div>

@@ -88,9 +88,22 @@ export default function EpaGuideView({ subtab = 'browse' }) {
 
     const filtered = useMemo(() => filterRows(rows, filters), [rows, filters]);
     const sorted   = useMemo(() => sortRows(filtered, sortKey, sortDir), [filtered, sortKey, sortDir]);
+    /**
+     * The body, without the pinned rows.
+     *
+     * A pinned row appears in the band above and nowhere else. Leaving it in
+     * both would read as two configurations, and unticking one of them would
+     * look like it had failed. Paging counts what is actually below, so the
+     * last page is not short by however many are pinned.
+     */
+    const unpinned = useMemo(
+        () => sorted.filter(r => !selectedIds.includes(r.id)),
+        [sorted, selectedIds],
+    );
+
     const pageRows = useMemo(
-        () => sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
-        [sorted, page],
+        () => unpinned.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+        [unpinned, page],
     );
     // Scaled against everything the filter matches, not just this page, so
     // paging does not rescale the bars underneath the reader.
@@ -147,7 +160,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
         );
     }
 
-    const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+    const totalPages = Math.max(1, Math.ceil(unpinned.length / PAGE_SIZE));
 
     return (
         <div className="guide-view">
@@ -202,6 +215,12 @@ export default function EpaGuideView({ subtab = 'browse' }) {
             >
                 <GuideTable
                     rows={pageRows}
+                    pinnedRows={compareRows}
+                    onUnpinAll={() => setSelectedIds([])}
+                    onOpenCompare={() => {
+                        document.getElementById('guide-compare')
+                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
                     visibleColumns={columns}
                     sortKey={sortKey}
                     sortDir={sortDir}
@@ -213,7 +232,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                     barMaxima={barMaxima}
                 />
 
-                {sorted.length > PAGE_SIZE && (
+                {unpinned.length > PAGE_SIZE && (
                     <div className="guide-pager">
                         <button className="btn btn-secondary" disabled={page === 0}
                             onClick={() => setPage(p => p - 1)}>Previous</button>
@@ -226,6 +245,10 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                 )}
             </CollapsibleSection>
 
+            {/* The band's "open in Compare" scrolls here. An id rather than a
+                ref threaded through the table: the table has no business
+                holding a handle to a panel three components away. */}
+            <div id="guide-compare" />
             <GuideComparePanel
                 rows={compareRows}
                 showAll={showAllCompare}
