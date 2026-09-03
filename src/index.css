@@ -4181,6 +4181,179 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .guide-facet {
     @apply flex flex-col gap-1.5 min-w-0;
 }
+
+/* ── The browse filter strip (phase 5a) ─────────────────────────────────────
+ *
+ * One row of controls and, under it, a line saying what is currently narrowing
+ * the view. It replaces a wall of chips that had to be collapsed behind a
+ * disclosure to fit — see GuideFilterBar for why the disclosure went with it.
+ */
+.guide-filter-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+.guide-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.guide-filter-row .guide-search-input {
+    width: 210px;
+    flex: none;
+}
+
+/* The tally sits hard right, away from the controls: it is the ANSWER to them,
+   not one of them. */
+.guide-filter-tally {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-left: auto;
+}
+/* Mono like the figure it follows, but NOT uppercase: .text-nano's caps are
+   right for a section label and wrong for a sentence fragment — "1,175 OF
+   1,175" reads as a heading rather than as a count. */
+.guide-filter-tally-total {
+    font-family: var(--font-mono);
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    color: var(--color-text-meta);
+}
+
+.guide-filter-reset {
+    font-family: var(--font-mono);
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    color: var(--color-accent-orange);
+}
+.guide-filter-reset:hover { text-decoration: underline; }
+
+/* A facet, closed. Reads as a control rather than a chip: it opens something,
+   where a chip toggles. Active carries the accent so a glance across the row
+   says which facets are doing work. */
+.guide-facet-menu { position: relative; }
+.guide-facet-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-input);
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.guide-facet-btn:hover { background-color: var(--color-hover-lift); }
+.guide-facet-btn.active {
+    border-color: var(--color-primary-border);
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
+}
+.guide-facet-btn-value {
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+.guide-facet-caret {
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    opacity: 0.7;
+}
+
+/* The open menu. 238px because the longest make name fits and a wider panel
+   starts covering the table it is filtering. */
+.guide-facet-panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    width: 238px;
+    max-height: 60vh;
+    padding: 8px;
+    gap: 6px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-popover);
+    background-color: var(--color-popover);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.guide-facet-panel-search { width: 100%; }
+.guide-facet-panel-head,
+.guide-facet-panel-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.guide-facet-panel-foot {
+    padding-top: 6px;
+    border-top: 1px solid var(--color-border);
+}
+.guide-facet-panel-list {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+}
+.guide-facet-option {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 4px;
+    border-radius: var(--radius-mark);
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-primary);
+    cursor: pointer;
+}
+.guide-facet-option:hover { background-color: var(--color-hover-lift); }
+.guide-facet-option.selected { background-color: var(--color-primary-surface); }
+/* Disabled, not hidden: a make vanishing reads as a bug, a greyed one reads as
+   an answer. */
+.guide-facet-option:has(input:disabled) {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.guide-facet-option-name { @apply truncate flex-1 min-w-0; }
+.guide-facet-option-count {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+
+/* A range's bounds, in the same button-and-panel shape as a facet so the row
+   reads as one kind of control. <details> rather than the facet's own state:
+   there is nothing to filter or count inside, so it needs no JavaScript. */
+.guide-range-menu > summary { list-style: none; }
+.guide-range-menu > summary::-webkit-details-marker { display: none; }
+.guide-range-panel { width: 200px; }
+
+/* What is narrowing the view. A chip here REMOVES its value — the opposite of
+   the chips it replaced, which selected one, so it carries the ✕ that says so. */
+.guide-narrowed-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+.guide-narrowed-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 7px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-chip);
+    background-color: var(--color-surface-muted);
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-primary);
+    cursor: pointer;
+}
+.guide-narrowed-chip:hover {
+    border-color: var(--color-danger-border);
+    color: var(--color-danger-text);
+}
 .guide-facet-search {
     @apply w-full sm:w-64;
 }

@@ -153,6 +153,8 @@ export const SECTIONS = [
             { cls: 'badge-status',    as: 'span', label: 'Status' },
             { cls: 'owner-badge',     as: 'span', label: 'Owner' },
             { cls: 'badge-micro is-qualified', as: 'span', label: 'Corrected' },
+            { cls: 'guide-narrowed-chip', as: 'button', label: '2026 ✕',
+              note: 'Removes its own value. The opposite of the chips it replaced, which selected one — hence the ✕ and the danger-coloured hover.' },
             { cls: 'fe-picker-badge', as: 'span', label: 'FE picker' },
             { cls: 'pair-more-badge', as: 'span', label: '+2 more' },
             { cls: 'spec-link-kind-pill', as: 'span', label: 'Link kind' },
