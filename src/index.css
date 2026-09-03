@@ -4297,7 +4297,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     min-height: 0;
     overflow-y: auto;
 }
-.guide-facet-option {
+/* A row in one of these menus, whichever menu it is. The facet list and the
+   column list were written an hour apart with the same six declarations. */
+.guide-facet-option,
+.guide-column-row {
     display: flex;
     align-items: center;
     gap: 7px;
@@ -4305,9 +4308,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border-radius: var(--radius-mark);
     font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
     color: var(--color-text-primary);
+    text-align: left;
     cursor: pointer;
 }
-.guide-facet-option:hover { background-color: var(--color-hover-lift); }
+.guide-facet-option:hover,
+.guide-column-row:hover { background-color: var(--color-hover-lift); }
 .guide-facet-option.selected { background-color: var(--color-primary-surface); }
 /* Disabled, not hidden: a make vanishing reads as a bug, a greyed one reads as
    an answer. */
@@ -4316,30 +4321,19 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     cursor: not-allowed;
 }
 .guide-facet-option-name { @apply truncate flex-1 min-w-0; }
-.guide-facet-option-count {
-    flex: none;
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-meta);
-}
+/* The quiet figure at the end of a menu row — a count on a facet, a unit on a
+   column. Same role, so the same type. */
+.guide-facet-option-count,
 
 /* The column list. Wider than a facet menu because a column carries a label
    AND a unit AND a control, where a facet value carries a name and a count. */
 .guide-column-panel { width: 220px; }
 .guide-column-picker { position: relative; }
 .guide-column-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
     width: 100%;
-    padding: 3px 4px;
-    border-radius: var(--radius-mark);
-    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
-    color: var(--color-text-primary);
-    text-align: left;
+    /* The one real difference: these rows are draggable and say so. */
     cursor: grab;
 }
-.guide-column-row:hover { background-color: var(--color-hover-lift); }
 .guide-column-row.dragging { opacity: 0.5; }
 .guide-column-row.is-hidden {
     color: var(--color-text-meta);
@@ -4370,10 +4364,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 /* A range's bounds, in the same button-and-panel shape as a facet so the row
-   reads as one kind of control. <details> rather than the facet's own state:
-   there is nothing to filter or count inside, so it needs no JavaScript. */
-.guide-range-menu > summary { list-style: none; }
-.guide-range-menu > summary::-webkit-details-marker { display: none; }
+   reads as one kind of control — and now with the same open/close behaviour
+   too, which <details> could not give it. */
 .guide-range-panel { width: 200px; }
 
 /* What is narrowing the view. A chip here REMOVES its value — the opposite of

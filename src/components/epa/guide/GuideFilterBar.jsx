@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { useLightDismiss } from '../../../hooks/useLightDismiss';
 import { EMPTY_FILTERS } from '../../../utils/feGuideBrowse';
 import GuideFacetMenu from './GuideFacetMenu';
 
@@ -40,8 +41,19 @@ const FACETS = [
     { key: 'parents',     rowKey: 'parent_name',   label: 'Parent' },
 ];
 
-/** A min/max pair behind its own button, so bounds cost a line like a facet. */
+/**
+ * A min/max pair behind its own button, so bounds cost a line like a facet.
+ *
+ * It was a <details>, on the grounds that nothing inside needed JavaScript.
+ * That was true and still wrong: <details> does not light-dismiss, so alone in
+ * a row of menus that close on an outside click these two stayed open — and
+ * their panel sat in the DOM whether open or not, so `.guide-facet-panel`
+ * stopped meaning "a menu is open". Same state and the same hook as its
+ * neighbours now; the row behaves as one kind of control.
+ */
 function RangeMenu({ label, unit, minKey, maxKey, filters, onChange }) {
+    const [open, setOpen] = useState(false);
+    const ref = useLightDismiss(open, () => setOpen(false));
     const min = filters[minKey];
     const max = filters[maxKey];
     const set = (key) => (e) => {
@@ -50,8 +62,13 @@ function RangeMenu({ label, unit, minKey, maxKey, filters, onChange }) {
     };
     const active = min != null || max != null;
     return (
-        <details className="guide-facet-menu guide-range-menu">
-            <summary className={`guide-facet-btn${active ? ' active' : ''}`}>
+        <div className="guide-facet-menu" ref={ref}>
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                className={`guide-facet-btn${active ? ' active' : ''}`}
+                aria-expanded={open}
+            >
                 {label}
                 {active && (
                     <span className="guide-facet-btn-value">
@@ -59,31 +76,33 @@ function RangeMenu({ label, unit, minKey, maxKey, filters, onChange }) {
                     </span>
                 )}
                 <span className="guide-facet-caret" aria-hidden="true">▾</span>
-            </summary>
-            <div className="guide-facet-panel guide-range-panel">
-                <div className="guide-facet-panel-head">
-                    <span className="text-nano">{unit}</span>
-                    {active && (
-                        <button
-                            type="button"
-                            className="section-action"
-                            onClick={() => onChange({ [minKey]: null, [maxKey]: null })}
-                        >
-                            clear
-                        </button>
-                    )}
+            </button>
+            {open && (
+                <div className="guide-facet-panel guide-range-panel">
+                    <div className="guide-facet-panel-head">
+                        <span className="text-nano">{unit}</span>
+                        {active && (
+                            <button
+                                type="button"
+                                className="section-action"
+                                onClick={() => onChange({ [minKey]: null, [maxKey]: null })}
+                            >
+                                clear
+                            </button>
+                        )}
+                    </div>
+                    <div className="guide-range-inputs">
+                        <input type="number" inputMode="numeric" placeholder="min"
+                            aria-label={`Minimum ${label}`}
+                            value={min ?? ''} onChange={set(minKey)} className="form-input guide-range-input" />
+                        <span className="text-meta">–</span>
+                        <input type="number" inputMode="numeric" placeholder="max"
+                            aria-label={`Maximum ${label}`}
+                            value={max ?? ''} onChange={set(maxKey)} className="form-input guide-range-input" />
+                    </div>
                 </div>
-                <div className="guide-range-inputs">
-                    <input type="number" inputMode="numeric" placeholder="min"
-                        aria-label={`Minimum ${label}`}
-                        value={min ?? ''} onChange={set(minKey)} className="form-input guide-range-input" />
-                    <span className="text-meta">–</span>
-                    <input type="number" inputMode="numeric" placeholder="max"
-                        aria-label={`Maximum ${label}`}
-                        value={max ?? ''} onChange={set(maxKey)} className="form-input guide-range-input" />
-                </div>
-            </div>
-        </details>
+            )}
+        </div>
     );
 }
 

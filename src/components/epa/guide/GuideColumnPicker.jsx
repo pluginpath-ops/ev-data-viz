@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
+import { useLightDismiss } from '../../../hooks/useLightDismiss';
 import { GUIDE_COLUMNS, DEFAULT_COLUMNS, columnByKey } from '../../../utils/feGuideBrowse';
 
 /**
@@ -24,6 +25,7 @@ const FIXED_KEY = 'carline';
 
 export default function GuideColumnPicker({ visible, onChange }) {
     const [open, setOpen] = useState(false);
+    const ref = useLightDismiss(open, () => setOpen(false));
     // A REF for what is being dragged, and state only for the styling.
     // Reading it from state in the drop handler meant reading the closure the
     // row was last rendered with — which, between a dragstart and a drop that
@@ -31,21 +33,7 @@ export default function GuideColumnPicker({ visible, onChange }) {
     // nothing. A ref is current the moment it is written.
     const dragKeyRef = useRef(null);
     const [dragKey, setDragKey] = useState(null);
-    const ref = useRef(null);
 
-    // Pointerdown rather than click, so the menu does not survive a drag that
-    // starts inside it and ends outside.
-    useEffect(() => {
-        if (!open) return;
-        const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-        const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
-        document.addEventListener('pointerdown', onDown);
-        document.addEventListener('keydown', onKey);
-        return () => {
-            document.removeEventListener('pointerdown', onDown);
-            document.removeEventListener('keydown', onKey);
-        };
-    }, [open]);
 
     const shown = visible.map(columnByKey).filter(Boolean);
     const hidden = GUIDE_COLUMNS.filter(c => !visible.includes(c.key));
