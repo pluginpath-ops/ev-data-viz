@@ -143,13 +143,14 @@ const FALLBACK = {
     grid:       'rgb(26, 33, 44)',
     axis:       'rgb(61, 74, 90)',
     accent:     'rgb(45, 127, 249)',
+    callout:    'rgb(242, 139, 60)',
     background: 'rgb(17, 22, 31)',
 };
 
 /**
  * Resolve the chart palette for whatever theme is currently applied.
  *
- * @returns {{tick: string, legend: string, grid: string, axis: string, accent: string,
+ * @returns {{tick: string, legend: string, grid: string, axis: string, accent: string, callout: string,
  *   background: string}}
  *   tick       — axis tick labels
  *   legend     — legend entries, axis titles and the chart title
@@ -157,6 +158,7 @@ const FALLBACK = {
  *   axis       — the axis lines themselves, a step stronger than the grid
  *   accent     — the site's blue, for canvas text that is branding rather than data
  *   background — the flat fill a PNG export is composited onto
+ *   callout    — the orange a reference mark drawn OVER the plot is called out in
  */
 export function chartTheme() {
     if (typeof document === 'undefined' || !document.documentElement) {
@@ -179,5 +181,9 @@ export function chartTheme() {
         // The panel, not the page: a chart is exported as the thing it sits in,
         // and the frame it will gain in a later phase is that same panel.
         background: read('--color-card', FALLBACK.background),
+        // The single "active / now" signal, for marks that call one value out
+        // of the plot — a reference speed, a median. Distinct from `accent`,
+        // which is the brand blue the wordmark is drawn in.
+        callout:    read('--color-accent-orange', FALLBACK.callout),
     };
 }

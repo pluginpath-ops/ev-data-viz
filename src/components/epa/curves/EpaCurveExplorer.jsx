@@ -4,7 +4,7 @@ import { useTheme } from '../../../hooks/useTheme';
 import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
 import { buildEpaCurveFromModel } from '../../../utils/epaDerivations';
-import { DEFAULT_SS_ETA, CURVE_SPEED_RANGE } from '../../../constants/epa';
+import { DEFAULT_SS_ETA, CURVE_SPEED_RANGE, CURVE_REFERENCE_MPH } from '../../../constants/epa';
 import { curveSubjects, curveTooltipLines, disambiguateLabels } from '../../../utils/epaCurveSubjects';
 import { PALETTE } from '../../../utils/specHelpers';
 import { convSpeed, speedLabel } from '../../../utils/unitConversions';
@@ -12,7 +12,7 @@ import CurveSubjectPicker from './CurveSubjectPicker';
 import ViewingConditions, { useViewingConditions } from '../ViewingConditions';
 import AxisScaleControls from '../../AxisScaleControls';
 import LoadingSpinner from '../../LoadingSpinner';
-import { chartTheme, applyChartDefaults } from '../../../utils/chartTheme';
+import { chartTheme, chartFonts, applyChartDefaults } from '../../../utils/chartTheme';
 import PlotFrame from '../../charts/PlotFrame';
 import { useChartPng } from '../../../hooks/useChartPng';
 import InfoIcon from '../../InfoIcon';
@@ -47,6 +47,91 @@ const Y_AXES = [
     { key: 'mpge',     label: 'MPGe',        unit: 'MPGe',      digits: 1, needsEnergy: false, etaSensitive: true },
     { key: 'rangeMi',  label: 'Range',       unit: 'mi',        digits: 0, needsEnergy: true,  etaSensitive: false },
 ];
+
+/** Linear interpolation of a sorted {x, y} series at `x`. */
+function valueAt(points, x) {
+    if (!points?.length) return null;
+    const before = [...points].filter(p => p.x <= x).at(-1);
+    const after = points.find(p => p.x > x);
+    if (before && after) {
+        const t = (x - before.x) / (after.x - before.x);
+        return before.y + t * (after.y - before.y);
+    }
+    return before?.y ?? after?.y ?? null;
+}
+
+/**
+ * The reference-speed rule, its crossings, and the axis captions.
+ *
+ * One speed is called out because comparing curves means comparing them
+ * SOMEWHERE, and a reader picking their own point off two crossing lines is
+ * doing arithmetic the chart should have done. It is drawn rather than written
+ * beside the chart so that it survives the PNG export, which is the only form
+ * most of these ever get read in.
+ *
+ * Colours come from chartTheme(), including the callout orange — the canvas is
+ * the one surface the stylesheet cannot reach, and the alternative is the hex
+ * literal this file used to carry.
+ */
+function makeReferencePlugin(refX, refLabel, xCaption, yCaption) {
+    return {
+        id: 'curveReference',
+        afterDatasetsDraw(chart) {
+            const { ctx, chartArea: area, scales } = chart;
+            if (!area || !scales.x) return;
+            const { callout, tick } = chartTheme();
+            const fonts = chartFonts();
+            const px = scales.x.getPixelForValue(refX);
+
+            ctx.save();
+
+            if (px >= area.left && px <= area.right) {
+                ctx.strokeStyle = callout;
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(px, area.top);
+                ctx.lineTo(px, area.bottom);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.font = `${fonts.nano}px ${fonts.mono}`;
+                ctx.fillStyle = callout;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(refLabel, px + 5, area.top + 2);
+
+                // A dot where each curve crosses, so the legend's figure has a
+                // visible anchor rather than being a number to take on trust.
+                chart.data.datasets.forEach((ds, i) => {
+                    const meta = chart.getDatasetMeta(i);
+                    if (meta.hidden) return;
+                    const y = valueAt(ds.data, refX);
+                    if (y == null) return;
+                    const py = scales.y.getPixelForValue(y);
+                    if (py < area.top || py > area.bottom) return;
+                    ctx.fillStyle = ds.borderColor;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+
+            // Axis captions, replacing Chart.js's centred titles: the units
+            // belong at the ends of the axes they describe, where the eye
+            // already is when it reaches the last tick.
+            ctx.font = `${fonts.nano}px ${fonts.mono}`;
+            ctx.fillStyle = tick;
+            ctx.textBaseline = 'alphabetic';
+            ctx.textAlign = 'left';
+            ctx.fillText(xCaption, area.left, chart.height - 2);
+            ctx.textAlign = 'right';
+            ctx.fillText(yCaption, area.right, chart.height - 2);
+
+            ctx.restore();
+        },
+    };
+}
 
 export default function EpaCurveExplorer() {
     const { getCertGroupsForCurves, units } = useAppContext();
@@ -163,16 +248,23 @@ export default function EpaCurveExplorer() {
                     .map(pt => ({ x: convSpeed(pt.mph, units), y: pt[yAxis] })),
                 borderColor: PALETTE[i % PALETTE.length],
                 backgroundColor: PALETTE[i % PALETTE.length],
-                // A borrowed-energy curve is drawn dashed on the range axis
-                // only. Its shape is measured, so on the consumption axes there
-                // is nothing to qualify — dashing it everywhere would imply the
-                // whole curve is soft when only its scale is.
-                borderDash: (axis.needsEnergy && s.tier === 'nominal') ? [6, 4] : undefined,
+                // Dashed means one thing: the SHAPE is measured and the
+                // MAGNITUDE is estimated. Two cases reach it — a borrowed pack
+                // capacity on the range axis, and an assumed η on the axes that
+                // divide by it — and they were drawn differently for no reason a
+                // reader could act on. Neither is dashed where it does not
+                // apply, which is what keeps the mark meaningful.
+                borderDash: ((axis.needsEnergy && s.tier === 'nominal')
+                    || (axis.etaSensitive && !s.etaMeasured)) ? [7, 5] : undefined,
                 pointRadius: 0,
-                borderWidth: 2,
+                borderWidth: 2.5,
                 tension: 0.2,
             };
         });
+
+        // One number, drawn on the plot, labelled, and read back in the legend.
+        const refX = convSpeed(CURVE_REFERENCE_MPH, units);
+        const refLabel = `${Math.round(refX)} ${speedLabel(units).toUpperCase()}`;
 
         // From the stylesheet, not retyped here — see utils/chartTheme.
         const { grid, legend: text } = chartTheme();
@@ -181,6 +273,12 @@ export default function EpaCurveExplorer() {
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
             data: { datasets },
+            plugins: [makeReferencePlugin(
+                refX,
+                refLabel,
+                `SPEED · ${speedLabel(units)}`,
+                `${axis.label.toUpperCase()} · ${axis.unit}`,
+            )],
             options: {
                 /* The whole chart is rebuilt on every conditions change, so an
                    animation replays from scratch each time — which hides the
@@ -189,11 +287,16 @@ export default function EpaCurveExplorer() {
                 animation: false,
                 responsive: true,
                 maintainAspectRatio: false,
+                // Room under the plot for the axis captions the plugin draws.
+                layout: { padding: { bottom: 16 } },
                 interaction: { mode: 'nearest', intersect: false },
                 scales: {
                     x: {
                         type: 'linear',
-                        title: { display: true, text: speedLabel(units), color: text },
+                        // Titles off: the plugin draws both captions at the ends
+                        // of their axes instead, which is where the eye already
+                        // is when it reaches the last tick.
+                        title: { display: false },
                         // The default window is the curve's own domain rather
                         // than a literal 5–120: CURVE_SPEED_RANGE is an Admin
                         // knob, and a hardcoded bound would stop tracking the
@@ -203,7 +306,7 @@ export default function EpaCurveExplorer() {
                         grid: { color: grid }, ticks: { color: text },
                     },
                     y: {
-                        title: { display: true, text: `${axis.label} (${axis.unit})`, color: text },
+                        title: { display: false },
                         min: scale.yMin ?? undefined,
                         max: scale.yMax ?? undefined,
                         grid: { color: grid }, ticks: { color: text },
@@ -214,14 +317,21 @@ export default function EpaCurveExplorer() {
                         labels: {
                             color: text,
                             boxHeight: 2,
-                            // ⚠ on the curves the current axis qualifies, so a
-                            // mixed plot says which lines rest on an assumption
-                            // without the reader consulting the picker.
+                            // Each entry carries its own value at the reference
+                            // speed. Comparing curves means comparing them
+                            // somewhere, and reading two crossing lines off a
+                            // shared tick is arithmetic the chart should have
+                            // done. ⚠ still marks the curves this axis
+                            // qualifies, so a mixed plot says which figures rest
+                            // on an assumption.
                             generateLabels(chart) {
                                 const base = Chart.defaults.plugins.legend.labels.generateLabels(chart);
                                 return base.map(item => {
                                     const ds = chart.data.datasets[item.datasetIndex];
-                                    return ds?._flagged ? { ...item, text: `⚠ ${item.text}` } : item;
+                                    const v = valueAt(ds?.data, refX);
+                                    const suffix = v == null ? '' : `  ${v.toFixed(axis.digits)} @ ${Math.round(refX)}`;
+                                    const text = `${ds?._flagged ? '⚠ ' : ''}${item.text}${suffix}`;
+                                    return { ...item, text };
                                 });
                             },
                         },
