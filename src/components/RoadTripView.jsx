@@ -1656,8 +1656,8 @@ export default function RoadTripView({
                                 the same "this is active now, and it is changing
                                 your data" signal race mode uses. */}
                             {towingMode && (
-                                <>
-                                    <label className="scenario-row is-override">
+                                <div className="override-panel">
+                                    <label className="scenario-row">
                                         <span className="scenario-key">Tow eff</span>
                                         <input type="number" className="form-input" step="0.1" min="0.3" max="5"
                                             value={dispTowingEff}
@@ -1667,7 +1667,7 @@ export default function RoadTripView({
                                             }} />
                                         <span className="scenario-unit">{towingEffLabel}</span>
                                     </label>
-                                    <label className="scenario-row is-override">
+                                    <label className="scenario-row">
                                         <span className="scenario-key">At</span>
                                         <input type="number" className="form-input" min="20"
                                             value={dispTowingRef}
@@ -1682,7 +1682,7 @@ export default function RoadTripView({
                                         vehicle's measured figure. Battery capacity and charging
                                         speed still vary per vehicle.
                                     </p>
-                                </>
+                                </div>
                             )}
                         </div>
                     </div>

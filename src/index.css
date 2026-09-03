@@ -132,6 +132,7 @@
     --color-nav-active:  rgb(29, 78, 216);    /* provisional — light pass */
 
     --color-hover-lift: rgba(0, 0, 0, 0.05);  /* provisional — light pass */
+    --color-accent-orange-surface: rgba(217, 119, 6, 0.10); /* provisional — light pass */
 
     --color-chart-grid: rgb(229, 231, 235);   /* provisional — light pass */
     --color-chart-axis: rgb(156, 163, 175);   /* provisional — light pass */
@@ -269,6 +270,11 @@
        bar, so a tab hover reading it went the wrong way and was invisible. A
        translucent white composes correctly over all three. */
     --color-hover-lift: rgba(255, 255, 255, 0.07);
+
+    /* A wash of the "active now" accent, for a control that is currently
+       changing the data. Translucent so it reads correctly on the rail, on a
+       card, or on the page. */
+    --color-accent-orange-surface: rgba(242, 139, 60, 0.10);
 
     --color-chart-grid: rgb(26, 33, 44);  /* #1a212c */
     --color-chart-axis: rgb(61, 74, 90);  /* #3d4a5a — the same value as text-faint,
@@ -1658,7 +1664,10 @@ body {
     border-radius: var(--radius-control);
     background-color: var(--color-card);
 }
-.race-mode.is-on { border-color: var(--color-accent-orange); }
+.race-mode.is-on {
+    border-color: var(--color-accent-orange);
+    background-color: var(--color-accent-orange-surface);
+}
 
 .race-mode-switch {
     display: flex;
@@ -1770,15 +1779,29 @@ body {
     font-family: var(--font-mono);
     font-weight: 600;
 }
-/* A parameter that OVERRIDES measured data rather than describing the trip.
-   Orange, because that is this design's "active now, and it is changing what
-   you are looking at" signal — the same one race mode carries. It is not a
-   warning: the override is the point, it just must not be invisible. */
-.scenario-row.is-override .scenario-key { color: var(--color-accent-orange); }
-.scenario-row.is-override .form-input {
-    border-color: var(--color-accent-orange);
-    color: var(--color-accent-orange);
+/* Parameters that OVERRIDE measured data rather than describing the trip.
+ *
+ * ONE box around the set, not chrome on each field. Colouring every key and
+ * every input made the override look like a validation error on three separate
+ * controls; a single bounding box says "these belong together and they are
+ * doing something" once. The fields inside keep their normal treatment — the
+ * numbers are ordinary numbers, it is their AUTHORITY that is unusual.
+ *
+ * Orange because this is the design's "active now, and it is changing what you
+ * are looking at" signal, the same one race mode carries. Not a warning: the
+ * override is the point, it just must not be invisible.
+ */
+.override-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-accent-orange);
+    border-radius: var(--radius-control);
+    background-color: var(--color-accent-orange-surface);
 }
+.override-panel .scenario-key { color: var(--color-accent-orange); }
+.override-panel .text-note { margin: 0; }
 
 .scenario-unit {
     font-size: calc(var(--fs-body) * 0.7857);
