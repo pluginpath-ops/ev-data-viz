@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
-import { useChromeHeight } from './hooks/useChromeHeight';
+import { useHeaderHeight } from './hooks/useHeaderHeight';
 import AppNav from './components/shell/AppNav';
 import SubTabStrip from './components/shell/SubTabStrip';
 import AuthModal from './components/AuthModal';
@@ -82,8 +82,8 @@ export default function App() {
         const t = setTimeout(clearNotification, 6000);
         return () => clearTimeout(t);
     }, [appNotification, clearNotification]);
-    // Measured, not hardcoded — see hooks/useChromeHeight.
-    const chromeRef = useChromeHeight();
+    // Measured, not hardcoded — see hooks/useHeaderHeight.
+    const headerRef = useHeaderHeight();
 
 
     const [activeVehicle, setActiveVehicle] = useState(null);
@@ -97,8 +97,8 @@ export default function App() {
     const [adminSubtab, setAdminSubtab] = useState(DEFAULT_ADMIN_SUBTAB);
     // And for EPA (Browse / Label Statistics / Certification Statistics /
     // Speed-Consumption Curves), which used to own its own state and draw its
-    // own rail below the chrome — the one section whose sub-tabs did not sit in
-    // the nav strip with everything else.
+    // own sub-nav below the header — the one section whose sub-tabs did not sit
+    // in the header with everything else.
     const [epaSubtab, setEpaSubtab] = useState(DEFAULT_EPA_SUBTAB);
 
     // Keep activeVehicle in sync with vehicles state. Computed early (rather
@@ -664,7 +664,7 @@ export default function App() {
                 {/* ── Chrome ──
                   * One 50px bar. The photo hero and the compact title bar it
                   * replaced are gone; see components/shell/AppNav for why. */}
-                <nav className="app-nav" ref={chromeRef}>
+                <nav className="app-nav" ref={headerRef}>
                     <AppNav
                         view={view}
                         chartCategories={CHART_CATEGORIES}

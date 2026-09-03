@@ -44,9 +44,24 @@ inline cluster kept painting the old palette.
   dark-override cap (`playground.test.js`). Lower those the same way.
 - Never add a `[data-theme="dark"] .foo` rule — it cannot follow a themed
   subtree.
-- **Naming is worth stopping for.** A class name is the whole value of
-  extracting one, and a bad name is worse than the cluster it replaced. If the
-  right name isn't obvious, say so and ask rather than guessing.
+
+### Naming
+
+**One name per thing — `docs/vocabulary.md` is the list.** Read it before
+naming anything new, and use the standard term it gives rather than inventing a
+house one.
+
+It exists because three words drifted: "rail" meant the chart sidebar, the
+sub-nav AND a card's coloured left edge; "chrome" meant both a category and one
+specific region. A word with no fixed referent attracts whatever needs naming
+next. The short version — **chrome** is the category (furniture, not data),
+**header** is the pinned block at the top, **sidebar** is the chart's control
+column, **accent border** is a card's coloured left edge, **chips** are the
+selected-vehicle pills.
+
+**Naming is worth stopping for.** A class name is the whole value of extracting
+one, and a bad name is worse than the cluster it replaced. If the right name
+isn't obvious, say so and ask rather than guessing.
 
 ### Tech Stack
 - React 19 + Vite + Tailwind CSS v4 (`@tailwindcss/vite`, CSS-first, no `tailwind.config.js`)

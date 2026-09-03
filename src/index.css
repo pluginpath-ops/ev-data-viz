@@ -559,10 +559,10 @@
 
 /* Chart mode sub-nav — slightly smaller than .btn-tab */
 /* Admin sub-tab nav (Roles / EPA Data / Model Constants / Interface) */
-/* A section's own sub-tab rail. Same 38px metrics and the same orange active
-   marker as the nav strip, on the page rather than on the fill — so the two
-   read as the same control even though only one of them can live in the
-   chrome. Does not wrap: a rail that reflows changes the height of everything
+/* A section's own in-page sub-nav. Same 38px metrics and the same orange
+   active marker as the header's sub-nav, on the page rather than on the fill —
+   so the two read as the same control even though only one of them can live in
+   the header. Does not wrap: a sub-nav that reflows changes the height of everything
    below it. */
 .admin-subtabs {
     display: flex;
@@ -826,7 +826,7 @@ body {
        that depends on how far the page has been scrolled. That constant is what
        lets the sidebar be exactly the height of what is left of the viewport;
        see the rail's own note. Its measured height is published as
-       --app-chrome-h by hooks/useChromeHeight. */
+       --app-header-h by hooks/useHeaderHeight. */
     position: sticky;
     top: 0;
     z-index: 30;
@@ -1513,15 +1513,15 @@ body {
     left: 6px;
 }
 
-/* Queued for deletion: dimmed, and the rail says why. */
+/* Queued for deletion: dimmed, and the accent border says why. */
 .vehicle-card.is-pending {
     opacity: 0.6;
     border-left-color: var(--color-danger);
 }
 
-/* The same object in a different shape, so it takes the same rail rather than
-   a second selection language: one row, horizontal, no media band of its own
-   beyond the thumbnail. */
+/* The same object in a different shape, so it takes the same accent border
+   rather than a second selection language: one row, horizontal, no media band
+   of its own beyond the thumbnail. */
 .vehicle-row {
     flex-direction: row;
     align-items: center;
@@ -1718,14 +1718,14 @@ body {
            below the chrome, so a full viewport of height overhung by exactly
            the chrome's height, and the only scroll position where it looked
            right was one far enough down that the chrome had gone.
-           Pinning the chrome makes that offset a constant; --app-chrome-h is
+           Pinning the chrome makes that offset a constant; --app-header-h is
            that constant, measured rather than written down because the
            selection strip wraps to a second row when enough vehicles are
            picked. The fallback keeps this sane if the hook never runs. */
-        top: var(--app-chrome-h, 0px);
+        top: var(--app-header-h, 0px);
         align-self: start;
-        height: calc(100vh - var(--app-chrome-h, 0px));
-        max-height: calc(100vh - var(--app-chrome-h, 0px));
+        height: calc(100vh - var(--app-header-h, 0px));
+        max-height: calc(100vh - var(--app-header-h, 0px));
     }
 }
 
@@ -2525,7 +2525,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     margin-left: calc(var(--rail-pad-l) * -1);
     margin-right: calc(var(--rail-pad-r) * -1);
     /* +3px so the label sits on the same left edge as the colour-barred rows
-       below it, whose 3px rail comes before their own content. */
+       below it, whose 3px accent border comes before their own content. */
     padding: 7px var(--rail-pad-r) 7px calc(var(--rail-pad-l) + 3px);
     border-radius: 0;
     border-top: 1px solid var(--color-border);
@@ -2551,13 +2551,13 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    the only thing in the selector that is also on the plot. */
 .vehicle-run-group {
     border-left: 3px solid;
-    /* Square on the colour side. A rounded bar reads as a decorative edge on a
-       pill; a hard one reads as a rail the row hangs off, which is what it is. */
+    /* Square on the colour side. A rounded bar reads as decoration on a pill; a
+       hard one reads as an accent border the row hangs off, which is what it is. */
     border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
-    /* The rail sits OUTSIDE the rail's own gutter — half of it, pulled left by
-       the negative margin — and the padding puts the content back on the same
-       27px edge as the section band above. Chrome in the margin, content in the
-       column: the bar identifies the group without eating into the space the
+    /* The accent border sits OUTSIDE the sidebar's own gutter — half of it,
+       pulled left by the negative margin — and the padding puts the content back
+       on the same 27px edge as the section band above. Chrome in the margin,
+       content in the column: the border identifies the group without eating into the space the
        group's text has to live in.
 
        No right padding at all. The group's right edge is the content edge that
@@ -2634,7 +2634,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-surface-muted);
 }
 /* A row carrying an override is doing something the trip settings above are
-   not, so it says so on the same rail every other state uses. */
+   not, so it says so on the same accent border every other state uses. */
 .routing-row.is-custom {
     border-left-color: var(--color-accent-orange);
     background-color: var(--color-accent-orange-surface);
