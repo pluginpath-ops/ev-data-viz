@@ -108,6 +108,7 @@ function RangeMenu({ label, unit, minKey, maxKey, filters, onChange }) {
 
 export default function GuideFilterBar({
     rows, facets, filters, onChange, onReset, filterFn, columnPicker, shownCount,
+    clustered, onToggleClustered,
 }) {
     /**
      * Counts per facet value, each computed with that facet's own selection
@@ -196,10 +197,13 @@ export default function GuideFilterBar({
             </div>
 
             {/* What is narrowing the view, stated. Reading it used to mean
-                opening the filters and scanning them for highlights. */}
-            {narrowedBy.length > 0 && (
+                opening the filters and scanning them for highlights.
+                The row renders whenever there is something to put on it — the
+                cluster toggle lives here too, at the right, because it changes
+                how the rows are grouped rather than which rows there are. */}
+            {(narrowedBy.length > 0 || onToggleClustered) && (
                 <div className="guide-narrowed-row">
-                    <span className="text-nano">Narrowed by</span>
+                    {narrowedBy.length > 0 && <span className="text-nano">Narrowed by</span>}
                     {narrowedBy.map(c => (
                         <button
                             key={c.id}
@@ -212,6 +216,12 @@ export default function GuideFilterBar({
                             <span aria-hidden="true">✕</span>
                         </button>
                     ))}
+                    {onToggleClustered && (
+                        <label className="guide-cluster-toggle">
+                            <input type="checkbox" checked={clustered} onChange={onToggleClustered} />
+                            Cluster by EPA test group
+                        </label>
+                    )}
                 </div>
             )}
         </div>

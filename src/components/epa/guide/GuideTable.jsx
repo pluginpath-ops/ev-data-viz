@@ -1,4 +1,5 @@
-import { columnByKey, formatCell, barPercent } from '../../../utils/feGuideBrowse';
+import { useState } from 'react';
+import { columnByKey, formatCell, barPercent, clusterByTestGroup } from '../../../utils/feGuideBrowse';
 
 /**
  * The browse table (#235).
@@ -111,10 +112,62 @@ function GuideRow({ row, cols, selectedIds, onToggleSelect, onOpenRow, vehicleLi
     );
 }
 
+/** Rows of one test group, with the tail folded away until asked for. */
+const CLUSTER_PREVIEW = 3;
+
+function Cluster({ group, span, rowProps }) {
+    const [open, setOpen] = useState(false);
+    const first = group.rows[0];
+    const hidden = group.rows.length - CLUSTER_PREVIEW;
+    const shown = open ? group.rows : group.rows.slice(0, CLUSTER_PREVIEW);
+
+    return (
+        <>
+            <tr className="guide-cluster-head">
+                <td colSpan={span}>
+                    <div className="guide-cluster-head-inner">
+                        <span className="guide-cluster-caret" aria-hidden="true">
+                            {group.rows.length > CLUSTER_PREVIEW ? (open ? '▾' : '▸') : ''}
+                        </span>
+                        {/* The test group leads, in mono, because it is the
+                            identity EPA actually assigned — the marketing names
+                            beneath it are what vary. */}
+                        <span className="guide-cluster-id">{group.testGroup ?? '—'}</span>
+                        <span className="guide-cluster-name">
+                            {[first.brand, first.carline].filter(Boolean).join(' ')}
+                            <span className="text-meta"> · {first.model_year}</span>
+                        </span>
+                        <span className="guide-cluster-meta">
+                            {group.rows.length} config{group.rows.length === 1 ? '' : 's'}
+                            {/* The one thing that makes configurations in a single
+                                test group NOT interchangeable. */}
+                            {group.packVaries && <span className="badge-micro is-qualified">pack varies</span>}
+                        </span>
+                    </div>
+                </td>
+            </tr>
+
+            {shown.map(row => (
+                <GuideRow key={row.id} row={row} {...rowProps} />
+            ))}
+
+            {!open && hidden > 0 && (
+                <tr className="guide-cluster-more">
+                    <td colSpan={span}>
+                        <button type="button" className="section-action" onClick={() => setOpen(true)}>
+                            {hidden} more configuration{hidden === 1 ? '' : 's'} in this group — show all
+                        </button>
+                    </td>
+                </tr>
+            )}
+        </>
+    );
+}
+
 export default function GuideTable({
     rows, visibleColumns, sortKey, sortDir, onSort,
     selectedIds, onToggleSelect, onOpenRow, vehicleLinks, barMaxima,
-    pinnedRows = [], onUnpinAll, onOpenCompare,
+    pinnedRows = [], onUnpinAll, onOpenCompare, clustered = false,
 }) {
     // Mapped from the visible list rather than filtered out of GUIDE_COLUMNS:
     // the order the reader arranged is the order they get, and filtering would
@@ -179,9 +232,13 @@ export default function GuideTable({
                         </>
                     )}
 
-                    {rows.map(row => (
-                        <GuideRow key={row.id} row={row} {...rowProps} />
-                    ))}
+                    {clustered
+                        ? clusterByTestGroup(rows).map(group => (
+                            <Cluster key={group.key} group={group} span={span} rowProps={rowProps} />
+                        ))
+                        : rows.map(row => (
+                            <GuideRow key={row.id} row={row} {...rowProps} />
+                        ))}
                 </tbody>
             </table>
             {rows.length === 0 && pinnedRows.length === 0 && (

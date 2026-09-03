@@ -4663,6 +4663,63 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     --bar-track:  rgba(148, 163, 184, 0.16);
 }
 
+/* ── Clusters ───────────────────────────────────────────────────────────────
+ *
+ * A test group's header. Deliberately NOT a spread bar: inside one carline it
+ * was decoration, and the per-row sparklines already show the shape.
+ */
+.guide-cluster-head td {
+    padding: 5px 12px;
+    background-color: var(--color-cluster);
+    border-bottom: 1px solid var(--color-border);
+}
+.guide-cluster-head-inner {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+.guide-cluster-caret {
+    flex: none;
+    width: 10px;
+    color: var(--color-text-faint);
+}
+/* Mono, and first: this is the identity EPA assigned. The marketing names
+   under it are the part that varies. */
+.guide-cluster-id {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    color: var(--color-text-secondary);
+}
+.guide-cluster-name {
+    @apply truncate min-w-0;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-primary);
+}
+.guide-cluster-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+.guide-cluster-more td {
+    padding: 3px 12px 6px 34px;
+    background-color: var(--color-cluster);
+}
+
+.guide-cluster-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
 /* ── The pinned band ────────────────────────────────────────────────────────
  *
  * Rows kept above the sort and outside it. They are the SAME rows as the body's

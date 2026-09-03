@@ -3,7 +3,7 @@ import {
     wheelSizeIn, splitCarlineClass, bodyClassLabel, cityHwyRatio, isCollapsedRow,
     decorateRow, GUIDE_COLUMNS, DEFAULT_COLUMNS, columnByKey, formatCell,
     buildFacets, filterRows, sortRows, EMPTY_FILTERS,
-    encodeGuideParams, decodeGuideParams, computeBarMaxima, barPercent,
+    encodeGuideParams, decodeGuideParams, computeBarMaxima, barPercent, clusterByTestGroup,
     buildBrandIndex, resolveBrand, driveGroup,
 } from '../feGuideBrowse';
 
@@ -341,5 +341,40 @@ describe('driveGroup', () => {
         const d = decorateRow({ carline: 'R1S', drive_desc: 'Part-time 4-Wheel Drive' }, undefined);
         expect(d.drive_group).toBe('All Wheel Drive');
         expect(d.drive_desc).toBe('Part-time 4-Wheel Drive');
+    });
+});
+
+
+describe('clusterByTestGroup', () => {
+    const row = (id, group, pack) => ({ id, smog_test_group: group, nominal_pack_kwh: pack });
+
+    it('gathers configurations EPA certified together', () => {
+        // The whole point: 3 rows under one test group are one measurement.
+        const c = clusterByTestGroup([row(1, 'A'), row(2, 'A'), row(3, 'A')]);
+        expect(c).toHaveLength(1);
+        expect(c[0].rows.map(r => r.id)).toEqual([1, 2, 3]);
+    });
+
+    it('keeps the sort: a cluster leads where its first member did', () => {
+        const c = clusterByTestGroup([row(1, 'B'), row(2, 'A'), row(3, 'B')]);
+        expect(c.map(g => g.testGroup)).toEqual(['B', 'A']);
+    });
+
+    it('gives a row with no test group a cluster of its own', () => {
+        // NOT one "ungrouped" heading: EPA did not group these, and collecting
+        // them would claim a shared measurement that does not exist.
+        const c = clusterByTestGroup([row(1, null), row(2, null)]);
+        expect(c).toHaveLength(2);
+        expect(c.every(g => g.testGroup === null)).toBe(true);
+    });
+
+    it('flags a cluster whose pack varies', () => {
+        expect(clusterByTestGroup([row(1, 'A', 100), row(2, 'A', 120)])[0].packVaries).toBe(true);
+        expect(clusterByTestGroup([row(1, 'A', 100), row(2, 'A', 100)])[0].packVaries).toBe(false);
+    });
+
+    it('does not call a pack varied because one row is missing it', () => {
+        // An absent capacity is not a different capacity.
+        expect(clusterByTestGroup([row(1, 'A', 100), row(2, 'A', null)])[0].packVaries).toBe(false);
     });
 });

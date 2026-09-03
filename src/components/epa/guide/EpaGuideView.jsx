@@ -61,6 +61,9 @@ export default function EpaGuideView({ subtab = 'browse' }) {
     const [columns, setColumns]   = useState(initial.columns);
     const [page, setPage]         = useState(initial.page);
     const [selectedIds, setSelectedIds] = useState(initial.selectedIds);
+    // Off by default. Clustering answers "how many measurements is this really",
+    // which is a question you arrive at rather than start with.
+    const [clustered, setClustered] = useState(initial.clustered);
     const [openRow, setOpenRow]   = useState(null);
     const [showAllCompare, setShowAllCompare] = useState(false);
 
@@ -68,7 +71,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
     // filter click is a refinement, and pushing would make Back walk through
     // every keystroke of the search box instead of leaving the tab.
     useEffect(() => {
-        const p = encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds, columns });
+        const p = encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds, columns, clustered });
         p.set('tab', 'epa');
         // Re-set the sub-tab the section owns. encodeGuideParams builds a fresh
         // URLSearchParams from this view's state alone, so anything not written
@@ -76,7 +79,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
         // the default tab.
         p.set('sub', subtab);
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [filters, sortKey, sortDir, page, selectedIds, columns, subtab]);
+    }, [filters, sortKey, sortDir, page, selectedIds, columns, clustered, subtab]);
 
     // NOT `.map(decorateRow)` — Array.map passes the index as the second
     // argument, which would arrive as the brand index and resolve nothing.
@@ -193,6 +196,8 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                 onReset={resetFilters}
                 filterFn={filterRows}
                 shownCount={sorted.length}
+                clustered={clustered}
+                onToggleClustered={() => setClustered(c => !c)}
                 columnPicker={<GuideColumnPicker visible={columns} onChange={setColumns} />}
             />
 
@@ -217,6 +222,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                     rows={pageRows}
                     pinnedRows={compareRows}
                     onUnpinAll={() => setSelectedIds([])}
+                    clustered={clustered}
                     onOpenCompare={() => {
                         document.getElementById('guide-compare')
                             ?.scrollIntoView({ behavior: 'smooth', block: 'start' });

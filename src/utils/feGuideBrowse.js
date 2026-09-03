@@ -440,7 +440,7 @@ const NUM_PARAMS = {
 };
 const NUMERIC_LISTS = new Set(['years', 'motorCounts', 'wheelSizes']);
 
-export function encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds, columns }) {
+export function encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds, columns, clustered }) {
     const p = new URLSearchParams();
     for (const [key, param] of Object.entries(LIST_PARAMS)) {
         const v = filters[key];
@@ -466,6 +466,8 @@ export function encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds
     if (columns?.length && !sameColumns(columns, DEFAULT_COLUMNS)) {
         p.set('cols', columns.join(','));
     }
+    // Off is the default, so only the on state is written.
+    if (clustered) p.set('cluster', '1');
     return p;
 }
 
@@ -515,6 +517,7 @@ export function decodeGuideParams(search) {
         page: Number.isFinite(pageNum) && pageNum > 1 ? pageNum - 1 : 0,
         selectedIds,
         columns: cols.length ? cols : DEFAULT_COLUMNS,
+        clustered: p.get('cluster') === '1',
     };
 }
 
@@ -559,6 +562,44 @@ export function computeBarMaxima(rows) {
         maxima[scale] = max;
     }
     return maxima;
+}
+
+/**
+ * Group rows under the EPA test group that certified them (#235, phase 5c).
+ *
+ * Fifty rows are not fifty measurements. EPA certifies configurations together
+ * and files them under one smog test group, so twenty-four Rivian rows can be
+ * one measurement wearing many marketing names — and a flat list presents them
+ * as twenty-four independent results, which is the single most misleading
+ * thing this table can do.
+ *
+ * Clusters come out in the order their first member appeared, so whatever sort
+ * the reader chose still governs which group leads.
+ *
+ * A configuration with no test group becomes its own cluster rather than
+ * joining a shared "ungrouped" heading. EPA did not group them; collecting them
+ * under one header would claim a shared measurement that does not exist.
+ */
+export function clusterByTestGroup(rows) {
+    const order = [];
+    const byKey = new Map();
+    for (const row of rows ?? []) {
+        const key = row.smog_test_group || `solo:${row.id}`;
+        if (!byKey.has(key)) { byKey.set(key, []); order.push(key); }
+        byKey.get(key).push(row);
+    }
+    return order.map((key) => {
+        const members = byKey.get(key);
+        const packs = new Set(members.map(r => r.nominal_pack_kwh).filter(v => v != null));
+        return {
+            key,
+            rows: members,
+            testGroup: members[0].smog_test_group ?? null,
+            // The one thing that makes configurations in a single test group
+            // NOT interchangeable, so it is the one thing the header adds.
+            packVaries: packs.size > 1,
+        };
+    });
 }
 
 /**
