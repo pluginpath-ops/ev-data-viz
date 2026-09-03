@@ -30,7 +30,7 @@ import InfoIcon from '../../InfoIcon';
  * guide's gross pack for another 108. Mixing the two silently would put an
  * estimate and a measurement on one axis with nothing to tell them apart.
  */
-export default function CurveSubjectPicker({ subjects, selected, onToggle, onClear }) {
+export default function CurveSubjectPicker({ subjects, selected, onToggle, onClear, colors }) {
     const [query, setQuery] = useState('');
     // `corrected` was missing from this default, which hid a tier that is
     // strictly BETTER than `nominal` — its capacity is the record's own —
@@ -111,6 +111,14 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                                 type="checkbox"
                                 checked={selected.includes(s.key)}
                                 onChange={() => onToggle(s.key)}
+                            />
+                            {/* The colour the curve is drawn in, so a row and a
+                                line can be matched. Without it the only way to
+                                tell three plotted records apart was to read the
+                                legend and come back. */}
+                            <span
+                                className={`series-swatch${colors?.get(s.key) ? '' : ' is-empty'}`}
+                                style={colors?.get(s.key) ? { backgroundColor: colors.get(s.key) } : undefined}
                             />
                             <span className="curve-picker-name">
                                 {s.label}

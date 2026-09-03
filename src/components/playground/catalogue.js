@@ -76,7 +76,7 @@ export const NOT_CATALOGUED = {
 export const DARK_OVERRIDE_CLASSES = new Set([
     'badge-hidden',
     'brand-alias-chip', 'chart-copy-btn-active',
-    'curve-picker-row', 'guide-row', 'guide-tested-note',
+    'guide-row', 'guide-tested-note',
     'merge-target-banner', 'specs-table-container', 'stats-suppressed-flag',
     'sweep-batch', 'vote-btn-vouch'
 ]);

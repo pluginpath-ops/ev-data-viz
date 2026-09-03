@@ -2648,11 +2648,21 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
     color: var(--color-text-secondary);
 }
-.routing-swatch {
+/* The colour of a plotted series, wherever a row has to say which line it is.
+   Named for what it IS rather than for the first screen that needed one: it
+   was .routing-swatch, scoped to Road Trip, while the curve picker had no way
+   at all to tell a reader which record was which line. */
+.series-swatch {
     width: 10px;
     height: 10px;
     flex: none;
     border-radius: var(--radius-track);
+}
+/* Unplotted: the row can still be read, and the swatch says "not on the chart"
+   rather than claiming a colour it does not have. */
+.series-swatch.is-empty {
+    background-color: transparent;
+    border: 1px solid var(--color-border-strong);
 }
 
 .routing-row-fields {
@@ -4826,10 +4836,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-primary);
 }
 .curve-picker-row:hover    { background-color: var(--color-surface-muted); }
-.curve-picker-row.selected { background-color: var(--color-primary-light); }
-[data-theme="dark"] .curve-picker-row.selected {
-    background-color: rgba(59, 130, 246, 0.18);
-}
+/* --color-popover, not --color-primary-light: the light value needed a dark
+   override to be legible, and a token that reads correctly in both themes is
+   the whole point of having one. */
+.curve-picker-row.selected { background-color: var(--color-popover); }
 .curve-picker-name {
     @apply truncate flex-1 min-w-0;
 }

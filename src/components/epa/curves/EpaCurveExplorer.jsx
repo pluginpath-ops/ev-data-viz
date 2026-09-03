@@ -182,6 +182,14 @@ export default function EpaCurveExplorer() {
 
     const displayNames = useMemo(() => disambiguateLabels(plotted), [plotted]);
 
+    // One assignment, read by the chart and by the picker's swatches. Computing
+    // it twice from the same index arithmetic would agree right up until one of
+    // them changed.
+    const colorByKey = useMemo(
+        () => new Map(plotted.map((s, i) => [s.key, PALETTE[i % PALETTE.length]])),
+        [plotted],
+    );
+
     // ── The frame's caption ─────────────────────────────────────────────────
     // Deliberately the same shape as EpaCurvesView's: a modelled curve with no
     // statement of what it was modelled AT is not a chart anyone can act on,
@@ -232,7 +240,7 @@ export default function EpaCurveExplorer() {
         chartRef.current?.destroy();
         if (!plotted.length) return;
 
-        const datasets = plotted.map((s, i) => {
+        const datasets = plotted.map((s) => {
             const curve = buildEpaCurveFromModel(
                 s.group, s.useableKwh ?? 0, densityRatio, accessoryOverrideWNum,
                 windSpeedMphNum, windDirectionDegNum, gradeGainFtNum, gradeDistanceMilesNum,
@@ -246,8 +254,8 @@ export default function EpaCurveExplorer() {
                 data: curve
                     .filter(pt => pt[yAxis] != null)
                     .map(pt => ({ x: convSpeed(pt.mph, units), y: pt[yAxis] })),
-                borderColor: PALETTE[i % PALETTE.length],
-                backgroundColor: PALETTE[i % PALETTE.length],
+                borderColor: colorByKey.get(s.key),
+                backgroundColor: colorByKey.get(s.key),
                 // Dashed means one thing: the SHAPE is measured and the
                 // MAGNITUDE is estimated. Two cases reach it — a borrowed pack
                 // capacity on the range axis, and an assumed η on the axes that
@@ -357,7 +365,7 @@ export default function EpaCurveExplorer() {
             },
         });
         return () => chartRef.current?.destroy();
-    }, [plotted, yAxis, axis, units, isDark, displayNames, scale,
+    }, [plotted, yAxis, axis, units, isDark, displayNames, scale, colorByKey,
         densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum,
         gradeGainFtNum, gradeDistanceMilesNum]);
 
@@ -430,6 +438,7 @@ export default function EpaCurveExplorer() {
                             onToggle={(key) => setSelected(prev =>
                                 prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])}
                             onClear={() => setSelected([])}
+                            colors={colorByKey}
                         />
                     </div>
                 </aside>

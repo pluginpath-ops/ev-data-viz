@@ -229,7 +229,7 @@ function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, d
                         return (
                             <div key={e.key} className={`routing-row${isCustom ? ' is-custom' : ''}`}>
                                 <div className="routing-row-name">
-                                    <span className="routing-swatch" style={{ backgroundColor: e.color }} />
+                                    <span className="series-swatch" style={{ backgroundColor: e.color }} />
                                     {/* The legend's SHORT label — the one actually
                                         printed on the chart. `full` spells out
                                         every atom (`2026 · Tesla · Model Y ·
