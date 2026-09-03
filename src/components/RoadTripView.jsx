@@ -29,8 +29,8 @@ import { chartTheme } from '../utils/chartTheme';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
 import PlotFrame from './charts/PlotFrame';
+import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
-import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 
 Chart.register(ZoomPlugin);
 
@@ -587,8 +587,6 @@ export default function RoadTripView({
     ).current;
     const [axisScale, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
     const [copiedUrl, setCopiedUrl] = useState(false);
-    const [imageCopied, setImageCopied] = useState(false);
-    const [chartImage, setChartImage]   = useState(null);
     const [sortCol, setSortCol] = useState(null);   // column key or null
     const [sortDir, setSortDir] = useState('asc');  // 'asc' | 'desc'
     const onAxisChange = (key, val) => setAxisScale(prev => ({ ...prev, [key]: val }));
@@ -1532,18 +1530,8 @@ export default function RoadTripView({
     }, [validEntries, isSpeedMode, totalDistance, speed, mode, legDistance, chargeTime,
         startSoc, minSoc, towingMode, units, dl, sl]);
 
-    const handleCopyImage = async () => {
-        if (!chartRef.current) return;
-        const frame = { title: plotTitle, subtitle: plotSubtitle };
-        try {
-            setChartImage(await copyChartAsPng(chartRef.current, frame));
-            setImageCopied(true);
-            setTimeout(() => setImageCopied(false), 2500);
-        } catch {
-            // Clipboard API not supported — render inline for manual save.
-            setChartImage(chartToPngDataUrl(chartRef.current, frame));
-        }
-    };
+    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
 
     const dispLeg          = units === 'metric' ? Math.round(legDistance * MI_TO_KM) : legDistance;
     const dispTotal        = units === 'metric' ? Math.round(totalDistance * MI_TO_KM) : totalDistance;
@@ -1878,6 +1866,8 @@ export default function RoadTripView({
                 <PlotFrame
                     title={plotTitle}
                     subtitle={plotSubtitle}
+                    preview={preview}
+                    onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (
                         <>
                             <button
@@ -1904,7 +1894,7 @@ export default function RoadTripView({
                                 {copiedUrl ? '✓ Copied' : '🔗 URL'}
                             </button>
                             <button
-                                onClick={handleCopyImage}
+                                onClick={copyPng}
                                 className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
                                 title="Copy the framed chart as a PNG"
                             >
@@ -1926,16 +1916,6 @@ export default function RoadTripView({
 
             {!presentationMode && !loading && validEntries.length > 0 && (
                 <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset zoom to restore</p>
-            )}
-
-            {chartImage && (
-                <div className="mt-3">
-                    <div className="inline-row mb-1.5">
-                        <p className="text-xs text-meta">Right-click or long-press to copy / save</p>
-                        <button onClick={() => setChartImage(null)} className="chart-copy-btn">✕ Dismiss</button>
-                    </div>
-                    <img src={chartImage} alt="Chart export" className="w-full rounded border border-[var(--color-border)]" />
-                </div>
             )}
 
             {/* ── Axis Scale Controls (card provided by AxisScaleControls) ─ */}

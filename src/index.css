@@ -1879,6 +1879,28 @@ body {
     background-color: var(--color-border);
 }
 
+/* The export receipt. A quarter width, because its job is to say "this is what
+   you got" and to be right-clickable — not to be a second copy of the chart
+   competing with the real one directly below it. */
+.chart-png-preview {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.chart-png-preview img {
+    width: 25%;
+    min-width: 160px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+}
+.chart-png-preview-note {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+}
+
 .plot-frame {
     padding: 14px 16px 16px;
     background-color: var(--color-card);

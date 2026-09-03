@@ -11,7 +11,7 @@
  * reader finding out what an export does and does not include only after they
  * have already pasted it somewhere.
  */
-export default function PlotFrame({ title, subtitle, exportControls, children }) {
+export default function PlotFrame({ title, subtitle, exportControls, preview, onDismissPreview, children }) {
     return (
         <>
             {exportControls && (
@@ -19,6 +19,23 @@ export default function PlotFrame({ title, subtitle, exportControls, children })
                     <span className="text-micro">PNG / URL export captures the frame below</span>
                     <span className="chart-export-rule" />
                     {exportControls}
+                </div>
+            )}
+
+            {/* What was just copied, under the button that copied it and above
+                the chart it came from — small, because it is a receipt rather
+                than a second copy of the chart. Right-click or long-press to
+                save: the clipboard write fails silently on most mobile browsers,
+                and is no use at all to someone who wants a FILE. */}
+            {preview && (
+                <div className="chart-png-preview">
+                    <img src={preview} alt="Copied chart" />
+                    <div className="chart-png-preview-note">
+                        <span className="text-note">Right-click or long-press to save</span>
+                        <button type="button" onClick={onDismissPreview} className="chart-copy-btn">
+                            ✕ Dismiss
+                        </button>
+                    </div>
                 </div>
             )}
             <div className="plot-frame">

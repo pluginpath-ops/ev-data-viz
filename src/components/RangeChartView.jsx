@@ -19,11 +19,11 @@ import {
     fmtSpeed, speedBasisNote, fmtTemp,
 } from '../utils/unitConversions';
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
-import { copyChartAsPng } from '../utils/chartUtils';
 import { chartTheme, MONO_STACK } from '../utils/chartTheme';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
+import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
@@ -73,7 +73,6 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     const chartInstance = useRef(null);
     const [chartType,    setChartType]    = useState('range-vehicle-bar');
     const [effUnit,      setEffUnit]      = useState('mi_kwh'); // 'mi_kwh' | 'wh_mi'
-    const [copied,       setCopied]       = useState(false);
     const [copiedUrl,    setCopiedUrl]    = useState(false);
 
     // ── Axis scale state — yMin defaults to 0, rest auto ─────────────────────
@@ -555,18 +554,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
         return parts.join(' · ');
     }, [plottableRuns, chartType, effUnit, correctionMode, units]);
 
-    // ── Copy chart PNG ────────────────────────────────────────────────────────
-    const handleCopyImage = async () => {
-        if (!chartInstance.current) return;
-        try {
-            await copyChartAsPng(chartInstance.current, { title: plotTitle, subtitle: plotSubtitle });
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2500);
-        } catch { /* Clipboard API not supported — chart is still visible */ }
-    };
+    const { copyPng, copied, preview, dismissPreview } =
+        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle });
 
-
-    // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div className="chart-layout">
             {/* ── Left rail: pick here, read on the right. Same rig as Charging,
@@ -697,6 +687,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             <PlotFrame
                 title={plotTitle}
                 subtitle={plotSubtitle}
+                preview={preview}
+                onDismissPreview={dismissPreview}
                 exportControls={!presentationMode && (
                     <>
                         <button
@@ -712,7 +704,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                             {copiedUrl ? '✓ Copied' : '🔗 URL'}
                         </button>
                         <button
-                            onClick={handleCopyImage}
+                            onClick={copyPng}
                             disabled={plottableRuns.length === 0}
                             className={`chart-copy-btn disabled:opacity-40 disabled:cursor-not-allowed ${copied ? 'chart-copy-btn-active' : ''}`}
                             title="Copy the framed chart as a PNG"

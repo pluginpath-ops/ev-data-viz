@@ -20,9 +20,9 @@ import { resolvePairColors } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
+import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
 import { chartTheme, MONO_STACK } from '../utils/chartTheme';
-import { copyChartAsPng } from '../utils/chartUtils';
 
 
 /**
@@ -540,7 +540,6 @@ export default function ChargeCompareView({
     // most likely to be pasted into a comparison thread was the one that could
     // not be. Each frame exports itself: a reader wanting "time to add 200 mi"
     // should not have to crop it out of an image answering a different question.
-    const [pngCopied, setPngCopied] = useState(0);
 
     const plotSubtitle = useMemo(() => {
         const pairs = activePairs.length;
@@ -554,14 +553,11 @@ export default function ChargeCompareView({
         ].join(' · ');
     }, [activePairs, startSoc, correctionMode, units]);
 
-    const copyFramed = async (instanceRef, title) => {
-        if (!instanceRef.current) return;
-        try {
-            await copyChartAsPng(instanceRef.current, { title, subtitle: plotSubtitle });
-            setPngCopied(instanceRef === chart1Instance ? 1 : 2);
-            setTimeout(() => setPngCopied(0), 2500);
-        } catch { /* Clipboard API not supported — the chart is still on screen */ }
-    };
+    // Two frames, two exports, so two independent previews.
+    const title1 = `Range added in ${xMinutes} minutes`;
+    const title2 = `Time to add ${units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} ${distanceLabel(units)}`;
+    const png1 = useChartPng(chart1Instance, { title: title1, subtitle: plotSubtitle });
+    const png2 = useChartPng(chart2Instance, { title: title2, subtitle: plotSubtitle });
 
     // ── Compute bars for one chart type ──────────────────────────────────────
     // chartType: 'range_added' | 'time_to_range'
@@ -959,8 +955,10 @@ export default function ChargeCompareView({
                         pasting "time to add 200 mi" should not have to crop it
                         out of an image that also answers a different question. */}
                     <PlotFrame
-                        title={`Range added in ${xMinutes} minutes`}
+                        title={title1}
                         subtitle={plotSubtitle}
+                        preview={png1.preview}
+                        onDismissPreview={png1.dismissPreview}
                         exportControls={!presentationMode && (
                             <>
                                 <button
@@ -971,11 +969,11 @@ export default function ChargeCompareView({
                                     {copied ? '✓ Copied' : '🔗 URL'}
                                 </button>
                                 <button
-                                    onClick={() => copyFramed(chart1Instance, `Range added in ${xMinutes} minutes`)}
-                                    className={`chart-copy-btn ${pngCopied === 1 ? 'chart-copy-btn-active' : ''}`}
+                                    onClick={png1.copyPng}
+                                    className={`chart-copy-btn ${png1.copied ? 'chart-copy-btn-active' : ''}`}
                                     title="Copy the framed chart as a PNG"
                                 >
-                                    {pngCopied === 1 ? '✓ Copied' : 'PNG'}
+                                    {png1.copied ? '✓ Copied' : 'PNG'}
                                 </button>
                             </>
                         )}
@@ -987,15 +985,17 @@ export default function ChargeCompareView({
 
                     <div className="mt-4">
                         <PlotFrame
-                            title={`Time to add ${units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} ${distanceLabel(units)}`}
+                            title={title2}
                             subtitle={plotSubtitle}
+                            preview={png2.preview}
+                            onDismissPreview={png2.dismissPreview}
                             exportControls={!presentationMode && (
                                 <button
-                                    onClick={() => copyFramed(chart2Instance, `Time to add ${units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} ${distanceLabel(units)}`)}
-                                    className={`chart-copy-btn ${pngCopied === 2 ? 'chart-copy-btn-active' : ''}`}
+                                    onClick={png2.copyPng}
+                                    className={`chart-copy-btn ${png2.copied ? 'chart-copy-btn-active' : ''}`}
                                     title="Copy the framed chart as a PNG"
                                 >
-                                    {pngCopied === 2 ? '✓ Copied' : 'PNG'}
+                                    {png2.copied ? '✓ Copied' : 'PNG'}
                                 </button>
                             )}
                         >

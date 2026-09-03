@@ -23,9 +23,9 @@ import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitC
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
 import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
 import { resolveRangeSource, epaRangeOption, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
-import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
 import { chartTheme } from '../utils/chartTheme';
 import PlotFrame from './charts/PlotFrame';
+import { useChartPng } from '../hooks/useChartPng';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import ChartInfoBubble from './ChartInfoBubble';
@@ -46,8 +46,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const [runDataCache, setRunDataCache] = useState({});
     const [loadingData, setLoadingData] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [chartImage, setChartImage] = useState(null);
-    const [imageCopied, setImageCopied] = useState(false);
 
     // Preserve the user's pill order
     // Memoised, as every other chart view already does it. Unmemoised this was a
@@ -470,7 +468,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
     useEffect(() => {
         if (!chartRef.current) return;
-        setChartImage(null); // clear stale preview whenever chart redraws
 
         const ctx = chartRef.current.getContext('2d');
 
@@ -710,21 +707,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     }, [selectedRuns, selectedVehicles, raceActive, raceThreshold, chartConfig.correctionMode, units]);
 
     // ── PNG export ───────────────────────────────────────────────────────────
-    const handleExportImage = async () => {
-        if (!chartInstance.current) return;
-        // The frame's own caption, so the PNG says what the page says. Without
-        // this the export is four unlabelled curves.
-        const frame = { title: plotTitle, subtitle: plotSubtitle };
-        try {
-            const dataUrl = await copyChartAsPng(chartInstance.current, frame);
-            setChartImage(dataUrl);
-            setImageCopied(true);
-            setTimeout(() => setImageCopied(false), 2500);
-        } catch {
-            // Clipboard API not supported — render inline for manual save
-            setChartImage(chartToPngDataUrl(chartInstance.current, frame));
-        }
-    };
+    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle });
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -988,6 +972,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             <PlotFrame
                 title={plotTitle}
                 subtitle={plotSubtitle}
+                preview={preview}
+                onDismissPreview={dismissPreview}
                 exportControls={!presentationMode && (
                     <>
                         <button
@@ -1010,7 +996,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             {copied ? '✓ Copied' : '🔗 URL'}
                         </button>
                         <button
-                            onClick={handleExportImage}
+                            onClick={copyPng}
                             className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
                             title="Copy the framed chart as a PNG"
                         >
@@ -1029,25 +1015,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
             {!presentationMode && (
                 <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset zoom to restore</p>
-            )}
-
-            {/* Inline image preview. Kept because the clipboard write fails
-                silently on most mobile browsers, and an image the reader can
-                long-press is the only fallback that works there. */}
-            {chartImage && (
-                <div className="mt-3">
-                    <div className="inline-row mb-1.5">
-                        <p className="text-xs text-meta">Right-click or long-press to copy / save</p>
-                        <button onClick={() => setChartImage(null)} className="chart-copy-btn">
-                            ✕ Dismiss
-                        </button>
-                    </div>
-                    <img
-                        src={chartImage}
-                        alt="Chart export"
-                        className="w-full rounded border border-[var(--color-border)]"
-                    />
-                </div>
             )}
 
             {/* ── Controls below chart: scale inputs + line toggle + race mode — hidden in presentation mode ── */}

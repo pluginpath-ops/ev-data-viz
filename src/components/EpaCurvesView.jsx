@@ -17,7 +17,7 @@ import InfoIcon from './InfoIcon';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
-import { copyChartAsPng } from '../utils/chartUtils';
+import { useChartPng } from '../hooks/useChartPng';
 import EpaMethodologyDiagram from './epa/EpaMethodologyDiagram';
 import EpaCertificationPaths from './epa/EpaCertificationPaths';
 import EpaCycleSpeedChart from './epa/EpaCycleSpeedChart';
@@ -243,7 +243,6 @@ export default function EpaCurvesView({
     // ── UI state ──────────────────────────────────────────────────────────────
     const [selectorExpanded, setSelectorExpanded] = useState(false);
     const [urlCopied,        setUrlCopied]        = useState(false);
-    const [imageCopied,      setImageCopied]      = useState(false);
     // Altitude, temperature, and accessory load are viewing conditions (like the
     // unit toggle): they scale the plotted curve at plot time for ALL curves.
     // Never persisted; never affect stored coefficients, accessory fields, or
@@ -643,16 +642,8 @@ export default function EpaCurvesView({
         return parts.join(' · ');
     }, [datasets, conditions, overlayMode, units]);
 
-    // ── Copy PNG ──────────────────────────────────────────────────────────────
-    const handleCopyPng = async () => {
-        if (!chartRef.current) return;
-        const frame = { title: plotTitle, subtitle: plotSubtitle };
-        try {
-            await copyChartAsPng(chartRef.current, frame);
-            setImageCopied(true);
-            setTimeout(() => setImageCopied(false), 2500);
-        } catch { /* Clipboard API not supported — the chart is still on screen */ }
-    };
+    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
 
     const handleCopyUrl = () => {
         navigator.clipboard.writeText(window.location.href).then(() => {
@@ -1006,6 +997,8 @@ export default function EpaCurvesView({
                 <PlotFrame
                     title={plotTitle}
                     subtitle={plotSubtitle}
+                    preview={preview}
+                    onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (
                         <>
                             <button
@@ -1016,7 +1009,7 @@ export default function EpaCurvesView({
                                 {urlCopied ? '✓ Copied' : '🔗 URL'}
                             </button>
                             <button
-                                onClick={handleCopyPng}
+                                onClick={copyPng}
                                 disabled={!datasets.length}
                                 className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
                                 title="Copy the framed chart as a PNG"
