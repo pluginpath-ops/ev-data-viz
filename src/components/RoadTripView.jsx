@@ -79,6 +79,23 @@ function isSimUnrealistic(sim) {
 }
 
 /** Y-value for one sweep sim result (shared by speed and distance sweeps). */
+/**
+ * Simulation mode × towing.
+ *
+ * `mode` and `towingMode` are independent flags in the config, and the UI used
+ * to present them that way — a two-button group and a separate checkbox. But
+ * there are only four combinations and all four are meaningful, so naming each
+ * one is clearer than asking a reader to assemble it from two controls in
+ * different regions. (This works because the product is small; a third
+ * orthogonal flag would need the controls split back apart.)
+ */
+const SIM_MODES = [
+    { value: 'distance',     mode: 'distance', towing: false, label: 'Fixed charge amount' },
+    { value: 'time',         mode: 'time',     towing: false, label: 'Fixed charge time' },
+    { value: 'distance-tow', mode: 'distance', towing: true,  label: 'Fixed charge amount — towing' },
+    { value: 'time-tow',     mode: 'time',     towing: true,  label: 'Fixed charge time — towing' },
+];
+
 const X_AXES = [
     { value: 'totalTime', label: 'Total time' },
     { value: 'driveTime', label: 'Drive time' },
@@ -1423,6 +1440,12 @@ export default function RoadTripView({
     }, [totalDistance, speed, overhead]);
 
     // Display values in current units
+    // The Sim dropdown's value is the PRODUCT of two config flags, so it is
+    // derived rather than stored — nothing new to keep in sync, and a config
+    // arriving from a URL resolves to the right option by construction.
+    const simMode = (SIM_MODES.find(m => m.mode === mode && m.towing === !!towingMode)
+        ?? SIM_MODES[0]).value;
+
     // ── Axis registries ─────────────────────────────────────────────────────
     // Y depends on X. Over a speed or trip-distance SWEEP the y-axis is a
     // duration — the chart asks "how long does this trip take at each speed" —
@@ -1528,12 +1551,21 @@ export default function RoadTripView({
                                 <span className="axis-row-key">Sim</span>
                                 <select
                                     className="form-input"
-                                    value={mode}
-                                    onChange={e => setField('mode', e.target.value)}
-                                    title="What is held fixed at each stop: how much range you add, or how long you stay"
+                                    value={simMode}
+                                    onChange={e => {
+                                        const next = SIM_MODES.find(m => m.value === e.target.value);
+                                        // One update, not two: the pair is a single
+                                        // choice here, and setting them separately
+                                        // would rebuild the simulation twice.
+                                        setRoadTripConfig(prev => ({
+                                            ...prev, mode: next.mode, towingMode: next.towing,
+                                        }));
+                                    }}
+                                    title="What is held fixed at each stop, and whether every vehicle's efficiency is overridden with a towing figure"
                                 >
-                                    <option value="distance">Fixed charge amount</option>
-                                    <option value="time">Fixed charge time</option>
+                                    {SIM_MODES.map(m => (
+                                        <option key={m.value} value={m.value}>{m.label}</option>
+                                    ))}
                                 </select>
                             </label>
                         </div>
@@ -1616,6 +1648,42 @@ export default function RoadTripView({
                                     onChange={e => setField('overhead', Number(e.target.value))} />
                                 <span className="scenario-unit">min overhead</span>
                             </label>
+
+                            {/* Towing's two numbers belong with the trip, not in
+                                DISPLAY: they are parameters of the simulation,
+                                not of how it is drawn. Orange because towing
+                                OVERRIDES every vehicle's measured efficiency —
+                                the same "this is active now, and it is changing
+                                your data" signal race mode uses. */}
+                            {towingMode && (
+                                <>
+                                    <label className="scenario-row is-override">
+                                        <span className="scenario-key">Tow eff</span>
+                                        <input type="number" className="form-input" step="0.1" min="0.3" max="5"
+                                            value={dispTowingEff}
+                                            onChange={e => {
+                                                const val = parseFloat(e.target.value);
+                                                setField('towingEfficiency', units === 'metric' ? val / MI_TO_KM : val);
+                                            }} />
+                                        <span className="scenario-unit">{towingEffLabel}</span>
+                                    </label>
+                                    <label className="scenario-row is-override">
+                                        <span className="scenario-key">At</span>
+                                        <input type="number" className="form-input" min="20"
+                                            value={dispTowingRef}
+                                            onChange={e => {
+                                                const val = Number(e.target.value);
+                                                setField('towingRefSpeedMph', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
+                                            }} />
+                                        <span className="scenario-unit">{sl}</span>
+                                    </label>
+                                    <p className="text-note">
+                                        Full system efficiency (vehicle + trailer), replacing every
+                                        vehicle's measured figure. Battery capacity and charging
+                                        speed still vary per vehicle.
+                                    </p>
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -1627,15 +1695,6 @@ export default function RoadTripView({
                     <div className="chart-rail-group">
                         <span className="text-micro">Display</span>
                         <div className="display-grid">
-                            <label className="toggle-label" title="Override all vehicle efficiencies with a fixed trailer-system value. Battery capacity and charging curve still vary per vehicle.">
-                                <input
-                                    type="checkbox"
-                                    checked={!!towingMode}
-                                    onChange={e => setField('towingMode', e.target.checked)}
-                                    className="w-4 h-4"
-                                />
-                                <span className="text-sm">Towing</span>
-                            </label>
                             {setChartConfig && (
                                 <>
                                     <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
@@ -1647,34 +1706,6 @@ export default function RoadTripView({
                             <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                         )}
 
-                        {/* Towing's own two numbers, only while it is on. */}
-                        {towingMode && (
-                            <div className="axis-rows">
-                                <label className="scenario-row">
-                                    <span className="scenario-key">Eff</span>
-                                    <input type="number" className="form-input" step="0.1" min="0.3" max="5"
-                                        value={dispTowingEff}
-                                        onChange={e => {
-                                            const val = parseFloat(e.target.value);
-                                            setField('towingEfficiency', units === 'metric' ? val / MI_TO_KM : val);
-                                        }} />
-                                    <span className="scenario-unit">{towingEffLabel}</span>
-                                </label>
-                                <label className="scenario-row">
-                                    <span className="scenario-key">At</span>
-                                    <input type="number" className="form-input" min="20"
-                                        value={dispTowingRef}
-                                        onChange={e => {
-                                            const val = Number(e.target.value);
-                                            setField('towingRefSpeedMph', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
-                                        }} />
-                                    <span className="scenario-unit">{sl}</span>
-                                </label>
-                                <p className="text-note">
-                                    Full system efficiency (vehicle + trailer). Battery capacity and charging speed still vary per vehicle.
-                                </p>
-                            </div>
-                        )}
                     </div>
 
                     {/* Simulation result warnings — shown here so they're near the controls that triggered them */}

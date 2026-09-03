@@ -1770,6 +1770,16 @@ body {
     font-family: var(--font-mono);
     font-weight: 600;
 }
+/* A parameter that OVERRIDES measured data rather than describing the trip.
+   Orange, because that is this design's "active now, and it is changing what
+   you are looking at" signal — the same one race mode carries. It is not a
+   warning: the override is the point, it just must not be invisible. */
+.scenario-row.is-override .scenario-key { color: var(--color-accent-orange); }
+.scenario-row.is-override .form-input {
+    border-color: var(--color-accent-orange);
+    color: var(--color-accent-orange);
+}
+
 .scenario-unit {
     font-size: calc(var(--fs-body) * 0.7857);
     color: var(--color-text-meta);
