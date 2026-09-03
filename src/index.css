@@ -133,6 +133,7 @@
 
     --color-hover-lift: rgba(0, 0, 0, 0.05);  /* provisional — light pass */
     --color-accent-orange-surface: rgba(217, 119, 6, 0.10); /* provisional — light pass */
+    --color-accent-orange-muted: rgba(217, 119, 6, 0.45); /* provisional — light pass */
 
     --color-chart-grid: rgb(229, 231, 235);   /* provisional — light pass */
     --color-chart-axis: rgb(156, 163, 175);   /* provisional — light pass */
@@ -275,6 +276,7 @@
        changing the data. Translucent so it reads correctly on the rail, on a
        card, or on the page. */
     --color-accent-orange-surface: rgba(242, 139, 60, 0.10);
+    --color-accent-orange-muted: rgba(242, 139, 60, 0.45);
 
     --color-chart-grid: rgb(26, 33, 44);  /* #1a212c */
     --color-chart-axis: rgb(61, 74, 90);  /* #3d4a5a — the same value as text-faint,
@@ -1429,18 +1431,70 @@ body {
     /* Left edge reserved for the selection bar, so selecting a card does not
        change its width and reflow the grid. */
     border-left: 3px solid transparent;
+    /* Positioning context for the selection mark below. */
+    position: relative;
     transition: border-color 0.15s ease-in-out, background-color 0.15s ease-in-out;
 }
-.vehicle-card:hover { border-color: var(--color-border-strong); }
+
+/* Hover leaves the LEFT border alone and previews the selection colour on it.
+ *
+ * `border-color` is a shorthand, so the old `:hover { border-color: … }`
+ * repainted the selection bar grey — and you select by CLICKING, which leaves
+ * the cursor on the card, so grey-on-hover was the whole of the feedback at
+ * the one moment it had to be legible. Selecting looked like nothing had
+ * happened. Now hover shows the bar at 45%: a hovered card says "this is what
+ * selecting looks like", and the click completes it rather than undoing it. */
+.vehicle-card:hover {
+    border-top-color: var(--color-border-strong);
+    border-right-color: var(--color-border-strong);
+    border-bottom-color: var(--color-border-strong);
+    border-left-color: var(--color-accent-orange-muted);
+}
 
 /* Broadsheet's treatment: a left orange bar and a tinted band, not a full-row
-   wash and not a floating checkmark. Orange because "selected" is the same
-   active/now signal the sub-nav uses — this is the state you are working in. */
+   wash. Orange because "selected" is the same active/now signal the sub-nav
+   uses — this is the state you are working in.
+ *
+ * Declared AFTER :hover at equal specificity, so a selected card keeps the
+ * full-strength bar while the cursor is on it. Fading a real state to signal
+ * hover would weaken the signal; previewing it on an unselected card
+ * strengthens it. */
 .vehicle-card.is-selected {
     border-left-color: var(--color-accent-orange);
     background-color: var(--color-cluster);
 }
-.vehicle-card.is-selected:hover { border-color: var(--color-border-strong); }
+
+/* The second code. A bar alone is one channel, and one channel is thin when a
+   3px edge is competing with a hover treatment and a photograph — so the state
+   also gets a mark that NOTHING else on the card can produce. Dark plate
+   because it sits over an arbitrary photo, the same reason .vehicle-media-badge
+   has one. */
+.vehicle-card.is-selected::before {
+    content: '✓';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 19px;
+    height: 19px;
+    border-radius: var(--radius-mark);
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    font-weight: 700;
+    line-height: 1;
+    color: var(--color-accent-orange);
+    background-color: rgba(8, 12, 18, 0.72);
+}
+
+/* The row has no media band to sit on top of, so the mark centres on the
+   left edge instead of hanging in a corner that does not exist. */
+.vehicle-row.is-selected::before {
+    top: 50%;
+    transform: translateY(-50%);
+    left: 6px;
+}
 
 /* Queued for deletion: dimmed, and the rail says why. */
 .vehicle-card.is-pending {
