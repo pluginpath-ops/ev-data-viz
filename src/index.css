@@ -1752,6 +1752,20 @@ body {
     align-items: center;
     gap: 8px;
 }
+/* An axis with only one possible value. Reads as a stated fact — the value,
+   then why there is no control — rather than as a field that will not let you
+   type in it. */
+.axis-row-fixed {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+    padding: 2px 0;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+}
+
 .axis-row-key {
     font-family: var(--font-mono);
     font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
@@ -2413,6 +2427,29 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * is the same identity-then-values shape a run row uses, so the two lists read
  * as one kind of thing.
  */
+/* A disclosure INSIDE a rail group — one step quieter than the section band,
+   which belongs to a whole region. Used for the elevation-gain adjustment,
+   which reveals its own fields. */
+.subgroup-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 4px 7px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-sunken);
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    text-align: left;
+}
+.subgroup-header:hover { background-color: var(--color-hover-lift); }
+.subgroup-header.is-open {
+    border-color: var(--color-accent-orange);
+    color: var(--color-accent-orange);
+}
+
 .routing-panel { margin-top: 14px; }
 
 .routing-rows {
@@ -3054,6 +3091,13 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * of the icon and spans its width: it opens downward inside the rail, where
  * there is always room, and can never reach an edge it would be clipped by.
  */
+/* Two positioning anchors, so the nearest one wins: a scenario row for the
+   controls that have one, and the group for everything else — the viewing
+   conditions, whose rows are plain flex divs with no class to hook.
+   Anchoring ONLY to .scenario-row was the bug: a viewing-conditions icon then
+   had no positioned ancestor inside the rail and its tooltip resolved against
+   something far up the tree. */
+.chart-rail-group { position: relative; }
 .chart-rail .scenario-row { position: relative; }
 .chart-rail .info-icon { position: static; }
 .chart-rail .info-icon-tooltip {

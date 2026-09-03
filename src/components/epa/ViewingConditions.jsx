@@ -220,22 +220,29 @@ export default function ViewingConditions({ conditions }) {
                 {/* The elevation-gain disclosure. Turning it OFF clears the inputs
                     rather than only hiding them — a hidden adjustment that keeps
                     applying is the worst of both. */}
-                <button
-                    type="button"
-                    className={`btn ${gradeExpanded ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => setGradeExpanded(e => {
-                        const next = !e;
-                        if (!next) {
-                            setGradeGainFt('');
-                            setGradeDistanceMiles('');
-                        }
-                        return next;
-                    })}
-                    title="Adjust for a net elevation gain/loss over a route (advanced — usually 0)"
-                >
-                    Adj. Elevation
-                </button>
             </div>
+
+            {/* A disclosure, not a button. It reveals two fields rather than
+                doing something, and as a filled primary button it read as an
+                action — and as the only accent-coloured control in the row, as
+                the most important one. Orange when open, because an elevation
+                adjustment IS changing the curve. */}
+            <button
+                type="button"
+                className={`subgroup-header${gradeExpanded ? ' is-open' : ''}`}
+                onClick={() => setGradeExpanded(e => {
+                    const next = !e;
+                    if (!next) {
+                        setGradeGainFt('');
+                        setGradeDistanceMiles('');
+                    }
+                    return next;
+                })}
+                title="Adjust for a net elevation gain/loss over a route (advanced — usually 0)"
+            >
+                <span style={{ display: 'inline-block', transform: gradeExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
+                Elevation gain / loss
+            </button>
 
             {/* Elevation gain/loss panel — a route/grade effect (distinct from static
                 altitude). Its own row, toggled by the "Adj. Elevation" button above, so

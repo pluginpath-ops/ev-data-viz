@@ -739,10 +739,18 @@ export default function EpaCurvesView({
                     <div className="chart-rail-group">
                         <span className="text-micro">Axes</span>
                         <div className="axis-rows">
-                            <label className="axis-row">
+                            {/* Not a disabled <input>. A field box says "you may
+                                type here" and then refuses, and greying it only
+                                turns that into "you may type here later" — this
+                                axis is never anything else. Stated as a value
+                                with the reason beside it. */}
+                            <div className="axis-row">
                                 <span className="axis-row-key">X</span>
-                                <input className="form-input" value={`Steady speed (${speedLabel(units)})`} disabled readOnly />
-                            </label>
+                                <span className="axis-row-fixed">
+                                    Steady speed ({speedLabel(units)})
+                                    <span className="text-nano">fixed</span>
+                                </span>
+                            </div>
                             <label className="axis-row">
                                 <span className="axis-row-key">Y</span>
                                 <select
