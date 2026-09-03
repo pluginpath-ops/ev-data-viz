@@ -12,6 +12,7 @@ import CurveSubjectPicker from './CurveSubjectPicker';
 import ViewingConditions, { useViewingConditions } from '../ViewingConditions';
 import AxisScaleControls from '../../AxisScaleControls';
 import LoadingSpinner from '../../LoadingSpinner';
+import CollapsibleSection from '../../CollapsibleSection';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../../utils/chartTheme';
 import PlotFrame from '../../charts/PlotFrame';
 import { useChartPng } from '../../../hooks/useChartPng';
@@ -374,15 +375,6 @@ export default function EpaCurveExplorer() {
 
     return (
         <div className="stats-view">
-            {/* One line, not a section header block: the layout below is the
-                screen, and the only thing worth saying up front is why this
-                view ignores the vehicle selection. */}
-            <p className="text-note mb-3">
-                Efficiency against steady speed, computed from each record’s own road-load
-                coefficients. {subjects.length} records can be plotted — most belong to no
-                vehicle in the database, which is why this view does not use the vehicle selection.
-            </p>
-
             <div className="chart-layout">
                 <aside className="chart-rail">
                     {/* Every class here is Phase 4's. The controls were a stack
@@ -425,13 +417,39 @@ export default function EpaCurveExplorer() {
                         </span>
                     </div>
 
+                    {/* Closed by default, so the sidebar's height goes to the
+                        record list instead. These scale the curve at plot time
+                        and are almost always left alone — but a reader who HAS
+                        set one has to see that without opening it, which is
+                        what the subtitle is for. */}
                     <div className="chart-rail-group">
-                        <span className="text-micro">Viewing conditions</span>
-                        <ViewingConditions conditions={conditions} />
+                        <CollapsibleSection
+                            className="collapsible-section--flush"
+                            title={<span className="text-micro">Viewing conditions</span>}
+                            subtitle={conditions.anyAdjusted
+                                ? 'adjusted — not standard conditions'
+                                : 'standard'}
+                        >
+                            <ViewingConditions conditions={conditions} />
+                        </CollapsibleSection>
                     </div>
 
-                    <div className="chart-rail-group">
-                        <span className="text-micro">Records</span>
+                    {/* The last group takes whatever height is left, so the
+                        record list is the sidebar's only scroller. */}
+                    <div className="chart-rail-group is-fill">
+                        {/* Behind the glyph, not printed above the list. It
+                            answers a first-visit question — why this view has no
+                            vehicle selection — and then costs four lines of a
+                            300px column on every visit after that. */}
+                        <span className="text-micro">
+                            Records
+                            <InfoIcon
+                                position="right"
+                                text={`${subjects.length} certification records carry road-load `
+                                    + 'coefficients. Most belong to no vehicle in the database, '
+                                    + 'which is why this view does not use the vehicle selection.'}
+                            />
+                        </span>
                         <CurveSubjectPicker
                             subjects={subjects}
                             selected={selected}

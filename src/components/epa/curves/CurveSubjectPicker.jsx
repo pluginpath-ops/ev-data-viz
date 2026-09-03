@@ -1,5 +1,5 @@
 import { Fragment, useState, useMemo } from 'react';
-import { CURVE_TIERS, tierByKey, tierCounts } from '../../../utils/epaCurveSubjects';
+import { CURVE_TIERS, tierByKey } from '../../../utils/epaCurveSubjects';
 
 import InfoIcon from '../../InfoIcon';
 
@@ -24,7 +24,6 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
     // that cannot answer the range axis at all.
     const [tiers, setTiers] = useState(['measured', 'corrected', 'nominal']);
 
-    const counts = useMemo(() => tierCounts(subjects), [subjects]);
 
     const shown = useMemo(() => {
         const needle = query.trim().toLowerCase();
@@ -58,13 +57,16 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
 
     return (
         <div className="guide-filter-bar">
+            {/* No label above it. The placeholder already says what the field
+                takes, and a heading that repeats the field's own text is a row
+                of the sidebar spent twice. */}
             <div className="guide-facet guide-facet-search">
-                <div className="guide-facet-label">Search</div>
                 <input
                     type="search"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
-                    placeholder="Make, carline or test group"
+                    placeholder="Filter make, model, or ID"
+                    aria-label="Filter records by make, model, or test group ID"
                     className="form-input guide-search-input"
                 />
             </div>
@@ -96,9 +98,14 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                         <button key={t.key} type="button"
                             className={`guide-chip ${tiers.includes(t.key) ? 'active' : ''}`}
                             onClick={() => toggleTier(t.key)}
-                            title={t.hint}>
-                            {t.label}
-                            <span className="guide-chip-count">{counts[t.key]}</span>
+                            title={`${t.label} — ${t.hint}`}>
+                            {/* The short form, and no count: the list's own
+                                dividers now carry both the full label and the
+                                number, so a chip repeating them was spending
+                                three rows of a 320px sidebar to say it twice.
+                                The full label is on hover with the explanation
+                                it belongs to. */}
+                            {t.badge}
                         </button>
                     ))}
                 </div>

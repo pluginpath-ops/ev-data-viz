@@ -147,13 +147,6 @@ export function curveSubjects(groups) {
         .sort((a, b) => rank[a.tier] - rank[b.tier] || a.label.localeCompare(b.label));
 }
 
-/** How many subjects sit in each tier, for the filter's counts. */
-export function tierCounts(subjects) {
-    const out = Object.fromEntries(CURVE_TIERS.map(t => [t.key, 0]));
-    for (const s of subjects) out[s.tier] += 1;
-    return out;
-}
-
 // ── Chart labelling ──────────────────────────────────────────────────────────
 
 /**

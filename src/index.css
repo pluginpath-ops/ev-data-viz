@@ -1687,6 +1687,49 @@ body {
 .chart-rail input[type="text"],
 .chart-rail input[type="number"] { max-width: 100%; }
 
+/* The record picker was built for EPA Browse's filter bar, which is a panel on
+   a page. Dropped into the sidebar it brought that panel with it — a bordered,
+   filled box with 16px of its own padding, inside a group that is already the
+   panel. Same treatment every other borrowed control gets here: keep the
+   layout, drop the chrome. */
+.chart-rail .guide-filter-bar {
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 10px;
+    min-height: 0;
+}
+
+/* ── One scroller per sidebar ───────────────────────────────────────────────
+ *
+ * A rail that scrolls AND a list inside it that scrolls is two scrollbars in
+ * one 320px column, and the outer one carries the controls away while you use
+ * the inner one. A group marked `is-fill` takes the leftover height instead, so
+ * the axes and conditions stay put and the list is the only thing that moves.
+ *
+ * The rail keeps `overflow-y: auto` as a FALLBACK. Forcing it to hidden was a
+ * bug: in a viewport too short for the controls themselves, the leftover height
+ * goes negative and hidden clips them with no way to reach them. Letting the
+ * rail scroll in that one case degrades to two scrollbars instead of to
+ * unreachable controls.
+ */
+.chart-rail-group.is-fill {
+    flex: 1;
+    min-height: 0;
+}
+/* Only the parts that must SHRINK get min-height: 0. Applying it to every
+   child let the group's own label and note collapse below their text and
+   overlap each other — flex will happily shrink a paragraph to nothing once
+   you tell it the content size is not a floor. */
+.chart-rail-group.is-fill > .guide-filter-bar,
+.chart-rail-group.is-fill .curve-picker-list-facet {
+    flex: 1;
+    min-height: 0;
+}
+
 /* A labelled group inside the rail. */
 .chart-rail-group {
     display: flex;
@@ -4861,7 +4904,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    the run selector's do. */
 .curve-picker-list {
     @apply flex flex-col gap-px overflow-y-auto;
-    max-height: 40vh;
+    flex: 1;
+    min-height: 120px;
     margin: 0 calc(var(--rail-pad-r) * -1) 0 calc(var(--rail-pad-l) * -1);
 }
 .curve-picker-list .curve-picker-row {

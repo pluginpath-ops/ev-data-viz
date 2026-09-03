@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    CURVE_TIERS, tierByKey, curveSubject, curveSubjects, tierCounts, resolveCurveEnergy,
+    CURVE_TIERS, tierByKey, curveSubject, curveSubjects, resolveCurveEnergy,
     curveTooltipLines, disambiguateLabels,
 } from '../epaCurveSubjects';
 
@@ -119,10 +119,6 @@ describe('ordering and counts', () => {
     it('puts the best-grounded first', () => {
         expect(curveSubjects(set).map(s => s.tier))
             .toEqual(['measured', 'corrected', 'nominal', 'shape']);
-    });
-    it('counts each tier for the filter', () => {
-        expect(tierCounts(curveSubjects(set)))
-            .toEqual({ measured: 1, corrected: 1, nominal: 1, shape: 1 });
     });
     it('drops the unplottable from the list entirely', () => {
         expect(curveSubjects([...set, group({ id: 'E', coeffs: [] })])).toHaveLength(4);
