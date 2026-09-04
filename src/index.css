@@ -4320,11 +4320,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     opacity: 0.45;
     cursor: not-allowed;
 }
-.guide-facet-option-name { @apply truncate flex-1 min-w-0; }
-/* The quiet figure at the end of a menu row — a count on a facet, a unit on a
-   column. Same role, so the same type. */
-.guide-facet-option-count,
-
 /* The column list. Wider than a facet menu because a column carries a label
    AND a unit AND a control, where a facet value carries a name and a count. */
 .guide-column-panel { width: 220px; }
@@ -4345,7 +4340,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-family: var(--font-mono);
     color: var(--color-text-faint);
 }
+/* The name a menu row is read by: takes the slack, truncates rather than
+   wrapping, and — the part that matters — min-w-0, without which a long value
+   pushes the count off the panel instead of clipping itself. */
+.guide-facet-option-name,
 .guide-column-name { @apply truncate flex-1 min-w-0; }
+/* The quiet figure at the end of a menu row — a count on a facet, a unit on a
+   column. Same role, so the same type. */
+.guide-facet-option-count,
 .guide-column-unit {
     flex: none;
     font-family: var(--font-mono);
@@ -4673,16 +4675,34 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-cluster);
     border-bottom: 1px solid var(--color-border);
 }
+/* The whole header is the disclosure — a real <button>, so it is reachable and
+   announces its state, rather than a caret glyph with a click handler bolted to
+   a div. */
 .guide-cluster-head-inner {
     display: flex;
     align-items: baseline;
     gap: 10px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 0;
+    cursor: pointer;
 }
+.guide-cluster-head:hover td { background-color: var(--color-hover-lift); }
 .guide-cluster-caret {
     flex: none;
     width: 10px;
     color: var(--color-text-faint);
 }
+/* What clicking does, said in words next to the name it applies to. It used to
+   sit at the FOOT of the group on the same cluster surface as the next group's
+   header, where it read as belonging to the group below. */
+.guide-cluster-action {
+    flex: none;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-primary);
+}
+.guide-cluster-head-inner:hover .guide-cluster-action { text-decoration: underline; }
 /* Mono, and first: this is the identity EPA assigned. The marketing names
    under it are the part that varies. */
 .guide-cluster-id {
@@ -4696,20 +4716,17 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
     color: var(--color-text-primary);
 }
+/* Packed left with the rest of the header, NOT pushed to the far right. The
+   band spans a table that scrolls sideways, so a right-aligned end sits off
+   screen at rest — the config count was only readable after scrolling to it. */
 .guide-cluster-meta {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-left: auto;
     font-family: var(--font-mono);
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     color: var(--color-text-meta);
 }
-.guide-cluster-more td {
-    padding: 3px 12px 6px 34px;
-    background-color: var(--color-cluster);
-}
-
 .guide-cluster-toggle {
     display: inline-flex;
     align-items: center;
@@ -4818,9 +4835,35 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .guide-compare-row {
     border-bottom: 1px solid var(--color-border);
 }
+/* The field column stays put through a sideways scroll. With four or five
+   configurations the table is wider than the panel, and a row of numbers whose
+   label has scrolled off is unreadable — the same reason the browse table pins
+   its configuration name. */
+.guide-compare-field,
+.guide-compare-table .guide-th.sticky-field {
+    position: sticky;
+    left: 0;
+    width: 11rem;
+    min-width: 11rem;
+    box-shadow: 1px 0 0 var(--color-border);
+}
 .guide-compare-field {
     @apply font-medium;
+    /* Opaque, or the scrolling columns show through it. */
+    background-color: var(--color-card);
     color: var(--color-text-secondary);
+    z-index: 1;
+}
+/* The corner cell is pinned on both axes, so it has to sit above both. */
+.guide-compare-table .guide-th.sticky-field { z-index: 3; }
+/* A group heading spans every column, so pinning the CELL would do nothing —
+   its text is what has to stay at the left edge. */
+.guide-compare-group-label {
+    position: sticky;
+    /* Matched to the field column's own cell padding, so the heading does not
+       jump left by 12px the moment the table starts scrolling. */
+    left: 0.75rem;
+    display: inline-block;
 }
 
 /* ── Detail modal ────────────────────────────────────────────────────────── */

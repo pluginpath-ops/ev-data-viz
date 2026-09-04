@@ -50,7 +50,7 @@ export default function GuideComparePanel({ rows, showAll, onToggleShowAll, onCl
                 <table className="guide-table guide-compare-table">
                     <thead>
                         <tr>
-                            <th className="guide-th">Field</th>
+                            <th className="guide-th sticky-field">Field</th>
                             {rows.map(r => (
                                 <th key={r.id} className="guide-th">
                                     <div className="guide-compare-head">
@@ -74,7 +74,7 @@ export default function GuideComparePanel({ rows, showAll, onToggleShowAll, onCl
                             <Fragment key={group}>
                                 <tr>
                                     <td className="guide-td guide-compare-group" colSpan={rows.length + 1}>
-                                        {group}
+                                        <span className="guide-compare-group-label">{group}</span>
                                     </td>
                                 </tr>
                                 {cols.map(col => (

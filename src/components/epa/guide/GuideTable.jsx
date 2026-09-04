@@ -112,54 +112,89 @@ function GuideRow({ row, cols, selectedIds, onToggleSelect, onOpenRow, vehicleLi
     );
 }
 
-/** Rows of one test group, with the tail folded away until asked for. */
+/**
+ * Rows of one test group, with the tail folded away until asked for.
+ *
+ * The header IS the control. It used to carry a caret that did nothing while a
+ * separate "N more…" button sat at the FOOT of the group — on the same cluster
+ * surface as the next group's header, so it read as belonging to the group
+ * below it rather than the one above. One affordance, in the one place a
+ * disclosure is looked for.
+ *
+ * Three states rather than two, because a group has three useful shapes: the
+ * first few rows, all of them, and none. A two-state control can show you
+ * everything or a sample but never lets you put a group you have finished with
+ * out of the way.
+ */
 const CLUSTER_PREVIEW = 3;
 
+/**
+ * preview → all → collapsed → preview.
+ *
+ * A group that already fits inside the preview has no distinct "all", so it
+ * cycles between shown and collapsed instead of stopping twice on the same
+ * picture.
+ */
+function nextState(state, foldable) {
+    if (!foldable) return state === 'collapsed' ? 'preview' : 'collapsed';
+    if (state === 'preview') return 'all';
+    if (state === 'all') return 'collapsed';
+    return 'preview';
+}
+
 function Cluster({ group, span, rowProps }) {
-    const [open, setOpen] = useState(false);
+    const [state, setState] = useState('preview');
     const first = group.rows[0];
-    const hidden = group.rows.length - CLUSTER_PREVIEW;
-    const shown = open ? group.rows : group.rows.slice(0, CLUSTER_PREVIEW);
+    const total = group.rows.length;
+    const foldable = total > CLUSTER_PREVIEW;
+
+    const shown = state === 'collapsed' ? []
+        : state === 'all' || !foldable ? group.rows
+            : group.rows.slice(0, CLUSTER_PREVIEW);
+
+    // Hollow for a partial open, solid for a full one — the label says it in
+    // words too, but the glyph is what the eye reads down a column of groups.
+    const caret = state === 'collapsed' ? '\u25B8'
+        : state === 'preview' && foldable ? '\u25BF' : '\u25BE';
+
+    // Phrased as what clicking DOES, because the whole header is the button.
+    const action = state === 'collapsed'
+        ? (foldable ? `show ${CLUSTER_PREVIEW} of ${total}` : `show ${total}`)
+        : state === 'preview' && foldable ? `show all ${total}` : 'hide';
 
     return (
         <>
             <tr className="guide-cluster-head">
                 <td colSpan={span}>
-                    <div className="guide-cluster-head-inner">
-                        <span className="guide-cluster-caret" aria-hidden="true">
-                            {group.rows.length > CLUSTER_PREVIEW ? (open ? '▾' : '▸') : ''}
-                        </span>
+                    <button
+                        type="button"
+                        className="guide-cluster-head-inner"
+                        onClick={() => setState(s => nextState(s, foldable))}
+                        aria-expanded={state !== 'collapsed'}
+                    >
+                        <span className="guide-cluster-caret" aria-hidden="true">{caret}</span>
                         {/* The test group leads, in mono, because it is the
                             identity EPA actually assigned — the marketing names
                             beneath it are what vary. */}
-                        <span className="guide-cluster-id">{group.testGroup ?? '—'}</span>
+                        <span className="guide-cluster-id">{group.testGroup ?? '\u2014'}</span>
                         <span className="guide-cluster-name">
                             {[first.brand, first.carline].filter(Boolean).join(' ')}
                             <span className="text-meta"> · {first.model_year}</span>
                         </span>
+                        <span className="guide-cluster-action">{action}</span>
                         <span className="guide-cluster-meta">
-                            {group.rows.length} config{group.rows.length === 1 ? '' : 's'}
+                            {total} config{total === 1 ? '' : 's'}
                             {/* The one thing that makes configurations in a single
                                 test group NOT interchangeable. */}
                             {group.packVaries && <span className="badge-micro is-qualified">pack varies</span>}
                         </span>
-                    </div>
+                    </button>
                 </td>
             </tr>
 
             {shown.map(row => (
                 <GuideRow key={row.id} row={row} {...rowProps} />
             ))}
-
-            {!open && hidden > 0 && (
-                <tr className="guide-cluster-more">
-                    <td colSpan={span}>
-                        <button type="button" className="section-action" onClick={() => setOpen(true)}>
-                            {hidden} more configuration{hidden === 1 ? '' : 's'} in this group — show all
-                        </button>
-                    </td>
-                </tr>
-            )}
         </>
     );
 }
