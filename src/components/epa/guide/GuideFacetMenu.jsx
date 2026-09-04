@@ -62,7 +62,7 @@ export default function GuideFacetMenu({
             >
                 {label}
                 {summary && <span className="guide-facet-btn-value">{summary}</span>}
-                <span className="guide-facet-caret" aria-hidden="true">▾</span>
+                <span className="disclosure-caret guide-facet-caret" aria-hidden="true">▾</span>
             </button>
 
             {open && (

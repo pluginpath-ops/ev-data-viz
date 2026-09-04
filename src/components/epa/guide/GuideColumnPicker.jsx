@@ -68,7 +68,7 @@ export default function GuideColumnPicker({ visible, onChange }) {
             >
                 Columns
                 <span className="guide-facet-btn-value">{visible.length}</span>
-                <span className="guide-facet-caret" aria-hidden="true">▾</span>
+                <span className="disclosure-caret guide-facet-caret" aria-hidden="true">▾</span>
             </button>
 
             {open && (

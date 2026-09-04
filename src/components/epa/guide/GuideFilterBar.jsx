@@ -75,7 +75,7 @@ function RangeMenu({ label, unit, minKey, maxKey, filters, onChange }) {
                         {min ?? '–'}…{max ?? '–'}
                     </span>
                 )}
-                <span className="guide-facet-caret" aria-hidden="true">▾</span>
+                <span className="disclosure-caret guide-facet-caret" aria-hidden="true">▾</span>
             </button>
             {open && (
                 <div className="guide-facet-panel guide-range-panel">

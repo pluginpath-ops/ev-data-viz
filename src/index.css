@@ -1183,6 +1183,37 @@ body {
 }
 
 
+/* ── Disclosure caret ───────────────────────────────────────────────────────
+ *
+ * The glyph that says a thing opens. One rule, because it had two: the facet
+ * buttons drew it at 9px with opacity 0.7, and the cluster header drew it in
+ * --color-text-faint, which in dark is #3d4a5a — the DISABLED colour. A
+ * control's own affordance was painted in the one colour that means "you
+ * cannot use this", which is why it read as decoration.
+ *
+ * Secondary at rest, primary once the button it belongs to is hovered. No
+ * opacity: dimming a token is how a colour leaves the theme without leaving
+ * the stylesheet.
+ *
+ * Size comes from --caret-size, so a caret LEADING a row and one TRAILING a
+ * button can differ without either leaving this rule. Both values are on the
+ * type scale — one step up from body, one step down.
+ *
+ * The glyphs themselves are still per-site (▸▿▾ here, ▶ and ▼ elsewhere), and
+ * a dozen other disclosures across the app have not been brought onto this
+ * class yet. That sweep, and the choice of ONE symbol for all of them, is its
+ * own design pass — see issue.
+ */
+.disclosure-caret {
+    display: inline-block;
+    flex: none;
+    font-size: var(--caret-size, var(--fs-control, calc(var(--fs-body) * var(--fs-step))));
+    line-height: 1;
+    color: var(--color-text-secondary);
+    transition: color 0.12s;
+}
+button:hover > .disclosure-caret { color: var(--color-text-primary); }
+
 /* ── Badges and Tags ────────────────────────────────────────────────────────── */
 
 /* Base pill — full-radius small badge; color classes added inline */
@@ -4256,10 +4287,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-family: var(--font-mono);
     font-weight: 600;
 }
-.guide-facet-caret {
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    opacity: 0.7;
-}
+/* Trailing a button label, so one step DOWN from the control's own text. */
+.guide-facet-caret { --caret-size: var(--fs-micro, calc(var(--fs-body) * 0.7143)); }
 
 /* The open menu. 238px because the longest make name fits and a wider panel
    starts covering the table it is filtering. */
@@ -4689,10 +4718,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     cursor: pointer;
 }
 .guide-cluster-head:hover td { background-color: var(--color-hover-lift); }
+/* Leading the row rather than trailing a label, so one step UP from body. The
+   fixed width stops the header shifting as the glyph changes between states. */
 .guide-cluster-caret {
-    flex: none;
-    width: 10px;
-    color: var(--color-text-faint);
+    --caret-size: calc(var(--fs-body) / var(--fs-step));
+    width: 13px;
 }
 /* What clicking does, said in words next to the name it applies to. It used to
    sit at the FOOT of the group on the same cluster surface as the next group's

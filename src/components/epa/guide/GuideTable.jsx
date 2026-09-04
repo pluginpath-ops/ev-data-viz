@@ -172,7 +172,7 @@ function Cluster({ group, span, rowProps }) {
                         onClick={() => setState(s => nextState(s, foldable))}
                         aria-expanded={state !== 'collapsed'}
                     >
-                        <span className="guide-cluster-caret" aria-hidden="true">{caret}</span>
+                        <span className="disclosure-caret guide-cluster-caret" aria-hidden="true">{caret}</span>
                         {/* The test group leads, in mono, because it is the
                             identity EPA actually assigned — the marketing names
                             beneath it are what vary. */}
