@@ -4734,9 +4734,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    announces its state, rather than a caret glyph with a click handler bolted to
    a div. */
 .guide-cluster-head-inner {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
+    display: block;
     width: 100%;
     text-align: left;
     background: none;
@@ -4804,15 +4802,30 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-pinned-head);
     border-bottom: 1px solid var(--color-border);
 }
-.guide-pinned-head-inner {
+/* The chrome on a full-span band row — the pinned header and a cluster header.
+ *
+ * Sticky at the left edge, because these rows span a table that is wider than
+ * its container: anything laid out across the full span leaves the viewport,
+ * which is how the pinned band's buttons became unreachable at 17 columns.
+ * `width: max-content` is what gives sticky something to slide within — a
+ * block filling the cell has no slack to stay behind.
+ *
+ * Nothing in here is pushed right with `margin-left: auto` for the same
+ * reason. */
+.guide-band-content {
+    position: sticky;
+    /* Matched to the band cell's own 12px padding, so the chrome does not jump
+       left the moment the table starts scrolling. */
+    left: 0.75rem;
     display: flex;
     align-items: baseline;
     gap: 10px;
+    width: max-content;
+    max-width: 100%;
 }
 .guide-pinned-actions {
     display: flex;
     gap: 12px;
-    margin-left: auto;
 }
 .guide-row.pinned .guide-td {
     background-color: var(--color-pinned);

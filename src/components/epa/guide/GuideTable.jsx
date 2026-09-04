@@ -172,21 +172,26 @@ function Cluster({ group, span, rowProps }) {
                         onClick={() => setState(s => nextState(s, foldable))}
                         aria-expanded={state !== 'collapsed'}
                     >
-                        <span className="disclosure-caret guide-cluster-caret" aria-hidden="true">{caret}</span>
-                        {/* The test group leads, in mono, because it is the
-                            identity EPA actually assigned — the marketing names
-                            beneath it are what vary. */}
-                        <span className="guide-cluster-id">{group.testGroup ?? '\u2014'}</span>
-                        <span className="guide-cluster-name">
-                            {[first.brand, first.carline].filter(Boolean).join(' ')}
-                            <span className="text-meta"> · {first.model_year}</span>
-                        </span>
-                        <span className="guide-cluster-action">{action}</span>
-                        <span className="guide-cluster-meta">
-                            {total} config{total === 1 ? '' : 's'}
-                            {/* The one thing that makes configurations in a single
-                                test group NOT interchangeable. */}
-                            {group.packVaries && <span className="badge-micro is-qualified">pack varies</span>}
+                        {/* The button stays full width so the whole row is the
+                            click target; the CONTENT is what has to stay at the
+                            left edge, so the flex and the sticky live in here. */}
+                        <span className="guide-band-content">
+                            <span className="disclosure-caret guide-cluster-caret" aria-hidden="true">{caret}</span>
+                            {/* The test group leads, in mono, because it is the
+                                identity EPA actually assigned — the marketing
+                                names beneath it are what vary. */}
+                            <span className="guide-cluster-id">{group.testGroup ?? '\u2014'}</span>
+                            <span className="guide-cluster-name">
+                                {[first.brand, first.carline].filter(Boolean).join(' ')}
+                                <span className="text-meta"> · {first.model_year}</span>
+                            </span>
+                            <span className="guide-cluster-action">{action}</span>
+                            <span className="guide-cluster-meta">
+                                {total} config{total === 1 ? '' : 's'}
+                                {/* The one thing that makes configurations in a
+                                    single test group NOT interchangeable. */}
+                                {group.packVaries && <span className="badge-micro is-qualified">pack varies</span>}
+                            </span>
                         </span>
                     </button>
                 </td>
@@ -235,7 +240,7 @@ export default function GuideTable({
                                     which is what makes colSpan work — the band
                                     collapsed to the width of the first column. */}
                                 <td colSpan={span}>
-                                    <div className="guide-pinned-head-inner">
+                                    <div className="guide-band-content">
                                         <span className="text-nano">
                                             Pinned for comparison · {pinnedRows.length}
                                         </span>
@@ -245,7 +250,7 @@ export default function GuideTable({
                                         <span className="guide-pinned-actions">
                                             {onOpenCompare && (
                                                 <button type="button" className="section-action" onClick={onOpenCompare}>
-                                                    open in Compare ↗
+                                                    jump to comparison ↓
                                                 </button>
                                             )}
                                             {onUnpinAll && (
