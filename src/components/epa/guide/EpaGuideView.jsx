@@ -96,21 +96,6 @@ export default function EpaGuideView({ subtab = 'browse' }) {
     // paging does not rescale the bars underneath the reader.
     const barMaxima = useMemo(() => computeBarMaxima(filtered), [filtered]);
 
-    /**
-     * How many filters are narrowing the view.
-     *
-     * Counted against EMPTY_FILTERS rather than by listing the keys here, so a
-     * filter added later is counted without anyone remembering to come back —
-     * a collapsed panel silently hiding a filter nobody knew was on is the one
-     * failure this subtitle exists to prevent.
-     */
-    const activeFilterCount = useMemo(
-        () => Object.entries(filters).filter(([k, v]) => {
-            const empty = EMPTY_FILTERS[k];
-            return Array.isArray(v) ? v.length > 0 : (v ?? '') !== (empty ?? '');
-        }).length,
-        [filters],
-    );
 
     const compareRows = useMemo(
         () => selectedIds.map(id => rows.find(r => r.id === id)).filter(Boolean),
@@ -184,24 +169,19 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                 </div>
             )}
 
-            {/* Same disclosure as the table below. The filters are how you
-                arrive at a set, and dead weight once you have — collapsing them
-                is what puts a comparison and its controls on one screen. */}
-            <CollapsibleSection
-                defaultOpen
-                title="Filters"
-                subtitle={`${activeFilterCount > 0 ? `${activeFilterCount} active` : 'none active'} · ${sorted.length.toLocaleString()} shown`}
-            >
-                <GuideFilterBar
-                    rows={rows}
-                    facets={facets}
-                    filters={filters}
-                    onChange={updateFilters}
-                    onReset={resetFilters}
-                    filterFn={filterRows}
-                    columnPicker={<GuideColumnPicker visible={columns} onChange={setColumns} />}
-                />
-            </CollapsibleSection>
+            {/* No disclosure any more. The filters were collapsible because a
+                wall of chips cost most of a screen; a strip that costs one line
+                is cheaper left open than reached for. */}
+            <GuideFilterBar
+                rows={rows}
+                facets={facets}
+                filters={filters}
+                onChange={updateFilters}
+                onReset={resetFilters}
+                filterFn={filterRows}
+                shownCount={sorted.length}
+                columnPicker={<GuideColumnPicker visible={columns} onChange={setColumns} />}
+            />
 
             {/* The table comes FIRST and the comparison grows beneath it.
                 Above, the panel appeared on the first tick and resized on every

@@ -1,118 +1,113 @@
 import { useMemo } from 'react';
 import { EMPTY_FILTERS } from '../../../utils/feGuideBrowse';
+import GuideFacetMenu from './GuideFacetMenu';
 
 /**
- * Faceted filters for the guide browser (#235).
+ * The guide browser's filter strip (#235, re-skin phase 5a).
  *
- * Multi-select chips rather than dropdowns: with 38 makes and 6 model years the
- * question is usually "these two against each other", and a select forces that
- * to be one at a time.
+ * It was a wall of chips — every value of every facet rendered at once, which
+ * with 38 makes and 9 classes and 6 years cost most of a screen before the
+ * first row of data, and had to be collapsed behind a disclosure to be usable
+ * at all. It is now one row: a search box, a button per facet, and the count.
+ * A strip that costs a line does not need to be collapsible, so the disclosure
+ * around it is gone.
  *
- * Each facet reports how many rows it would leave, computed against the OTHER
- * filters rather than all of them — so the counts describe what clicking would
- * actually do instead of what the unfiltered corpus holds. A facet value that
- * would leave nothing is disabled rather than hidden, because a make vanishing
- * from the list reads as a bug where a greyed-out one reads as an answer.
+ * What is narrowing the view moves OUT of the controls and onto its own line —
+ * a removable chip per active value. Reading the current state used to mean
+ * opening the filters and scanning them for highlights.
  */
-function FacetGroup({ label, hint, values, selected, onToggle, onClear, countFor, format = String }) {
-    if (!values.length) return null;
-    return (
-        <div className="guide-facet">
-            <div className="guide-facet-label">
-                {label}
-                {hint && <span className="text-note ml-1">{hint}</span>}
-            </div>
-            <div className="guide-facet-values">
-                {values.map((v) => {
-                    const on = selected.includes(v);
-                    const n = countFor(v);
-                    return (
-                        <button
-                            key={String(v)}
-                            type="button"
-                            onClick={() => onToggle(v)}
-                            disabled={!on && n === 0}
-                            className={`guide-chip ${on ? 'active' : ''}`}
-                            title={`${n} configuration${n === 1 ? '' : 's'}`}
-                        >
-                            {format(v)}
-                            <span className="guide-chip-count">{n}</span>
-                        </button>
-                    );
-                })}
-                {/* LAST, not first. It comes and goes with the selection, and
-                    at the head of the row every other chip shifts sideways as
-                    it appears — under a cursor that is on its way to one of
-                    them. At the tail nothing that was already there moves.
 
-                    Clearing one facet took a click per selected chip otherwise,
-                    and with six model years that is six.
+/**
+ * The facets, once.
+ *
+ * Counts, menus and the narrowed-by chips are all derived from this list. They
+ * were three hand-written blocks that had to be kept in step, which is how the
+ * chip line would have been born already missing a facet.
+ *
+ * `rowKey` is the field on a row; `key` is the filter it drives.
+ */
+const FACETS = [
+    { key: 'years',       rowKey: 'model_year',    label: 'Year' },
+    { key: 'makes',       rowKey: 'brand',         label: 'Make' },
+    { key: 'bodyClasses', rowKey: 'body_class',    label: 'Class' },
+    { key: 'drives',      rowKey: 'drive_desc',    label: 'Drive' },
+    { key: 'motorCounts', rowKey: 'motor_count',   label: 'Motors' },
+    // Named as partial because it is: EPA has no wheel column, and only some
+    // makers write the size into the configuration name.
+    { key: 'wheelSizes',  rowKey: 'wheel_size_in', label: 'Wheels',
+      format: v => `${v}"`, hint: 'where stated' },
+    // Only appears once a curator has set parents.
+    { key: 'parents',     rowKey: 'parent_name',   label: 'Parent' },
+];
 
-                    The Statistics tab keeps an always-visible All on its year
-                    facet, deliberately — there a single year is the DEFAULT and
-                    "all years" is a distinct analytic choice that counts a
-                    configuration once per year it appears in, so it has to be
-                    selectable rather than merely reachable. */}
-                {selected.length > 0 && (
-                    <button
-                        type="button"
-                        onClick={onClear}
-                        className="guide-chip"
-                        title={`Clear the ${label.toLowerCase()} filter`}
-                    >
-                        All
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-}
-
-/** A min/max pair. Blank means unbounded, which is not the same as zero. */
-function RangeInput({ label, unit, minKey, maxKey, filters, onChange }) {
+/** A min/max pair behind its own button, so bounds cost a line like a facet. */
+function RangeMenu({ label, unit, minKey, maxKey, filters, onChange }) {
+    const min = filters[minKey];
+    const max = filters[maxKey];
     const set = (key) => (e) => {
         const raw = e.target.value;
         onChange({ [key]: raw === '' ? null : Number(raw) });
     };
+    const active = min != null || max != null;
     return (
-        <div className="guide-facet">
-            <div className="guide-facet-label">{label} <span className="text-note">{unit}</span></div>
-            <div className="guide-range-inputs">
-                <input type="number" inputMode="numeric" placeholder="min"
-                    value={filters[minKey] ?? ''} onChange={set(minKey)} className="form-input guide-range-input" />
-                <span className="text-meta">–</span>
-                <input type="number" inputMode="numeric" placeholder="max"
-                    value={filters[maxKey] ?? ''} onChange={set(maxKey)} className="form-input guide-range-input" />
+        <details className="guide-facet-menu guide-range-menu">
+            <summary className={`guide-facet-btn${active ? ' active' : ''}`}>
+                {label}
+                {active && (
+                    <span className="guide-facet-btn-value">
+                        {min ?? '–'}…{max ?? '–'}
+                    </span>
+                )}
+                <span className="guide-facet-caret" aria-hidden="true">▾</span>
+            </summary>
+            <div className="guide-facet-panel guide-range-panel">
+                <div className="guide-facet-panel-head">
+                    <span className="text-nano">{unit}</span>
+                    {active && (
+                        <button
+                            type="button"
+                            className="section-action"
+                            onClick={() => onChange({ [minKey]: null, [maxKey]: null })}
+                        >
+                            clear
+                        </button>
+                    )}
+                </div>
+                <div className="guide-range-inputs">
+                    <input type="number" inputMode="numeric" placeholder="min"
+                        aria-label={`Minimum ${label}`}
+                        value={min ?? ''} onChange={set(minKey)} className="form-input guide-range-input" />
+                    <span className="text-meta">–</span>
+                    <input type="number" inputMode="numeric" placeholder="max"
+                        aria-label={`Maximum ${label}`}
+                        value={max ?? ''} onChange={set(maxKey)} className="form-input guide-range-input" />
+                </div>
             </div>
-        </div>
+        </details>
     );
 }
 
-export default function GuideFilterBar({ rows, facets, filters, onChange, onReset, filterFn, columnPicker }) {
+export default function GuideFilterBar({
+    rows, facets, filters, onChange, onReset, filterFn, columnPicker, shownCount,
+}) {
     /**
      * Counts per facet value, each computed with that facet's own selection
-     * removed. Recomputed together so one pass over the rows serves them all.
+     * removed — so a number says what clicking would LEAVE rather than what the
+     * corpus holds. Recomputed together so one pass serves them all.
      */
     const counts = useMemo(() => {
-        const forFacet = (facetKey, rowKey) => {
-            const base = filterFn(rows, { ...filters, [facetKey]: [] });
+        const out = {};
+        for (const f of FACETS) {
+            const base = filterFn(rows, { ...filters, [f.key]: [] });
             const tally = new Map();
             for (const r of base) {
-                const v = r[rowKey];
+                const v = r[f.rowKey];
                 if (v == null || v === '') continue;
                 tally.set(v, (tally.get(v) ?? 0) + 1);
             }
-            return tally;
-        };
-        return {
-            years:       forFacet('years', 'model_year'),
-            makes:       forFacet('makes', 'brand'),
-            parents:     forFacet('parents', 'parent_name'),
-            bodyClasses: forFacet('bodyClasses', 'body_class'),
-            drives:      forFacet('drives', 'drive_desc'),
-            motorCounts: forFacet('motorCounts', 'motor_count'),
-            wheelSizes:  forFacet('wheelSizes', 'wheel_size_in'),
-        };
+            out[f.key] = tally;
+        }
+        return out;
     }, [rows, filters, filterFn]);
 
     const toggle = (key) => (v) => {
@@ -126,52 +121,79 @@ export default function GuideFilterBar({ rows, facets, filters, onChange, onRese
         return Array.isArray(v) ? v.length > 0 : v !== empty;
     });
 
+    /** Every active value, flattened, so the chip line is data rather than markup. */
+    const narrowedBy = FACETS.flatMap(f =>
+        (filters[f.key] ?? []).map(v => ({
+            id: `${f.key}:${v}`,
+            text: (f.format ?? String)(v),
+            remove: () => onChange({ [f.key]: filters[f.key].filter(x => x !== v) }),
+        })),
+    );
+
     return (
-        <div className="guide-filter-bar">
-            <div className="guide-facet guide-facet-search">
-                <div className="guide-facet-label">Search</div>
+        <div className="guide-filter-strip">
+            <div className="guide-filter-row">
                 <input
                     type="search"
                     value={filters.search}
                     onChange={e => onChange({ search: e.target.value })}
-                    placeholder="Make, configuration or test group"
+                    placeholder="Search carline or test group…"
+                    aria-label="Search carline or test group"
                     className="form-input guide-search-input"
                 />
+
+                {FACETS.map(f => (
+                    <GuideFacetMenu
+                        key={f.key}
+                        label={f.label}
+                        hint={f.hint}
+                        format={f.format}
+                        values={facets[f.key]}
+                        selected={filters[f.key]}
+                        countFor={v => counts[f.key].get(v) ?? 0}
+                        onToggle={toggle(f.key)}
+                        onClear={clear(f.key)}
+                    />
+                ))}
+
+                <RangeMenu label="Range" unit="miles" minKey="minRange" maxKey="maxRange"
+                    filters={filters} onChange={onChange} />
+                <RangeMenu label="MPGe" unit="combined MPGe" minKey="minMpge" maxKey="maxMpge"
+                    filters={filters} onChange={onChange} />
+
+                {/* Not a filter, but it belongs here: everything that changes
+                    what you are looking at lives in this row. */}
+                {columnPicker}
+
+                <div className="guide-filter-tally">
+                    <span className="text-data">{shownCount?.toLocaleString()}</span>
+                    <span className="guide-filter-tally-total">of {rows.length.toLocaleString()}</span>
+                    {active && (
+                        <button type="button" onClick={onReset} className="guide-filter-reset">
+                            Reset
+                        </button>
+                    )}
+                </div>
             </div>
 
-            <FacetGroup label="Model year" values={facets.years} selected={filters.years}
-                onToggle={toggle('years')} onClear={clear('years')} countFor={v => counts.years.get(v) ?? 0} />
-            {/* Not a filter, but it belongs with them: everything that changes
-                what you are looking at lives in this bar. */}
-            {columnPicker && <div className="guide-facet guide-facet-columns">{columnPicker}</div>}
-
-            <FacetGroup label="Class" values={facets.bodyClasses} selected={filters.bodyClasses}
-                onToggle={toggle('bodyClasses')} onClear={clear('bodyClasses')} countFor={v => counts.bodyClasses.get(v) ?? 0} />
-            <FacetGroup label="Make" values={facets.makes} selected={filters.makes}
-                onToggle={toggle('makes')} onClear={clear('makes')} countFor={v => counts.makes.get(v) ?? 0} />
-            {/* Only rendered once a curator has set parents — an empty facet
-                would be a row of nothing with a heading over it. */}
-            <FacetGroup label="Parent" values={facets.parents} selected={filters.parents}
-                onToggle={toggle('parents')} onClear={clear('parents')} countFor={v => counts.parents.get(v) ?? 0} />
-            <FacetGroup label="Drive" values={facets.drives} selected={filters.drives}
-                onToggle={toggle('drives')} onClear={clear('drives')} countFor={v => counts.drives.get(v) ?? 0} />
-            <FacetGroup label="Motors" values={facets.motorCounts} selected={filters.motorCounts}
-                onToggle={toggle('motorCounts')} onClear={clear('motorCounts')} countFor={v => counts.motorCounts.get(v) ?? 0} />
-            {/* Named as partial, because it is: EPA has no wheel column and only
-                some makers write the size into the configuration name. */}
-            <FacetGroup label="Wheels" hint="where stated" values={facets.wheelSizes} selected={filters.wheelSizes}
-                onToggle={toggle('wheelSizes')} onClear={clear('wheelSizes')} countFor={v => counts.wheelSizes.get(v) ?? 0}
-                format={v => `${v}"`} />
-
-            <RangeInput label="Range" unit="mi" minKey="minRange" maxKey="maxRange"
-                filters={filters} onChange={onChange} />
-            <RangeInput label="Combined" unit="MPGe" minKey="minMpge" maxKey="maxMpge"
-                filters={filters} onChange={onChange} />
-
-            {active && (
-                <button type="button" onClick={onReset} className="btn btn-secondary guide-reset">
-                    Clear filters
-                </button>
+            {/* What is narrowing the view, stated. Reading it used to mean
+                opening the filters and scanning them for highlights. */}
+            {narrowedBy.length > 0 && (
+                <div className="guide-narrowed-row">
+                    <span className="text-nano">Narrowed by</span>
+                    {narrowedBy.map(c => (
+                        <button
+                            key={c.id}
+                            type="button"
+                            className="guide-narrowed-chip"
+                            onClick={c.remove}
+                            title={`Remove ${c.text}`}
+                        >
+                            {c.text}
+                            <span aria-hidden="true">✕</span>
+                        </button>
+                    ))}
+                </div>
             )}
         </div>
     );
