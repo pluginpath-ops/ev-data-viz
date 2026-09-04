@@ -1,4 +1,5 @@
-import { GUIDE_COLUMNS, formatCell, barPercent } from '../../../utils/feGuideBrowse';
+import { useState } from 'react';
+import { columnByKey, formatCell, barPercent, clusterByTestGroup } from '../../../utils/feGuideBrowse';
 
 /**
  * The browse table (#235).
@@ -43,11 +44,177 @@ function SortHeader({ col, sortKey, sortDir, onSort }) {
     );
 }
 
+/**
+ * One configuration. Rendered by the pinned band and by the body from the same
+ * component, so a pinned row cannot drift into looking like a different thing
+ * from the row it was pinned out of.
+ */
+function GuideRow({ row, cols, selectedIds, onToggleSelect, onOpenRow, vehicleLinks, barMaxima, pinned }) {
+    const vehicles = vehicleLinks[row.id]?.vehicles ?? [];
+    return (
+        <tr
+            className={`guide-row${selectedIds.includes(row.id) ? ' selected' : ''}${pinned ? ' pinned' : ''}`}
+            onClick={() => onOpenRow(row)}
+        >
+            <td className="guide-td guide-td-select sticky-select" onClick={e => e.stopPropagation()}>
+                <input
+                    type="checkbox"
+                    checked={selectedIds.includes(row.id)}
+                    onChange={() => onToggleSelect(row.id)}
+                    aria-label={`Compare ${row.carline}`}
+                />
+            </td>
+            {cols.map((col) => {
+                const pct = barPercent(row, col, barMaxima);
+                return (
+                    <td
+                        key={col.key}
+                        className={`guide-td ${col.numeric ? 'numeric' : ''} ${col.sticky ? 'sticky-name' : ''}`}
+                    >
+                        {col.key === 'carline' ? (
+                            <span className="guide-carline">
+                                <span className="guide-carline-name">{row.carline}</span>
+                                {/* Badges ride on the name rather than holding columns of
+                                    their own — at 30 columns the horizontal budget is the
+                                    scarce one. */}
+                                {vehicles.length > 0 && (
+                                    <span
+                                        className="guide-badge guide-badge-tested"
+                                        title={`We hold test data for ${vehicles.map(v => `${v.year} ${v.name}`).join(', ')}`}
+                                    >
+                                        tested
+                                    </span>
+                                )}
+                                {row.is_collapsed && (
+                                    <span
+                                        className="guide-badge guide-badge-multi"
+                                        title="EPA collapsed several configurations into this row — its motor count and power are a union, not one vehicle"
+                                    >
+                                        multi
+                                    </span>
+                                )}
+                            </span>
+                        ) : pct != null ? (
+                            /* The value, then its bar beneath it. */
+                            <span className="guide-cell-stack">
+                                <span>{formatCell(row, col)}</span>
+                                <span
+                                    className="guide-spark"
+                                    style={{ '--bar-fill': `${pct}%` }}
+                                    aria-hidden="true"
+                                />
+                            </span>
+                        ) : formatCell(row, col)}
+                    </td>
+                );
+            })}
+        </tr>
+    );
+}
+
+/**
+ * Rows of one test group, with the tail folded away until asked for.
+ *
+ * The header IS the control. It used to carry a caret that did nothing while a
+ * separate "N more…" button sat at the FOOT of the group — on the same cluster
+ * surface as the next group's header, so it read as belonging to the group
+ * below it rather than the one above. One affordance, in the one place a
+ * disclosure is looked for.
+ *
+ * Three states rather than two, because a group has three useful shapes: the
+ * first few rows, all of them, and none. A two-state control can show you
+ * everything or a sample but never lets you put a group you have finished with
+ * out of the way.
+ */
+const CLUSTER_PREVIEW = 3;
+
+/**
+ * preview → all → collapsed → preview.
+ *
+ * A group that already fits inside the preview has no distinct "all", so it
+ * cycles between shown and collapsed instead of stopping twice on the same
+ * picture.
+ */
+function nextState(state, foldable) {
+    if (!foldable) return state === 'collapsed' ? 'preview' : 'collapsed';
+    if (state === 'preview') return 'all';
+    if (state === 'all') return 'collapsed';
+    return 'preview';
+}
+
+function Cluster({ group, span, rowProps }) {
+    const [state, setState] = useState('preview');
+    const first = group.rows[0];
+    const total = group.rows.length;
+    const foldable = total > CLUSTER_PREVIEW;
+
+    const shown = state === 'collapsed' ? []
+        : state === 'all' || !foldable ? group.rows
+            : group.rows.slice(0, CLUSTER_PREVIEW);
+
+    // Hollow for a partial open, solid for a full one — the label says it in
+    // words too, but the glyph is what the eye reads down a column of groups.
+    const caret = state === 'collapsed' ? '\u25B8'
+        : state === 'preview' && foldable ? '\u25BF' : '\u25BE';
+
+    // Phrased as what clicking DOES, because the whole header is the button.
+    const action = state === 'collapsed'
+        ? (foldable ? `show ${CLUSTER_PREVIEW} of ${total}` : `show ${total}`)
+        : state === 'preview' && foldable ? `show all ${total}` : 'hide';
+
+    return (
+        <>
+            <tr className="guide-cluster-head">
+                <td colSpan={span}>
+                    <button
+                        type="button"
+                        className="guide-cluster-head-inner"
+                        onClick={() => setState(s => nextState(s, foldable))}
+                        aria-expanded={state !== 'collapsed'}
+                    >
+                        {/* The button stays full width so the whole row is the
+                            click target; the CONTENT is what has to stay at the
+                            left edge, so the flex and the sticky live in here. */}
+                        <span className="guide-band-content">
+                            <span className="disclosure-caret guide-cluster-caret" aria-hidden="true">{caret}</span>
+                            {/* The test group leads, in mono, because it is the
+                                identity EPA actually assigned — the marketing
+                                names beneath it are what vary. */}
+                            <span className="guide-cluster-id">{group.testGroup ?? '\u2014'}</span>
+                            <span className="guide-cluster-name">
+                                {[first.brand, first.carline].filter(Boolean).join(' ')}
+                                <span className="text-meta"> · {first.model_year}</span>
+                            </span>
+                            <span className="guide-cluster-action">{action}</span>
+                            <span className="guide-cluster-meta">
+                                {total} config{total === 1 ? '' : 's'}
+                                {/* The one thing that makes configurations in a
+                                    single test group NOT interchangeable. */}
+                                {group.packVaries && <span className="badge-micro is-qualified">pack varies</span>}
+                            </span>
+                        </span>
+                    </button>
+                </td>
+            </tr>
+
+            {shown.map(row => (
+                <GuideRow key={row.id} row={row} {...rowProps} />
+            ))}
+        </>
+    );
+}
+
 export default function GuideTable({
     rows, visibleColumns, sortKey, sortDir, onSort,
     selectedIds, onToggleSelect, onOpenRow, vehicleLinks, barMaxima,
+    pinnedRows = [], onUnpinAll, onOpenCompare, clustered = false,
 }) {
-    const cols = GUIDE_COLUMNS.filter(c => visibleColumns.includes(c.key));
+    // Mapped from the visible list rather than filtered out of GUIDE_COLUMNS:
+    // the order the reader arranged is the order they get, and filtering would
+    // silently restore the constant's.
+    const cols = visibleColumns.map(columnByKey).filter(Boolean);
+    const span = cols.length + 1;
+    const rowProps = { cols, selectedIds, onToggleSelect, onOpenRow, vehicleLinks, barMaxima };
 
     return (
         <div className="guide-table-container">
@@ -61,63 +228,60 @@ export default function GuideTable({
                     </tr>
                 </thead>
                 <tbody>
-                    {rows.map((row) => {
-                        const vehicles = vehicleLinks[row.id]?.vehicles ?? [];
-                        return (
-                            <tr
-                                key={row.id}
-                                className={`guide-row ${selectedIds.includes(row.id) ? 'selected' : ''}`}
-                                onClick={() => onOpenRow(row)}
-                            >
-                                <td className="guide-td guide-td-select sticky-select" onClick={e => e.stopPropagation()}>
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedIds.includes(row.id)}
-                                        onChange={() => onToggleSelect(row.id)}
-                                        aria-label={`Compare ${row.carline}`}
-                                    />
+                    {/* Pinned rows sit above the sort and outside it, and are
+                        NOT repeated in the body below — a row in two places at
+                        once reads as two configurations, and unticking one of
+                        them would look like it failed. */}
+                    {pinnedRows.length > 0 && (
+                        <>
+                            <tr className="guide-pinned-head">
+                                {/* The flex lives on a div INSIDE the cell. On the
+                                    <td> itself it replaces `display: table-cell`,
+                                    which is what makes colSpan work — the band
+                                    collapsed to the width of the first column. */}
+                                <td colSpan={span}>
+                                    <div className="guide-band-content">
+                                        <span className="text-nano">
+                                            Pinned for comparison · {pinnedRows.length}
+                                        </span>
+                                        <span className="text-note">
+                                            kept at the top through filters and sorting
+                                        </span>
+                                        <span className="guide-pinned-actions">
+                                            {onOpenCompare && (
+                                                <button type="button" className="section-action" onClick={onOpenCompare}>
+                                                    jump to comparison ↓
+                                                </button>
+                                            )}
+                                            {onUnpinAll && (
+                                                <button type="button" className="section-action" onClick={onUnpinAll}>
+                                                    unpin all
+                                                </button>
+                                            )}
+                                        </span>
+                                    </div>
                                 </td>
-                                {cols.map((col) => {
-                                    const pct = barPercent(row, col, barMaxima);
-                                    return (
-                                        <td
-                                            key={col.key}
-                                            className={`guide-td ${col.numeric ? 'numeric' : ''} ${col.sticky ? 'sticky-name' : ''} ${pct != null ? 'has-bar' : ''}`}
-                                            style={pct != null ? { '--bar-fill': `${pct}%` } : undefined}
-                                        >
-                                            {col.key === 'carline' ? (
-                                                <span className="guide-carline">
-                                                    <span className="guide-carline-name">{row.carline}</span>
-                                                    {/* Badges ride on the name rather than holding columns of
-                                                        their own — at 30 columns the horizontal budget is the
-                                                        scarce one. */}
-                                                    {vehicles.length > 0 && (
-                                                        <span
-                                                            className="guide-badge guide-badge-tested"
-                                                            title={`We hold test data for ${vehicles.map(v => `${v.year} ${v.name}`).join(', ')}`}
-                                                        >
-                                                            tested
-                                                        </span>
-                                                    )}
-                                                    {row.is_collapsed && (
-                                                        <span
-                                                            className="guide-badge guide-badge-multi"
-                                                            title="EPA collapsed several configurations into this row — its motor count and power are a union, not one vehicle"
-                                                        >
-                                                            multi
-                                                        </span>
-                                                    )}
-                                                </span>
-                                            ) : formatCell(row, col)}
-                                        </td>
-                                    );
-                                })}
                             </tr>
-                        );
-                    })}
+                            {pinnedRows.map(row => (
+                                <GuideRow key={`pin-${row.id}`} row={row} pinned {...rowProps} />
+                            ))}
+                            {/* A gap, not a rule: the band and the body are the
+                                same table and a border would read as the end of
+                                one table and the start of another. */}
+                            <tr className="guide-pinned-spacer"><td colSpan={span} /></tr>
+                        </>
+                    )}
+
+                    {clustered
+                        ? clusterByTestGroup(rows).map(group => (
+                            <Cluster key={group.key} group={group} span={span} rowProps={rowProps} />
+                        ))
+                        : rows.map(row => (
+                            <GuideRow key={row.id} row={row} {...rowProps} />
+                        ))}
                 </tbody>
             </table>
-            {rows.length === 0 && (
+            {rows.length === 0 && pinnedRows.length === 0 && (
                 <div className="empty-state">No configurations match these filters.</div>
             )}
         </div>

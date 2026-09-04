@@ -58,9 +58,12 @@ export default function EpaGuideView({ subtab = 'browse' }) {
     const [filters, setFilters]   = useState(initial.filters);
     const [sortKey, setSortKey]   = useState(initial.sortKey);
     const [sortDir, setSortDir]   = useState(initial.sortDir);
-    const [columns, setColumns]   = useState(DEFAULT_COLUMNS);
+    const [columns, setColumns]   = useState(initial.columns);
     const [page, setPage]         = useState(initial.page);
     const [selectedIds, setSelectedIds] = useState(initial.selectedIds);
+    // Off by default. Clustering answers "how many measurements is this really",
+    // which is a question you arrive at rather than start with.
+    const [clustered, setClustered] = useState(initial.clustered);
     const [openRow, setOpenRow]   = useState(null);
     const [showAllCompare, setShowAllCompare] = useState(false);
 
@@ -68,7 +71,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
     // filter click is a refinement, and pushing would make Back walk through
     // every keystroke of the search box instead of leaving the tab.
     useEffect(() => {
-        const p = encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds });
+        const p = encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds, columns, clustered });
         p.set('tab', 'epa');
         // Re-set the sub-tab the section owns. encodeGuideParams builds a fresh
         // URLSearchParams from this view's state alone, so anything not written
@@ -76,7 +79,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
         // the default tab.
         p.set('sub', subtab);
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [filters, sortKey, sortDir, page, selectedIds, subtab]);
+    }, [filters, sortKey, sortDir, page, selectedIds, columns, clustered, subtab]);
 
     // NOT `.map(decorateRow)` — Array.map passes the index as the second
     // argument, which would arrive as the brand index and resolve nothing.
@@ -88,9 +91,22 @@ export default function EpaGuideView({ subtab = 'browse' }) {
 
     const filtered = useMemo(() => filterRows(rows, filters), [rows, filters]);
     const sorted   = useMemo(() => sortRows(filtered, sortKey, sortDir), [filtered, sortKey, sortDir]);
+    /**
+     * The body, without the pinned rows.
+     *
+     * A pinned row appears in the band above and nowhere else. Leaving it in
+     * both would read as two configurations, and unticking one of them would
+     * look like it had failed. Paging counts what is actually below, so the
+     * last page is not short by however many are pinned.
+     */
+    const unpinned = useMemo(
+        () => sorted.filter(r => !selectedIds.includes(r.id)),
+        [sorted, selectedIds],
+    );
+
     const pageRows = useMemo(
-        () => sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
-        [sorted, page],
+        () => unpinned.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+        [unpinned, page],
     );
     // Scaled against everything the filter matches, not just this page, so
     // paging does not rescale the bars underneath the reader.
@@ -147,7 +163,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
         );
     }
 
-    const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+    const totalPages = Math.max(1, Math.ceil(unpinned.length / PAGE_SIZE));
 
     return (
         <div className="guide-view">
@@ -180,6 +196,8 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                 onReset={resetFilters}
                 filterFn={filterRows}
                 shownCount={sorted.length}
+                clustered={clustered}
+                onToggleClustered={() => setClustered(c => !c)}
                 columnPicker={<GuideColumnPicker visible={columns} onChange={setColumns} />}
             />
 
@@ -202,6 +220,13 @@ export default function EpaGuideView({ subtab = 'browse' }) {
             >
                 <GuideTable
                     rows={pageRows}
+                    pinnedRows={compareRows}
+                    onUnpinAll={() => setSelectedIds([])}
+                    clustered={clustered}
+                    onOpenCompare={() => {
+                        document.getElementById('guide-compare')
+                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
                     visibleColumns={columns}
                     sortKey={sortKey}
                     sortDir={sortDir}
@@ -213,7 +238,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                     barMaxima={barMaxima}
                 />
 
-                {sorted.length > PAGE_SIZE && (
+                {unpinned.length > PAGE_SIZE && (
                     <div className="guide-pager">
                         <button className="btn btn-secondary" disabled={page === 0}
                             onClick={() => setPage(p => p - 1)}>Previous</button>
@@ -226,6 +251,10 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                 )}
             </CollapsibleSection>
 
+            {/* The band's "open in Compare" scrolls here. An id rather than a
+                ref threaded through the table: the table has no business
+                holding a handle to a panel three components away. */}
+            <div id="guide-compare" />
             <GuideComparePanel
                 rows={compareRows}
                 showAll={showAllCompare}

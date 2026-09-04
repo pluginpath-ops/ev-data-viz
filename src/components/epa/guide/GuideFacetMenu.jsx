@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useLightDismiss } from '../../../hooks/useLightDismiss';
 
 /**
  * One facet, as a button that opens a menu (#235, re-skin phase 5a).
@@ -27,22 +28,9 @@ export default function GuideFacetMenu({
     label, values, selected, countFor, onToggle, onClear, format = String, hint,
 }) {
     const [open, setOpen] = useState(false);
+    const ref = useLightDismiss(open, () => setOpen(false));
     const [query, setQuery] = useState('');
-    const ref = useRef(null);
 
-    // Pointerdown rather than click, so the menu does not survive a drag that
-    // starts inside it and ends outside. Same as GuideColumnPicker.
-    useEffect(() => {
-        if (!open) return;
-        const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-        const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
-        document.addEventListener('pointerdown', onDown);
-        document.addEventListener('keydown', onKey);
-        return () => {
-            document.removeEventListener('pointerdown', onDown);
-            document.removeEventListener('keydown', onKey);
-        };
-    }, [open]);
 
     const ordered = useMemo(() => {
         const withCounts = values.map(v => ({ v, n: countFor(v), text: String(format(v)) }));
@@ -74,7 +62,7 @@ export default function GuideFacetMenu({
             >
                 {label}
                 {summary && <span className="guide-facet-btn-value">{summary}</span>}
-                <span className="guide-facet-caret" aria-hidden="true">▾</span>
+                <span className="disclosure-caret guide-facet-caret" aria-hidden="true">▾</span>
             </button>
 
             {open && (

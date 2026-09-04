@@ -440,7 +440,7 @@ const NUM_PARAMS = {
 };
 const NUMERIC_LISTS = new Set(['years', 'motorCounts', 'wheelSizes']);
 
-export function encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds }) {
+export function encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds, columns, clustered }) {
     const p = new URLSearchParams();
     for (const [key, param] of Object.entries(LIST_PARAMS)) {
         const v = filters[key];
@@ -459,7 +459,21 @@ export function encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds
     // the import upserts on the natural key rather than reinserting — so a
     // link keeps working across re-imports of the same model year.
     if (selectedIds?.length) p.set('sel', selectedIds.join(','));
+    // The columns and their ORDER. It is the one piece of browse state that did
+    // not round-trip: a link reproduced someone's filters, sort and selection
+    // and then showed them a different set of columns. Omitted when it matches
+    // the default, so an ordinary link does not carry ten keys.
+    if (columns?.length && !sameColumns(columns, DEFAULT_COLUMNS)) {
+        p.set('cols', columns.join(','));
+    }
+    // Off is the default, so only the on state is written.
+    if (clustered) p.set('cluster', '1');
     return p;
+}
+
+/** Same keys in the same order. Order matters — it is half of what is stored. */
+function sameColumns(a, b) {
+    return a.length === b.length && a.every((k, i) => k === b[i]);
 }
 
 export function decodeGuideParams(search) {
@@ -492,12 +506,18 @@ export function decodeGuideParams(search) {
         // ids, so a string would silently match nothing and the comparison
         // would come back empty with no explanation.
         .filter(Number.isFinite);
+    // Unknown keys are dropped rather than trusted: a renamed column would
+    // otherwise render an empty header that sorts by nothing. An empty result
+    // falls back to the default rather than showing a table with no columns.
+    const cols = (p.get('cols') ?? '').split(',').filter(k => columnByKey(k));
     return {
         filters,
         sortKey,
         sortDir: p.get('dir') === 'asc' ? 'asc' : 'desc',
         page: Number.isFinite(pageNum) && pageNum > 1 ? pageNum - 1 : 0,
         selectedIds,
+        columns: cols.length ? cols : DEFAULT_COLUMNS,
+        clustered: p.get('cluster') === '1',
     };
 }
 
@@ -544,6 +564,53 @@ export function computeBarMaxima(rows) {
     return maxima;
 }
 
+/**
+ * Group rows under the EPA test group that certified them (#235, phase 5c).
+ *
+ * Fifty rows are not fifty measurements. EPA certifies configurations together
+ * and files them under one smog test group, so twenty-four Rivian rows can be
+ * one measurement wearing many marketing names — and a flat list presents them
+ * as twenty-four independent results, which is the single most misleading
+ * thing this table can do.
+ *
+ * Clusters come out in the order their first member appeared, so whatever sort
+ * the reader chose still governs which group leads.
+ *
+ * A configuration with no test group becomes its own cluster rather than
+ * joining a shared "ungrouped" heading. EPA did not group them; collecting them
+ * under one header would claim a shared measurement that does not exist.
+ */
+export function clusterByTestGroup(rows) {
+    const order = [];
+    const byKey = new Map();
+    for (const row of rows ?? []) {
+        const key = row.smog_test_group || `solo:${row.id}`;
+        if (!byKey.has(key)) { byKey.set(key, []); order.push(key); }
+        byKey.get(key).push(row);
+    }
+    return order.map((key) => {
+        const members = byKey.get(key);
+        const packs = new Set(members.map(r => r.nominal_pack_kwh).filter(v => v != null));
+        return {
+            key,
+            rows: members,
+            testGroup: members[0].smog_test_group ?? null,
+            // The one thing that makes configurations in a single test group
+            // NOT interchangeable, so it is the one thing the header adds.
+            packVaries: packs.size > 1,
+        };
+    });
+}
+
+/**
+ * The smallest bar a real value may draw.
+ *
+ * Below this a measurement renders as an empty track, which is what an ABSENT
+ * value looks like — and the distinction between "short" and "not measured" is
+ * the one this column has to keep.
+ */
+export const BAR_MIN_PCT = 4;
+
 /** A value's share of its unit's maximum, 0–100, or null when there is no bar. */
 export function barPercent(row, col, maxima) {
     if (!col.bar) return null;
@@ -554,5 +621,5 @@ export function barPercent(row, col, maxima) {
     if (v == null || v === '') return null;
     const n = Number(v);
     if (!Number.isFinite(n) || !(max > 0)) return null;
-    return Math.max(0, Math.min(100, (n / max) * 100));
+    return Math.max(BAR_MIN_PCT, Math.min(100, (n / max) * 100));
 }
