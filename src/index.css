@@ -4539,10 +4539,20 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    than the cell, and are dropped entirely on a position:sticky cell — the
    pinned columns would lose their gridlines. Borders therefore live on the
    cells, and border-spacing is zeroed so they still meet. */
+/* `fixed`, so a column's width comes from its HEADER rather than from whichever
+   fifty rows happen to be on the page. Under `auto` every re-sort re-measured
+   the content — a Make column reading "Kia" on one page and "Mercedes-Benz" on
+   the next moved every column to the right of it — so sorting, which is meant
+   to reorder rows, silently relaid the whole table.
+ *
+ * Fixed layout does NOT stop the table overflowing: `w-full` is a floor, and
+ * once the widths below exceed it the table grows past the container and the
+ * container scrolls. Adding columns still works. */
 .guide-table {
     @apply w-full text-sm;
     border-collapse: separate;
     border-spacing: 0;
+    table-layout: fixed;
 }
 
 /* Header: name on one line, unit beneath. The unit line is always present so
@@ -4575,7 +4585,22 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .guide-th.numeric .guide-th-name,
 .guide-th.numeric .guide-th-unit { @apply text-center; }
 .guide-th.active .guide-th-name  { color: var(--color-primary); }
-.guide-th-select { @apply cursor-default; }
+/* The checkbox column is the one cell whose content is not text. It must not
+   ellipsis, and at 2.25rem the default px-3 leaves 12px of room for a 16px box
+   — under fixed layout that overflowed and drew a "…" beside every checkbox. */
+.guide-th.guide-th-select,
+.guide-td.guide-td-select {
+    @apply px-0 text-center cursor-default;
+    text-overflow: clip;
+}
+/* Two widths, taken from what a column HOLDS rather than written per column:
+   figures are short and of a known precision, text is neither. The pinned
+   columns declare their own further down and win on source order. A header
+   longer than its column ellipses — the full label is in the tooltip, and the
+   unit line beneath carries the rest of the meaning. */
+.guide-th          { width: 9rem; }
+.guide-th.numeric  { width: 6rem; }
+.guide-th-name     { @apply truncate; }
 .guide-sort-caret {
     @apply ml-1 inline-block;
     font-size: 0.5625rem;
@@ -4634,15 +4659,16 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: rgba(59, 130, 246, 0.15);
 }
 .guide-td {
-    @apply px-3 py-1.5 whitespace-nowrap;
+    /* With fixed widths a long value has to clip rather than widen its column,
+       which is the whole point of fixing them. */
+    @apply px-3 py-1.5 whitespace-nowrap truncate;
     color: var(--color-text-primary);
     border-bottom: 1px solid var(--color-border);
 }
 .guide-td.numeric { @apply text-center tabular-nums; }
-.guide-td-select  { @apply cursor-default; }
 
-/* The name is the one column allowed to truncate — it is also the widest, and
-   the full value is in the tooltip and the detail view. */
+/* The name column is the widest and the likeliest to clip; the full value is in
+   the tooltip and the detail view. */
 .guide-carline {
     @apply flex items-center gap-1.5 min-w-0;
 }
