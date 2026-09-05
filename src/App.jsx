@@ -673,6 +673,8 @@ export default function App() {
                         isAdmin={isAdmin}
                         user={user}
                         userRole={userRole}
+                        units={units}
+                        onToggleUnits={toggleUnits}
                         onNavigate={navigateTo}
                         onNavigateChartCategory={navigateToChartCategory}
                         onSignIn={() => setShowAuthModal(true)}
@@ -716,13 +718,22 @@ export default function App() {
                     )}
                     <div className="selected-strip">
                         <div className="page-container py-2">
-                        {/* Selected vehicles row */}
-                        <div className="inline-row flex-wrap">
+                        {/* Selected vehicles row.
+                          * The chips are CAPPED at two rows and scroll past
+                          * that. This strip is inside the sticky header, so
+                          * every chip it grows by is taken off every screen
+                          * below it for good — a fifteen-vehicle selection used
+                          * to pin a third of a phone viewport, and the chart
+                          * sidebar sizes itself against this height. The label
+                          * and Clear all sit outside the scroller so the way
+                          * out of a large selection never scrolls away. */}
+                        <div className="selected-strip-row">
                             <span className="text-micro">Selected</span>
                             {selectedVehicles.length === 0 ? (
                                 <span className="text-meta">None</span>
                             ) : (
                                 <>
+                                    <div className="selected-chip-scroll">
                                     {selectedVehicles.map((vehicleId, idx) => {
                                         const vehicle = vehicles.find(v => v.id === vehicleId);
                                         if (!vehicle) return null;
@@ -774,6 +785,7 @@ export default function App() {
                                             </div>
                                         );
                                     })}
+                                    </div>
                                     {/* Not btn-warning. Orange is the single
                                       * "active / now" signal in this design and
                                       * nothing else is allowed to use it — that
@@ -789,9 +801,6 @@ export default function App() {
                                     </button>
                                 </>
                             )}
-                            <button onClick={toggleUnits} className="units-toggle ml-auto" title="Switch unit system">
-                                ⇄ {units === 'imperial' ? 'IMP' : 'MET'}
-                            </button>
                         </div>
                         </div>
                     </div>

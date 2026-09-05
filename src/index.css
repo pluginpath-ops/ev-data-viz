@@ -931,6 +931,188 @@ body {
 }
 
 
+/* ── Collapsed navigation (#281) ────────────────────────────────────────────
+ *
+ * Below 1000px both nav levels become a menu. The button shows where you ARE,
+ * so the bar still answers "which section is this" after it has given up
+ * showing its own items.
+ *
+ * One set of rules for both levels; the two differ only in the fill they sit
+ * on, which is the same distinction `.btn-tab` and `.btn-subtab` already make.
+ */
+/* Static, deliberately: the panel below anchors to the BAR, not to the button.
+   Anchored to the button it started at the wordmark's right edge — 139px in —
+   and a 240px panel then ran 4px past a 375px viewport. */
+.nav-menu {
+    position: static;
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+}
+.app-nav-bar,
+.subtab-strip { position: relative; }
+.nav-menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 15px;
+    min-width: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+.nav-menu-current { @apply truncate; }
+.nav-menu-main .nav-menu-btn {
+    height: 100%;
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    background-color: var(--color-nav-active);
+    color: var(--color-text-on-nav);
+}
+.nav-menu-sub .nav-menu-btn {
+    height: 100%;
+    padding-left: 24px;
+    font-size: calc(var(--fs-body) * 0.9286);
+    color: var(--color-text-on-nav);
+    box-shadow: inset 0 -2px 0 var(--color-accent-orange);
+}
+
+/* A full-width sheet under its own bar, rather than a panel hanging off the
+   button. Below 1000px there is no width to spend on getting an anchor right,
+   and a nav item that truncates is a destination you cannot identify before
+   choosing it — "Charging & Efficiency" alone wants 180px. */
+.nav-menu-panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    padding: 4px;
+    border-radius: var(--radius-control);
+    background-color: var(--color-popover);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-popover, 0 8px 24px rgb(0 0 0 / 0.35));
+}
+.nav-menu-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    /* 40px of target. This is the one control on a phone that every other
+       screen is reached through, and a 28px menu row is a miss. */
+    min-height: 40px;
+    justify-content: center;
+    padding: 6px 10px;
+    border: none;
+    border-radius: var(--radius-mark);
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-primary);
+}
+.nav-menu-item:hover:not(:disabled) { background-color: var(--color-hover-lift); }
+/* Orange, like every other "which view is live" mark in this design. */
+.nav-menu-item.active {
+    font-weight: 600;
+    box-shadow: inset 2px 0 0 var(--color-accent-orange);
+}
+.nav-menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
+.nav-menu-item-hint {
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+
+/* ── Account and settings menu (#281) ───────────────────────────────────────
+ *
+ * One circle at every width, holding what used to sit beside it in the bar: the
+ * signed-in email, the role, and the unit system. The `Sign In` button it
+ * replaces cost 111px of a 375px phone bar.
+ */
+.account-menu { position: relative; }
+.account-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--color-border-strong);
+    background-color: var(--color-surface-muted);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    font-weight: 600;
+}
+.account-btn:hover { border-color: var(--color-primary); color: var(--color-text-primary); }
+/* Signed in reads differently from signed out at a glance, which is the whole
+   job of an avatar: filled and lettered vs. outlined and generic. */
+.account-btn.signed-in {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-primary-text, #fff);
+}
+
+.account-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 15rem;
+    padding: 12px;
+    border-radius: var(--radius-control);
+    background-color: var(--color-popover);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-popover, 0 8px 24px rgb(0 0 0 / 0.35));
+}
+.account-identity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border);
+}
+.account-email {
+    @apply truncate;
+    min-width: 0;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-primary);
+}
+.account-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+/* Two labelled halves rather than the bar's old `⇄ IMP`, which said a switch
+   existed but never which way it would go. */
+.account-segmented {
+    display: flex;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+}
+.account-segmented button {
+    padding: 3px 9px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+.account-segmented button:hover { color: var(--color-text-primary); }
+.account-segmented button.active {
+    background-color: var(--color-primary);
+    color: var(--color-primary-text, #fff);
+}
+.account-action { width: 100%; justify-content: center; }
+
 /* ── Modals ─────────────────────────────────────────────────────────────────── */
 
 .modal-overlay {
@@ -1341,22 +1523,6 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* A unit system is a display preference, not an action — it sat in the bar as a
    bordered blue button, which read as something to DO. Mono, because what it
    switches is the numbers. */
-.units-toggle {
-    @apply cursor-pointer transition-colors;
-    padding: 4px 9px;
-    border: 1px solid transparent;
-    border-radius: var(--radius-control);
-    font-family: var(--font-mono);
-    font-size: calc(var(--fs-body) * 0.7857);
-    font-weight: 500;
-    background: none;
-    color: var(--color-text-meta);
-}
-.units-toggle:hover {
-    border-color: var(--color-border-strong);
-    color: var(--color-text-secondary);
-}
-
 /* Selected vehicle chip. The rule down its left edge is the series colour, so
    the chip ties to the same vehicle on every chart — a left bar and a tinted
    band rather than a full-row wash, which is what let the old rounded-full
@@ -1397,6 +1563,45 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 .selected-strip {
     background-color: var(--color-surface-muted);
     border-top: 1px solid var(--color-border);
+}
+.selected-strip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+/* The label and Clear all keep their width: squeezed by the chips at 375px,
+   "Clear all" wrapped to two lines and made the strip taller than the chips it
+   was there to remove. */
+.selected-strip-row > .text-micro,
+.selected-strip-row > .btn {
+    flex: none;
+    white-space: nowrap;
+}
+/* Two rows of chips, then it scrolls.
+ *
+ * This strip lives inside the sticky header, so every row it grows by is taken
+ * off every screen below it permanently — and the chart sidebar sizes itself
+ * against the header's measured height, so an unbounded strip shortens the
+ * plot as well. Fifteen selected vehicles wrapped to five rows and pinned a
+ * third of a phone viewport.
+ *
+ * The cap is two chip rows exactly: 2 × 26px of chip plus the 8px between
+ * them. `Selected` and `Clear all` stay OUTSIDE this box, so the way out of a
+ * large selection is never the thing that scrolled away. */
+.selected-chip-scroll {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    /* Takes the slack on ONE line with the label and Clear all. Giving the
+       chips their own full-width line was measurably worse: it bought them
+       80px of width and cost 34px of header on every screen below, which is
+       the resource this cap exists to protect. */
+    flex: 1 1 auto;
+    min-width: 0;
+    max-height: 3.75rem;
+    overflow-y: auto;
+    scrollbar-width: thin;
 }
 
 /* ── Tested figure ──────────────────────────────────────────────────────────
