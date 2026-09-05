@@ -51,6 +51,10 @@ export const NOT_CATALOGUED = {
     'tag-filter-legend': 'The "AND / OR / NOT" key beside the bar, not a control.',
     'run-stat-badges':   'Layout wrapper — a flex row of badges.',
     'guide-chip-count':  'The count suffix inside .guide-chip; shown as part of that specimen.',
+    'selected-chip-scroll':
+        'The capped, scrolling box the selected-vehicle chips sit in. It is a '
+        + 'height budget for the sticky header, not a control — a specimen of it '
+        + 'would be an empty 60px rectangle. The chips inside it are catalogued.',
     'btn-toggle-clear':  'The × inside an active .btn-toggle; shown as part of that specimen.',
     'vehicle-media-badge':
         'Absolutely positioned over a vehicle photograph, on a dark plate that only '

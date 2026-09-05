@@ -22,10 +22,14 @@ a house one, so that a new reader already knows it.
 | Everything that is UI furniture rather than data | **chrome** | "browser chrome", Mozilla | a category, not a component |
 | The pinned block at the top of every page | **header** | HTML `<header>`; Material *top app bar* | `.app-nav`, [App.jsx](../src/App.jsx) |
 | Its measured height, published for CSS | **`--app-header-h`** | — | [useHeaderHeight.js](../src/hooks/useHeaderHeight.js) |
-| Row 1 — wordmark, section tabs, Sign In | **nav bar** | Bootstrap *navbar* | `.app-nav-bar`, [AppNav.jsx](../src/components/shell/AppNav.jsx) |
+| Row 1 — wordmark, section tabs, account | **nav bar** | Bootstrap *navbar* | `.app-nav-bar`, [AppNav.jsx](../src/components/shell/AppNav.jsx) |
 | The six section buttons | **tabs** | WAI-ARIA `tablist` | `.btn-tab` |
 | Row 2 — Charging / Range & Efficiency / … | **sub-nav** | common web | `.subtab-strip`, [SubTabStrip.jsx](../src/components/shell/SubTabStrip.jsx) |
+| Either row of tabs, collapsed below 1000px | **nav menu** | — | `.nav-menu`, [NavMenu.jsx](../src/components/shell/NavMenu.jsx) |
+| The one width at which the chrome collapses | **compact** | — | [useIsCompact.js](../src/hooks/useIsCompact.js) — the only breakpoint |
+| The circle at the right end, and what it opens | **account menu** | Material *account* | `.account-menu`, [AccountMenu.jsx](../src/components/shell/AccountMenu.jsx) |
 | Row 3 — the removable selected-vehicle pills | **chips** | Material *input chips* | `.selected-strip`, `.selected-vehicle-chip` |
+| The capped box the chips scroll inside | **chip scroller** | — | `.selected-chip-scroll` — two rows, then it scrolls |
 | The centred max-width content column | **page container** | — | `.page-container` |
 
 `.app-nav` is the header **and** its rows; the class predates this document.

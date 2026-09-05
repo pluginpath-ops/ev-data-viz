@@ -1,3 +1,6 @@
+import { useIsCompact } from '../../hooks/useIsCompact';
+import NavMenu from './NavMenu';
+
 /**
  * The 38px strip under the main nav — second-level navigation for a section.
  *
@@ -15,24 +18,35 @@
  * "one fill continued" promise true everywhere rather than only in the nav.
  */
 export default function SubTabStrip({ items, activeKey, onSelect, end = null }) {
+    const compact = useIsCompact();
+
     if (!items?.length) return null;
 
     return (
         <div className="subtab-strip">
-            <div className="subtab-strip-items">
-                {items.map(({ key, label, disabled }) => (
-                    <button
-                        key={key}
-                        type="button"
-                        onClick={() => onSelect(key)}
-                        disabled={disabled}
-                        aria-current={key === activeKey ? 'page' : undefined}
-                        className={`btn-subtab ${key === activeKey ? 'active' : ''}`}
-                    >
-                        {label}
-                    </button>
-                ))}
-            </div>
+            {/* Below 1000px the sub-tabs collapse the same way the main tabs do.
+                The handoff prescribed a horizontal scroll with a `›` affordance
+                here, which is what the main nav already did and what made it
+                unusable: a scroll box holding items you cannot see is not
+                navigation. Two levels, one gesture. */}
+            {compact ? (
+                <NavMenu items={items} activeKey={activeKey} onSelect={onSelect} level="sub" />
+            ) : (
+                <div className="subtab-strip-items">
+                    {items.map(({ key, label, disabled }) => (
+                        <button
+                            key={key}
+                            type="button"
+                            onClick={() => onSelect(key)}
+                            disabled={disabled}
+                            aria-current={key === activeKey ? 'page' : undefined}
+                            className={`btn-subtab ${key === activeKey ? 'active' : ''}`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            )}
             {end && <div className="subtab-strip-end">{end}</div>}
         </div>
     );
