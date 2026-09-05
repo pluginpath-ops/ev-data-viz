@@ -1015,9 +1015,14 @@ body {
     color: var(--color-text-primary);
 }
 .nav-menu-item:hover:not(:disabled) { background-color: var(--color-hover-lift); }
-/* Orange, like every other "which view is live" mark in this design. */
+/* Orange, like every other "which view is live" mark in this design — and
+   square on the colour side, like every other accent border in it. The item's
+   own corner radius was rounding the ends of the bar, which reads as a pill
+   floating inside the row rather than as an edge the row is anchored to. See
+   .selected-vehicle-chip and .vehicle-run-group for the same rule. */
 .nav-menu-item.active {
     font-weight: 600;
+    border-radius: 0 var(--radius-mark) var(--radius-mark) 0;
     box-shadow: inset 2px 0 0 var(--color-accent-orange);
 }
 .nav-menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
