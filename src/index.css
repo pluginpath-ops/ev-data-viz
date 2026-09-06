@@ -5355,55 +5355,69 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-size: 0.6875rem;
 }
 
-/* ── Shared axis for the box column ──────────────────────────────────────────
-   Reads as |min ———— unit ———— max|. The labels sit ABOVE the rule rather than
-   beside it so the rule spans the full column width — the boxes below are
-   positioned as a percentage of exactly this range, and a rule inset by the
-   width of its own labels would put every box slightly off its own axis. */
-.stats-axis {
-    @apply flex flex-col gap-0.5;
-    min-width: 12rem;
+/* ── Column widths ───────────────────────────────────────────────────────────
+   The bar column takes the slack and everything else is fixed, so the numbers
+   sit at the same x on every screen and the picture gets whatever is left. The
+   table inherits `table-layout: fixed` from .guide-table, so these ARE the
+   widths rather than suggestions. */
+.stats-table .stats-th-name   { width: 190px; }
+.stats-table .stats-th-n      { width: 52px; }
+.stats-table .stats-th-dist   { width: auto; }
+.stats-table .stats-th-median { width: 84px; }
+.stats-table .stats-th-end    { width: 64px; }
+.stats-td-name { @apply truncate; }
+/* Tighter than the browse table's px-3. These columns are sized to their
+   content to the pixel, and 12px a side left 32px for "137.5" — every figure in
+   the three narrow columns ellipsed. */
+.stats-table .guide-td,
+.stats-table .guide-th { @apply px-2; }
+
+/* Names the three marks in the order the bar draws them, so the bar carries no
+   legend of its own. Not uppercased on the unit: MPGe has a deliberate
+   lowercase 'e' and "MPGE" is simply the wrong unit name. */
+.stats-th-dist {
+    @apply align-bottom;
 }
-/* Highest contrast the token set offers — near-black on light, near-white on
-   dark. These are the numbers the whole column is measured against, so they are
-   read deliberately rather than glanced at, and a faint axis made every box
-   below it float against nothing. */
-.stats-axis-labels {
-    @apply flex items-baseline justify-between;
-    font-size: 0.6875rem;
+.stats-dist-legend {
+    @apply block uppercase;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     font-weight: 600;
-    color: var(--color-text-primary);
+    letter-spacing: 0.08em;
+    color: var(--color-text-meta);
 }
-/* Not uppercased: MPGe carries a deliberate lowercase 'e' and "MPGE" is simply
-   the wrong unit name. Units render as they are written. */
-.stats-axis-unit {
-    letter-spacing: 0.02em;
-    color: var(--color-text-primary);
+.stats-dist-unit {
+    @apply block;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-faint);
 }
-/* End ticks turn a bare line into an axis with bounds. */
-.stats-axis-rule {
-    @apply relative w-full;
-    height: 5px;
+
+.stats-row { border-bottom: 1px solid var(--color-border); }
+/* The corpus row is pinned at the BOTTOM. It used to render first, where it
+   read as the best row of a ranking rather than as the thing the ranking is
+   measured against — and it is the row that states the shared domain, which is
+   a summary and belongs under what it summarises. */
+.stats-row-overall {
+    position: sticky;
+    bottom: 0;
+    background-color: var(--color-cluster);
+    font-weight: 600;
+}
+.stats-row-overall .guide-td {
+    background-color: var(--color-cluster);
     border-top: 1px solid var(--color-border-strong);
 }
-.stats-axis-rule::before,
-.stats-axis-rule::after {
-    content: '';
-    @apply absolute top-0;
-    width: 1px;
-    height: 5px;
-    background-color: var(--color-border-strong);
+/* Its median is the fleet's median — the one number every row above is being
+   compared against, so it takes the "this is the reference" colour. */
+.stats-row-overall .stats-td-median { color: var(--color-accent-orange); }
+/* Marked, not dimmed away: the row still has to be readable, because the whole
+   point of keeping it is that the reader sees the bucket exists. */
+.stats-row.suppressed .stats-td-name { color: var(--color-text-meta); }
+.stats-suppressed-note {
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-meta);
+    white-space: normal;
 }
-.stats-axis-rule::before { left: 0; }
-.stats-axis-rule::after  { right: 0; }
-.stats-row { border-bottom: 1px solid var(--color-border); }
-/* The corpus line is a reference, not a competitor — it reads above the
-   ranking and is visually quieter than the buckets it frames. */
-.stats-row-overall {
-    background-color: var(--color-surface-muted);
-    font-weight: 600;
-}
-.stats-row.suppressed { @apply opacity-60; }
 .stats-suppressed-flag {
     @apply ml-2 px-1.5 py-0.5 rounded uppercase;
     font-size: 0.5625rem;
@@ -5423,6 +5437,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply relative w-full;
     height: 1.1rem;
 }
+/* Three weights, and the order is the reading order: a 1px line for the full
+   range, a 6px band for the middle half, a 2px tick for the median. The band
+   has no border — at 6px a 1px outline is a third of it, and it read as a
+   filled pill rather than as a span. */
 .stats-box-whisker {
     @apply absolute;
     top: 50%;
@@ -5432,18 +5450,24 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .stats-box-iqr {
     @apply absolute rounded-sm;
-    top: 0.2rem;
-    bottom: 0.2rem;
+    top: 50%;
+    height: 6px;
+    transform: translateY(-50%);
     background-color: var(--bar-strong);
-    border: 1px solid var(--bar-edge);
 }
+/* Orange, and taller than the band it sits in, because it is the number the
+   row is ranked by and the eye should find it without looking. */
 .stats-box-median {
     @apply absolute;
-    top: 0.1rem;
-    bottom: 0.1rem;
+    top: 50%;
     width: 2px;
-    background-color: var(--color-primary);
+    height: 12px;
+    transform: translateY(-50%);
+    background-color: var(--color-accent-orange);
 }
+/* The corpus bar is the domain itself, so it spans the column by definition.
+   Quieter than the rows it frames — it is the reference, not a competitor. */
+.stats-box-track.is-corpus .stats-box-iqr { background-color: var(--bar-soft); }
 
 /* ── Panels ──────────────────────────────────────────────────────────────── */
 
