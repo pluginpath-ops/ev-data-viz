@@ -5361,21 +5361,26 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    sit at the same x on every screen and the picture gets whatever is left. The
    table inherits `table-layout: fixed` from .guide-table, so these ARE the
    widths rather than suggestions. */
-.stats-table .stats-th-name   { width: 190px; }
-.stats-table .stats-th-n      { width: 52px; }
-.stats-table .stats-th-dist   { width: auto; }
-.stats-table .stats-th-median { width: 84px; }
-.stats-table .stats-th-end    { width: 64px; }
+.stats-table .stats-th-name { width: 190px; }
+.stats-table .stats-th-dist { width: auto; }
+/* Every figure column the same width, sized to the widest thing any measure
+   prints: `0.0253` for a road-load C coefficient, at four decimals it genuinely
+   needs. It was 64px — 48px of content after padding — which is within a pixel
+   or two of that string, so the certification measures ellipsed to `0.02…`.
+   A truncated number is worse than any amount of column. */
+.stats-table .guide-th.numeric { width: 76px; }
+/* After the rule above, and equal specificity, so these two win. */
+.stats-table .guide-th.stats-th-n      { width: 52px; }
+.stats-table .guide-th.stats-th-median { width: 82px; }
 .stats-td-name { @apply truncate; }
-/* Tighter than the browse table's px-3. These columns are sized to their
-   content to the pixel, and 12px a side left 32px for "137.5" — every figure in
-   the three narrow columns ellipsed. */
+/* Tighter than the browse table's px-3: seven columns of figures, and 12px a
+   side is 168px spent on gaps. */
 .stats-table .guide-td,
 .stats-table .guide-th { @apply px-2; }
 
-/* Names the three marks in the order the bar draws them, so the bar carries no
-   legend of its own. Not uppercased on the unit: MPGe has a deliberate
-   lowercase 'e' and "MPGE" is simply the wrong unit name. */
+/* Names the picture, not the marks — the five columns to its right do that. Not
+   uppercased on the unit: MPGe has a deliberate lowercase 'e' and "MPGE" is
+   simply the wrong unit name. */
 .stats-th-dist {
     @apply align-bottom;
 }
@@ -5394,19 +5399,16 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 .stats-row { border-bottom: 1px solid var(--color-border); }
-/* The corpus row is pinned at the BOTTOM. It used to render first, where it
-   read as the best row of a ranking rather than as the thing the ranking is
-   measured against — and it is the row that states the shared domain, which is
-   a summary and belongs under what it summarises. */
+/* The corpus row leads. It is the frame every row below is read against — it
+   sets the domain each bar is drawn on — and a reference belongs where the eye
+   starts, not under a ranking it is not competing in. */
 .stats-row-overall {
-    position: sticky;
-    bottom: 0;
     background-color: var(--color-cluster);
     font-weight: 600;
 }
 .stats-row-overall .guide-td {
     background-color: var(--color-cluster);
-    border-top: 1px solid var(--color-border-strong);
+    border-bottom: 1px solid var(--color-border-strong);
 }
 /* Its median is the fleet's median — the one number every row above is being
    compared against, so it takes the "this is the reference" colour. */
@@ -5439,9 +5441,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     height: 1.1rem;
 }
 /* Three weights, and the order is the reading order: a 1px line for the full
-   range, a 6px band for the middle half, a 2px tick for the median. The band
-   has no border — at 6px a 1px outline is a third of it, and it read as a
-   filled pill rather than as a span. */
+   range, an 8px band for the middle half, a 2px tick for the median — kept
+   taller than the band so it stays findable inside it. The band has no border:
+   at this height a 1px outline is an eighth of it, and it read as a filled pill
+   rather than as a span. */
 .stats-box-whisker {
     @apply absolute;
     top: 50%;
@@ -5452,7 +5455,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .stats-box-iqr {
     @apply absolute rounded-sm;
     top: 50%;
-    height: 6px;
+    height: 8px;
     transform: translateY(-50%);
     background-color: var(--bar-strong);
 }
@@ -5462,7 +5465,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply absolute;
     top: 50%;
     width: 2px;
-    height: 12px;
+    height: 14px;
     transform: translateY(-50%);
     background-color: var(--color-accent-orange);
 }

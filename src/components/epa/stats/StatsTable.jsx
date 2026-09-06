@@ -98,7 +98,7 @@ export default function StatsTable({ rows, measureDef, overall, dimensionLabel, 
     const usable = Number.isFinite(scale.min) && Number.isFinite(scale.max) && scale.max > scale.min;
 
     const fmt = (v) => (v == null ? '—' : v.toFixed(digits));
-    const span = usable ? 4 : 3;
+    const span = usable ? 6 : 5;
 
     return (
         <div className="guide-table-container">
@@ -111,25 +111,54 @@ export default function StatsTable({ rows, measureDef, overall, dimensionLabel, 
                             className="guide-th numeric stats-th-n" />
                         {usable && (
                             <th className="guide-th stats-th-dist">
-                                {/* Names the three marks in the order they are
-                                    drawn, so the bar needs no legend of its own.
-                                    The unit rides here because the median, min
-                                    and max columns to the right are all in it. */}
-                                <span className="stats-dist-legend">Median · IQR · Range</span>
+                                {/* Names the picture, not the marks. It tried
+                                    `MEDIAN · IQR · RANGE` and that put the word
+                                    "median" in two headings a few columns apart
+                                    meaning two different things — a legend and
+                                    a column. The five columns to the right name
+                                    the marks; this only has to say what the
+                                    drawing IS, and in what unit. */}
+                                <span className="stats-dist-legend">Distribution</span>
                                 {(m?.unit || m?.axisLabel) && (
                                     <span className="stats-dist-unit">{m.unit || m.axisLabel}</span>
                                 )}
                             </th>
                         )}
+                        {/* The bar's own order, left to right. Written in any
+                            other order they would have to be re-mapped onto the
+                            picture by eye every time. The quartiles are the two
+                            that most need naming: the band is the middle half
+                            of the data and nothing else on the row says so. */}
+                        <SortTh label="Min" sortKey="min" sort={sort} onSort={onSort} />
+                        <SortTh label="Lower Q" sortKey="q1" sort={sort} onSort={onSort} />
                         <SortTh label="Median" sortKey="median" sort={sort} onSort={onSort}
                             className="guide-th numeric stats-th-median" />
-                        <SortTh label="Min" sortKey="min" sort={sort} onSort={onSort}
-                            className="guide-th numeric stats-th-end" />
-                        <SortTh label="Max" sortKey="max" sort={sort} onSort={onSort}
-                            className="guide-th numeric stats-th-end" />
+                        <SortTh label="Upper Q" sortKey="q3" sort={sort} onSort={onSort} />
+                        <SortTh label="Max" sortKey="max" sort={sort} onSort={onSort} />
                     </tr>
                 </thead>
                 <tbody>
+                    {/* The corpus FIRST. It is the frame every row below is read
+                        against — it sets the domain each bar is drawn on — and a
+                        reference belongs where the eye starts rather than under
+                        a ranking it is not competing in. */}
+                    {overall.n > 0 && (
+                        <tr className="stats-row stats-row-overall">
+                            <td className="guide-td stats-td-name">All {plural(dimensionLabel)}</td>
+                            <td className="guide-td numeric">{overall.n}</td>
+                            {usable && (
+                                <td className="guide-td">
+                                    <Bar stats={overall} scale={scale} digits={digits} corpus />
+                                </td>
+                            )}
+                            <td className="guide-td numeric">{fmt(overall.min)}</td>
+                            <td className="guide-td numeric">{fmt(overall.q1)}</td>
+                            <td className="guide-td numeric stats-td-median">{fmt(overall.median)}</td>
+                            <td className="guide-td numeric">{fmt(overall.q3)}</td>
+                            <td className="guide-td numeric">{fmt(overall.max)}</td>
+                        </tr>
+                    )}
+
                     {rows.map(r => (
                         <tr key={String(r.bucket)} className={`stats-row ${r.suppressed ? 'suppressed' : ''}`}>
                             <td className="guide-td stats-td-name">
@@ -157,34 +186,16 @@ export default function StatsTable({ rows, measureDef, overall, dimensionLabel, 
                                             <Bar stats={r} scale={scale} digits={digits} />
                                         </td>
                                     )}
-                                    <td className="guide-td numeric stats-td-median">{fmt(r.median)}</td>
                                     <td className="guide-td numeric">{fmt(r.min)}</td>
+                                    <td className="guide-td numeric">{fmt(r.q1)}</td>
+                                    <td className="guide-td numeric stats-td-median">{fmt(r.median)}</td>
+                                    <td className="guide-td numeric">{fmt(r.q3)}</td>
                                     <td className="guide-td numeric">{fmt(r.max)}</td>
                                 </>
                             )}
                         </tr>
                     ))}
 
-                    {/* The corpus LAST, and pinned there.
-                        It used to render first, where it read as the best row of
-                        a ranking rather than as the thing the ranking is measured
-                        against — and it is also the row that states the shared
-                        domain, which is a summary and belongs under what it
-                        summarises. */}
-                    {overall.n > 0 && (
-                        <tr className="stats-row stats-row-overall">
-                            <td className="guide-td stats-td-name">All {plural(dimensionLabel)}</td>
-                            <td className="guide-td numeric">{overall.n}</td>
-                            {usable && (
-                                <td className="guide-td">
-                                    <Bar stats={overall} scale={scale} digits={digits} corpus />
-                                </td>
-                            )}
-                            <td className="guide-td numeric stats-td-median">{fmt(overall.median)}</td>
-                            <td className="guide-td numeric">{fmt(overall.min)}</td>
-                            <td className="guide-td numeric">{fmt(overall.max)}</td>
-                        </tr>
-                    )}
                 </tbody>
             </table>
             {rows.length === 0 && <div className="empty-state">Nothing to summarise for this selection.</div>}
