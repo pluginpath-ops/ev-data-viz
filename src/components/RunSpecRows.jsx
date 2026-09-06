@@ -9,7 +9,7 @@ import { runKindFrom } from '../utils/runUtils';
  * could start a line on its own. Nothing was wrong, but nothing was findable
  * either — the eye had no anchor.
  *
- * Three rows, in the order a test is actually thought about:
+ * Three bands, in the order a test is actually thought about:
  *
  *   design      what the test was set up to do — speed held, SoC window
  *   conditions  what the day imposed — temperature, wind, altitude, terrain
@@ -20,29 +20,54 @@ import { runKindFrom } from '../utils/runUtils';
  * can put the condition rows side by side and see immediately why the results
  * differ.
  *
- * A row with nothing in it is not rendered, so a charging test with no
- * conditions recorded does not leave an empty band.
+ * A band with nothing in it is not rendered, so a charging test with no
+ * conditions recorded does not leave an empty rail.
+ *
+ * ── Every figure is now a LABELLED cell (re-skin phase 8) ────────────────────
+ *
+ * The values used to be bare — `72 °F`, `4,800 ft`, `↗ 1,240 ft gain` — leaning
+ * on units and emoji to say what each one was. That works while you already
+ * know the card; it does not survive two runs side by side, where `4,800 ft`
+ * and `1,240 ft` are an altitude and a climb and nothing on screen says which.
+ * Each cell now carries its own name above its value, and the cells sit on an
+ * auto-fit track grid: as many columns as the run actually records, no padding
+ * columns for the fields it does not.
+ *
+ * ── And the colours are gone ─────────────────────────────────────────────────
+ *
+ * Speed was amber, temperature orange, wind cyan, distance green, energy and
+ * efficiency blue — seven hues across three rows where no hue meant anything,
+ * which is the exact pattern the re-skin exists to remove. A reading is a
+ * reading; the one distinction worth a colour is whether it can be trusted at
+ * face value, so a qualified figure is marked and everything else is neutral.
  */
 
-const Item = ({ children, title, className = 'text-secondary' }) => (
-    <span className={className} title={title}>{children}</span>
-);
-
-// A missing condition is shown as a gap rather than omitted, so the row keeps
-// its shape from card to card and an unrecorded figure is visibly unrecorded
-// — the correction skips exactly these, and silence looked like zero.
+/** A figure that was not recorded. Shown, not omitted: the correction skips
+ *  exactly these, and silence looked like zero. */
 const Missing = ({ what }) => (
-    <span className="text-meta" title={`No ${what} recorded — correction skips this axis`}>—</span>
+    <span className="run-cell-missing" title={`No ${what} recorded — correction skips this axis`}>—</span>
 );
 
-function Row({ label, items }) {
-    if (!items.length) return null;
+function Band({ label, cells }) {
+    if (!cells.length) return null;
     return (
-        <div className="run-spec-row">
-            <span className="run-spec-label">{label}</span>
-            <span className="run-spec-items">
-                {items.map((item, i) => <span key={i} className="run-spec-item">{item}</span>)}
-            </span>
+        <div className="run-band">
+            {/* A solid rail, at a weight that can be read. It was faint text in
+                a fixed-width column, which made the band names the quietest
+                thing on a card whose whole structure they define. */}
+            <span className="run-band-label">{label}</span>
+            <div className="run-band-cells">
+                {cells.map(c => (
+                    <div
+                        key={c.key}
+                        className={`run-cell${c.tone ? ` is-${c.tone}` : ''}`}
+                        title={c.title}
+                    >
+                        <span className="run-cell-label">{c.label}</span>
+                        <span className="run-cell-value">{c.value}</span>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
@@ -54,143 +79,196 @@ export default function RunSpecRows({ run, units, socRange, fieldMeta = [], calc
     // ── Design: what the test was set up to do ───────────────────────────────
     const design = [];
     if (isRange) {
-        design.push(run.speed_mph != null
-            ? <Item key="spd" className={run.speed_basis === 'mixed' ? 'text-amber-600' : 'text-secondary'}>
-                  {fmtSpeed(run.speed_mph, units)}
-              </Item>
-            : <Item key="spd" className="text-amber-600"
-                    title="Set Speed (mph) in run metadata for accurate efficiency">
-                  {fmtSpeed(70, units)} (est.)
-              </Item>);
+        if (run.speed_mph != null) {
+            design.push({
+                key: 'spd',
+                label: 'Speed held',
+                value: fmtSpeed(run.speed_mph, units),
+                // A cycle average where the column means a held setpoint: true,
+                // but not comparable to a steady-state test, and the speed
+                // correction is skipped for it.
+                tone: run.speed_basis === 'mixed' ? 'qualified' : undefined,
+                title: run.speed_basis === 'mixed'
+                    ? 'Average over a varying-speed cycle, not a held setpoint. Not comparable to a steady-state test, and speed correction is skipped for it.'
+                    : undefined,
+            });
+        } else {
+            design.push({
+                key: 'spd',
+                label: 'Speed held',
+                value: `${fmtSpeed(70, units)} est.`,
+                tone: 'qualified',
+                title: 'Set Speed (mph) in run metadata for accurate efficiency',
+            });
+        }
         if (speedBasisNote(run)) {
-            design.push(
-                <Item key="basis" className="text-amber-600"
-                      title="Average over a varying-speed cycle, not a held setpoint. Not comparable to a steady-state test, and speed correction is skipped for it.">
-                    {speedBasisNote(run)}
-                </Item>);
+            design.push({
+                key: 'basis', label: 'Basis', value: speedBasisNote(run), tone: 'qualified',
+                title: 'Average over a varying-speed cycle, not a held setpoint.',
+            });
         }
     }
     // A charging run's stored start_soc/end_soc came from the 046 split and
     // describe the DISCHARGE, so they read backwards and sometimes disagree with
     // the run entirely. Its data points are the measurement; prefer them.
     if (!isRange && socRange) {
-        design.push(
-            <Item key="soc" title="Measured from this run's data points">
-                SoC {Math.round(socRange.min)}→{Math.round(socRange.max)}%
-            </Item>);
+        design.push({
+            key: 'soc', label: 'SoC window · measured',
+            value: `${Math.round(socRange.min)} → ${Math.round(socRange.max)} %`,
+            title: "Measured from this run's data points",
+        });
     } else if (run.start_soc != null && run.end_soc != null) {
-        design.push(
-            <Item key="soc"
-                  title={isRange ? undefined : 'From the run record — its data points have not loaded yet'}>
-                SoC {run.start_soc}→{run.end_soc}%
-            </Item>);
+        design.push({
+            key: 'soc', label: 'SoC window',
+            value: `${run.start_soc} → ${run.end_soc} %`,
+            title: isRange ? undefined : 'From the run record — its data points have not loaded yet',
+        });
     }
 
     // ── Conditions: what the day imposed ─────────────────────────────────────
     const conditions = [];
 
     if (run.temperature_f != null) {
-        conditions.push(<Item key="tmp" className="text-orange-700">{fmtTemp(run.temperature_f, units)}</Item>);
+        conditions.push({ key: 'tmp', label: 'Temp', value: fmtTemp(run.temperature_f, units) });
     } else if (isRange) {
-        conditions.push(<span key="tmp">🌡 <Missing what="temperature" /></span>);
+        conditions.push({ key: 'tmp', label: 'Temp', value: <Missing what="temperature" /> });
     }
 
     if (run.avg_wind_speed_mph != null) {
-        conditions.push(
-            <Item key="wind" className="text-cyan-700"
-                  title={run.wind_direction_deg != null
-                      ? `${run.wind_direction_deg}° vs travel (0°=tailwind, 180°=headwind)`
-                      : 'Direction not recorded'}>
-                💨 {fmtSpeed(run.avg_wind_speed_mph, units)}
-                {run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : ''}
-            </Item>);
+        conditions.push({
+            key: 'wind', label: 'Wind',
+            value: fmtSpeed(run.avg_wind_speed_mph, units)
+                + (run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : ''),
+            title: run.wind_direction_deg != null
+                ? `${run.wind_direction_deg}° vs travel (0°=tailwind, 180°=headwind)`
+                : 'Direction not recorded',
+        });
     } else if (isRange) {
-        conditions.push(<span key="wind">💨 <Missing what="wind" /></span>);
+        conditions.push({ key: 'wind', label: 'Wind', value: <Missing what="wind" /> });
     }
 
-    // Altitude and elevation gain are both in feet and mean different things, so
-    // each says which it is rather than relying on the reader to infer it.
+    // Altitude and elevation gain are both in feet and mean different things.
+    // Each said which it was with an emoji; now the cell label does it.
     if (run.altitude_ft != null) {
-        conditions.push(
-            <Item key="alt" className="text-secondary"
-                  title="Elevation the test was run at — drives air density, and so aero drag.">
-                ⛰ {Math.round(run.altitude_ft)} ft
-            </Item>);
+        conditions.push({
+            key: 'alt', label: 'Altitude', value: `${Math.round(run.altitude_ft).toLocaleString()} ft`,
+            title: 'Elevation the test was run at — drives air density, and so aero drag.',
+        });
     } else if (isRange) {
-        conditions.push(<span key="alt">⛰ <Missing what="altitude" /></span>);
+        conditions.push({ key: 'alt', label: 'Altitude', value: <Missing what="altitude" /> });
     }
 
     // Elevation gain is a property of a ROUTE. A charging test does not drive
     // one, so the field is meaningless there however it got populated.
     if (isRange) {
         conditions.push(run.elevation_gain_ft != null
-            ? <Item key="gain" className="text-secondary"
-                    title="Net climb over the route — drives the potential-energy term.">
-                  ↗ {Math.round(run.elevation_gain_ft)} ft gain
-              </Item>
-            : <span key="gain">↗ <Missing what="elevation gain" /> gain</span>);
+            ? {
+                key: 'gain', label: 'Elev gain',
+                value: `${Math.round(run.elevation_gain_ft).toLocaleString()} ft`,
+                title: 'Net climb over the route — drives the potential-energy term.',
+            }
+            : { key: 'gain', label: 'Elev gain', value: <Missing what="elevation gain" /> });
     }
-    // The notes field is literally called `conditions` in the schema, and that is
-    // what it holds — "overnight, 20in AT tyres", "lots of elevation gain/loss".
-    // It belongs beside the measured conditions rather than on a line of its own.
-    if (run.conditions) {
-        conditions.push(<Item key="notes" className="text-secondary italic">{run.conditions}</Item>);
-    }
+
     const software = run.softwareVersion || run.software_version;
     if (software) {
-        conditions.push(
-            <Item key="sw" className="text-secondary" title="Vehicle software version at the time of the test">
-                sw {software}
-            </Item>);
+        conditions.push({
+            key: 'sw', label: 'Software', value: software,
+            title: 'Vehicle software version at the time of the test',
+        });
+    }
+
+    // The notes field is literally called `conditions` in the schema, and that is
+    // what it holds — "overnight, 20in AT tyres", "lots of elevation gain/loss".
+    // It belongs beside the measured conditions rather than on a line of its
+    // own, and last because it is the one cell with no fixed shape.
+    if (run.conditions) {
+        conditions.push({ key: 'notes', label: 'Notes', value: run.conditions, tone: 'prose' });
     }
 
     // ── Results: what came out ───────────────────────────────────────────────
     const results = [];
     if (isRange) {
         if (run.distance_miles != null) {
-            results.push(<Item key="dist" className="text-green-700">{fmtDistance(run.distance_miles, units)}</Item>);
+            results.push({ key: 'dist', label: 'Distance', value: fmtDistance(run.distance_miles, units) });
         }
         if (run.energy_kwh != null) {
-            results.push(<Item key="kwh" className="text-blue-700" title="Energy out (measured at vehicle)">{run.energy_kwh} kWh out</Item>);
+            results.push({
+                key: 'kwh', label: 'Energy out', value: `${run.energy_kwh} kWh`,
+                title: 'Energy out (measured at vehicle)',
+            });
         }
         if (run.energy_kwh != null && run.distance_miles != null) {
-            results.push(
-                <Item key="eff" className="text-blue-700">
-                    {calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} {getEffLabel('mi_kwh', units)}
-                </Item>);
+            results.push({
+                key: 'eff', label: 'Efficiency',
+                value: `${calcEff(run.distance_miles, run.energy_kwh, 'mi_kwh', units)} ${getEffLabel('mi_kwh', units)}`,
+            });
         }
     } else {
-        results.push(<Item key="pts">{run.dataPointCount ?? run.data?.length ?? 0} data points</Item>);
+        results.push({
+            key: 'pts', label: 'Data points',
+            value: (run.dataPointCount ?? run.data?.length ?? 0).toLocaleString(),
+        });
+
         // Which columns the data actually carries, and which were estimated.
-        for (const f of fieldMeta.filter(f => (run.populated_fields || []).includes(f.key))) {
-            const isCalc = (run.calculated_fields || []).includes(f.key);
-            results.push(
-                <span key={`field-${f.key}`}
-                    title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
-                    className={`px-2 py-0.5 text-xs rounded-full font-medium border ${isCalc ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                    {isCalc ? `~${f.label}` : f.label}
-                </span>);
+        // One cell, not one per column: they are a set, and six cells of two
+        // characters each would take a third of the grid to say "SoC kW Time".
+        const present = fieldMeta.filter(f => (run.populated_fields || []).includes(f.key));
+        if (present.length) {
+            results.push({
+                key: 'cols', label: 'Columns',
+                value: (
+                    <span className="run-cell-tags">
+                        {present.map(f => {
+                            const isCalc = (run.calculated_fields || []).includes(f.key);
+                            return (
+                                <span
+                                    key={f.key}
+                                    className={`badge-micro${isCalc ? ' is-qualified' : ''}`}
+                                    title={isCalc ? `${f.title} (estimated from rated range)` : f.title}
+                                >
+                                    {isCalc ? `~${f.label}` : f.label}
+                                </span>
+                            );
+                        })}
+                    </span>
+                ),
+            });
         }
+
         if (run.charge_energy_kwh != null) {
-            results.push(<Item key="kwhin" className="text-blue-700" title="Energy in (measured at charger or vehicle)">{run.charge_energy_kwh} kWh in</Item>);
+            results.push({
+                key: 'kwhin', label: 'Energy in', value: `${run.charge_energy_kwh} kWh`,
+                title: 'Energy in (measured at charger or vehicle)',
+            });
         }
+
         // The kWh cross-check stays with the figure it checks.
         if (onCheckKwh && run.charge_energy_kwh != null && (run.dataPointCount ?? 0) > 1) {
             const check = calcKwhByRun?.[run.id];
             if (!check) {
-                results.push(
-                    <button key="cmp" onClick={() => onCheckKwh(run)}
-                        className="text-meta hover:text-secondary border border-[var(--color-border)] rounded px-1.5 py-0.5 transition-colors text-xs"
-                        title="Calculate kWh from data points and compare">Compare ↔</button>);
+                results.push({
+                    key: 'cmp', label: 'Cross-check',
+                    value: (
+                        <button type="button" onClick={() => onCheckKwh(run)} className="run-cell-action"
+                            title="Calculate kWh from data points and compare">
+                            Compare ↔
+                        </button>
+                    ),
+                });
             } else if (check.loading) {
-                results.push(<Item key="cmp" className="text-meta text-xs">Calculating…</Item>);
+                results.push({ key: 'cmp', label: 'Cross-check', value: 'Calculating…' });
             } else if (check.kwh != null) {
                 const pct = Math.abs(run.charge_energy_kwh - check.kwh) / Math.max(run.charge_energy_kwh, check.kwh) * 100;
-                results.push(
-                    <span key="cmp" title={`Calculated from data points: ${check.kwh} kWh`}
-                        className={`text-xs px-1.5 py-0.5 rounded border font-medium ${pct > 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                        {pct > 5 ? '⚠️ ' : '✓ '}data: {check.kwh} kWh ({pct.toFixed(1)}%)
-                    </span>);
+                // Agreement is the expected case and takes the neutral badge —
+                // an intent is for the few that are actually saying something is
+                // wrong. Only the disagreement is coloured.
+                results.push({
+                    key: 'cmp', label: 'Cross-check',
+                    tone: pct > 5 ? 'warning' : undefined,
+                    title: `Calculated from data points: ${check.kwh} kWh`,
+                    value: `${pct > 5 ? '⚠ ' : '✓ '}${check.kwh} kWh · ${pct.toFixed(1)} %`,
+                });
             }
         }
     }
@@ -198,10 +276,10 @@ export default function RunSpecRows({ run, units, socRange, fieldMeta = [], calc
     if (!design.length && !conditions.length && !results.length) return null;
 
     return (
-        <div className="run-spec-rows">
-            <Row label="Design"     items={design} />
-            <Row label="Conditions" items={conditions} />
-            <Row label="Results"    items={results} />
+        <div className="run-bands">
+            <Band label="Design"     cells={design} />
+            <Band label="Conditions" cells={conditions} />
+            <Band label="Results"    cells={results} />
         </div>
     );
 }
