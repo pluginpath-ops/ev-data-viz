@@ -3,14 +3,12 @@ import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
 import { decorateRow, buildBrandIndex } from '../../../utils/feGuideBrowse';
 import {
-    UNITS, DEFAULT_UNIT, DIMENSIONS, MEASURES, measureByKey, SORT_KEYS, DEFAULT_SORT,
-    summarise, overall, histogram, extremes, bucketise, describe,
-    histogramOf, extremesOf, applyStatsFilters, bestCoveredYear, yearsPresent,
+    UNITS, DEFAULT_UNIT, DIMENSIONS, SORT_KEYS, DEFAULT_SORT,
+    applyStatsFilters, bestCoveredYear, yearsPresent,
 } from '../../../utils/epaGuideStats';
-import {
-    CERT_MEASURES, certMeasureByKey, certObservations, coverageFor, nullImpossible,
-    UNKNOWN_DIMENSION,
-} from '../../../utils/epaCertStats';
+import { UNKNOWN_DIMENSION } from '../../../utils/epaCertStats';
+import { datasetByKey, isKnownMeasure, certPopulation } from '../../../utils/statsDatasets';
+import StatsControls from './StatsControls';
 import StatsTable from './StatsTable';
 import StatsHistogram from './StatsHistogram';
 import StatsExtremes from './StatsExtremes';
@@ -34,20 +32,6 @@ import LoadingSpinner from '../../LoadingSpinner';
  */
 const MIN_N = 3;
 
-/**
- * Two datasets, not two views of one.
- *
- * The guide holds what reached the window sticker for 1,175 configurations; the
- * certification records hold the lab's own measurements for 181. Different
- * populations, different measures, different n — so which one is being read has
- * to be a deliberate choice rather than something inferred from the measure
- * that happens to be selected.
- */
-const DATASETS = [
-    { key: 'guide', label: 'Label figures', source: 'Fuel Economy Guide — what reached the window sticker' },
-    { key: 'cert',  label: 'Lab measurements', source: 'EPA certification records — road load, efficiency, energy' },
-];
-
 export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' }) {
     const { getFeGuideRows, getBrandAliases, getCertGroupsForStats } = useAppContext();
 
@@ -63,15 +47,11 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
         return {
             unit:      UNITS.some(u => u.key === p.get('u')) ? p.get('u') : DEFAULT_UNIT,
             dimension: DIMENSIONS.some(d => d.key === p.get('d')) ? p.get('d') : 'body_class',
-            // Checked against BOTH catalogues. Only the guide's was consulted,
-            // so a certification-side measure in the URL failed validation and
-            // reverted to the guide default — which the cert tab then swapped
-            // for charger efficiency. Every shared link to a certification
-            // measure opened on the wrong one. Which dataset owns the key does
-            // not need deciding here; `measure` below already resolves that
-            // against the active tab.
-            measure:   [...MEASURES, ...CERT_MEASURES].some(m => m.key === p.get('ms'))
-                ? p.get('ms') : 'label_comb_mpge',
+            // Validated against both catalogues; which dataset OWNS the key
+            // does not need deciding here, because `measure` below resolves
+            // that against the active tab. Null when unknown, so the dataset's
+            // own default answers rather than the guide's always answering.
+            measure:   isKnownMeasure(p.get('ms')) ? p.get('ms') : null,
             // `key:dir` in one parameter — two would let a link carry half a
             // sort, and there is no sensible reading of a direction with no
             // column. Anything unrecognised falls back whole.
@@ -101,8 +81,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
     const [classes, setClasses]     = useState(initial.classes);
     const [drives, setDrives]       = useState(initial.drives);
 
-    const isCert = dataset === 'cert';
-    const measures = isCert ? CERT_MEASURES : MEASURES;
+    const ds = datasetByKey(dataset);
 
     /**
      * A measure belongs to one dataset. Switching datasets with `aero_c`
@@ -113,15 +92,10 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
      * render and cascade, and this is derivable — the selection is only ever
      * the stored one when the active dataset actually has it.
      */
-    const measure = measures.some(m => m.key === storedMeasure)
+    const measure = ds.measures.some(m => m.key === storedMeasure)
         ? storedMeasure
-        // Charger efficiency opens the certification side because it is the
-        // one figure here with no counterpart anywhere else: nobody publishes
-        // it, it is measured rather than derived from an assumption, and its
-        // spread is the most immediate signal of whether a record imported
-        // soundly.
-        : (isCert ? 'charger_eff' : 'label_comb_mpge');
-    const measDef = isCert ? certMeasureByKey(measure) : measureByKey(measure);
+        : ds.defaultMeasure;
+    const measDef = ds.measureByKey(measure);
 
     const brandIndex = useMemo(() => buildBrandIndex(aliases ?? []), [aliases]);
     const allRows = useMemo(
@@ -136,19 +110,25 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
      * below it to collapse.
      */
     const certObs = useMemo(
-        () => certObservations(certGroups ?? [], brandIndex),
+        () => certPopulation(certGroups, brandIndex),
         [certGroups, brandIndex],
+    );
+
+    /**
+     * The population on screen, chosen by the dataset rather than by an
+     * `isCert` here. Everything below reads it: the year chips, the filter
+     * chips, the filtered set and every statistic.
+     */
+    const active = useMemo(
+        () => ds.observations({ guideRows: allRows, certObs }),
+        [ds, allRows, certObs],
     );
 
     // Both derived from the dataset on screen. The guide's best-covered year is
     // not the certification records' — defaulting one tab to the other's answer
     // lands it on a thin year for no visible reason.
-    const activeForYears = isCert ? certObs : allRows;
-    const allYears = useMemo(() => yearsPresent(activeForYears), [activeForYears]);
-    const defaultYear = useMemo(() => bestCoveredYear(activeForYears), [activeForYears]);
-
-
-
+    const allYears = useMemo(() => yearsPresent(active), [active]);
+    const defaultYear = useMemo(() => bestCoveredYear(active), [active]);
 
 
     // One year by default, because the same configuration recurs across years
@@ -194,14 +174,13 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
      *
      * `Unknown` sorts last rather than alphabetically. It is not a class.
      */
-    const facetRows = isCert ? certObs : allRows;
     const facetValues = (rows, key) => {
         const vals = [...new Set(rows.map(r => r[key]).filter(Boolean))];
         const known = vals.filter(v => v !== UNKNOWN_DIMENSION).sort();
         return vals.includes(UNKNOWN_DIMENSION) ? [...known, UNKNOWN_DIMENSION] : known;
     };
-    const allClasses = useMemo(() => facetValues(facetRows, 'body_class'), [facetRows]);
-    const allDrives  = useMemo(() => facetValues(facetRows, 'drive_group'), [facetRows]);
+    const allClasses = useMemo(() => facetValues(active, 'body_class'), [active]);
+    const allDrives  = useMemo(() => facetValues(active, 'drive_group'), [active]);
 
     const toggleIn = (list, setList) => (v) =>
         setList(list.includes(v) ? list.filter(x => x !== v) : [...list, v]);
@@ -219,7 +198,10 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
         p.set('sub', subtab);
         if (unit !== DEFAULT_UNIT)        p.set('u', unit);
         if (dimension !== 'body_class')   p.set('d', dimension);
-        if (measure !== 'label_comb_mpge') p.set('ms', measure);
+        // Against the ACTIVE dataset's default, not always the guide's — the
+        // certification tab wrote `ms=charger_eff` into every URL to say
+        // "the default".
+        if (measure !== ds.defaultMeasure) p.set('ms', measure);
         if (sort.key !== DEFAULT_SORT.key || sort.dir !== DEFAULT_SORT.dir) {
             p.set('so', `${sort.key}:${sort.dir}`);
         }
@@ -229,17 +211,14 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
         if (showClassFilter && classes.length) p.set('cl', classes.join(','));
         if (showDriveFilter && drives.length)  p.set('dr', drives.join(','));
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [dataset, unit, dimension, measure, sort, years, classes, drives, showClassFilter, showDriveFilter, subtab]);
+    }, [ds, unit, dimension, measure, sort, years, classes, drives, showClassFilter, showDriveFilter, subtab]);
 
     /**
-     * The population under study, whichever dataset that is.
-     *
      * Guide rows and certification observations carry the same three dimension
      * fields by design, so one filter serves both. Written twice, the second
      * copy would drift the first time a filter was added — which is the failure
      * this whole module keeps arguing against elsewhere.
      */
-    const active = isCert ? certObs : allRows;
     const filtered = useMemo(
         () => applyStatsFilters(active, {
             years: selectedYears, classes, drives,
@@ -249,52 +228,24 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
     );
 
     /**
-     * The plotted population: the filtered one with any impossible value for
-     * the measure on screen nulled.
-     *
-     * A backstop, not the fix. Zoox filed 999.0 for energy, distance and
-     * recharge alike and Karsan filed 1.0 for all three — placeholders, not
-     * measurements — and one of them alone set the axis from 1 to 999 and
-     * flattened every box on the table. The records want correcting on the
-     * certification side; this stops a value that cannot be true from reaching
-     * a median in the meantime.
+     * The plotted population: the filtered one, cleaned by whatever the dataset
+     * says needs cleaning — see `statsDatasets` for the placeholder values on
+     * the certification side.
      *
      * Everything below reads `plotted` rather than `filtered`, coverage
      * included, so the count in the caption describes the same numbers the
      * table and the histogram were built from.
      */
-    const plotted = useMemo(
-        () => (isCert ? nullImpossible(filtered, measure) : filtered),
-        [isCert, filtered, measure],
-    );
+    const plotted  = useMemo(() => ds.plotted(filtered, measure), [ds, filtered, measure]);
+    const coverage = useMemo(() => ds.coverage(plotted, measure), [ds, plotted, measure]);
 
-    const coverage = useMemo(
-        () => (isCert ? coverageFor(plotted, measure) : null),
-        [isCert, plotted, measure],
+    const summary = useMemo(
+        () => ds.summarise(plotted, { unit, dimension, measure, minN: MIN_N, sort }),
+        [ds, plotted, unit, dimension, measure, sort],
     );
-
-    const summary   = useMemo(
-        () => (isCert
-            ? bucketise(plotted, { dimension, measure, minN: MIN_N, sort })
-            : summarise(plotted, { unit, dimension, measure, minN: MIN_N, sort })),
-        [isCert, plotted, unit, dimension, measure, sort],
-    );
-    const corpus    = useMemo(
-        () => (isCert ? describe(plotted.map(o => o[measure])) : overall(plotted, { unit, measure })),
-        [isCert, plotted, unit, measure],
-    );
-    const hist = useMemo(
-        () => (isCert
-            ? histogramOf(plotted, { measure, bins: 24 })
-            : histogram(plotted, { unit, measure, bins: 24 })),
-        [isCert, plotted, unit, measure],
-    );
-    const tails = useMemo(
-        () => (isCert
-            ? extremesOf(plotted, { measure, count: 5 })
-            : extremes(plotted, { unit, measure, count: 5 })),
-        [isCert, plotted, unit, measure],
-    );
+    const corpus = useMemo(() => ds.corpus(plotted, { unit, measure }), [ds, plotted, unit, measure]);
+    const hist   = useMemo(() => ds.histogram(plotted, { unit, measure, bins: 24 }), [ds, plotted, unit, measure]);
+    const tails  = useMemo(() => ds.extremes(plotted, { unit, measure, count: 5 }), [ds, plotted, unit, measure]);
 
     if (loading) return <LoadingSpinner />;
     if (error) {
@@ -313,132 +264,65 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
 
     const unitDef = UNITS.find(u => u.key === unit);
     const dimDef  = DIMENSIONS.find(d => d.key === dimension);
-    const dsDef   = DATASETS.find(d => d.key === dataset);
+
+    /* The controls say what is selected; this says what the numbers below MEAN,
+       which is a different sentence. The unit clause is the guide's question —
+       on the certification side there is no choice to report, so it states the
+       record is the unit rather than echoing a control that is not on screen. */
+    const scope = [
+        ds.unitPhrase(unit),
+        selectedYears.length === 0 ? 'all model years'
+            : selectedYears.length === 1 ? `model year ${selectedYears[0]}`
+                : `model years ${selectedYears.join(', ')}`,
+        showClassFilter && classes.length > 0 ? `${classes.join(' / ')} only` : null,
+        showDriveFilter && drives.length > 0 ? `${drives.join(' / ')} only` : null,
+        corpus.n > 0 ? `n=${corpus.n}` : null,
+    ].filter(Boolean);
 
     return (
         <div className="stats-view">
-            <div className="section-header">
+            <StatsControls
+                units={UNITS}
+                unit={unit}
+                onUnit={setUnit}
+                hasUnitChoice={ds.hasUnitChoice}
+                measures={ds.measures}
+                measure={measure}
+                onMeasure={setMeasure}
+                defaultMeasure={ds.defaultMeasure}
+                dimensions={DIMENSIONS}
+                dimension={dimension}
+                onDimension={setDimension}
+                allYears={allYears}
+                selectedYears={selectedYears}
+                onToggleYear={toggleYear}
+                onAllYears={() => setYears([])}
+                allClasses={allClasses}
+                classes={classes}
+                onToggleClass={toggleIn(classes, setClasses)}
+                onClearClasses={() => setClasses([])}
+                showClassFilter={showClassFilter}
+                allDrives={allDrives}
+                drives={drives}
+                onToggleDrive={toggleIn(drives, setDrives)}
+                onClearDrives={() => setDrives([])}
+                showDriveFilter={showDriveFilter}
+            />
+
+            {/* The measure and the grouping, as a sentence, because the strip
+                above states them as settings. `answers` is the unit's own
+                question — the reason to care which unit is selected at all —
+                and it sits at the right where the design puts it. */}
+            <div className="stats-headline">
                 <div>
-                    <div className="section-title">{dsDef?.label}</div>
-                    <div className="text-note">
-                        {dsDef?.source}
-                    </div>
-                    <div className="text-note">
-                        {/* The unit clause is the guide's question. On the
-                            certification side there is no choice to report —
-                            the record is the unit — so it states that rather
-                            than echoing a control that is not on screen. */}
-                        {measDef?.label} by {dimDef?.label.toLowerCase()},
-                        {' '}{isCert ? 'per certification record' : unitDef?.label.toLowerCase()},
-                        {' '}{selectedYears.length === 0
-                            ? 'all model years'
-                            : selectedYears.length === 1
-                                ? `model year ${selectedYears[0]}`
-                                : `model years ${selectedYears.join(', ')}`}
-                        {showClassFilter && classes.length > 0 && `, ${classes.join(' / ')} only`}
-                        {showDriveFilter && drives.length > 0 && `, ${drives.join(' / ')} only`}.
-                    </div>
+                    <span className="stats-headline-title">
+                        {measDef?.label} by {dimDef?.label.toLowerCase()}
+                    </span>
+                    <span className="stats-headline-scope">{scope.join(' · ')}</span>
                 </div>
-            </div>
-
-            <div className="guide-filter-bar">
-                {/* The unit leads, and states the question each answers. The
-                    same query gives materially different numbers, and a reader
-                    who does not know which one they are looking at cannot use
-                    any of them. */}
-                {/* Only the guide has a unit-of-analysis question. A
-                    certification record IS the unit; there is nothing below it
-                    to collapse. */}
-                {!isCert && (
-                <div className="guide-facet stats-facet-unit">
-                    <div className="guide-facet-label">Count one observation per</div>
-                    <div className="guide-facet-values">
-                        {UNITS.map(u => (
-                            <button
-                                key={u.key}
-                                type="button"
-                                className={`guide-chip ${unit === u.key ? 'active' : ''}`}
-                                onClick={() => setUnit(u.key)}
-                                title={u.answers}
-                            >
-                                {u.label.replace('Per ', '')}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="text-note">{unitDef?.answers}</div>
-                </div>
+                {ds.hasUnitChoice && unitDef?.answers && (
+                    <span className="stats-headline-question">“{unitDef.answers}”</span>
                 )}
-
-                <div className="guide-facet">
-                    <div className="guide-facet-label">Model year</div>
-                    <div className="guide-facet-values">
-                        {allYears.map(y => (
-                            <button key={y} type="button"
-                                className={`guide-chip ${selectedYears.includes(y) ? 'active' : ''}`}
-                                onClick={() => toggleYear(y)}>{y}</button>
-                        ))}
-                        <button type="button"
-                            className={`guide-chip ${selectedYears.length === 0 ? 'active' : ''}`}
-                            onClick={() => setYears([])}>All</button>
-                    </div>
-                    {/* Stated rather than prevented. Comparing two years is a
-                        real question; counting one car twice while asking what
-                        is typical is a different one, and the reader should be
-                        told which they are looking at. */}
-                    {selectedYears.length !== 1 && (
-                        <div className="text-note">
-                            A configuration that appears in several years is counted once per year.
-                        </div>
-                    )}
-                </div>
-
-                <div className="guide-facet">
-                    <div className="guide-facet-label">Group by</div>
-                    <div className="guide-facet-values">
-                        {DIMENSIONS.map(d => (
-                            <button key={d.key} type="button"
-                                className={`guide-chip ${dimension === d.key ? 'active' : ''}`}
-                                onClick={() => setDimension(d.key)}>{d.label}</button>
-                        ))}
-                    </div>
-                </div>
-
-                {showClassFilter && (
-                    <div className="guide-facet">
-                        <div className="guide-facet-label">Only these classes</div>
-                        <div className="guide-facet-values">
-                            {allClasses.map(c => (
-                                <button key={c} type="button"
-                                    className={`guide-chip ${classes.includes(c) ? 'active' : ''}`}
-                                    onClick={() => toggleIn(classes, setClasses)(c)}>{c}</button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {showDriveFilter && (
-                    <div className="guide-facet">
-                        <div className="guide-facet-label">Only these drivetrains</div>
-                        <div className="guide-facet-values">
-                            {allDrives.map(d => (
-                                <button key={d} type="button"
-                                    className={`guide-chip ${drives.includes(d) ? 'active' : ''}`}
-                                    onClick={() => toggleIn(drives, setDrives)(d)}>{d}</button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                <div className="guide-facet">
-                    <div className="guide-facet-label">Measure</div>
-                    <div className="guide-facet-values">
-                        {measures.map(m => (
-                            <button key={m.key} type="button"
-                                className={`guide-chip ${measure === m.key ? 'active' : ''}`}
-                                onClick={() => setMeasure(m.key)}>{m.label}</button>
-                        ))}
-                    </div>
-                </div>
             </div>
 
             {/* What the figure is computed from, and what it is not. A median
@@ -471,7 +355,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
             <div className="stats-panels">
                 <div className="stats-panel">
                     <div className="section-header-title">Distribution</div>
-                    <StatsHistogram data={hist} measureDef={measDef} />
+                    <StatsHistogram data={hist} measureDef={measDef} overall={corpus} />
                 </div>
                 <div className="stats-panel">
                     <div className="section-header-title">Named extremes</div>
@@ -479,10 +363,14 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
                 </div>
             </div>
 
-            <div className="text-note">
-                Buckets with fewer than {MIN_N} observations are marked rather than dropped.
+            {/* Held to a measure's width rather than the page's. This is prose
+                about method, and prose set to 1400px is unreadable however
+                short it is. */}
+            <div className="text-note stats-method-note">
                 Medians and quartiles throughout — these distributions are small and skewed,
                 and one long-range outlier moves a mean in a way it does not move a median.
+                A configuration present in several model years is counted once per year, and
+                buckets with fewer than {MIN_N} observations are marked rather than dropped.
             </div>
         </div>
     );

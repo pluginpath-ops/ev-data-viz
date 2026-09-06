@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useLightDismiss } from '../../../hooks/useLightDismiss';
+import MenuButton from '../../shell/MenuButton';
 
 /**
  * One facet, as a button that opens a menu (#235, re-skin phase 5a).
@@ -27,8 +27,6 @@ import { useLightDismiss } from '../../../hooks/useLightDismiss';
 export default function GuideFacetMenu({
     label, values, selected, countFor, onToggle, onClear, format = String, hint,
 }) {
-    const [open, setOpen] = useState(false);
-    const ref = useLightDismiss(open, () => setOpen(false));
     const [query, setQuery] = useState('');
 
 
@@ -52,21 +50,14 @@ export default function GuideFacetMenu({
             : String(selected.length);
 
     return (
-        <div className="guide-facet-menu" ref={ref}>
-            <button
-                type="button"
-                onClick={() => setOpen(o => !o)}
-                className={`guide-facet-btn${selected.length ? ' active' : ''}`}
-                title={hint ? `${label} — ${hint}` : label}
-                aria-expanded={open}
-            >
-                {label}
-                {summary && <span className="guide-facet-btn-value">{summary}</span>}
-                <span className="disclosure-caret guide-facet-caret" aria-hidden="true">▾</span>
-            </button>
-
-            {open && (
-                <div className="guide-facet-panel">
+        <MenuButton
+            label={label}
+            value={summary}
+            active={selected.length > 0}
+            title={hint ? `${label} — ${hint}` : label}
+        >
+            {({ close }) => (
+                <>
                     {/* Only where the list is long enough to need it. A filter
                         box above eight options is furniture. */}
                     {values.length > 8 && (
@@ -118,12 +109,12 @@ export default function GuideFacetMenu({
 
                     <div className="guide-facet-panel-foot">
                         <span className="text-nano">{shown.length} shown</span>
-                        <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
+                        <button type="button" className="btn btn-secondary" onClick={close}>
                             Done
                         </button>
                     </div>
-                </div>
+                </>
             )}
-        </div>
+        </MenuButton>
     );
 }
