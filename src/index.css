@@ -2437,6 +2437,12 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 
 /* Top-right of the band, on a dark plate so it stays readable over any photo. */
 .vehicle-media-badge {
+    /* inline-flex so the same badge works as a full-width control in a button
+       stack, which is what Tests & Data needs of it — see .is-inline. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     position: absolute;
     right: 10px;
     top: 9px;
@@ -3241,14 +3247,57 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 /* Range estimation option panel; color classes added inline */
+/* ── State panels ────────────────────────────────────────────────────────────
+ *
+ * A block that says what the importer is about to do, and whether that is
+ * fine. Both of these carried a semantic class and then had their STATE
+ * painted on inline — `bg-green-50 border-green-200` against `bg-amber-50
+ * border-amber-200` — so the class named the panel and a palette literal named
+ * the only part of it that ever changed.
+ *
+ * The intents are shared, because "this is fine" and "look at this" are the
+ * same two states on both panels and on the note panel above.
+ */
 .estimation-panel {
     @apply p-4 rounded-lg border flex items-start justify-between gap-4;
     border-color: var(--color-border);
 }
-
-/* Join key / merge-mode info panel; color classes added inline */
 .join-key-panel {
     @apply mt-5 p-4 rounded-lg border;
+    border-color: var(--color-border);
+}
+.estimation-panel.is-good,
+.join-key-panel.is-good,
+.state-panel.is-good {
+    border-color: var(--color-success-border);
+    background-color: var(--color-success-surface);
+    color: var(--color-success-text);
+}
+.estimation-panel.is-warning,
+.join-key-panel.is-warning,
+.state-panel.is-warning {
+    border-color: var(--color-warning-border);
+    background-color: var(--color-warning-surface);
+    color: var(--color-warning-text);
+}
+.estimation-panel.is-danger,
+.join-key-panel.is-danger,
+.state-panel.is-danger {
+    border-color: var(--color-danger-border);
+    background-color: var(--color-danger-surface);
+    color: var(--color-danger-text);
+}
+/* A heading inside a state panel takes the panel's own colour rather than
+   restating it — the intent is on the container, once. */
+.estimation-panel.is-good > * > .state-panel-title,
+.join-key-panel .state-panel-title,
+.state-panel .state-panel-title {
+    font-weight: 600;
+    color: inherit;
+}
+/* The same block, where nothing named it before. */
+.state-panel {
+    @apply mb-3 p-3 rounded-lg border flex flex-wrap items-center gap-3;
     border-color: var(--color-border);
 }
 
@@ -3995,6 +4044,58 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-meta);
 }
 
+/* ── Note panel ──────────────────────────────────────────────────────────────
+ *
+ * A small bordered notice carrying an intent — a warning about the data, an
+ * error from a parse, a fact about what an import is about to do.
+ *
+ * Tests & Data had seven of these, written inline seven times: `text-xs
+ * text-amber-700 bg-amber-50 border border-amber-200 rounded p-2` and its red
+ * and blue variants. Every one of them was a light surface with no dark
+ * counterpart, which is what `KNOWN_OFFENDERS` counts — a third of that
+ * backlog was this one component, retyped.
+ *
+ * Warning is the default because most of them are warnings, and because a
+ * notice with no intent is a paragraph. */
+.note-panel {
+    padding: 6px 9px;
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-control);
+    background-color: var(--color-warning-surface);
+    color: var(--color-warning-text);
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+}
+.note-panel.is-danger {
+    border-color: var(--color-danger-border);
+    background-color: var(--color-danger-surface);
+    color: var(--color-danger-text);
+}
+/* Not an alarm: "timestamps detected, they will be converted". It takes the
+   brand surface rather than a status one because nothing is wrong. */
+.note-panel.is-info {
+    border-color: var(--color-primary-border);
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
+}
+
+/* A card queued for deletion, waiting on the undo bar. It wore
+   `opacity-60 border-2 border-red-200`, which on a dark theme is a pale pink
+   line nobody can see. */
+.card.is-pending-delete {
+    opacity: 0.6;
+    border-color: var(--color-danger-border);
+}
+/* The one spinner that was drawn with a palette border rather than the
+   theme's. */
+.spinner-inline {
+    @apply inline-block animate-spin;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--color-primary);
+    border-top-color: transparent;
+    border-radius: 50%;
+}
+
 /* ── Charging pair (handoff 7b, treatment A) ─────────────────────────────────
  *
  * A bordered footer UNDER the bands rather than a row inside them. It sat in
@@ -4039,6 +4140,58 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .run-pair-state {
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     color: var(--color-text-meta);
+}
+
+/* ── Note panel ──────────────────────────────────────────────────────────────
+ *
+ * A small bordered notice carrying an intent — a warning about the data, an
+ * error from a parse, a fact about what an import is about to do.
+ *
+ * Tests & Data had seven of these, written inline seven times: `text-xs
+ * text-amber-700 bg-amber-50 border border-amber-200 rounded p-2` and its red
+ * and blue variants. Every one of them was a light surface with no dark
+ * counterpart, which is what `KNOWN_OFFENDERS` counts — a third of that
+ * backlog was this one component, retyped.
+ *
+ * Warning is the default because most of them are warnings, and because a
+ * notice with no intent is a paragraph. */
+.note-panel {
+    padding: 6px 9px;
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-control);
+    background-color: var(--color-warning-surface);
+    color: var(--color-warning-text);
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+}
+.note-panel.is-danger {
+    border-color: var(--color-danger-border);
+    background-color: var(--color-danger-surface);
+    color: var(--color-danger-text);
+}
+/* Not an alarm: "timestamps detected, they will be converted". It takes the
+   brand surface rather than a status one because nothing is wrong. */
+.note-panel.is-info {
+    border-color: var(--color-primary-border);
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
+}
+
+/* A card queued for deletion, waiting on the undo bar. It wore
+   `opacity-60 border-2 border-red-200`, which on a dark theme is a pale pink
+   line nobody can see. */
+.card.is-pending-delete {
+    opacity: 0.6;
+    border-color: var(--color-danger-border);
+}
+/* The one spinner that was drawn with a palette border rather than the
+   theme's. */
+.spinner-inline {
+    @apply inline-block animate-spin;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--color-primary);
+    border-top-color: transparent;
+    border-radius: 50%;
 }
 
 /* ── Selective inheritance picker ───────────────────────────────────────────── */

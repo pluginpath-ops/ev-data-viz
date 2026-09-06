@@ -170,7 +170,7 @@ function scanCss(key, test) {
 export const LEDGER = [
     {
         key: 'palette-text',
-        count: 256,
+        count: 235,
         scope: 'src/**/*.jsx',
         what: 'Text colours written as Tailwind palette utilities. These sit outside '
             + 'the theme: when the re-skin re-valued the tokens, every one of these '
@@ -181,7 +181,7 @@ export const LEDGER = [
     },
     {
         key: 'palette-bg',
-        count: 121,
+        count: 89,
         scope: 'src/**/*.jsx',
         what: 'Background fills written as palette utilities. The subset of these that '
             + 'are LIGHT fills with no dark counterpart is separately ratcheted as '
@@ -193,7 +193,7 @@ export const LEDGER = [
     },
     {
         key: 'palette-border',
-        count: 81,
+        count: 58,
         scope: 'src/**/*.jsx',
         what: 'Border colours written as palette utilities.',
         fix: '--color-border, --color-border-strong, --color-border-subtle.',
@@ -213,7 +213,7 @@ export const LEDGER = [
     },
     {
         key: 'arbitrary-text-size',
-        count: 102,
+        count: 101,
         scope: 'src/**/*.jsx',
         what: 'Font sizes written as arbitrary values — `text-[10px]`, `text-[11px]`. '
             + 'Every one is a size the global UI-scale knob cannot move and the type '

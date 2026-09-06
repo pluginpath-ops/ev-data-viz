@@ -220,7 +220,7 @@ const DeriveAxisPanel = ({
             </div>
 
             {batteryMissing && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                <p className="note-panel">
                     ⚠ Set the battery capacity (kWh) on this vehicle to derive charging axes.
                 </p>
             )}
@@ -358,13 +358,13 @@ const DeriveAxisPanel = ({
                     </div>
 
                     {error && (
-                        <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{error}</p>
+                        <p className="note-panel is-danger">{error}</p>
                     )}
 
                     {preview && !error && (
                         <div className="space-y-1">
                             {preview.warnings.length > 0 && (
-                                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 space-y-0.5">
+                                <div className="note-panel space-y-0.5">
                                     {preview.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
                                 </div>
                             )}
@@ -1297,31 +1297,32 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 <div className="flex flex-col gap-1 flex-shrink-0 items-stretch w-28">
                     {(() => {
                         const isPublic = vehicle.visibility === 'public';
-                        const base = 'w-full flex items-center justify-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition';
+                        // The same badge the vehicle card wears, off its photograph.
+                        const base = 'vehicle-media-badge is-inline w-full';
                         return canPublish() ? (
                             <button
                                 onClick={() => onToggleVehicleVisibility(vehicle.id, isPublic ? 'private' : 'public')}
-                                className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200' : 'bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]'}`}
+                                className={`${base} ${isPublic ? 'is-public' : 'is-private'}`}
                             >
                                 {isPublic ? '🌐 Public' : '🔒 Private'}
                             </button>
                         ) : (
-                            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)]'}`}>
+                            <span className={`${base} ${isPublic ? 'is-public' : 'is-private'}`}>
                                 {isPublic ? '🌐 Public' : '🔒 Private'}
                             </span>
                         );
                     })()}
                     {canEdit(vehicle) && (
-                        <button onClick={openEditVehicle} className="px-3 py-1 rounded-md text-xs font-medium bg-[var(--color-surface-sunken)] text-secondary hover:bg-[var(--color-surface-muted)] transition">
+                        <button onClick={openEditVehicle} className="btn btn-secondary">
                             Edit
                         </button>
                     )}
                     {canEdit(vehicle) ? (
-                        <button onClick={() => setShowEditSpecs(true)} className="px-3 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition">
+                        <button onClick={() => setShowEditSpecs(true)} className="btn btn-secondary">
                             Specs
                         </button>
                     ) : vehicle.specs && Object.keys(vehicle.specs).length > 0 && (
-                        <button onClick={() => setShowViewSpecs(true)} className="px-3 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition">
+                        <button onClick={() => setShowViewSpecs(true)} className="btn btn-secondary">
                             Specs
                         </button>
                     )}
@@ -1329,15 +1330,15 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         <button
                             onClick={async () => { setDuplicatingVehicle(true); await onDuplicateVehicle(vehicle.id); setDuplicatingVehicle(false); }}
                             disabled={duplicatingVehicle}
-                            className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-50 flex items-center gap-1"
+                            className="btn btn-secondary disabled:opacity-50"
                         >
-                            {duplicatingVehicle ? <><span className="inline-block w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"/>Copying…</> : '⧉ Copy'}
+                            {duplicatingVehicle ? <><span className="spinner-inline"/>Copying…</> : '⧉ Copy'}
                         </button>
                     )}
                     {canDelete(vehicle) && (
                         <button
                             onClick={() => { if (window.confirm(`Delete "${vehicle.name}" and all its tests?`)) onDeleteVehicle(vehicle.id); }}
-                            className="px-3 py-1 rounded-md text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition"
+                            className="btn btn-danger"
                         >
                             Delete
                         </button>
@@ -1515,7 +1516,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     />
                                                     {runMetadata.startSoc !== '' && runMetadata.endSoc !== '' &&
                                                      parseFloat(runMetadata.startSoc) < parseFloat(runMetadata.endSoc) && (
-                                                        <p className="col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                        <p className="note-panel col-span-2">
                                                             ⚠ Start SoC is lower than End SoC — for a range test the vehicle depletes, so Start should be higher (e.g. 95% → 5%). Did you swap them?
                                                         </p>
                                                     )}
@@ -1730,7 +1731,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     isTimestampValue(firstRow[fieldMapping.time]);
                                 if (!tsMapped && !timeColTs) return null;
                                 return (
-                                    <p className="mt-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                                    <p className="note-panel is-info mt-3">
                                         📅 Timestamps detected — will be converted to elapsed minutes from the first data point
                                         {tsMapped && !timeMapped && ' (Elapsed Time will be derived automatically)'}
                                     </p>
@@ -1742,9 +1743,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 <div className="mt-5 space-y-3">
                                     {/* Measured range from test data */}
                                     {offerRangeEstimateTest && (
-                                        <div className={`estimation-panel ${estimations.range === 'measured' ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+                                        <div className={`estimation-panel ${estimations.range === 'measured' ? 'is-good' : 'is-warning'}`}>
                                             <div className="flex-1 min-w-0">
-                                                <p className={`text-sm font-semibold ${estimations.range === 'measured' ? 'text-green-800' : 'text-amber-800'}`}>
+                                                <p className="state-panel-title">
                                                     {estimations.range === 'measured' ? '✓ Range will be estimated (test data)' : '📏 Estimate from measured range test'}
                                                 </p>
                                                 {rangeTestRuns.length > 1 && (
@@ -1785,9 +1786,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
                             {/* Join key selector — merge mode only */}
                             {uploadMode === 'merge' && (
-                                <div className={`join-key-panel ${missingJoinKey ? 'bg-red-50 border-red-200' : showJoinSelector ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
+                                <div className={`join-key-panel ${missingJoinKey ? 'is-danger' : showJoinSelector ? 'is-warning' : 'is-good'}`}>
                                     {missingJoinKey ? (
-                                        <p className="text-sm font-semibold text-red-700">
+                                        <p className="state-panel-title">
                                             ⚠ Map at least one of <strong>SoC</strong> or <strong>Time</strong> — it's needed to link incoming rows to existing ones.
                                         </p>
                                     ) : showJoinSelector ? (
@@ -1876,7 +1877,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                   return (
                     <div
                         key={run.id}
-                        className={`card${isPending ? ' opacity-60 border-2 border-red-200' : ''}`}
+                        className={`card${isPending ? ' is-pending-delete' : ''}`}
                     >
                         {editingRunId === run.id ? (
                             <div>
@@ -1964,7 +1965,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 />
                                                 {editFormData.startSoc !== '' && editFormData.endSoc !== '' &&
                                                  parseFloat(editFormData.startSoc) < parseFloat(editFormData.endSoc) && (
-                                                    <p className="col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                    <p className="note-panel col-span-2">
                                                         ⚠ Start SoC is lower than End SoC — for a range test the vehicle depletes, so Start should be higher (e.g. 95% → 5%). Did you swap them?
                                                     </p>
                                                 )}
@@ -2142,8 +2143,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 if (!editData.every(r => r.range == null)) return null;
                                                 if (!hasAnyOption) return null;
                                                 return (
-                                                    <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200">
-                                                        <p className="text-xs text-blue-800 font-semibold mb-2">ℹ No range data — estimate from SoC%:</p>
+                                                    <div className="note-panel is-info mb-3">
+                                                        <p className="font-semibold mb-2">ℹ No range data — estimate from SoC%:</p>
                                                         <div className="flex flex-wrap gap-2">
                                                             {effectiveRangeFromTest && (() => {
                                                                 const hasSocMeta = selectedRangeTestRun?.start_soc != null && selectedRangeTestRun?.end_soc != null;
@@ -2186,10 +2187,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 const packE  = (cap && dSoC != null) ? roundTo(cap * dSoC / 100, 1) : null;
                                                 const excess = (cap && packE != null && hasManual) ? (manual - packE) / cap * 100 : null;
                                                 const good   = excess != null && excess >= 0 && excess <= 10;
-                                                const tone   = excess == null ? 'bg-[var(--color-surface-muted)] border-[var(--color-border)]'
-                                                             : good ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200';
+                                                const tone   = excess == null ? ''
+                                                             : good ? 'is-good' : 'is-warning';
                                                 return (
-                                                    <div className={`mb-3 p-3 rounded-lg border flex flex-wrap items-center gap-3 ${tone}`}>
+                                                    <div className={`state-panel ${tone}`}>
                                                         <span className="text-xs text-secondary">
                                                             {editCalcKwh != null && <>⚡ <strong>Data points → {editCalcKwh} kWh</strong> · </>}
                                                             {packE != null
@@ -2198,12 +2199,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             {hasManual && <span className="text-secondary"> · entered {manual} kWh</span>}
                                                         </span>
                                                         {excess != null && good && (
-                                                            <span className="text-xs bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full font-medium">
+                                                            <span className="badge-status">
                                                                 ✓ +{excess.toFixed(1)}% vs pack (within losses)
                                                             </span>
                                                         )}
                                                         {excess != null && !good && (
-                                                            <span className="text-xs bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-medium">
+                                                            <span className="badge-status is-warning">
                                                                 ⚠️ {excess >= 0 ? '+' : ''}{excess.toFixed(1)}% vs pack {excess < 0 ? '(below SoC-implied)' : '(>10% of capacity)'}
                                                             </span>
                                                         )}
@@ -2250,11 +2251,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                                                 : [...prev, field]
                                                                                         )}
                                                                                         title={isEst ? 'Estimated — click to mark as actual' : 'Actual — click to mark as estimated'}
-                                                                                        className={`text-[10px] font-normal rounded px-1 leading-tight w-fit transition-colors ${
-                                                                                            isEst
-                                                                                                ? 'text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100'
-                                                                                                : 'text-green-700 bg-green-50 border border-green-200 hover:bg-green-100'
-                                                                                        }`}
+                                                                                        className={`badge-micro${isEst ? ' is-qualified' : ''}`}
                                                                                     >
                                                                                         {isEst ? '~est' : 'act'}
                                                                                     </button>
@@ -2476,9 +2473,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         <RunSourceLinks run={run} className="text-sm font-normal" />
                                                     </h3>
                                                     {run.isDefault && (
-                                                        <span className="text-xs px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>Default</span>
+                                                        <span className="badge-default">Default</span>
                                                     )}
-                                                    <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5">Estimated</span>
+                                                    <span className="badge-micro is-qualified">Estimated</span>
                                                 </div>
                                                 <div className="run-meta">
                                                     {/* The source is the one thing on this card you
