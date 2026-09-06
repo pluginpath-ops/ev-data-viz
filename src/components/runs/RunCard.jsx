@@ -3,7 +3,7 @@ import RunSpecRows from '../RunSpecRows';
 import { RunVoteButtons } from '../VoteButtons';
 import RunSourceLinks from '../RunSourceLinks';
 import { RunKindPill, FIELD_META, inferRunFlags } from './runDisplay';
-import { filterChargingRuns, defaultChargingRun } from '../../utils/runUtils';
+import { filterChargingRuns, defaultChargingRun, runKindFrom } from '../../utils/runUtils';
 
 /**
  * One test, as it is read rather than edited (#235, re-skin phase 8 step 1).
@@ -35,6 +35,24 @@ import { filterChargingRuns, defaultChargingRun } from '../../utils/runUtils';
  * without one sees. Leaving it on Auto keeps the vehicle-wide default, which is
  * the right choice for most range tests — this exists for the range test that
  * needs a different curve than its siblings.
+ *
+ * ── Treatment A, the bordered footer (handoff 7b) ───────────────────────────
+ *
+ * It sat in the run's meta block, inline with the measured figures, wearing a
+ * bare `Charging pair:` label and a form select — so a curator's editorial
+ * choice looked exactly like a reading off the dynamometer. It is a footer
+ * under the bands now, OUTSIDE the grid, so it cannot be mistaken for measured
+ * data.
+ *
+ * Orange because it is the same "this is the live pairing" signal the chart
+ * already uses for its Y2 axis, and this is the one control on the card that
+ * changes what another screen plots.
+ *
+ * The handoff offered two louder and quieter alternatives — a slot in the
+ * identity line, and a fourth band on an accented rail. The identity line
+ * costs header room and crowds the vote and action controls at narrower
+ * widths; the fourth band puts an editorial control in the grid this change
+ * exists to keep it out of.
  */
 function PairedChargingControl({ run, vehicle, onSet }) {
     const chargingRuns = filterChargingRuns(vehicle.runs);
@@ -44,23 +62,27 @@ function PairedChargingControl({ run, vehicle, onSet }) {
     const isCurated = run.paired_charging_run_id != null;
 
     return (
-        <div className="flex items-center gap-2 text-sm mt-1">
-            <span className="text-label shrink-0">Charging pair:</span>
+        <div className={`run-pair${isCurated ? ' is-curated' : ''}`}>
+            <span className="run-pair-label">Charging pair</span>
             <select
                 value={run.paired_charging_run_id ?? ''}
                 onChange={e => onSet(e.target.value || null)}
-                className="form-input form-input"
+                aria-label="Charging test paired with this range test"
+                className="form-input run-pair-select"
             >
                 <option value="">Auto{auto ? ` — ${auto.name}` : ''}</option>
                 {chargingRuns.map(r => (
                     <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
             </select>
-            {isCurated && (
-                <span className="text-xs text-indigo-500" title="Published pairing — everyone sees this, not just someone with a shared link">
-                    curated
-                </span>
-            )}
+            {/* Auto is not a weaker version of a pairing, it is a different
+                one: the vehicle-wide default, which moves when that default
+                moves. Saying which is on is the point of the strip. */}
+            <span className="run-pair-state">
+                {isCurated
+                    ? 'published for this test'
+                    : 'follows the vehicle default'}
+            </span>
         </div>
     );
 }
@@ -77,6 +99,7 @@ export default function RunCard({
     setCopyToRun, setCopyingToVehicleId, handleUpdateData, onUpdateRun,
     handleCheckKwh,
 }) {
+    const kindLabel = runKindFrom(run) === 'range' ? 'range' : 'charging';
     return (
         <div className="run-card-header">
             <div className="flex-1">
@@ -128,27 +151,37 @@ export default function RunCard({
                             onDelete={deleteTestSession}
                         />
                     )}
-                    {(inferRunFlags(run).includes('range') || run.distance_miles != null) && canEdit(vehicle) && (
-                        <PairedChargingControl
-                            run={run}
-                            vehicle={vehicle}
-                            onSet={chargingId => setPairedChargingRun(vehicle.id, run.id, chargingId)}
-                        />
-                    )}
                 </div>
+                {/* Under the bands, not in them — see PairedChargingControl. */}
+                {(inferRunFlags(run).includes('range') || run.distance_miles != null) && canEdit(vehicle) && (
+                    <PairedChargingControl
+                        run={run}
+                        vehicle={vehicle}
+                        onSet={chargingId => setPairedChargingRun(vehicle.id, run.id, chargingId)}
+                    />
+                )}
             </div>
             <div className="run-actions">
                 <div className="run-actions-row">
-                    {/* Set Default — ghost text, green on hover, pale blue + × when active */}
+                    {/* Says WHICH default. A vehicle carries one default
+                        charging test AND one default range test — the service
+                        has scoped them per kind since migration 046 — but the
+                        button said a bare "Default", so setting one looked like
+                        it must have unset the other. The star is the state; the
+                        kind is the fact that was missing. */}
                     <button
                         onClick={() => run.isDefault ? clearDefaultRun(vehicle.id, run.id) : onSetDefaultRun(run.id)}
-                        title={!canCreate ? 'Sign in to save changes' : run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
+                        title={!canCreate
+                            ? 'Sign in to save changes'
+                            : run.isDefault
+                                ? `Click to clear — this vehicle would then have no default ${kindLabel} test`
+                                : `Set as this vehicle's default ${kindLabel} test for charts`}
                         className={`btn btn-toggle${run.isDefault ? ' active' : ''}`
                             + (!canCreate ? ' opacity-50 cursor-not-allowed' : '')}
                     >
                         {run.isDefault
-                            ? <>Default <span className="btn-toggle-clear">×</span></>
-                            : 'Set Default'}
+                            ? <>★ Default {kindLabel} <span className="btn-toggle-clear">×</span></>
+                            : '☆ Set default'}
                     </button>
                     {canEdit(vehicle) && (
                         <button onClick={() => handleEditRun(run)} className="btn btn-edit text-sm">Edit</button>

@@ -3945,6 +3945,98 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .run-cell-action:hover { text-decoration: underline; }
 
+/* ── Charging pair (handoff 7b, treatment A) ─────────────────────────────────
+ *
+ * A bordered footer UNDER the bands rather than a row inside them. It sat in
+ * the meta block wearing a bare `Charging pair:` label and a form select, so a
+ * curator's editorial choice looked exactly like a reading off the dynamometer.
+ *
+ * Orange because it is the same "this is the live pairing" signal the chart
+ * uses for its Y2 axis — and this is the one control on the card that changes
+ * what another screen plots. */
+.run-pair {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-muted);
+}
+/* Only a PUBLISHED pairing takes the accent. On Auto the card is following the
+   vehicle default rather than asserting anything, and colouring that would make
+   every range card claim a decision nobody made. */
+.run-pair.is-curated {
+    border-color: var(--color-accent-orange);
+    background-color: var(--color-accent-orange-surface);
+}
+.run-pair-label {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-text-meta);
+}
+.run-pair.is-curated .run-pair-label { color: var(--color-accent-orange); }
+.run-pair-select {
+    min-width: 0;
+    max-width: 22rem;
+}
+.run-pair-state {
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+
+/* ── Charging pair (handoff 7b, treatment A) ─────────────────────────────────
+ *
+ * A bordered footer UNDER the bands rather than a row inside them. It sat in
+ * the meta block wearing a bare `Charging pair:` label and a form select, so a
+ * curator's editorial choice looked exactly like a reading off the dynamometer.
+ *
+ * Orange because it is the same "this is the live pairing" signal the chart
+ * uses for its Y2 axis — and this is the one control on the card that changes
+ * what another screen plots. */
+.run-pair {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-muted);
+}
+/* Only a PUBLISHED pairing takes the accent. On Auto the card is following the
+   vehicle default rather than asserting anything, and colouring that would
+   make every range card claim a decision nobody made. */
+.run-pair.is-curated {
+    border-color: var(--color-accent-orange);
+    background-color: var(--color-accent-orange-surface);
+}
+.run-pair-label {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-text-meta);
+}
+.run-pair.is-curated .run-pair-label { color: var(--color-accent-orange); }
+.run-pair-select {
+    min-width: 0;
+    max-width: 22rem;
+}
+.run-pair-state {
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+
 /* ── Selective inheritance picker ───────────────────────────────────────────── */
 .spec-link-picker {
     @apply mt-2 p-2 rounded-lg;
