@@ -4473,7 +4473,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* A facet, closed. Reads as a control rather than a chip: it opens something,
    where a chip toggles. Active carries the accent so a glance across the row
    says which facets are doing work. */
-.guide-facet-menu { position: relative; }
+/* The wrapper a menu button positions its panel against. This was written
+   three times under three names — `.guide-facet-menu`, `.guide-column-picker`
+   and one more on the picker's superseded markup, which the compiler had no
+   way to tell us was dead. */
+.menu-button { position: relative; }
 .guide-facet-btn {
     display: inline-flex;
     align-items: center;
@@ -4562,7 +4566,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* The column list. Wider than a facet menu because a column carries a label
    AND a unit AND a control, where a facet value carries a name and a count. */
 .guide-column-panel { width: 220px; }
-.guide-column-picker { position: relative; }
 .guide-column-row {
     width: 100%;
     /* The one real difference: these rows are draggable and say so. */
@@ -4705,34 +4708,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    that changes what you see is in one place. */
 .guide-facet-columns {
     @apply justify-end;
-}
-
-/* ── Column picker ───────────────────────────────────────────────────────── */
-
-.guide-column-picker {
-    @apply relative;
-}
-.guide-column-menu {
-    @apply absolute right-0 mt-1 z-30 p-3 rounded-lg overflow-y-auto;
-    width: 17rem;
-    max-height: 26rem;
-    background-color: var(--color-card);
-    border: 1px solid var(--color-border);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-}
-.guide-column-menu-head {
-    @apply flex items-center justify-between mb-2 pb-2;
-    border-bottom: 1px solid var(--color-border);
-}
-.guide-column-group {
-    @apply mb-2;
-}
-.guide-column-group-title {
-    @apply mb-1;
-}
-.guide-column-option {
-    @apply flex items-center gap-2 py-0.5 text-sm cursor-pointer;
-    color: var(--color-text-primary);
 }
 
 /* ── Table ───────────────────────────────────────────────────────────────── */

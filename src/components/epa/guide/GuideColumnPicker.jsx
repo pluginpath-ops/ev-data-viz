@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useLightDismiss } from '../../../hooks/useLightDismiss';
+import MenuButton from '../../shell/MenuButton';
 import { GUIDE_COLUMNS, DEFAULT_COLUMNS, columnByKey } from '../../../utils/feGuideBrowse';
 
 /**
@@ -24,8 +24,6 @@ import { GUIDE_COLUMNS, DEFAULT_COLUMNS, columnByKey } from '../../../utils/feGu
 const FIXED_KEY = 'carline';
 
 export default function GuideColumnPicker({ visible, onChange }) {
-    const [open, setOpen] = useState(false);
-    const ref = useLightDismiss(open, () => setOpen(false));
     // A REF for what is being dragged, and state only for the styling.
     // Reading it from state in the drop handler meant reading the closure the
     // row was last rendered with — which, between a dragstart and a drop that
@@ -59,20 +57,14 @@ export default function GuideColumnPicker({ visible, onChange }) {
     };
 
     return (
-        <div className="guide-column-picker" ref={ref}>
-            <button
-                type="button"
-                onClick={() => setOpen(o => !o)}
-                className={`guide-facet-btn${visible.length !== DEFAULT_COLUMNS.length ? ' active' : ''}`}
-                aria-expanded={open}
-            >
-                Columns
-                <span className="guide-facet-btn-value">{visible.length}</span>
-                <span className="disclosure-caret guide-facet-caret" aria-hidden="true">▾</span>
-            </button>
-
-            {open && (
-                <div className="guide-facet-panel guide-column-panel">
+        <MenuButton
+            label="Columns"
+            value={visible.length}
+            active={visible.length !== DEFAULT_COLUMNS.length}
+            panelClass="guide-column-panel"
+        >
+            {({ close }) => (
+                <>
                     <div className="guide-facet-panel-head">
                         <span className="text-nano">Shown · drag to reorder</span>
                         <button type="button" className="section-action" onClick={() => onChange(DEFAULT_COLUMNS)}>
@@ -151,12 +143,12 @@ export default function GuideColumnPicker({ visible, onChange }) {
 
                     <div className="guide-facet-panel-foot">
                         <span className="text-nano">{shown.length} of {GUIDE_COLUMNS.length}</span>
-                        <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
+                        <button type="button" className="btn btn-secondary" onClick={close}>
                             Done
                         </button>
                     </div>
-                </div>
+                </>
             )}
-        </div>
+        </MenuButton>
     );
 }
