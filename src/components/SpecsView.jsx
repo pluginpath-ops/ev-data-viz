@@ -1,10 +1,14 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
-import { formatSpecValue, fmtDistance, distanceLabel } from '../utils/unitConversions';
+import { formatSpecValue, distanceLabel } from '../utils/unitConversions';
 import { SpecFieldFlagButton } from './VoteButtons';
 import { mergeInheritedSpecs, resolveEffectiveSpecs, vehicleLabel, vehicleColor } from '../utils/specHelpers';
 import SpecsControls from './specs/SpecsControls';
+import { bestIndices, rowDiffers, rowIsEmpty } from '../utils/specCompare';
+
+/** Allocated once: a new Set per row per render is 70 objects a keystroke. */
+const EMPTY_SET = new Set();
 
 export default function SpecsView({ selectedVehicleIds }) {
     // Read vehicles directly from context so optimistic updates (e.g. admin unflag)
@@ -221,32 +225,15 @@ export default function SpecsView({ selectedVehicleIds }) {
         }),
     ];
 
-    /** Not all the same recorded value — the question "differences only" asks. */
-    const differs = (row) => {
-        const first = row.values[0]?.raw ?? null;
-        return row.values.some(v => (v.raw ?? null) !== first);
-    };
-    const isEmpty = (row) => row.values.every(v => v.raw == null);
-
-    /**
-     * Which cell wins, or null.
-     *
-     * Null unless the FIELD says which way is an improvement — see the note on
-     * SPEC_CATEGORIES. A tie has no winner either: washing three of four cells
-     * says "these three beat that one", which is not what a tie means.
-     */
-    const bestIndex = (row) => {
-        if (!markBest || !row.better) return null;
-        // `Number(null)` is 0, not NaN — so an unrecorded cell competed as a
-        // zero. On a `lower` row two blanks then tied at 0 and the row was
-        // silently skipped; with one blank, "not recorded" would have WON.
-        const nums = row.values.map(v => (v.raw == null ? NaN : Number(v.raw)));
-        const valid = nums.filter(n => Number.isFinite(n));
-        if (valid.length < 2) return null;
-        const target = row.better === 'lower' ? Math.min(...valid) : Math.max(...valid);
-        if (valid.filter(n => n === target).length > 1) return null;
-        return nums.findIndex(n => n === target);
-    };
+    // The three questions the controls ask, in utils/specCompare so their edge
+    // cases can be tested rather than eyeballed — two of the three bugs found
+    // in them were `Number(null) === 0` and a formatted string, neither of
+    // which a glance at the table would catch.
+    const differs = (row) => rowDiffers(row.values.map(v => v.raw));
+    const isEmpty = (row) => rowIsEmpty(row.values.map(v => v.raw));
+    const bestSet = (row) => (markBest
+        ? bestIndices(row.values.map(v => v.raw), row.better)
+        : EMPTY_SET);
 
     const needle = filter.trim().toLowerCase();
     const visibleSections = sections
@@ -325,7 +312,7 @@ export default function SpecsView({ selectedVehicleIds }) {
                                         </td>
                                     </tr>
                                     {sec.rows.map(row => {
-                                        const best = bestIndex(row);
+                                        const best = bestSet(row);
                                         return (
                                             <tr key={row.key} className="specs-row">
                                                 <td className={`specs-td specs-col-label${row.italic ? ' is-custom' : ''}`}>
@@ -360,7 +347,7 @@ export default function SpecsView({ selectedVehicleIds }) {
                                                     return (
                                                         <td
                                                             key={String(cell.rv.id)}
-                                                            className={`specs-td${i === best ? ' is-best' : ''}${cell.raw == null ? ' is-unrecorded' : ''}`}
+                                                            className={`specs-td${best.has(i) ? ' is-best' : ''}${cell.raw == null ? ' is-unrecorded' : ''}`}
                                                         >
                                                             <span className="specs-cell">
                                                                 <span className={isInherited ? 'specs-inherited' : undefined}>
