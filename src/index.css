@@ -3388,50 +3388,181 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* ── Specs View ─────────────────────────────────────────────────────────────── */
 
 /* Specs comparison table outer wrapper */
+/* ══════════════════════════════════════════════════════════════════════════
+   COMPARE SPECS (#277)
+
+   The table power users live in. Two frozen edges — the row labels on the left
+   and the vehicle columns on top — because a figure whose row label or column
+   header has scrolled away belongs to nothing.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.specs-view {
+    @apply flex flex-col gap-3;
+}
+
+/* ── The controls strip ──────────────────────────────────────────────────── */
+.specs-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: var(--radius-card);
+    background-color: var(--color-surface-muted);
+    border: 1px solid var(--color-border);
+}
+.specs-filter {
+    width: 14rem;
+    max-width: 100%;
+}
+/* Says what the filters DID, so a short table is explained rather than
+   mysterious — the commonest reading of a filtered table is "is that all?" */
+.specs-controls-count {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+
 .specs-table-container {
-    @apply rounded-lg shadow overflow-auto;
-    max-height: calc(100vh - 12rem); /* owns both scroll axes so sticky header/col work */
+    @apply rounded-lg overflow-auto;
+    max-height: calc(100vh - 14rem); /* owns both scroll axes so sticky header/col work */
     background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+}
+.specs-table {
+    @apply w-full;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
-/* Specs table cell — both <th> and <td> */
-.specs-table-cell {
-    @apply px-6 py-4;
-}
-
-/* ── Sticky header row + first column ────────────────────────────────────── */
-
-/* All header <th> cells stick to the top of the viewport */
-.specs-table-container thead th {
+/* ── The two frozen edges ────────────────────────────────────────────────────
+ *
+ * The header colours were `rgb(249,250,251)` with an
+ * `[data-theme="dark"]` override at `rgb(23,37,84)` — a shape that cannot
+ * follow a themed subtree, which is the one rule this re-skin does not bend.
+ * Tokens now, and the dark override is gone rather than re-valued.
+ *
+ * Four z-indexes, because there are four layers: an ordinary cell, the frozen
+ * label column, the header row, and the corner that is frozen on both axes.
+ */
+.specs-th {
+    @apply px-3 py-2 text-left align-bottom;
     position: sticky;
     top: 0;
     z-index: 3;
-    background-color: rgb(249, 250, 251); /* gray-50 — matches old bg-gray-50 */
+    background-color: var(--color-surface-muted);
+    border-bottom: 1px solid var(--color-border-strong);
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    font-weight: 600;
+    color: var(--color-text-primary);
 }
-[data-theme="dark"] .specs-table-container thead th {
-    background-color: rgb(23, 37, 84);  /* blue-950 — matches old dark:bg-blue-950 */
-    color: rgb(226, 232, 240);          /* slate-200 — matches old dark:text-slate-100 */
+.specs-td {
+    @apply px-3 py-1.5;
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--fs-data, var(--fs-body));
+    color: var(--color-text-value);
 }
-
-/* First-column label cells in the body stick to the left */
-.specs-table-container tbody td:first-child {
+.specs-col-label {
     position: sticky;
     left: 0;
     z-index: 2;
+    width: 15rem;
+    min-width: 15rem;
     background-color: var(--color-card);
     border-right: 1px solid var(--color-border);
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    font-weight: 500;
+    color: var(--color-text-secondary);
 }
-
-/* Top-left corner: sticky in both directions — needs the highest z-index */
-.specs-table-container thead th:first-child {
+.specs-th.specs-col-label {
     z-index: 4;
-    border-right: 1px solid var(--color-border);
+    background-color: var(--color-surface-muted);
+}
+.specs-col-label.is-custom {
+    font-style: italic;
+    color: var(--color-text-meta);
 }
 
-/* Category-section divider rows span all columns — restore their background */
-.specs-table-container td.specs-table-category-header {
-    background-color: var(--color-surface-sunken);
-    border-right: none;
+/* The column's series colour, so a column ties to the same vehicle on every
+   chart. A bar rather than a dot: it has to survive being read past four
+   columns of figures. */
+.specs-col-swatch {
+    display: block;
+    width: 100%;
+    height: 3px;
+    margin-bottom: 5px;
+    border-radius: var(--radius-track);
+}
+.specs-col-name { @apply block; }
+.specs-col-inherits {
+    @apply block;
+    margin-top: 2px;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    font-weight: 400;
+    color: var(--color-text-meta);
+}
+
+/* ── Category bands ──────────────────────────────────────────────────────────
+   The band rail from Tests & Data, turned sideways: a full-width label row
+   that sticks UNDER the column header, so the category a figure belongs to is
+   readable at any scroll position. */
+.specs-category-header {
+    position: sticky;
+    /* Directly under the header row. The offset is MEASURED and published by
+       the view, because the header grows a line when a vehicle inherits its
+       specs — a constant was right for some selections and 23px wrong for
+       others. */
+    top: var(--specs-head-h, 3.25rem);
+    z-index: 2;
+    padding: 5px 12px;
+    background-color: var(--color-cluster);
+    border-top: 1px solid var(--color-border-strong);
+    border-bottom: 1px solid var(--color-border);
+}
+.specs-category-label {
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+}
+.specs-category-count {
+    margin-left: 8px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+
+.specs-cell {
+    @apply flex items-center gap-1;
+}
+/* No "this row differs" marker. It was built, and measured at 56 of 57 rows on
+   a four-vehicle comparison — four different cars disagree about almost
+   everything, so the mark fired on 98% of the table and became a stripe.
+   `Differences only` is the control that answers the question; a badge that is
+   always on does not. */
+/* Best in row: a muted WASH on the cell, never coloured text. The figure stays
+   the same colour as its neighbours so the eye lands on the cell rather than
+   reading the digits as special. */
+.specs-td.is-best {
+    background-color: var(--color-success-surface);
+    box-shadow: inset 0 0 0 1px var(--color-success-border);
+}
+/* Unrecorded is a dim dash, not a blank: missing data has to be visible, or a
+   gap reads as a value nobody bothered to look at. */
+.specs-td.is-unrecorded { color: var(--color-text-meta); }
+
+.specs-inherited { color: var(--color-primary); }
+.specs-inherited-tag {
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    line-height: 1;
+    color: var(--color-primary);
+    user-select: none;
 }
 
 /* ── Vehicle Specs — card display & edit form ─────────────────────────────── */

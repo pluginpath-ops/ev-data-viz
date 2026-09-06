@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { formatSpecValue, fmtDistance, distanceLabel } from '../utils/unitConversions';
 import { SpecFieldFlagButton } from './VoteButtons';
-import { mergeInheritedSpecs, resolveEffectiveSpecs, vehicleLabel } from '../utils/specHelpers';
+import { mergeInheritedSpecs, resolveEffectiveSpecs, vehicleLabel, vehicleColor } from '../utils/specHelpers';
+import SpecsControls from './specs/SpecsControls';
 
 export default function SpecsView({ selectedVehicleIds }) {
     // Read vehicles directly from context so optimistic updates (e.g. admin unflag)
@@ -12,6 +13,43 @@ export default function SpecsView({ selectedVehicleIds }) {
 
     // Pending flags — buffered locally, committed to DB when the tab is left (unmount).
     const [pendingFlags, setPendingFlags] = useState(() => new Map());
+
+    /**
+     * What the table is showing.
+     *
+     * `hideEmpty` starts ON: a row every vehicle leaves blank says nothing, and
+     * with 65 rows in the schema most comparisons are mostly blank. `markBest`
+     * starts OFF — see the note on SPEC_CATEGORIES for why that is not a
+     * default anyone should have to turn back off.
+     */
+    /**
+     * The header's measured height, so the category bands can stick directly
+     * under it.
+     *
+     * Measured rather than written down: the header grows a line when a vehicle
+     * inherits its specs, so a constant would be right for some selections and
+     * wrong for others — 75px against the 52 a fixed value would have guessed.
+     */
+    const [headHeight, setHeadHeight] = useState(0);
+    /* A CALLBACK ref, not a ref object with an effect. The view renders an
+       empty state before it renders a table, so the <thead> arrives on a later
+       render than the first — and a ref object's identity never changes, so an
+       effect keyed on it would never re-run to find it. React 19 takes a
+       cleanup return from a callback ref, which is where the observer is
+       disconnected. */
+    const headRef = useCallback((el) => {
+        if (!el) return undefined;
+        const measure = () => setHeadHeight(el.offsetHeight);
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
+    const [filter, setFilter]       = useState('');
+    const [diffOnly, setDiffOnly]   = useState(false);
+    const [hideEmpty, setHideEmpty] = useState(true);
+    const [markBest, setMarkBest]   = useState(false);
     const pendingFlagsRef = useRef(pendingFlags);
     useEffect(() => { pendingFlagsRef.current = pendingFlags; }, [pendingFlags]);
 
@@ -75,101 +113,115 @@ export default function SpecsView({ selectedVehicleIds }) {
     // Small inherited indicator shown in cells where the value came from a source vehicle.
     const InheritedTag = ({ sourceName }) => (
         <span
-            className="text-[10px] text-indigo-400 ml-0.5 leading-none select-none"
+            className="specs-inherited-tag"
             title={sourceName ? `Inherited from ${sourceName}` : 'Inherited'}
         >↑</span>
     );
 
-    // Build a flat array of <tr> elements for all spec categories.
-    const specRows = SPEC_CATEGORIES.flatMap(cat => {
-        const customKeys = [...(customKeysByCategory[cat.key] || new Set())];
-
-        const hasAnyData = resolvedVehicles.some(rv => {
-            const catData = rv.effectiveSpecs?.[cat.key];
-            if (!catData) return false;
-            return cat.fields.some(f => {
-                const val = catData[f.key];
-                return val !== null && val !== undefined && val !== '';
-            }) || customKeys.some(ck => catData._custom?.[ck] != null);
-        });
-        if (!hasAnyData) return [];
-
-        const headerRow = (
-            <tr key={`${cat.key}--header`}>
-                <td className="specs-table-category-header" colSpan={resolvedVehicles.length + 1}>
-                    {cat.label}
-                </td>
-            </tr>
-        );
-
-        const predefinedRows = cat.fields.flatMap(field => {
-            const hasValue = resolvedVehicles.some(rv => {
-                const val = rv.effectiveSpecs?.[cat.key]?.[field.key];
-                return val !== null && val !== undefined && val !== '';
-            });
-            if (!hasValue) return [];
-            const fieldKey = `${cat.key}.${field.key}`;
-            return [(
-                <tr key={`${cat.key}--${field.key}`}>
-                    <td className="specs-table-cell font-medium text-sm">{field.label}</td>
-                    {resolvedVehicles.map(rv => {
-                        const value = rv.effectiveSpecs?.[cat.key]?.[field.key];
-                        const isInherited = rv.inheritedKeys.has(fieldKey);
-                        const committedIsFlagged = (rv.flagged_specs || []).includes(fieldKey);
-                        const isPending = pendingFlags.get(rv.id)?.has(fieldKey) ?? false;
-                        return (
-                            <td key={String(rv.id)} className="specs-table-cell text-sm">
-                                <span className="flex items-center gap-1">
-                                    <span className={isInherited ? 'text-indigo-400' : ''}>
-                                        {formatValue(value, field.type, field.unitGroup)}
-                                    </span>
-                                    {isInherited && <InheritedTag sourceName={rv.sourceVehicleName} />}
-                                    <SpecFieldFlagButton
-                                        isFlagged={committedIsFlagged || isPending}
-                                        isPending={isPending && !committedIsFlagged}
-                                        onFlag={() => handleFlag(rv.id, fieldKey)}
-                                        onUnflag={() => unflagSpecField(rv.id, fieldKey)}
-                                        isAdmin={isAdmin}
-                                    />
-                                </span>
-                            </td>
-                        );
-                    })}
-                </tr>
-            )];
-        });
-
-        const customRows = customKeys.map(customKey => (
-            <tr key={`${cat.key}--custom--${customKey}`}>
-                <td className="specs-table-cell font-medium text-sm text-secondary italic">
-                    {formatCustomKey(customKey)}
-                </td>
-                {resolvedVehicles.map(rv => {
-                    const value = rv.effectiveSpecs?.[cat.key]?._custom?.[customKey];
-                    const isInherited = rv.inheritedKeys.has(`${cat.key}._custom.${customKey}`);
-                    return (
-                        <td key={String(rv.id)} className="specs-table-cell text-sm">
-                            {value != null ? (
-                                <span className="flex items-center gap-0.5">
-                                    <span className={isInherited ? 'text-indigo-400' : ''}>{value}</span>
-                                    {isInherited && <InheritedTag sourceName={rv.sourceVehicleName} />}
-                                </span>
-                            ) : '—'}
-                        </td>
-                    );
-                })}
-            </tr>
-        ));
-
-        return [headerRow, ...predefinedRows, ...customRows];
+    /**
+     * Every row the table can show, as DATA (#277, re-skin phase 9).
+     *
+     * It used to build `<tr>` elements directly in a flatMap, which is why the
+     * table could not answer any question about itself: "how many rows differ",
+     * "hide the empty ones", "which cell is best" are all questions about a set
+     * of values, and there was no set — only markup. The controls strip below
+     * is what this refactor is for.
+     *
+     * `values` is one entry per vehicle, in column order, carrying the raw
+     * value as well as the formatted one: `differs` has to compare what was
+     * recorded, not how it was printed, or two figures that round to the same
+     * string would read as agreement.
+     */
+    const buildRow = (key, label, get, { type, unitGroup, better, italic } = {}) => ({
+        key, label, better, italic,
+        values: resolvedVehicles.map(rv => {
+            const raw = get(rv);
+            const empty = raw === null || raw === undefined || raw === '';
+            return { raw: empty ? null : raw, text: formatValue(raw, type, unitGroup), rv };
+        }),
     });
 
+    const coreRows = [
+        buildRow('vehicle.make',    'Make',    v => v.make),
+        buildRow('vehicle.model',   'Model',   v => v.model),
+        buildRow('vehicle.trim',    'Trim',    v => v.trim),
+        buildRow('vehicle.year',    'Year',    v => v.year),
+        buildRow('vehicle.battery', 'Battery (kWh, usable)', v => v.battery),
+        buildRow('vehicle.range',   `EPA Range (${distanceLabel(units)})`,
+            v => (v.range ? fmtDistance(v.range, units) : null)),
+        buildRow('vehicle.runs',    'Test Runs', v => v.runs?.length ?? 0),
+    ];
+
+    const sections = [
+        { key: '--core', label: 'Vehicle', rows: coreRows },
+        ...SPEC_CATEGORIES.map(cat => {
+            const customKeys = [...(customKeysByCategory[cat.key] || new Set())];
+            return {
+                key: cat.key,
+                label: cat.label,
+                rows: [
+                    ...cat.fields.map(f => ({
+                        ...buildRow(`${cat.key}.${f.key}`, f.label,
+                            rv => rv.effectiveSpecs?.[cat.key]?.[f.key],
+                            { type: f.type, unitGroup: f.unitGroup, better: f.better }),
+                        flagKey: `${cat.key}.${f.key}`,
+                    })),
+                    ...customKeys.map(ck => buildRow(
+                        `${cat.key}._custom.${ck}`, formatCustomKey(ck),
+                        rv => rv.effectiveSpecs?.[cat.key]?._custom?.[ck],
+                        { italic: true })),
+                ],
+            };
+        }),
+    ];
+
+    /** Not all the same recorded value — the question "differences only" asks. */
+    const differs = (row) => {
+        const first = row.values[0]?.raw ?? null;
+        return row.values.some(v => (v.raw ?? null) !== first);
+    };
+    const isEmpty = (row) => row.values.every(v => v.raw == null);
+
+    /**
+     * Which cell wins, or null.
+     *
+     * Null unless the FIELD says which way is an improvement — see the note on
+     * SPEC_CATEGORIES. A tie has no winner either: washing three of four cells
+     * says "these three beat that one", which is not what a tie means.
+     */
+    const bestIndex = (row) => {
+        if (!markBest || !row.better) return null;
+        const nums = row.values.map(v => (typeof v.raw === 'number' ? v.raw : Number(v.raw)));
+        const valid = nums.filter(n => Number.isFinite(n));
+        if (valid.length < 2) return null;
+        const target = row.better === 'lower' ? Math.min(...valid) : Math.max(...valid);
+        if (valid.filter(n => n === target).length > 1) return null;
+        return nums.findIndex(n => n === target);
+    };
+
+    const needle = filter.trim().toLowerCase();
+    const visibleSections = sections
+        .map(sec => ({
+            ...sec,
+            rows: sec.rows.filter(r =>
+                (!needle || r.label.toLowerCase().includes(needle))
+                && (!hideEmpty || !isEmpty(r))
+                && (!diffOnly || differs(r))),
+        }))
+        .filter(sec => sec.rows.length > 0);
+
+    const shownCount = visibleSections.reduce((n, s) => n + s.rows.length, 0);
+    const totalCount = sections.reduce((n, s) => n + s.rows.length, 0);
+
     return (
-        <div>
-            <h2 className="page-title mb-6">
-                Vehicle Specifications Comparison
-                {selectedVehicleIds.length > 0 && ` (${selectedVehicleIds.length} Selected)`}
-            </h2>
+        <div className="specs-view">
+            <SpecsControls
+                filter={filter} onFilter={setFilter}
+                diffOnly={diffOnly} onDiffOnly={() => setDiffOnly(v => !v)}
+                hideEmpty={hideEmpty} onHideEmpty={() => setHideEmpty(v => !v)}
+                markBest={markBest} onMarkBest={() => setMarkBest(v => !v)}
+                shown={shownCount} total={totalCount} vehicles={resolvedVehicles.length}
+            />
 
             {displayVehicles.length === 0 ? (
                 <div className="empty-state">
@@ -180,58 +232,93 @@ export default function SpecsView({ selectedVehicleIds }) {
                     </p>
                 </div>
             ) : (
-                <div className="specs-table-container">
-                    <table className="w-full">
-                        <thead>
+                <div
+                    className="specs-table-container"
+                    style={{ '--specs-head-h': `${headHeight}px` }}
+                >
+                    <table className="specs-table">
+                        <thead ref={headRef}>
                             <tr>
-                                <th className="px-6 py-3 text-left font-semibold">Specification</th>
-                                {resolvedVehicles.map(rv => (
-                                    <th key={String(rv.id)} className="px-6 py-3 text-left font-semibold">
-                                        <div>{vehicleLabel(rv)}</div>
+                                <th className="specs-th specs-col-label">Specification</th>
+                                {resolvedVehicles.map((rv, i) => (
+                                    <th key={String(rv.id)} className="specs-th">
+                                        {/* The column carries the vehicle's series colour, so a
+                                            column ties to the same vehicle on every chart. Same
+                                            helper the charts use, so they cannot disagree. */}
+                                        <span
+                                            className="specs-col-swatch"
+                                            style={{ backgroundColor: vehicleColor(rv, i) }}
+                                            aria-hidden="true"
+                                        />
+                                        <span className="specs-col-name">{vehicleLabel(rv)}</span>
                                         {rv.sourceVehicleName && (
-                                            <div className="text-xs font-normal text-indigo-400 mt-0.5">
+                                            <span className="specs-col-inherits">
                                                 ↑ inherits from {rv.sourceVehicleName}
-                                            </div>
+                                            </span>
                                         )}
                                     </th>
                                 ))}
                             </tr>
                         </thead>
-                        <tbody className="divide-y dark:divide-slate-700">
-                            {/* ── Core vehicle fields ── */}
-                            <tr>
-                                <td className="specs-table-cell font-medium">Make</td>
-                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.make || '—'}</td>)}
-                            </tr>
-                            <tr>
-                                <td className="specs-table-cell font-medium">Model</td>
-                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.model || '—'}</td>)}
-                            </tr>
-                            <tr>
-                                <td className="specs-table-cell font-medium">Trim</td>
-                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.trim || '—'}</td>)}
-                            </tr>
-                            <tr>
-                                <td className="specs-table-cell font-medium">Year</td>
-                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.year || '—'}</td>)}
-                            </tr>
-                            <tr>
-                                <td className="specs-table-cell font-medium">Battery (kWh, usable)</td>
-                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.battery || '—'}</td>)}
-                            </tr>
-                            <tr>
-                                <td className="specs-table-cell font-medium">EPA Range ({distanceLabel(units)})</td>
-                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.range ? fmtDistance(v.range, units) : '—'}</td>)}
-                            </tr>
-                            <tr>
-                                <td className="specs-table-cell font-medium">Test Runs</td>
-                                {displayVehicles.map(v => <td key={String(v.id)} className="specs-table-cell">{v.runs?.length || 0}</td>)}
-                            </tr>
-
-                            {/* ── Structured spec categories (flat array, no nested arrays) ── */}
-                            {specRows}
+                        <tbody>
+                            {visibleSections.map(sec => (
+                                <Fragment key={sec.key}>
+                                    <tr className="specs-category-row">
+                                        <td className="specs-category-header" colSpan={resolvedVehicles.length + 1}>
+                                            <span className="specs-category-label">{sec.label}</span>
+                                            <span className="specs-category-count">
+                                                {sec.rows.length} row{sec.rows.length === 1 ? '' : 's'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {sec.rows.map(row => {
+                                        const best = bestIndex(row);
+                                        return (
+                                            <tr key={row.key} className="specs-row">
+                                                <td className={`specs-td specs-col-label${row.italic ? ' is-custom' : ''}`}>
+                                                    {row.label}
+                                                </td>
+                                                {row.values.map((cell, i) => {
+                                                    const isInherited = row.flagKey
+                                                        ? cell.rv.inheritedKeys.has(row.flagKey)
+                                                        : cell.rv.inheritedKeys.has(row.key);
+                                                    const committed = row.flagKey
+                                                        && (cell.rv.flagged_specs || []).includes(row.flagKey);
+                                                    const pending = row.flagKey
+                                                        && (pendingFlags.get(cell.rv.id)?.has(row.flagKey) ?? false);
+                                                    return (
+                                                        <td
+                                                            key={String(cell.rv.id)}
+                                                            className={`specs-td${i === best ? ' is-best' : ''}${cell.raw == null ? ' is-unrecorded' : ''}`}
+                                                        >
+                                                            <span className="specs-cell">
+                                                                <span className={isInherited ? 'specs-inherited' : undefined}>
+                                                                    {cell.text}
+                                                                </span>
+                                                                {isInherited && <InheritedTag sourceName={cell.rv.sourceVehicleName} />}
+                                                                {row.flagKey && (
+                                                                    <SpecFieldFlagButton
+                                                                        isFlagged={committed || pending}
+                                                                        isPending={pending && !committed}
+                                                                        onFlag={() => handleFlag(cell.rv.id, row.flagKey)}
+                                                                        onUnflag={() => unflagSpecField(cell.rv.id, row.flagKey)}
+                                                                        isAdmin={isAdmin}
+                                                                    />
+                                                                )}
+                                                            </span>
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        );
+                                    })}
+                                </Fragment>
+                            ))}
                         </tbody>
                     </table>
+                    {shownCount === 0 && (
+                        <div className="empty-state">No specification matches these filters.</div>
+                    )}
                 </div>
             )}
         </div>
