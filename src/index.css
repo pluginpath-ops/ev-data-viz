@@ -5361,7 +5361,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    sit at the same x on every screen and the picture gets whatever is left. The
    table inherits `table-layout: fixed` from .guide-table, so these ARE the
    widths rather than suggestions. */
-.stats-table .stats-th-name { width: 190px; }
+/* 190px in the handoff, where the flag was a two-word `SUPPRESSED`. "too few
+   observations" beside "Minicompact Car" measured 235px, so four bucket names
+   ellipsed to make room for a label about them. The bar column has 600px to
+   give and the names do not. */
+.stats-table .stats-th-name { width: 244px; }
 .stats-table .stats-th-dist { width: auto; }
 /* Every figure column the same width, sized to the widest thing any measure
    prints: `0.0253` for a road-load C coefficient, at four decimals it genuinely
@@ -5413,17 +5417,16 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Its median is the fleet's median — the one number every row above is being
    compared against, so it takes the "this is the reference" colour. */
 .stats-row-overall .stats-td-median { color: var(--color-accent-orange); }
-/* Marked, not dimmed away: the row still has to be readable, because the whole
-   point of keeping it is that the reader sees the bucket exists. */
-.stats-row.suppressed .stats-td-name { color: var(--color-text-meta); }
-.stats-suppressed-note {
-    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
-    color: var(--color-text-meta);
-    white-space: normal;
-}
+/* Muted, and flagged. Shown rather than dropped — a bucket that vanishes from a
+   ranking reads as a bug, where a dimmed one reads as an answer — but muted far
+   enough that the eye skips it while scanning the rows that carry weight. */
+.stats-row.suppressed { @apply opacity-60; }
+/* Not uppercased: "TOO FEW OBSERVATIONS" is wider than most bucket names and
+   would push them out of a 190px column to say something the muting has already
+   said. */
 .stats-suppressed-flag {
-    @apply ml-2 px-1.5 py-0.5 rounded uppercase;
-    font-size: 0.5625rem;
+    @apply ml-2 px-1.5 py-0.5 rounded;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     font-weight: 700;
     background-color: var(--color-surface-sunken);
     color: var(--color-text-muted);

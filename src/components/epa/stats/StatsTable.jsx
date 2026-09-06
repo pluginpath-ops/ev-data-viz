@@ -98,7 +98,6 @@ export default function StatsTable({ rows, measureDef, overall, dimensionLabel, 
     const usable = Number.isFinite(scale.min) && Number.isFinite(scale.max) && scale.max > scale.min;
 
     const fmt = (v) => (v == null ? '—' : v.toFixed(digits));
-    const span = usable ? 6 : 5;
 
     return (
         <div className="guide-table-container">
@@ -166,33 +165,28 @@ export default function StatsTable({ rows, measureDef, overall, dimensionLabel, 
                                 {/* Shown, not hidden: a bucket that vanishes from a
                                     ranking reads as a bug, where one marked
                                     too-small is an answer. */}
-                                {r.suppressed && <span className="stats-suppressed-flag">suppressed</span>}
+                                {/* The row is muted and flagged rather than
+                                    given a sentence in place of its figures. A
+                                    paragraph per thin bucket was five paragraphs
+                                    down one table, each saying the same thing at
+                                    length; the badge and the muting say it at a
+                                    glance, and the numbers stay readable for
+                                    anyone who wants them. */}
+                                {r.suppressed && (
+                                    <span className="stats-suppressed-flag">too few observations</span>
+                                )}
                             </td>
                             <td className="guide-td numeric">{r.n}</td>
-                            {r.suppressed ? (
-                                /* No median, no quartiles, no bar — a
-                                   five-number summary of two observations is a
-                                   picture of nothing, and printing one would
-                                   make the row look like the rows above it. The
-                                   sentence takes the space they would have. */
-                                <td className="guide-td stats-suppressed-note" colSpan={span}>
-                                    Fewer than 3 observations — shown rather than dropped, so the
-                                    {' '}{dimensionLabel.toLowerCase()} does not silently vanish from the ranking.
+                            {usable && (
+                                <td className="guide-td">
+                                    <Bar stats={r} scale={scale} digits={digits} />
                                 </td>
-                            ) : (
-                                <>
-                                    {usable && (
-                                        <td className="guide-td">
-                                            <Bar stats={r} scale={scale} digits={digits} />
-                                        </td>
-                                    )}
-                                    <td className="guide-td numeric">{fmt(r.min)}</td>
-                                    <td className="guide-td numeric">{fmt(r.q1)}</td>
-                                    <td className="guide-td numeric stats-td-median">{fmt(r.median)}</td>
-                                    <td className="guide-td numeric">{fmt(r.q3)}</td>
-                                    <td className="guide-td numeric">{fmt(r.max)}</td>
-                                </>
                             )}
+                            <td className="guide-td numeric">{fmt(r.min)}</td>
+                            <td className="guide-td numeric">{fmt(r.q1)}</td>
+                            <td className="guide-td numeric stats-td-median">{fmt(r.median)}</td>
+                            <td className="guide-td numeric">{fmt(r.q3)}</td>
+                            <td className="guide-td numeric">{fmt(r.max)}</td>
                         </tr>
                     ))}
 
