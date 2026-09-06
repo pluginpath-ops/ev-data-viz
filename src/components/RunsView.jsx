@@ -2499,8 +2499,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         />
                                                     </p>
                                                     <p>Date: {run.date}</p>
-                                                    {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
-                                                    {run.conditions && <p>Notes: {run.conditions}</p>}
+                                                    {/* Software and Notes are cells in the CONDITIONS band
+                                                        below — they were printed here as well, so an
+                                                        inherited card said each of them twice. */}
                                                     <RunSpecRows run={run} units={units} fieldMeta={FIELD_META} />
                                                 </div>
                                             </div>
@@ -2530,8 +2531,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         </button>
                                                     )}
                                                 </div>
-                                                {/* Row 2: Color Picker | Scale × */}
-                                                <div className="run-actions-row flex-wrap">
+                                                {/* Rows 2-4: colour, then the two scaling knobs,
+                                                    one per line — see .run-actions-stack. */}
+                                                <div className="run-actions-stack">
                                                     <label className="flex items-center gap-1 text-xs text-secondary">
                                                         <input
                                                             type="color"

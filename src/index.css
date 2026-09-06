@@ -3275,6 +3275,15 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .run-actions-row {
     @apply flex gap-2 items-center;
 }
+/* One control per line, right-aligned with the rest of the action column.
+ *
+ * The inherited card carries three in this row — a colour and the two scaling
+ * knobs — and side by side they ran to nearly half the card's width, so the
+ * quietest controls on the card were also its widest thing. Each is a labelled
+ * field; a labelled field wants a line. */
+.run-actions-stack {
+    @apply flex flex-col gap-1.5 items-end;
+}
 
 
 /* ── Auth Modal ─────────────────────────────────────────────────────────────── */
@@ -3757,13 +3766,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .session-group-header {
     @apply flex items-center gap-3 flex-wrap px-3 py-2;
     background-color: var(--color-surface-sunken);
-    border-top-left-radius: calc(0.75rem - 1px);
-    border-top-right-radius: calc(0.75rem - 1px);
-}
-/* Collapsed, the header is the whole card and rounds at the bottom too. */
-.session-group-header:last-child {
-    border-bottom-left-radius: calc(0.75rem - 1px);
-    border-bottom-right-radius: calc(0.75rem - 1px);
 }
 .session-group-toggle {
     @apply flex items-center gap-2 text-left transition-colors;
@@ -3802,25 +3804,27 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* The session card CONTAINS its runs, so collapsing visibly folds them away
    rather than making a band and some cards disappear independently. */
+/* Square, all four corners.
+ *
+ * It was rounded on the three non-accent sides, which is the house rule for a
+ * CARD. This is not a card — it is a container the cards sit inside — and a
+ * rounded frame around a stack of rounded cards reads as two competing shapes
+ * at every corner. The run cards keep their radius; the thing holding them
+ * gives up its own. */
 .session-group {
-    /* Square on the colour side — see .vehicle-run-group. */
-    border-radius: 0 0.75rem 0.75rem 0;
     border: 1px solid var(--color-border);
     border-left: 3px solid var(--color-primary);
 }
 /* Deliberately NOT overflow-hidden. It was, to keep the nested header and body
-   inside the rounded corner — and it also clipped the run cards' "More ▾"
-   menu, which is absolutely positioned and drops below its card. The children
-   carry the radius instead, which contains them just as well and clips
-   nothing. */
+   inside the rounded corner it no longer has — and it also clipped the run
+   cards' "More ▾" menu, which is absolutely positioned and drops below its
+   card. Square corners need no clipping at all. */
 .session-group.is-unassigned {
     border-left-color: var(--color-border);
 }
 .session-group-body {
     @apply flex flex-col gap-3 p-3;
     background-color: var(--color-surface-sunken);
-    border-bottom-left-radius: calc(0.75rem - 1px);
-    border-bottom-right-radius: calc(0.75rem - 1px);
 }
 /* Nested cards sit on the sunken group background, so they lose the outer
    border that would otherwise read as a second frame inside the first. */
