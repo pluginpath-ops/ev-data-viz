@@ -25,43 +25,13 @@ import EpaVehicleSection from './EpaVehicleSection';
 import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
 import { displayImageUrl } from '../utils/imageRenditions';
-import { filterChargingRuns, defaultChargingRun, isRangeRun, runKindFrom, linkableRuns, linkableCounts } from '../utils/runUtils';
+import { isRangeRun, runKindFrom, linkableRuns, linkableCounts } from '../utils/runUtils';
 import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
+import RunCard from './runs/RunCard';
+import { DATA_FLAGS, RunKindPill, FIELD_META, inferRunFlags } from './runs/runDisplay';
 
-// ── Data-type flag definitions ────────────────────────────────────────────────
-// Each flag represents a data domain that can independently be present in a run.
-// Flags are stored as an array so future types can be added without schema changes.
-const DATA_FLAGS = [
-    { key: 'charging', label: '⚡ Charging', pillStyle: 'bg-blue-100 text-blue-800 border-blue-300',   desc: 'Time-series charging data (charge rate, SoC)' },
-    { key: 'range',    label: '📏 Range',    pillStyle: 'bg-purple-100 text-purple-800 border-purple-300', desc: 'Range/efficiency test (distance, SoC, speed, efficiency)' },
-];
 
-/**
- * A run's role. Since migration 046 a run is a charging test OR a range test,
- * never both — the dual-role rows were split, and the flag pair that expressed
- * them is gone. Kept as a one-element array so the pill rendering below, which
- * was written against a list, does not have to change.
- */
-const inferRunFlags = (run) => [isRangeRun(run) ? 'range' : 'charging'];
 
-/**
- * A run's role, as the pill that opens its title line.
- *
- * The kind is the first thing that decides how to read every number below it,
- * and on an inherited test it also decides which knobs mean anything —
- * efficiency only ever moves a distance, so on a charging link it is inert
- * while capacity is doing all the work. The inherited card was the one card
- * without this pill, which is precisely where it was most needed.
- */
-function RunKindPill({ run, className = '' }) {
-    const flag = DATA_FLAGS.find(f => f.key === runKindFrom(run));
-    if (!flag) return null;
-    return (
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${flag.pillStyle} shrink-0 ${className}`.trim()}>
-            {flag.label}
-        </span>
-    );
-}
 
 const INHERITED_SECTION_HELP =
     'Tests borrowed from another vehicle that shares this one\'s hardware — a ' +
@@ -160,59 +130,9 @@ function FactorInput({ label, title, value, onChange, onCommit }) {
     );
 }
 
-// ── Field tag metadata (ordered for display) ──────────────────────────────────
-const FIELD_META = [
-    { key: 'soc',         label: 'SoC',   title: 'State of Charge (%)' },
-    { key: 'chargeRate',  label: 'kW',    title: 'Charge Rate (kW)' },
-    { key: 'time',        label: 'Time',  title: 'Time' },
-    { key: 'range',       label: 'Range', title: 'Range' },
-    { key: 'temperature', label: 'Temp',  title: 'Temperature' },
-];
 
 // ── Shared run-card display components ───────────────────────────────────────
 
-/**
- * Range metadata pill row — shown on both regular and inherited run cards.
- * Renders the 📏 Range pill followed by speed, distance, energy, efficiency,
- * temperature, SoC window, and source link.
- */
-/**
- * Curator's default charging test for a range test (migration 045).
- *
- * A chart-session pairing lives only in the URL, so it is reproducible only by
- * whoever holds the link. This is the published answer: what a visitor arriving
- * without one sees. Leaving it on Auto keeps the vehicle-wide default, which is
- * the right choice for most range tests — this exists for the range test that
- * needs a different curve than its siblings.
- */
-function PairedChargingControl({ run, vehicle, onSet }) {
-    const chargingRuns = filterChargingRuns(vehicle.runs);
-    if (chargingRuns.length === 0) return null;
-
-    const auto = defaultChargingRun(vehicle);
-    const isCurated = run.paired_charging_run_id != null;
-
-    return (
-        <div className="flex items-center gap-2 text-sm mt-1">
-            <span className="text-label shrink-0">Charging pair:</span>
-            <select
-                value={run.paired_charging_run_id ?? ''}
-                onChange={e => onSet(e.target.value || null)}
-                className="form-input form-input"
-            >
-                <option value="">Auto{auto ? ` — ${auto.name}` : ''}</option>
-                {chargingRuns.map(r => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-            </select>
-            {isCurated && (
-                <span className="text-xs text-indigo-500" title="Published pairing — everyone sees this, not just someone with a shared link">
-                    curated
-                </span>
-            )}
-        </div>
-    );
-}
 
 
 
@@ -300,7 +220,7 @@ const DeriveAxisPanel = ({
             </div>
 
             {batteryMissing && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                <p className="note-panel">
                     ⚠ Set the battery capacity (kWh) on this vehicle to derive charging axes.
                 </p>
             )}
@@ -438,13 +358,13 @@ const DeriveAxisPanel = ({
                     </div>
 
                     {error && (
-                        <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{error}</p>
+                        <p className="note-panel is-danger">{error}</p>
                     )}
 
                     {preview && !error && (
                         <div className="space-y-1">
                             {preview.warnings.length > 0 && (
-                                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 space-y-0.5">
+                                <div className="note-panel space-y-0.5">
                                     {preview.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
                                 </div>
                             )}
@@ -1377,31 +1297,32 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 <div className="flex flex-col gap-1 flex-shrink-0 items-stretch w-28">
                     {(() => {
                         const isPublic = vehicle.visibility === 'public';
-                        const base = 'w-full flex items-center justify-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border transition';
+                        // The same badge the vehicle card wears, off its photograph.
+                        const base = 'vehicle-media-badge is-inline w-full';
                         return canPublish() ? (
                             <button
                                 onClick={() => onToggleVehicleVisibility(vehicle.id, isPublic ? 'private' : 'public')}
-                                className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200' : 'bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]'}`}
+                                className={`${base} ${isPublic ? 'is-public' : 'is-private'}`}
                             >
                                 {isPublic ? '🌐 Public' : '🔒 Private'}
                             </button>
                         ) : (
-                            <span className={`${base} ${isPublic ? 'bg-green-100 text-green-700 border-green-300' : 'bg-[var(--color-surface-sunken)] text-secondary border-[var(--color-border)]'}`}>
+                            <span className={`${base} ${isPublic ? 'is-public' : 'is-private'}`}>
                                 {isPublic ? '🌐 Public' : '🔒 Private'}
                             </span>
                         );
                     })()}
                     {canEdit(vehicle) && (
-                        <button onClick={openEditVehicle} className="px-3 py-1 rounded-md text-xs font-medium bg-[var(--color-surface-sunken)] text-secondary hover:bg-[var(--color-surface-muted)] transition">
+                        <button onClick={openEditVehicle} className="btn btn-secondary">
                             Edit
                         </button>
                     )}
                     {canEdit(vehicle) ? (
-                        <button onClick={() => setShowEditSpecs(true)} className="px-3 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition">
+                        <button onClick={() => setShowEditSpecs(true)} className="btn btn-secondary">
                             Specs
                         </button>
                     ) : vehicle.specs && Object.keys(vehicle.specs).length > 0 && (
-                        <button onClick={() => setShowViewSpecs(true)} className="px-3 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition">
+                        <button onClick={() => setShowViewSpecs(true)} className="btn btn-secondary">
                             Specs
                         </button>
                     )}
@@ -1409,15 +1330,15 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         <button
                             onClick={async () => { setDuplicatingVehicle(true); await onDuplicateVehicle(vehicle.id); setDuplicatingVehicle(false); }}
                             disabled={duplicatingVehicle}
-                            className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-50 flex items-center gap-1"
+                            className="btn btn-secondary disabled:opacity-50"
                         >
-                            {duplicatingVehicle ? <><span className="inline-block w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"/>Copying…</> : '⧉ Copy'}
+                            {duplicatingVehicle ? <><span className="spinner-inline"/>Copying…</> : '⧉ Copy'}
                         </button>
                     )}
                     {canDelete(vehicle) && (
                         <button
                             onClick={() => { if (window.confirm(`Delete "${vehicle.name}" and all its tests?`)) onDeleteVehicle(vehicle.id); }}
-                            className="px-3 py-1 rounded-md text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition"
+                            className="btn btn-danger"
                         >
                             Delete
                         </button>
@@ -1595,7 +1516,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     />
                                                     {runMetadata.startSoc !== '' && runMetadata.endSoc !== '' &&
                                                      parseFloat(runMetadata.startSoc) < parseFloat(runMetadata.endSoc) && (
-                                                        <p className="col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                        <p className="note-panel col-span-2">
                                                             ⚠ Start SoC is lower than End SoC — for a range test the vehicle depletes, so Start should be higher (e.g. 95% → 5%). Did you swap them?
                                                         </p>
                                                     )}
@@ -1810,7 +1731,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     isTimestampValue(firstRow[fieldMapping.time]);
                                 if (!tsMapped && !timeColTs) return null;
                                 return (
-                                    <p className="mt-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                                    <p className="note-panel is-info mt-3">
                                         📅 Timestamps detected — will be converted to elapsed minutes from the first data point
                                         {tsMapped && !timeMapped && ' (Elapsed Time will be derived automatically)'}
                                     </p>
@@ -1822,9 +1743,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 <div className="mt-5 space-y-3">
                                     {/* Measured range from test data */}
                                     {offerRangeEstimateTest && (
-                                        <div className={`estimation-panel ${estimations.range === 'measured' ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+                                        <div className={`estimation-panel ${estimations.range === 'measured' ? 'is-good' : 'is-warning'}`}>
                                             <div className="flex-1 min-w-0">
-                                                <p className={`text-sm font-semibold ${estimations.range === 'measured' ? 'text-green-800' : 'text-amber-800'}`}>
+                                                <p className="state-panel-title">
                                                     {estimations.range === 'measured' ? '✓ Range will be estimated (test data)' : '📏 Estimate from measured range test'}
                                                 </p>
                                                 {rangeTestRuns.length > 1 && (
@@ -1865,9 +1786,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
                             {/* Join key selector — merge mode only */}
                             {uploadMode === 'merge' && (
-                                <div className={`join-key-panel ${missingJoinKey ? 'bg-red-50 border-red-200' : showJoinSelector ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
+                                <div className={`join-key-panel ${missingJoinKey ? 'is-danger' : showJoinSelector ? 'is-warning' : 'is-good'}`}>
                                     {missingJoinKey ? (
-                                        <p className="text-sm font-semibold text-red-700">
+                                        <p className="state-panel-title">
                                             ⚠ Map at least one of <strong>SoC</strong> or <strong>Time</strong> — it's needed to link incoming rows to existing ones.
                                         </p>
                                     ) : showJoinSelector ? (
@@ -1956,7 +1877,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                   return (
                     <div
                         key={run.id}
-                        className={`card${isPending ? ' opacity-60 border-2 border-red-200' : ''}`}
+                        className={`card${isPending ? ' is-pending-delete' : ''}`}
                     >
                         {editingRunId === run.id ? (
                             <div>
@@ -2044,7 +1965,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 />
                                                 {editFormData.startSoc !== '' && editFormData.endSoc !== '' &&
                                                  parseFloat(editFormData.startSoc) < parseFloat(editFormData.endSoc) && (
-                                                    <p className="col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                    <p className="note-panel col-span-2">
                                                         ⚠ Start SoC is lower than End SoC — for a range test the vehicle depletes, so Start should be higher (e.g. 95% → 5%). Did you swap them?
                                                     </p>
                                                 )}
@@ -2222,8 +2143,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 if (!editData.every(r => r.range == null)) return null;
                                                 if (!hasAnyOption) return null;
                                                 return (
-                                                    <div className="mb-3 p-3 rounded-lg border bg-blue-50 border-blue-200">
-                                                        <p className="text-xs text-blue-800 font-semibold mb-2">ℹ No range data — estimate from SoC%:</p>
+                                                    <div className="note-panel is-info mb-3">
+                                                        <p className="font-semibold mb-2">ℹ No range data — estimate from SoC%:</p>
                                                         <div className="flex flex-wrap gap-2">
                                                             {effectiveRangeFromTest && (() => {
                                                                 const hasSocMeta = selectedRangeTestRun?.start_soc != null && selectedRangeTestRun?.end_soc != null;
@@ -2266,10 +2187,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 const packE  = (cap && dSoC != null) ? roundTo(cap * dSoC / 100, 1) : null;
                                                 const excess = (cap && packE != null && hasManual) ? (manual - packE) / cap * 100 : null;
                                                 const good   = excess != null && excess >= 0 && excess <= 10;
-                                                const tone   = excess == null ? 'bg-[var(--color-surface-muted)] border-[var(--color-border)]'
-                                                             : good ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200';
+                                                const tone   = excess == null ? ''
+                                                             : good ? 'is-good' : 'is-warning';
                                                 return (
-                                                    <div className={`mb-3 p-3 rounded-lg border flex flex-wrap items-center gap-3 ${tone}`}>
+                                                    <div className={`state-panel ${tone}`}>
                                                         <span className="text-xs text-secondary">
                                                             {editCalcKwh != null && <>⚡ <strong>Data points → {editCalcKwh} kWh</strong> · </>}
                                                             {packE != null
@@ -2278,12 +2199,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             {hasManual && <span className="text-secondary"> · entered {manual} kWh</span>}
                                                         </span>
                                                         {excess != null && good && (
-                                                            <span className="text-xs bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full font-medium">
+                                                            <span className="badge-status">
                                                                 ✓ +{excess.toFixed(1)}% vs pack (within losses)
                                                             </span>
                                                         )}
                                                         {excess != null && !good && (
-                                                            <span className="text-xs bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-medium">
+                                                            <span className="badge-status is-warning">
                                                                 ⚠️ {excess >= 0 ? '+' : ''}{excess.toFixed(1)}% vs pack {excess < 0 ? '(below SoC-implied)' : '(>10% of capacity)'}
                                                             </span>
                                                         )}
@@ -2330,11 +2251,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                                                 : [...prev, field]
                                                                                         )}
                                                                                         title={isEst ? 'Estimated — click to mark as actual' : 'Actual — click to mark as estimated'}
-                                                                                        className={`text-[10px] font-normal rounded px-1 leading-tight w-fit transition-colors ${
-                                                                                            isEst
-                                                                                                ? 'text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100'
-                                                                                                : 'text-green-700 bg-green-50 border border-green-200 hover:bg-green-100'
-                                                                                        }`}
+                                                                                        className={`badge-micro${isEst ? ' is-qualified' : ''}`}
                                                                                     >
                                                                                         {isEst ? '~est' : 'act'}
                                                                                     </button>
@@ -2410,167 +2327,43 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 </div>
                             </div>
                         ) : (
-                            <div className="run-card-header">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <RunKindPill run={run} />
-                                        <h3 className="section-title">
-                                            {run.name}
-                                            {run.isHidden && (
-                                                <span
-                                                    title="Hidden from regular viewers — only admins/contributors can see this test"
-                                                    className="ml-1 badge-hidden"
-                                                >
-                                                    Hidden
-                                                </span>
-                                            )}
-                                            <RunSourceLinks run={run} className="text-sm font-normal" />
-                                        </h3>
-                                        {/* The session heading already carries the
-                                            date for a grouped run; repeating it puts
-                                            the same fact on screen twice. */}
-                                        {run.date && run.session_id == null && (
-                                            <span className="text-sm text-meta">{run.date}</span>
-                                        )}
-                                        <RunVoteButtons
-                                            vouch={votes.vouch}
-                                            flag={votes.flag}
-                                            myVote={votes.myVote}
-                                            onVote={(voteType) => toggleRunVote(run.id, voteType)}
-                                        />
-                                    </div>
-                                    <div className="run-meta">
-                                        <RunSpecRows
-                                            run={run}
-                                            units={units}
-                                            socRange={socRanges[run.id]}
-                                            fieldMeta={FIELD_META}
-                                            calcKwhByRun={calcKwhByRun}
-                                            onCheckKwh={handleCheckKwh}
-                                        />
-                                        {canEdit(vehicle) && (
-                                            <SessionControl
-                                                run={run}
-                                                vehicle={vehicle}
-                                                vehicles={vehicles}
-                                                sessions={testSessions}
-                                                onAssign={sessionId => setRunsSession([run.id], sessionId)}
-                                                onCreate={createTestSession}
-                                                onUpdate={updateTestSession}
-                                                onDelete={deleteTestSession}
-                                            />
-                                        )}
-                                        {(inferRunFlags(run).includes('range') || run.distance_miles != null) && canEdit(vehicle) && (
-                                            <PairedChargingControl
-                                                run={run}
-                                                vehicle={vehicle}
-                                                onSet={chargingId => setPairedChargingRun(vehicle.id, run.id, chargingId)}
-                                            />
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="run-actions">
-                                    <div className="run-actions-row">
-                                        {/* Set Default — ghost text, green on hover, pale blue + × when active */}
-                                        <button
-                                            onClick={() => run.isDefault ? clearDefaultRun(vehicle.id, run.id) : onSetDefaultRun(run.id)}
-                                            title={!canCreate ? 'Sign in to save changes' : run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
-                                            className={`btn btn-toggle${run.isDefault ? ' active' : ''}`
-                                                + (!canCreate ? ' opacity-50 cursor-not-allowed' : '')}
-                                        >
-                                            {run.isDefault
-                                                ? <>Default <span className="btn-toggle-clear">×</span></>
-                                                : 'Set Default'}
-                                        </button>
-                                        {canEdit(vehicle) && (
-                                            <button onClick={() => handleEditRun(run)} className="btn btn-edit text-sm">Edit</button>
-                                        )}
-                                        <button
-                                            onClick={() => isPending ? restoreItem(run.id) : queueDelete(run.id)}
-                                            title={!canCreate && !isPending ? 'Sign in to save changes' : undefined}
-                                            className={`btn text-sm ${isPending ? 'btn-restore' : 'btn-danger'}${!canCreate && !isPending ? ' opacity-50 cursor-not-allowed' : ''}`}
-                                        >
-                                            {isPending ? '↩ Restore' : 'Delete'}
-                                        </button>
-                                        {/* More ▾ overflow menu */}
-                                        <div className="relative">
-                                            <button
-                                                onClick={() => setOpenMenuRunId(openMenuRunId === run.id ? null : run.id)}
-                                                className="btn btn-primary text-sm"
-                                            >More ▾</button>
-                                            {openMenuRunId === run.id && (
-                                                <>
-                                                    <div className="fixed inset-0 z-10" onClick={() => setOpenMenuRunId(null)} />
-                                                    <div className="dropdown-menu w-52 z-20">
-                                                        <button
-                                                            onClick={() => { handleExportCsv(run); setOpenMenuRunId(null); }}
-                                                            disabled={exportingRunId === run.id}
-                                                            className="dropdown-item w-full text-left disabled:opacity-50"
-                                                        >
-                                                            {exportingRunId === run.id ? '↓ Exporting…' : '↓ Download CSV'}
-                                                        </button>
-                                                        {canEdit(vehicle) && (
-                                                            <button
-                                                                onClick={() => { handleDuplicateRun(run); setOpenMenuRunId(null); }}
-                                                                disabled={duplicatingRunId !== null}
-                                                                className="dropdown-item w-full text-left disabled:opacity-50"
-                                                            >
-                                                                {duplicatingRunId === run.id ? '⧉ Copying…' : '⧉ Copy'}
-                                                            </button>
-                                                        )}
-                                                        {canEdit(vehicle) && copyTargetVehicles.length > 0 && (
-                                                            <button
-                                                                onClick={() => { setCopyToRun(run); setCopyingToVehicleId(''); setOpenMenuRunId(null); }}
-                                                                className="dropdown-item w-full text-left"
-                                                            >
-                                                                ↪ Copy to…
-                                                            </button>
-                                                        )}
-                                                        {canEdit(vehicle) && (
-                                                            <button
-                                                                onClick={() => { handleUpdateData(run); setOpenMenuRunId(null); }}
-                                                                className="dropdown-item w-full text-left"
-                                                            >
-                                                                ↑ Upload additional data
-                                                            </button>
-                                                        )}
-                                                        {isContributor && (
-                                                            <button
-                                                                onClick={() => { onUpdateRun(run.id, { isHidden: !run.isHidden }); setOpenMenuRunId(null); }}
-                                                                title={run.isHidden ? 'Make this test visible to all viewers' : 'Hide this test from regular viewers'}
-                                                                className="dropdown-item w-full text-left"
-                                                            >
-                                                                {run.isHidden ? '◎ Unhide from viewers' : '⊘ Hide from viewers'}
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                    {/* Color picker — lower right */}
-                                    <div className="run-actions-row">
-                                        <label className="flex items-center gap-1 text-xs text-meta cursor-pointer">
-                                            <input
-                                                type="color"
-                                                value={run.color || '#3b82f6'}
-                                                onChange={e => onUpdateRun(run.id, { color: e.target.value })}
-                                                className="w-7 h-5 border-0 rounded cursor-pointer shrink-0"
-                                                title="Change plot color"
-                                            />
-                                            <input
-                                                type="text"
-                                                value={run.color || '#3b82f6'}
-                                                onChange={e => onUpdateRun(run.id, { color: e.target.value })}
-                                                onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRun(run.id, { color: run.color || '#3b82f6' }); }}
-                                                className="form-input w-20 .5 font-mono text-secondary"
-                                                placeholder="#3b82f6"
-                                                maxLength={7}
-                                            />
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
+                            <RunCard
+                                run={run}
+                                votes={votes}
+                                isPending={isPending}
+                                vehicle={vehicle}
+                                vehicles={vehicles}
+                                units={units}
+                                socRange={socRanges[run.id]}
+                                testSessions={testSessions}
+                                copyTargetVehicles={copyTargetVehicles}
+                                calcKwhByRun={calcKwhByRun}
+                                canEdit={canEdit}
+                                canCreate={canCreate}
+                                isContributor={isContributor}
+                                openMenuRunId={openMenuRunId}
+                                setOpenMenuRunId={setOpenMenuRunId}
+                                exportingRunId={exportingRunId}
+                                duplicatingRunId={duplicatingRunId}
+                                toggleRunVote={toggleRunVote}
+                                setRunsSession={setRunsSession}
+                                createTestSession={createTestSession}
+                                updateTestSession={updateTestSession}
+                                deleteTestSession={deleteTestSession}
+                                setPairedChargingRun={setPairedChargingRun}
+                                clearDefaultRun={clearDefaultRun}
+                                onSetDefaultRun={onSetDefaultRun}
+                                handleEditRun={handleEditRun}
+                                restoreItem={restoreItem}
+                                queueDelete={queueDelete}
+                                handleExportCsv={handleExportCsv}
+                                handleDuplicateRun={handleDuplicateRun}
+                                setCopyToRun={setCopyToRun}
+                                setCopyingToVehicleId={setCopyingToVehicleId}
+                                handleUpdateData={handleUpdateData}
+                                onUpdateRun={onUpdateRun}
+                                handleCheckKwh={handleCheckKwh}
+                            />
                         )}
                     </div>
                   );
@@ -2680,9 +2473,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         <RunSourceLinks run={run} className="text-sm font-normal" />
                                                     </h3>
                                                     {run.isDefault && (
-                                                        <span className="text-xs px-2 py-1 rounded font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}>Default</span>
+                                                        <span className="badge-default">Default</span>
                                                     )}
-                                                    <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5">Estimated</span>
+                                                    <span className="badge-micro is-qualified">Estimated</span>
                                                 </div>
                                                 <div className="run-meta">
                                                     {/* The source is the one thing on this card you
@@ -2703,8 +2496,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         />
                                                     </p>
                                                     <p>Date: {run.date}</p>
-                                                    {(run.softwareVersion || run.software_version) && <p>Software: {run.softwareVersion || run.software_version}</p>}
-                                                    {run.conditions && <p>Notes: {run.conditions}</p>}
+                                                    {/* Software and Notes are cells in the CONDITIONS band
+                                                        below — they were printed here as well, so an
+                                                        inherited card said each of them twice. */}
                                                     <RunSpecRows run={run} units={units} fieldMeta={FIELD_META} />
                                                 </div>
                                             </div>
@@ -2734,8 +2528,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         </button>
                                                     )}
                                                 </div>
-                                                {/* Row 2: Color Picker | Scale × */}
-                                                <div className="run-actions-row flex-wrap">
+                                                {/* Rows 2-4: colour, then the two scaling knobs,
+                                                    one per line — see .run-actions-stack. */}
+                                                <div className="run-actions-stack">
                                                     <label className="flex items-center gap-1 text-xs text-secondary">
                                                         <input
                                                             type="color"

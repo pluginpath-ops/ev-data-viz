@@ -2437,6 +2437,12 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 
 /* Top-right of the band, on a dark plate so it stays readable over any photo. */
 .vehicle-media-badge {
+    /* inline-flex so the same badge works as a full-width control in a button
+       stack, which is what Tests & Data needs of it — see .is-inline. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     position: absolute;
     right: 10px;
     top: 9px;
@@ -3241,14 +3247,57 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 /* Range estimation option panel; color classes added inline */
+/* ── State panels ────────────────────────────────────────────────────────────
+ *
+ * A block that says what the importer is about to do, and whether that is
+ * fine. Both of these carried a semantic class and then had their STATE
+ * painted on inline — `bg-green-50 border-green-200` against `bg-amber-50
+ * border-amber-200` — so the class named the panel and a palette literal named
+ * the only part of it that ever changed.
+ *
+ * The intents are shared, because "this is fine" and "look at this" are the
+ * same two states on both panels and on the note panel above.
+ */
 .estimation-panel {
     @apply p-4 rounded-lg border flex items-start justify-between gap-4;
     border-color: var(--color-border);
 }
-
-/* Join key / merge-mode info panel; color classes added inline */
 .join-key-panel {
     @apply mt-5 p-4 rounded-lg border;
+    border-color: var(--color-border);
+}
+.estimation-panel.is-good,
+.join-key-panel.is-good,
+.state-panel.is-good {
+    border-color: var(--color-success-border);
+    background-color: var(--color-success-surface);
+    color: var(--color-success-text);
+}
+.estimation-panel.is-warning,
+.join-key-panel.is-warning,
+.state-panel.is-warning {
+    border-color: var(--color-warning-border);
+    background-color: var(--color-warning-surface);
+    color: var(--color-warning-text);
+}
+.estimation-panel.is-danger,
+.join-key-panel.is-danger,
+.state-panel.is-danger {
+    border-color: var(--color-danger-border);
+    background-color: var(--color-danger-surface);
+    color: var(--color-danger-text);
+}
+/* A heading inside a state panel takes the panel's own colour rather than
+   restating it — the intent is on the container, once. */
+.estimation-panel.is-good > * > .state-panel-title,
+.join-key-panel .state-panel-title,
+.state-panel .state-panel-title {
+    font-weight: 600;
+    color: inherit;
+}
+/* The same block, where nothing named it before. */
+.state-panel {
+    @apply mb-3 p-3 rounded-lg border flex flex-wrap items-center gap-3;
     border-color: var(--color-border);
 }
 
@@ -3274,6 +3323,15 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .run-actions-row {
     @apply flex gap-2 items-center;
+}
+/* One control per line, right-aligned with the rest of the action column.
+ *
+ * The inherited card carries three in this row — a colour and the two scaling
+ * knobs — and side by side they ran to nearly half the card's width, so the
+ * quietest controls on the card were also its widest thing. Each is a labelled
+ * field; a labelled field wants a line. */
+.run-actions-stack {
+    @apply flex flex-col gap-1.5 items-end;
 }
 
 
@@ -3757,13 +3815,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .session-group-header {
     @apply flex items-center gap-3 flex-wrap px-3 py-2;
     background-color: var(--color-surface-sunken);
-    border-top-left-radius: calc(0.75rem - 1px);
-    border-top-right-radius: calc(0.75rem - 1px);
-}
-/* Collapsed, the header is the whole card and rounds at the bottom too. */
-.session-group-header:last-child {
-    border-bottom-left-radius: calc(0.75rem - 1px);
-    border-bottom-right-radius: calc(0.75rem - 1px);
 }
 .session-group-toggle {
     @apply flex items-center gap-2 text-left transition-colors;
@@ -3802,25 +3853,27 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* The session card CONTAINS its runs, so collapsing visibly folds them away
    rather than making a band and some cards disappear independently. */
+/* Square, all four corners.
+ *
+ * It was rounded on the three non-accent sides, which is the house rule for a
+ * CARD. This is not a card — it is a container the cards sit inside — and a
+ * rounded frame around a stack of rounded cards reads as two competing shapes
+ * at every corner. The run cards keep their radius; the thing holding them
+ * gives up its own. */
 .session-group {
-    /* Square on the colour side — see .vehicle-run-group. */
-    border-radius: 0 0.75rem 0.75rem 0;
     border: 1px solid var(--color-border);
     border-left: 3px solid var(--color-primary);
 }
 /* Deliberately NOT overflow-hidden. It was, to keep the nested header and body
-   inside the rounded corner — and it also clipped the run cards' "More ▾"
-   menu, which is absolutely positioned and drops below its card. The children
-   carry the radius instead, which contains them just as well and clips
-   nothing. */
+   inside the rounded corner it no longer has — and it also clipped the run
+   cards' "More ▾" menu, which is absolutely positioned and drops below its
+   card. Square corners need no clipping at all. */
 .session-group.is-unassigned {
     border-left-color: var(--color-border);
 }
 .session-group-body {
     @apply flex flex-col gap-3 p-3;
     background-color: var(--color-surface-sunken);
-    border-bottom-left-radius: calc(0.75rem - 1px);
-    border-bottom-right-radius: calc(0.75rem - 1px);
 }
 /* Nested cards sit on the sunken group background, so they lose the outer
    border that would otherwise read as a second frame inside the first. */
@@ -3839,24 +3892,306 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-primary);
 }
 
-/* ── Run spec rows ──────────────────────────────────────────────────────────── */
-/* Grouped by meaning — design / conditions / results — with each row wrapping
-   inside its own band. The old single dot-separated line wrapped wherever the
-   card ended, so a temperature could start a line on its own and speed could
-   sit beside efficiency. A fixed label column gives the eye an anchor. */
-.run-spec-rows {
-    @apply flex flex-col gap-1 mt-1.5;
+/* ── Run bands ───────────────────────────────────────────────────────────────
+ *
+ * Design / conditions / results, each on its own row with a solid label rail
+ * and its figures on an auto-fit track grid. Three changes from what this
+ * replaced, and each fixes something specific:
+ *
+ * The rail is SOLID and the label is legible. It was faint text in a
+ * fixed-width column, which made the band names the quietest thing on a card
+ * whose entire structure they define.
+ *
+ * The figures are a GRID, not a wrapping line. A wrapped line re-flows to
+ * whatever width the card happens to be, so the same field lands in a different
+ * place on every card and two runs cannot be compared by eye. `auto-fit` means
+ * as many columns as the run actually records — a field it does not carry costs
+ * no column at all.
+ *
+ * And every cell carries its own LABEL. `4,800 ft` and `1,240 ft` are an
+ * altitude and a climb, and units alone never said which.
+ */
+.run-bands {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-top: 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    overflow: hidden;
+    background-color: var(--color-border);
 }
-.run-spec-row {
-    @apply flex items-baseline gap-2 text-sm;
+.run-band {
+    display: grid;
+    grid-template-columns: 6.5rem 1fr;
+    gap: 1px;
+    background-color: var(--color-border);
 }
-.run-spec-label {
-    @apply text-xs uppercase tracking-wide shrink-0;
-    width: 5.5rem;
-    color: var(--color-text-faint);
+.run-band-label {
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    background-color: var(--color-surface-sunken);
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
 }
-.run-spec-items {
-    @apply flex flex-wrap items-baseline gap-x-3 gap-y-0.5 min-w-0;
+.run-band-cells {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1px;
+    background-color: var(--color-border);
+}
+.run-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    padding: 5px 10px;
+    background-color: var(--color-card);
+}
+.run-cell-label {
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    letter-spacing: 0.06em;
+    color: var(--color-text-meta);
+    @apply truncate;
+}
+.run-cell-value {
+    font-size: var(--fs-data, var(--fs-body));
+    color: var(--color-text-value);
+}
+/* A reading that is true but carries a caveat — a cycle average where the
+   column means a held speed. The figure is still the point, so only its colour
+   moves; nothing is wrong with the number. */
+.run-cell.is-qualified .run-cell-value { color: var(--color-warning-text); }
+.run-cell.is-warning {
+    background-color: var(--color-warning-surface);
+}
+.run-cell.is-warning .run-cell-value { color: var(--color-warning-text); }
+/* Free text, not a figure: it wraps, and it is allowed more than one column
+   because a sentence in a 9rem cell is a column of single words. */
+.run-cell.is-prose { grid-column: span 2; }
+.run-cell.is-prose .run-cell-value {
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    color: var(--color-text-secondary);
+}
+.run-cell-missing {
+    color: var(--color-text-meta);
+}
+.run-cell-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+.run-cell-action {
+    align-self: flex-start;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-primary);
+}
+.run-cell-action:hover { text-decoration: underline; }
+
+/* ── Charging pair (handoff 7b, treatment A) ─────────────────────────────────
+ *
+ * A bordered footer UNDER the bands rather than a row inside them. It sat in
+ * the meta block wearing a bare `Charging pair:` label and a form select, so a
+ * curator's editorial choice looked exactly like a reading off the dynamometer.
+ *
+ * Orange because it is the same "this is the live pairing" signal the chart
+ * uses for its Y2 axis — and this is the one control on the card that changes
+ * what another screen plots. */
+.run-pair {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-muted);
+}
+/* Only a PUBLISHED pairing takes the accent. On Auto the card is following the
+   vehicle default rather than asserting anything, and colouring that would make
+   every range card claim a decision nobody made. */
+.run-pair.is-curated {
+    border-color: var(--color-accent-orange);
+    background-color: var(--color-accent-orange-surface);
+}
+.run-pair-label {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-text-meta);
+}
+.run-pair.is-curated .run-pair-label { color: var(--color-accent-orange); }
+.run-pair-select {
+    min-width: 0;
+    max-width: 22rem;
+}
+.run-pair-state {
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+
+/* ── Note panel ──────────────────────────────────────────────────────────────
+ *
+ * A small bordered notice carrying an intent — a warning about the data, an
+ * error from a parse, a fact about what an import is about to do.
+ *
+ * Tests & Data had seven of these, written inline seven times: `text-xs
+ * text-amber-700 bg-amber-50 border border-amber-200 rounded p-2` and its red
+ * and blue variants. Every one of them was a light surface with no dark
+ * counterpart, which is what `KNOWN_OFFENDERS` counts — a third of that
+ * backlog was this one component, retyped.
+ *
+ * Warning is the default because most of them are warnings, and because a
+ * notice with no intent is a paragraph. */
+.note-panel {
+    padding: 6px 9px;
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-control);
+    background-color: var(--color-warning-surface);
+    color: var(--color-warning-text);
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+}
+.note-panel.is-danger {
+    border-color: var(--color-danger-border);
+    background-color: var(--color-danger-surface);
+    color: var(--color-danger-text);
+}
+/* Not an alarm: "timestamps detected, they will be converted". It takes the
+   brand surface rather than a status one because nothing is wrong. */
+.note-panel.is-info {
+    border-color: var(--color-primary-border);
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
+}
+
+/* A card queued for deletion, waiting on the undo bar. It wore
+   `opacity-60 border-2 border-red-200`, which on a dark theme is a pale pink
+   line nobody can see. */
+.card.is-pending-delete {
+    opacity: 0.6;
+    border-color: var(--color-danger-border);
+}
+/* The one spinner that was drawn with a palette border rather than the
+   theme's. */
+.spinner-inline {
+    @apply inline-block animate-spin;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--color-primary);
+    border-top-color: transparent;
+    border-radius: 50%;
+}
+
+/* ── Charging pair (handoff 7b, treatment A) ─────────────────────────────────
+ *
+ * A bordered footer UNDER the bands rather than a row inside them. It sat in
+ * the meta block wearing a bare `Charging pair:` label and a form select, so a
+ * curator's editorial choice looked exactly like a reading off the dynamometer.
+ *
+ * Orange because it is the same "this is the live pairing" signal the chart
+ * uses for its Y2 axis — and this is the one control on the card that changes
+ * what another screen plots. */
+.run-pair {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-muted);
+}
+/* Only a PUBLISHED pairing takes the accent. On Auto the card is following the
+   vehicle default rather than asserting anything, and colouring that would
+   make every range card claim a decision nobody made. */
+.run-pair.is-curated {
+    border-color: var(--color-accent-orange);
+    background-color: var(--color-accent-orange-surface);
+}
+.run-pair-label {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-text-meta);
+}
+.run-pair.is-curated .run-pair-label { color: var(--color-accent-orange); }
+.run-pair-select {
+    min-width: 0;
+    max-width: 22rem;
+}
+.run-pair-state {
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+
+/* ── Note panel ──────────────────────────────────────────────────────────────
+ *
+ * A small bordered notice carrying an intent — a warning about the data, an
+ * error from a parse, a fact about what an import is about to do.
+ *
+ * Tests & Data had seven of these, written inline seven times: `text-xs
+ * text-amber-700 bg-amber-50 border border-amber-200 rounded p-2` and its red
+ * and blue variants. Every one of them was a light surface with no dark
+ * counterpart, which is what `KNOWN_OFFENDERS` counts — a third of that
+ * backlog was this one component, retyped.
+ *
+ * Warning is the default because most of them are warnings, and because a
+ * notice with no intent is a paragraph. */
+.note-panel {
+    padding: 6px 9px;
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-control);
+    background-color: var(--color-warning-surface);
+    color: var(--color-warning-text);
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+}
+.note-panel.is-danger {
+    border-color: var(--color-danger-border);
+    background-color: var(--color-danger-surface);
+    color: var(--color-danger-text);
+}
+/* Not an alarm: "timestamps detected, they will be converted". It takes the
+   brand surface rather than a status one because nothing is wrong. */
+.note-panel.is-info {
+    border-color: var(--color-primary-border);
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
+}
+
+/* A card queued for deletion, waiting on the undo bar. It wore
+   `opacity-60 border-2 border-red-200`, which on a dark theme is a pale pink
+   line nobody can see. */
+.card.is-pending-delete {
+    opacity: 0.6;
+    border-color: var(--color-danger-border);
+}
+/* The one spinner that was drawn with a palette border rather than the
+   theme's. */
+.spinner-inline {
+    @apply inline-block animate-spin;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--color-primary);
+    border-top-color: transparent;
+    border-radius: 50%;
 }
 
 /* ── Selective inheritance picker ───────────────────────────────────────────── */

@@ -380,9 +380,13 @@ function offenders() {
  * card dropped the green `bg-green-100` visibility pill and the `bg-blue-50`
  * footer button for tokens, 69 once .badge-status gained real intents and
  * stopped every call site bringing its own bg-amber-50 / bg-red-50 cluster.
- * RunsView holds 31 of what is left.
+ *
+ * RunsView held 31 of those and now holds 10. Phase 8 of the re-skin named the
+ * components it was retyping — .note-panel eight times over, the estimation and
+ * join-key panels' states, the visibility badge, the vehicle action stack — and
+ * each name took a cluster with it.
  */
-const KNOWN_OFFENDERS = 61;
+const KNOWN_OFFENDERS = 38;
 
 describe('hardcoded light surfaces', () => {
     it('does not grow', () => {
