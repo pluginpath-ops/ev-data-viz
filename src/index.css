@@ -5235,8 +5235,94 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .stats-view {
     @apply flex flex-col gap-4;
 }
-.stats-facet-unit {
-    @apply max-w-xs;
+
+/* ── The controls strip ──────────────────────────────────────────────────────
+ *
+ * One row. It was five stacked chip walls — unit, year, group-by, class,
+ * drivetrain, measure — each a label above every value, which with 10 measures
+ * and 9 classes and 6 years spent most of a screen before the first number.
+ * Same diagnosis Browse's filter wall got in phase 5a, same answer.
+ *
+ * It wraps rather than scrolls: this is a form, and a control you cannot see is
+ * a question you do not know you were asked.
+ */
+.stats-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: var(--radius-card);
+    background-color: var(--color-surface-muted);
+    border: 1px solid var(--color-border);
+}
+.stats-controls-divider {
+    width: 1px;
+    align-self: stretch;
+    margin: 0 4px;
+    background-color: var(--color-border);
+}
+
+/* The unit stays open, in words. It changes every number on the screen, and a
+   reader who does not know which one they are looking at cannot use any of
+   them — behind a caret it would be the question nobody thinks to ask. */
+.stats-segmented-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.stats-segmented {
+    display: flex;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-border-strong);
+    overflow: hidden;
+}
+.stats-segmented button {
+    padding: 5px 10px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+}
+.stats-segmented button:hover:not(.active) {
+    background-color: var(--color-hover-lift);
+    color: var(--color-text-primary);
+}
+.stats-segmented button.active {
+    background-color: var(--color-primary);
+    color: var(--color-primary-text, #fff);
+    font-weight: 600;
+}
+
+/* ── The headline ────────────────────────────────────────────────────────────
+   What the numbers MEAN, as a sentence — the strip above states the same
+   things as settings, which is a different job. */
+.stats-headline {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.stats-headline-title {
+    font-size: calc(var(--fs-body) * 1.2857);
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+.stats-headline-scope {
+    margin-left: 10px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-meta);
+}
+/* The unit's own question — the reason to care which unit is selected at all.
+   Quoted because it is a question a reader asks, not a label for a control. */
+.stats-headline-question {
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-faint);
 }
 
 /* ── Summary table ───────────────────────────────────────────────────────── */

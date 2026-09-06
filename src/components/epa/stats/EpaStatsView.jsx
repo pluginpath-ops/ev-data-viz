@@ -8,6 +8,7 @@ import {
 } from '../../../utils/epaGuideStats';
 import { UNKNOWN_DIMENSION } from '../../../utils/epaCertStats';
 import { datasetByKey, isKnownMeasure, certPopulation } from '../../../utils/statsDatasets';
+import StatsControls from './StatsControls';
 import StatsTable from './StatsTable';
 import StatsHistogram from './StatsHistogram';
 import StatsExtremes from './StatsExtremes';
@@ -264,130 +265,64 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
     const unitDef = UNITS.find(u => u.key === unit);
     const dimDef  = DIMENSIONS.find(d => d.key === dimension);
 
+    /* The controls say what is selected; this says what the numbers below MEAN,
+       which is a different sentence. The unit clause is the guide's question —
+       on the certification side there is no choice to report, so it states the
+       record is the unit rather than echoing a control that is not on screen. */
+    const scope = [
+        ds.unitPhrase(unit),
+        selectedYears.length === 0 ? 'all model years'
+            : selectedYears.length === 1 ? `model year ${selectedYears[0]}`
+                : `model years ${selectedYears.join(', ')}`,
+        showClassFilter && classes.length > 0 ? `${classes.join(' / ')} only` : null,
+        showDriveFilter && drives.length > 0 ? `${drives.join(' / ')} only` : null,
+        corpus.n > 0 ? `n=${corpus.n}` : null,
+    ].filter(Boolean);
+
     return (
         <div className="stats-view">
-            <div className="section-header">
+            <StatsControls
+                units={UNITS}
+                unit={unit}
+                onUnit={setUnit}
+                hasUnitChoice={ds.hasUnitChoice}
+                measures={ds.measures}
+                measure={measure}
+                onMeasure={setMeasure}
+                defaultMeasure={ds.defaultMeasure}
+                dimensions={DIMENSIONS}
+                dimension={dimension}
+                onDimension={setDimension}
+                allYears={allYears}
+                selectedYears={selectedYears}
+                onToggleYear={toggleYear}
+                onAllYears={() => setYears([])}
+                allClasses={allClasses}
+                classes={classes}
+                onToggleClass={toggleIn(classes, setClasses)}
+                onClearClasses={() => setClasses([])}
+                showClassFilter={showClassFilter}
+                allDrives={allDrives}
+                drives={drives}
+                onToggleDrive={toggleIn(drives, setDrives)}
+                onClearDrives={() => setDrives([])}
+                showDriveFilter={showDriveFilter}
+            />
+
+            {/* The measure and the grouping, as a sentence, because the strip
+                above states them as settings. `answers` is the unit's own
+                question — the reason to care which unit is selected at all —
+                and it sits at the right where the design puts it. */}
+            <div className="stats-headline">
                 <div>
-                    <div className="section-title">{ds.label}</div>
-                    <div className="text-note">
-                        {ds.source}
-                    </div>
-                    <div className="text-note">
-                        {/* The unit clause is the guide's question. On the
-                            certification side there is no choice to report —
-                            the record is the unit — so it states that rather
-                            than echoing a control that is not on screen. */}
-                        {measDef?.label} by {dimDef?.label.toLowerCase()},
-                        {' '}{ds.unitPhrase(unit)},
-                        {' '}{selectedYears.length === 0
-                            ? 'all model years'
-                            : selectedYears.length === 1
-                                ? `model year ${selectedYears[0]}`
-                                : `model years ${selectedYears.join(', ')}`}
-                        {showClassFilter && classes.length > 0 && `, ${classes.join(' / ')} only`}
-                        {showDriveFilter && drives.length > 0 && `, ${drives.join(' / ')} only`}.
-                    </div>
+                    <span className="stats-headline-title">
+                        {measDef?.label} by {dimDef?.label.toLowerCase()}
+                    </span>
+                    <span className="stats-headline-scope">{scope.join(' · ')}</span>
                 </div>
-            </div>
-
-            <div className="guide-filter-bar">
-                {/* The unit leads, and states the question each answers. The
-                    same query gives materially different numbers, and a reader
-                    who does not know which one they are looking at cannot use
-                    any of them. */}
-                {/* Only the guide has a unit-of-analysis question. A
-                    certification record IS the unit; there is nothing below it
-                    to collapse. */}
-                {ds.hasUnitChoice && (
-                <div className="guide-facet stats-facet-unit">
-                    <div className="guide-facet-label">Count one observation per</div>
-                    <div className="guide-facet-values">
-                        {UNITS.map(u => (
-                            <button
-                                key={u.key}
-                                type="button"
-                                className={`guide-chip ${unit === u.key ? 'active' : ''}`}
-                                onClick={() => setUnit(u.key)}
-                                title={u.answers}
-                            >
-                                {u.label.replace('Per ', '')}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="text-note">{unitDef?.answers}</div>
-                </div>
+                {ds.hasUnitChoice && unitDef?.answers && (
+                    <span className="stats-headline-question">“{unitDef.answers}”</span>
                 )}
-
-                <div className="guide-facet">
-                    <div className="guide-facet-label">Model year</div>
-                    <div className="guide-facet-values">
-                        {allYears.map(y => (
-                            <button key={y} type="button"
-                                className={`guide-chip ${selectedYears.includes(y) ? 'active' : ''}`}
-                                onClick={() => toggleYear(y)}>{y}</button>
-                        ))}
-                        <button type="button"
-                            className={`guide-chip ${selectedYears.length === 0 ? 'active' : ''}`}
-                            onClick={() => setYears([])}>All</button>
-                    </div>
-                    {/* Stated rather than prevented. Comparing two years is a
-                        real question; counting one car twice while asking what
-                        is typical is a different one, and the reader should be
-                        told which they are looking at. */}
-                    {selectedYears.length !== 1 && (
-                        <div className="text-note">
-                            A configuration that appears in several years is counted once per year.
-                        </div>
-                    )}
-                </div>
-
-                <div className="guide-facet">
-                    <div className="guide-facet-label">Group by</div>
-                    <div className="guide-facet-values">
-                        {DIMENSIONS.map(d => (
-                            <button key={d.key} type="button"
-                                className={`guide-chip ${dimension === d.key ? 'active' : ''}`}
-                                onClick={() => setDimension(d.key)}>{d.label}</button>
-                        ))}
-                    </div>
-                </div>
-
-                {showClassFilter && (
-                    <div className="guide-facet">
-                        <div className="guide-facet-label">Only these classes</div>
-                        <div className="guide-facet-values">
-                            {allClasses.map(c => (
-                                <button key={c} type="button"
-                                    className={`guide-chip ${classes.includes(c) ? 'active' : ''}`}
-                                    onClick={() => toggleIn(classes, setClasses)(c)}>{c}</button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {showDriveFilter && (
-                    <div className="guide-facet">
-                        <div className="guide-facet-label">Only these drivetrains</div>
-                        <div className="guide-facet-values">
-                            {allDrives.map(d => (
-                                <button key={d} type="button"
-                                    className={`guide-chip ${drives.includes(d) ? 'active' : ''}`}
-                                    onClick={() => toggleIn(drives, setDrives)(d)}>{d}</button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                <div className="guide-facet">
-                    <div className="guide-facet-label">Measure</div>
-                    <div className="guide-facet-values">
-                        {ds.measures.map(m => (
-                            <button key={m.key} type="button"
-                                className={`guide-chip ${measure === m.key ? 'active' : ''}`}
-                                onClick={() => setMeasure(m.key)}>{m.label}</button>
-                        ))}
-                    </div>
-                </div>
             </div>
 
             {/* What the figure is computed from, and what it is not. A median
