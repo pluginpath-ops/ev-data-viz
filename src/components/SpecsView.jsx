@@ -15,55 +15,6 @@ export default function SpecsView({ selectedVehicleIds }) {
     const pendingFlagsRef = useRef(pendingFlags);
     useEffect(() => { pendingFlagsRef.current = pendingFlags; }, [pendingFlags]);
 
-    // ── Sticky mirror scrollbar ───────────────────────────────────────────────
-    // The real scroll container is deep inside the page; its native scrollbar
-    // only appears at the very bottom of the content. The mirror scrollbar sticks
-    // to the bottom of the viewport and overlays the table so it is always reachable.
-    const tableContainerRef = useRef(null);
-    const mirrorRef = useRef(null);
-    const isSyncing = useRef(false);
-    const [isOverflowing, setIsOverflowing] = useState(false);
-    const [mirrorInnerWidth, setMirrorInnerWidth] = useState(0);
-
-    useEffect(() => {
-        const container = tableContainerRef.current;
-        if (!container) return;
-        const update = () => {
-            setIsOverflowing(container.scrollWidth > container.clientWidth + 1);
-            setMirrorInnerWidth(container.scrollWidth);
-        };
-        update();
-        const ro = new ResizeObserver(update);
-        ro.observe(container);
-        const table = container.querySelector('table');
-        if (table) ro.observe(table);
-        return () => ro.disconnect();
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    useEffect(() => {
-        const container = tableContainerRef.current;
-        const mirror = mirrorRef.current;
-        if (!container || !mirror) return;
-        const onContainerScroll = () => {
-            if (isSyncing.current) return;
-            isSyncing.current = true;
-            mirror.scrollLeft = container.scrollLeft;
-            isSyncing.current = false;
-        };
-        const onMirrorScroll = () => {
-            if (isSyncing.current) return;
-            isSyncing.current = true;
-            container.scrollLeft = mirror.scrollLeft;
-            isSyncing.current = false;
-        };
-        container.addEventListener('scroll', onContainerScroll, { passive: true });
-        mirror.addEventListener('scroll', onMirrorScroll, { passive: true });
-        return () => {
-            container.removeEventListener('scroll', onContainerScroll);
-            mirror.removeEventListener('scroll', onMirrorScroll);
-        };
-    }, []);
-
     // Commit all pending flags on tab leave (component unmount).
     useEffect(() => {
         return () => {
@@ -229,7 +180,7 @@ export default function SpecsView({ selectedVehicleIds }) {
                     </p>
                 </div>
             ) : (
-                <div className="specs-table-container" ref={tableContainerRef}>
+                <div className="specs-table-container">
                     <table className="w-full">
                         <thead>
                             <tr>
@@ -283,11 +234,6 @@ export default function SpecsView({ selectedVehicleIds }) {
                     </table>
                 </div>
             )}
-
-            {/* Mirror scrollbar — no longer needed now that the container has a
-                fixed max-height and owns both scroll axes; native scrollbar is
-                always visible at the container bottom. Hidden but kept for reference. */}
-            <div ref={mirrorRef} style={{ display: 'none' }} />
         </div>
     );
 }
