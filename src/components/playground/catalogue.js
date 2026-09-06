@@ -145,6 +145,8 @@ export const SECTIONS = [
             { cls: 'guide-badge',        as: 'span', label: 'Guide badge', note: 'Base carries no background of its own — it needs a state below.' },
             { cls: 'guide-badge guide-badge-tested', as: 'span', label: 'Guide badge · tested' },
             { cls: 'guide-badge guide-badge-multi',  as: 'span', label: 'Guide badge · multi' },
+            { cls: 'stats-histogram-median-chip', as: 'span', label: 'Histogram median',
+              note: 'Rides above the plot area, never over the bars it measures.' },
             { cls: 'badge-micro',            as: 'span', label: 'Micro badge',
               note: 'The metrics every run-row marker shares. Mono, because a badge on a run row almost always carries a figure — "70 mph", "72 °F", "291 mi". Neutral by default: most are readings, not states.' },
             { cls: 'badge-micro is-qualified', as: 'span', label: 'Micro badge · qualified',

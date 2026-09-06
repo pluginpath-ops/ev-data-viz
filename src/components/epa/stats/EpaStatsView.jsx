@@ -355,7 +355,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
             <div className="stats-panels">
                 <div className="stats-panel">
                     <div className="section-header-title">Distribution</div>
-                    <StatsHistogram data={hist} measureDef={measDef} />
+                    <StatsHistogram data={hist} measureDef={measDef} overall={corpus} />
                 </div>
                 <div className="stats-panel">
                     <div className="section-header-title">Named extremes</div>
@@ -363,10 +363,14 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
                 </div>
             </div>
 
-            <div className="text-note">
-                Buckets with fewer than {MIN_N} observations are marked rather than dropped.
+            {/* Held to a measure's width rather than the page's. This is prose
+                about method, and prose set to 1400px is unreadable however
+                short it is. */}
+            <div className="text-note stats-method-note">
                 Medians and quartiles throughout — these distributions are small and skewed,
                 and one long-range outlier moves a mean in a way it does not move a median.
+                A configuration present in several model years is counted once per year, and
+                buckets with fewer than {MIN_N} observations are marked rather than dropped.
             </div>
         </div>
     );
