@@ -3427,9 +3427,26 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-meta);
 }
 
+/* Sized to the viewport that is actually left below it, MEASURED.
+ *
+ * It was `max-height: calc(100vh - 14rem)`, and 14rem is a guess at how much
+ * chrome sits above: the header, the sub-nav, the selection strip, the page
+ * title, the controls. At 1280×800 with four vehicles that guess put the
+ * container bottom 5px inside the fold — so one more line of selected-vehicle
+ * chips pushed the horizontal scrollbar just off the bottom of the screen:
+ * present, functional, and impossible to reach.
+ *
+ * `flex: 1` is not the fix either. <main> is `min-h-screen`, not a fixed
+ * height, so a flex child with nothing to divide grows to its content — the
+ * container went to 2,581px on the same page.
+ *
+ * --specs-max-h is published by the view from the container's own PAGE offset,
+ * so the table ends above the fold whatever is stacked over it. It still owns
+ * both scroll axes, which is what makes the sticky header and the frozen label
+ * column work. */
 .specs-table-container {
     @apply rounded-lg overflow-auto;
-    max-height: calc(100vh - 14rem); /* owns both scroll axes so sticky header/col work */
+    max-height: var(--specs-max-h, calc(100vh - 14rem));
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
@@ -3484,6 +3501,15 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .specs-col-label.is-custom {
     font-style: italic;
+    color: var(--color-text-meta);
+}
+/* Which way is better, on the rows that have an answer. It appears only while
+   "mark best" is on: without it the feature looks broken on every row that was
+   skipped on purpose, because a skipped row and a missed one look identical. */
+.specs-direction {
+    margin-left: 5px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     color: var(--color-text-meta);
 }
 

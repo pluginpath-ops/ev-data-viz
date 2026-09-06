@@ -46,6 +46,48 @@ export default function SpecsView({ selectedVehicleIds }) {
         return () => ro.disconnect();
     }, []);
 
+    /**
+     * How tall the table can be before its bottom edge leaves the screen.
+     *
+     * Measured, because everything above it varies: the sticky header grows
+     * with the number of selected vehicles, and the controls strip wraps. The
+     * constant it replaces — `calc(100vh - 14rem)` — left the container bottom
+     * 5px inside the fold at 1280×800 with four vehicles, which is to say one
+     * extra row of chips put the horizontal scrollbar just off the bottom of
+     * the screen. A scrollbar you cannot reach is worse than no scrollbar.
+     *
+     * Measured against the container's PAGE offset, not its viewport top. The
+     * viewport top is the tempting one and it oscillates: sizing to it makes
+     * the container taller as you scroll, a taller container makes a taller
+     * page, and the page grows under the scroll that is measuring it. The page
+     * offset does not move when you scroll, so the answer is stable — and it is
+     * the tighter of the two constraints anyway, since the table starts below
+     * more chrome than stays pinned above it.
+     */
+    const [maxHeight, setMaxHeight] = useState(null);
+    const tableRef = useCallback((el) => {
+        if (!el) return undefined;
+        let frame = 0;
+        const measure = () => {
+            frame = 0;
+            const pageTop = el.getBoundingClientRect().top + window.scrollY;
+            // 16px so the container's bottom border is not flush with the fold.
+            setMaxHeight(Math.max(240, Math.round(window.innerHeight - pageTop - 16)));
+        };
+        const schedule = () => { if (!frame) frame = requestAnimationFrame(measure); };
+        measure();
+        window.addEventListener('resize', schedule);
+        // The chrome above the table grows with the selection, and the controls
+        // strip wraps — both move the page offset without a window resize.
+        const ro = new ResizeObserver(schedule);
+        ro.observe(document.body);
+        return () => {
+            if (frame) cancelAnimationFrame(frame);
+            window.removeEventListener('resize', schedule);
+            ro.disconnect();
+        };
+    }, []);
+
     const [filter, setFilter]       = useState('');
     const [diffOnly, setDiffOnly]   = useState(false);
     const [hideEmpty, setHideEmpty] = useState(true);
@@ -147,8 +189,12 @@ export default function SpecsView({ selectedVehicleIds }) {
         buildRow('vehicle.trim',    'Trim',    v => v.trim),
         buildRow('vehicle.year',    'Year',    v => v.year),
         buildRow('vehicle.battery', 'Battery (kWh, usable)', v => v.battery),
+        // The RAW number, formatted by unitGroup. Passing `fmtDistance(...)`
+        // here made the row's value the string "405 mi", which `Number()` reads
+        // as NaN — so the one core row with a better direction could never have
+        // a best cell. A row model has to hold what was recorded.
         buildRow('vehicle.range',   `EPA Range (${distanceLabel(units)})`,
-            v => (v.range ? fmtDistance(v.range, units) : null)),
+            v => v.range, { unitGroup: 'distance', better: 'higher' }),
         buildRow('vehicle.runs',    'Test Runs', v => v.runs?.length ?? 0),
     ];
 
@@ -191,7 +237,10 @@ export default function SpecsView({ selectedVehicleIds }) {
      */
     const bestIndex = (row) => {
         if (!markBest || !row.better) return null;
-        const nums = row.values.map(v => (typeof v.raw === 'number' ? v.raw : Number(v.raw)));
+        // `Number(null)` is 0, not NaN — so an unrecorded cell competed as a
+        // zero. On a `lower` row two blanks then tied at 0 and the row was
+        // silently skipped; with one blank, "not recorded" would have WON.
+        const nums = row.values.map(v => (v.raw == null ? NaN : Number(v.raw)));
         const valid = nums.filter(n => Number.isFinite(n));
         if (valid.length < 2) return null;
         const target = row.better === 'lower' ? Math.min(...valid) : Math.max(...valid);
@@ -234,7 +283,11 @@ export default function SpecsView({ selectedVehicleIds }) {
             ) : (
                 <div
                     className="specs-table-container"
-                    style={{ '--specs-head-h': `${headHeight}px` }}
+                    ref={tableRef}
+                    style={{
+                        '--specs-head-h': `${headHeight}px`,
+                        ...(maxHeight ? { '--specs-max-h': `${maxHeight}px` } : {}),
+                    }}
                 >
                     <table className="specs-table">
                         <thead ref={headRef}>
@@ -277,6 +330,24 @@ export default function SpecsView({ selectedVehicleIds }) {
                                             <tr key={row.key} className="specs-row">
                                                 <td className={`specs-td specs-col-label${row.italic ? ' is-custom' : ''}`}>
                                                     {row.label}
+                                                    {/* Which rows take part, said on the rows
+                                                        themselves. Without it "mark best" looks
+                                                        broken on every row that has no better
+                                                        direction — the reader cannot tell a row
+                                                        that was skipped on purpose from one the
+                                                        feature missed. Shown only with the toggle
+                                                        on, because off it is answering a question
+                                                        nobody asked. */}
+                                                    {markBest && row.better && (
+                                                        <span
+                                                            className="specs-direction"
+                                                            title={row.better === 'higher'
+                                                                ? 'Higher is better — the best cell is marked'
+                                                                : 'Lower is better — the best cell is marked'}
+                                                        >
+                                                            {row.better === 'higher' ? '↑' : '↓'}
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 {row.values.map((cell, i) => {
                                                     const isInherited = row.flagKey

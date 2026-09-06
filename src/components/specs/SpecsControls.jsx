@@ -58,7 +58,7 @@ export default function SpecsControls({
             {/* Off by default, and it only marks rows whose field declares which
                 way is an improvement — see the note on SPEC_CATEGORIES. */}
             <Toggle on={markBest} onToggle={onMarkBest}
-                title="Wash the winning cell on rows that have an unambiguous better direction — charge time down, braking distance down, charge rate up. Rows without one stay neutral.">
+                title="Wash the winning cell on rows that have an unambiguous better direction. Those rows show ↑ or ↓ beside their label while this is on; rows without a direction — more motors, more speakers, a bigger battery — stay neutral, because none of those is better without a use case.">
                 Mark best in row
             </Toggle>
 
