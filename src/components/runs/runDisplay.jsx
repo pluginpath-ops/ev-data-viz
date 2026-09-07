@@ -13,8 +13,8 @@ import { runKindFrom, isRangeRun } from '../../utils/runUtils';
 // Each flag represents a data domain that can independently be present in a run.
 // Flags are stored as an array so future types can be added without schema changes.
 export const DATA_FLAGS = [
-    { key: 'charging', label: '⚡ Charging', pillStyle: 'bg-blue-100 text-blue-800 border-blue-300',   desc: 'Time-series charging data (charge rate, SoC)' },
-    { key: 'range',    label: '📏 Range',    pillStyle: 'bg-purple-100 text-purple-800 border-purple-300', desc: 'Range/efficiency test (distance, SoC, speed, efficiency)' },
+    { key: 'charging', label: '⚡ Charging', pillStyle: 'run-kind is-charging',   desc: 'Time-series charging data (charge rate, SoC)' },
+    { key: 'range',    label: '📏 Range',    pillStyle: 'run-kind is-range', desc: 'Range/efficiency test (distance, SoC, speed, efficiency)' },
 ];
 
 /**

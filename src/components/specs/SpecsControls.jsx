@@ -37,7 +37,7 @@ export default function SpecsControls({
     ].filter(Boolean);
 
     return (
-        <div className="specs-controls">
+        <div className="controls-strip">
             <input
                 type="search"
                 value={filter}

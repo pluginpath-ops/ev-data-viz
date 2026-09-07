@@ -49,7 +49,8 @@ inline cluster kept painting the old palette.
 
 **One name per thing — `docs/vocabulary.md` is the list.** Read it before
 naming anything new, and use the standard term it gives rather than inventing a
-house one.
+house one. `docs/design-tokens.md` is the same for colour, and
+`docs/typography.md` for type: both name every value and say which rule owns it.
 
 It exists because three words drifted: "rail" meant the chart sidebar, the
 sub-nav AND a card's coloured left edge; "chrome" meant both a category and one

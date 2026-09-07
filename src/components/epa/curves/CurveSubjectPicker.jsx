@@ -146,7 +146,7 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                                     />
                                     <span className="curve-picker-name">
                                         <span className="curve-picker-title">{s.label}</span>
-                                        <span className="curve-picker-meta">{s.sublabel}</span>
+                                        <span className="text-caption curve-picker-meta">{s.sublabel}</span>
                                     </span>
                                 </label>
                             ))}

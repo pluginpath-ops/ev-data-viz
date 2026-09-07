@@ -70,6 +70,9 @@
     --color-warning: rgb(245, 158, 11);
     --color-warning-hover: rgb(217, 119, 6);
 
+    /* Every token below is documented in docs/design-tokens.md, with its light
+       and dark value and how many places use it. */
+
     /* ── Callout triad: surface / border / text ────────────────────────────
        The base colours above are SOLID fills — a button, a filled badge. They
        cannot describe the other shape a status takes: a tinted panel with a
@@ -641,7 +644,7 @@ body {
 }
 
 /* ============================================================================
-   TYPOGRAPHY SYSTEM   (see docs/typography.md)
+   TYPOGRAPHY SYSTEM   (see docs/typography.md; colours in docs/design-tokens.md)
    ----------------------------------------------------------------------------
    ONE AXIS. A role carries its own size, weight AND colour; you pick exactly
    one and you are done. There is no colour tier to compose with (#277).
@@ -775,8 +778,94 @@ body {
 }
 
 /* Fixed bottom action bar (delete queue, undo toast, notification) */
+/* A bar pinned to the bottom of the window, carrying an outcome or a pending
+ * action. Four of them existed — the delete queue, the reorder confirm, the
+ * global notification's two states — and each brought its own `bg-red-50
+ * border-t-2 border-red-200`, which on a dark theme is a pale pink line under
+ * a pale pink slab that nothing else on the page resembles. */
 .fixed-action-bar {
     @apply fixed bottom-0 left-0 right-0 shadow-2xl;
+    border-top: 2px solid var(--color-border-strong);
+    background-color: var(--color-surface-muted);
+    color: var(--color-text-primary);
+}
+.fixed-action-bar.is-good {
+    border-top-color: var(--color-success-border);
+    background-color: var(--color-success-surface);
+    color: var(--color-success-text);
+}
+.fixed-action-bar.is-danger {
+    border-top-color: var(--color-danger-border);
+    background-color: var(--color-danger-surface);
+    color: var(--color-danger-text);
+}
+.fixed-action-bar.is-info {
+    border-top-color: var(--color-primary-border);
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
+}
+
+/* A run's kind, as the pill that opens its title line.
+ *
+ * Charging and range are the one place in this app where two hues genuinely
+ * encode a category rather than decorating one — the kind decides how every
+ * number below it is read. They are the accent tokens, not raw palette:
+ * `bg-blue-100 text-blue-800 border-blue-300` and its purple twin were fixed
+ * light colours with no dark counterpart, so on a dark theme they were two pale
+ * slabs at the top of every card. */
+.run-kind {
+    @apply text-xs px-2 py-0.5 rounded-full font-medium shrink-0;
+    border: 1px solid transparent;
+}
+.run-kind.is-charging {
+    border-color: color-mix(in srgb, var(--color-accent-blue) 45%, transparent);
+    background-color: color-mix(in srgb, var(--color-accent-blue) 14%, transparent);
+    color: var(--color-accent-blue);
+}
+.run-kind.is-range {
+    border-color: color-mix(in srgb, var(--color-accent-violet) 45%, transparent);
+    background-color: color-mix(in srgb, var(--color-accent-violet) 14%, transparent);
+    color: var(--color-accent-violet);
+}
+
+/* A destructive icon button that is quiet until you approach it. Three of them
+ * reached for `hover:bg-red-50`, a light tint with no dark counterpart. */
+.btn-icon-danger {
+    @apply rounded transition-colors leading-none;
+    border: 1px solid transparent;
+    color: var(--color-text-meta);
+}
+.btn-icon-danger:hover {
+    border-color: var(--color-danger-border);
+    background-color: var(--color-danger-surface);
+    color: var(--color-danger-text);
+}
+
+/* One option in a type-ahead list. Two dropdowns had the same row with the same
+ * `hover:bg-indigo-50 dark:hover:bg-indigo-900` — a pair that keys off
+ * `prefers-color-scheme` rather than this app's data-theme, so on a dark theme
+ * set by the toggle the hover was a pale lavender slab. */
+.option-row {
+    @apply px-3 py-2 text-sm cursor-pointer;
+    color: var(--color-text-primary);
+}
+.option-row:hover { background-color: var(--color-hover-lift); }
+.option-row.is-selected {
+    font-weight: 600;
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
+}
+
+/* Where a file is dropped. Two importers had the same rectangle, and both said
+ * "active" with `bg-indigo-50/40` — a colour the theme does not contain. */
+.drop-zone {
+    @apply rounded-lg p-10 text-center;
+    border: 2px dashed var(--color-border);
+    transition: border-color 0.12s, background-color 0.12s;
+}
+.drop-zone.is-over {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary-surface);
 }
 
 /* Empty-state placeholder content */
@@ -1408,9 +1497,13 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
    so one that does not is still a pill rather than floating text. */
 .tag-pill {
     @apply px-2 py-0.5 rounded-full text-xs font-medium;
+    border: 1px solid transparent;
     background-color: var(--color-surface-sunken);
     color: var(--color-text-secondary);
 }
+/* Summary counts at the head of a result — a row of them, read at a glance,
+   so they carry more air than a pill inside a row of data. */
+.tag-pill.is-summary { @apply px-3 py-1; }
 
 /* Square-radius informational badge (blue by default) */
 /* ── Micro badges ───────────────────────────────────────────────────────────
@@ -1460,19 +1553,33 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
    column means a held speed. Quieter than a full intent: the figure is still
    the point, and the dagger beside it says to read the tooltip. The background
    stays neutral because nothing is wrong with the number. */
-.badge-micro.is-qualified {
+.badge-micro.is-qualified,
+.tag-pill.is-qualified {
     border-color: var(--color-warning-border);
     color: var(--color-warning-text);
 }
 
+/* "This happened, and it is what you wanted" — an import that created rows, a
+   check that agreed. The one intent the badge family did not have, because
+   until the import summaries nothing needed to say so. */
+.badge-micro.is-good,
+.badge-status.is-good,
+.tag-pill.is-good {
+    background-color: var(--color-success-surface);
+    border-color: var(--color-success-border);
+    color: var(--color-success-text);
+}
+
 .badge-micro.is-warning,
-.badge-status.is-warning {
+.badge-status.is-warning,
+.tag-pill.is-warning {
     background-color: var(--color-warning-surface);
     border-color: var(--color-warning-border);
     color: var(--color-warning-text);
 }
 .badge-micro.is-danger,
-.badge-status.is-danger {
+.badge-status.is-danger,
+.tag-pill.is-danger {
     background-color: var(--color-danger-surface);
     border-color: var(--color-danger-border);
     color: var(--color-danger-text);
@@ -2619,9 +2726,25 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 
-.tag-filter-or   { @apply bg-green-500 text-white border-green-500 hover:bg-green-600; }
-.tag-filter-and  { @apply bg-blue-500 text-white border-blue-500 hover:bg-blue-600; }
-.tag-filter-not  { @apply bg-red-500 text-white border-red-500 hover:bg-red-600; }
+/* AND / OR / NOT, on the tokens that already mean those things.
+ *
+ * These were `@apply bg-blue-500 text-white border-blue-500` and its green and
+ * red twins — raw palette, no tokens, no dark rule, and the last three things
+ * #277 named that the re-skin had not reached. They were never illegible, so
+ * this was not a bug: it was three states of one control sitting outside the
+ * system while its fourth state, `.tag-filter-na`, sat inside it.
+ *
+ * The mapping is the one the issue asked for. NOT takes danger because it is
+ * the exclusion — the state that removes rows — and danger is what this app
+ * already uses to say so. White text on all three, because each is a solid
+ * fill of a saturated token; that is the one place a literal white is the
+ * right answer rather than a missing one. */
+.tag-filter-and { background-color: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.tag-filter-and:hover { background-color: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+.tag-filter-or  { background-color: var(--color-success); border-color: var(--color-success); color: #fff; }
+.tag-filter-or:hover  { background-color: var(--color-success-hover); border-color: var(--color-success-hover); }
+.tag-filter-not { background-color: var(--color-danger);  border-color: var(--color-danger);  color: #fff; }
+.tag-filter-not:hover { background-color: var(--color-danger-hover);  border-color: var(--color-danger-hover); }
 
 /* Small legend explaining OR/AND/NOT color states */
 .tag-filter-legend {
@@ -3340,7 +3463,25 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* OAuth provider button (GitHub, Google) */
 .auth-provider-btn {
     @apply w-full flex items-center justify-center gap-3 font-medium py-3 px-4 rounded-lg transition;
+    border: 2px solid var(--color-border-strong);
+    background-color: var(--color-surface-muted);
+    color: var(--color-text-primary);
 }
+.auth-provider-btn:hover { background-color: var(--color-hover-lift); }
+
+/* Google's button, in Google's colours — literal, and deliberately so.
+ *
+ * Their brand guidelines require the white form beside the mark, and re-valuing
+ * it against our tokens would be repainting someone else's trademark. It is the
+ * same reason the drift ledger exempts the four hexes inside the mark itself.
+ * Written here rather than inline so the ratchet can reach zero without the
+ * exception disappearing into a component. */
+.auth-provider-btn.is-google {
+    background-color: #ffffff;
+    border-color: #dadce0;
+    color: #1f1f1f;
+}
+.auth-provider-btn.is-google:hover { background-color: #f8f9fa; }
 
 
 /* ── Import Tableau Modal ───────────────────────────────────────────────────── */
@@ -3401,16 +3542,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 /* ── The controls strip ──────────────────────────────────────────────────── */
-.specs-controls {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px 12px;
-    border-radius: var(--radius-card);
-    background-color: var(--color-surface-muted);
-    border: 1px solid var(--color-border);
-}
+
 .specs-filter {
     width: 14rem;
     max-width: 100%;
@@ -3512,9 +3644,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    skipped on purpose, because a skipped row and a missed one look identical. */
 .specs-direction {
     margin-left: 5px;
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-meta);
 }
 
 /* The column's series colour, so a column ties to the same vehicle on every
@@ -3582,11 +3711,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     letter-spacing: 0.09em;
     text-transform: uppercase;
     color: var(--color-text-secondary);
-}
-.specs-band-count {
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-meta);
 }
 
 .specs-cell {
@@ -3664,11 +3788,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 /* Category header row in the comparison table */
-.specs-table-category-header {
-    @apply text-xs font-semibold uppercase tracking-wide px-6 py-2;
-    background-color: var(--color-surface-sunken);
-    color: var(--color-text-muted);
-}
 
 /* ── Vote buttons ──────────────────────────────────────────────────────────── */
 
@@ -5665,7 +5784,28 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * It wraps rather than scrolls: this is a form, and a control you cannot see is
  * a question you do not know you were asked.
  */
-.stats-controls {
+/* ONE controls strip, for every screen that has one.
+ *
+ * `.specs-controls` and `.stats-controls` were byte-identical — I wrote the
+ * second by copying the first — and the vocabulary already had a name for the
+ * thing. Anything a particular screen needs on top goes on a second class
+ * beside this one. */
+/* A quiet mono annotation: a count beside a heading, an axis end, a record's
+ * sub-line. Four places had arrived at exactly these three declarations
+ * independently — `.specs-band-count`, `.stats-histogram-summary`,
+ * `.stats-histogram-axis`, `.curve-picker-meta` — which is the evidence that it
+ * is a type ROLE and not four components that happen to match.
+ *
+ * `.text-nano` is the same size and family but uppercased and letterspaced,
+ * which is the LABEL treatment. This is the one for text that is read rather
+ * than scanned. */
+.text-caption {
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+
+.controls-strip {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -5919,11 +6059,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .stats-histogram-head {
     @apply flex items-baseline justify-between gap-3;
 }
-.stats-histogram-summary {
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-meta);
-}
 .stats-histogram-median-value {
     font-weight: 700;
     color: var(--color-accent-orange);
@@ -5984,9 +6119,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .stats-histogram-axis {
     @apply flex justify-between;
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-meta);
 }
 
 /* ── Named extremes ──────────────────────────────────────────────────────── */
@@ -6229,9 +6361,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    make read as a record's coordinates rather than as prose. */
 .curve-picker-meta {
     @apply truncate;
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-meta);
 }
 
 /* Named on every row, because once a mixed set is plotted this is the only

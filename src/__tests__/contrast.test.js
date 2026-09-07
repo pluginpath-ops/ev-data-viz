@@ -360,33 +360,26 @@ function offenders() {
 }
 
 /**
- * The backlog, held still.
+ * Zero, and it stays zero.
  *
- * A count rather than a ban, and a warn-shaped rule rather than a wall: there
- * are already dozens of these and "a lint that fails on arrival is one nobody
- * runs" is this project's own stated position on exactly that trade-off.
+ * This was a backlog held still: a count rather than a ban, because there were
+ * 79 of these and "a lint that fails on arrival is one nobody runs" is this
+ * project's own stated position. The ratchet made it a number that could only
+ * go down — 79 at the sweep that added it, 74, 71, 69, 59, 44, 38 — and the
+ * re-skin's last phase took the rest.
  *
- * What it buys is the ratchet. Adding a new hardcoded light surface fails this
- * test and the message says which file; removing one fails it too, and the fix
- * is to lower the number — which makes the backlog a thing that only ever goes
- * down. Migrating a cluster onto `--color-warning-surface` and friends is how
- * it goes down.
+ * It is a BAN now, which is what a ratchet is for: the count was a way of
+ * getting here, not a permanent fixture. A light background written inline with
+ * no dark counterpart is the invisible-input bug, and there is no longer a
+ * backlog of them to hide a new one in.
  *
- * A LITERAL, not `offenders().length`, which is what the first version wrote —
- * a number derived from the thing it checks always equals itself, so the test
- * passed and could never have failed.
- *
- * 79 at the sweep that added this, 74 after it, 71 once the re-skin's vehicle
- * card dropped the green `bg-green-100` visibility pill and the `bg-blue-50`
- * footer button for tokens, 69 once .badge-status gained real intents and
- * stopped every call site bringing its own bg-amber-50 / bg-red-50 cluster.
- *
- * RunsView held 31 of those and now holds 10. Phase 8 of the re-skin named the
- * components it was retyping — .note-panel eight times over, the estimation and
- * join-key panels' states, the visibility badge, the vehicle action stack — and
- * each name took a cluster with it.
+ * The one deliberate exception is Google's sign-in button, whose white
+ * background is a brand requirement rather than a colour choice. It lives in
+ * `.auth-provider-btn.is-google` in the stylesheet — named, commented, and out
+ * of the JSX this rule scans, so the exception is written down instead of
+ * being subtracted from a number.
  */
-const KNOWN_OFFENDERS = 38;
+const KNOWN_OFFENDERS = 0;
 
 describe('hardcoded light surfaces', () => {
     it('does not grow', () => {

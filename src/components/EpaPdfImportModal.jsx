@@ -189,14 +189,14 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                     <button onClick={onClose} className="text-meta hover:text-secondary text-xl leading-none">×</button>
                 </div>
 
-                {error && <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">⚠️ {error}</div>}
+                {error && <div className="note-panel is-danger mb-3">⚠️ {error}</div>}
 
                 {step === 'upload' && (
                     <div
                         onDrop={onDrop}
                         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                         onDragLeave={() => setDragOver(false)}
-                        className={`border-2 border-dashed rounded-lg p-10 text-center ${dragOver ? 'border-indigo-400 bg-indigo-50/40' : 'border-[var(--color-border)]'}`}
+                        className={`drop-zone${dragOver ? ' is-over' : ''}`}
                     >
                         <p className="text-sm text-secondary mb-3">
                             {progress

@@ -134,7 +134,7 @@ export default function StatsControls({
     );
 
     return (
-        <div className="stats-controls">
+        <div className="controls-strip">
             {hasUnitChoice && (
                 <>
                     <Segmented

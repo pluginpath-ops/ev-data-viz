@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { SECTIONS, OWNED_FAMILIES, hasDarkOverride } from './catalogue';
+import { COMPOSITES } from './specimens';
 import { parseColor, compositeStack, contrastRatio, AA_NORMAL, AA_LARGE } from '../../utils/contrast';
 
 /**
@@ -65,9 +66,12 @@ function Specimen({ spec }) {
     // specimens sit permanently red, and a badge that is always red for a
     // decision someone already made teaches people to stop reading badges.
     const remeasure = useCallback(() => {
+        // A composite has several foreground/background pairs; one ratio would
+        // describe whichever happened to be on the outer element.
+        if (spec.composite) return;
         const m = measure(ref.current);
         setReading(m && spec.minRatio ? { ...m, floor: spec.minRatio, relaxed: true } : m);
-    }, [spec.minRatio]);
+    }, [spec.minRatio, spec.composite]);
 
     useEffect(() => {
         // After paint, not during the effect. A measurement taken in the same
@@ -97,7 +101,15 @@ function Specimen({ spec }) {
         : spec.as === 'select' ? 'select' : spec.as === 'textarea' ? 'textarea' : 'span';
 
     const common = { ref, className: spec.cls };
-    const node = spec.as === 'input'
+    /* A composite: a popover, a plot frame, a bar. Rendered by the catalogue
+       rather than assembled from `as` + `label`, because these are only
+       meaningful put together — a `.guide-facet-panel` on its own is an empty
+       rounded box, and the thing worth checking is the option rows inside it.
+       No contrast reading: that measures ONE foreground against ONE background,
+       and a composite has several. */
+    const composite = spec.composite ? COMPOSITES[spec.composite] : null;
+    const node = composite ? composite()
+        : spec.as === 'input'
         ? <El {...common} defaultValue="42" placeholder="—" />
         : spec.as === 'textarea'
             ? <El {...common} defaultValue="Multi-line text" rows={2} />
@@ -111,7 +123,7 @@ function Specimen({ spec }) {
         <div className="pg-specimen">
             <div className="pg-specimen-stage">{node}</div>
             <div className="pg-specimen-meta">
-                <code className="pg-specimen-cls">{spec.cls}</code>
+                <code className="pg-specimen-cls">{spec.cls ?? spec.covers.join(' · ')}</code>
                 {reading && (
                     <span className={`pg-ratio ${pass ? 'is-pass' : 'is-fail'}`}
                         title={`${reading.px}px / weight ${reading.weight} — needs ${reading.floor}:1`
@@ -119,7 +131,7 @@ function Specimen({ spec }) {
                         {reading.ratio.toFixed(2)}:1
                     </span>
                 )}
-                {hasDarkOverride(spec.cls) && (
+                {spec.cls && hasDarkOverride(spec.cls) && (
                     <span className="pg-unscoped" title={
                         'Styled by a [data-theme="dark"] override rather than tokens, so it '
                         + 'cannot follow a themed subtree — in the side-by-side view below it '
@@ -183,7 +195,7 @@ function TokenGrid() {
 function SpecimenSet({ specimens, split }) {
     const body = (
         <div className="pg-specimens">
-            {specimens.map(s => <Specimen key={s.cls + s.label} spec={s} />)}
+            {specimens.map(s => <Specimen key={(s.cls ?? s.composite) + s.label} spec={s} />)}
         </div>
     );
     if (!split) return body;
@@ -193,7 +205,7 @@ function SpecimenSet({ specimens, split }) {
                 <div key={theme} data-theme={theme} className="pg-split-pane">
                     <div className="pg-split-label">{theme}</div>
                     <div className="pg-specimens">
-                        {specimens.map(s => <Specimen key={s.cls + s.label} spec={s} />)}
+                        {specimens.map(s => <Specimen key={(s.cls ?? s.composite) + s.label} spec={s} />)}
                     </div>
                 </div>
             ))}

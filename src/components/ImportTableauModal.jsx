@@ -181,21 +181,21 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
 
                             {/* Summary pills */}
                             <div className="flex flex-wrap gap-2">
-                                <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                                <span className="tag-pill is-summary">
                                     {activeSessions.length} active sessions
                                 </span>
                                 {realCount > 0 && (
-                                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700">
+                                    <span className="tag-pill is-summary">
                                         {realCount} real
                                     </span>
                                 )}
                                 {syntheticCount > 0 && (
-                                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
+                                    <span className="tag-pill is-summary is-qualified">
                                         {syntheticCount} synthetic
                                     </span>
                                 )}
                                 {newVehicleCount > 0 && (
-                                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700">
+                                    <span className="tag-pill is-summary is-warning">
                                         {newVehicleCount} new vehicle{newVehicleCount !== 1 ? 's' : ''} will be created
                                     </span>
                                 )}
@@ -206,14 +206,14 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                 <button
                                     type="button"
                                     onClick={() => setSkipSet(new Set(uniqueVehicles.map(v => v.raw)))}
-                                    className="px-3 py-1 rounded text-xs font-medium bg-[var(--color-surface-sunken)] text-secondary hover:bg-[var(--color-surface-muted)] transition"
+                                    className="btn btn-secondary"
                                 >
                                     Skip all
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSkipSet(new Set())}
-                                    className="px-3 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
+                                    className="btn btn-secondary"
                                 >
                                     Include all
                                 </button>
@@ -253,11 +253,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                                 type="button"
                                                 onClick={() => toggleSkip(raw)}
                                                 title={skipped ? 'Include this vehicle' : 'Skip this vehicle'}
-                                                className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium border transition ${
-                                                    skipped
-                                                        ? 'bg-[var(--color-surface-muted)] text-secondary border-[var(--color-border)]'
-                                                        : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
-                                                }`}
+                                                className={`tag-pill flex-shrink-0${skipped ? '' : ' is-danger'}`}
                                             >
                                                 {skipped ? 'Skipped' : 'Skip'}
                                             </button>
@@ -299,7 +295,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                                             {date}
                                                         </span>
                                                         {synthetic && (
-                                                            <span className="px-1.5 py-0.5 rounded text-xs bg-purple-50 text-purple-600 flex-shrink-0">
+                                                            <span className="tag-pill is-qualified flex-shrink-0">
                                                                 synthetic
                                                             </span>
                                                         )}
@@ -359,19 +355,19 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                             <h3 className="text-lg font-bold">Import complete</h3>
                             <div className="flex flex-wrap gap-2 justify-center mt-1">
                                 {result.vehiclesCreated > 0 && (
-                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-700">
+                                    <span className="tag-pill is-summary is-good">
                                         {result.vehiclesCreated} vehicle{result.vehiclesCreated !== 1 ? 's' : ''} created
                                     </span>
                                 )}
-                                <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700">
+                                <span className="tag-pill is-summary">
                                     {result.runsImported} run{result.runsImported !== 1 ? 's' : ''} imported
                                 </span>
                                 {result.runsSkipped > 0 && (
-                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-50 text-yellow-700">
+                                    <span className="tag-pill is-summary is-warning">
                                         {result.runsSkipped} duplicate{result.runsSkipped !== 1 ? 's' : ''} skipped
                                     </span>
                                 )}
-                                <span className="px-3 py-1 rounded-full text-sm font-medium bg-[var(--color-surface-sunken)] text-secondary">
+                                <span className="tag-pill is-summary">
                                     {result.pointsImported.toLocaleString()} data points
                                 </span>
                             </div>

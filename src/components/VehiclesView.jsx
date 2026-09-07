@@ -368,14 +368,14 @@ export default function VehiclesView({
                 {canEdit(vehicle) ? (
                     <button
                         onClick={(e) => { e.stopPropagation(); setSpecsEditingVehicle(vehicle); }}
-                        className="px-3 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition"
+                        className="btn btn-secondary"
                     >
                         Specs
                     </button>
                 ) : vehicle.specs && Object.keys(vehicle.specs).length > 0 && (
                     <button
                         onClick={(e) => { e.stopPropagation(); setSpecsViewingVehicle(vehicle); }}
-                        className="px-3 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition"
+                        className="btn btn-secondary"
                     >
                         Specs
                     </button>
@@ -385,7 +385,7 @@ export default function VehiclesView({
                         onClick={(e) => handleDuplicateVehicle(vehicle, e)}
                         disabled={duplicatingId !== null}
                         title="Duplicate vehicle and all tests"
-                        className="px-3 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-50 flex items-center gap-1"
+                        className="btn btn-secondary disabled:opacity-50"
                     >
                         {duplicatingId === vehicle.id
                             ? <><span className="inline-block w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"/>Copying…</>
@@ -395,7 +395,7 @@ export default function VehiclesView({
                 {canDelete(vehicle) && (
                     <button
                         onClick={(e) => { e.stopPropagation(); isPending ? restoreItem(vehicle.id) : queueDelete(vehicle.id); }}
-                        className={`px-3 py-1 rounded-md text-xs font-medium transition ${isPending ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                        className={`btn ${isPending ? 'btn-restore' : 'btn-danger'}`}
                     >
                         {isPending ? '↩ Restore' : 'Delete'}
                     </button>
@@ -615,11 +615,7 @@ export default function VehiclesView({
                 {canEdit({}) && sortBy === 'default' && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0 && (
                     <button
                         onClick={() => { if (editingOrder) setPendingOrder(null); setEditingOrder(v => !v); }}
-                        className={`text-sm px-3 py-2 rounded border transition flex-shrink-0 ${
-                            editingOrder
-                                ? 'bg-blue-50 border-blue-300 text-blue-700'
-                                : 'bg-[var(--color-surface-muted)] border-[var(--color-border)] text-secondary hover:bg-[var(--color-surface-sunken)]'
-                        }`}
+                        className={`btn btn-toggle${editingOrder ? ' active' : ''} flex-shrink-0`}
                         style={editingOrder ? { backgroundColor: 'var(--color-primary-light)', borderColor: 'var(--color-primary)', color: 'var(--color-primary-text)' } : {}}
                     >
                         ✏️ Edit Order
@@ -1019,7 +1015,7 @@ export default function VehiclesView({
             )}
 
             {pendingOrder && (
-                <div className="fixed bottom-0 left-0 right-0 z-40 bg-blue-50 border-t-2 border-blue-200 shadow-2xl">
+                <div className="fixed-action-bar is-info z-40">
                     <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
                         <span className="font-medium flex-1" style={{ color: 'var(--color-primary-text)' }}>
                             Vehicle default order changed

@@ -49,7 +49,7 @@ export default function DeleteQueueBar({
     // ── Queue bar ─────────────────────────────────────────────────────────────
     if (pendingCount > 0) {
         return (
-            <div className="fixed-action-bar z-50 bg-red-50 border-t-2 border-red-200">
+            <div className="fixed-action-bar is-danger z-50">
                 <div className="page-container py-3 flex items-center gap-4">
                     <span className="text-red-700 font-medium flex-1">
                         🗑 {plural(pendingCount)} queued for deletion

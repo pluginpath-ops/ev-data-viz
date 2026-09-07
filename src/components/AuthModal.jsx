@@ -38,14 +38,14 @@ export default function AuthModal({ onClose, onAuthSuccess }) {
                 </div>
 
                 {error && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                    <div className="note-panel is-danger mb-4">
                         {error}
                     </div>
                 )}
 
                 {/* Debug info - remove after OAuth is working */}
                 {!getSupabase() && (
-                    <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded mb-4 text-sm">
+                    <div className="note-panel mb-4">
                         <strong>Debug:</strong> Supabase library loading issue. Check browser console for details.
                     </div>
                 )}
@@ -65,7 +65,7 @@ export default function AuthModal({ onClose, onAuthSuccess }) {
                     <button
                         onClick={() => handleOAuthSignIn('google')}
                         disabled={loading}
-                        className="auth-provider-btn bg-white hover:bg-gray-50 text-gray-800 border-2 border-gray-300"
+                        className="auth-provider-btn is-google"
                     >
                         <svg className="w-5 h-5" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

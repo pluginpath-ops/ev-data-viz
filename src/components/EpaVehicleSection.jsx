@@ -483,7 +483,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                 {!searching && results.map(g => (
                                     <li
                                         key={g.test_group_id}
-                                        className="px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900"
+                                        className="option-row"
                                         onMouseDown={e => { e.preventDefault(); handleSelect(g); }}
                                     >
                                         <span className="font-medium">{g.make} · {g.epa_carline_name}</span>

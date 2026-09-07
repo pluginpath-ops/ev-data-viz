@@ -72,7 +72,7 @@ export default function RolesPermissions({ users, loading, saving, currentUserId
                 </div>
             )}
 
-            <div className="mt-6 p-4 rounded-lg border bg-amber-50 border-amber-200">
+            <div className="note-panel mt-6">
                 <p className="text-sm text-amber-800 font-semibold mb-1">Role permissions</p>
                 <ul className="text-xs text-amber-700 space-y-1">
                     <li><strong>admin</strong> — full access: edit/delete any vehicle or test, manage users, toggle visibility, change site settings</li>

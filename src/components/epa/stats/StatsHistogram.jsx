@@ -45,7 +45,7 @@ export default function StatsHistogram({ data, measureDef, overall }) {
             <div className="stats-histogram-head">
                 <span className="text-nano">Distribution · {data.bins.length} bins</span>
                 {overall?.n > 0 && (
-                    <span className="stats-histogram-summary">
+                    <span className="text-caption">
                         median <span className="stats-histogram-median-value">{fmt(overall.median)}</span>
                         {' · '}IQR {fmt(overall.q1)}–{fmt(overall.q3)}
                         {' · '}n={data.n}
@@ -79,7 +79,7 @@ export default function StatsHistogram({ data, measureDef, overall }) {
                 )}
             </div>
 
-            <div className="stats-histogram-axis">
+            <div className="text-caption stats-histogram-axis">
                 <span>{fmt(domain.min)}</span>
                 <span>
                     {fmt(domain.max)}

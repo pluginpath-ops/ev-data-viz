@@ -146,7 +146,16 @@ describe('the playground is inert', () => {
                 for (const key of Object.keys(spec)) {
                     expect(/^on[A-Z]/.test(key), `${spec.cls} declares a handler: ${key}`).toBe(false);
                 }
-                expect(typeof spec.cls).toBe('string');
+                // A specimen names either the class it renders, or — for a
+                // composite, whose markup lives in specimens.jsx — the key of
+                // the renderer plus the classes it claims to cover.
+                if (spec.composite) {
+                    expect(typeof spec.composite, 'a composite needs a key').toBe('string');
+                    expect(Array.isArray(spec.covers) && spec.covers.length > 0,
+                        `${spec.composite} must declare what it covers`).toBe(true);
+                } else {
+                    expect(typeof spec.cls).toBe('string');
+                }
             }
         }
     });

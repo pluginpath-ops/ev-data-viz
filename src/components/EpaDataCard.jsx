@@ -287,7 +287,7 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                                 type="button"
                                                 disabled={isDel}
                                                 onClick={() => handleDelete(g)}
-                                                className="btn btn-secondary text-xs py-0.5 px-2 text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/30 disabled:opacity-40"
+                                                className="btn btn-danger text-xs py-0.5 px-2 disabled:opacity-40"
                                             >
                                                 {isDel ? '…' : 'Delete'}
                                             </button>

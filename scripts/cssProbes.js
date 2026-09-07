@@ -216,7 +216,7 @@ export const LEDGER = [
     },
     {
         key: 'near-identical',
-        count: 48,
+        count: 43,
         what: `pairs of classes at least ${NEAR_THRESHOLD * 100}% identical by declaration. `
             + 'Two names for one idea is how a 639-class stylesheet stops being holdable.',
         fix: 'one class, and a modifier for whatever genuinely differs.',
@@ -227,7 +227,7 @@ export const LEDGER = [
     },
     {
         key: 'unreferenced',
-        count: 21,
+        count: 20,
         what: 'classes the stylesheet defines that no source file names. Dead rules are '
             + 'invisible to the compiler, the linter and the tests alike.',
         fix: 'delete it, or add it to CONSTRUCTED with the template that builds it.',
