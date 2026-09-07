@@ -64,3 +64,28 @@ export function bestIndices(values, better) {
 
     return new Set(nums.flatMap((n, i) => (n === target ? [i] : [])));
 }
+
+/**
+ * A row label with its unit removed, when the VALUE is going to carry one.
+ *
+ * The schema writes "Horsepower (hp)", and `formatSpecValue` renders "338 hp"
+ * — so the unit was on screen twice on every row that converts. Worse, the
+ * label is a fixed string and the value is not: in metric the cell reads
+ * "252 kW" under a label still insisting on "(hp)". The label was not
+ * redundant there, it was wrong.
+ *
+ * Only for fields with a `unitGroup`, because only those produce a converted,
+ * unit-bearing value. "Max DC Charge Rate (kW)" has no unitGroup — its cell is
+ * a bare "400" and the label is the only place the unit appears, so it keeps
+ * it. Same for "Charge Time 10→80% (min)".
+ *
+ * The schema keeps its own labels untouched: the spec EDIT form needs the unit
+ * in the label, because there the input is raw and the label is what tells you
+ * what to type.
+ */
+export function labelWithoutUnit(label, unitGroup) {
+    if (!unitGroup) return label;
+    // Only a trailing parenthetical, so "0–60 mph (sec) — claimed" — which has
+    // no unitGroup anyway — could never lose the qualifier that follows it.
+    return label.replace(/\s*\([^()]*\)\s*$/, '');
+}

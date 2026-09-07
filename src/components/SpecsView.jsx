@@ -1,11 +1,11 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
-import { formatSpecValue, distanceLabel } from '../utils/unitConversions';
+import { formatSpecValue } from '../utils/unitConversions';
 import { SpecFieldFlagButton } from './VoteButtons';
 import { mergeInheritedSpecs, resolveEffectiveSpecs, vehicleLabel, vehicleColor } from '../utils/specHelpers';
 import SpecsControls from './specs/SpecsControls';
-import { bestIndices, rowDiffers, rowIsEmpty } from '../utils/specCompare';
+import { bestIndices, labelWithoutUnit, rowDiffers, rowIsEmpty } from '../utils/specCompare';
 
 /** Allocated once: a new Set per row per render is 70 objects a keystroke. */
 const EMPTY_SET = new Set();
@@ -197,7 +197,9 @@ export default function SpecsView({ selectedVehicleIds }) {
         // here made the row's value the string "405 mi", which `Number()` reads
         // as NaN — so the one core row with a better direction could never have
         // a best cell. A row model has to hold what was recorded.
-        buildRow('vehicle.range',   `EPA Range (${distanceLabel(units)})`,
+        // No unit in the label: the value carries the converted one, and the
+        // label was the half that could not follow a unit-system change.
+        buildRow('vehicle.range',   'EPA Range',
             v => v.range, { unitGroup: 'distance', better: 'higher' }),
         buildRow('vehicle.runs',    'Test Runs', v => v.runs?.length ?? 0),
     ];
@@ -210,8 +212,10 @@ export default function SpecsView({ selectedVehicleIds }) {
                 key: cat.key,
                 label: cat.label,
                 rows: [
+                    // The label loses its unit where the VALUE carries a
+                    // converted one — see labelWithoutUnit.
                     ...cat.fields.map(f => ({
-                        ...buildRow(`${cat.key}.${f.key}`, f.label,
+                        ...buildRow(`${cat.key}.${f.key}`, labelWithoutUnit(f.label, f.unitGroup),
                             rv => rv.effectiveSpecs?.[cat.key]?.[f.key],
                             { type: f.type, unitGroup: f.unitGroup, better: f.better }),
                         flagKey: `${cat.key}.${f.key}`,
@@ -303,11 +307,15 @@ export default function SpecsView({ selectedVehicleIds }) {
                         <tbody>
                             {visibleSections.map(sec => (
                                 <Fragment key={sec.key}>
-                                    <tr className="specs-category-row">
-                                        <td className="specs-category-header" colSpan={resolvedVehicles.length + 1}>
-                                            <span className="specs-category-label">{sec.label}</span>
-                                            <span className="specs-category-count">
-                                                {sec.rows.length} row{sec.rows.length === 1 ? '' : 's'}
+                                    <tr className="specs-band-row">
+                                        <td className="specs-band" colSpan={resolvedVehicles.length + 1}>
+                                            {/* Sticky CONTENT, not a sticky cell — the cell already
+                                                spans every column. See .specs-band-inner. */}
+                                            <span className="specs-band-inner">
+                                                <span className="specs-band-label">{sec.label}</span>
+                                                <span className="specs-band-count">
+                                                    {sec.rows.length} row{sec.rows.length === 1 ? '' : 's'}
+                                                </span>
                                             </span>
                                         </td>
                                     </tr>

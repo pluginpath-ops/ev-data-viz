@@ -3468,6 +3468,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  */
 .specs-th {
     @apply px-3 py-2 text-left align-bottom;
+    position: relative;
     position: sticky;
     top: 0;
     z-index: 3;
@@ -3480,7 +3481,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .specs-td {
     @apply px-3 py-1.5;
     border-bottom: 1px solid var(--color-border);
-    font-size: var(--fs-data, var(--fs-body));
+    /* One step down from body. At --fs-data the figures were the largest text
+       on a screen that is 70 rows of them, which makes a dense table read as a
+       loud one. */
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
     color: var(--color-text-value);
 }
 .specs-col-label {
@@ -3515,13 +3519,16 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* The column's series colour, so a column ties to the same vehicle on every
    chart. A bar rather than a dot: it has to survive being read past four
-   columns of figures. */
+   columns of figures.
+   Flush to the top edge of the header cell rather than inset by its padding —
+   a rule that starts 8px down and 12px in reads as an underline for nothing.
+   Absolute, so it spans the column rather than the text. */
 .specs-col-swatch {
-    display: block;
-    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
     height: 3px;
-    margin-bottom: 5px;
-    border-radius: var(--radius-track);
 }
 .specs-col-name { @apply block; }
 .specs-col-inherits {
@@ -3536,7 +3543,13 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    The band rail from Tests & Data, turned sideways: a full-width label row
    that sticks UNDER the column header, so the category a figure belongs to is
    readable at any scroll position. */
-.specs-category-header {
+/* NOT `.specs-category-header` — that name was already taken, by the collapsible
+   category toggle on the vehicle spec CARD a few hundred lines below. The later
+   rule won, so this band inherited `@apply flex` on a <td>, which replaces
+   `display: table-cell` and collapses colSpan: the band rendered 240px wide
+   instead of spanning the table, and its sticky label had nowhere to slide.
+   Named for what it is — the band rail from Tests & Data, turned sideways. */
+.specs-band {
     position: sticky;
     /* Directly under the header row. The offset is MEASURED and published by
        the view, because the header grows a line when a vehicle inherits its
@@ -3549,7 +3562,20 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border-top: 1px solid var(--color-border-strong);
     border-bottom: 1px solid var(--color-border);
 }
-.specs-category-label {
+/* The band spans every column, so pinning the CELL would do nothing — its
+   CONTENT is what has to stay at the left edge. Without this the category name
+   scrolled away the moment the table did, which is the one thing a band exists
+   to prevent. Same fix as the EPA compare panel's group headings. */
+.specs-band-inner {
+    position: sticky;
+    /* Matched to the frozen label column, so a band name lines up with the row
+       labels it is heading rather than with the container edge. */
+    left: 12px;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+}
+.specs-band-label {
     font-family: var(--font-mono);
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     font-weight: 700;
@@ -3557,8 +3583,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     text-transform: uppercase;
     color: var(--color-text-secondary);
 }
-.specs-category-count {
-    margin-left: 8px;
+.specs-band-count {
     font-family: var(--font-mono);
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     color: var(--color-text-meta);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bestIndices, rowDiffers, rowIsEmpty } from '../specCompare';
+import { bestIndices, labelWithoutUnit, rowDiffers, rowIsEmpty } from '../specCompare';
 
 const idx = (values, better) => [...bestIndices(values, better)].sort((a, b) => a - b);
 
@@ -65,5 +65,29 @@ describe('rowDiffers / rowIsEmpty', () => {
     it('is empty only when nothing at all was recorded', () => {
         expect(rowIsEmpty([null, undefined])).toBe(true);
         expect(rowIsEmpty([null, 0])).toBe(false);
+    });
+});
+
+describe('labelWithoutUnit', () => {
+    it('drops the unit when the value will carry a converted one', () => {
+        expect(labelWithoutUnit('Horsepower (hp)', 'power')).toBe('Horsepower');
+        expect(labelWithoutUnit('Torque (lb-ft)', 'torque')).toBe('Torque');
+        expect(labelWithoutUnit('Ground Clearance (in)', 'dimension')).toBe('Ground Clearance');
+    });
+
+    it('keeps it when the value will not', () => {
+        // No unitGroup means the cell renders a bare number, so the label is
+        // the only place the unit appears.
+        expect(labelWithoutUnit('Max DC Charge Rate (kW)')).toBe('Max DC Charge Rate (kW)');
+        expect(labelWithoutUnit('Charge Time 10→80% (min)', undefined)).toBe('Charge Time 10→80% (min)');
+    });
+
+    it('only strips a TRAILING parenthetical', () => {
+        // "published" and "claimed" do real work — the schema says nothing in
+        // this category is measured by EVBench — so a qualifier after the
+        // bracket must survive.
+        expect(labelWithoutUnit('Braking 70–0 — published', 'feet')).toBe('Braking 70–0 — published');
+        expect(labelWithoutUnit('Top Speed — claimed', 'speed')).toBe('Top Speed — claimed');
+        expect(labelWithoutUnit('¼ Mile Trap Speed — claimed', 'speed')).toBe('¼ Mile Trap Speed — claimed');
     });
 });
