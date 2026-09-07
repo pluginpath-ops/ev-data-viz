@@ -13,6 +13,7 @@
  *
  *   npm run health            the table
  *   npm run health --targets  the same, with what each number is heading for
+ *   npm run health --markdown a GitHub job summary, for CI
  */
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -24,6 +25,7 @@ const BAR = '═'.repeat(74);
 const bar = '─'.repeat(74);
 const pad = (s, n) => String(s).padEnd(n);
 const showTargets = process.argv.includes('--targets');
+const asMarkdown = process.argv.includes('--markdown');
 
 /** The one ratchet that lives as a bare literal in a test file. */
 function knownOffenders() {
@@ -54,16 +56,44 @@ rows.push({ group: 'Stylesheet', name: 'lines', now: cs.lines, target: null, not
 rows.push({ group: 'Stylesheet', name: 'classes', now: cs.classes, target: null, note: `${cs.onceOnly} used once` });
 
 // ── Print ──────────────────────────────────────────────────────────────────
-console.log(`\n${BAR}\n  EVBench — ratchets and where they are heading\n${BAR}`);
-let group = null;
-for (const r of rows) {
-    if (r.group !== group) { group = r.group; console.log(`\n${group}\n${bar}`); }
-    const target = r.target === null ? '—' : String(r.target);
-    const cols = `${pad(r.name, 30)}${pad(r.now, 9)}`;
-    console.log(showTargets ? `${cols}${pad(target, 9)}${r.note}` : `${cols}${r.note}`);
+
+/**
+ * The same rows as a GitHub job summary.
+ *
+ * Rendered per run rather than committed: these numbers are DERIVED, and their
+ * checked-in form is already `scripts/driftProbes.js` and `scripts/cssProbes.js`
+ * — the ledgers the suites assert against. A generated file in the repo would
+ * be a third copy of the same facts, able to disagree with both, conflicting on
+ * every branch, and stale the moment someone merges without running it.
+ */
+if (asMarkdown) {
+    console.log('## Ratchets\n');
+    let g = null;
+    for (const r of rows) {
+        if (r.group !== g) {
+            g = r.group;
+            console.log(`\n### ${g}\n`);
+            console.log('| | now | target | |');
+            console.log('|---|---:|---:|---|');
+        }
+        const target = r.target === null ? '—' : String(r.target);
+        console.log(`| ${r.sub ? '&nbsp;&nbsp;' : ''}${r.name.trim()} | \`${r.now}\` | ${target} | ${r.note} |`);
+    }
+    console.log('\nTarget 0 means "should end at zero", not "must be zero now". '
+        + 'The numbers themselves live in `scripts/driftProbes.js` and `scripts/cssProbes.js`, '
+        + 'where the suites assert them — this table is a view, not a source.');
+} else {
+    console.log(`\n${BAR}\n  EVBench — ratchets and where they are heading\n${BAR}`);
+    let group = null;
+    for (const r of rows) {
+        if (r.group !== group) { group = r.group; console.log(`\n${group}\n${bar}`); }
+        const target = r.target === null ? '—' : String(r.target);
+        const cols = `${pad(r.name, 30)}${pad(r.now, 9)}`;
+        console.log(showTargets ? `${cols}${pad(target, 9)}${r.note}` : `${cols}${r.note}`);
+    }
+    console.log(`\n${bar}`);
+    console.log(showTargets
+        ? '  Target 0 means "should end at zero" — not "must be zero now".'
+        : '  npm run health --targets  to see what each number is heading for.');
+    console.log(`${bar}\n`);
 }
-console.log(`\n${bar}`);
-console.log(showTargets
-    ? '  Target 0 means "should end at zero" — not "must be zero now".'
-    : '  npm run health --targets  to see what each number is heading for.');
-console.log(`${bar}\n`);
