@@ -1,0 +1,61 @@
+# Lint, test, build — and print the ratchets into the run's summary.
+#
+# There was no CI at all before this. Every guard in the repo — 967 tests, the
+# drift ledger, the contrast ratchet, the stylesheet probes — ran only when
+# somebody remembered to run it locally, which means the first merge that
+# skipped `npm test` would have broken a ratchet silently and nobody would have
+# known until the next person hit it.
+#
+# The health table is written to the job summary rather than committed. Those
+# numbers are DERIVED; their checked-in form is already scripts/driftProbes.js
+# and scripts/cssProbes.js, which the suites assert against. A generated file in
+# the repo would be a third copy of the same facts — able to disagree with both,
+# conflicting on every branch, and stale the moment someone merged without
+# regenerating it.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push supersedes the run it interrupted; no point finishing a build for
+# a commit nobody will look at.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `ci`, not `install`: it installs exactly the lockfile and fails if
+      # package.json and package-lock.json disagree.
+      - run: npm ci
+
+      # Zero errors is the bar; the warnings are a visible backlog, per
+      # CLAUDE.md. `--max-warnings` is deliberately NOT set — a lint that fails
+      # on arrival is one nobody runs.
+      - name: Lint
+        run: npm run lint
+
+      # The ratchets live here. A drift count that no longer matches the ledger
+      # fails this step and says which number to write down.
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Last, and never gating: it is a view of numbers the suites already
+      # asserted. If it disagreed with them, the Test step would have failed.
+      - name: Ratchets
+        if: always()
+        run: npm run health --silent -- --markdown >> "$GITHUB_STEP_SUMMARY"
