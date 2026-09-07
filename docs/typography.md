@@ -1,98 +1,116 @@
-# Typography & text styles
+# Typography
 
-A small, theme-aware set of semantic text classes that covers all site text.
-Defined in `src/index.css` under the **TYPOGRAPHY SYSTEM** banner.
+Semantic text classes, defined in `src/index.css` under the **TYPOGRAPHY SYSTEM**
+banner. Specimens for all of them are on `?tab=playground`.
 
-## Why
+## One axis
 
-Two problems this solves:
+**A role carries its own size, weight and colour. Pick exactly one and you are
+done.** There is no colour tier to compose with.
 
-1. **Dark mode.** Hardcoded Tailwind `text-gray-*` (and arbitrary `text-[11px]`)
-   look fine in light mode but render muddy/illegible on the dark-navy theme,
-   because they don't follow the `--color-text-*` variables. As of writing there
-   were **339** such occurrences across 29 files.
-2. **Consistency.** Font sizes had drifted into one-off arbitrary values
-   (`text-[9px]`, `[10px]`, `[11px]`, `[13px]`) instead of a shared scale.
+It used to be two axes — a size class plus a colour class — and the pair
+drifted. `.text-caption` alone appeared with three different colours across 55
+sites, so "caption" had come to mean nothing except "one step down". A role says
+what the text *is*, and the appearance follows from that (#277).
 
-## The model — two orthogonal axes
+| Role | Element | What it is | Size |
+|---|---|---|---|
+| `.page-title` | `h2` | Page heading | body × 1.71 |
+| `.section-title` | `h3` | Card / section heading | body × 1.29 |
+| `.subsection-title` | `h4` | Group heading inside a card | body |
+| `.text-body` | `p`, `span` | Default body copy — the anchor | **body** |
+| `.text-secondary` | `p`, `span` | Supporting copy. Body's size, quieter | body |
+| `.text-note` | `p`, `span` | A gloss on the thing beside it. *Italic* | one step down |
+| `.text-meta` | `span` | Counts, ids, glyphs, parentheticals. Roman | one step down |
+| `.text-label` | `label` | Form / field labels. Heavier | one step down |
+| `.text-control` | — | Control surfaces — a chart sidebar, a run row | one step down |
+| `.text-data` | `span` | Numeric / monospace values, tabular | body |
+| `.text-caption` | `span` | A quiet mono annotation — a count, an axis end | nano |
+| `.text-micro` | `span` | A label naming a region. **MONO, UPPERCASE, tracked** | body × 0.71 |
+| `.text-nano` | `span` | The same, one step down — inside a chip or a swatch | body × 0.64 |
 
-Compose **one ROLE class** with **at most one COLOR class**.
+The three title roles carry `--font-display` and tighter tracking. **Only titles
+do** — the display face is a role, not something a component reaches for, which
+is why `--font-display` has no Tailwind utility of its own.
 
-### Role (size + weight)
-Roles default to `--color-text-primary` (inherited from `<body>`), so a heading
-or body line needs *no* color class unless you want it dimmer.
+### `.text-note` vs `.text-meta`
 
-| Class | Element | Use |
-|---|---|---|
-| `.page-title` | h2 | Page heading (e.g. "Admin Panel") |
-| `.section-title` | h3 | Card / section heading |
-| `.subsection-title` | h4 | Group heading inside a card |
-| `.text-body` | p, span | Default body copy (`text-sm`) |
-| `.text-secondary` | p, span | Supporting copy — body size, quieter |
-| `.text-note` | p, span | A gloss on the thing beside it — helper text, a status line. *Italic* |
-| `.text-meta` | span | Counts, ids, glyphs, parentheticals. Roman |
-| `.text-label` | label | Form / field labels |
+Both sit one step below body, and the difference is real. `.text-note` is
+*italic*, because that is what italic is for: marking text as commentary rather
+than content. `.text-meta` is roman, because a count or a chevron is incidental
+detail, not a sentence. **Never italicise a glyph.**
 
-| `.text-data` | span | Numeric / monospace values (tabular) |
+### `.text-micro`/`.text-nano` vs `.text-caption`
 
-### Color tiers (theme-aware)
-Use to dim text below primary. They adapt to light/dark automatically.
+Same family and size, different treatment. The first two are **uppercased and
+letterspaced** — the label treatment, for text that is scanned. `.text-caption`
+is neither, for text that is read.
 
-| Class | Light | Dark |
-|---|---|---|
-| `.text-secondary` | gray-600 | slate-300 |
+## Sizes are relative, never typed
 
+Two variables anchor everything:
 
+```css
+--fs-body: 0.875rem;   /* 14px — the anchor */
+--fs-step: 0.857;      /* one step down = 12px; one step up = 16.3px */
+```
 
-## Examples
+Every other size derives from those through `calc()`. Moving body moves the
+whole scale coherently, instead of leaving eight independent numbers to drift
+apart.
+
+```css
+/* the shape every role uses */
+font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+```
+
+The `calc()` sits **inside the fallback**, so an unset `--fs-<role>` derives and
+a set one pins. That is what lets the knob panel override one role without
+detaching the rest.
+
+**A literal `font-size` in this stylesheet is drift**, because it stops
+following `--fs-body` and stops responding to the `--ui-scale` knob — which is
+the whole reason the scale is relative. `npm run drift off-scale-font-size`
+lists the ones that remain.
+
+Titles are the one deliberate exception to `--fs-step`: they carry their own
+multiple of body (1.71, 1.29, 1.00) rather than compounding the step three
+times, which would have moved the page title from 24px to 22.2px — a change
+nobody asked for, smuggled in by a refactor.
+
+## In JSX
+
+Prefer these over `text-gray-*` or an arbitrary `text-[11px]`. Neither is
+theme-aware: they look fine in light mode and illegible on dark navy. The drift
+ledger counts both — `npm run drift palette-text`, `npm run drift
+arbitrary-text-size`.
 
 ```jsx
 <h3 className="section-title">Model Constants</h3>
-<p className="text-body text-secondary">Tune the EPA math on this browser only.</p>
-
-<label className="text-label">Accessory load</label>
+<p className="text-body">Tune the EPA math on this browser only.</p>
 <p className="text-note">Constant parasitic draw assumed in the back-solve.</p>
 
+<label className="text-label">Accessory load</label>
 <span className="text-data">0.88</span>
+<span className="text-micro">Conditions</span>
 ```
 
-## Migration
+## Live knobs
 
-Replacing the 339 `text-gray-*` usages happens **incrementally**, file-by-file,
-in small reviewable PRs (highest-traffic views first) — not one big sweep.
+Admin → **Interface Settings → Typography** tunes the system live, per browser,
+never the database.
 
-Rough mapping when migrating a file:
+- Defaults, knob metadata and the store: `src/styles/typographyKnobs.js`
+- Applied as custom properties on `:root`, re-applied before first paint in
+  `src/main.jsx` via `applyTypographyOverrides()`
+- Panel: `src/components/admin/TypographyKnobs.jsx`
+- `--ui-scale` on the root font-size scales every rem-based size at once
 
-| Old | New |
-|---|---|
-| `text-gray-900` / `text-gray-800` (heading) | a role class (no color) |
-| `text-gray-700` | `.text-secondary` (or role + secondary) |
-| `text-gray-600` | `.text-secondary` |
-| `text-gray-500` | `.text-secondary` |
-| `text-gray-400` | `.text-meta` |
-| `text-[10px]` / `[11px]` / `[13px]` | nearest role / `text-xs` |
-| `bg-gray-*`, `border-gray-*` | `var(--color-surface-*)`, `var(--color-border)` |
+To expose a new tunable: variable-ise the property in the role, then add a knob
+entry to `TYPO_GROUPS`. Colour is not a knob — it is theme-specific, and a role
+owning its own colour is the point of the one-axis model.
 
-**Exception — leave intentional arbitrary sizes alone.** An arbitrary `text-[..px]`
-with a documented rationale (e.g. the test-count badges in `VehiclesView` are
-deliberately `text-[13px]`, 1px smaller than the `text-sm` rows for hierarchy) is
-*not* drift — keep it. Only migrate sizes that are incidental/inconsistent. The
-color migration (gray → semantic) still applies regardless of size.
+## See also
 
-## Live style knobs (implemented)
-
-Admin → **Interface Settings → Typography** tunes the type system live. Each role
-class reads its font-size/weight from a CSS variable (default = the shipped value,
-so an unset var is a no-op), and the root font-size carries a global `--ui-scale`
-that scales every rem-based size site-wide.
-
-- Defaults + knob metadata + the localStorage store: `src/styles/typographyKnobs.js`
-  (separate store key from the EPA constants, so the two panels are independent).
-- Overrides apply **live** as CSS custom properties on `:root` (no reload), and are
-  re-applied before first paint in `src/main.jsx` via `applyTypographyOverrides()`.
-- Panel: `src/components/admin/TypographyKnobs.jsx` (with a live preview).
-- Per-browser only — never the DB or other users.
-
-To expose a new tunable: variable-ize the property in the role class here, then add
-a knob entry to `TYPO_GROUPS`. Colour tiers are not yet knobs (they're theme-specific
-— a future extension).
+- [`design-tokens.md`](design-tokens.md) — the colour and radius tokens
+- [`vocabulary.md`](vocabulary.md) — one name per thing

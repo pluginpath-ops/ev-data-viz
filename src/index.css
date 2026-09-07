@@ -70,6 +70,9 @@
     --color-warning: rgb(245, 158, 11);
     --color-warning-hover: rgb(217, 119, 6);
 
+    /* Every token below is documented in docs/design-tokens.md, with its light
+       and dark value and how many places use it. */
+
     /* ── Callout triad: surface / border / text ────────────────────────────
        The base colours above are SOLID fills — a button, a filled badge. They
        cannot describe the other shape a status takes: a tinted panel with a
@@ -641,7 +644,7 @@ body {
 }
 
 /* ============================================================================
-   TYPOGRAPHY SYSTEM   (see docs/typography.md)
+   TYPOGRAPHY SYSTEM   (see docs/typography.md; colours in docs/design-tokens.md)
    ----------------------------------------------------------------------------
    ONE AXIS. A role carries its own size, weight AND colour; you pick exactly
    one and you are done. There is no colour tier to compose with (#277).
