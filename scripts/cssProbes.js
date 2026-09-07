@@ -66,9 +66,6 @@ export const CONSTRUCTED = {
     'nav-menu-main': 'NavMenu builds `nav-menu-${level}`.',
     'nav-menu-sub':  'NavMenu builds `nav-menu-${level}`.',
     'is-prose':      'RunSpecRows builds `is-${cell.tone}`.',
-    'popover--above':  'InfoIcon builds `popover--${position}`.',
-    'popover--center': 'InfoIcon builds `popover--${position}`.',
-    'popover--right':  'InfoIcon builds `popover--${position}`.',
     'step-1': 'StatsHistogram builds `step-${n}` for its four-step fill.',
     'step-2': 'StatsHistogram builds `step-${n}` for its four-step fill.',
     'step-3': 'StatsHistogram builds `step-${n}` for its four-step fill.',
@@ -208,7 +205,10 @@ export function usage() {
 export const LEDGER = [
     {
         key: 'redefined',
-        count: 8,
+        // 8 → 7: the popover pass merged `.info-icon-tooltip`, which was
+        // defined twice — once for the base state and once to re-declare the
+        // same `display: none` reasoning in a comment above it.
+        count: 7,
         what: 'a class whose own solo rule is written more than once. Two places to '
             + 'look for what one class does, and the later one silently wins.',
         fix: 'merge them, or give the second one a modifier that says what it changes.',

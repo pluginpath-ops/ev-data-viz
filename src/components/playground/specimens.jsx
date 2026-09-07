@@ -95,6 +95,43 @@ export const COMPOSITES = {
         </div>
     ),
 
+    /* The two tiers one glyph moves between. Rendered static here; in the app
+       both are portalled and fixed, which is what lets them leave the sidebar. */
+    'popover-peek': () => (
+        <div className="popover popover--peek" style={{ position: 'static', pointerEvents: 'auto' }}>
+            Everything the car draws that is not traction — HVAC, battery
+            conditioning, lighting.
+            <span className="popover-more">Click ⓘ for the full panel</span>
+        </div>
+    ),
+
+    'popover-pinned': () => (
+        <div className="popover popover--pinned" style={{ position: 'static' }}>
+            <div className="popover-head">
+                <span className="popover-title">EV auxiliary load reference</span>
+                <button type="button" className="popover-close" aria-label="Close">×</button>
+            </div>
+            <div>
+                <p>The curve default is the modelled steady-state draw; these are the
+                   figures to reach for when modelling a specific ambient.</p>
+            </div>
+        </div>
+    ),
+
+    /* Below the breakpoint the chrome collapses at, every pin is this instead.
+       Shown boxed rather than bottom-anchored, since a specimen has no viewport
+       edge to sit on. */
+    'popover-sheet': () => (
+        <div className="popover popover--sheet" style={{ position: 'static', maxWidth: 340 }}>
+            <span className="popover-grabber" aria-hidden="true" />
+            <div className="popover-head">
+                <span className="popover-title">EV auxiliary load</span>
+                <button type="button" className="popover-close" aria-label="Close">×</button>
+            </div>
+            <div><p>Everything the car draws that is not traction.</p></div>
+        </div>
+    ),
+
     'plot-frame': () => (
         <div className="plot-frame" style={{ width: 300 }}>
             <div className="plot-frame-head">

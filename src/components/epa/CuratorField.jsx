@@ -52,7 +52,7 @@ export default function CuratorField({
             <span className={`shrink-0 flex items-center gap-1 ${used ? 'text-secondary font-semibold' : 'text-secondary'}`}>
                 {used && <span title="Used in a derived calculation" className="text-indigo-500">∗</span>}
                 {label}
-                {tooltip && <InfoIcon text={tooltip} position="right" />}
+                {tooltip && <InfoIcon text={tooltip} />}
                 {overrideSource === 'pending' && (
                     <span title="Unsaved edit — click Save changes to commit" className="text-amber-500 text-[9px] font-bold">✎</span>
                 )}

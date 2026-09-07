@@ -413,7 +413,7 @@ export default function EpaCurveExplorer() {
                             This screen explained nothing at all. */}
                         <span className="text-note">
                             How this is calculated
-                            <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" />
+                            <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} />
                         </span>
                     </div>
 
@@ -444,11 +444,9 @@ export default function EpaCurveExplorer() {
                         <span className="text-micro">
                             Records
                             <InfoIcon
-                                position="right"
                                 text={`${subjects.length} certification records carry road-load `
                                     + 'coefficients. Most belong to no vehicle in the database, '
-                                    + 'which is why this view does not use the vehicle selection.'}
-                            />
+                                    + 'which is why this view does not use the vehicle selection.'} />
                         </span>
                         <CurveSubjectPicker
                             subjects={subjects}

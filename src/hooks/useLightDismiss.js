@@ -17,11 +17,19 @@ import { useEffect, useRef } from 'react';
  * keydown attached for every closed menu on a page means Escape walking a
  * dozen handlers that all decline to act.
  *
+ * `alsoInside` is for overlays whose trigger is not an ancestor of the panel —
+ * a portalled popover, where the glyph and the panel are in different subtrees.
+ * Without it, clicking the trigger to close reads as an outside click, the
+ * overlay dismisses on pointerdown, and the click that follows re-opens it: a
+ * toggle that cannot be toggled off.
+ *
  * @param {boolean} open      whether the overlay is currently showing
  * @param {() => void} onDismiss  called on an outside pointerdown or Escape
+ * @param {{current: HTMLElement|null}} [alsoInside]  a second element that
+ *        counts as inside — typically the trigger
  * @returns {{current: HTMLElement|null}} ref for the element that is "inside"
  */
-export function useLightDismiss(open, onDismiss) {
+export function useLightDismiss(open, onDismiss, alsoInside = null) {
     const ref = useRef(null);
     // The callback is read through a ref so a caller passing an inline arrow —
     // which every caller does — does not re-bind both listeners on every render.
@@ -34,7 +42,10 @@ export function useLightDismiss(open, onDismiss) {
     useEffect(() => {
         if (!open) return;
         const onDown = (e) => {
-            if (ref.current && !ref.current.contains(e.target)) handler.current();
+            const inside = (el) => el && el.contains(e.target);
+            if (!ref.current) return;
+            if (inside(ref.current) || inside(alsoInside?.current)) return;
+            handler.current();
         };
         const onKey = (e) => { if (e.key === 'Escape') handler.current(); };
         document.addEventListener('pointerdown', onDown);
@@ -43,7 +54,7 @@ export function useLightDismiss(open, onDismiss) {
             document.removeEventListener('pointerdown', onDown);
             document.removeEventListener('keydown', onKey);
         };
-    }, [open]);
+    }, [open, alsoInside]);
 
     return ref;
 }

@@ -432,7 +432,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
         <div className="mt-6">
             <SectionHeader
                 title="EPA Testing Data"
-                info={<InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" className="ml-1" />}
+                info={<InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} className="ml-1" />}
                 actions={canEdit && (
                     <>
                         <SectionAction onClick={() => setShowPdfModal(true)}>📑 Import from EPA lab PDF</SectionAction>

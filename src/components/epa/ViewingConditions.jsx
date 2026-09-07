@@ -112,9 +112,7 @@ export default function ViewingConditions({ conditions }) {
                         Altitude
                         <InfoIcon
                             text="Adjusts aerodynamic drag for air density at this elevation. Models air density only — does not capture battery, regen, or cabin-heating effects. Curve is the standard-condition baseline scaled for thinner air."
-                            position="right"
-                            className="ml-1"
-                        />
+                            className="ml-1" />
                     </span>
                     <input
                         type="number"
@@ -133,9 +131,7 @@ export default function ViewingConditions({ conditions }) {
                         Temp
                         <InfoIcon
                             text={`Adjusts aerodynamic drag for air density at this ambient temperature (colder air is denser). Standard condition is ${STANDARD_TEMP_F}°F. Models air density only — does not capture battery, HVAC, or cold-tire effects.`}
-                            position="right"
-                            className="ml-1"
-                        />
+                            className="ml-1" />
                     </span>
                     <input
                         type="number"
@@ -162,9 +158,9 @@ export default function ViewingConditions({ conditions }) {
                     <span className="viewing-label">
                         Accessory Load
                         <InfoIcon
-                            tooltipClassName="info-icon-tooltip--wide"
-                            position="right"
                             className="ml-1"
+                            title="EV auxiliary load reference"
+                            text="Everything the car draws that is not traction — HVAC, battery conditioning, lighting."
                         >
                             <AccessoryLoadReferenceTable />
                         </InfoIcon>
@@ -188,9 +184,7 @@ export default function ViewingConditions({ conditions }) {
                         Wind
                         <InfoIcon
                             text="Scales aerodynamic drag by apparent (relative) airspeed — a headwind raises effective drag speed, a tailwind lowers it, a pure crosswind raises it slightly. Direction is relative to travel: 0°=tailwind, 180°=headwind, 90°/270°=crosswind. Models relative-airspeed magnitude only — does not capture yaw-angle sensitivity of drag coefficient."
-                            position="right"
-                            className="ml-1"
-                        />
+                            className="ml-1" />
                     </span>
                     <input
                         type="number"
@@ -227,26 +221,30 @@ export default function ViewingConditions({ conditions }) {
                 action — and as the only accent-coloured control in the row, as
                 the most important one. Orange when open, because an elevation
                 adjustment IS changing the curve. */}
-            <button
-                type="button"
-                className={`subgroup-header${gradeExpanded ? ' is-open' : ''}`}
-                onClick={() => setGradeExpanded(e => {
-                    const next = !e;
-                    if (!next) {
-                        setGradeGainFt('');
-                        setGradeDistanceMiles('');
-                    }
-                    return next;
-                })}
-                title="Adjust for a net elevation gain/loss over a route (advanced — usually 0)"
-            >
-                <span style={{ display: 'inline-block', transform: gradeExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                Elevation gain / loss
+            {/* The glyph sits OUTSIDE the toggle, not inside it. A button
+                inside a button is invalid HTML — but the reason to move it is
+                older than that: clicking the ⓘ used to toggle the section,
+                because the click reached the disclosure it was sitting in. */}
+            <div className="subgroup-header-row">
+                <button
+                    type="button"
+                    className={`subgroup-header${gradeExpanded ? ' is-open' : ''}`}
+                    onClick={() => setGradeExpanded(e => {
+                        const next = !e;
+                        if (!next) {
+                            setGradeGainFt('');
+                            setGradeDistanceMiles('');
+                        }
+                        return next;
+                    })}
+                    title="Adjust for a net elevation gain/loss over a route (advanced — usually 0)"
+                >
+                    <span style={{ display: 'inline-block', transform: gradeExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
+                    Elevation gain / loss
+                </button>
                 <InfoIcon
-                    position="right"
-                    text="Adds a fixed energy cost or credit for a net climb or descent over a given distance — a route effect, distinct from static altitude, which is air density. Climbing uses full physics from vehicle weight; descending assumes only ~70% of the theoretical energy comes back through regen. Usually 0 — most tests are round trips or flat routes."
-                />
-            </button>
+                    text="Adds a fixed energy cost or credit for a net climb or descent over a given distance — a route effect, distinct from static altitude, which is air density. Climbing uses full physics from vehicle weight; descending assumes only ~70% of the theoretical energy comes back through regen. Usually 0 — most tests are round trips or flat routes." />
+            </div>
 
             {/* Elevation gain/loss panel — a route/grade effect (distinct from static
                 altitude). Its own row, toggled by the "Adj. Elevation" button above, so

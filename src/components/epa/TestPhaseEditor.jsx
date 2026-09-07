@@ -215,7 +215,7 @@ function EnumField({ label, value, options, tooltip, canEdit, onSave }) {
         <div className="flex items-center justify-between gap-2 py-0.5">
             <span className="text-secondary flex items-center gap-1">
                 {label}
-                {tooltip && <InfoIcon text={tooltip} position="right" />}
+                {tooltip && <InfoIcon text={tooltip} />}
             </span>
             <span className="flex items-center gap-1 shrink-0">
                 {canEdit ? (

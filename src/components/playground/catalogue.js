@@ -39,7 +39,7 @@ export const OWNED_FAMILIES = [
     { id: 'notices', label: 'Notices & panels',
       match: (n) => /^(note-panel|state-panel|drop-zone|empty-state|fixed-action-bar)/.test(n) },
     { id: 'menus',   label: 'Menus & popovers',
-      match: (n) => /^(menu-button|guide-facet-|disclosure-caret|nav-menu|account-)/.test(n) },
+      match: (n) => /^(menu-button|guide-facet-|disclosure-caret|nav-menu|account-|popover|info-icon)/.test(n) },
     { id: 'figures', label: 'Figures — frames, bars, cells',
       match: (n) => /^(plot-frame|stat-cell|guide-spark|guide-cell-stack|stats-box-|stats-histogram-|run-band|run-cell)/.test(n) },
 ];
@@ -52,6 +52,8 @@ export const OWNED_FAMILIES = [
  * teaches nothing — or variants whose parent is already shown.
  */
 export const NOT_CATALOGUED = {
+    'info-icon':        'Layout wrapper — an inline-flex span holding the glyph. The glyph is catalogued.',
+    'popover--anchored': 'Position and layer only, no appearance: it carries the `fixed` that lets a panel leave a scrolling sidebar. Its two tiers are catalogued.',
     'cert-chips':        'Layout wrapper — a flex row that holds chips. The chips are catalogued.',
     'tag-filter-bar':    'Layout wrapper for the filter row.',
     'tag-filter-legend': 'The "AND / OR / NOT" key beside the bar, not a control.',
@@ -169,6 +171,17 @@ export const SECTIONS = [
             { composite: 'account-menu', label: 'Account menu, open',
               covers: ['account-menu', 'account-panel', 'account-identity', 'account-email', 'account-row', 'account-segmented', 'account-action'],
               note: 'What used to sit beside it in the nav bar: the signed-in email, the role, and the unit system. The Sign In button it replaced cost 111px of a 375px phone bar.' },
+            { cls: 'info-icon-glyph', as: 'button', label: 'ⓘ',
+              note: 'A real button, not a glyph in a span: before the popover pass there was no keyboard route to any of the 21 of them, and the four carrying a reference table had no accessible name at all.' },
+            { composite: 'popover-peek', label: 'Peek — hover or focus',
+              covers: ['popover--peek', 'popover-more'],
+              note: 'Pointer-transparent, so it never eats a click on what it explains, and it closes on scroll rather than being scrolled. The height cap fits the copy: the design asked for four lines, but the shortest explainer measured five and the longest twenty.' },
+            { composite: 'popover-pinned', label: 'Pinned — click',
+              covers: ['popover--pinned', 'popover-head', 'popover-title', 'popover-close'],
+              note: 'Fixed, selectable, scrollable, one at a time. It is where a reference table goes — 520px, which no sidebar has, which is the whole reason the panel had to leave.' },
+            { composite: 'popover-sheet', label: 'Sheet — narrow screens',
+              covers: ['popover--sheet', 'popover-grabber'],
+              note: 'There is no hover to peek with on touch, so a tap opens this directly rather than reproducing a hover tier as a tap.' },
             { composite: 'nav-menu', label: 'Nav menu, collapsed',
               covers: ['nav-menu', 'nav-menu-main', 'nav-menu-sub', 'nav-menu-btn', 'nav-menu-current', 'nav-menu-panel', 'nav-menu-item-hint'],
               note: 'A gated destination says WHY in the row — a title attribute is invisible on touch, which is the only place this form appears.' },
