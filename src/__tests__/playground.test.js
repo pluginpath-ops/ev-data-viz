@@ -124,7 +124,11 @@ describe('the classes that cannot follow a themed subtree', () => {
 });
 
 describe('the playground is inert', () => {
-    const files = ['components/playground/Playground.jsx', 'components/playground/catalogue.js']
+    // specimens.jsx is on this list because it CAN hold live components — the
+    // popover specimen is one. That is exactly when an inertness guarantee
+    // stops being free and has to be checked.
+    const files = ['components/playground/Playground.jsx', 'components/playground/catalogue.js',
+        'components/playground/specimens.jsx']
         .map(f => ({ f, src: readFileSync(join(ROOT, 'src', f), 'utf8') }));
 
     it('reads no application data', () => {

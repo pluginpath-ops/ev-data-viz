@@ -3029,6 +3029,13 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     text-align: left;
 }
 .subgroup-header:hover { background-color: var(--color-hover-lift); }
+/* A toggle and its explanation, side by side. The toggle keeps `width: 100%`
+   and flexes; the glyph is a button of its own and must not be inside it. */
+.subgroup-header-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
 .subgroup-header.is-open {
     border-color: var(--color-accent-orange);
     color: var(--color-accent-orange);
@@ -3846,27 +3853,72 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply inline-flex items-center;
 }
 
-/* ── InfoIcon — ⓘ glyph with CSS-only hover tooltip ─────────────────────────── */
+/* ── InfoIcon — peek, then pin ───────────────────────────────────────────────
+ *
+ * This block replaced ~175 lines, and almost all of what went was workaround.
+ *
+ * The panel used to be a DOM child of the glyph, absolutely positioned, which
+ * meant it could never leave `.chart-rail` — a scrolling box, so a clipping
+ * context on BOTH axes. Everything downstream of that was compensation: the
+ * anchor moved off the glyph onto its row because a group anchor put one panel
+ * 750px down; four `position: relative/static` rules fought over which
+ * ancestor won; one width was forced from the rail's padding variables because
+ * five had diverged across eight tooltips in one 320px column; a 40vh cap
+ * needed `pointer-events: auto` so the capped panel stayed scrollable; and the
+ * whole thing was `display: none` rather than `visibility: hidden` because
+ * eight hidden panels were adding 234px of phantom scroll to the sidebar.
+ *
+ * The panel is now portalled and `position: fixed`, so none of that applies.
+ * Placement is arithmetic (`utils/popoverPlacement.js`), which is why there
+ * are no `--above`/`--below` classes here: a fixed box is positioned against
+ * the viewport, and CSS cannot say "6px under that glyph".
+ */
 
-.info-icon {
-    position: relative;
+/* A colour chip, for the playground's live popover specimen. */
+.pg-swatch {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+}
+
+/* Whatever opens a popover, wrapped. The panel itself is portalled out, so
+   this only ever holds the trigger — it exists so the trigger sits on the text
+   baseline beside whatever it belongs to. */
+.popover-anchor {
     display: inline-flex;
     align-items: center;
-    cursor: help;
+}
+
+.info-icon {
     margin-left: 0.25rem;
 }
 
+/* A real <button>: it opens a panel, and before this there was no keyboard
+   route to any of the 21 of them — the panel showed on `:hover` alone, and the
+   two carrying a reference table had no accessible name at all, because the
+   old component set `aria-label` only when its content was a string. */
 .info-icon-glyph {
+    @apply inline-flex items-center justify-center;
+    padding: 0;
+    border: 0;
+    background: none;
     font-size: 0.75em;
     line-height: 1;
     opacity: 0.5;
     transition: opacity 0.15s;
     color: var(--color-text-secondary);
+    cursor: help;
     user-select: none;
 }
-
-.info-icon:hover .info-icon-glyph {
-    opacity: 0.9;
+.info-icon-glyph:hover { opacity: 0.9; }
+.info-icon-glyph:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
 }
 
 /* On an override panel the glyph carries the panel's own accent and drops the
@@ -3877,150 +3929,133 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-accent-orange);
     opacity: 0.85;
 }
-.info-icon.is-accent:hover .info-icon-glyph { opacity: 1; }
+.info-icon.is-accent .info-icon-glyph:hover { opacity: 1; }
 
-/* `display: none`, not just `visibility: hidden`.
+/* Anchored to a measured point rather than to an ancestor. `left`/`top` arrive
+   as inline styles from useAnchoredPosition; everything else is here.
  *
- * A hidden-but-displayed absolute box still contributes to the scrollable
- * overflow of every ancestor that can scroll. In the chart sidebar that meant
- * ~234px of invisible tooltip hanging below the last control, so the rail grew
- * a scrollbar for content nobody could see — a second scrollbar beside the
- * record list's own, which is what made the column feel sloppy.
+ * Two classes, not one. `.popover` is written ~500 lines further down this
+ * file, so on equal specificity IT wins and `position: fixed` here would be
+ * silently discarded — leaving a portalled panel positioned `absolute` against
+ * the document, which looks correct until the page is scrolled and then places
+ * every panel off by the scroll offset. Same reason `.popover.info-icon-tooltip`
+ * needed doubling before it: ordering is not something a stylesheet this size
+ * should be relying on. */
+.popover.popover--anchored {
+    position: fixed;
+    z-index: var(--z-tooltip);
+}
+
+/* ── Peek ────────────────────────────────────────────────────────────────────
  *
- * The fade survives where `allow-discrete` is supported and degrades to an
- * instant show where it is not. */
-.info-icon-tooltip {
-    /* `display: none`, not just `visibility: hidden`. A hidden element still
-       contributes scrollable overflow, and eight of these in one sidebar added
-       234px of phantom scroll. `@starting-style` below is what keeps the fade
-       working through a display change. */
-    display: none;
-    visibility: hidden;
-    opacity: 0;
-    transition-behavior: allow-discrete;
-    transition: opacity 0.15s;
+ * Pointer-transparent, because a gloss must never eat a click on the thing it
+ * is glossing — and it does not need to be clickable, since it closes on
+ * scroll rather than being scrolled.
+ *
+ * The height cap fits the copy rather than the other way round. The design
+ * called for four lines; measured against the real strings, the shortest
+ * explainer is five lines at this width and the longest is twenty, so a
+ * four-line cap would have clipped all sixteen with no way to reach the rest.
+ * 22rem clears the longest with headroom. Content that outgrows it is content
+ * that has become a reference panel — give it `children` and it gets a pin. */
+.popover.popover--peek {
+    --popover-w: 276px;
+    --popover-max-h: 22rem;
+    pointer-events: none;
     font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
     line-height: 1.4;
-    /* Transparent to the pointer by default, so a tooltip never eats a click
-       on what it is explaining. The one context that caps its height turns
-       this back on — see .chart-rail below — because a scrollable tooltip you
-       cannot put the cursor on is not scrollable. */
-    pointer-events: none;
     color: var(--color-text-primary);
 }
-/* Two classes, so this beats `.popover`'s own z-index regardless of which rule
-   is written first. A tooltip has to clear the panel it is explaining, and
-   ordering is not something a stylesheet this size should be relying on. */
-.popover.info-icon-tooltip { z-index: var(--z-tooltip); }
 
-.info-icon:hover .info-icon-tooltip {
-    display: block;
-    visibility: visible;
-    opacity: 1;
-}
-@starting-style {
-    .info-icon:hover .info-icon-tooltip { opacity: 0; }
+/* The affordance, not an instruction: it appears only where a pin exists. */
+.popover-more {
+    @apply block mt-1.5;
+    font-family: var(--font-mono);
+    font-size: calc(var(--fs-body) * 0.64);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-meta);
 }
 
-/* Tooltip placement variants */
-
-
-
-/* Inside the rail the tooltip cannot escape.
+/* ── Pinned ──────────────────────────────────────────────────────────────────
  *
- * The rail scrolls (`overflow-y: auto` for a long run list), which makes it a
- * clipping context in BOTH directions — so a tooltip anchored to an icon near
- * the right edge is simply cut off by the sidebar. Rather than fight that with
- * fixed positioning and JS coordinates, the tooltip anchors to the ROW instead
- * of the icon and spans its width: it opens downward inside the rail, where
- * there is always room, and can never reach an edge it would be clipped by.
- */
-/* Two positioning anchors, so the nearest one wins: a scenario row for the
-   controls that have one, and the group for everything else — the viewing
-   conditions, whose rows are plain flex divs with no class to hook.
-   Anchoring ONLY to .scenario-row was the bug: a viewing-conditions icon then
-   had no positioned ancestor inside the rail and its tooltip resolved against
-   something far up the tree. */
-/* The element that CONTAINS the icon is the anchor, so a tooltip opens under
-   the label it explains.
- *
- * The group used to be the fallback, and that held only while groups were
- * short. Once one of them grew to fill the sidebar — 750px of record list —
- * `top: calc(100% + 6px)` put its tooltip 750px down, below the fold, and
- * opening it scrolled the page. Anchoring to whatever directly holds the glyph
- * is independent of how tall its section happens to be.
- *
- * The row anchors stay: rows hold several controls, and a tooltip should open
- * under its own row rather than under whichever element inside it won. */
-.chart-rail-group { position: relative; }
-.chart-rail .scenario-row,
-.chart-rail .viewing-row { position: relative; }
-.chart-rail :has(> .info-icon) { position: relative; }
-/* …unless a ROW already anchors it. Without this the label became the anchor
-   and `left: 0; right: 0` resolved against ITS width — turning a viewing
-   condition's tooltip into a 92px column 400px tall. The row is the right
-   anchor wherever there is one; the container is only the fallback for icons
-   that sit in a section header with no row of their own. */
-.chart-rail .viewing-row :has(> .info-icon),
-.chart-rail .scenario-row :has(> .info-icon) { position: static; }
-.chart-rail .info-icon { position: static; }
-/* Inside the sidebar, EVERY tooltip stretches to its anchor and opens
-   downward, whatever the call site asked for — `.popover--stretch`, applied by
-   context rather than by hand. A 320px column has no room to the right and its
-   left edge is cut off by the rail, so a placement choice made at the call site
-   is a choice between two wrong answers. */
-.chart-rail .info-icon-tooltip {
-    top: calc(100% + 6px);
-    bottom: auto;
-    left: 0;
-    right: auto;
-    /* ONE width, from the RAIL rather than the anchor.
-     *
-     * `right: 0` used to stretch each tooltip across whatever element held its
-     * glyph, and those differ: a `.viewing-row` is 209px, another is 251, a
-     * `.text-note` is 264. Five widths in one 320px column, which is the
-     * measurement that opened #284. Every anchor starts at the rail's content
-     * edge, so pinning `left: 0` and taking the width from the rail lands all
-     * of them in the same column.
-     *
-     * Derived from the rail's own padding variables, so the wide-screen media
-     * query that changes them moves this with it. */
-    --popover-w: calc(320px - var(--rail-pad-l) - var(--rail-pad-r));
-    transform: none;
-    white-space: normal;
-}
-
-/* Capped, because the rail is exactly one viewport tall and no longer scrolls:
-   anything taller than the space below its glyph opens into somewhere the
-   reader cannot reach. One of these carries a reference table and is ~800px —
-   which overflows in EITHER direction, so flipping it upward only moved the
-   unreachable part to the top.
-   `pointer-events: auto` is what makes the cap usable: the tooltip is a
-   DESCENDANT of .info-icon, so moving onto it keeps :hover true and it can be
-   scrolled without vanishing under the cursor. */
-/* Tighter than the base 60vh, because the rail is exactly one viewport tall
-   and does not scroll: a tooltip is opening into the space below its glyph,
-   not into the page. `pointer-events: auto` is what makes any cap usable — the
-   tooltip is a DESCENDANT of .info-icon, so moving onto it keeps :hover true
-   and it can be scrolled without vanishing under the cursor. */
-.chart-rail .info-icon-tooltip {
-    --popover-max-h: 40vh;
+ * Wide enough for a six-column table, which is the content that earns a pin.
+ * Interactive, unlike the peek: selectable text and its own scroll. */
+.popover.popover--pinned {
+    --popover-w: 520px;
+    --popover-max-h: 70vh;
+    padding: 0;
     pointer-events: auto;
+    /* The SAME size as the peek, deliberately. A pin is not a louder tier, it
+       is the same voice with more of it — the peek is the first two lines of
+       what the pin says in full. Sizing them differently made the identical
+       sentence change register on click, and put the panel's prose a step
+       above the page's own body text, which is backwards for a gloss. */
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
 }
+.popover.popover--pinned:focus-visible { outline: none; }
 
-/* Tier gloss inside that tooltip: the chip's own label, then what it means. */
-.curve-tier-legend {
-    @apply mt-1;
-    color: var(--color-text-secondary);
+.popover-head {
+    @apply flex items-center gap-2 px-3 py-2;
+    border-bottom: 1px solid var(--color-border);
 }
-.curve-tier-legend-name {
-    @apply font-medium mr-1;
+/* The one step up in the panel, and it is one step, not two: at body size
+   against note-sized prose the header reads as a header through the display
+   face and the weight, without shouting over what it names. */
+.popover-title {
+    @apply flex-1 font-semibold;
+    font-family: var(--font-display);
+    font-size: var(--fs-body);
     color: var(--color-text-primary);
 }
+.popover-close {
+    @apply flex-none leading-none;
+    padding: 2px 6px;
+    border: 0;
+    background: none;
+    font-size: calc(var(--fs-body) * 1.29);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+.popover-close:hover { color: var(--color-text-primary); }
 
-/* Richer content — the accessory-load reference table. A width, not a class:
-   see --popover-w on .popover. */
-.info-icon-tooltip--wide { --popover-w: 460px; }
+.popover.popover--pinned > :not(.popover-head):not(.popover-grabber) {
+    @apply px-3 py-2.5;
+}
+
+/* ── Sheet ───────────────────────────────────────────────────────────────────
+ *
+ * Below the breakpoint the chrome already collapses at, every pin is a sheet.
+ * There is no hover on touch, so the peek tier has no trigger there — rather
+ * than reproduce it as a tap, the tap opens this directly.
+ *
+ * Full width and bottom-anchored: a centred panel on a phone leaves margins
+ * too thin to read past, and a table wants every pixel of the width. */
+.popover.popover--sheet {
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    position: fixed;
+    z-index: var(--z-tooltip);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-width: none;
+    max-height: 80vh;
+    padding: 0;
+    pointer-events: auto;
+    border-width: 1px 0 0;
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+}
+.popover-grabber {
+    @apply block mx-auto my-2;
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background-color: var(--color-border);
+}
+.popover.popover--sheet > :not(.popover-head):not(.popover-grabber) {
+    @apply px-4 py-3;
+}
 
 /* The accessory-load reference table, inside a tooltip.
  *
@@ -4404,8 +4439,15 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
      * identity from its anchor.
      *
      * Explicit, not `all: initial`: children that set their own type — a menu
-     * option, a badge, a heading inside the panel — still win. */
+     * option, a badge, a heading inside the panel — still win.
+     *
+     * SIZE was the axis this reset forgot, and it hid for a while: every early
+     * consumer's body carried its own type — a table, a menu row, a badge — so
+     * the panel's own size never showed. The first pinned panel of plain prose
+     * inherited from `body` and rendered at the browser's 16px default, a full
+     * step ABOVE page body text, which is backwards for supporting content. */
     font-family: var(--font-sans);
+    font-size: var(--fs-body);
     font-style: normal;
     font-weight: 400;
     text-transform: none;
@@ -4426,12 +4468,15 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     box-shadow: var(--shadow-popover);
 }
 
-/* Placement. One policy, chosen by name rather than by writing offsets at the
-   call site — and every one of them clears its anchor by the same 6px. */
+/* Placement, for a panel that opens INSIDE its own anchor — the three menus
+   and the two dropdowns. One policy, chosen by name rather than by writing
+   offsets at the call site, and every one clears its anchor by the same 6px.
+ *
+ * `--center`, `--above` and `--right` were deleted with the popover pass. They
+ * existed only for InfoIcon's `position` prop, and a panel that leaves its
+ * anchor's containing block cannot be placed in CSS at all — see
+ * `utils/popoverPlacement.js` for the arithmetic that replaced them. */
 .popover--below   { top: calc(100% + 6px); left: 0; }
-.popover--center  { top: calc(100% + 6px); left: 50%; transform: translateX(-50%); }
-.popover--above   { bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); }
-.popover--right   { left: calc(100% + 6px); top: 50%; transform: translateY(-50%); }
 .popover--end     { top: calc(100% + 6px); right: 0; }
 /* Both edges pinned: the panel takes its anchor's width rather than its own.
    What the collapsed nav menu needs, and what a sidebar tooltip needs. */

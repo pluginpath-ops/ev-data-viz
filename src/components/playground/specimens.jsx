@@ -12,7 +12,72 @@
  * the rendering stay on opposite sides of that line.
  */
 
+import { useState } from 'react';
+import Popover from '../Popover';
+import { OKABE_ITO } from '../../utils/colorUtils';
+
+/**
+ * The only LIVE specimen on this page, and the one that has to be.
+ *
+ * Every other entry here is markup: a class on an empty element, which is all
+ * you need to check an appearance. `Popover` is not an appearance — it is a
+ * mechanism, and the three things worth checking about it cannot be shown by
+ * static markup because they are all about time and communication:
+ *
+ *   • an arbitrary trigger, not the ⓘ — here a colour swatch, which is the
+ *     shape #299's colour control needs
+ *   • content that closes its own panel, via the `{ close }` it is handed
+ *   • an owner that is told, via `onOpenChange`
+ *
+ * Local state only. The page stays inert in the sense the guard means: it
+ * reads no application data and performs no action outside this component.
+ */
+function PopoverSeams() {
+    // The real resolver's palette, not four literals that would drift from it.
+    const SLOTS = OKABE_ITO.slice(0, 4);
+    const [slot, setSlot] = useState(SLOTS[0]);
+    const [draft, setDraft] = useState(SLOTS[0]);
+    const [ownerSees, setOwnerSees] = useState('closed');
+
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Popover
+                width="240px"
+                title="Series colour"
+                onOpenChange={o => { setOwnerSees(o ? 'open' : 'closed'); if (o) setDraft(slot); }}
+                trigger={props => (
+                    <button {...props} type="button" className="pg-swatch"
+                        style={{ backgroundColor: slot }} aria-label="Series colour" />
+                )}
+            >
+                {({ close }) => (
+                    <div>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                            {SLOTS.map(c => (
+                                <button key={c} type="button" className="pg-swatch"
+                                    aria-label={c} aria-pressed={draft === c}
+                                    style={{ backgroundColor: c, outline: draft === c ? '2px solid var(--color-primary)' : 'none', outlineOffset: 2 }}
+                                    onClick={() => setDraft(c)} />
+                            ))}
+                        </div>
+                        {/* Discard on dismiss: only this button writes. The ×,
+                            Escape and an outside click all leave `slot` alone. */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                            <button type="button" className="btn btn-secondary" onClick={close}>Cancel</button>
+                            <button type="button" className="btn btn-primary"
+                                onClick={() => { setSlot(draft); close(); }}>Apply</button>
+                        </div>
+                    </div>
+                )}
+            </Popover>
+            <span className="text-nano">owner sees: {ownerSees}</span>
+        </div>
+    );
+}
+
 export const COMPOSITES = {
+    'popover-seams': () => <PopoverSeams />,
+
     'facet-panel': () => (
         <div className="menu-button" style={{ position: 'static' }}>
             <button type="button" className="guide-facet-btn active">
@@ -92,6 +157,43 @@ export const COMPOSITES = {
                     <span className="nav-menu-item-hint">Select a vehicle first</span>
                 </button>
             </div>
+        </div>
+    ),
+
+    /* The two tiers one glyph moves between. Rendered static here; in the app
+       both are portalled and fixed, which is what lets them leave the sidebar. */
+    'popover-peek': () => (
+        <div className="popover popover--peek" style={{ position: 'static', pointerEvents: 'auto' }}>
+            Everything the car draws that is not traction — HVAC, battery
+            conditioning, lighting.
+            <span className="popover-more">Click ⓘ for the full panel</span>
+        </div>
+    ),
+
+    'popover-pinned': () => (
+        <div className="popover popover--pinned" style={{ position: 'static' }}>
+            <div className="popover-head">
+                <span className="popover-title">EV auxiliary load reference</span>
+                <button type="button" className="popover-close" aria-label="Close">×</button>
+            </div>
+            <div>
+                <p>The curve default is the modelled steady-state draw; these are the
+                   figures to reach for when modelling a specific ambient.</p>
+            </div>
+        </div>
+    ),
+
+    /* Below the breakpoint the chrome collapses at, every pin is this instead.
+       Shown boxed rather than bottom-anchored, since a specimen has no viewport
+       edge to sit on. */
+    'popover-sheet': () => (
+        <div className="popover popover--sheet" style={{ position: 'static', maxWidth: 340 }}>
+            <span className="popover-grabber" aria-hidden="true" />
+            <div className="popover-head">
+                <span className="popover-title">EV auxiliary load</span>
+                <button type="button" className="popover-close" aria-label="Close">×</button>
+            </div>
+            <div><p>Everything the car draws that is not traction.</p></div>
         </div>
     ),
 

@@ -162,7 +162,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                 sections run long: an action is worth having at both ends. */}
             <SectionHeader
                 title="Performance Testing"
-                info={<InfoIcon text={SECTION_HELP} position="right" className="ml-1" />}
+                info={<InfoIcon text={SECTION_HELP} className="ml-1" />}
                 actions={canEdit && (
                     <>
                         <SectionAction onClick={() => setShowImport(true)}>📄 Import testing CSV</SectionAction>

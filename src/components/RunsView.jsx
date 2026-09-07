@@ -1365,7 +1365,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             {subtab === 'tests' && (<>
             <SectionHeader
                 title="Charging & Range Tests"
-                info={<InfoIcon text={TESTS_SECTION_HELP} position="right" className="ml-1" />}
+                info={<InfoIcon text={TESTS_SECTION_HELP} className="ml-1" />}
                 actions={canCreate && (
                     <SectionAction onClick={() => {
                         // Toggles, as it always has: a second click cancels
@@ -2394,7 +2394,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 <div className="mt-6">
                     <SectionHeader
                         title="Inherited Tests"
-                        info={<InfoIcon text={INHERITED_SECTION_HELP} position="right" className="ml-1" />}
+                        info={<InfoIcon text={INHERITED_SECTION_HELP} className="ml-1" />}
                         actions={isContributor && canEdit(vehicle) && !showAddLink && (
                             <SectionAction onClick={() => setShowAddLink(true)}>
                                 + Add Inherited Link

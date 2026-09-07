@@ -760,7 +760,7 @@ export default function EpaCurvesView({
                         </div>
                         <span className="text-note">
                             How this is calculated
-                            <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} position="right" />
+                            <InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} />
                         </span>
                     </div>
 
@@ -771,10 +771,9 @@ export default function EpaCurvesView({
                         <span className="text-micro">
                             Overlay real-world tests
                             <InfoIcon
-                                tooltipClassName="info-icon-tooltip--wide"
-                                position="right"
+                                title="Overlay real-world tests"
+                                text="Plot this vehicle's own range-test points over its curve — corrected to the viewing conditions above, or exactly as recorded."
                             >
-                                    <p>Plot this vehicle's own range-test points on top of its curve.</p>
                                     <p className="mt-1.5"><strong>Corrected:</strong> scaled by temperature, wind, and elevation gain/loss to match the curve's current viewing conditions above — an apples-to-apples comparison.</p>
                                     <p className="mt-1.5"><strong>Uncorrected:</strong> the raw measured value as recorded, unadjusted — not a valid comparison across different test conditions, but useful to see the true recorded data.</p>
                             </InfoIcon>

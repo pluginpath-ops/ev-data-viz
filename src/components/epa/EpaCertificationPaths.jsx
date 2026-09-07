@@ -129,8 +129,10 @@ export default function EpaCertificationPaths({ models = [] }) {
                 <div className="cert-cell">
                     <span className="font-semibold text-secondary">
                         Derived 5-cycle
-                        <InfoIcon position="below" tooltipClassName="info-icon-tooltip--wide">
-                            <span className="block font-semibold mb-1">How the regression works</span>
+                        <InfoIcon
+                            title="How the regression works"
+                            text="The EPA regression that turns an unadjusted economy figure into a label figure — and why it diverges from the flat factor."
+                        >
                             <span className="block mb-2">
                                 1 / FE_adjusted = intercept + slope / FE_unadjusted, with the city
                                 fit at 0.003259 + 1.1805 / FE.

@@ -1710,7 +1710,7 @@ export default function RoadTripView({
                                             }} />
                                         <span className="scenario-unit">
                                             {towingEffLabel}
-                                            <InfoIcon className="is-accent" position="right" text={TOWING_NOTE} />
+                                            <InfoIcon className="is-accent" text={TOWING_NOTE} />
                                         </span>
                                     </label>
                                     <label className="scenario-row">
@@ -1723,7 +1723,7 @@ export default function RoadTripView({
                                             }} />
                                         <span className="scenario-unit">
                                             {sl}
-                                            <InfoIcon className="is-accent" position="right" text={TOWING_NOTE} />
+                                            <InfoIcon className="is-accent" text={TOWING_NOTE} />
                                         </span>
                                     </label>
                                 </div>
