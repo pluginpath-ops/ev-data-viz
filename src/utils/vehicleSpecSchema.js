@@ -14,6 +14,21 @@
  *   'text'    — free-text input
  */
 
+/**
+ * `better: 'lower' | 'higher'` — which way is an improvement, on the rows where
+ * that is a fact rather than an opinion.
+ *
+ * It exists for Compare Specs' "mark best in row", and its absence is the
+ * point: most rows have no better direction. More motors, more speakers, a
+ * bigger battery — none of those is better without a use case, and washing the
+ * winning cell would assert an editorial position the data does not support.
+ * So the annotation is opt-in per field, and a row without one stays neutral
+ * even with the toggle on.
+ *
+ * Ground clearance is deliberately NOT annotated, though the design named it.
+ * It is a trade-off — clearance against aerodynamics and roll centre — and it
+ * fails the same test the design applies to everything else.
+ */
 export const SPEC_CATEGORIES = [
     {
         key: 'pricing',
@@ -32,8 +47,8 @@ export const SPEC_CATEGORIES = [
             { key: 'motor_type',          label: 'Motor Type',              type: 'enum',
               options: ['Permanent Magnet', 'Induction', 'Wound Rotor', 'Switched Reluctance'] },
             { key: 'transmission_speeds', label: 'Transmission Speeds',     type: 'integer' },
-            { key: 'horsepower_hp',       label: 'Horsepower (hp)',         type: 'number', unitGroup: 'power' },
-            { key: 'torque_lbft',         label: 'Torque (lb-ft)',          type: 'number', unitGroup: 'torque' },
+            { key: 'horsepower_hp',       label: 'Horsepower (hp)',         type: 'number', better: 'higher', unitGroup: 'power' },
+            { key: 'torque_lbft',         label: 'Torque (lb-ft)',          type: 'number', better: 'higher', unitGroup: 'torque' },
             { key: 'battery_gross_kwh',   label: 'Battery Gross (kWh)',     type: 'number' },
         ],
     },
@@ -48,17 +63,17 @@ export const SPEC_CATEGORIES = [
         key: 'performance',
         label: 'Performance (Published)',
         fields: [
-            { key: 'zero_to_60_mph_sec', label: '0–60 mph (sec) — claimed',     type: 'number' },
-            { key: 'quarter_mile_sec',   label: '¼ Mile (sec) — claimed',       type: 'number' },
-            { key: 'quarter_mile_mph',   label: '¼ Mile Trap Speed — claimed',  type: 'number', unitGroup: 'speed' },
-            { key: 'top_speed_mph',      label: 'Top Speed — claimed',          type: 'number', unitGroup: 'speed' },
+            { key: 'zero_to_60_mph_sec', label: '0–60 mph (sec) — claimed',     type: 'number', better: 'lower' },
+            { key: 'quarter_mile_sec',   label: '¼ Mile (sec) — claimed',       type: 'number', better: 'lower' },
+            { key: 'quarter_mile_mph',   label: '¼ Mile Trap Speed — claimed',  type: 'number', better: 'higher', unitGroup: 'speed' },
+            { key: 'top_speed_mph',      label: 'Top Speed — claimed',          type: 'number', better: 'higher', unitGroup: 'speed' },
             { key: 'weight_lbs',         label: 'Curb Weight',                  type: 'number', unitGroup: 'weight' },
-            { key: 'braking_60_0_ft',    label: 'Braking 60–0 — published',     type: 'number', unitGroup: 'feet' },
-            { key: 'braking_70_0_ft',    label: 'Braking 70–0 — published',     type: 'number', unitGroup: 'feet' },
-            { key: 'lateral_g',          label: 'Lateral Grip (g) — published', type: 'number' },
-            { key: 'figure_8_sec',       label: 'Figure 8 (sec) — published',   type: 'number' },
-            { key: 'slalom_mph',         label: 'Slalom Speed — published',     type: 'number', unitGroup: 'speed' },
-            { key: 'elk_test_mph',       label: 'Elk Test Speed (Moose Test) — published', type: 'number', unitGroup: 'speed' },
+            { key: 'braking_60_0_ft',    label: 'Braking 60–0 — published',     type: 'number', better: 'lower', unitGroup: 'feet' },
+            { key: 'braking_70_0_ft',    label: 'Braking 70–0 — published',     type: 'number', better: 'lower', unitGroup: 'feet' },
+            { key: 'lateral_g',          label: 'Lateral Grip (g) — published', type: 'number', better: 'higher' },
+            { key: 'figure_8_sec',       label: 'Figure 8 (sec) — published',   type: 'number', better: 'lower' },
+            { key: 'slalom_mph',         label: 'Slalom Speed — published',     type: 'number', better: 'higher', unitGroup: 'speed' },
+            { key: 'elk_test_mph',       label: 'Elk Test Speed (Moose Test) — published', type: 'number', better: 'higher', unitGroup: 'speed' },
         ],
     },
     {
@@ -130,9 +145,9 @@ export const SPEC_CATEGORIES = [
         fields: [
             { key: 'battery_usable_kwh',          label: 'Battery Usable (kWh)',          type: 'number' },
             { key: 'battery_nominal_voltage_v',   label: 'Battery Nominal Voltage (V)',   type: 'number' },
-            { key: 'max_dc_kw',                   label: 'Max DC Charge Rate (kW)',        type: 'number' },
-            { key: 'max_ac_kw',                   label: 'Max AC Charge Rate (kW)',        type: 'number' },
-            { key: 'charge_time_10_to_80_pct_min',label: 'Charge Time 10→80% (min)',       type: 'number' },
+            { key: 'max_dc_kw',                   label: 'Max DC Charge Rate (kW)',        type: 'number', better: 'higher' },
+            { key: 'max_ac_kw',                   label: 'Max AC Charge Rate (kW)',        type: 'number', better: 'higher' },
+            { key: 'charge_time_10_to_80_pct_min',label: 'Charge Time 10→80% (min)',       type: 'number', better: 'lower' },
             { key: 'charge_port',                 label: 'Charge Port',                   type: 'enum',
               options: ['NACS', 'CCS1', 'CHAdeMO', 'Type 2'] },
             { key: 'v2l',                         label: 'Vehicle-to-Load (V2L)',          type: 'boolean' },
