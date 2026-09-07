@@ -313,7 +313,7 @@ export default function SpecsView({ selectedVehicleIds }) {
                                                 spans every column. See .specs-band-inner. */}
                                             <span className="specs-band-inner">
                                                 <span className="specs-band-label">{sec.label}</span>
-                                                <span className="specs-band-count">
+                                                <span className="text-caption">
                                                     {sec.rows.length} row{sec.rows.length === 1 ? '' : 's'}
                                                 </span>
                                             </span>
@@ -335,7 +335,7 @@ export default function SpecsView({ selectedVehicleIds }) {
                                                         nobody asked. */}
                                                     {markBest && row.better && (
                                                         <span
-                                                            className="specs-direction"
+                                                            className="text-caption specs-direction"
                                                             title={row.better === 'higher'
                                                                 ? 'Higher is better — the best cell is marked'
                                                                 : 'Lower is better — the best cell is marked'}

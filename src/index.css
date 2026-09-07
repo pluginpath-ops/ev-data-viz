@@ -3401,16 +3401,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 /* ── The controls strip ──────────────────────────────────────────────────── */
-.specs-controls {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px 12px;
-    border-radius: var(--radius-card);
-    background-color: var(--color-surface-muted);
-    border: 1px solid var(--color-border);
-}
+
 .specs-filter {
     width: 14rem;
     max-width: 100%;
@@ -3512,9 +3503,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    skipped on purpose, because a skipped row and a missed one look identical. */
 .specs-direction {
     margin-left: 5px;
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-meta);
 }
 
 /* The column's series colour, so a column ties to the same vehicle on every
@@ -3582,11 +3570,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     letter-spacing: 0.09em;
     text-transform: uppercase;
     color: var(--color-text-secondary);
-}
-.specs-band-count {
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-meta);
 }
 
 .specs-cell {
@@ -3664,11 +3647,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 /* Category header row in the comparison table */
-.specs-table-category-header {
-    @apply text-xs font-semibold uppercase tracking-wide px-6 py-2;
-    background-color: var(--color-surface-sunken);
-    color: var(--color-text-muted);
-}
 
 /* ── Vote buttons ──────────────────────────────────────────────────────────── */
 
@@ -5665,7 +5643,28 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * It wraps rather than scrolls: this is a form, and a control you cannot see is
  * a question you do not know you were asked.
  */
-.stats-controls {
+/* ONE controls strip, for every screen that has one.
+ *
+ * `.specs-controls` and `.stats-controls` were byte-identical — I wrote the
+ * second by copying the first — and the vocabulary already had a name for the
+ * thing. Anything a particular screen needs on top goes on a second class
+ * beside this one. */
+/* A quiet mono annotation: a count beside a heading, an axis end, a record's
+ * sub-line. Four places had arrived at exactly these three declarations
+ * independently — `.specs-band-count`, `.stats-histogram-summary`,
+ * `.stats-histogram-axis`, `.curve-picker-meta` — which is the evidence that it
+ * is a type ROLE and not four components that happen to match.
+ *
+ * `.text-nano` is the same size and family but uppercased and letterspaced,
+ * which is the LABEL treatment. This is the one for text that is read rather
+ * than scanned. */
+.text-caption {
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+
+.controls-strip {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -5919,11 +5918,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .stats-histogram-head {
     @apply flex items-baseline justify-between gap-3;
 }
-.stats-histogram-summary {
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-meta);
-}
 .stats-histogram-median-value {
     font-weight: 700;
     color: var(--color-accent-orange);
@@ -5984,9 +5978,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .stats-histogram-axis {
     @apply flex justify-between;
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-meta);
 }
 
 /* ── Named extremes ──────────────────────────────────────────────────────── */
@@ -6229,9 +6220,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    make read as a record's coordinates rather than as prose. */
 .curve-picker-meta {
     @apply truncate;
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-meta);
 }
 
 /* Named on every row, because once a mixed set is plotted this is the only

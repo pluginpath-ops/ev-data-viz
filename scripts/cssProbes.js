@@ -216,7 +216,7 @@ export const LEDGER = [
     },
     {
         key: 'near-identical',
-        count: 48,
+        count: 43,
         what: `pairs of classes at least ${NEAR_THRESHOLD * 100}% identical by declaration. `
             + 'Two names for one idea is how a 639-class stylesheet stops being holdable.',
         fix: 'one class, and a modifier for whatever genuinely differs.',
