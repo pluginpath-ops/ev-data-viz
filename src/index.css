@@ -309,6 +309,31 @@
     --color-success-text:    rgb(95, 214, 168);
 }
 
+/* ── Layers ──────────────────────────────────────────────────────────────────
+ *
+ * Named, because a raw z-index is a number whose only meaning is what it beats,
+ * and there were five of them chosen independently: 20 for a dropdown, 30 for
+ * the header, 40 for three panels, 60 for the notification bar, 100 for a
+ * tooltip.
+ *
+ * The tooltip sits above the modal on purpose. A tooltip inside a dialog has to
+ * show, and it is transient and pointer-transparent, so nothing it covers is
+ * something you were about to click. */
+:root {
+    --z-header:   30;
+    --z-popover:  40;
+    --z-modal:    50;
+    --z-toast:    60;
+    --z-tooltip: 100;
+}
+
+/* One shadow for anything that floats. It was already this value in three
+   places — twice as a `var(--shadow-popover, …)` fallback for a token that was
+   never defined, and once written out — so they agreed by accident. */
+:root {
+    --shadow-popover: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
 /* ── Radii ──────────────────────────────────────────────────────────────────
    The handoff's six, named for what they wrap rather than by size, so a call
    site says `--radius-control` and cannot drift to a neighbouring value. There
@@ -1072,18 +1097,11 @@ body {
    and a nav item that truncates is a destination you cannot identify before
    choosing it — "Charging & Efficiency" alone wants 180px. */
 .nav-menu-panel {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    z-index: 40;
     display: flex;
     flex-direction: column;
     padding: 4px;
-    border-radius: var(--radius-control);
-    background-color: var(--color-popover);
-    border: 1px solid var(--color-border);
-    box-shadow: var(--shadow-popover, 0 8px 24px rgb(0 0 0 / 0.35));
+    /* Flush to the bar it drops from, not floating 6px below it. */
+    top: 100%;
 }
 .nav-menu-item {
     display: flex;
@@ -1151,19 +1169,11 @@ body {
 }
 
 .account-panel {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    z-index: 40;
+    --popover-w: 15rem;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    width: 15rem;
     padding: 12px;
-    border-radius: var(--radius-control);
-    background-color: var(--color-popover);
-    border: 1px solid var(--color-border);
-    box-shadow: var(--shadow-popover, 0 8px 24px rgb(0 0 0 / 0.35));
 }
 .account-identity {
     display: flex;
@@ -1656,10 +1666,10 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 }
 
 /* Import ▾ dropdown panel */
+/* The "More ▾" overflow menu. It was --color-card on a rounded-lg with
+   Tailwind's shadow-lg at z-20 — a fourth answer to the same question. */
 .dropdown-menu {
-    @apply absolute right-0 mt-1 rounded-lg shadow-lg z-20 overflow-hidden;
-    background-color: var(--color-card);
-    border: 1px solid var(--color-border);
+    padding: 4px;
 }
 
 /* Single item inside a dropdown menu */
@@ -3880,26 +3890,28 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * The fade survives where `allow-discrete` is supported and degrades to an
  * instant show where it is not. */
 .info-icon-tooltip {
+    /* `display: none`, not just `visibility: hidden`. A hidden element still
+       contributes scrollable overflow, and eight of these in one sidebar added
+       234px of phantom scroll. `@starting-style` below is what keeps the fade
+       working through a display change. */
     display: none;
     visibility: hidden;
     opacity: 0;
     transition-behavior: allow-discrete;
-    position: absolute;
-    z-index: 100;
-    width: 240px;
-    max-width: calc(100vw - 2rem); /* never wider than the viewport on narrow screens */
-    padding: 0.5rem 0.625rem;
-    font-size: 0.75rem;
-    line-height: 1.4;
-    border-radius: var(--radius-popover);
-    pointer-events: none;
     transition: opacity 0.15s;
-    background-color: var(--color-surface-sunken);
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    line-height: 1.4;
+    /* Transparent to the pointer by default, so a tooltip never eats a click
+       on what it is explaining. The one context that caps its height turns
+       this back on — see .chart-rail below — because a scrollable tooltip you
+       cannot put the cursor on is not scrollable. */
+    pointer-events: none;
     color: var(--color-text-primary);
-    border: 1px solid var(--color-border);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    white-space: normal;
 }
+/* Two classes, so this beats `.popover`'s own z-index regardless of which rule
+   is written first. A tooltip has to clear the panel it is explaining, and
+   ordering is not something a stylesheet this size should be relying on. */
+.popover.info-icon-tooltip { z-index: var(--z-tooltip); }
 
 .info-icon:hover .info-icon-tooltip {
     display: block;
@@ -3911,23 +3923,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 /* Tooltip placement variants */
-.info-icon-tooltip--above {
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-}
 
-.info-icon-tooltip--below {
-    top: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-}
 
-.info-icon-tooltip--right {
-    left: calc(100% + 6px);
-    top: 50%;
-    transform: translateY(-50%);
-}
 
 /* Inside the rail the tooltip cannot escape.
  *
@@ -3967,13 +3964,28 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .chart-rail .viewing-row :has(> .info-icon),
 .chart-rail .scenario-row :has(> .info-icon) { position: static; }
 .chart-rail .info-icon { position: static; }
+/* Inside the sidebar, EVERY tooltip stretches to its anchor and opens
+   downward, whatever the call site asked for — `.popover--stretch`, applied by
+   context rather than by hand. A 320px column has no room to the right and its
+   left edge is cut off by the rail, so a placement choice made at the call site
+   is a choice between two wrong answers. */
 .chart-rail .info-icon-tooltip {
     top: calc(100% + 6px);
     bottom: auto;
     left: 0;
-    right: 0;
-    width: auto;
-    max-width: none;
+    right: auto;
+    /* ONE width, from the RAIL rather than the anchor.
+     *
+     * `right: 0` used to stretch each tooltip across whatever element held its
+     * glyph, and those differ: a `.viewing-row` is 209px, another is 251, a
+     * `.text-note` is 264. Five widths in one 320px column, which is the
+     * measurement that opened #284. Every anchor starts at the rail's content
+     * edge, so pinning `left: 0` and taking the width from the rail lands all
+     * of them in the same column.
+     *
+     * Derived from the rail's own padding variables, so the wide-screen media
+     * query that changes them moves this with it. */
+    --popover-w: calc(320px - var(--rail-pad-l) - var(--rail-pad-r));
     transform: none;
     white-space: normal;
 }
@@ -3986,20 +3998,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    `pointer-events: auto` is what makes the cap usable: the tooltip is a
    DESCENDANT of .info-icon, so moving onto it keeps :hover true and it can be
    scrolled without vanishing under the cursor. */
+/* Tighter than the base 60vh, because the rail is exactly one viewport tall
+   and does not scroll: a tooltip is opening into the space below its glyph,
+   not into the page. `pointer-events: auto` is what makes any cap usable — the
+   tooltip is a DESCENDANT of .info-icon, so moving onto it keeps :hover true
+   and it can be scrolled without vanishing under the cursor. */
 .chart-rail .info-icon-tooltip {
-    max-height: 40vh;
-    overflow-y: auto;
+    --popover-max-h: 40vh;
     pointer-events: auto;
-}
-
-/* Tooltip that opens OVER a muted panel (e.g. a filter bar).
-
-   The default fill is --color-surface-sunken, which the dark palette sets to
-   the same value as --color-surface-muted — the filter bar's own background.
-   A tooltip filled with its backdrop reads as a hole in the panel, so lift it
-   to the card colour, which differs from muted in both themes. */
-.info-icon-tooltip--on-panel {
-    background-color: var(--color-card);
 }
 
 /* Tier gloss inside that tooltip: the chip's own label, then what it means. */
@@ -4012,19 +4018,29 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-primary);
 }
 
-/* Width override for richer tooltip content (e.g. a reference table) */
-.info-icon-tooltip--wide {
-    width: 460px;
-    max-width: calc(100vw - 2rem);
-}
+/* Richer content — the accessory-load reference table. A width, not a class:
+   see --popover-w on .popover. */
+.info-icon-tooltip--wide { --popover-w: 460px; }
 
-/* Reference table shown inside a wide info-icon tooltip (e.g. EPA Curves accessory load) */
+/* The accessory-load reference table, inside a tooltip.
+ *
+ * Six columns of ranges in a 280px sidebar column: it measured 290px and was
+ * clipped by 10. Tighter cells fit it; `overflow-x: auto` on the table's own
+ * box means it can never be silently cut off again, whatever a future column
+ * does — the rail is `overflow-x: hidden`, so anything wider than the rail
+ * disappears rather than scrolling the page.
+ *
+ * The 11px is derived rather than typed, so it follows --fs-body and the
+ * --ui-scale knob like every other size. */
 .accessory-load-table {
-    @apply w-full border-collapse text-[11px] mt-1;
+    @apply w-full border-collapse mt-1;
+    display: block;
+    overflow-x: auto;
+    font-size: calc(var(--fs-body) * 0.7857);
 }
 .accessory-load-table th,
 .accessory-load-table td {
-    @apply border px-1 py-0.5 text-center;
+    @apply border px-0.5 py-0.5 text-center;
     border-color: var(--color-border);
 }
 .accessory-load-table th {
@@ -4344,6 +4360,82 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     color: var(--color-text-meta);
 }
+
+/* ── Popover ─────────────────────────────────────────────────────────────────
+ *
+ * ONE surface for anything that floats above the page (#284).
+ *
+ * There were five, built where each was needed, and they agreed on nothing:
+ * three fills (`--color-popover`, `--color-card`, `--color-surface-sunken`),
+ * three radii (`--radius-control`, `--radius-popover`, Tailwind's `rounded-lg`),
+ * three shadows, and z-indexes of 20, 40 and 100. `--color-popover` existed as
+ * a token the whole time and nothing used it for a popover.
+ *
+ * One of those divergences was load-bearing in the worst way: the tooltip's
+ * default fill equalled `--color-surface-muted` in dark, so a tooltip over a
+ * filter bar read as a HOLE in it — and the fix was a `--on-panel` modifier
+ * applied by hand at the call sites that hit it. That is a symptom of the
+ * default being wrong, not of those contexts being special. The modifier is
+ * gone; the fill is right.
+ *
+ * ── Width is a property, not a class ────────────────────────────────────────
+ *
+ * `--popover-w`. There were five widths across eight tooltips in ONE 320px
+ * column, because each anchored to whatever element happened to hold its glyph.
+ * A caller now sets a number rather than inventing a class, and the default is
+ * `auto` so a panel that should hug its content still can.
+ *
+ * ── And height belongs here, not to one context ─────────────────────────────
+ *
+ * `.chart-rail` capped tooltips at 40vh with internal scroll, because one of
+ * them carries a reference table ~800px tall. Any popover can overflow the
+ * viewport; the cap is the component's business.
+ */
+.popover {
+    position: absolute;
+    z-index: var(--z-popover);
+    /* A popover is its own typographic context.
+     *
+     * It only sets a size and a colour before, and inherited everything else
+     * from whatever it was nested in — so the same tooltip component rendered
+     * ITALIC beside a `.text-note`, MONO UPPERCASE 600 beside a `.text-micro`,
+     * and plain 400 elsewhere. Three content styles in one sidebar, from one
+     * component, for the same reason the widths diverged: it was taking its
+     * identity from its anchor.
+     *
+     * Explicit, not `all: initial`: children that set their own type — a menu
+     * option, a badge, a heading inside the panel — still win. */
+    font-family: var(--font-sans);
+    font-style: normal;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    text-align: left;
+    width: var(--popover-w, auto);
+    max-width: calc(100vw - 2rem);
+    max-height: var(--popover-max-h, 60vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* A default scrollbar is 16px of a 280px panel, taken from the content
+       rather than from the chrome. */
+    scrollbar-width: thin;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-popover);
+    background-color: var(--color-popover);
+    box-shadow: var(--shadow-popover);
+}
+
+/* Placement. One policy, chosen by name rather than by writing offsets at the
+   call site — and every one of them clears its anchor by the same 6px. */
+.popover--below   { top: calc(100% + 6px); left: 0; }
+.popover--center  { top: calc(100% + 6px); left: 50%; transform: translateX(-50%); }
+.popover--above   { bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); }
+.popover--right   { left: calc(100% + 6px); top: 50%; transform: translateY(-50%); }
+.popover--end     { top: calc(100% + 6px); right: 0; }
+/* Both edges pinned: the panel takes its anchor's width rather than its own.
+   What the collapsed nav menu needs, and what a sidebar tooltip needs. */
+.popover--stretch { top: calc(100% + 6px); left: 0; right: 0; width: auto; }
 
 /* ── Note panel ──────────────────────────────────────────────────────────────
  *
@@ -5043,21 +5135,13 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* The open menu. 238px because the longest make name fits and a wider panel
    starts covering the table it is filtering. */
+/* 238px because the longest make name fits and a wider panel starts covering
+   the table it is filtering. */
 .guide-facet-panel {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    z-index: 40;
+    --popover-w: 238px;
     display: flex;
     flex-direction: column;
-    width: 238px;
-    max-height: 60vh;
-    padding: 8px;
     gap: 6px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-popover);
-    background-color: var(--color-popover);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 .guide-facet-panel-search { width: 100%; }
 .guide-facet-panel-head,
@@ -5102,7 +5186,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* The column list. Wider than a facet menu because a column carries a label
    AND a unit AND a control, where a facet value carries a name and a count. */
-.guide-column-panel { width: 220px; }
+.guide-column-panel { --popover-w: 220px; }
 .guide-column-row {
     width: 100%;
     /* The one real difference: these rows are draggable and say so. */
@@ -5147,7 +5231,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* A range's bounds, in the same button-and-panel shape as a facet so the row
    reads as one kind of control — and now with the same open/close behaviour
    too, which <details> could not give it. */
-.guide-range-panel { width: 200px; }
+.guide-range-panel { --popover-w: 200px; }
 
 /* What is narrowing the view. A chip here REMOVES its value — the opposite of
    the chips it replaced, which selected one, so it carries the ✕ that says so. */

@@ -8,7 +8,8 @@
  * Props:
  *   text             {string}  — tooltip text (plain string; no HTML). Ignored if `children` is given.
  *   children         {node}    — richer tooltip content (e.g. a reference table), in place of `text`
- *   position         {'above'|'below'|'right'}  — tooltip placement (default: 'above')
+ *   position         {'above'|'below'|'right'|'center'|'end'|'stretch'}  — placement,
+ *                    from the shared .popover--* set (default: 'above')
  *   className        {string}  — extra classes on the wrapper span
  *   tooltipClassName {string}  — extra classes on the tooltip bubble itself (e.g. a width override)
  */
@@ -16,7 +17,7 @@ export default function InfoIcon({ text, children, position = 'above', className
     return (
         <span className={`info-icon ${className}`} aria-label={typeof text === 'string' ? text : undefined} role="img">
             <span className="info-icon-glyph">ⓘ</span>
-            <span className={`info-icon-tooltip info-icon-tooltip--${position} ${tooltipClassName}`}>
+            <span className={`popover popover--${position} info-icon-tooltip ${tooltipClassName}`.trim()}>
                 {children ?? text}
             </span>
         </span>

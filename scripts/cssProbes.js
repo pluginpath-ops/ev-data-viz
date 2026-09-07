@@ -66,13 +66,13 @@ export const CONSTRUCTED = {
     'nav-menu-main': 'NavMenu builds `nav-menu-${level}`.',
     'nav-menu-sub':  'NavMenu builds `nav-menu-${level}`.',
     'is-prose':      'RunSpecRows builds `is-${cell.tone}`.',
+    'popover--above':  'InfoIcon builds `popover--${position}`.',
+    'popover--center': 'InfoIcon builds `popover--${position}`.',
+    'popover--right':  'InfoIcon builds `popover--${position}`.',
     'step-1': 'StatsHistogram builds `step-${n}` for its four-step fill.',
     'step-2': 'StatsHistogram builds `step-${n}` for its four-step fill.',
     'step-3': 'StatsHistogram builds `step-${n}` for its four-step fill.',
     'step-4': 'StatsHistogram builds `step-${n}` for its four-step fill.',
-    'info-icon-tooltip--above': 'InfoIcon builds `info-icon-tooltip--${placement}`.',
-    'info-icon-tooltip--below': 'InfoIcon builds `info-icon-tooltip--${placement}`.',
-    'info-icon-tooltip--right': 'InfoIcon builds `info-icon-tooltip--${placement}`.',
 };
 
 // ── Parsing ─────────────────────────────────────────────────────────────────

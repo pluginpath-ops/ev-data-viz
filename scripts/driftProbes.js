@@ -280,7 +280,7 @@ export const LEDGER = [
     },
     {
         key: 'off-scale-font-size',
-        count: 11,
+        count: 10,
         scope: 'src/index.css',
         what: 'font-size declarations that do not derive from the type scale. A size '
             + 'the --ui-scale knob cannot reach, in the stylesheet that defines the '

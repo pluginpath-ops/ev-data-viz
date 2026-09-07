@@ -80,7 +80,7 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                         η, identical for both. Only capacity — and so range —
                         separates them. Detail rather than a standing caption, so
                         the control reads as a control. */}
-                    <InfoIcon position="below" tooltipClassName="info-icon-tooltip--on-panel">
+                    <InfoIcon position="below">
                         <div className="mb-1">
                             Every curve’s shape is measured road load. What differs is the
                             energy behind it.

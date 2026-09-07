@@ -49,7 +49,7 @@ export default function NavMenu({ items, activeKey, onSelect, level = 'main' }) 
             </button>
 
             {open && (
-                <div className="nav-menu-panel" role="menu">
+                <div className="popover popover--stretch nav-menu-panel" role="menu">
                     {items.map(({ key, label, disabled, hint }) => (
                         <button
                             key={key}
