@@ -266,7 +266,7 @@ export const LEDGER = [
     },
     {
         key: 'apply-palette',
-        count: 19,
+        count: 17,
         scope: 'src/index.css',
         what: 'Semantic classes whose @apply line reaches for a palette colour. These '
             + 'are the sharpest kind of drift: the class NAME says the right thing, so '

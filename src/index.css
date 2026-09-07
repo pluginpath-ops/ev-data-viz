@@ -2726,9 +2726,25 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 
-.tag-filter-or   { @apply bg-green-500 text-white border-green-500 hover:bg-green-600; }
-.tag-filter-and  { @apply bg-blue-500 text-white border-blue-500 hover:bg-blue-600; }
-.tag-filter-not  { @apply bg-red-500 text-white border-red-500 hover:bg-red-600; }
+/* AND / OR / NOT, on the tokens that already mean those things.
+ *
+ * These were `@apply bg-blue-500 text-white border-blue-500` and its green and
+ * red twins — raw palette, no tokens, no dark rule, and the last three things
+ * #277 named that the re-skin had not reached. They were never illegible, so
+ * this was not a bug: it was three states of one control sitting outside the
+ * system while its fourth state, `.tag-filter-na`, sat inside it.
+ *
+ * The mapping is the one the issue asked for. NOT takes danger because it is
+ * the exclusion — the state that removes rows — and danger is what this app
+ * already uses to say so. White text on all three, because each is a solid
+ * fill of a saturated token; that is the one place a literal white is the
+ * right answer rather than a missing one. */
+.tag-filter-and { background-color: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.tag-filter-and:hover { background-color: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+.tag-filter-or  { background-color: var(--color-success); border-color: var(--color-success); color: #fff; }
+.tag-filter-or:hover  { background-color: var(--color-success-hover); border-color: var(--color-success-hover); }
+.tag-filter-not { background-color: var(--color-danger);  border-color: var(--color-danger);  color: #fff; }
+.tag-filter-not:hover { background-color: var(--color-danger-hover);  border-color: var(--color-danger-hover); }
 
 /* Small legend explaining OR/AND/NOT color states */
 .tag-filter-legend {
