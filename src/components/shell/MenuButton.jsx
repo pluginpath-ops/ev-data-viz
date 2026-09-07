@@ -55,7 +55,7 @@ export default function MenuButton({
             </button>
 
             {open && (
-                <div className={`guide-facet-panel ${panelClass}`.trim()}>
+                <div className={`popover popover--below guide-facet-panel ${panelClass}`.trim()}>
                     {typeof children === 'function' ? children({ close }) : children}
                 </div>
             )}

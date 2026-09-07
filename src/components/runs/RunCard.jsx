@@ -202,7 +202,7 @@ export default function RunCard({
                         {openMenuRunId === run.id && (
                             <>
                                 <div className="fixed inset-0 z-10" onClick={() => setOpenMenuRunId(null)} />
-                                <div className="dropdown-menu w-52 z-20">
+                                <div className="popover popover--end dropdown-menu w-52">
                                     <button
                                         onClick={() => { handleExportCsv(run); setOpenMenuRunId(null); }}
                                         disabled={exportingRunId === run.id}

@@ -49,7 +49,7 @@ export default function AccountMenu({ user, userRole, units, onToggleUnits, onSi
             </button>
 
             {open && (
-                <div className="account-panel" role="menu">
+                <div className="popover popover--end account-panel" role="menu">
                     <div className="account-identity">
                         {user ? (
                             <>

@@ -29,6 +29,8 @@ a house one, so that a new reader already knows it.
 | The one width at which the chrome collapses | **compact** | — | [useIsCompact.js](../src/hooks/useIsCompact.js) — the only breakpoint |
 | The circle at the right end, and what it opens | **account menu** | Material *account* | `.account-menu`, [AccountMenu.jsx](../src/components/shell/AccountMenu.jsx) |
 | A button stating its value, opening a panel | **menu button** | WAI-ARIA *menu button* | `.menu-button`, [MenuButton.jsx](../src/components/shell/MenuButton.jsx) |
+| Anything that floats above the page | **popover** | common web | `.popover` + one `.popover--<placement>` |
+| Where it opens relative to its anchor | **placement** | Floating UI *placement* | `--above`, `--below`, `--center`, `--right`, `--end`, `--stretch` |
 | A row of them above a table or chart | **controls strip** | — | `.controls-strip` — one class, shared |
 | One choice, always visible, of two or three | **segmented control** | Apple HIG *segmented control* | `.stats-segmented`, `.account-segmented` |
 | Row 3 — the removable selected-vehicle pills | **chips** | Material *input chips* | `.selected-strip`, `.selected-vehicle-chip` |
