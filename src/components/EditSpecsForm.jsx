@@ -396,7 +396,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                         {filteredParents.map(v => (
                                             <li
                                                 key={v.id}
-                                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900 ${String(v.id) === inheritFromId ? 'font-semibold text-indigo-600 dark:text-indigo-300' : ''}`}
+                                                className={`option-row${String(v.id) === inheritFromId ? ' is-selected' : ''}`}
                                                 onMouseDown={() => {
                                                     setInheritFromId(String(v.id));
                                                     setShowParentDropdown(false);

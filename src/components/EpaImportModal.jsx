@@ -161,7 +161,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                             </div>
 
                             {error && (
-                                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">⚠️ {error}</div>
+                                <div className="note-panel is-danger mb-4">⚠️ {error}</div>
                             )}
 
                             {/* Table */}

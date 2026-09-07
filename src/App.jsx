@@ -1026,11 +1026,7 @@ export default function App() {
 
             {/* ── Global notification banner ──────────────────────────────── */}
             {appNotification && (
-                <div className={`fixed bottom-0 left-0 right-0 z-[60] border-t-2 shadow-2xl ${
-                    appNotification.type === 'error'
-                        ? 'bg-red-50 border-red-400'
-                        : 'bg-green-50 border-green-500'
-                }`}>
+                <div className={`fixed-action-bar z-[60] ${appNotification.type === 'error' ? 'is-danger' : 'is-good'}`}>
                     <div className="page-container py-3 flex items-center gap-4">
                         <span className="text-xl">{appNotification.type === 'error' ? '⚠️' : '✓'}</span>
                         <p className={`flex-1 text-sm font-medium ${

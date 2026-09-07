@@ -1771,11 +1771,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             </div>
                                             <button
                                                 onClick={() => setEstimations(prev => ({ ...prev, range: prev.range === 'measured' ? null : 'measured' }))}
-                                                className={`shrink-0 text-xs px-3 py-1 rounded border transition-colors ${
-                                                    estimations.range === 'measured'
-                                                        ? 'bg-white text-green-700 border-green-300 hover:bg-green-100'
-                                                        : 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'
-                                                }`}
+                                                className={`btn btn-toggle shrink-0${estimations.range === 'measured' ? ' active' : ''}`}
                                             >
                                                 {estimations.range === 'measured' ? 'Undo' : 'Use test data'}
                                             </button>
@@ -2259,7 +2255,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                                         <button
                                                                                             onClick={() => handleClearColumn(field)}
                                                                                             title={`Clear all ${label} values`}
-                                                                                            className="text-[10px] font-normal rounded px-1 leading-tight w-fit text-meta border border-transparent hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors"
+                                                                                            className="btn-icon-danger text-[10px] font-normal px-1 w-fit"
                                                                                         >
                                                                                             ×clr
                                                                                         </button>
@@ -2280,7 +2276,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                                 {canEdit(vehicle) && (
                                                                                     <button
                                                                                         onClick={() => handleDeleteDataRow(i)}
-                                                                                        className="w-5 h-5 flex items-center justify-center rounded text-meta hover:text-red-500 hover:bg-red-50 transition-colors leading-none flex-shrink-0"
+                                                                                        className="btn-icon-danger w-5 h-5 flex items-center justify-center flex-shrink-0"
                                                                                         title="Remove row"
                                                                                     >×</button>
                                                                                 )}

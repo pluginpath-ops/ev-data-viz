@@ -111,6 +111,8 @@ export const SECTIONS = [
             { cls: 'btn btn-edit',      as: 'button', label: 'Edit',      note: 'Edit actions. Currently the same green as success.' },
             { cls: 'btn btn-warning',   as: 'button', label: 'Warning',   note: 'Attention-drawing but not destructive.' },
             { cls: 'btn btn-danger',    as: 'button', label: 'Danger',    note: 'Destructive. Delete, Remove.' },
+            { cls: 'btn-icon-danger',   as: 'button', label: 'Danger · icon',
+              note: 'A destructive glyph that stays quiet until you approach it — a row × , a clear-column ×.' },
             { cls: 'btn-tab',        as: 'button', label: 'Nav tab',   note: 'Top-level navigation. Add `.active` for the current one.' },
             { cls: 'btn-tab active', as: 'button', label: 'Nav tab · active' },
             { cls: 'btn-subtab',        as: 'button', label: 'Sub-tab',

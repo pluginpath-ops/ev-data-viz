@@ -244,7 +244,7 @@ export default function ImportVehiclesModal({ onClose }) {
                 </div>
 
                 {error && (
-                    <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">⚠️ {error}</div>
+                    <div className="note-panel is-danger mb-3">⚠️ {error}</div>
                 )}
 
                 {step === 'upload' && (
@@ -253,7 +253,7 @@ export default function ImportVehiclesModal({ onClose }) {
                             onDrop={e => { e.preventDefault(); setDragOver(false); processFile(e.dataTransfer.files[0]); }}
                             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                             onDragLeave={() => setDragOver(false)}
-                            className={`border-2 border-dashed rounded-lg p-10 text-center ${dragOver ? 'border-indigo-400 bg-indigo-50/40' : 'border-[var(--color-border)]'}`}
+                            className={`drop-zone${dragOver ? ' is-over' : ''}`}
                         >
                             <p className="text-body text-secondary mb-3">
                                 {busy ? 'Reading file…' : 'Drop a CSV or JSON file here, or'}

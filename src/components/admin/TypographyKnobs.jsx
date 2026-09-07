@@ -84,7 +84,7 @@ function KnobRow({ knob, value, modified, onChange }) {
                     <span className="text-sm font-medium">{label}</span>
                     <code className="text-[11px] text-secondary bg-[var(--color-surface-sunken)] px-1.5 py-0.5 rounded">{cssVar}</code>
                     {modified && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">
+                        <span className="badge-micro is-warning">
                             modified
                         </span>
                     )}
