@@ -3874,9 +3874,25 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * the viewport, and CSS cannot say "6px under that glyph".
  */
 
-.info-icon {
+/* A colour chip, for the playground's live popover specimen. */
+.pg-swatch {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+}
+
+/* Whatever opens a popover, wrapped. The panel itself is portalled out, so
+   this only ever holds the trigger — it exists so the trigger sits on the text
+   baseline beside whatever it belongs to. */
+.popover-anchor {
     display: inline-flex;
     align-items: center;
+}
+
+.info-icon {
     margin-left: 0.25rem;
 }
 

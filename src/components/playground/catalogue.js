@@ -39,7 +39,7 @@ export const OWNED_FAMILIES = [
     { id: 'notices', label: 'Notices & panels',
       match: (n) => /^(note-panel|state-panel|drop-zone|empty-state|fixed-action-bar)/.test(n) },
     { id: 'menus',   label: 'Menus & popovers',
-      match: (n) => /^(menu-button|guide-facet-|disclosure-caret|nav-menu|account-|popover|info-icon)/.test(n) },
+      match: (n) => /^(menu-button|guide-facet-|disclosure-caret|nav-menu|account-|popover|info-icon|pg-swatch)/.test(n) },
     { id: 'figures', label: 'Figures — frames, bars, cells',
       match: (n) => /^(plot-frame|stat-cell|guide-spark|guide-cell-stack|stats-box-|stats-histogram-|run-band|run-cell)/.test(n) },
 ];
@@ -182,6 +182,9 @@ export const SECTIONS = [
             { composite: 'popover-sheet', label: 'Sheet — narrow screens',
               covers: ['popover--sheet', 'popover-grabber'],
               note: 'There is no hover to peek with on touch, so a tap opens this directly rather than reproducing a hover tier as a tap.' },
+            { composite: 'popover-seams', label: 'Popover — the three seams (live)',
+              covers: ['popover-anchor', 'pg-swatch'],
+              note: 'The one live specimen on this page. A popover holds any content and answers to its owner: an arbitrary trigger (a swatch, not the ⓘ), content that closes its own panel through the { close } it is handed, and an owner told through onOpenChange. Cancel, ×, Escape and an outside click all discard; only Apply writes.' },
             { composite: 'nav-menu', label: 'Nav menu, collapsed',
               covers: ['nav-menu', 'nav-menu-main', 'nav-menu-sub', 'nav-menu-btn', 'nav-menu-current', 'nav-menu-panel', 'nav-menu-item-hint'],
               note: 'A gated destination says WHY in the row — a title attribute is invisible on touch, which is the only place this form appears.' },
