@@ -4022,13 +4022,25 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    see --popover-w on .popover. */
 .info-icon-tooltip--wide { --popover-w: 460px; }
 
-/* Reference table shown inside a wide info-icon tooltip (e.g. EPA Curves accessory load) */
+/* The accessory-load reference table, inside a tooltip.
+ *
+ * Six columns of ranges in a 280px sidebar column: it measured 290px and was
+ * clipped by 10. Tighter cells fit it; `overflow-x: auto` on the table's own
+ * box means it can never be silently cut off again, whatever a future column
+ * does — the rail is `overflow-x: hidden`, so anything wider than the rail
+ * disappears rather than scrolling the page.
+ *
+ * The 11px is derived rather than typed, so it follows --fs-body and the
+ * --ui-scale knob like every other size. */
 .accessory-load-table {
-    @apply w-full border-collapse text-[11px] mt-1;
+    @apply w-full border-collapse mt-1;
+    display: block;
+    overflow-x: auto;
+    font-size: calc(var(--fs-body) * 0.7857);
 }
 .accessory-load-table th,
 .accessory-load-table td {
-    @apply border px-1 py-0.5 text-center;
+    @apply border px-0.5 py-0.5 text-center;
     border-color: var(--color-border);
 }
 .accessory-load-table th {
@@ -4382,11 +4394,31 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .popover {
     position: absolute;
     z-index: var(--z-popover);
+    /* A popover is its own typographic context.
+     *
+     * It only sets a size and a colour before, and inherited everything else
+     * from whatever it was nested in — so the same tooltip component rendered
+     * ITALIC beside a `.text-note`, MONO UPPERCASE 600 beside a `.text-micro`,
+     * and plain 400 elsewhere. Three content styles in one sidebar, from one
+     * component, for the same reason the widths diverged: it was taking its
+     * identity from its anchor.
+     *
+     * Explicit, not `all: initial`: children that set their own type — a menu
+     * option, a badge, a heading inside the panel — still win. */
+    font-family: var(--font-sans);
+    font-style: normal;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    text-align: left;
     width: var(--popover-w, auto);
     max-width: calc(100vw - 2rem);
     max-height: var(--popover-max-h, 60vh);
     overflow-y: auto;
     overscroll-behavior: contain;
+    /* A default scrollbar is 16px of a 280px panel, taken from the content
+       rather than from the chrome. */
+    scrollbar-width: thin;
     padding: 8px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-popover);
