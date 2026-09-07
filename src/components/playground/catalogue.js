@@ -35,7 +35,13 @@ export const OWNED_FAMILIES = [
       match: (n) => /(chip|badge|pill)/.test(n) || /^tag-(filter|pill)/.test(n) },
     { id: 'forms',   label: 'Form controls', match: (n) => /^form-input$/.test(n) },
     { id: 'type',    label: 'Typography',
-      match: (n) => /^(text-(body|data|label|meta|micro|nano|note|secondary)|page-title|section-title|subsection-title)$/.test(n) },
+      match: (n) => /^(text-(body|caption|control|data|label|meta|micro|nano|note|secondary)|page-title|section-title|subsection-title)$/.test(n) },
+    { id: 'notices', label: 'Notices & panels',
+      match: (n) => /^(note-panel|state-panel|drop-zone|empty-state|fixed-action-bar)/.test(n) },
+    { id: 'menus',   label: 'Menus & popovers',
+      match: (n) => /^(menu-button|guide-facet-|disclosure-caret|nav-menu|account-)/.test(n) },
+    { id: 'figures', label: 'Figures — frames, bars, cells',
+      match: (n) => /^(plot-frame|stat-cell|guide-spark|guide-cell-stack|stats-box-|stats-histogram-|run-band|run-cell)/.test(n) },
 ];
 
 /**
@@ -51,6 +57,23 @@ export const NOT_CATALOGUED = {
     'tag-filter-legend': 'The "AND / OR / NOT" key beside the bar, not a control.',
     'run-stat-badges':   'Layout wrapper — a flex row of badges.',
     'guide-chip-count':  'The count suffix inside .guide-chip; shown as part of that specimen.',
+    'text-control': 'A size, not a role — the one step down that control surfaces run at. '
+        + 'It has no colour of its own, so a specimen would be body text at 12px.',
+    'text-caption': 'Shown inside the histogram and run-band composites, which is where it '
+        + 'is actually used: a count beside a heading, an axis end.',
+    'state-panel-title': 'The heading inside a state panel; it takes the panel\'s own '
+        + 'colour rather than restating it, so it is shown by those specimens.',
+    'guide-facet-panel-search': 'The filter box that appears above eight options; shown by '
+        + 'the facet-menu composite only when the list is long enough to need it.',
+    'guide-facet-label': 'Superseded by the menu button — a leftover of the chip wall 5a '
+        + 'replaced, still styling one label in the stats controls.',
+    'guide-facet-values': 'Layout wrapper for a row of chips. The chips are catalogued.',
+    'guide-facet-search': 'Layout wrapper for the search input beside a facet row.',
+    'guide-facet-columns': 'Layout wrapper — a grid of facet columns.',
+    'fixed-action-bar':
+        'position: fixed. A specimen of it would leave the stage and pin itself to the '
+        + 'bottom of the window, over the page it is meant to be illustrating. Its three '
+        + 'intents are the same success / warning / danger triad the state panel shows.',
     'selected-chip-scroll':
         'The capped, scrolling box the selected-vehicle chips sit in. It is a '
         + 'height budget for the sticky header, not a control — a specimen of it '
@@ -99,6 +122,84 @@ export function hasDarkOverride(cls) {
  * checking interaction and focus states, which a div cannot show.
  */
 export const SECTIONS = [
+    {
+        id: 'notices',
+        title: 'Notices & panels',
+        blurb: 'A block carrying an intent. `.note-panel` is the small bordered notice — '
+             + 'warning by default, because most of them are warnings and a notice with no '
+             + 'intent is a paragraph. `.state-panel` is the larger block that says what an '
+             + 'operation is about to do, and whether that is fine.',
+        specimens: [
+            { cls: 'note-panel', as: 'span', label: '⚠ Set the battery capacity to derive charging axes.',
+              note: 'Warning is the default.' },
+            { cls: 'note-panel is-danger', as: 'span', label: 'Could not read that file.' },
+            { cls: 'note-panel is-info', as: 'span', label: '📅 Timestamps detected — will be converted.',
+              note: 'The brand surface, not a status one: nothing is wrong.' },
+            { cls: 'state-panel', as: 'span', label: 'Neutral — nothing to report yet.' },
+            { cls: 'state-panel is-good', as: 'span', label: '✓ Range will be estimated from test data.' },
+            { cls: 'state-panel is-warning', as: 'span', label: 'No SoC column mapped.' },
+            { cls: 'state-panel is-danger', as: 'span', label: '⚠ Map at least one of SoC or Time.' },
+            { cls: 'drop-zone', as: 'span', label: 'Drop a CSV here' },
+            { cls: 'drop-zone is-over', as: 'span', label: 'Drop a CSV here', note: 'While a file is over it.' },
+            { cls: 'empty-state', as: 'span', label: 'No configurations match these filters.' },
+        ],
+    },
+    {
+        id: 'menus',
+        title: 'Menus & popovers',
+        blurb: 'A button that states its value and opens a panel — WAI-ARIA calls it a menu '
+             + 'button. One component (`MenuButton`) behind every one of them: Browse\'s nine '
+             + 'facet menus, the column picker, the statistics measure and group-by. The panel '
+             + 'contents stay with the caller.',
+        specimens: [
+            { cls: 'guide-facet-btn', as: 'button', label: 'Make ▾', note: 'Resting — nothing selected.' },
+            { cls: 'guide-facet-btn active', as: 'button', label: 'Make Rivian ▾', note: 'Narrowing something.' },
+            { cls: 'disclosure-caret', as: 'span', label: '▾',
+              note: 'The glyph that says a thing opens. Secondary at rest, primary on the button\'s hover — it was --color-text-faint, which in dark is the DISABLED colour.' },
+            { composite: 'facet-panel', label: 'Facet menu, open',
+              covers: ['menu-button', 'guide-facet-panel', 'guide-facet-panel-head', 'guide-facet-panel-list', 'guide-facet-panel-foot', 'guide-facet-option', 'guide-facet-option-name', 'guide-facet-option-count', 'guide-facet-btn-value', 'guide-facet-caret'],
+              note: 'A value that would leave nothing is disabled rather than hidden: a make vanishing reads as a bug, a greyed one reads as an answer.' },
+            { cls: 'nav-menu-item', as: 'button', label: 'Charging & Efficiency',
+              note: 'One destination in the collapsed nav. 40px of target — this is the control every other screen is reached through on a phone.' },
+            { cls: 'nav-menu-item active', as: 'button', label: 'EPA' },
+            { cls: 'account-btn signed-in', as: 'button', label: 'G',
+              note: 'Signed in reads differently from signed out at a glance: filled and lettered vs outlined and generic.' },
+            { composite: 'account-menu', label: 'Account menu, open',
+              covers: ['account-menu', 'account-panel', 'account-identity', 'account-email', 'account-row', 'account-segmented', 'account-action'],
+              note: 'What used to sit beside it in the nav bar: the signed-in email, the role, and the unit system. The Sign In button it replaced cost 111px of a 375px phone bar.' },
+            { composite: 'nav-menu', label: 'Nav menu, collapsed',
+              covers: ['nav-menu', 'nav-menu-main', 'nav-menu-sub', 'nav-menu-btn', 'nav-menu-current', 'nav-menu-panel', 'nav-menu-item-hint'],
+              note: 'A gated destination says WHY in the row — a title attribute is invisible on touch, which is the only place this form appears.' },
+        ],
+    },
+    {
+        id: 'figures',
+        title: 'Figures — frames, bars, cells',
+        blurb: 'The marks that carry a measurement. All of them are drawn with positioned '
+             + 'divs against a shared domain rather than a chart library, because each is a '
+             + 'line, a band and a tick — and the axis has to match the data exactly.',
+        specimens: [
+            { composite: 'plot-frame', label: 'Plot frame',
+              covers: ['plot-frame', 'plot-frame-head', 'plot-frame-title', 'plot-frame-subtitle', 'plot-frame-mark'],
+              note: 'The figure boundary a PNG export captures — title, subtitle, and the accent mark.' },
+            { composite: 'stat-cell', label: 'Stat cell',
+              covers: ['stat-cell', 'stat-cell-value', 'stat-cell-unit', 'stat-cell-empty'],
+              note: 'A measured figure with its name above and its unit beside. Unrecorded is a dim dash, never blank.' },
+            { composite: 'distribution-bar', label: 'Distribution bar',
+              covers: ['stats-box-track', 'stats-box-whisker', 'stats-box-iqr', 'stats-box-median'],
+              note: 'Min–max line, IQR band, orange median tick. Every row is drawn against the CORPUS domain, never its own — the lower one is the corpus, which spans by definition.' },
+            { composite: 'sparkline', label: 'Sparkline',
+              covers: ['guide-spark', 'guide-cell-stack'],
+              note: 'The value, then its bar beneath. Soft-to-strong left to right, so a short bar is dimmer as well as shorter.' },
+            { composite: 'histogram', label: 'Histogram',
+              covers: ['stats-histogram', 'stats-histogram-head', 'stats-histogram-plot', 'stats-histogram-bars', 'stats-histogram-bar', 'stats-histogram-axis', 'stats-histogram-median', 'stats-histogram-median-chip', 'stats-histogram-median-value', 'text-caption'],
+              note: 'Four steps of one blue by height; an empty bin gets none of them. The median rides on a chip ABOVE the plot area — never over the bars it measures.' },
+            { composite: 'run-band', label: 'Run band',
+              covers: ['run-bands', 'run-band', 'run-band-label', 'run-band-cells', 'run-cell', 'run-cell-label', 'run-cell-value', 'run-cell-missing', 'run-cell-tags', 'run-cell-action'],
+              note: 'A solid label rail and an auto-fit track grid: as many columns as the run actually records, no padding columns.' },
+        ],
+    },
+
     {
         id: 'buttons',
         title: 'Buttons',
@@ -230,7 +331,13 @@ export function cataloguedClasses() {
             // a trailing hyphen: `text-xs` has no hyphen after `xs`, so a
             // pattern ending in `-` never excluded it and it was reported as a
             // class the stylesheet had lost.
-            for (const c of s.cls.split(/\s+/)) {
+            // A composite renders markup this file cannot see — its JSX lives
+            // in specimens.jsx, out of reach of `scripts/health.js`, which
+            // imports this in plain node. So it DECLARES what it shows. That
+            // is a list to keep in step, and deliberately so: the alternative
+            // is a composite quietly claiming to catalogue whatever it happens
+            // to contain today.
+            for (const c of (s.cls ?? (s.covers ?? []).join(' ')).split(/\s+/).filter(Boolean)) {
                 const isUtility = /^(p|px|py|m|mx|my|w|h)-[\d.]/.test(c)
                     || /^text-(xs|sm|base|lg|xl)$/.test(c)
                     || c === 'active';

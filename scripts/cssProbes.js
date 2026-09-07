@@ -227,7 +227,7 @@ export const LEDGER = [
     },
     {
         key: 'unreferenced',
-        count: 21,
+        count: 20,
         what: 'classes the stylesheet defines that no source file names. Dead rules are '
             + 'invisible to the compiler, the linter and the tests alike.',
         fix: 'delete it, or add it to CONSTRUCTED with the template that builds it.',
