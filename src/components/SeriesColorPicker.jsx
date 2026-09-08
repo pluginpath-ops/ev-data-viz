@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import Popover from './Popover';
 import {
     SERIES_PALETTES, DEFAULT_RUN_COLOR, seriesColorNote, isUnsetColor, sameHex,
@@ -139,6 +139,11 @@ function PickerPanel({
     close, plotted, stored, onChange, onReset, autoInForce,
     scoped, seriesId, vehicleId, series, onApplyMany,
 }) {
+    // Radios group by `name`, so two pickers open at once would share a group
+    // and fight. They cannot both be open today — the popover is one at a time
+    // — but a name that is only unique by luck is a bug waiting for a second
+    // caller.
+    const panelId = useId();
     const [paletteId, setPaletteId] = useState(SERIES_PALETTES[0].id);
 
     // Two axes, not one. SCOPE says who a pick reaches; DERIVATION says what it
@@ -147,11 +152,7 @@ function PickerPanel({
     // recolour a vehicle. It is not: telling four tests of ONE car apart wants
     // maximum contrast for the same reason telling four cars apart does.
     const [scope, setScope] = useState('test');
-    const [how, setHow] = useState(DERIVATION_DEFAULTS.vehicle);
-    const pickScope = (id) => {
-        setScope(id);
-        setHow(DERIVATION_DEFAULTS[id] ?? DERIVATION_DEFAULTS.vehicle);
-    };
+    const [mode, setMode] = useState('shades');
 
     // ── HSL is the model; the hex is a projection of it ─────────────────────
     //
@@ -193,19 +194,27 @@ function PickerPanel({
 
     const handSet = targets.filter(t => !isUnsetColor(t.stored)).length;
 
-    // ── What the rotation is indexing ───────────────────────────────────────
+    // ── Three outcomes, one choice ──────────────────────────────────────────
     //
-    // Shading is what makes rotation a per-VEHICLE thing. With it on, each
-    // vehicle takes the next colour and its tests step along that one; with it
-    // off there is no inner group left, so the rotation lands on each test
-    // directly. The row therefore cannot carry a fixed label without being
-    // wrong half the time — it said "A color per vehicle" while sitting alone
-    // at the vehicle scope, where there is exactly one vehicle.
+    // This was two independent toggles with an "at least one" rule, which made
+    // the first row's label depend on the second row's state: rotation means
+    // per-vehicle when shading groups it and per-test when nothing does. That
+    // is a relationship a reader had to derive from two controls before knowing
+    // what either would do. There are only ever three answers, so they are
+    // three answers now, and each says its own name.
     //
-    // An inactive row states what it WOULD do, not what is happening, which is
-    // the only way a greyed option can be worth reading.
+    // "A color per vehicle" needs more than one vehicle to mean anything, so it
+    // is only offered when there is one — which is also why the vehicle scope
+    // shows two options rather than three.
     const vehicleCount = new Set(targets.map(t => t.vehicleId)).size;
-    const perVehicle = how.shade && vehicleCount > 1;
+    const options = DERIVATIONS.filter(d => !d.needsVehicles || vehicleCount > 1);
+    const how = (DERIVATIONS.find(d => d.id === mode) ?? DERIVATIONS[0]).how;
+
+    // A scope change can take the current answer off the menu.
+    const pickScope = (id) => {
+        setScope(id);
+        setMode(id === 'all' ? 'family' : 'shades');
+    };
 
     // Auto answers for the SCOPE. Asking only about this series said "the
     // palette is choosing" while twelve other rows in the selected scope were
@@ -220,6 +229,11 @@ function PickerPanel({
         () => (targets.length ? seedPlot(base, targets, how, palette.colors) : null),
         [targets, base, how, palette],
     );
+
+    // Chosen "family" and then narrowed the scope to one vehicle: the answer is
+    // no longer on the menu, so fall back rather than silently doing something
+    // the panel is not showing as selected.
+    const active = options.some(o => o.id === mode) ? mode : options[options.length - 1].id;
 
     // "All tests" states its blast radius before it will commit; the other two
     // commit on click, because one series and one vehicle are both undoable by
@@ -240,16 +254,6 @@ function PickerPanel({
         if (scope === 'test' || !targets.length) onReset();
         else onApplyMany(Object.fromEntries(targets.map(t => [t.id, null])));
         close();
-    };
-
-    const toggleHow = (key) => {
-        // At the widest scope the two are independent and both is the default —
-        // a vehicle per colour, a test per step. Narrower, they are a choice
-        // between, since one vehicle has nothing to rotate through.
-        if (scope !== 'all') { setHow({ rotate: key === 'rotate', shade: key === 'shade' }); return; }
-        const next = { ...how, [key]: !how[key] };
-        if (!next.rotate && !next.shade) return;
-        setHow(next);
     };
 
     const ratio = ratioOf(base, chartTheme().background);
@@ -347,25 +351,18 @@ function PickerPanel({
                         onChange={l => nudge({ l })} />
 
                     {targets.length > 1 && (
-                        <div className="color-seed">
-                            <SeedRow
-                                name={perVehicle ? 'A color per vehicle' : 'A color per test'}
-                                hint={perVehicle
-                                    ? 'Each vehicle takes the next color of the rotation'
-                                    : 'Each test takes the next color of the rotation'}
-                                colors={rotatePaletteFrom(base, palette.colors, 4).slice(0, 4)}
-                                active={how.rotate}
-                                onSelect={() => toggleHow('rotate')}
-                            />
-                            <SeedRow
-                                name="A shade per test"
-                                hint={how.rotate && vehicleCount > 1
-                                    ? 'Each test of one vehicle takes a step along its color'
-                                    : 'Each test takes a step along the one color'}
-                                colors={rampFrom(base, 4)}
-                                active={how.shade}
-                                onSelect={() => toggleHow('shade')}
-                            />
+                        <div className="color-seed" role="radiogroup" aria-label="How to color the set">
+                            {options.map(o => (
+                                <SeedRow
+                                    key={o.id}
+                                    group={`${panelId}-derivation`}
+                                    name={o.name}
+                                    hint={o.hint}
+                                    colors={o.preview(base, palette.colors)}
+                                    active={o.id === active}
+                                    onSelect={() => setMode(o.id)}
+                                />
+                            ))}
                         </div>
                     )}
                 </div>
@@ -412,15 +409,40 @@ function PickerPanel({
 }
 
 /**
- * What each scope starts out doing. One vehicle has nothing to rotate through,
- * so it shades; the whole plot does both, which is 3c — a color per vehicle and
- * a shade per test.
+ * Every way a base can seed a set, as named outcomes.
+ *
+ * Each carries its own preview, and the previews are structurally honest rather
+ * than decorative: "a color per vehicle" shows two hues with two steps each,
+ * because that is the shape of what it does. It is the preview that lets the
+ * label stay short enough to fit on one line at 300px.
  */
-const DERIVATION_DEFAULTS = {
-    test:    { rotate: false, shade: true },
-    vehicle: { rotate: false, shade: true },
-    all:     { rotate: true,  shade: true },
-};
+const DERIVATIONS = [
+    {
+        id: 'distinct',
+        name: 'A color per test',
+        hint: 'Every test takes its own color from the palette',
+        how: { rotate: true, shade: false },
+        preview: (base, colors) => rotatePaletteFrom(base, colors, 4).slice(0, 4),
+    },
+    {
+        id: 'family',
+        name: 'A color per vehicle',
+        hint: 'Each vehicle takes the next color; its own tests step along it',
+        how: { rotate: true, shade: true },
+        needsVehicles: true,
+        preview: (base, colors) => {
+            const [a, b] = rotatePaletteFrom(base, colors, 2);
+            return [...rampFrom(a, 2), ...rampFrom(b, 2)];
+        },
+    },
+    {
+        id: 'shades',
+        name: 'Shades of one color',
+        hint: 'Everything shares one color, a step apart per test',
+        how: { rotate: false, shade: true },
+        preview: (base) => rampFrom(base, 4),
+    },
+];
 
 /** Names what "Back to auto" would release, so the button cannot mislead. */
 function scopeSuffix(scope, count) {
@@ -462,30 +484,37 @@ function Slider({ label, min, max, value, onChange, track, hue = 0, sat = 100, l
 }
 
 /**
- * One derivation, previewed AND selectable — the preview is the control, so
- * there is no separate list of options saying the same thing twice.
+ * One outcome: a real radio, its name, and a preview of what it produces.
+ *
+ * A NATIVE `<input type="radio">` rather than a styled button with
+ * `aria-pressed`. Three mutually exclusive answers is exactly what the element
+ * is for, and using it means arrow-key navigation within the group, the
+ * radiogroup semantics and the focus ring all arrive without being written —
+ * and a later pass at the app's radio styling reaches this for free, since
+ * there is almost nothing here to override.
+ *
+ * The preview sits on the right and is structurally honest: "a color per
+ * vehicle" shows two hues with two steps each, because that is the shape of
+ * what it does. Carrying the nuance there is what lets the label stay short
+ * enough to fit one line at 300px.
  */
-function SeedRow({ name, hint, colors, active, onSelect }) {
+function SeedRow({ group, name, hint, colors, active, onSelect }) {
     return (
-        <button
-            type="button"
-            title={hint}
-            aria-pressed={active}
-            className={`color-row color-seed-row${active ? ' is-active' : ''}`}
-            onClick={onSelect}
-        >
-            {/* Mark and chips in ONE box, so the swatches start at the same x on
-                both rows. Left loose as siblings of the label they were spaced
-                by `justify-between`, which distributes across three children —
-                so the chips drifted with the length of the name beside them. */}
-            <span className="color-seed-lead">
-                <span className="color-seed-tick" aria-hidden="true">{active ? '☑' : '☐'}</span>
+        <label className={`color-row color-seed-row${active ? ' is-active' : ''}`} title={hint}>
+            <input
+                type="radio"
+                name={group}
+                checked={active}
+                onChange={onSelect}
+                className="color-seed-radio"
+            />
+            <span className="color-seed-name">{name}</span>
+            <span className="color-seed-chips">
                 {colors.map((c, i) => (
                     <span key={`${c}-${i}`} className="series-swatch" style={{ backgroundColor: c }} />
                 ))}
             </span>
-            <span className="text-nano">{name}</span>
-        </button>
+        </label>
     );
 }
 

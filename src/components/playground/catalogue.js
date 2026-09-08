@@ -191,7 +191,7 @@ export const SECTIONS = [
               covers: ['popover-anchor', 'popover-foot', 'series-swatch--button',
                        'color-picker-body', 'color-row', 'color-scope', 'color-switch',
                        'color-slots', 'color-slot', 'color-hex', 'color-hex-chip',
-                       'color-auto', 'color-manual', 'color-seed-tick', 'color-seed-lead',
+                       'color-auto', 'color-manual', 'color-seed-radio', 'color-seed-name',
                        'color-slider', 'color-slider-input', 'color-seed', 'color-seed-row',
                        'color-seed-chips', 'color-readout', 'color-warning', 'color-note'],
               note: 'The one live specimen on this page, because a picker is a mechanism rather than an appearance. It replaced five <input type="color"> boxes — the browser\'s own dialog, one colour at a time, with no view of the set you are picking against. A pick here is a BASE: it becomes slot 1 and the rest of the set is re-derived from it, by rotation across hues or by lightness steps along one. Scope decides who that set is. Nothing at any scope reaches the database. Cancel, ×, Escape and an outside click all discard.' },
