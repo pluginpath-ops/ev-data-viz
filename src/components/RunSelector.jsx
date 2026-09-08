@@ -265,7 +265,10 @@ export default function RunSelector({
                                     className="vehicle-run-group"
                                     style={{ '--group-accent': accentFor(filteredRuns) ?? 'transparent' }}
                                 >
-                                    <div className="flex items-center gap-2 mb-2">
+                                    {/* mb-1.5, not mb-2: this margin is a third of
+                                        the distance between the accent strip's top
+                                        and the first row it is describing. */}
+                                    <div className="flex items-center gap-2 mb-1.5">
                                         <button
                                             onClick={() => toggleVehicle(vehicle.id)}
                                             className="flex items-center gap-1.5 text-left group"

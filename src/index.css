@@ -3044,9 +3044,19 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-primary);
 }
 
-/* Vehicle group list inside the run selector */
+/* Vehicle group list inside the run selector.
+ *
+ * gap-3, not gap-2: the group cards gave up 5px of internal padding, and the
+ * space is worth more between them than inside, where it only pushed the accent
+ * away from the first row.
+ *
+ * Between them it does a job nothing else can. Two stacked groups each carry an
+ * accent strip on the same 3px column, so when one vehicle's last colour is
+ * close to the next vehicle's first, the two bars meet and read as a single
+ * unbroken run down the rail. A couple of extra pixels is what keeps them two
+ * bars. */
 .runs-list {
-    @apply flex flex-col gap-2;
+    @apply flex flex-col gap-3;
 }
 
 /* Per-vehicle group. A card carrying the vehicle's series colour on its left
@@ -3072,7 +3082,12 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
        everything above it lines up on, and a run card inset from that read as a
        card inside a card — so the rows reach it too. */
     margin-left: -12px;
-    padding: 6px 0 7px 12px;
+    /* 4px, down from 6/7. Insetting the accent strip instead moved it by too few
+       pixels to see; the pixels the eye actually reads are the ones between the
+       strip's top and the first row, and those were padding. The card gave up
+       5px, and the space went to the gap BETWEEN cards, where it separates one
+       vehicle from the next rather than padding the inside of one. */
+    padding: 4px 0 4px 12px;
     background-color: var(--color-card);
 }
 
@@ -3084,6 +3099,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .vehicle-run-group::before {
     content: '';
     position: absolute;
+    /* The full card, edge to edge. An inset strip was tried and read as a stray
+       tail at both ends: the bar's job is to say how far the group extends, so
+       stopping short of the card is the one thing it must not do. */
     top: 0;
     bottom: 0;
     left: -3px;
