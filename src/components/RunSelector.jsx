@@ -352,9 +352,10 @@ function PairRows({
                         <RunColorControl
                             run={run}
                             vehicleId={vehicle.id}
+                            vehicleName={vehicle.name}
                             onUpdateRunColor={onUpdateRunColor}
-                                                        onUpdateRunColors={onUpdateRunColors}
-                                                        colorSeries={colorSeries}
+                            onUpdateRunColors={onUpdateRunColors}
+                            colorSeries={colorSeries}
                             colorMap={colorMap}
                         />
                     )}
@@ -367,9 +368,10 @@ function PairRows({
                             <RunColorControl
                                 run={run}
                                 vehicleId={vehicle.id}
+                                vehicleName={vehicle.name}
                                 onUpdateRunColor={onUpdateRunColor}
-                                                        onUpdateRunColors={onUpdateRunColors}
-                                                        colorSeries={colorSeries}
+                                onUpdateRunColors={onUpdateRunColors}
+                                colorSeries={colorSeries}
                                 colorMap={colorMap}
                             />
                             <span className="truncate">{run.name}</span>
@@ -479,7 +481,7 @@ function PairRows({
  * here is a SESSION override and reaches no database, and that "Auto" means
  * handing the run back to the palette rather than clearing a stored value.
  */
-function RunColorControl({ run, vehicleId, onUpdateRunColor, onUpdateRunColors, colorSeries, colorMap = {} }) {
+function RunColorControl({ run, vehicleId, vehicleName, onUpdateRunColor, onUpdateRunColors, colorSeries, colorMap = {} }) {
     if (!onUpdateRunColor) return null;
     // Synthetic rows (the EPA range option) have no run behind them to colour.
     if (run._synthetic) return null;
@@ -496,6 +498,7 @@ function RunColorControl({ run, vehicleId, onUpdateRunColor, onUpdateRunColors, 
             // apart most — Auto Color assigns over the top of every one of them.
             stored={run.color}
             label={run.name}
+            vehicleName={vehicleName}
             onChange={hex => onUpdateRunColor(vehicleId, run.id, hex)}
             onReset={() => onUpdateRunColor(vehicleId, run.id, null)}
             seriesId={run.id}
@@ -530,9 +533,10 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, onUpdateR
                 <RunColorControl
                     run={run}
                     vehicleId={vehicle.id}
+                    vehicleName={vehicle.name}
                     onUpdateRunColor={onUpdateRunColor}
-                                                        onUpdateRunColors={onUpdateRunColors}
-                                                        colorSeries={colorSeries}
+                    onUpdateRunColors={onUpdateRunColors}
+                    colorSeries={colorSeries}
                     colorMap={colorMap}
                 />
                 <span className="truncate">{run.name}</span>

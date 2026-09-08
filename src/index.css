@@ -4083,6 +4083,19 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply flex items-center gap-2;
     border-top: 1px solid var(--color-border);
 }
+/* The actions keep their width and the label gives up its own. A commit button
+   that wraps to two lines is a commit button that changed the panel's height
+   the moment the scope changed. */
+.popover-foot > .btn {
+    @apply flex-none;
+    white-space: nowrap;
+}
+.popover-foot > .text-nano {
+    @apply min-w-0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 /* Pushes the confirming pair right and leaves anything before it — "Auto" —
    on the left, away from the button that commits. */
 .popover-foot-gap { @apply flex-1; }
@@ -4158,14 +4171,24 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .color-manual.is-idle:hover,
 .color-manual.is-idle:focus-within { opacity: 1; }
 
-/* A checkbox glyph, only where the two derivations are independent. */
+/* Mark + chips as one block, so both rows start their swatches at the same x.
+   The mark shows in BOTH scopes: they differ in behaviour — one-of against
+   either-or-both — not in appearance, and a control that changes shape when
+   its rules change is a control you have to re-learn. */
+.color-seed-lead {
+    @apply flex items-center gap-1 flex-none;
+}
 .color-seed-tick {
     font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    line-height: 1;
     color: var(--color-text-meta);
-    margin-right: 4px;
+    margin-right: 3px;
 }
+.color-seed-row.is-active .color-seed-tick { color: var(--color-primary); }
 
+.color-switch { @apply block; }
 .color-switch select {
+    width: 100%;
     padding: 1px 4px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-mark);

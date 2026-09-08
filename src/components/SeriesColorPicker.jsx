@@ -63,6 +63,7 @@ export default function SeriesColorPicker({
     onChange,
     onReset = null,
     label = '',
+    vehicleName = '',
     seriesId = null,
     vehicleId = null,
     series = null,
@@ -79,7 +80,12 @@ export default function SeriesColorPicker({
     return (
         <Popover
             className={className}
-            title={label ? `Color — ${label}` : 'Series color'}
+            // No "Color —" prefix: a panel of swatches and a hue slider is not
+            // ambiguous about what it is, and the words cost the room the
+            // vehicle needs. The vehicle IS worth carrying — a test called
+            // "Supercharger (EST)" says nothing about which car it belongs to,
+            // and the wider scopes act on a vehicle by name.
+            title={[vehicleName, label].filter(Boolean).join(' · ') || 'Series color'}
             // One width everywhere: the rail, Tests & Data and a chip all get
             // the same panel, so it never reflows to suit its anchor.
             width="300px"
@@ -161,7 +167,6 @@ function PickerPanel({
     // takes Auto out of force — live, before anything commits, so the panel
     // stops claiming a state you have already left.
     const [touched, setTouched] = useState(false);
-    const auto = autoInForce && !touched;
 
     const setBase = (hex) => { setTouched(true); setBaseHex(hex); setHsl(hexToHsl(hex)); };
     const nudge = (patch) => {
@@ -187,7 +192,15 @@ function PickerPanel({
     }, [scoped, scope, series, vehicleId, seriesId]);
 
     const handSet = targets.filter(t => !isUnsetColor(t.stored)).length;
-    const vehicleCount = new Set(targets.map(t => t.vehicleId)).size;
+
+    // Auto answers for the SCOPE. Asking only about this series said "the
+    // palette is choosing" while twelve other rows in the selected scope were
+    // being held by hand — true of the swatch you opened, and wrong about the
+    // button's own reach.
+    const scopeAuto = scope === 'test' || !targets.length
+        ? autoInForce
+        : targets.every(t => t.auto);
+    const auto = scopeAuto && !touched;
 
     const derived = useMemo(
         () => (targets.length ? seedPlot(base, targets, how, palette.colors) : null),
@@ -258,25 +271,25 @@ function PickerPanel({
                             ? 'The palette is choosing this colour'
                             : 'Hand it back to the palette'}
                     >
-                        {auto ? 'Auto — the palette is choosing' : `Back to auto${scopeSuffix(scope, targets.length)}`}
+                        {auto ? autoOnLabel(scope, targets.length) : `Back to auto${scopeSuffix(scope, targets.length)}`}
                     </button>
                 )}
 
                 {/* Dimmed while Auto holds, not disabled: touching anything here
                     IS how you take it off auto, so it must stay reachable. */}
                 <div className={`color-manual${auto ? ' is-idle' : ''}`}>
-                    <div className="color-row">
-                        <span className="text-nano">Palette · {palette.label}</span>
-                        <label className="color-switch">
-                            <select value={paletteId} onChange={e => setPaletteId(e.target.value)} aria-label="Palette">
-                                {SERIES_PALETTES.map(p => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.label}{p.safe ? '' : ' (not colorblind-safe)'}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                    </div>
+                    {/* No label beside it. The select already reads "Okabe-Ito";
+                        saying it twice cost a line to wrapping and told nobody
+                        anything. */}
+                    <label className="color-switch">
+                        <select value={paletteId} onChange={e => setPaletteId(e.target.value)} aria-label="Palette">
+                            {SERIES_PALETTES.map(p => (
+                                <option key={p.id} value={p.id}>
+                                    {p.label}{p.safe ? '' : ' (not colorblind-safe)'}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
 
                     <div className="color-slots" role="group" aria-label={`${palette.label} palette`}>
                         {palette.colors.map((hex, i) => (
@@ -326,7 +339,6 @@ function PickerPanel({
                                 hint="Each vehicle takes the next color of the rotation"
                                 colors={rotatePaletteFrom(base, palette.colors, 4).slice(0, 4)}
                                 active={how.rotate}
-                                multi={armed}
                                 onSelect={() => toggleHow('rotate')}
                             />
                             <SeedRow
@@ -334,7 +346,6 @@ function PickerPanel({
                                 hint="Each test of one vehicle takes a step along its color"
                                 colors={rampFrom(base, 4)}
                                 active={how.shade}
-                                multi={armed}
                                 onSelect={() => toggleHow('shade')}
                             />
                         </div>
@@ -350,21 +361,24 @@ function PickerPanel({
                     )}
                 </div>
 
-                {armed && (
+                {/* One line, and only when there is something to lose. The
+                    button already says how many series are reseeded; what a
+                    reader cannot see is how much of it was chosen by a person. */}
+                {armed && handSet > 0 && (
                     <p className="color-warning">
-                        Reseeds {targets.length} plotted series
-                        {how.rotate && how.shade && vehicleCount > 1
-                            ? ` across ${vehicleCount} vehicles`
-                            : ''} from this base.
-                        {handSet > 0 && ` ${handSet} carr${handSet === 1 ? 'ies' : 'y'} a color someone set by hand. Those get overwritten.`}
+                        {handSet} hand-set color{handSet === 1 ? '' : 's'} will be overwritten
                     </p>
                 )}
             </div>
 
             <div className="popover-foot">
                 {/* Said out loud, because the whole panel turns on it: nothing
-                    here reaches the database, at any scope or any role. */}
-                <span className="text-nano">Session override</span>
+                    here reaches the database, at any scope or any role. Two
+                    words, not four — at 300px "Session override" wrapped to two
+                    lines and took the commit button with it. */}
+                <span className="text-nano" title="Nothing here is saved — it applies to this session only">
+                    Session only
+                </span>
                 <span className="popover-foot-gap" />
                 <button type="button" className="btn btn-secondary" onClick={close}>Cancel</button>
                 <button
@@ -397,6 +411,12 @@ function scopeSuffix(scope, count) {
     return '';
 }
 
+/** And what it is already true OF, for the same reason. */
+function autoOnLabel(scope, count) {
+    if (scope === 'test' || !count) return 'Auto — the palette is choosing';
+    return `Auto — all ${count} on the palette`;
+}
+
 /**
  * A labelled range whose track shows what it controls. The hue track is the
  * spectrum; the lightness track is the CURRENT hue from black to white, so the
@@ -427,7 +447,7 @@ function Slider({ label, min, max, value, onChange, track, hue = 0, sat = 100, l
  * One derivation, previewed AND selectable — the preview is the control, so
  * there is no separate list of options saying the same thing twice.
  */
-function SeedRow({ name, hint, colors, active, onSelect, multi = false }) {
+function SeedRow({ name, hint, colors, active, onSelect }) {
     return (
         <button
             type="button"
@@ -436,8 +456,12 @@ function SeedRow({ name, hint, colors, active, onSelect, multi = false }) {
             className={`color-row color-seed-row${active ? ' is-active' : ''}`}
             onClick={onSelect}
         >
-            {multi && <span className="color-seed-tick" aria-hidden="true">{active ? '☑' : '☐'}</span>}
-            <span className="color-seed-chips">
+            {/* Mark and chips in ONE box, so the swatches start at the same x on
+                both rows. Left loose as siblings of the label they were spaced
+                by `justify-between`, which distributes across three children —
+                so the chips drifted with the length of the name beside them. */}
+            <span className="color-seed-lead">
+                <span className="color-seed-tick" aria-hidden="true">{active ? '☑' : '☐'}</span>
                 {colors.map((c, i) => (
                     <span key={`${c}-${i}`} className="series-swatch" style={{ backgroundColor: c }} />
                 ))}
