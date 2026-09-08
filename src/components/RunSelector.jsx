@@ -5,6 +5,18 @@ import SeriesColorPicker from './SeriesColorPicker';
 import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 
 /**
+ * The colour a row is drawn in: an Okabe-Ito slot in auto mode, a session
+ * override where one was set, the stored preference otherwise.
+ *
+ * A function rather than the expression written twice, because the second
+ * reader of it is the group's accent border — and an accent that claims to be
+ * a row's colour while computing it differently is the bug this file just had.
+ */
+function plottedColorOf(run, colorMap) {
+    return colorMap[run.id] || run.color || DEFAULT_RUN_COLOR;
+}
+
+/**
  * Shared collapsible run selector used by ChargingView, RangeChartView,
  * ChargeCompareView, and RoadTripView.
  *
@@ -101,6 +113,51 @@ export default function RunSelector({
         setCollapsedVehicles(prev => ({ ...prev, [vehicleId]: !prev[vehicleId] }));
 
     const isSelected = (run) => selectedRunIds.some(id => String(id) === String(run.id));
+
+    /**
+     * Is any row of this run on the chart? Pair mode plots a run once per
+     * partner, so it asks about the PAIR keys — the same keys the bulk helper
+     * computes, because a group's edge and its "none" link have to agree about
+     * what "active" means.
+     */
+    const isRunActive = (run) => {
+        if (!pairMode || singlePartner) return isSelected(run);
+        return partnerRowsFor(run).some(partnerId =>
+            selectedRunIds.some(id => String(id) === pairKey(run.id, partnerId)));
+    };
+
+    /**
+     * The colour a vehicle's group edge carries: the tests of its that are
+     * ACTUALLY on the chart, and nothing at all when none of them are.
+     *
+     * `.vehicle-run-group` was written for "the vehicle's series colour — the
+     * only thing in the selector that is also on the plot", and for as long as
+     * this component has existed it passed the brand blue instead, so the edge
+     * said the same thing about every car. On EPA Curves, which did supply a
+     * colour, it was worse than uniform: it kept the palette's first answer
+     * after the rows had been recoloured by hand, naming a colour that was on
+     * no line.
+     *
+     * Anchoring it to the active rows is what keeps the promise. It reads their
+     * plotted colours through the same function the swatches do, so the two
+     * cannot come apart again, and an edge over a group with nothing selected
+     * has no series to name — so it goes, rather than falling back to a colour
+     * that would be a claim about a plot the vehicle is not on.
+     *
+     * Several active tests fade across all of them rather than taking the
+     * first: a vehicle contributing four lines in four colours is not
+     * represented by any one of them, and the edge is the only place the group
+     * as a whole can be said. Returned as a `background` value — one colour or
+     * a gradient — which is why the strip is painted rather than a border.
+     */
+    const accentFor = (runs) => {
+        // Nothing plots a synthetic row, so it has no colour to speak for.
+        const active = runs
+            .filter(run => !run._synthetic && isRunActive(run))
+            .map(run => plottedColorOf(run, colorMap));
+        if (!active.length) return null;
+        return active.length === 1 ? active[0] : `linear-gradient(180deg, ${active.join(', ')})`;
+    };
 
     /**
      * The partner rows for one charging run: whatever the user pinned, or a
@@ -203,8 +260,15 @@ export default function RunSelector({
                             const filteredRuns = primaryRunsFor(vehicle);
 
                             return (
-                                <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: 'var(--color-primary)' }}>
-                                    <div className="flex items-center gap-2 mb-2">
+                                <div
+                                    key={vehicle.id}
+                                    className="vehicle-run-group"
+                                    style={{ '--group-accent': accentFor(filteredRuns) ?? 'transparent' }}
+                                >
+                                    {/* mb-1.5, not mb-2: this margin is a third of
+                                        the distance between the accent strip's top
+                                        and the first row it is describing. */}
+                                    <div className="flex items-center gap-2 mb-1.5">
                                         <button
                                             onClick={() => toggleVehicle(vehicle.id)}
                                             className="flex items-center gap-1.5 text-left group"
@@ -486,9 +550,7 @@ function RunColorControl({ run, vehicleId, vehicleName, onUpdateRunColor, onUpda
     // Synthetic rows (the EPA range option) have no run behind them to colour.
     if (run._synthetic) return null;
 
-    // The colour actually on the chart: an Okabe-Ito slot in auto mode, a session
-    // override if one was set, the stored preference otherwise.
-    const plotted = colorMap[run.id] || run.color || DEFAULT_RUN_COLOR;
+    const plotted = plottedColorOf(run, colorMap);
 
     return (
         <SeriesColorPicker

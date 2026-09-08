@@ -3044,16 +3044,31 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-primary);
 }
 
-/* Vehicle group list inside the run selector */
+/* Vehicle group list inside the run selector.
+ *
+ * gap-3, not gap-2: the group cards gave up 5px of internal padding, and the
+ * space is worth more between them than inside, where it only pushed the accent
+ * away from the first row.
+ *
+ * Between them it does a job nothing else can. Two stacked groups each carry an
+ * accent strip on the same 3px column, so when one vehicle's last colour is
+ * close to the next vehicle's first, the two bars meet and read as a single
+ * unbroken run down the rail. A couple of extra pixels is what keeps them two
+ * bars. */
 .runs-list {
-    @apply flex flex-col gap-2;
+    @apply flex flex-col gap-3;
 }
 
 /* Per-vehicle group. A card carrying the vehicle's series colour on its left
    edge, so the group ties to the same vehicle on every chart — the colour is
    the only thing in the selector that is also on the plot. */
 .vehicle-run-group {
-    border-left: 3px solid;
+    position: relative;
+    /* Transparent, and painted by ::before instead — see below. Kept as a
+       BORDER rather than deleted so the group's geometry is unchanged, and so a
+       caller that still sets `border-color` inline (the performance selector)
+       goes on working with no pseudo-element at all. */
+    border-left: 3px solid transparent;
     /* Square on the colour side. A rounded bar reads as decoration on a pill; a
        hard one reads as an accent border the row hangs off, which is what it is. */
     border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
@@ -3067,8 +3082,31 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
        everything above it lines up on, and a run card inset from that read as a
        card inside a card — so the rows reach it too. */
     margin-left: -12px;
-    padding: 6px 0 7px 12px;
+    /* 4px, down from 6/7. Insetting the accent strip instead moved it by too few
+       pixels to see; the pixels the eye actually reads are the ones between the
+       strip's top and the first row, and those were padding. The card gave up
+       5px, and the space went to the gap BETWEEN cards, where it separates one
+       vehicle from the next rather than padding the inside of one. */
+    padding: 4px 0 4px 12px;
     background-color: var(--color-card);
+}
+
+/* The accent as a painted strip rather than a border colour.
+   A border takes ONE colour, and one colour cannot say "these three lines are
+   this car" once a vehicle has several tests on the chart in different colours.
+   `--group-accent` is a background, so it holds either a single colour or a
+   gradient across every colour the vehicle is currently drawn in. */
+.vehicle-run-group::before {
+    content: '';
+    position: absolute;
+    /* The full card, edge to edge. An inset strip was tried and read as a stray
+       tail at both ends: the bar's job is to say how far the group extends, so
+       stopping short of the card is the one thing it must not do. */
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    width: 3px;
+    background: var(--group-accent, transparent);
 }
 
 /* ── Customize routing ──────────────────────────────────────────────────────
@@ -3247,11 +3285,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-size: calc(var(--fs-body) * 0.7857);
     font-weight: 500;
     color: var(--color-text-meta);
-}
-
-/* Run name area: text + source link arrows + date/status badges */
-.run-label {
-    @apply flex-1 flex items-center gap-2 flex-wrap;
 }
 
 /* ↗ to the video/article a test came from. Attribution, so it is deliberately

@@ -170,7 +170,7 @@ function scanCss(key, test) {
 export const LEDGER = [
     {
         key: 'palette-text',
-        count: 198,
+        count: 194,
         scope: 'src/**/*.jsx',
         what: 'Text colours written as Tailwind palette utilities. These sit outside '
             + 'the theme: when the re-skin re-valued the tokens, every one of these '
@@ -181,7 +181,7 @@ export const LEDGER = [
     },
     {
         key: 'palette-bg',
-        count: 38,
+        count: 34,
         scope: 'src/**/*.jsx',
         what: 'Background fills written as palette utilities. The subset of these that '
             + 'are LIGHT fills with no dark counterpart is separately ratcheted as '
@@ -193,7 +193,7 @@ export const LEDGER = [
     },
     {
         key: 'palette-border',
-        count: 34,
+        count: 30,
         scope: 'src/**/*.jsx',
         what: 'Border colours written as palette utilities.',
         fix: '--color-border, --color-border-strong, --color-border-subtle.',
