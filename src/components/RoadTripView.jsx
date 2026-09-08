@@ -24,6 +24,7 @@ import {
 import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
+import { seriesRowsOf } from '../utils/colorUtils';
 import { resolvePairColors } from '../utils/colorUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import ChartInfoBubble from './ChartInfoBubble';
@@ -615,7 +616,7 @@ export default function RoadTripView({
         () => selectedVehicles.flatMap(v => filterRangeRuns(v.runs)),
         [selectedVehicles]
     );
-    const { colorMap, setColorOverride } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides } = useStickyChartColors(colorableRuns, {
         autoColor,
         resetKey: selectedVehicleIds.join(','),
     });
@@ -1775,6 +1776,8 @@ export default function RoadTripView({
                             selectedRunIds={selectedRunIds}
                             onToggleRun={toggleRunId}
                             onUpdateRunColor={(_vehicleId, runId, color) => setColorOverride(runId, color)}
+                            colorSeries={seriesRowsOf(runEntries.map(e => e.rangeRun), selectedVehicles)}
+                            onUpdateRunColors={setColorOverrides}
                             colorMap={colorMap}
                             runFilter={(run, vehicle) =>
                                 isRangeRun(run) && filterChargingRuns(vehicle.runs).length > 0}

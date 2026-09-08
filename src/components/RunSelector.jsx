@@ -13,6 +13,12 @@ import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
  *   selectedRunIds  — array of selected run IDs (pair keys in pair mode)
  *   onToggleRun     — (runId | pairKey) => void
  *   onUpdateRunColor — (vehicleId, runId, color) => void, or null to hide color inputs
+ *   onUpdateRunColors — (map) => void, a whole derived set at once. Supplying
+ *                     it WITH colorSeries is what puts the scope control in the
+ *                     colour panel; without both, a pick is one series
+ *   colorSeries     — [{id, vehicleId, stored}] for everything plotted, from
+ *                     colorUtils.seriesRowsFor. What "this vehicle" and "all
+ *                     tests" are allowed to touch
  *   runFilter       — (run, vehicle) => boolean — which runs to show per vehicle
  *   emptyMessage    — string shown when no runs pass the filter for a vehicle
  *   renderRunBadges — optional (run) => ReactNode — IDENTITY markers, on the
@@ -57,6 +63,8 @@ export default function RunSelector({
     selectedRunIds,
     onToggleRun,
     onUpdateRunColor = null,
+    onUpdateRunColors = null,
+    colorSeries = null,
     runFilter,
     emptyMessage = 'No runs',
     renderRunBadges = null,
@@ -245,6 +253,8 @@ export default function RunSelector({
                                                         onAddPartner={onAddPartner}
                                                         onRemovePartner={onRemovePartner}
                                                         onUpdateRunColor={onUpdateRunColor}
+                                                        onUpdateRunColors={onUpdateRunColors}
+                                                        colorSeries={colorSeries}
                                                         renderRunBadges={renderRunBadges}
                                                         renderRunMeta={renderRunMeta}
                                                         colorMap={colorMap}
@@ -257,6 +267,8 @@ export default function RunSelector({
                                                         isChecked={isSelected(run)}
                                                         onToggle={() => onToggleRun(run.id)}
                                                         onUpdateRunColor={onUpdateRunColor}
+                                                        onUpdateRunColors={onUpdateRunColors}
+                                                        colorSeries={colorSeries}
                                                         renderRunBadges={renderRunBadges}
                                                         renderRunMeta={renderRunMeta}
                                                         colorMap={colorMap}
@@ -287,7 +299,7 @@ function PairRows({
     run, vehicle, partnerIds, partnerRuns, resolvePartner,
     partnerLabel, singlePartner,
     selectedRunIds, onToggleRun, onSetPartner, onAddPartner, onRemovePartner,
-    onUpdateRunColor, renderRunBadges, renderRunMeta, colorMap,
+    onUpdateRunColor, onUpdateRunColors, colorSeries, renderRunBadges, renderRunMeta, colorMap,
 }) {
     // What the resolver would pick with nothing pinned — shown as the dropdown's
     // placeholder so an unpaired row still says where its miles come from.
@@ -341,6 +353,8 @@ function PairRows({
                             run={run}
                             vehicleId={vehicle.id}
                             onUpdateRunColor={onUpdateRunColor}
+                                                        onUpdateRunColors={onUpdateRunColors}
+                                                        colorSeries={colorSeries}
                             colorMap={colorMap}
                         />
                     )}
@@ -354,6 +368,8 @@ function PairRows({
                                 run={run}
                                 vehicleId={vehicle.id}
                                 onUpdateRunColor={onUpdateRunColor}
+                                                        onUpdateRunColors={onUpdateRunColors}
+                                                        colorSeries={colorSeries}
                                 colorMap={colorMap}
                             />
                             <span className="truncate">{run.name}</span>
@@ -463,7 +479,7 @@ function PairRows({
  * here is a SESSION override and reaches no database, and that "Auto" means
  * handing the run back to the palette rather than clearing a stored value.
  */
-function RunColorControl({ run, vehicleId, onUpdateRunColor, colorMap = {} }) {
+function RunColorControl({ run, vehicleId, onUpdateRunColor, onUpdateRunColors, colorSeries, colorMap = {} }) {
     if (!onUpdateRunColor) return null;
     // Synthetic rows (the EPA range option) have no run behind them to colour.
     if (run._synthetic) return null;
@@ -482,6 +498,10 @@ function RunColorControl({ run, vehicleId, onUpdateRunColor, colorMap = {} }) {
             label={run.name}
             onChange={hex => onUpdateRunColor(vehicleId, run.id, hex)}
             onReset={() => onUpdateRunColor(vehicleId, run.id, null)}
+            seriesId={run.id}
+            vehicleId={vehicleId}
+            series={colorSeries}
+            onApplyMany={onUpdateRunColors}
         />
     );
 }
@@ -496,7 +516,7 @@ function RunColorControl({ run, vehicleId, onUpdateRunColor, colorMap = {} }) {
  * and "Charging test"; the names carry that now, and in a rail it was spending
  * a third of the identity line on a fact nobody was comparing.
  */
-function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRunBadges, renderRunMeta, colorMap = {} }) {
+function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, onUpdateRunColors, colorSeries, renderRunBadges, renderRunMeta, colorMap = {} }) {
     const meta = renderRunMeta?.(run);
     return (
         <label className={`pair-row ${isChecked ? '' : 'opacity-60 hover:opacity-100'}`}>
@@ -510,6 +530,8 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, renderRun
                     run={run}
                     vehicleId={vehicle.id}
                     onUpdateRunColor={onUpdateRunColor}
+                                                        onUpdateRunColors={onUpdateRunColors}
+                                                        colorSeries={colorSeries}
                     colorMap={colorMap}
                 />
                 <span className="truncate">{run.name}</span>

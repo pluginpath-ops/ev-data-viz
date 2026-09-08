@@ -53,12 +53,22 @@ Renaming it is [tracked separately](#deferred-renames).
 | The colour one plotted series is drawn in | **series colour** | — | [colorUtils.js](../src/utils/colorUtils.js) `resolveChartColors()` |
 | The small square REPORTING that colour | **series swatch** | common web | `.series-swatch` — 10px, read-only |
 | The bigger one that CHANGES it | **series colour picker** | — | [SeriesColorPicker.jsx](../src/components/SeriesColorPicker.jsx), `.series-swatch--button` |
+| The colour a pick becomes slot 1 of | **the base** | — | the rest of the set is re-derived from it |
+| Re-ordering a palette to lead with the base | **rotation** | — | `rotatePaletteFrom()` — different hues, for unrelated tests |
+| One hue in lightness steps from the base | **the ramp**, or light→dark | — | `rampFrom()` — one vehicle's runs, handoff 3c |
+| How much of the plot a pick recolours | **scope** | — | this test · this vehicle · all tests |
 
 A series colour has two values that routinely differ and must not be called the
 same thing: the **stored** colour is the durable `runs.color` preference, and
 the **drawn** colour is what is actually on the chart after Auto Color and any
 session override have had their say. The picker says both out loud; before it,
 nothing did.
+
+Say **all tests**, never "all vehicles" — the widest scope reseeds every run
+currently ticked in the run picker, which is a set of tests and may be several
+per vehicle. Nothing at any scope writes to the database: the charting page has
+no durable colour path, whatever role you hold. The durable preference is edited
+in Tests & Data, which is the screen that owns it.
 
 **Careful with "rail."** Material Design 3 has a *navigation rail* — a slim
 vertical strip of navigation icons. We do not have one. Our `.chart-rail` is a

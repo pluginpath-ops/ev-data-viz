@@ -40,7 +40,8 @@ const EMPTY = {};
  * @param {Object}  opts
  * @param {boolean} opts.autoColor  auto mode on/off
  * @param {string}  opts.resetKey   changes when the vehicle set changes
- * @returns {{ colorMap: Object, setColorOverride: (runId, color) => void }}
+ * @returns {{ colorMap: Object, setColorOverride: (runId, color) => void,
+ *            setColorOverrides: (map) => void }}
  */
 export function useStickyChartColors(runs, { autoColor, resetKey }) {
     // A MONOTONIC generation, not a key derived from the boolean. Deriving it
@@ -80,6 +81,18 @@ export function useStickyChartColors(runs, { autoColor, resetKey }) {
         });
     };
 
+    // A whole derived set at once, and the ONE reason this is not a loop over
+    // setColorOverride: the picker's wider scopes recolour every series from a
+    // single base, and applying that one at a time would re-render the chart
+    // once per run and let a half-applied set be seen.
+    const setColorOverrides = (map) => {
+        setOverrideState(prev => ({
+            key: sessionKey,
+            map: { ...(prev.key === sessionKey ? prev.map : EMPTY), ...map },
+        }));
+    };
+
+
     const colorMap = useMemo(() => {
         if (assignedKey.current !== sessionKey) {
             assigned.current = {};
@@ -113,5 +126,9 @@ export function useStickyChartColors(runs, { autoColor, resetKey }) {
         return resolved;
     }, [runs, autoColor, sessionKey, overrides]);
 
-    return { colorMap, setColorOverride };
+    return {
+        colorMap,
+        setColorOverride,
+        setColorOverrides,
+    };
 }

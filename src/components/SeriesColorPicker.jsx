@@ -1,55 +1,61 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Popover from './Popover';
 import {
-    OKABE_ITO, OKABE_ITO_NAMES, DEFAULT_RUN_COLOR, seriesColorNote,
+    SERIES_PALETTES, DEFAULT_RUN_COLOR, seriesColorNote, isUnsetColor, sameHex,
+    paletteSlotOf, hexToHsl, hslToHex, rotatePaletteFrom, rampFrom,
 } from '../utils/colorUtils';
+import { ratioOf } from '../utils/contrast';
+import { chartTheme } from '../utils/chartTheme';
 
 /**
- * Pick the colour a series is drawn in.
+ * Pick the colour a series is drawn in — and, through it, the set.
  *
  * ── Why this is not an <input type="color"> ─────────────────────────────────
  *
- * It was, in five places. That control opens an OS dialog: one colour at a
- * time, modal, over the top of the chart, with no view of the set you are
+ * It was, in five places. That control opens the browser's own dialog: one
+ * colour at a time, over the top of the chart, with no view of the set you are
  * picking against — which is the entire problem, because a series colour only
- * means anything RELATIVE to the other series on the same plot. Picking a blue
- * without being able to see the blue already on the chart is guessing.
+ * means anything RELATIVE to the other series on the same plot. It also varies
+ * by browser, so "the colour picker" was not even one control.
  *
- * It also could not say the one thing that most needed saying. Auto Color
- * assigns from Okabe-Ito over the top of whatever is stored, so the colour a
- * run HAS and the colour it is DRAWN in come apart routinely, and the old
- * control expressed that as a `title` attribute on one of the five pickers.
- * `seriesColorNote` makes it a sentence, in the peek and in the panel.
+ * ── A pick is a BASE, not one series' colour ────────────────────────────────
  *
- * The palette offered is the one `resolveChartColors` assigns from, so a manual
- * pick and an automatic one draw from a single colourblind-safe set instead of
- * a hand-typed hex landing next to a palette slot it clashes with.
+ * Setting a colour here fixes it as slot 1 and the rest of the set is
+ * re-derived from it. That is what the two derivations mean, and they are the
+ * same two the scope control offers:
  *
- * ── Draft, then Apply ───────────────────────────────────────────────────────
+ *   rotation    the palette re-ordered to lead with the base — different hues,
+ *               which is what a whole plot of unrelated tests wants
+ *   light→dark  one hue in lightness steps, anchored so it runs AWAY from the
+ *               base — which is what one vehicle's runs want, so a chart reads
+ *               as families first and runs second (handoff 3c)
  *
- * Nothing commits until Apply. Cancel, ×, Escape and a click outside all
- * discard — the policy settled for every popover in #299, and the reason the
- * 400ms commit debounce the old rail picker needed is gone: it existed only
- * because a native picker fires on every pixel of a drag.
+ * The preview shows both before you commit either, because "what will this do
+ * to everything else" is the question the old control could not answer.
  *
- * ── One control, two kinds of colour ────────────────────────────────────────
+ * ── Nothing here writes to the database ─────────────────────────────────────
  *
- * The caller decides what a write MEANS, which is why `onChange` is a plain
- * callback and not a run id. In Tests & Data it writes `runs.color`, durably,
- * for every visitor. In a chart sidebar it sets a session override and touches
- * no database at all. Both are "set this colour"; only the caller knows which,
- * and that distinction is load-bearing (see hooks/useStickyChartColors).
+ * Every scope is a SESSION override. Reading a chart must never edit stored
+ * data for every other visitor, whatever role you hold — so the charting page
+ * has no durable path at all, and 3c's per-run steps are computed at render
+ * rather than stored. The durable `runs.color` preference is edited in Tests &
+ * Data, which is the screen that owns it; there, this control has no scope
+ * selector because there is nothing to scope.
  *
  * @param {string}  value       the colour actually being drawn right now
- * @param {string}  [stored]    the durable preference, when there is one and it
- *                              can differ from `value`. Omit where they cannot
- * @param {(hex: string) => void} onChange   commit. Required
- * @param {() => void} [onReset]  clear back to the palette's choice. Supplying
- *                              it is what puts "Auto" in the panel — omit it
- *                              where a site has nothing to fall back to
- * @param {string}  [label]     what is being coloured, for the header and the
- *                              accessible name
- * @param {string}  [className] classes for the wrapper
+ * @param {string}  [stored]    the durable preference, where one can differ
+ * @param {(hex: string) => void} onChange   commit for this series alone
+ * @param {() => void} [onReset]  hand it back to the palette. Supplying it is
+ *                              what puts "Auto" in the panel
+ * @param {string}  [label]     what is being coloured
+ * @param {string|number} [seriesId]   this series' id, and
+ * @param {string|number} [vehicleId]  the vehicle it belongs to — both needed
+ *                              before a scope wider than one series means anything
+ * @param {Array<{id, vehicleId, stored}>} [series]  everything plotted
+ * @param {(map: Record<string,string>) => void} [onApplyMany]  commit a whole
+ *                              derived set. Supplying it, with `series`, is
+ *                              what puts the scope control in the panel
+ * @param {string}  [className]
  */
 export default function SeriesColorPicker({
     value,
@@ -57,26 +63,28 @@ export default function SeriesColorPicker({
     onChange,
     onReset = null,
     label = '',
+    seriesId = null,
+    vehicleId = null,
+    series = null,
+    onApplyMany = null,
     className = '',
 }) {
     const plotted = value || DEFAULT_RUN_COLOR;
-    const [draft, setDraft] = useState(plotted);
-
-    const note = seriesColorNote(stored, plotted);
     const subject = label || 'this series';
+
+    // The scope control only appears when the owner can actually honour it.
+    const scoped = Boolean(onApplyMany && series?.length && seriesId != null);
 
     return (
         <Popover
             className={className}
             title={label ? `Colour — ${label}` : 'Series colour'}
-            width="16rem"
-            // Opening is what seeds the draft, so a panel reopened after a
-            // cancel starts from what is on the chart rather than from the
-            // pick that was thrown away.
-            onOpenChange={open => { if (open) setDraft(plotted); }}
+            // One width everywhere: the rail, Tests & Data and a chip all get
+            // the same panel, so it never reflows to suit its anchor.
+            width="300px"
             peek={
                 <>
-                    <ColorNote note={note} />
+                    <ColorNote note={seriesColorNote(stored, plotted)} />
                     <span className="popover-more">Click for the palette</span>
                 </>
             }
@@ -87,85 +95,270 @@ export default function SeriesColorPicker({
                     className="series-swatch--button"
                     style={{ backgroundColor: plotted }}
                     aria-label={`Colour for ${subject} — ${plotted}`}
-                    // Three of the five call sites sit inside a <label> that
-                    // wraps the row's checkbox, so a click that reaches the
-                    // label toggles the run's selection as well as opening
-                    // this. The old controls each remembered to stop that
-                    // themselves and two of them forgot; a swatch means
-                    // "open the colour panel" and never anything an ancestor
-                    // has a claim on, so it is stopped here, once.
+                    // Three of the call sites sit inside a <label> wrapping the
+                    // row's checkbox, so a click reaching the label toggles the
+                    // run's selection too. A swatch means "open the colour
+                    // panel" and never anything an ancestor has a claim on, so
+                    // it is stopped here, once, rather than at each site.
                     onClick={e => { e.stopPropagation(); onClick(e); }}
                 />
             )}
         >
             {({ close }) => (
-                <>
-                    <div className="color-picker-body">
-                        <ColorNote note={note} />
-                        <div className="color-slots" role="group" aria-label="Okabe-Ito palette">
-                            {OKABE_ITO.map((hex, i) => (
-                                <button
-                                    key={hex}
-                                    type="button"
-                                    className={`color-slot${sameHex(hex, draft) ? ' is-current' : ''}`}
-                                    style={{ backgroundColor: hex }}
-                                    aria-label={OKABE_ITO_NAMES[i]}
-                                    aria-pressed={sameHex(hex, draft)}
-                                    onClick={() => setDraft(hex)}
-                                />
-                            ))}
-                        </div>
-                        {/* The escape hatch, kept deliberately: the palette is
-                            seven colours and a chart can hold more series than
-                            that. It is the native control because matching a
-                            brand colour or an existing screenshot wants a full
-                            gamut, which no grid can offer. */}
-                        <label className="color-custom">
-                            <input
-                                type="color"
-                                value={draft}
-                                onChange={e => setDraft(e.target.value)}
-                                aria-label="Custom colour"
-                            />
-                            <span className="color-custom-hex">{draft.toUpperCase()}</span>
-                        </label>
-                    </div>
-                    <div className="popover-foot">
-                        {onReset && (
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={() => { onReset(); close(); }}
-                                title="Hand this series back to the palette"
-                            >
-                                Auto
-                            </button>
-                        )}
-                        <span className="popover-foot-gap" />
-                        <button type="button" className="btn btn-secondary" onClick={close}>
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={() => { onChange(draft); close(); }}
-                        >
-                            Apply
-                        </button>
-                    </div>
-                </>
+                <PickerPanel
+                    close={close}
+                    plotted={plotted}
+                    stored={stored}
+                    onChange={onChange}
+                    onReset={onReset}
+                    scoped={scoped}
+                    seriesId={seriesId}
+                    vehicleId={vehicleId}
+                    series={series}
+                    onApplyMany={onApplyMany}
+                />
             )}
         </Popover>
     );
 }
 
-/** Hex equality without caring which case either side was written in. */
-function sameHex(a, b) {
-    return String(a).toLowerCase() === String(b).toLowerCase();
+/**
+ * The panel body, mounted fresh each time the popover opens — which is what
+ * makes "the draft starts from what is on the chart" true without an effect
+ * watching for it.
+ */
+function PickerPanel({
+    close, plotted, stored, onChange, onReset,
+    scoped, seriesId, vehicleId, series, onApplyMany,
+}) {
+    const [base, setBase] = useState(plotted);
+    const [paletteId, setPaletteId] = useState(SERIES_PALETTES[0].id);
+    const [scope, setScope] = useState('test');
+
+    const palette = SERIES_PALETTES.find(p => p.id === paletteId) ?? SERIES_PALETTES[0];
+    const slot = paletteSlotOf(base, palette.colors);
+    const hsl = hexToHsl(base);
+
+    // Who each scope would touch, in a stable order so a set is reproducible.
+    const targets = useMemo(() => {
+        if (!scoped) return [];
+        const rows = scope === 'vehicle'
+            ? series.filter(s => s.vehicleId === vehicleId)
+            : series;
+        // The series being edited leads its own set: it is the base, so it must
+        // be the one that actually keeps the colour that was picked.
+        return [...rows].sort((a, b) =>
+            (a.id === seriesId ? -1 : 0) - (b.id === seriesId ? -1 : 0));
+    }, [scoped, scope, series, vehicleId, seriesId]);
+
+    const handSet = targets.filter(t => !isUnsetColor(t.stored)).length;
+
+    // The two derivations, and the scope each one serves.
+    const derived = useMemo(() => {
+        if (scope === 'test' || !targets.length) return null;
+        const colors = scope === 'vehicle'
+            ? rampFrom(base, targets.length)
+            : rotatePaletteFrom(base, palette.colors);
+        return Object.fromEntries(targets.map((t, i) => [t.id, colors[i % colors.length]]));
+    }, [scope, targets, base, palette]);
+
+    // "All tests" states its blast radius before it will commit; the other two
+    // commit on click, because one series and one vehicle are both undoable by
+    // looking at them.
+    const armed = scope === 'all';
+
+    const commit = () => {
+        if (scope === 'test' || !derived) onChange(base);
+        else onApplyMany(derived);
+        close();
+    };
+
+    const plotBg = chartTheme().background;
+    const ratio = ratioOf(base, plotBg);
+
+    return (
+        <>
+            <div className="color-picker-body">
+                {scoped && (
+                    <div className="stats-segmented color-scope" role="group" aria-label="Apply to">
+                        {[['test', 'This test'], ['vehicle', 'This vehicle'], ['all', 'All tests']]
+                            .map(([id, text]) => (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    className={scope === id ? 'active' : ''}
+                                    aria-pressed={scope === id}
+                                    onClick={() => setScope(id)}
+                                >
+                                    {text}
+                                </button>
+                            ))}
+                    </div>
+                )}
+
+                <div className="color-row">
+                    {onReset && (
+                        <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => { onReset(); close(); }}
+                            title="Hand this series back to the palette"
+                        >
+                            Auto
+                        </button>
+                    )}
+                    <span className="text-caption">
+                        {slot ? `slot ${slot} of ${palette.colors.length}` : 'off-palette'}
+                    </span>
+                </div>
+
+                <div className="color-row">
+                    <span className="text-nano">Palette · {palette.label}</span>
+                    <label className="color-switch">
+                        <span className="sr-only">Palette</span>
+                        <select value={paletteId} onChange={e => setPaletteId(e.target.value)}>
+                            {SERIES_PALETTES.map(p => (
+                                <option key={p.id} value={p.id}>
+                                    {p.label}{p.safe ? '' : ' (not colourblind-safe)'}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+
+                <div className="color-slots" role="group" aria-label={`${palette.label} palette`}>
+                    {palette.colors.map((hex, i) => (
+                        <button
+                            key={hex}
+                            type="button"
+                            className={`color-slot${sameHex(hex, base) ? ' is-current' : ''}`}
+                            style={{ backgroundColor: hex }}
+                            aria-label={`Slot ${i + 1}, ${hex}`}
+                            aria-pressed={sameHex(hex, base)}
+                            onClick={() => setBase(hex)}
+                        />
+                    ))}
+                </div>
+
+                <label className="color-hex">
+                    <span className="color-hex-chip" style={{ backgroundColor: base }} />
+                    <input
+                        type="text"
+                        value={base.toUpperCase()}
+                        maxLength={7}
+                        spellCheck={false}
+                        aria-label="Base colour, hex"
+                        onChange={e => {
+                            const v = e.target.value.trim();
+                            if (/^#[0-9a-fA-F]{6}$/.test(v)) setBase(v.toLowerCase());
+                        }}
+                    />
+                    <span className="text-nano">base</span>
+                </label>
+
+                <Slider
+                    label="Hue" min={0} max={360} value={Math.round(hsl.h)}
+                    track="hue"
+                    onChange={h => setBase(hslToHex({ ...hsl, h }))}
+                />
+                <Slider
+                    label="Lightness" min={0} max={100} value={Math.round(hsl.l)}
+                    track="lightness" hue={hsl.h} sat={hsl.s}
+                    onChange={l => setBase(hslToHex({ ...hsl, l }))}
+                />
+
+                {scoped && targets.length > 1 && (
+                    <div className="color-seed">
+                        <div className="color-row">
+                            <span className="text-nano">Base seeds the set</span>
+                            <span className="text-caption">
+                                {targets.length - 1} more series
+                            </span>
+                        </div>
+                        <SeedRow
+                            name="rotation"
+                            colors={rotatePaletteFrom(base, palette.colors).slice(0, 4)}
+                            active={scope === 'all'}
+                        />
+                        <SeedRow
+                            name="light→dark"
+                            colors={rampFrom(base, 4)}
+                            active={scope === 'vehicle'}
+                        />
+                    </div>
+                )}
+
+                <div className="color-row color-readout">
+                    <ColorNote note={seriesColorNote(stored, base)} />
+                    {ratio && <span className="text-caption">{ratio.toFixed(1)}:1 on plot</span>}
+                </div>
+
+                {armed && (
+                    <p className="color-warning">
+                        Reseeds {targets.length} plotted series from this base.
+                        {handSet > 0 && ` ${handSet} carr${handSet === 1 ? 'ies' : 'y'} a colour someone set by hand. Those get overwritten.`}
+                    </p>
+                )}
+            </div>
+
+            <div className="popover-foot">
+                {/* Said out loud, because the whole panel turns on it: nothing
+                    here reaches the database, at any scope or any role. */}
+                <span className="text-nano">Session override</span>
+                <span className="popover-foot-gap" />
+                <button type="button" className="btn btn-secondary" onClick={close}>Cancel</button>
+                <button
+                    type="button"
+                    className={armed ? 'btn btn-warning' : 'btn btn-primary'}
+                    onClick={commit}
+                >
+                    {armed ? `Overwrite ${targets.length}` : 'Apply'}
+                </button>
+            </div>
+        </>
+    );
 }
 
 /**
- * The stored-versus-plotted sentence. Silent in the one case where there is
+ * A labelled range whose track shows what it controls. The hue track is the
+ * spectrum; the lightness track is the CURRENT hue from black to white, so the
+ * slider is a preview of its own result rather than a grey bar with a number.
+ */
+function Slider({ label, min, max, value, onChange, track, hue = 0, sat = 100 }) {
+    return (
+        <label className="color-slider">
+            <span className="text-nano">{label}</span>
+            <input
+                type="range"
+                min={min}
+                max={max}
+                value={value}
+                className={`color-slider-input is-${track}`}
+                style={track === 'lightness'
+                    ? { '--track-hue': `${hue}`, '--track-sat': `${sat}%` }
+                    : undefined}
+                onChange={e => onChange(Number(e.target.value))}
+            />
+        </label>
+    );
+}
+
+/** One derivation, previewed. Marked when it is the one the scope would use. */
+function SeedRow({ name, colors, active }) {
+    return (
+        <div className={`color-row color-seed-row${active ? ' is-active' : ''}`}>
+            <span className="color-seed-chips">
+                {colors.map((c, i) => (
+                    <span key={`${c}-${i}`} className="series-swatch" style={{ backgroundColor: c }} />
+                ))}
+            </span>
+            <span className="text-nano">{name}</span>
+        </div>
+    );
+}
+
+/**
+ * The stored-versus-drawn sentence. Silent in the one case where there is
  * genuinely nothing to report — a stored colour that is also the drawn one —
  * because a line that always shows up stops being read.
  */

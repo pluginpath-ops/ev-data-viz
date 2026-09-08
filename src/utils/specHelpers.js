@@ -118,13 +118,17 @@ export function makeVehicleFields(units) {
 
 // ── Color palette ─────────────────────────────────────────────────────────────
 
-export const PALETTE = [
-    '#6366f1', '#f59e0b', '#10b981', '#ef4444',
-    '#3b82f6', '#a855f7', '#ec4899', '#14b8a6',
-];
+/**
+ * Re-exported, not declared. The eight live in colorUtils beside the palette
+ * the picker offers instead of them, so "which set is this colour from?" has
+ * one place to be answered. Four views import PALETTE from here; the name
+ * stays so they do not have to care.
+ */
+export { LEGACY_PALETTE as PALETTE } from './colorUtils';
+import { LEGACY_PALETTE } from './colorUtils';
 
 export function vehicleColor(vehicle, idx) {
-    return vehicle.color || PALETTE[idx % PALETTE.length];
+    return vehicle.color || LEGACY_PALETTE[idx % LEGACY_PALETTE.length];
 }
 
 // ── Field group builder (drives all optgroup dropdowns) ───────────────────────

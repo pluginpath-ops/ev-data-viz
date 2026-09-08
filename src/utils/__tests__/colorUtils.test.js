@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { resolvePairColors, seriesColorNote, DEFAULT_RUN_COLOR } from '../colorUtils';
+import {
+    resolvePairColors, seriesColorNote, DEFAULT_RUN_COLOR, OKABE_ITO_SET,
+    hexToHsl, hslToHex, rotatePaletteFrom, paletteSlotOf, rampFrom, seedPreview,
+    seriesRowsOf,
+} from '../colorUtils';
 
 const r = (key, primaryId, baseColor) => ({ key, primaryId, baseColor });
 const dist = (x, y) => {
@@ -79,5 +83,110 @@ describe('seriesColorNote', () => {
         // Auto Color off, nothing stored: the resolver hands back the sentinel
         // itself. That is still "the palette is choosing", not a saved blue.
         expect(seriesColorNote(DEFAULT_RUN_COLOR, DEFAULT_RUN_COLOR).kind).toBe('auto');
+    });
+});
+
+describe('HSL round trip', () => {
+    it('returns every palette colour unchanged', () => {
+        // The sliders read HSL and write hex back on every drag, so a lossy
+        // round trip would walk a colour away from its slot one nudge at a time.
+        for (const hex of OKABE_ITO_SET) {
+            expect(hslToHex(hexToHsl(hex)).toLowerCase()).toBe(hex.toLowerCase());
+        }
+    });
+
+    it('keeps a grey at zero saturation rather than inventing a hue', () => {
+        expect(hexToHsl('#9ca3af').s).toBeLessThan(20);
+        expect(hexToHsl('#808080').s).toBe(0);
+    });
+});
+
+describe('a base seeds the set', () => {
+    it('rotates the palette so the base leads it', () => {
+        const set = rotatePaletteFrom(OKABE_ITO_SET[2], OKABE_ITO_SET);
+        expect(set[0]).toBe(OKABE_ITO_SET[2]);
+        expect(set).toHaveLength(OKABE_ITO_SET.length);
+        // Rotation, not re-sorting: the palette's own spacing survives.
+        expect(new Set(set)).toEqual(new Set(OKABE_ITO_SET));
+        expect(set[1]).toBe(OKABE_ITO_SET[3]);
+    });
+
+    it('lets an off-palette base lead without displacing a slot', () => {
+        const set = rotatePaletteFrom('#123456', OKABE_ITO_SET);
+        expect(set[0]).toBe('#123456');
+        expect(set).toHaveLength(OKABE_ITO_SET.length + 1);
+    });
+
+    it('numbers a slot from one, and reports null off-palette', () => {
+        expect(paletteSlotOf(OKABE_ITO_SET[2], OKABE_ITO_SET)).toBe(3);
+        expect(paletteSlotOf('#123456', OKABE_ITO_SET)).toBe(null);
+        expect(paletteSlotOf('#e69f00', OKABE_ITO_SET)).toBe(1); // case-blind
+    });
+
+    it('runs the ramp AWAY from a light base, not through it', () => {
+        // #F0E442 is the pale yellow — the case that made this rule necessary.
+        const ramp = rampFrom('#F0E442', 4);
+        const light = ramp.map(c => hexToHsl(c).l);
+        expect(ramp[0]).toBe('#F0E442');
+        // Every derived colour is darker than the base, and monotonically so.
+        for (let i = 1; i < light.length; i++) expect(light[i]).toBeLessThan(light[i - 1]);
+    });
+
+    it('runs the ramp away from a dark base too — the other direction', () => {
+        const ramp = rampFrom('#0072B2', 4);
+        const light = ramp.map(c => hexToHsl(c).l);
+        for (let i = 1; i < light.length; i++) expect(light[i]).toBeGreaterThan(light[i - 1]);
+    });
+
+    it('gives a single series just the base', () => {
+        expect(rampFrom('#E69F00', 1)).toEqual(['#E69F00']);
+        expect(seedPreview('#E69F00', 1, 'rotation', OKABE_ITO_SET)).toEqual(['#E69F00']);
+    });
+
+    it('holds the base at slot one in both derivations', () => {
+        for (const mode of ['rotation', 'ramp']) {
+            expect(seedPreview('#56B4E9', 4, mode, OKABE_ITO_SET)[0]).toBe('#56B4E9');
+        }
+    });
+});
+
+describe('seriesRowsOf', () => {
+    const vehicles = [
+        { id: 1, runs: [{ id: 'a', color: '#FF0000' }, { id: 'b' }] },
+        { id: 2, runs: [{ id: 'd', color: '#0072B2' }] },
+    ];
+    const run = id => vehicles.flatMap(v => v.runs).find(r => r.id === id);
+
+    it('carries the vehicle through, which is what "this vehicle" scopes on', () => {
+        expect(seriesRowsOf([run('a'), run('b'), run('d')], vehicles)).toEqual([
+            { id: 'a', vehicleId: 1, stored: '#FF0000' },
+            { id: 'b', vehicleId: 1, stored: null },
+            { id: 'd', vehicleId: 2, stored: '#0072B2' },
+        ]);
+    });
+
+    it('counts a run once however many partners it is plotted against', () => {
+        // Pair mode plots one range run per charging partner: three rows on the
+        // chart, one colour. Counting three would make "Overwrite N" lie.
+        expect(seriesRowsOf([run('a'), run('a'), run('a'), run('d')], vehicles).map(r => r.id))
+            .toEqual(['a', 'd']);
+    });
+
+    it('drops synthetic rows — there is no run behind them to colour', () => {
+        expect(seriesRowsOf([run('a'), { id: 'epa', _synthetic: true }], vehicles).map(r => r.id))
+            .toEqual(['a']);
+    });
+
+    it('matches ids across the string/number divide the URL introduces', () => {
+        expect(seriesRowsOf([{ id: '7' }], [{ id: 9, runs: [{ id: 7 }] }])[0].vehicleId).toBe(9);
+    });
+
+    it('leaves the vehicle null rather than guessing when there is no owner', () => {
+        expect(seriesRowsOf([{ id: 'orphan' }], vehicles)[0].vehicleId).toBe(null);
+    });
+
+    it('survives empty and missing input', () => {
+        expect(seriesRowsOf(null, null)).toEqual([]);
+        expect(seriesRowsOf([], vehicles)).toEqual([]);
     });
 });

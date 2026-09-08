@@ -15,7 +15,7 @@
 import { useState } from 'react';
 import Popover from '../Popover';
 import SeriesColorPicker from '../SeriesColorPicker';
-import { OKABE_ITO } from '../../utils/colorUtils';
+import { OKABE_ITO, LEGACY_PALETTE } from '../../utils/colorUtils';
 
 /**
  * The only LIVE specimen on this page, and the one that has to be.
@@ -40,24 +40,38 @@ import { OKABE_ITO } from '../../utils/colorUtils';
  * no application data and performs no action outside this component.
  */
 function ColorPickerSeams() {
-    // The real resolver's palette, so the "stored" value is a colour the picker
-    // could actually have been given, not a literal that would drift from it.
-    const [committed, setCommitted] = useState(OKABE_ITO[4]);
+    // A plotted set the wider scopes can act on: two vehicles, four series, one
+    // of them carrying a hand-set colour so "Overwrite" has something to warn
+    // about. Shaped exactly like seriesRowsOf's output, because that is what a
+    // chart view hands the picker.
+    const SERIES = [
+        { id: 'r1', vehicleId: 'v1', stored: LEGACY_PALETTE[3] },
+        { id: 'r2', vehicleId: 'v1', stored: null },
+        { id: 'r3', vehicleId: 'v1', stored: null },
+        { id: 'r4', vehicleId: 'v2', stored: null },
+    ];
+    const [drawn, setDrawn] = useState({ r1: OKABE_ITO[0], r2: OKABE_ITO[1], r3: OKABE_ITO[2], r4: OKABE_ITO[4] });
     const [ownerSees, setOwnerSees] = useState('closed');
 
     return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <SeriesColorPicker
                 label="90 kW test"
-                // Deliberately different from `stored`, so the panel shows the
-                // diverged note — the state the old control could not express
-                // and the reason this one exists.
-                value={OKABE_ITO[0]}
-                stored={committed}
-                onChange={setCommitted}
-                onReset={() => setCommitted(null)}
+                value={drawn.r1}
+                stored={SERIES[0].stored}
+                seriesId="r1"
+                vehicleId="v1"
+                series={SERIES}
+                onChange={hex => setDrawn(d => ({ ...d, r1: hex }))}
+                onReset={() => setDrawn(d => ({ ...d, r1: OKABE_ITO[0] }))}
+                onApplyMany={map => setDrawn(d => ({ ...d, ...map }))}
             />
-            <span className="text-nano">saved: {committed || 'auto'} · owner sees: {ownerSees}</span>
+            <span className="color-seed-chips">
+                {SERIES.map(s => (
+                    <span key={s.id} className="series-swatch" style={{ backgroundColor: drawn[s.id] }} />
+                ))}
+            </span>
+            <span className="text-nano">the plotted set</span>
             {/* A bare Popover beside it, purely to show that the owner is told:
                 the picker keeps its own open state to itself, as it should. */}
             <Popover
@@ -81,6 +95,7 @@ function ColorPickerSeams() {
                     </>
                 )}
             </Popover>
+            <span className="text-nano">owner sees: {ownerSees}</span>
         </div>
     );
 }

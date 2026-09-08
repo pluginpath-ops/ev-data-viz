@@ -314,3 +314,181 @@ export function seriesColorNote(stored, plotted) {
     }
     return { kind: 'diverged', stored, plotted };
 }
+
+// ── The set a base seeds ─────────────────────────────────────────────────────
+
+/**
+ * The neutral eighth slot.
+ *
+ * Canonical Okabe-Ito is eight including black. Black is invisible on a dark
+ * plot, so the slot carries a mid grey instead — the same grey a spec-linked
+ * run already falls back to, rather than a ninth colour nobody chose.
+ */
+export const SERIES_NEUTRAL = '#9ca3af';
+
+/** Okabe-Ito as the picker offers it: seven hues plus the neutral. */
+export const OKABE_ITO_SET = [...OKABE_ITO, SERIES_NEUTRAL];
+
+/**
+ * The palette that was here before Okabe-Ito, kept switchable rather than
+ * deleted: matching an existing screenshot or a partner's brand is a real
+ * curator task, and the honest way to allow it is a named palette you have to
+ * choose — not a hex field that quietly leaves the safe set.
+ *
+ * It lives here, not in specHelpers, so the picker and `vehicleColor()` read
+ * one definition. DataService still carries its own eight for newly imported
+ * and duplicated runs, and those had ALREADY drifted from this set — a
+ * different eight colours entirely. Left alone here because changing them
+ * changes what colour new records are born with, which is a data decision
+ * rather than a picker one.
+ */
+export const LEGACY_PALETTE = [
+    '#6366f1', '#f59e0b', '#10b981', '#ef4444',
+    '#3b82f6', '#a855f7', '#ec4899', '#14b8a6',
+];
+
+/** The palettes the picker can switch between, in offer order. */
+export const SERIES_PALETTES = [
+    { id: 'okabe-ito', label: 'Okabe-Ito', safe: true,  colors: OKABE_ITO_SET },
+    { id: 'legacy',    label: 'Legacy',    safe: false, colors: LEGACY_PALETTE },
+];
+
+/** Hex equality that does not care how either side was written. */
+export function sameHex(a, b) {
+    return String(a).toLowerCase() === String(b).toLowerCase();
+}
+
+/**
+ * Which slot a colour occupies, 1-based, or null when it is off-palette.
+ *
+ * The picker says "slot 3 of 8" so that a colour has an ADDRESS and not just a
+ * value: the whole set is never visible at once, and knowing you are on slot 3
+ * is what makes "rotate from here" a sentence you can predict the result of.
+ */
+export function paletteSlotOf(hex, colors) {
+    const i = colors.findIndex(c => sameHex(c, hex));
+    return i === -1 ? null : i + 1;
+}
+
+// ── HSL, for the two sliders ─────────────────────────────────────────────────
+
+/** @returns {{h: number, s: number, l: number}} h 0-360, s and l 0-100. */
+export function hexToHsl(hex) {
+    const { r, g, b } = hexToRgb(hex);
+    const [rn, gn, bn] = [r / 255, g / 255, b / 255];
+    const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+    const l = (max + min) / 2;
+    const d = max - min;
+    if (d === 0) return { h: 0, s: 0, l: l * 100 };
+    const s = d / (1 - Math.abs(2 * l - 1));
+    let h;
+    if (max === rn) h = ((gn - bn) / d) % 6;
+    else if (max === gn) h = (bn - rn) / d + 2;
+    else h = (rn - gn) / d + 4;
+    h *= 60;
+    return { h: (h + 360) % 360, s: s * 100, l: l * 100 };
+}
+
+export function hslToHex({ h, s, l }) {
+    const sn = s / 100, ln = l / 100;
+    const c = (1 - Math.abs(2 * ln - 1)) * sn;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = ln - c / 2;
+    const seg = Math.floor(((h % 360) + 360) % 360 / 60);
+    const [r1, g1, b1] = [
+        [c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x],
+    ][seg];
+    const to2 = (v) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+    return `#${to2(r1)}${to2(g1)}${to2(b1)}`;
+}
+
+// ── Deriving the rest of the set from the base ───────────────────────────────
+
+/**
+ * The palette re-ordered so `base` leads it.
+ *
+ * A pick is a BASE, not just one series' colour: it becomes slot 1 and
+ * everything else is re-derived from where it landed. Rotating rather than
+ * re-sorting keeps the palette's own spacing — Okabe-Ito's order is already
+ * chosen so that neighbours are far apart, and sorting by distance from the
+ * base would throw that away to solve a problem the palette has already solved.
+ *
+ * A base that is not in the palette simply leads it, because there is no slot
+ * to rotate from.
+ */
+export function rotatePaletteFrom(base, colors) {
+    const i = colors.findIndex(c => sameHex(c, base));
+    if (i === -1) return [base, ...colors];
+    return [...colors.slice(i), ...colors.slice(0, i)];
+}
+
+/** How far the light→dark ramp travels across the whole set. */
+const RAMP_SPAN = 0.62;
+
+/**
+ * A lightness ramp of `count` colours, anchored so the base is an END of it.
+ *
+ * The direction is chosen by the base rather than fixed: a light base darkens,
+ * a dark base lightens. That is the difference between a ramp that runs AWAY
+ * from the base and one that runs THROUGH it — and running through it is what
+ * `PALETTE_PASSES` does today, which is why a pale yellow base there produces
+ * a set whose lightest member is lighter than the colour you actually chose.
+ */
+export function rampFrom(base, count) {
+    if (count <= 1) return [base];
+    const { l } = hexToHsl(base);
+    const away = l > 50 ? -1 : 1;
+    const out = [base];
+    for (let i = 1; i < count; i++) {
+        out.push(shiftLightness(base, away * RAMP_SPAN * (i / (count - 1))));
+    }
+    return out;
+}
+
+/**
+ * What the panel's "base seeds the set" preview shows for one derivation.
+ *
+ * @param {string} base
+ * @param {number} count  how many series the base is seeding, including itself
+ * @param {'rotation'|'ramp'} mode
+ * @param {string[]} colors  the active palette
+ */
+export function seedPreview(base, count, mode, colors) {
+    const n = Math.max(1, count);
+    return mode === 'ramp'
+        ? rampFrom(base, n)
+        : rotatePaletteFrom(base, colors).slice(0, n);
+}
+
+/**
+ * The plotted set, in the shape the picker's wider scopes need.
+ *
+ * Takes the runs a view is ALREADY colouring rather than its selection ids,
+ * and that is the whole point: two of the four chart views key selection by
+ * pair rather than by run, so a helper reading `selectedRunIds` would quietly
+ * return nothing there and the scope control would vanish with no error. Every
+ * view computes "the runs on the chart" regardless.
+ *
+ * The vehicle comes from a lookup because a run does not carry its owner, and
+ * "this vehicle" is the scope that needs it.
+ *
+ * @param {Array} runs      the runs being coloured, in plot order
+ * @param {Array} vehicles  selected vehicles, each with .runs, for the lookup
+ * @returns {Array<{id, vehicleId, stored}>}
+ */
+export function seriesRowsOf(runs, vehicles) {
+    const owner = new Map();
+    for (const v of vehicles ?? []) {
+        for (const r of v.runs ?? []) owner.set(String(r.id), v.id);
+    }
+    const seen = new Set();
+    const rows = [];
+    for (const r of runs ?? []) {
+        // Pair mode plots one range run against several charging partners, so
+        // the same run arrives more than once. It is still one series colour.
+        if (!r || r._synthetic || seen.has(String(r.id))) continue;
+        seen.add(String(r.id));
+        rows.push({ id: r.id, vehicleId: owner.get(String(r.id)) ?? null, stored: r.color ?? null });
+    }
+    return rows;
+}

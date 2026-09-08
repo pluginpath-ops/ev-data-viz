@@ -27,6 +27,7 @@ import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
+import { seriesRowsOf } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
@@ -118,7 +119,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         ),
         [selectedVehicles, selectedRuns]
     );
-    const { colorMap, setColorOverride } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides } = useStickyChartColors(colorableRuns, {
         autoColor: chartConfig.autoColor,
         resetKey: selectedVehicleIds.join(','),
     });
@@ -875,6 +876,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}
                     onUpdateRunColor={handleColorChange}
+                    colorSeries={seriesRowsOf(colorableRuns, selectedVehicles)}
+                    onUpdateRunColors={setColorOverrides}
                     runFilter={isChargingRun}
                     colorMap={colorMap}
                     emptyMessage="No charging test records"
