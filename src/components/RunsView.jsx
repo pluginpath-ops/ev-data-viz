@@ -14,6 +14,7 @@ import SessionControl from './SessionControl';
 import RunSpecRows from './RunSpecRows';
 import SectionHeader, { SectionAction } from './SectionHeader';
 import InfoIcon from './InfoIcon';
+import SeriesColorPicker from './SeriesColorPicker';
 import SessionGroupHeader from './SessionGroupHeader';
 import VehicleLink from './VehicleLink';
 import SessionEditModal from './SessionEditModal';
@@ -2527,24 +2528,13 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 {/* Rows 2-4: colour, then the two scaling knobs,
                                                     one per line — see .run-actions-stack. */}
                                                 <div className="run-actions-stack">
-                                                    <label className="flex items-center gap-1 text-xs text-secondary">
-                                                        <input
-                                                            type="color"
-                                                            value={runColor}
-                                                            onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
-                                                            className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
-                                                            title="Change color"
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            value={runColor}
-                                                            onChange={e => updateRunColor(vehicle.id, run.id, e.target.value)}
-                                                            onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) updateRunColor(vehicle.id, run.id, runColor); }}
-                                                            className="form-input w-20 .5 font-mono text-secondary"
-                                                            placeholder="#9ca3af"
-                                                            maxLength={7}
-                                                        />
-                                                    </label>
+                                                    <SeriesColorPicker
+                                                        value={runColor}
+                                                        stored={run.color}
+                                                        label={run.name}
+                                                        onChange={hex => updateRunColor(vehicle.id, run.id, hex)}
+                                                        onReset={() => updateRunColor(vehicle.id, run.id, null)}
+                                                    />
                                                     {factors.map(f => (isContributor && canEdit(vehicle) ? (
                                                         <FactorInput
                                                             key={f.key}

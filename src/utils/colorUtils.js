@@ -27,8 +27,27 @@ export const OKABE_ITO = [
     '#CC79A7', // reddish purple
 ];
 
-/** The "no preference" sentinel stored when a run color is unset. */
-const DEFAULT_RUN_COLOR = '#3b82f6';
+/**
+ * The same seven, named. These sat in the comments above and were unreachable,
+ * which was fine while the palette was only ever assigned FROM. The picker
+ * offers them to a person, and "swatch 4 of 7" is not something a screen reader
+ * can act on — so the name moves out of the comment and into the API.
+ */
+export const OKABE_ITO_NAMES = [
+    'orange', 'sky blue', 'bluish green', 'yellow', 'blue', 'vermilion', 'reddish purple',
+];
+
+/**
+ * The "no preference" sentinel stored when a run color is unset.
+ *
+ * It is a SENTINEL, not a choice, and the difference matters now that a person
+ * can pick a colour by hand: a run explicitly set to this exact blue is
+ * indistinguishable from one nobody has touched, and gets reassigned. The
+ * picker avoids minting it — `onReset` writes null rather than this — but a
+ * Custom pick can still land on it. Telling the two apart needs a stored flag,
+ * which is a schema change and is filed, not smuggled in here.
+ */
+export const DEFAULT_RUN_COLOR = '#3b82f6';
 
 // ── CIE Lab math ─────────────────────────────────────────────────────────────
 
@@ -67,7 +86,12 @@ function deltaE(hexA, hexB) {
     return Math.sqrt((a.L - b.L) ** 2 + (a.a - b.a) ** 2 + (a.b - b.b) ** 2);
 }
 
-function isDefaultColor(color) {
+/**
+ * Is this colour "unset"? Null, empty, or the sentinel — the three ways a run
+ * says it has no stored preference. Exported so the picker asks the resolver's
+ * own question rather than reimplementing it and drifting.
+ */
+export function isUnsetColor(color) {
     return !color || color === DEFAULT_RUN_COLOR;
 }
 
@@ -183,7 +207,7 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual')
             // 1. Transient session override — highest priority
             chosen = sessionOverrides[run.id];
 
-        } else if (mode === 'manual' && !isDefaultColor(run.color)) {
+        } else if (mode === 'manual' && !isUnsetColor(run.color)) {
             // 2. Manual mode: contributor-set color wins, seeds the placed list
             //    so nudged runs avoid clashing with it
             chosen = run.color;
@@ -197,7 +221,7 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual')
             // otherwise every run past the palette length ties and collapses.
             const pool = expandedCandidates(OKABE_ITO, sorted.length);
             const candidates =
-                mode === 'auto' && !isDefaultColor(run.color)
+                mode === 'auto' && !isUnsetColor(run.color)
                     ? [...pool].sort((a, b) => deltaE(a, run.color) - deltaE(b, run.color))
                     : pool;
 
@@ -259,4 +283,34 @@ export function resolvePairColors(rows) {
         });
     }
     return out;
+}
+
+// ── What the picker says about a colour ──────────────────────────────────────
+
+/**
+ * Reconcile the colour a series HAS with the colour it is DRAWN in.
+ *
+ * These come apart routinely and nothing said so. Auto Color assigns an
+ * Okabe-Ito slot over the stored preference; a session override replaces both;
+ * a run with no preference at all is drawn in whatever the resolver picked.
+ * The old control expressed all of that as one swatch and a `title` attribute,
+ * so the answer to "why is this line orange when I set it to blue?" was hidden
+ * behind a hover and only present at one of the five pickers.
+ *
+ * Three states, because there are three:
+ *
+ *   auto      nothing stored — the palette is choosing, and that is fine
+ *   saved     stored and drawn in the same colour, so there is nothing to say
+ *   diverged  stored one thing, drawn another. The only one worth words
+ *
+ * @param {string|null} stored   the durable preference (runs.color), if any
+ * @param {string} plotted       what is actually on the chart right now
+ * @returns {{kind: 'auto'|'saved'|'diverged', stored?: string, plotted: string}}
+ */
+export function seriesColorNote(stored, plotted) {
+    if (isUnsetColor(stored)) return { kind: 'auto', plotted };
+    if (stored.toLowerCase() === String(plotted).toLowerCase()) {
+        return { kind: 'saved', plotted };
+    }
+    return { kind: 'diverged', stored, plotted };
 }

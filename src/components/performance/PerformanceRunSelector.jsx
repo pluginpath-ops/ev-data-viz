@@ -15,6 +15,8 @@
  */
 import { useState } from 'react';
 import RunSourceLinks from '../RunSourceLinks';
+import SeriesColorPicker from '../SeriesColorPicker';
+import { DEFAULT_RUN_COLOR } from '../../utils/colorUtils';
 
 export default function PerformanceRunSelector({
     vehicles,          // [{ id, name, runs: [{ id, name, driveMode, zeroTo60, color, sourceUrl }] }]
@@ -115,13 +117,14 @@ export default function PerformanceRunSelector({
                                                                 onChange={() => toggle(run.id)}
                                                             />
                                                             {onUpdateColor && (
-                                                                <input
-                                                                    type="color"
-                                                                    value={colorMap[run.id] || run.color || '#3b82f6'}
-                                                                    onChange={e => onUpdateColor(run.id, e.target.value)}
-                                                                    onClick={e => e.stopPropagation()}
-                                                                    className="w-7 h-5 border-0 rounded cursor-pointer shrink-0"
-                                                                    title="Set this run's colour"
+                                                                <SeriesColorPicker
+                                                                    value={colorMap[run.id] || run.color || DEFAULT_RUN_COLOR}
+                                                                    stored={run.color}
+                                                                    label={run.name}
+                                                                    onChange={hex => onUpdateColor(run.id, hex)}
+                                                                    onReset={colorPicked?.(run.id)
+                                                                        ? () => onUpdateColor(run.id, null)
+                                                                        : null}
                                                                 />
                                                             )}
                                                             <span className="text-secondary">{run.name}</span>
@@ -130,16 +133,6 @@ export default function PerformanceRunSelector({
                                                                 <span className="font-mono text-meta">
                                                                     {Number(run.zeroTo60).toFixed(3)} s
                                                                 </span>
-                                                            )}
-                                                            {onUpdateColor && colorPicked?.(run.id) && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={e => { e.preventDefault(); onUpdateColor(run.id, null); }}
-                                                                    className="text-[10px] text-meta hover:text-secondary"
-                                                                    title="Clear — back to the auto palette"
-                                                                >
-                                                                    reset
-                                                                </button>
                                                             )}
                                                         </label>
                                                     ))}

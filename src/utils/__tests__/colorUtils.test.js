@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolvePairColors } from '../colorUtils';
+import { resolvePairColors, seriesColorNote, DEFAULT_RUN_COLOR } from '../colorUtils';
 
 const r = (key, primaryId, baseColor) => ({ key, primaryId, baseColor });
 const dist = (x, y) => {
@@ -49,5 +49,35 @@ describe('pair colours', () => {
     it('tolerates empty and undefined input', () => {
         expect(resolvePairColors([])).toEqual({});
         expect(resolvePairColors()).toEqual({});
+    });
+});
+
+describe('seriesColorNote', () => {
+    it('reads an unset colour as auto, whichever way it is unset', () => {
+        for (const unset of [null, undefined, '', DEFAULT_RUN_COLOR]) {
+            expect(seriesColorNote(unset, '#E69F00').kind).toBe('auto');
+        }
+    });
+
+    it('says nothing when the stored colour is the one being drawn', () => {
+        expect(seriesColorNote('#E69F00', '#E69F00').kind).toBe('saved');
+    });
+
+    it('ignores hex case when comparing', () => {
+        // `<input type="color">` returns lowercase; the palette is written
+        // uppercase. A control that called those different would report every
+        // palette pick as diverged the moment it was saved.
+        expect(seriesColorNote('#e69f00', '#E69F00').kind).toBe('saved');
+    });
+
+    it('reports both colours when they differ', () => {
+        expect(seriesColorNote('#0072B2', '#E69F00'))
+            .toEqual({ kind: 'diverged', stored: '#0072B2', plotted: '#E69F00' });
+    });
+
+    it('calls the sentinel unset even against a plotted colour equal to it', () => {
+        // Auto Color off, nothing stored: the resolver hands back the sentinel
+        // itself. That is still "the palette is choosing", not a saved blue.
+        expect(seriesColorNote(DEFAULT_RUN_COLOR, DEFAULT_RUN_COLOR).kind).toBe('auto');
     });
 });

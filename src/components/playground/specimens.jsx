@@ -14,69 +14,102 @@
 
 import { useState } from 'react';
 import Popover from '../Popover';
+import SeriesColorPicker from '../SeriesColorPicker';
 import { OKABE_ITO } from '../../utils/colorUtils';
 
 /**
  * The only LIVE specimen on this page, and the one that has to be.
  *
  * Every other entry here is markup: a class on an empty element, which is all
- * you need to check an appearance. `Popover` is not an appearance — it is a
- * mechanism, and the three things worth checking about it cannot be shown by
- * static markup because they are all about time and communication:
+ * you need to check an appearance. A colour picker is not an appearance — it is
+ * a mechanism, and the things worth checking about it cannot be shown by static
+ * markup because they are all about time and communication:
  *
- *   • an arbitrary trigger, not the ⓘ — here a colour swatch, which is the
- *     shape #299's colour control needs
+ *   • an arbitrary trigger, not the ⓘ — a swatch, whose click must open the
+ *     panel WITHOUT reaching the row it sits in
  *   • content that closes its own panel, via the `{ close }` it is handed
  *   • an owner that is told, via `onOpenChange`
+ *   • discard on dismiss — Cancel, ×, Escape and an outside click all leave
+ *     the committed colour alone; only Apply writes
  *
- * Local state only. The page stays inert in the sense the guard means: it
- * reads no application data and performs no action outside this component.
+ * This was a mock of the colour control while the control did not exist. It is
+ * now the control itself, which is strictly better: a mock proves the seams of
+ * a copy, and drifts from the real one the first time either changes.
+ *
+ * Local state only. The page stays inert in the sense the guard means: it reads
+ * no application data and performs no action outside this component.
  */
-function PopoverSeams() {
-    // The real resolver's palette, not four literals that would drift from it.
-    const SLOTS = OKABE_ITO.slice(0, 4);
-    const [slot, setSlot] = useState(SLOTS[0]);
-    const [draft, setDraft] = useState(SLOTS[0]);
+function ColorPickerSeams() {
+    // The real resolver's palette, so the "stored" value is a colour the picker
+    // could actually have been given, not a literal that would drift from it.
+    const [committed, setCommitted] = useState(OKABE_ITO[4]);
     const [ownerSees, setOwnerSees] = useState('closed');
 
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <SeriesColorPicker
+                label="90 kW test"
+                // Deliberately different from `stored`, so the panel shows the
+                // diverged note — the state the old control could not express
+                // and the reason this one exists.
+                value={OKABE_ITO[0]}
+                stored={committed}
+                onChange={setCommitted}
+                onReset={() => setCommitted(null)}
+            />
+            <span className="text-nano">saved: {committed || 'auto'} · owner sees: {ownerSees}</span>
+            {/* A bare Popover beside it, purely to show that the owner is told:
+                the picker keeps its own open state to itself, as it should. */}
             <Popover
-                width="240px"
-                title="Series colour"
-                onOpenChange={o => { setOwnerSees(o ? 'open' : 'closed'); if (o) setDraft(slot); }}
+                title="onOpenChange"
+                onOpenChange={o => setOwnerSees(o ? 'open' : 'closed')}
                 trigger={props => (
-                    <button {...props} type="button" className="pg-swatch"
-                        style={{ backgroundColor: slot }} aria-label="Series colour" />
+                    <button {...props} type="button" className="btn btn-secondary">Panel</button>
                 )}
             >
                 {({ close }) => (
-                    <div>
-                        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                            {SLOTS.map(c => (
-                                <button key={c} type="button" className="pg-swatch"
-                                    aria-label={c} aria-pressed={draft === c}
-                                    style={{ backgroundColor: c, outline: draft === c ? '2px solid var(--color-primary)' : 'none', outlineOffset: 2 }}
-                                    onClick={() => setDraft(c)} />
-                            ))}
+                    <>
+                        <div className="color-picker-body">
+                            <span className="color-note">
+                                The owner reads <b>open</b> while this is showing.
+                            </span>
                         </div>
-                        {/* Discard on dismiss: only this button writes. The ×,
-                            Escape and an outside click all leave `slot` alone. */}
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-                            <button type="button" className="btn btn-secondary" onClick={close}>Cancel</button>
-                            <button type="button" className="btn btn-primary"
-                                onClick={() => { setSlot(draft); close(); }}>Apply</button>
+                        <div className="popover-foot">
+                            <span className="popover-foot-gap" />
+                            <button type="button" className="btn btn-secondary" onClick={close}>Done</button>
                         </div>
-                    </div>
+                    </>
                 )}
             </Popover>
-            <span className="text-nano">owner sees: {ownerSees}</span>
+        </div>
+    );
+}
+
+/**
+ * The three states of the read-only swatch, side by side — which is the only
+ * way to see that "hollow" and "coloured" are the same box, and that the
+ * qualifier dot clears the corner of both.
+ */
+function SeriesSwatches() {
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            {[
+                ['plotted', 'series-swatch', { backgroundColor: OKABE_ITO[2] }],
+                ['not plotted', 'series-swatch is-empty', {}],
+                ['qualified', 'series-swatch is-qualified', { backgroundColor: OKABE_ITO[4] }],
+            ].map(([label, cls, style]) => (
+                <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span className={cls} style={style} />
+                    <span className="text-nano">{label}</span>
+                </span>
+            ))}
         </div>
     );
 }
 
 export const COMPOSITES = {
-    'popover-seams': () => <PopoverSeams />,
+    'series-color-picker': () => <ColorPickerSeams />,
+    'series-swatch': () => <SeriesSwatches />,
 
     'facet-panel': () => (
         <div className="menu-button" style={{ position: 'static' }}>

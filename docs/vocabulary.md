@@ -50,6 +50,15 @@ Renaming it is [tracked separately](#deferred-renames).
 | The thumbnail of what PNG just copied | **export preview** | — | [useChartPng.js](../src/hooks/useChartPng.js), `.chart-png-preview` |
 | Canvas type sizes derived from `--fs-body` | **chart fonts** | — | [chartTheme.js](../src/utils/chartTheme.js) `chartFonts()` |
 | Canvas colours read from the tokens | **chart theme** | — | [chartTheme.js](../src/utils/chartTheme.js) `chartTheme()` |
+| The colour one plotted series is drawn in | **series colour** | — | [colorUtils.js](../src/utils/colorUtils.js) `resolveChartColors()` |
+| The small square REPORTING that colour | **series swatch** | common web | `.series-swatch` — 10px, read-only |
+| The bigger one that CHANGES it | **series colour picker** | — | [SeriesColorPicker.jsx](../src/components/SeriesColorPicker.jsx), `.series-swatch--button` |
+
+A series colour has two values that routinely differ and must not be called the
+same thing: the **stored** colour is the durable `runs.color` preference, and
+the **drawn** colour is what is actually on the chart after Auto Color and any
+session override have had their say. The picker says both out loud; before it,
+nothing did.
 
 **Careful with "rail."** Material Design 3 has a *navigation rail* — a slim
 vertical strip of navigation icons. We do not have one. Our `.chart-rail` is a

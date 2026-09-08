@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { pairKey, partnersFor } from '../utils/pairings';
 import RunSourceLinks from './RunSourceLinks';
+import SeriesColorPicker from './SeriesColorPicker';
+import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 
 /**
  * Shared collapsible run selector used by ChargingView, RangeChartView,
@@ -446,62 +448,40 @@ function PairRows({
 }
 
 /**
- * Swatch + colour picker for one run.
+ * The colour control for one run, in a chart sidebar.
  *
  * Extracted from RunRow so pair rows get the same control: they had a swatch
  * that merely looked like a button, which left no way to change a colour once
  * the pair charts stopped using the flat list.
  *
- * The local in-flight colour keeps a rapid picker drag from writing to the
- * database on every pixel — it commits on a short debounce, or on blur.
+ * Everything this used to do itself now belongs to SeriesColorPicker, and one
+ * piece of it went away entirely: the 400ms commit debounce and its blur
+ * fallback existed only because `<input type="color">` fires on every pixel of
+ * a drag. A panel that commits on Apply fires once.
+ *
+ * What is left is the part that is genuinely about this screen — that a write
+ * here is a SESSION override and reaches no database, and that "Auto" means
+ * handing the run back to the palette rather than clearing a stored value.
  */
 function RunColorControl({ run, vehicleId, onUpdateRunColor, colorMap = {} }) {
-    // The colour actually on the chart: an Okabe-Ito slot in auto mode, a session
-    // override if one was set, the stored preference otherwise.
-    const plotted = colorMap[run.id] || run.color || '#3b82f6';
-
-    const [localColor, setLocalColor] = useState(plotted);
-    const commitTimer = useRef(null);
-
-    // The swatch tracks what is PLOTTED, not what is stored. It used to show the
-    // stored preference and explain the difference in a tooltip, which meant that
-    // turning Auto Color off recoloured every line while every swatch sat still —
-    // the control and the thing it controls disagreeing, with the explanation
-    // hidden behind a hover. Following the plotted colour costs the stored value
-    // no visibility that matters here: this picker sets a session override, and
-    // the picker in Tests & Data (which passes no colorMap, so plotted falls
-    // through to run.color) is the one that owns the stored preference.
-    useEffect(() => { setLocalColor(plotted); }, [plotted]);
-
     if (!onUpdateRunColor) return null;
     // Synthetic rows (the EPA range option) have no run behind them to colour.
     if (run._synthetic) return null;
 
-    const commit = (value) => {
-        if (/^#[0-9A-Fa-f]{6}$/.test(value)) onUpdateRunColor(vehicleId, run.id, value);
-    };
+    // The colour actually on the chart: an Okabe-Ito slot in auto mode, a session
+    // override if one was set, the stored preference otherwise.
+    const plotted = colorMap[run.id] || run.color || DEFAULT_RUN_COLOR;
 
-    // One chip, not two. There used to be a read-only swatch showing the resolved
-    // chart colour beside a picker showing the stored preference — with Auto
-    // Color on those differ for most runs, so the row displayed two colour chips
-    // that disagreed and only one of which could be clicked.
     return (
-        <input
-            type="color"
-            value={localColor}
-            onChange={e => {
-                e.stopPropagation();
-                const val = e.target.value;
-                setLocalColor(val);
-                clearTimeout(commitTimer.current);
-                commitTimer.current = setTimeout(() => commit(val), 400);
-            }}
-            onBlur={() => { clearTimeout(commitTimer.current); commit(localColor); }}
-            onClick={e => e.stopPropagation()}
-            className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
-            title={run.color && run.color.toLowerCase() !== localColor.toLowerCase()
-                ? `Color ${localColor} — this run's saved colour is ${run.color}`
-                : `Color ${localColor}`}
+        <SeriesColorPicker
+            value={plotted}
+            // The stored preference, so the panel can say when the chart is
+            // drawing something else. This is the screen where those two come
+            // apart most — Auto Color assigns over the top of every one of them.
+            stored={run.color}
+            label={run.name}
+            onChange={hex => onUpdateRunColor(vehicleId, run.id, hex)}
+            onReset={() => onUpdateRunColor(vehicleId, run.id, null)}
         />
     );
 }

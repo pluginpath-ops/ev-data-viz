@@ -3124,6 +3124,28 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-accent-orange);
 }
 
+/* The same swatch, when it is the control rather than the report.
+ *
+ * Bigger than its read-only sibling on purpose: 10px is enough to identify a
+ * line beside its name and nowhere near enough to hit, and this one replaced
+ * five `<input type="color">` boxes that were each about this size. It keeps
+ * the border in every state so the box does not change dimensions on hover —
+ * a swatch that grows under the cursor is a swatch you mis-click. */
+.series-swatch--button {
+    width: 1.75rem;
+    height: 1.25rem;
+    flex: none;
+    padding: 0;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-mark);
+    cursor: pointer;
+}
+.series-swatch--button:hover { border-color: var(--color-text-secondary); }
+.series-swatch--button:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
 .routing-row-fields {
     display: flex;
     flex-direction: column;
@@ -3874,15 +3896,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * the viewport, and CSS cannot say "6px under that glyph".
  */
 
-/* A colour chip, for the playground's live popover specimen. */
-.pg-swatch {
-    width: 22px;
-    height: 22px;
-    flex: none;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-control);
-    cursor: pointer;
-}
 
 /* Whatever opens a popover, wrapped. The panel itself is portalled out, so
    this only ever holds the trigger — it exists so the trigger sits on the text
@@ -4055,6 +4068,91 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .popover.popover--sheet > :not(.popover-head):not(.popover-grabber) {
     @apply px-4 py-3;
+}
+
+/* ── A panel's action row ────────────────────────────────────────────────────
+ *
+ * Belongs to the popover, not to the colour picker that needed it first: any
+ * panel that COMMITS something wants a bordered row at the bottom, and #299
+ * settled that every one of them discards on dismiss — which only reads as a
+ * policy if Cancel and Apply sit in the same place every time.
+ *
+ * It takes its padding from the tier rules above, like any other direct child,
+ * so it lines up with the body in both the pinned panel and the sheet. */
+.popover-foot {
+    @apply flex items-center gap-2;
+    border-top: 1px solid var(--color-border);
+}
+/* Pushes the confirming pair right and leaves anything before it — "Auto" —
+   on the left, away from the button that commits. */
+.popover-foot-gap { @apply flex-1; }
+
+/* ── The colour picker's panel ───────────────────────────────────────────────
+ *
+ * Sized by its content: seven palette slots in one row is what sets the width,
+ * and 16rem is the narrowest that leaves them big enough to aim at. */
+.color-picker-body {
+    @apply flex flex-col gap-2.5;
+}
+
+/* One row, never two. The palette is exactly seven, and wrapping it to a
+   second line would make the eighth cell look like a colour that is missing. */
+.color-slots {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+.color-slot {
+    height: 1.5rem;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: var(--radius-mark);
+    cursor: pointer;
+}
+.color-slot:hover { border-color: var(--color-text-secondary); }
+.color-slot:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
+/* The draft, marked with a ring inside the cell rather than a tick over it:
+   a glyph would have to be dark on yellow and light on blue to stay legible,
+   and the ring reads on all seven. */
+.color-slot.is-current {
+    border-color: var(--color-text-primary);
+    box-shadow: inset 0 0 0 1px var(--color-surface-input);
+}
+
+.color-custom {
+    @apply flex items-center gap-2 cursor-pointer;
+}
+.color-custom input[type="color"] {
+    width: 1.75rem;
+    height: 1.25rem;
+    flex: none;
+    padding: 0;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-mark);
+    background: none;
+    cursor: pointer;
+}
+.color-custom-hex {
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-secondary);
+}
+
+/* Why the drawn colour is not the stored one. Quiet by design — it is a
+   footnote on a control, and it is absent entirely when the two agree. */
+.color-note {
+    @apply block;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    line-height: 1.5;
+    color: var(--color-text-meta);
+}
+.color-note b {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--color-text-secondary);
 }
 
 /* The accessory-load reference table, inside a tooltip.
