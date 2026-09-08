@@ -3746,6 +3746,28 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-style: italic;
     color: var(--color-text-meta);
 }
+
+/* Same trade as the FE Guide's pinned name, one notch less severe: 15rem is
+   240px of a 349px scroller on a phone — 69% — so one vehicle column showed and
+   a comparison table compared nothing.
+ *
+ * 10rem rather than the guide's narrower pin because this label WRAPS where the
+ * guide's truncates, and a spec name is the row's only identifier: losing its
+ * tail to an ellipsis would be worse than spending a second line on it.
+ *
+ * The second line turns out not to be spent. Measured across all 62 rows: the
+ * median is still 35px, and the four tallest — 114px, 80px, 63px, 63px — are
+ * tall because of their VALUES ("Supported Apps" lists them) rather than their
+ * labels, which are short enough to fit 136px of text box. So this costs
+ * nothing and frees 80px.
+ *
+ * After the rules above, so it wins on order at equal specificity. */
+@media (max-width: 48rem) {
+    .specs-col-label {
+        width: 10rem;
+        min-width: 10rem;
+    }
+}
 /* Which way is better, on the rows that have an answer. It appears only while
    "mark best" is on: without it the feature looks broken on every row that was
    skipped on purpose, because a skipped row and a missed one look identical. */
@@ -5897,6 +5919,28 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* A hairline marking where the pinned block ends, so the seam is legible when
    content scrolls under it. */
 .sticky-name { box-shadow: 1px 0 0 var(--color-border); }
+
+/* On a phone the pinned block WAS the table. 36px + 288px is 324 of a 349px
+   scroller — 93%, leaving 25px for the other nine columns, so the sideways
+   scroll the pin exists to survive had nothing left to scroll.
+ *
+ * Both widths move together and have to: `.sticky-name`'s `left` is the select
+ * column's width, and a sticky offset has to be known in advance. The name
+ * truncates (`.guide-carline-name`), so it loses characters rather than
+ * breaking, and 160px still carries enough to tell configurations apart with
+ * the detail modal a tap away.
+ *
+ * This has to live HERE rather than with the other phone rules ~3700 lines
+ * earlier: equal specificity, so the later rule wins. */
+@media (max-width: 48rem) {
+    .sticky-select { width: 2rem; min-width: 2rem; }
+    .sticky-name {
+        left: 2rem;
+        width: 10rem;
+        min-width: 10rem;
+        max-width: 10rem;
+    }
+}
 
 .guide-row {
     @apply cursor-pointer transition-colors;
