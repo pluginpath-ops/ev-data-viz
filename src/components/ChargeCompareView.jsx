@@ -823,9 +823,7 @@ export default function ChargeCompareView({
         <div className="chart-layout">
             {/* ── Left rail: same rig as Charging and Range & Efficiency ── */}
             {!presentationMode && <aside className="chart-rail">
-                {loading && <LoadingSpinner message="Loading charging data…" />}
-
-                {/* ── SCENARIO ──
+                                {/* ── SCENARIO ──
                   * The three numbers that define the question both charts
                   * answer. They were a wrapping row of "Label: [input]" pairs
                   * that read as a form; as a labelled group of short rows they
@@ -952,6 +950,11 @@ export default function ChargeCompareView({
             </aside>}
 
             <div className="chart-main">
+                {loading && (
+                    <span className="chart-loading">
+                        <LoadingSpinner message="Loading charging data…" />
+                    </span>
+                )}
 
             {!hasRangeRuns ? (
                 <div className="card text-center py-12 text-meta">

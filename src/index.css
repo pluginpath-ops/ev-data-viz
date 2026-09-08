@@ -1955,6 +1955,40 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 .chart-main {
     flex: 1;
     min-width: 0;
+    /* The ground the loading badge floats over. `relative`, not `transform` —
+       a transformed ancestor becomes the containing block for `position: fixed`
+       descendants, which is exactly what would break every popover on the
+       page. */
+    position: relative;
+}
+
+/* ── Loading, out of flow ────────────────────────────────────────────────────
+ *
+ * It used to sit in flow at the top of the sidebar, so adding a run pushed
+ * every control down 36px and let them spring back — which moves the thing you
+ * were about to click out from under the cursor. Charging had a second one
+ * above the canvas doing the same to the plot.
+ *
+ * Absolute, so its cost to layout is zero and the acceptance test can be a
+ * measurement rather than a judgement: the first control's top must not move
+ * between idle and loading. Pointer-transparent, because the stale chart
+ * underneath stays readable and worth interacting with while the new data
+ * arrives. */
+.chart-loading {
+    @apply flex items-center;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    /* Above the canvas, and no higher — this is not a page-level layer, so it
+       has no business in the z-index tokens. */
+    z-index: 1;
+    padding: 6px 12px;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-border);
+    background-color: var(--color-card);
+    box-shadow: var(--shadow-popover, 0 4px 12px rgba(0, 0, 0, 0.3));
+    pointer-events: none;
 }
 
 /* ── Controls, re-laid for a 300px column ──────────────────────────────────
@@ -2143,10 +2177,44 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
            which hid the same bug rather than avoiding it. */
         align-items: stretch;
     }
+    /* ── The stacked sidebar has to stay bounded ─────────────────────────────
+     *
+     * `max-height: none` was here because the desktop rule pins the rail to
+     * `calc(100vh - header)` and sticks it beside the plot; stacked, a rail
+     * exactly one screen tall would bury the chart under a full viewport of
+     * controls. Removing the cap solved that and created a worse one: the rail
+     * grows to its content, and one view's content is a 377-row record
+     * browser. Measured at 375px, EPA → Speed-Consumption Curves came to
+     * 13736px of sidebar — 17.7 screens of page, with the chart 17.2 screens
+     * down and no way to know it was there.
+     *
+     * A cap restores what the desktop layout always had: the rail scrolls
+     * inside itself (`overflow-y: auto` is on the base rule) rather than
+     * scrolling the page. 60vh rather than 100vh because the point of stacking
+     * is that the chart is below — leaving the rail a full screen would put it
+     * exactly at the fold, where nothing signals that anything follows. */
     .chart-rail {
         width: 100%;
         position: static;
-        max-height: none;
+        max-height: 60vh;
+    }
+}
+
+/* ── Phone gutters ───────────────────────────────────────────────────────────
+ *
+ * `.page-container` spends 24px a side, which is right at a laptop width and is
+ * 13% of a 375px phone. Measured on EPA → Speed-Consumption Curves: of 375px,
+ * a control row got 325 — 48 to this gutter and 26 to the sidebar's own padding
+ * and border.
+ *
+ * Only the gutter moves here. The sidebar's padding and border are what make it
+ * read as a distinct region rather than as loose controls, and dropping them on
+ * a narrow screen is a question about what the stacked layout should LOOK like,
+ * not about how much room it has. That belongs to a design pass. */
+@media (max-width: 48rem) {
+    .page-container {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
     }
 }
 
@@ -6742,6 +6810,19 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     flex: 1;
     min-height: 120px;
     margin: 0 calc(var(--rail-pad-r) * -1) 0 calc(var(--rail-pad-l) * -1);
+}
+
+/* Stacked, the sidebar is capped (see the layout media query) and this list is
+   `flex: 1` — so once the rail stopped growing, the list collapsed to the floor
+   above: four rows out of 377. It is the primary control on this view, so it
+   gets a floor of its own, worth about eight rows, and the rail scrolls for the
+   rest.
+ *
+ * It has to live HERE rather than beside the other stacked rules. Those are
+ * written ~4000 lines earlier, and at equal specificity the later rule wins —
+ * the same ordering trap `.popover.popover--anchored` was doubled to escape. */
+@media (max-width: 68.75rem) {
+    .curve-picker-list { min-height: 30vh; }
 }
 .curve-picker-list .curve-picker-row {
     padding-left: var(--rail-pad-l);
