@@ -126,10 +126,17 @@ export function useStickyChartColors(runs, { autoColor, resetKey }) {
         // of. An assignment is what the palette chose; an override is what a
         // person chose over it, and only the first is this map's business.
         if (autoColor) {
-            const keep = Object.fromEntries(
-                Object.entries(resolved).filter(([runId]) => !(runId in overrides)),
+            // An overridden run is DROPPED, not merely skipped. Skipping left
+            // its previous assignment sitting in the map while the resolver —
+            // seeing the override — handed that same colour to somebody else,
+            // so two runs ended up remembered at one colour. An override is
+            // what a person chose over an assignment; the assignment it
+            // replaced is not worth keeping, and keeping it was a duplicate
+            // waiting for the override to be cleared.
+            assigned.current = Object.fromEntries(
+                Object.entries({ ...assigned.current, ...resolved })
+                    .filter(([runId]) => !(runId in overrides)),
             );
-            assigned.current = { ...assigned.current, ...keep };
         }
         return resolved;
     }, [runs, autoColor, sessionKey, overrides]);

@@ -441,3 +441,37 @@ describe('the palettes on offer', () => {
         }
     });
 });
+
+describe('a colour pinned to a run that sorts later', () => {
+    const at = (id, color, day) => ({ id, color, created_at: `2026-01-${String(day).padStart(2, '0')}` });
+
+    it('is not handed to an earlier run that had none', () => {
+        // The bug this exists for. `placed` only knew about runs already
+        // visited, so a free run early in the order could take a colour a LATER
+        // run was pinned to, and nothing ever compared them. It needed the
+        // pinned run to sort AFTER the free one — which is what happens when
+        // runs are ticked in a different order from their creation dates.
+        const runs = [at(1, null, 1), at(2, null, 2)];
+        const out = resolveChartColors(runs, { 2: '#E69F00' }, 'auto');
+        expect(out[2]).toBe('#E69F00');
+        expect(out[1]).not.toBe('#E69F00');
+    });
+
+    it('holds across a whole plot of pinned and free runs', () => {
+        const runs = Array.from({ length: 12 }, (_, i) => at(i + 1, null, i + 1));
+        // Pin the LAST four, which every earlier run is resolved before.
+        const pinned = { 9: '#E69F00', 10: '#56B4E9', 11: '#009E73', 12: '#F0E442' };
+        const out = resolveChartColors(runs, pinned, 'auto');
+        expect(new Set(Object.values(out)).size).toBe(12);
+        for (const [id, hex] of Object.entries(pinned)) expect(out[id]).toBe(hex);
+    });
+
+    it('still returns the pinned colour itself, unchanged and uncounted', () => {
+        // Pre-seeding `placed` must not make a pinned colour look twice-used and
+        // push everything else away from it more than it deserves.
+        const runs = [at(1, null, 1), at(2, null, 2), at(3, null, 3)];
+        const out = resolveChartColors(runs, { 1: '#E69F00' }, 'auto');
+        expect(out[1]).toBe('#E69F00');
+        expect(new Set(Object.values(out)).size).toBe(3);
+    });
+});

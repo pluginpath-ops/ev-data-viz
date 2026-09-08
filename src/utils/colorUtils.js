@@ -297,14 +297,27 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual')
     });
 
     const result = {};
-    const placed = [];  // hex strings of already-resolved colors
+
+    // Every colour the caller has already fixed — a session override, or an
+    // assignment useStickyChartColors is holding still — is on the chart no
+    // matter where its run falls in this order. They go in UP FRONT.
+    //
+    // Without that, `placed` only knew about runs already visited, so an
+    // unassigned run could take a colour that a LATER run was pinned to and
+    // nothing would ever compare them. It needed the pinned run to sort after
+    // the free one, which is why it showed up only once runs were ticked in an
+    // order different from their creation dates: thirteen runs, nine colours,
+    // and a resolver that returns thirteen distinct ones when asked directly.
+    const placed = sorted.map(r => sessionOverrides[r.id]).filter(Boolean);
 
     for (const run of sorted) {
         let chosen;
 
         if (sessionOverrides[run.id]) {
-            // 1. Transient session override — highest priority
-            chosen = sessionOverrides[run.id];
+            // 1. Transient session override — highest priority, and already in
+            //    `placed` from the pass above, so it is not pushed again below.
+            result[run.id] = sessionOverrides[run.id];
+            continue;
 
         } else if (mode === 'manual' && !isUnsetColor(run.color)
                    && !placed.some(p => sameHex(p, run.color))) {
