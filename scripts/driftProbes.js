@@ -213,7 +213,7 @@ export const LEDGER = [
     },
     {
         key: 'arbitrary-text-size',
-        count: 99,
+        count: 98,
         scope: 'src/**/*.jsx',
         what: 'Font sizes written as arbitrary values — `text-[10px]`, `text-[11px]`. '
             + 'Every one is a size the global UI-scale knob cannot move and the type '
@@ -225,7 +225,7 @@ export const LEDGER = [
     },
     {
         key: 'hex-literal',
-        count: 58,
+        count: 51,
         scope: 'src/**/*.jsx',
         what: 'Raw hex colours in component source. Mostly canvas drawing and the '
             + '`#3b82f6` default series colour, repeated at eight call sites rather '

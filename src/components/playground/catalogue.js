@@ -39,7 +39,7 @@ export const OWNED_FAMILIES = [
     { id: 'notices', label: 'Notices & panels',
       match: (n) => /^(note-panel|state-panel|drop-zone|empty-state|fixed-action-bar)/.test(n) },
     { id: 'menus',   label: 'Menus & popovers',
-      match: (n) => /^(menu-button|guide-facet-|disclosure-caret|nav-menu|account-|popover|info-icon|pg-swatch)/.test(n) },
+      match: (n) => /^(menu-button|guide-facet-|disclosure-caret|nav-menu|account-|popover|info-icon|color-|series-swatch)/.test(n) },
     { id: 'figures', label: 'Figures — frames, bars, cells',
       match: (n) => /^(plot-frame|stat-cell|guide-spark|guide-cell-stack|stats-box-|stats-histogram-|run-band|run-cell)/.test(n) },
 ];
@@ -53,6 +53,8 @@ export const OWNED_FAMILIES = [
  */
 export const NOT_CATALOGUED = {
     'info-icon':        'Layout wrapper — an inline-flex span holding the glyph. The glyph is catalogued.',
+    'popover-foot-gap': 'A flex spacer inside the action row — it has no appearance at '
+        + 'all, it is the gap that keeps Auto away from Apply. The row is catalogued.',
     'popover--anchored': 'Position and layer only, no appearance: it carries the `fixed` that lets a panel leave a scrolling sidebar. Its two tiers are catalogued.',
     'cert-chips':        'Layout wrapper — a flex row that holds chips. The chips are catalogued.',
     'tag-filter-bar':    'Layout wrapper for the filter row.',
@@ -182,9 +184,17 @@ export const SECTIONS = [
             { composite: 'popover-sheet', label: 'Sheet — narrow screens',
               covers: ['popover--sheet', 'popover-grabber'],
               note: 'There is no hover to peek with on touch, so a tap opens this directly rather than reproducing a hover tier as a tap.' },
-            { composite: 'popover-seams', label: 'Popover — the three seams (live)',
-              covers: ['popover-anchor', 'pg-swatch'],
-              note: 'The one live specimen on this page. A popover holds any content and answers to its owner: an arbitrary trigger (a swatch, not the ⓘ), content that closes its own panel through the { close } it is handed, and an owner told through onOpenChange. Cancel, ×, Escape and an outside click all discard; only Apply writes.' },
+            { composite: 'series-swatch', label: 'Series swatch — the read-only one',
+              covers: ['series-swatch'],
+              note: 'The 10px sibling of the picker\'s trigger: it REPORTS which line a row is, it does not change it. Hollow when the row is not plotted, so it says "not on the chart" rather than claiming a colour it does not have; orange dot when the series rests on an assumption.' },
+            { composite: 'series-color-picker', label: 'Series colour picker (live)',
+              covers: ['popover-anchor', 'popover-foot', 'series-swatch--button',
+                       'color-picker-body', 'color-row', 'color-scope', 'color-switch',
+                       'color-slots', 'color-slot', 'color-hex', 'color-hex-chip',
+                       'color-auto', 'color-manual', 'color-seed-radio', 'color-seed-name',
+                       'color-slider', 'color-slider-input', 'color-seed', 'color-seed-row',
+                       'color-seed-chips', 'color-readout', 'color-warning', 'color-note'],
+              note: 'The one live specimen on this page, because a picker is a mechanism rather than an appearance. It replaced five <input type="color"> boxes — the browser\'s own dialog, one colour at a time, with no view of the set you are picking against. A pick here is a BASE: it becomes slot 1 and the rest of the set is re-derived from it, by rotation across hues or by lightness steps along one. Scope decides who that set is. Nothing at any scope reaches the database. Cancel, ×, Escape and an outside click all discard.' },
             { composite: 'nav-menu', label: 'Nav menu, collapsed',
               covers: ['nav-menu', 'nav-menu-main', 'nav-menu-sub', 'nav-menu-btn', 'nav-menu-current', 'nav-menu-panel', 'nav-menu-item-hint'],
               note: 'A gated destination says WHY in the row — a title attribute is invisible on touch, which is the only place this form appears.' },

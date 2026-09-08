@@ -66,6 +66,11 @@ export const CONSTRUCTED = {
     'nav-menu-main': 'NavMenu builds `nav-menu-${level}`.',
     'nav-menu-sub':  'NavMenu builds `nav-menu-${level}`.',
     'is-prose':      'RunSpecRows builds `is-${cell.tone}`.',
+    'is-hue':        'SeriesColorPicker builds `color-slider-input is-${track}`.',
+    'is-lightness':  'SeriesColorPicker builds `color-slider-input is-${track}`.',
+    'is-saturation': 'SeriesColorPicker builds `color-slider-input is-${track}`.',
+    'is-weak':       'SeriesColorPicker builds `text-caption${weak ? \' is-weak\' : \'\'}` '
+        + 'when a colour falls under the 3:1 non-text contrast minimum.',
     'step-1': 'StatsHistogram builds `step-${n}` for its four-step fill.',
     'step-2': 'StatsHistogram builds `step-${n}` for its four-step fill.',
     'step-3': 'StatsHistogram builds `step-${n}` for its four-step fill.',

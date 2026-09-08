@@ -40,7 +40,9 @@ const EMPTY = {};
  * @param {Object}  opts
  * @param {boolean} opts.autoColor  auto mode on/off
  * @param {string}  opts.resetKey   changes when the vehicle set changes
- * @returns {{ colorMap: Object, setColorOverride: (runId, color) => void }}
+ * @returns {{ colorMap: Object, setColorOverride: (runId, color) => void,
+ *            setColorOverrides: (map) => void,
+ *            isColorOverridden: (runId) => boolean }}
  */
 export function useStickyChartColors(runs, { autoColor, resetKey }) {
     // A MONOTONIC generation, not a key derived from the boolean. Deriving it
@@ -63,12 +65,41 @@ export function useStickyChartColors(runs, { autoColor, resetKey }) {
     // not read, so it can never be applied to the wrong set of runs.
     const overrides = overrideState.key === sessionKey ? overrideState.map : EMPTY;
 
+    // A null colour REMOVES the override rather than storing null, which is what
+    // the picker's "Auto" means: hand this run back to the palette. Storing null
+    // would leave a key that resolveChartColors reads as falsy and skips, so the
+    // run would fall through to its stored colour instead — the same outcome by
+    // accident in manual mode, and the wrong one in auto.
     const setColorOverride = (runId, color) => {
-        setOverrideState(prev => ({
-            key: sessionKey,
-            map: { ...(prev.key === sessionKey ? prev.map : EMPTY), [runId]: color },
-        }));
+        setOverrideState(prev => {
+            const base = prev.key === sessionKey ? prev.map : EMPTY;
+            if (color == null) {
+                if (!(runId in base)) return prev.key === sessionKey ? prev : { key: sessionKey, map: EMPTY };
+                const { [runId]: _removed, ...rest } = base;
+                return { key: sessionKey, map: rest };
+            }
+            return { key: sessionKey, map: { ...base, [runId]: color } };
+        });
     };
+
+    // A whole derived set at once, and the ONE reason this is not a loop over
+    // setColorOverride: the picker's wider scopes recolour every series from a
+    // single base, and applying that one at a time would re-render the chart
+    // once per run and let a half-applied set be seen.
+    const setColorOverrides = (map) => {
+        setOverrideState(prev => {
+            const next = { ...(prev.key === sessionKey ? prev.map : EMPTY) };
+            // A null value REMOVES, matching setColorOverride. That is what the
+            // picker's "Back to auto" sends for a whole scope, and it has to be
+            // one update: clearing twenty runs one at a time would re-solve the
+            // palette after each and shuffle the colours it had not reached yet.
+            for (const [id, color] of Object.entries(map)) {
+                if (color == null) delete next[id]; else next[id] = color;
+            }
+            return { key: sessionKey, map: next };
+        });
+    };
+
 
     const colorMap = useMemo(() => {
         if (assignedKey.current !== sessionKey) {
@@ -87,9 +118,36 @@ export function useStickyChartColors(runs, { autoColor, resetKey }) {
         // Remember, so the next call holds these in place. Idempotent: React may
         // run a memo more than once, and re-merging the same answer changes
         // nothing — unlike a mutation whose result depends on not having run yet.
-        if (autoColor) assigned.current = { ...assigned.current, ...resolved };
+        //
+        // An OVERRIDE is deliberately not remembered. It arrives in the seed and
+        // therefore comes back out in `resolved`, so folding it in would write
+        // the hand-picked colour into the auto assignments — and then clearing
+        // the override would restore the run to the colour it was just cleared
+        // of. An assignment is what the palette chose; an override is what a
+        // person chose over it, and only the first is this map's business.
+        if (autoColor) {
+            // An overridden run is DROPPED, not merely skipped. Skipping left
+            // its previous assignment sitting in the map while the resolver —
+            // seeing the override — handed that same colour to somebody else,
+            // so two runs ended up remembered at one colour. An override is
+            // what a person chose over an assignment; the assignment it
+            // replaced is not worth keeping, and keeping it was a duplicate
+            // waiting for the override to be cleared.
+            assigned.current = Object.fromEntries(
+                Object.entries({ ...assigned.current, ...resolved })
+                    .filter(([runId]) => !(runId in overrides)),
+            );
+        }
         return resolved;
     }, [runs, autoColor, sessionKey, overrides]);
 
-    return { colorMap, setColorOverride };
+    return {
+        colorMap,
+        setColorOverride,
+        setColorOverrides,
+        // Whether a run is showing a hand-picked colour rather than the
+        // palette's. The picker reflects this rather than guessing from the
+        // stored value, which answers a different question entirely.
+        isColorOverridden: (runId) => runId in overrides,
+    };
 }

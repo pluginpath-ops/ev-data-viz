@@ -14,6 +14,7 @@ import { buildEpaCurveFromModel, resolveCurveEta, resolvePrimaryCoeffs, correctM
 import { filterRangeRuns } from '../utils/runUtils';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
+import SeriesColorPicker from './SeriesColorPicker';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
@@ -908,14 +909,17 @@ export default function EpaCurvesView({
                                                                         onChange={() => toggleMapping(mapping.id)}
                                                                         className="w-4 h-4 mt-0.5 shrink-0"
                                                                     />
-                                                                    {/* Color picker */}
-                                                                    <input
-                                                                        type="color"
+                                                                    {/* Colour. Session-only: a curve's colour lives in
+                                                                        this view's state and is never written back, so
+                                                                        there is no stored value to differ from. */}
+                                                                    <SeriesColorPicker
                                                                         value={pickerColor}
-                                                                        onChange={e => setMappingColors(prev => ({ ...prev, [mapping.id]: e.target.value }))}
-                                                                        onClick={e => e.stopPropagation()}
-                                                                        className="w-8 h-6 border-0 rounded cursor-pointer shrink-0"
-                                                                        title="Change curve color"
+                                                                        label={epaLabel}
+                                                                        onChange={hex => setMappingColors(prev => ({ ...prev, [mapping.id]: hex }))}
+                                                                        onReset={() => setMappingColors(prev => {
+                                                                            const { [mapping.id]: _cleared, ...rest } = prev;
+                                                                            return rest;
+                                                                        })}
                                                                     />
                                                                     {/* Label + metadata */}
                                                                     <div className="run-label min-w-0">

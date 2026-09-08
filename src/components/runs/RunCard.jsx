@@ -2,6 +2,8 @@ import SessionControl from '../SessionControl';
 import RunSpecRows from '../RunSpecRows';
 import { RunVoteButtons } from '../VoteButtons';
 import RunSourceLinks from '../RunSourceLinks';
+import SeriesColorPicker from '../SeriesColorPicker';
+import { DEFAULT_RUN_COLOR } from '../../utils/colorUtils';
 import { RunKindPill, FIELD_META, inferRunFlags } from './runDisplay';
 import { filterChargingRuns, defaultChargingRun, runKindFrom } from '../../utils/runUtils';
 
@@ -249,26 +251,16 @@ export default function RunCard({
                         )}
                     </div>
                 </div>
-                {/* Color picker — lower right */}
+                {/* Colour — lower right. This one is DURABLE: it writes
+                    runs.color and every visitor sees it. */}
                 <div className="run-actions-row">
-                    <label className="flex items-center gap-1 text-xs text-meta cursor-pointer">
-                        <input
-                            type="color"
-                            value={run.color || '#3b82f6'}
-                            onChange={e => onUpdateRun(run.id, { color: e.target.value })}
-                            className="w-7 h-5 border-0 rounded cursor-pointer shrink-0"
-                            title="Change plot color"
-                        />
-                        <input
-                            type="text"
-                            value={run.color || '#3b82f6'}
-                            onChange={e => onUpdateRun(run.id, { color: e.target.value })}
-                            onBlur={e => { if (!/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) onUpdateRun(run.id, { color: run.color || '#3b82f6' }); }}
-                            className="form-input w-20 .5 font-mono text-secondary"
-                            placeholder="#3b82f6"
-                            maxLength={7}
-                        />
-                    </label>
+                    <SeriesColorPicker
+                        value={run.color || DEFAULT_RUN_COLOR}
+                        stored={run.color}
+                        label={run.name}
+                        onChange={hex => onUpdateRun(run.id, { color: hex })}
+                        onReset={() => onUpdateRun(run.id, { color: null })}
+                    />
                 </div>
             </div>
         </div>

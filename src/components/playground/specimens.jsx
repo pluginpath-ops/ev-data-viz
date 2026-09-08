@@ -14,69 +14,107 @@
 
 import { useState } from 'react';
 import Popover from '../Popover';
-import { OKABE_ITO } from '../../utils/colorUtils';
+import SeriesColorPicker from '../SeriesColorPicker';
+import { OKABE_ITO, LEGACY_PALETTE } from '../../utils/colorUtils';
 
 /**
  * The only LIVE specimen on this page, and the one that has to be.
  *
  * Every other entry here is markup: a class on an empty element, which is all
- * you need to check an appearance. `Popover` is not an appearance — it is a
- * mechanism, and the three things worth checking about it cannot be shown by
- * static markup because they are all about time and communication:
+ * you need to check an appearance. A colour picker is not an appearance — it is
+ * a mechanism, and the things worth checking about it cannot be shown by static
+ * markup because they are all about time and communication:
  *
- *   • an arbitrary trigger, not the ⓘ — here a colour swatch, which is the
- *     shape #299's colour control needs
+ *   • an arbitrary trigger, not the ⓘ — a swatch, whose click must open the
+ *     panel WITHOUT reaching the row it sits in
  *   • content that closes its own panel, via the `{ close }` it is handed
  *   • an owner that is told, via `onOpenChange`
+ *   • discard on dismiss — Cancel, ×, Escape and an outside click all leave
+ *     the committed colour alone; only Apply writes
  *
- * Local state only. The page stays inert in the sense the guard means: it
- * reads no application data and performs no action outside this component.
+ * This was a mock of the colour control while the control did not exist. It is
+ * now the control itself, which is strictly better: a mock proves the seams of
+ * a copy, and drifts from the real one the first time either changes.
+ *
+ * Local state only. The page stays inert in the sense the guard means: it reads
+ * no application data and performs no action outside this component.
  */
-function PopoverSeams() {
-    // The real resolver's palette, not four literals that would drift from it.
-    const SLOTS = OKABE_ITO.slice(0, 4);
-    const [slot, setSlot] = useState(SLOTS[0]);
-    const [draft, setDraft] = useState(SLOTS[0]);
-    const [ownerSees, setOwnerSees] = useState('closed');
+function ColorPickerSeams() {
+    // A plotted set the wider scopes can act on: two vehicles — one with three
+    // tests, one with a single test — so "a color per vehicle, a shade per
+    // test" has something to actually do. One row carries a hand-set colour so
+    // "Overwrite" has something to warn about. Shaped exactly like
+    // seriesRowsOf's output, because that is what a chart view hands the picker.
+    const PLOT = [
+        { id: 'r1', vehicleId: 'v1', stored: LEGACY_PALETTE[3] },
+        { id: 'r2', vehicleId: 'v1', stored: null },
+        { id: 'r3', vehicleId: 'v1', stored: null },
+        { id: 'r4', vehicleId: 'v2', stored: null },
+    ];
+    // What the palette would choose, which is what "auto" means here.
+    const AUTO = { r1: OKABE_ITO[0], r2: OKABE_ITO[1], r3: OKABE_ITO[2], r4: OKABE_ITO[4] };
+
+    const [overrides, setOverrides] = useState({});
+    const drawn = id => overrides[id] ?? AUTO[id];
+    const apply = map => setOverrides(prev => {
+        const next = { ...prev };
+        for (const [id, c] of Object.entries(map)) { if (c == null) delete next[id]; else next[id] = c; }
+        return next;
+    });
 
     return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Popover
-                width="240px"
-                title="Series colour"
-                onOpenChange={o => { setOwnerSees(o ? 'open' : 'closed'); if (o) setDraft(slot); }}
-                trigger={props => (
-                    <button {...props} type="button" className="pg-swatch"
-                        style={{ backgroundColor: slot }} aria-label="Series colour" />
-                )}
-            >
-                {({ close }) => (
-                    <div>
-                        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                            {SLOTS.map(c => (
-                                <button key={c} type="button" className="pg-swatch"
-                                    aria-label={c} aria-pressed={draft === c}
-                                    style={{ backgroundColor: c, outline: draft === c ? '2px solid var(--color-primary)' : 'none', outlineOffset: 2 }}
-                                    onClick={() => setDraft(c)} />
-                            ))}
-                        </div>
-                        {/* Discard on dismiss: only this button writes. The ×,
-                            Escape and an outside click all leave `slot` alone. */}
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-                            <button type="button" className="btn btn-secondary" onClick={close}>Cancel</button>
-                            <button type="button" className="btn btn-primary"
-                                onClick={() => { setSlot(draft); close(); }}>Apply</button>
-                        </div>
-                    </div>
-                )}
-            </Popover>
-            <span className="text-nano">owner sees: {ownerSees}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <SeriesColorPicker
+                label="90 kW test"
+                value={drawn('r1')}
+                stored={PLOT[0].stored}
+                seriesId="r1"
+                vehicleId="v1"
+                series={PLOT.map(r => ({ ...r, auto: !(r.id in overrides) }))}
+                isAuto={!('r1' in overrides)}
+                onChange={hex => apply({ r1: hex })}
+                onReset={() => apply({ r1: null })}
+                onApplyMany={apply}
+            />
+            <span className="color-seed-chips">
+                {PLOT.map(r => (
+                    <span key={r.id} className="series-swatch" style={{ backgroundColor: drawn(r.id) }} />
+                ))}
+            </span>
+            <span className="text-nano">
+                {Object.keys(overrides).length
+                    ? `${Object.keys(overrides).length} overridden`
+                    : 'all on auto'}
+            </span>
+        </div>
+    );
+}
+
+/**
+ * The three states of the read-only swatch, side by side — which is the only
+ * way to see that "hollow" and "coloured" are the same box, and that the
+ * qualifier dot clears the corner of both.
+ */
+function SeriesSwatches() {
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            {[
+                ['plotted', 'series-swatch', { backgroundColor: OKABE_ITO[2] }],
+                ['not plotted', 'series-swatch is-empty', {}],
+                ['qualified', 'series-swatch is-qualified', { backgroundColor: OKABE_ITO[4] }],
+            ].map(([label, cls, style]) => (
+                <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span className={cls} style={style} />
+                    <span className="text-nano">{label}</span>
+                </span>
+            ))}
         </div>
     );
 }
 
 export const COMPOSITES = {
-    'popover-seams': () => <PopoverSeams />,
+    'series-color-picker': () => <ColorPickerSeams />,
+    'series-swatch': () => <SeriesSwatches />,
 
     'facet-panel': () => (
         <div className="menu-button" style={{ position: 'static' }}>

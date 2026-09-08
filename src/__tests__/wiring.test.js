@@ -284,7 +284,12 @@ describe('the seams that broke before', () => {
             expect(text, `${f} does not import the shared source-link component`)
                 .toMatch(/import RunSourceLinks/);
 
-            const names = (text.match(/\{run\.name\}/g) ?? []).length;
+            // Rendered names only. `label={run.name}` hands the name to a
+            // control as a prop — SeriesColorPicker takes one for its header —
+            // and counting those as rows made the ratio demand a source link
+            // per prop. The `=` lookbehind is the whole difference between a
+            // name a reader sees on a row and a name passed to a component.
+            const names = (text.match(/(?<!=)\{run\.name\}/g) ?? []).length;
             const links = (text.match(/<RunSourceLinks/g) ?? []).length;
             expect(names, `${f} renders no run name — has the row renderer moved?`)
                 .toBeGreaterThan(0);
