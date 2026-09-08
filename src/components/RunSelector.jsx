@@ -374,7 +374,7 @@ function PairRows({
                                 colorSeries={colorSeries}
                                 colorMap={colorMap}
                             />
-                            <span className="truncate">{run.name}</span>
+                            <span className="truncate" title={run.name}>{run.name}</span>
                             {/* Identity markers only. Conditions moved to their
                                 own row: a paired row already spends a line on
                                 the pairing, so name + chips + control on one
@@ -539,7 +539,7 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, onUpdateR
                     colorSeries={colorSeries}
                     colorMap={colorMap}
                 />
-                <span className="truncate">{run.name}</span>
+                <span className="truncate" title={run.name}>{run.name}</span>
                 {renderRunBadges?.(run)}
                 <RunSourceLinks run={run} className="shrink-0 ml-auto" />
             </span>

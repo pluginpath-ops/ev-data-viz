@@ -735,8 +735,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
               * scrolled away exactly when you were reading the thing they
               * control. The rail sticks; the plot column scrolls past it. */}
             {!presentationMode && <aside className="chart-rail">
-                {loadingData && <LoadingSpinner message="Loading run data…" />}
-                {/* The axis presets used to sit here. They were the first thing
+                                {/* The axis presets used to sit here. They were the first thing
                     in the rail and the least explicable — five buttons whose
                     labels ("Rate + SoC vs Time") only mean something once you
                     already know what the axes do. Removed rather than
@@ -931,6 +930,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             </aside>}
 
             <div className="chart-main">
+                {loadingData && (
+                    <span className="chart-loading">
+                        <LoadingSpinner message="Loading run data…" />
+                    </span>
+                )}
 
             {/* Runs the alignment could not include, named on the chart itself.
                 The selector carries a badge, but that only helps someone who
@@ -1008,9 +1012,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     </>
                 )}
             >
-                {loadingData && (
-                    <div className="text-center py-4 text-secondary text-sm">Loading run data...</div>
-                )}
                 <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px' }}>
                     <canvas ref={chartRef}></canvas>
                 </div>

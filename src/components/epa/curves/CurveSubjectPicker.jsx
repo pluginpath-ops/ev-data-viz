@@ -144,7 +144,7 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                                             : 'Drivetrain efficiency is assumed, not measured — the curve\'s shape is real, its magnitude scales with η'}
                                     />
                                     <span className="curve-picker-name">
-                                        <span className="curve-picker-title">{s.label}</span>
+                                        <span className="curve-picker-title" title={s.label}>{s.label}</span>
                                         <span className="text-caption curve-picker-meta">{s.sublabel}</span>
                                     </span>
                                 </label>

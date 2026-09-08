@@ -1551,9 +1551,7 @@ export default function RoadTripView({
             {/* ── Left rail: same rig as the other three chart screens ── */}
             {!presentationMode && (
                 <aside className="chart-rail">
-                    {loading && <LoadingSpinner message="Loading charging data…" />}
-
-                    {/* ── AXES ──
+                                        {/* ── AXES ──
                       * Four button groups became three dropdowns. As buttons
                       * they read as twelve actions and took four rows; the
                       * charging charts already say a choice of axis looks like
@@ -1854,6 +1852,11 @@ export default function RoadTripView({
             )}
 
             <div className="chart-main">
+                {loading && (
+                    <span className="chart-loading">
+                        <LoadingSpinner message="Loading charging data…" />
+                    </span>
+                )}
 
             {/* ── Chart ────────────────────────────────────────────────── */}
             {loading && (

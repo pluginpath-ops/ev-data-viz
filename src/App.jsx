@@ -28,6 +28,25 @@ import { isEpaPartnerId } from './utils/rangeSource';
    read by name in several places, so it is mapped here rather than renamed. */
 const EPA_STRIP_ITEMS = EPA_SUBTABS.map(t => ({ key: t.id, label: t.label }));
 
+/**
+ * Views that never read the vehicle selection.
+ *
+ * Tests & Data takes ONE vehicle (`currentActiveVehicle`, which comes from
+ * `activeVehicle` and not from the selection); the EPA section takes no vehicle
+ * props at all; Admin and the playground take none either. On all four, the
+ * chips describe a choice that changes nothing on the screen showing them.
+ *
+ * That matters more than it sounds, because the strip lives inside the STICKY
+ * header — as the note beside it says, every row it occupies is taken off every
+ * screen below it for good. Measured on a 375px phone with six vehicles picked:
+ * 77px, which is 46% of the header and 9.5% of the viewport, spent saying
+ * nothing.
+ *
+ * Hiding is not clearing. The selection survives the trip and the chips are
+ * back the moment a view uses them again.
+ */
+const SELECTION_INERT_VIEWS = new Set(['runs', 'epa', 'admin', 'playground']);
+
 export default function App() {
     const {
         vehicles,
@@ -716,7 +735,7 @@ export default function App() {
                             )}
                         />
                     )}
-                    <div className="selected-strip">
+                    {!SELECTION_INERT_VIEWS.has(view) && <div className="selected-strip">
                         <div className="page-container py-2">
                         {/* Selected vehicles row.
                           * The chips are CAPPED at two rows and scroll past
@@ -803,7 +822,7 @@ export default function App() {
                             )}
                         </div>
                         </div>
-                    </div>
+                    </div>}
                 </nav>
 
                 <main className="page-container py-6 flex-1 flex flex-col">
