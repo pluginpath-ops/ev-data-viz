@@ -119,17 +119,87 @@ function shiftLightness(hex, amount) {
     return `#${to2(r)}${to2(g)}${to2(b)}`;
 }
 
-/** Lightness offsets applied on each successive pass through the palette. */
-const PALETTE_PASSES = [0, 0.42, -0.32, 0.66, -0.52];
+/**
+ * Successive passes through the palette, as HSL deltas.
+ *
+ * Both axes move, and that is the point. Lightness alone was what this did
+ * before, and a second pass that is only "the same colour, lighter" reads as a
+ * faded version of the first rather than as its own series — worse on a plot
+ * than a slightly different colour would be. Pulling saturation at the same
+ * time separates the passes from each other as well as from the base.
+ *
+ * Contrast within a pass stays Okabe-Ito's; contrast BETWEEN passes is
+ * deliberately weaker than that. Past seven series there is no arrangement of
+ * colours that is all strongly distinct, so the honest goal is that no two are
+ * ever the SAME — which is what the caller can actually rely on.
+ */
+const PALETTE_PASSES = [
+    { l:   0, s:   0 },   // the palette itself
+    { l:  20, s: -30 },   // lighter, washed
+    { l: -18, s:   8 },   // darker, deeper
+    { l:  34, s: -50 },   // pale
+    { l: -30, s: -18 },   // near-black, muted
+];
+
+/** Degrees of hue added each time the passes run out and start over. */
+const PASS_HUE_NUDGE = 11;
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/** Below this saturation a colour has no usable hue to vary. */
+const ACHROMATIC_S = 20;
 
 /**
- * The candidate list extended far enough to cover `count` runs, by cycling the
- * base palette through progressively lighter and darker variants.
+ * One palette colour, on a given pass, or null where it should not be varied.
+ *
+ * Clamped away from pure white and black, which are not series colours at all —
+ * invisible on one theme or the other.
+ *
+ * A near-grey is skipped entirely after the first pass. Measured: the worst
+ * pair in a 16-series set was #dccfd6 against #d3d7de at ΔE 6.3, and BOTH were
+ * pale variants of the neutral slot. Varying a colour with no hue only produces
+ * more colours with no hue, and they then collide with every other pale variant
+ * in the set. The grey stays available as itself; it just stops breeding.
  */
-function expandedCandidates(base, count) {
-    const out = [...base];
-    for (let pass = 1; pass < PALETTE_PASSES.length && out.length < count; pass++) {
-        for (const c of base) out.push(shiftLightness(c, PALETTE_PASSES[pass]));
+function passVariant(hex, pass) {
+    if (pass === 0) return hex;
+    const { h, s, l } = hexToHsl(hex);
+    if (s < ACHROMATIC_S) return null;
+    const step = PALETTE_PASSES[pass % PALETTE_PASSES.length];
+    const wrap = Math.floor(pass / PALETTE_PASSES.length);
+    return hslToHex({
+        h: (h + wrap * PASS_HUE_NUDGE) % 360,
+        s: clamp(s + step.s, ACHROMATIC_S + 5, 100),
+        l: clamp(l + step.l, 14, 88),
+    });
+}
+
+/**
+ * The palette extended to at least `count` colours, never repeating one.
+ *
+ * The repeat is the whole reason this exists. Auto Color has always extended
+ * the palette this way; the picker's own rotation did not, and wrapped with a
+ * modulo — so a twelve-car chart recoloured from one base got eight colours and
+ * four exact duplicates, which is precisely what a reader assumes the tool is
+ * preventing. One function now, used by both, so they cannot drift apart again.
+ *
+ * Duplicates are skipped rather than counted: clamping can land two passes of a
+ * very light colour on the same lightness, and a candidate list containing the
+ * same hex twice would hand two series one colour by construction.
+ */
+export function expandPalette(colors, count) {
+    const out = [];
+    const seen = new Set();
+    for (let pass = 0; out.length < count && pass < 40; pass++) {
+        for (const c of colors) {
+            const v = passVariant(c, pass);
+            if (v == null) continue;
+            const key = v.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push(v);
+            if (out.length >= count) break;
+        }
     }
     return out;
 }
@@ -165,6 +235,31 @@ function pickBestSlot(orderedCandidates, placed) {
         }
     }
     return bestColor;
+}
+
+/** How far apart two series have to be before they read as different lines. */
+const CLASH_MIN_DELTA = 15;
+
+/**
+ * The nearest colour to `want` that is still clearly apart from everything
+ * placed — for a run whose saved colour is already taken.
+ *
+ * `pickBestSlot` cannot answer this. It maximises distance from what is placed,
+ * so handed a second green it returns whatever is FURTHEST from green, and the
+ * curator's one expressed wish is the first thing discarded. Here proximity
+ * leads and distinctness is the constraint: the nearest candidate that clears
+ * the threshold, so a clashing green becomes another green.
+ *
+ * Falls back to the greedy pick when nothing clears it — past a certain density
+ * there is no near-and-distinct colour left, and distinct is the half worth
+ * keeping.
+ */
+function pickNearestDistinct(want, candidates, placed) {
+    const byProximity = [...candidates].sort((a, b) => deltaE(a, want) - deltaE(b, want));
+    for (const c of byProximity) {
+        if (placed.every(p => deltaE(c, p) >= CLASH_MIN_DELTA)) return c;
+    }
+    return pickBestSlot(candidates, placed);
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -207,25 +302,42 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual')
             // 1. Transient session override — highest priority
             chosen = sessionOverrides[run.id];
 
-        } else if (mode === 'manual' && !isUnsetColor(run.color)) {
+        } else if (mode === 'manual' && !isUnsetColor(run.color)
+                   && !placed.some(p => sameHex(p, run.color))) {
             // 2. Manual mode: contributor-set color wins, seeds the placed list
-            //    so nudged runs avoid clashing with it
+            //    so nudged runs avoid clashing with it.
+            //
+            //    UNLESS it is already on the chart. Two runs saved with the same
+            //    hex used to draw as one line twice and the legend was the only
+            //    way to tell them apart — measured live at 13 series in 9
+            //    colours, none of it the palette running out. Honouring a stored
+            //    colour means honouring it as an identity, and an identity two
+            //    series share is not one. First in the stable order keeps it;
+            //    the later one is nudged, staying in the same hue family through
+            //    the bias below, so a clashing green becomes another green
+            //    rather than jumping to blue.
             chosen = run.color;
 
         } else {
             // 3. Assign an Okabe-Ito slot.
-            //    Auto mode with an explicit color: sort candidates by proximity
-            //    to the stored color so the family preference is expressed first.
-            //    Default / unset colors: use the standard palette order.
             // Extended so there are always at least as many candidates as runs;
             // otherwise every run past the palette length ties and collapses.
-            const pool = expandedCandidates(OKABE_ITO, sorted.length);
-            const candidates =
-                mode === 'auto' && !isUnsetColor(run.color)
-                    ? [...pool].sort((a, b) => deltaE(a, run.color) - deltaE(b, run.color))
-                    : pool;
+            const pool = expandPalette(OKABE_ITO, sorted.length);
 
-            chosen = pickBestSlot(candidates, placed);
+            if (mode === 'manual' && !isUnsetColor(run.color)) {
+                // Only reachable as a clash: a stored colour already on the
+                // chart. Stay in its family — see pickNearestDistinct.
+                chosen = pickNearestDistinct(run.color, pool, placed);
+            } else {
+                // Auto mode with an explicit color: sort candidates by proximity
+                // to the stored color so the family preference is expressed as a
+                // tiebreak. Default / unset colors: use the standard palette order.
+                const candidates =
+                    mode === 'auto' && !isUnsetColor(run.color)
+                        ? [...pool].sort((a, b) => deltaE(a, run.color) - deltaE(b, run.color))
+                        : pool;
+                chosen = pickBestSlot(candidates, placed);
+            }
         }
 
         result[run.id] = chosen;
@@ -416,10 +528,13 @@ export function hslToHex({ h, s, l }) {
  * A base that is not in the palette simply leads it, because there is no slot
  * to rotate from.
  */
-export function rotatePaletteFrom(base, colors) {
+export function rotatePaletteFrom(base, colors, count = 0) {
     const i = colors.findIndex(c => sameHex(c, base));
-    if (i === -1) return [base, ...colors];
-    return [...colors.slice(i), ...colors.slice(0, i)];
+    const rotated = i === -1 ? [base, ...colors] : [...colors.slice(i), ...colors.slice(0, i)];
+    // Asked for more series than the palette holds, it extends rather than
+    // wrapping — see expandPalette. Without a count it is just the rotation,
+    // which is what the four-swatch preview wants.
+    return count > rotated.length ? expandPalette(rotated, count) : rotated;
 }
 
 /** How far the light→dark ramp travels across the whole set. */

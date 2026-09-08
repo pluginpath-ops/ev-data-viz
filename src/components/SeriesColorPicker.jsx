@@ -195,7 +195,9 @@ function PickerPanel({
         if (!targets.length) return null;
         const colors = derivation === 'shades'
             ? rampFrom(base, targets.length)
-            : rotatePaletteFrom(base, palette.colors);
+            // The count matters: without it the rotation wraps with a modulo and
+            // a twelve-series plot gets eight colours and four duplicates.
+            : rotatePaletteFrom(base, palette.colors, targets.length);
         return Object.fromEntries(targets.map((t, i) => [t.id, colors[i % colors.length]]));
     }, [derivation, targets, base, palette]);
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     resolvePairColors, seriesColorNote, DEFAULT_RUN_COLOR, OKABE_ITO_SET,
     hexToHsl, hslToHex, rotatePaletteFrom, paletteSlotOf, rampFrom, seedPreview,
-    seriesRowsOf,
+    seriesRowsOf, expandPalette, OKABE_ITO, SERIES_NEUTRAL, resolveChartColors,
 } from '../colorUtils';
 
 const r = (key, primaryId, baseColor) => ({ key, primaryId, baseColor });
@@ -205,5 +205,103 @@ describe('seriesRowsOf', () => {
     it('survives empty and missing input', () => {
         expect(seriesRowsOf(null, null)).toEqual([]);
         expect(seriesRowsOf([], vehicles)).toEqual([]);
+    });
+});
+
+describe('extending the palette past its length', () => {
+    it('never repeats a colour, however many series are asked for', () => {
+        // The bug this exists for: the picker's rotation wrapped with a modulo,
+        // so a twelve-car chart got eight colours and four exact duplicates —
+        // precisely what a reader assumes the tool is preventing.
+        for (const n of [8, 12, 20, 30, 48]) {
+            const set = expandPalette(OKABE_ITO_SET, n);
+            expect(set).toHaveLength(n);
+            expect(new Set(set.map(c => c.toLowerCase())).size).toBe(n);
+        }
+    });
+
+    it('leaves the palette itself untouched on the first pass', () => {
+        expect(expandPalette(OKABE_ITO_SET, OKABE_ITO_SET.length)).toEqual(OKABE_ITO_SET);
+    });
+
+    it('varies saturation as well as lightness', () => {
+        // Lightness alone was what this did before, and a second pass that is
+        // only "the same colour, lighter" reads as a faded first pass rather
+        // than as its own series.
+        const set = expandPalette(OKABE_ITO, 14);
+        const base = hexToHsl(OKABE_ITO[0]);
+        const second = hexToHsl(set[OKABE_ITO.length]);
+        expect(second.l).not.toBeCloseTo(base.l, 0);
+        expect(second.s).not.toBeCloseTo(base.s, 0);
+    });
+
+    it('does not breed the neutral slot', () => {
+        // Varying a colour with no hue only makes more colours with no hue, and
+        // they collide with every other pale variant. Measured: the worst pair
+        // in a 16-series set used to be two pale variants of the grey.
+        const set = expandPalette(OKABE_ITO_SET, 30);
+        const greys = set.filter(c => hexToHsl(c).s < 20);
+        expect(greys).toEqual([SERIES_NEUTRAL]);
+    });
+
+    it('keeps every colour clear of pure white and black', () => {
+        for (const c of expandPalette(OKABE_ITO_SET, 40)) {
+            const { l } = hexToHsl(c);
+            expect(l).toBeGreaterThan(10);
+            expect(l).toBeLessThan(92);
+        }
+    });
+
+    it('rotation extends when given a count, and only rotates without one', () => {
+        expect(rotatePaletteFrom(OKABE_ITO_SET[0], OKABE_ITO_SET)).toHaveLength(OKABE_ITO_SET.length);
+        const twelve = rotatePaletteFrom(OKABE_ITO_SET[2], OKABE_ITO_SET, 12);
+        expect(twelve).toHaveLength(12);
+        expect(new Set(twelve.map(c => c.toLowerCase())).size).toBe(12);
+        expect(twelve[0]).toBe(OKABE_ITO_SET[2]);
+    });
+
+    it('gives resolveChartColors a distinct colour per run well past the palette', () => {
+        const runs = Array.from({ length: 20 }, (_, i) => ({ id: i + 1, color: null, created_at: `2026-01-${i + 1}` }));
+        const assigned = Object.values(resolveChartColors(runs, {}, 'auto'));
+        expect(new Set(assigned).size).toBe(20);
+    });
+});
+
+describe('two runs saved with the same colour', () => {
+    const at = (id, color, day) => ({ id, color, created_at: `2026-01-${String(day).padStart(2, '0')}` });
+
+    it('keeps the first and nudges the second, in manual mode', () => {
+        const out = resolveChartColors([at(1, '#009E73', 1), at(2, '#009E73', 2)], {}, 'manual');
+        expect(out[1]).toBe('#009E73');
+        expect(out[2]).not.toBe('#009E73');
+    });
+
+    it('nudges within the hue family rather than across the wheel', () => {
+        // A clashing green should become another green. Jumping to blue would
+        // discard the one thing the curator did express.
+        const out = resolveChartColors([at(1, '#009E73', 1), at(2, '#009E73', 2)], {}, 'manual');
+        const { h } = hexToHsl(out[2]);
+        const green = hexToHsl('#009E73').h;
+        expect(Math.abs(h - green)).toBeLessThan(60);
+    });
+
+    it('still honours a colour nobody else is using', () => {
+        const out = resolveChartColors([at(1, '#009E73', 1), at(2, '#CC79A7', 2)], {}, 'manual');
+        expect(out[1]).toBe('#009E73');
+        expect(out[2]).toBe('#CC79A7');
+    });
+
+    it('is decided by the stable order, not by which run was passed first', () => {
+        const rows = [at(2, '#009E73', 2), at(1, '#009E73', 1)];
+        expect(resolveChartColors(rows, {}, 'manual')[1]).toBe('#009E73');
+        expect(resolveChartColors([...rows].reverse(), {}, 'manual')[1]).toBe('#009E73');
+    });
+
+    it('gives thirteen runs sharing three colours thirteen distinct ones', () => {
+        // The shape measured on the live chart before this.
+        const rows = ['#F0E442', '#F0E442', '#009E73', '#009E73', '#009E73', '#CC79A7', '#CC79A7',
+                      '#E69F00', '#56B4E9', '#0072B2', '#D55E00', '#ef4444', '#9ca3af']
+            .map((c, i) => at(i + 1, c, i + 1));
+        expect(new Set(Object.values(resolveChartColors(rows, {}, 'manual'))).size).toBe(13);
     });
 });
