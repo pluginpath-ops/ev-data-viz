@@ -3,6 +3,7 @@ import {
     resolvePairColors, seriesColorNote, DEFAULT_RUN_COLOR, OKABE_ITO_SET,
     hexToHsl, hslToHex, rotatePaletteFrom, paletteSlotOf, rampFrom, seedPreview,
     seriesRowsOf, expandPalette, OKABE_ITO, SERIES_NEUTRAL, resolveChartColors, seedPlot,
+    SERIES_PALETTES, HOUSE_PALETTE,
 } from '../colorUtils';
 
 const r = (key, primaryId, baseColor) => ({ key, primaryId, baseColor });
@@ -374,5 +375,69 @@ describe('seedPlot', () => {
 
     it('survives an empty plot', () => {
         expect(seedPlot(P[0], [], { rotate: true, shade: true }, P)).toEqual({});
+    });
+});
+
+describe('the palettes on offer', () => {
+    it('every palette has a unique id, a label and at least five slots', () => {
+        const ids = SERIES_PALETTES.map(p => p.id);
+        expect(new Set(ids).size).toBe(ids.length);
+        for (const p of SERIES_PALETTES) {
+            expect(p.label, p.id).toBeTruthy();
+            expect(p.colors.length, p.id).toBeGreaterThanOrEqual(5);
+        }
+    });
+
+    it('no palette repeats a colour within itself', () => {
+        for (const p of SERIES_PALETTES) {
+            const seen = p.colors.map(c => c.toLowerCase());
+            expect(new Set(seen).size, p.id).toBe(seen.length);
+        }
+    });
+
+    it('every palette can grow to twenty without repeating', () => {
+        // Including the monochromes, which have no hue to nudge — expandPalette
+        // has to vary the greys when varying them is all there is.
+        for (const p of SERIES_PALETTES) {
+            const set = expandPalette(p.colors, 20);
+            expect(set.length, p.id).toBe(20);
+            expect(new Set(set.map(c => c.toLowerCase())).size, p.id).toBe(20);
+        }
+    });
+
+    it('a monochrome palette really is one hue, ordered light to dark', () => {
+        for (const p of SERIES_PALETTES.filter(x => x.id.startsWith('mono'))) {
+            const hsl = p.colors.map(hexToHsl);
+            // A tolerance, not equality: eight bits per channel cannot hold one
+            // exact hue at every lightness. Hue lives in the DIFFERENCES between
+            // channels, so the less saturated the colour the fewer units carry
+            // it and the coarser the rounding — mono-orange spans 1 degree at
+            // s=88, mono-white spans 3 at s=37. Five is still nowhere near a
+            // different colour: the palette's own neighbours sit 40 apart.
+            const hues = hsl.map(c => c.h);
+            expect(Math.max(...hues) - Math.min(...hues), p.id).toBeLessThan(5);
+            for (let i = 1; i < hsl.length; i++) {
+                expect(hsl[i].l, p.id).toBeLessThan(hsl[i - 1].l);
+            }
+        }
+    });
+
+    it('keeps every slot clear of pure white and black', () => {
+        for (const p of SERIES_PALETTES) {
+            for (const c of p.colors) {
+                const { l } = hexToHsl(c);
+                expect(l, `${p.id} ${c}`).toBeGreaterThan(8);
+                expect(l, `${p.id} ${c}`).toBeLessThan(97);
+            }
+        }
+    });
+
+    it('draws the house palette from the theme rather than new colours', () => {
+        // The dark theme's own --color-accent-* values, plus --color-text-primary
+        // standing in for white. A house palette that invented its own blue
+        // would be the drift the token system exists to stop.
+        for (const token of ['#2d7ff9', '#f28b3c', '#23b47e', '#9b8cf0', '#6b7a8f', '#f2f5f9']) {
+            expect(HOUSE_PALETTE.map(c => c.toLowerCase())).toContain(token);
+        }
     });
 });

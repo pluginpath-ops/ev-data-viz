@@ -4200,11 +4200,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-secondary);
 }
 
-/* One row, never two. The palette is exactly eight, and wrapping it to a
-   second line would make the ninth cell look like a colour that is missing. */
+/* One row, never two, whatever the palette's length — wrapping it would make
+   the first cell of the second line look like a colour that is missing.
+   `grid-auto-flow: column` follows the palette instead of pinning eight, which
+   matters now that adding a palette is a data edit. */
 .color-slots {
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     gap: 4px;
 }
 .color-slot {

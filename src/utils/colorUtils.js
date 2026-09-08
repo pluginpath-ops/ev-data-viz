@@ -161,10 +161,10 @@ const ACHROMATIC_S = 20;
  * more colours with no hue, and they then collide with every other pale variant
  * in the set. The grey stays available as itself; it just stops breeding.
  */
-function passVariant(hex, pass) {
+function passVariant(hex, pass, skipAchromatic = true) {
     if (pass === 0) return hex;
     const { h, s, l } = hexToHsl(hex);
-    if (s < ACHROMATIC_S) return null;
+    if (skipAchromatic && s < ACHROMATIC_S) return null;
     const step = PALETTE_PASSES[pass % PALETTE_PASSES.length];
     const wrap = Math.floor(pass / PALETTE_PASSES.length);
     return hslToHex({
@@ -188,11 +188,15 @@ function passVariant(hex, pass) {
  * same hex twice would hand two series one colour by construction.
  */
 export function expandPalette(colors, count) {
+    // Whether skipping the greys is affordable. In a palette that is ALL grey —
+    // a monochrome one — refusing to vary them would return fewer colours than
+    // asked for, and the caller would fall back to a modulo and repeat.
+    const hasChromatic = colors.some(c => hexToHsl(c).s >= ACHROMATIC_S);
     const out = [];
     const seen = new Set();
     for (let pass = 0; out.length < count && pass < 40; pass++) {
         for (const c of colors) {
-            const v = passVariant(c, pass);
+            const v = passVariant(c, pass, hasChromatic);
             if (v == null) continue;
             const key = v.toLowerCase();
             if (seen.has(key)) continue;
@@ -459,10 +463,69 @@ export const LEGACY_PALETTE = [
     '#3b82f6', '#a855f7', '#ec4899', '#14b8a6',
 ];
 
-/** The palettes the picker can switch between, in offer order. */
+/**
+ * The house accents, as a series palette.
+ *
+ * Values are the dark theme's own `--color-accent-*` tokens, not new colours:
+ * blue #2d7ff9, orange #f28b3c, green #23b47e, violet #9b8cf0, grey #6b7a8f.
+ * "White" is `--color-text-primary`, #f2f5f9, which is an extremely faint blue
+ * rather than a true white — a real white on a dark plot is a glare, and this
+ * one already belongs to the theme.
+ *
+ * The yellow is Okabe-Ito's, reused rather than invented: the theme has no
+ * yellow token, and adding one is a design decision rather than a palette one.
+ *
+ * A caveat worth stating where it will be read: the design vocabulary reserves
+ * orange as the single active/now signal and lets nothing else use it. That
+ * rule is about CHROME. A series colour is data, and a curator choosing the
+ * house palette is choosing to draw with the house's colours — but if the
+ * orange series ever reads as "this one is selected", this is why.
+ */
+export const HOUSE_PALETTE = [
+    '#2d7ff9', // accent-blue
+    '#f28b3c', // accent-orange
+    '#f2f5f9', // text-primary — the faint blue that stands in for white
+    '#23b47e', // accent-green
+    '#F0E442', // Okabe-Ito yellow; the theme has none
+    '#9b8cf0', // accent-violet
+    '#6b7a8f', // accent-grey
+];
+
+/**
+ * `count` evenly spaced lightness steps of one colour, light to dark.
+ *
+ * Not `rampFrom`: that anchors an END on a base a person picked and travels
+ * away from it, which is right for deriving a set and wrong for building a
+ * palette. A palette wants the whole usable range regardless of where its seed
+ * happens to sit.
+ */
+function monochrome(hex, count, from = 84, to = 24) {
+    const { h, s } = hexToHsl(hex);
+    return Array.from({ length: count }, (_, i) =>
+        hslToHex({ h, s, l: from + (to - from) * (i / (count - 1)) }));
+}
+
+/**
+ * The palettes the picker can switch between, in offer order.
+ *
+ * Adding one is a data edit, which is the point — it is also where the
+ * "everything in one hue" look went when it stopped being a fourth radio. A
+ * monochrome palette IS that look, and says so by its name rather than by a
+ * derivation nobody could tell from its neighbour.
+ *
+ * `safe` marks a palette a colourblind reader can separate. The monochromes
+ * qualify for a different reason from Okabe-Ito: they carry no hue information
+ * at all, so there is none to lose.
+ */
 export const SERIES_PALETTES = [
-    { id: 'okabe-ito', label: 'Okabe-Ito', safe: true,  colors: OKABE_ITO_SET },
-    { id: 'legacy',    label: 'Legacy',    safe: false, colors: LEGACY_PALETTE },
+    { id: 'okabe-ito', label: 'Okabe-Ito',      safe: true,  colors: OKABE_ITO_SET },
+    { id: 'house',     label: 'House',          safe: false, colors: HOUSE_PALETTE },
+    { id: 'mono-blue', label: 'Mono · blue',    safe: true,  colors: monochrome('#2d7ff9', 8) },
+    { id: 'mono-orange', label: 'Mono · orange', safe: true, colors: monochrome('#f28b3c', 8) },
+    // Starts lighter than the other two: the whole identity of this one is the
+    // near-white top, and the shared 84 clipped it to an ordinary pale blue.
+    { id: 'mono-white', label: 'Mono · faint blue', safe: true, colors: monochrome('#f2f5f9', 8, 93, 30) },
+    { id: 'legacy',    label: 'Legacy',         safe: false, colors: LEGACY_PALETTE },
 ];
 
 /** Hex equality that does not care how either side was written. */
