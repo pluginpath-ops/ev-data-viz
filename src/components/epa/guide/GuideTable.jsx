@@ -73,7 +73,12 @@ function GuideRow({ row, cols, selectedIds, onToggleSelect, onOpenRow, vehicleLi
                     >
                         {col.key === 'carline' ? (
                             <span className="guide-carline">
-                                <span className="guide-carline-name">{row.carline}</span>
+                                {/* 40 of 50 names are clipped at phone width, and
+                                    the pin cannot be widened without taking the
+                                    table back. A tap already opens the detail,
+                                    whose heading is the full name; this is the
+                                    same answer for a pointer. */}
+                                <span className="guide-carline-name" title={row.carline}>{row.carline}</span>
                                 {/* Badges ride on the name rather than holding columns of
                                     their own — at 30 columns the horizontal budget is the
                                     scarce one. */}
