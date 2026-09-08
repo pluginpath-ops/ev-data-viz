@@ -193,6 +193,20 @@ function PickerPanel({
 
     const handSet = targets.filter(t => !isUnsetColor(t.stored)).length;
 
+    // ── What the rotation is indexing ───────────────────────────────────────
+    //
+    // Shading is what makes rotation a per-VEHICLE thing. With it on, each
+    // vehicle takes the next colour and its tests step along that one; with it
+    // off there is no inner group left, so the rotation lands on each test
+    // directly. The row therefore cannot carry a fixed label without being
+    // wrong half the time — it said "A color per vehicle" while sitting alone
+    // at the vehicle scope, where there is exactly one vehicle.
+    //
+    // An inactive row states what it WOULD do, not what is happening, which is
+    // the only way a greyed option can be worth reading.
+    const vehicleCount = new Set(targets.map(t => t.vehicleId)).size;
+    const perVehicle = how.shade && vehicleCount > 1;
+
     // Auto answers for the SCOPE. Asking only about this series said "the
     // palette is choosing" while twelve other rows in the selected scope were
     // being held by hand — true of the swatch you opened, and wrong about the
@@ -335,15 +349,19 @@ function PickerPanel({
                     {targets.length > 1 && (
                         <div className="color-seed">
                             <SeedRow
-                                name="A color per vehicle"
-                                hint="Each vehicle takes the next color of the rotation"
+                                name={perVehicle ? 'A color per vehicle' : 'A color per test'}
+                                hint={perVehicle
+                                    ? 'Each vehicle takes the next color of the rotation'
+                                    : 'Each test takes the next color of the rotation'}
                                 colors={rotatePaletteFrom(base, palette.colors, 4).slice(0, 4)}
                                 active={how.rotate}
                                 onSelect={() => toggleHow('rotate')}
                             />
                             <SeedRow
                                 name="A shade per test"
-                                hint="Each test of one vehicle takes a step along its color"
+                                hint={how.rotate && vehicleCount > 1
+                                    ? 'Each test of one vehicle takes a step along its color'
+                                    : 'Each test takes a step along the one color'}
                                 colors={rampFrom(base, 4)}
                                 active={how.shade}
                                 onSelect={() => toggleHow('shade')}

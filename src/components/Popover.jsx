@@ -165,7 +165,18 @@ export default function Popover({
                 'aria-haspopup': canOpen ? 'dialog' : undefined,
                 onPointerEnter: () => { if (!isCompact && !isOpen) setPeeking(true); },
                 onPointerLeave: stopPeek,
-                onFocus: () => { if (!isCompact && !isOpen) setPeeking(true); },
+                // `:focus-visible`, not focus. A peek on focus exists so a
+                // keyboard reader gets the gloss a pointer would have given
+                // them — but closing a panel returns focus to its trigger
+                // PROGRAMMATICALLY, and treating that as a hover left a gloss
+                // hanging beside a pointer that was two hundred pixels away,
+                // with no pointerleave ever coming to clear it. Anything that
+                // closes itself hit this: the colour picker's Apply, an
+                // InfoIcon's ×.
+                onFocus: (e) => {
+                    if (isCompact || isOpen) return;
+                    if (e.target.matches?.(':focus-visible')) setPeeking(true);
+                },
                 onBlur: stopPeek,
                 onClick: () => {
                     if (!canOpen) return;
