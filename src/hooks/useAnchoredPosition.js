@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { placePopover } from '../utils/popoverPlacement';
+import { placePopover, MARGIN } from '../utils/popoverPlacement';
 
 /**
  * Fixed-position a floating panel against a trigger it does not live inside.
@@ -63,15 +63,55 @@ export function useAnchoredPosition(openKey, onScrollAway) {
     // Detach clears the position rather than leaving the last one: between
     // tiers that would place a 520px panel at a 276px panel's coordinates for
     // one frame. Hidden for a frame beats wrong for a frame.
-    const measureRef = useCallback((panel) => {
+    const panelRef = useRef(null);
+    const place = useCallback((panel) => {
         const anchor = anchorRef.current;
-        if (!panel || !anchor || !openKey) { setPos(null); return; }
         setPos(placePopover(
             anchor.getBoundingClientRect(),
             { width: panel.offsetWidth, height: panel.offsetHeight },
             { width: window.innerWidth, height: window.innerHeight },
         ));
-    }, [openKey]);
+    }, []);
+
+    const measureRef = useCallback((panel) => {
+        panelRef.current = panel;
+        const anchor = anchorRef.current;
+        if (!panel || !anchor || !openKey) { setPos(null); return; }
+        place(panel);
+    }, [openKey, place]);
+
+    /**
+     * A panel that outgrows its own placement.
+     *
+     * Placement happens once, against the height the panel had when it
+     * attached. Content can change that afterwards — the colour picker gains
+     * rows and a warning when its scope widens — and a box placed for 400px
+     * that becomes 520px runs off the bottom of the screen, capped at 70vh and
+     * scrolling internally but with its lower half unreachable.
+     *
+     * This is NOT the scroll tracking the header rules out. That is about the
+     * ANCHOR moving, where chasing it would drag the panel away with a trigger
+     * that has left the screen. This is the panel outgrowing itself, which
+     * nothing else can correct and which no fixed buffer can predict: the
+     * growth is content-dependent, so a margin big enough for the worst case
+     * would push every panel up for a case most of them never hit.
+     *
+     * It only acts when the box no longer FITS. A panel that grew and still
+     * fits stays exactly where it opened, which is the promise above.
+     */
+    useEffect(() => {
+        const panel = panelRef.current;
+        if (!openKey || !panel || typeof ResizeObserver === 'undefined') return;
+        const observer = new ResizeObserver(() => {
+            const box = panel.getBoundingClientRect();
+            const fits = box.top >= MARGIN && box.bottom <= window.innerHeight - MARGIN;
+            // Size changes fire this; position changes do not, so re-placing
+            // here cannot feed itself.
+            if (!fits && anchorRef.current) place(panel);
+        });
+        observer.observe(panel);
+        return () => observer.disconnect();
+    }, [openKey, place]);
 
     // Read through a ref, so a caller passing an inline arrow — which every
     // caller does — does not re-bind the listener on every render. Same reason
