@@ -4244,9 +4244,26 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border-radius: var(--radius-mark);
     background-color: var(--color-surface-sunken);
 }
-/* A color-row that is dimmed until its derivation is the one in force. */
-.color-seed-row { opacity: 0.45; }
+/* A color-row that is also a choice: dimmed until it is the one in force.
+   It is a real <button>, so it takes the reset — a preview you can click is
+   still a control, and the alternative was a second list of radio buttons
+   saying the same thing beside the swatches that already say it. */
+.color-seed-row {
+    width: 100%;
+    padding: 2px 3px;
+    border: 0;
+    border-radius: var(--radius-mark);
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    opacity: 0.45;
+}
+.color-seed-row:hover { opacity: 0.8; background-color: var(--color-hover-lift); }
 .color-seed-row.is-active { opacity: 1; }
+.color-seed-row:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
 .color-seed-chips {
     @apply flex items-center gap-1;
 }

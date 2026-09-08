@@ -78,7 +78,7 @@ export default function SeriesColorPicker({
     return (
         <Popover
             className={className}
-            title={label ? `Colour — ${label}` : 'Series colour'}
+            title={label ? `Color — ${label}` : 'Series color'}
             // One width everywhere: the rail, Tests & Data and a chip all get
             // the same panel, so it never reflows to suit its anchor.
             width="300px"
@@ -94,7 +94,7 @@ export default function SeriesColorPicker({
                     type="button"
                     className="series-swatch--button"
                     style={{ backgroundColor: plotted }}
-                    aria-label={`Colour for ${subject} — ${plotted}`}
+                    aria-label={`Color for ${subject} — ${plotted}`}
                     // Three of the call sites sit inside a <label> wrapping the
                     // row's checkbox, so a click reaching the label toggles the
                     // run's selection too. A swatch means "open the colour
@@ -132,7 +132,20 @@ function PickerPanel({
     scoped, seriesId, vehicleId, series, onApplyMany,
 }) {
     const [paletteId, setPaletteId] = useState(SERIES_PALETTES[0].id);
+
+    // Two axes, not one. SCOPE says who a pick reaches; DERIVATION says what it
+    // does to them. Welding them — one vehicle always gets shades, everything
+    // always gets separate colours — assumed that a family is the only reason
+    // to recolour a vehicle, and it is not: telling four tests of ONE car apart
+    // wants maximum contrast between them, exactly like telling four cars apart.
+    // Each scope still has the derivation it usually wants as its default; the
+    // rows below are how you say otherwise.
     const [scope, setScope] = useState('test');
+    const [derivation, setDerivation] = useState('shades');
+    const pickScope = (id) => {
+        setScope(id);
+        setDerivation(id === 'all' ? 'distinct' : 'shades');
+    };
 
     // ── HSL is the model; the hex is a projection of it ─────────────────────
     //
@@ -165,7 +178,7 @@ function PickerPanel({
 
     // Who each scope would touch, in a stable order so a set is reproducible.
     const targets = useMemo(() => {
-        if (!scoped) return [];
+        if (!scoped || scope === 'test') return [];
         const rows = scope === 'vehicle'
             ? series.filter(s => s.vehicleId === vehicleId)
             : series;
@@ -179,12 +192,12 @@ function PickerPanel({
 
     // The two derivations, and the scope each one serves.
     const derived = useMemo(() => {
-        if (scope === 'test' || !targets.length) return null;
-        const colors = scope === 'vehicle'
+        if (!targets.length) return null;
+        const colors = derivation === 'shades'
             ? rampFrom(base, targets.length)
             : rotatePaletteFrom(base, palette.colors);
         return Object.fromEntries(targets.map((t, i) => [t.id, colors[i % colors.length]]));
-    }, [scope, targets, base, palette]);
+    }, [derivation, targets, base, palette]);
 
     // "All tests" states its blast radius before it will commit; the other two
     // commit on click, because one series and one vehicle are both undoable by
@@ -212,7 +225,7 @@ function PickerPanel({
                                     type="button"
                                     className={scope === id ? 'active' : ''}
                                     aria-pressed={scope === id}
-                                    onClick={() => setScope(id)}
+                                    onClick={() => pickScope(id)}
                                 >
                                     {text}
                                 </button>
@@ -243,7 +256,7 @@ function PickerPanel({
                         <select value={paletteId} onChange={e => setPaletteId(e.target.value)}>
                             {SERIES_PALETTES.map(p => (
                                 <option key={p.id} value={p.id}>
-                                    {p.label}{p.safe ? '' : ' (not colourblind-safe)'}
+                                    {p.label}{p.safe ? '' : ' (not colorblind-safe)'}
                                 </option>
                             ))}
                         </select>
@@ -271,7 +284,7 @@ function PickerPanel({
                         value={base.toUpperCase()}
                         maxLength={7}
                         spellCheck={false}
-                        aria-label="Base colour, hex"
+                        aria-label="Base color, hex"
                         onChange={e => {
                             const v = e.target.value.trim();
                             if (/^#[0-9a-fA-F]{6}$/.test(v)) setBase(v.toLowerCase());
@@ -298,21 +311,26 @@ function PickerPanel({
 
                 {scoped && targets.length > 1 && (
                     <div className="color-seed">
-                        <div className="color-row">
-                            <span className="text-nano">Base seeds the set</span>
-                            <span className="text-caption">
-                                {targets.length - 1} more series
-                            </span>
-                        </div>
+                        {/* No heading. "Base seeds the set" and "3 more series"
+                            were both written from inside the implementation:
+                            they name the mechanism rather than the thing it
+                            produces, and a reader who has not read the code has
+                            no way in. The rows now say what each derivation is
+                            FOR — one hue per vehicle, one step per test — which
+                            is the same sentence handoff 3c uses. */}
                         <SeedRow
-                            name="rotation"
+                            name="Different colors"
+                            hint="Every series a color of its own — maximum contrast"
                             colors={rotatePaletteFrom(base, palette.colors).slice(0, 4)}
-                            active={scope === 'all'}
+                            active={derivation === 'distinct'}
+                            onSelect={() => setDerivation('distinct')}
                         />
                         <SeedRow
-                            name="light→dark"
+                            name="Shades of one"
+                            hint="One color in steps — they read as a set"
                             colors={rampFrom(base, 4)}
-                            active={scope === 'vehicle'}
+                            active={derivation === 'shades'}
+                            onSelect={() => setDerivation('shades')}
                         />
                     </div>
                 )}
@@ -329,7 +347,7 @@ function PickerPanel({
                 {armed && (
                     <p className="color-warning">
                         Reseeds {targets.length} plotted series from this base.
-                        {handSet > 0 && ` ${handSet} carr${handSet === 1 ? 'ies' : 'y'} a colour someone set by hand. Those get overwritten.`}
+                        {handSet > 0 && ` ${handSet} carr${handSet === 1 ? 'ies' : 'y'} a color someone set by hand. Those get overwritten.`}
                     </p>
                 )}
             </div>
@@ -378,17 +396,26 @@ function Slider({ label, min, max, value, onChange, track, hue = 0, sat = 100, l
     );
 }
 
-/** One derivation, previewed. Marked when it is the one the scope would use. */
-function SeedRow({ name, colors, active }) {
+/**
+ * One derivation, previewed AND selectable — the preview is the control, so
+ * there is no separate list of options saying the same thing twice.
+ */
+function SeedRow({ name, hint, colors, active, onSelect }) {
     return (
-        <div className={`color-row color-seed-row${active ? ' is-active' : ''}`}>
+        <button
+            type="button"
+            title={hint}
+            aria-pressed={active}
+            className={`color-row color-seed-row${active ? ' is-active' : ''}`}
+            onClick={onSelect}
+        >
             <span className="color-seed-chips">
                 {colors.map((c, i) => (
                     <span key={`${c}-${i}`} className="series-swatch" style={{ backgroundColor: c }} />
                 ))}
             </span>
             <span className="text-nano">{name}</span>
-        </div>
+        </button>
     );
 }
 
@@ -402,7 +429,7 @@ function ColorNote({ note }) {
     return (
         <span className="color-note">
             {note.kind === 'auto'
-                ? <>No saved colour — drawn <b>{note.plotted.toUpperCase()}</b></>
+                ? <>No saved color — drawn <b>{note.plotted.toUpperCase()}</b></>
                 : <>Saved <b>{note.stored.toUpperCase()}</b> · drawn <b>{note.plotted.toUpperCase()}</b></>}
         </span>
     );
