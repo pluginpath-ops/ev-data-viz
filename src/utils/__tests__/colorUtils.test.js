@@ -412,7 +412,7 @@ describe('the palettes on offer', () => {
             // exact hue at every lightness. Hue lives in the DIFFERENCES between
             // channels, so the less saturated the colour the fewer units carry
             // it and the coarser the rounding — mono-orange spans 1 degree at
-            // s=88, mono-white spans 3 at s=37. Five is still nowhere near a
+            // s=88, mono-ice spans 3 at s=37. Five is still nowhere near a
             // different colour: the palette's own neighbours sit 40 apart.
             const hues = hsl.map(c => c.h);
             expect(Math.max(...hues) - Math.min(...hues), p.id).toBeLessThan(5);

@@ -522,9 +522,11 @@ export const SERIES_PALETTES = [
     { id: 'house',     label: 'House',          safe: false, colors: HOUSE_PALETTE },
     { id: 'mono-blue', label: 'Mono · blue',    safe: true,  colors: monochrome('#2d7ff9', 8) },
     { id: 'mono-orange', label: 'Mono · orange', safe: true, colors: monochrome('#f28b3c', 8) },
-    // Starts lighter than the other two: the whole identity of this one is the
-    // near-white top, and the shared 84 clipped it to an ordinary pale blue.
-    { id: 'mono-white', label: 'Mono · faint blue', safe: true, colors: monochrome('#f2f5f9', 8, 93, 30) },
+    // "Ice" rather than "faint blue", which read as a weaker version of the
+    // palette above it rather than as its own thing. It starts lighter than the
+    // other two as well: the near-white top is the whole identity of this one,
+    // and the shared 84 clipped it to an ordinary pale blue.
+    { id: 'mono-ice', label: 'Mono · ice', safe: true, colors: monochrome('#f2f5f9', 8, 93, 30) },
     { id: 'legacy',    label: 'Legacy',         safe: false, colors: LEGACY_PALETTE },
 ];
 

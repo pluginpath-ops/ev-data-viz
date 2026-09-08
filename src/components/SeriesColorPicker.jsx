@@ -180,6 +180,26 @@ function PickerPanel({
     const palette = SERIES_PALETTES.find(p => p.id === paletteId) ?? SERIES_PALETTES[0];
     const slot = paletteSlotOf(base, palette.colors);
 
+    /**
+     * Switching palettes moves the base into the new one.
+     *
+     * Leaving it put looked like respecting a choice and was not: the base is
+     * slot 1 of whatever it seeds, so an orange base under Mono · blue made
+     * `rotatePaletteFrom` return [orange, ...blues] and the previews showed an
+     * orange chip in a blue palette. Picking a palette IS the statement that
+     * you want to work in it.
+     *
+     * The SLOT survives rather than the colour, so switching sets keeps "the
+     * third one" and stays predictable. Clamped, because palettes are no longer
+     * all the same length — House is seven.
+     */
+    const pickPalette = (id) => {
+        const next = SERIES_PALETTES.find(p => p.id === id) ?? SERIES_PALETTES[0];
+        const index = Math.min((slot ?? 1) - 1, next.colors.length - 1);
+        setPaletteId(id);
+        setBase(next.colors[index]);
+    };
+
     // Who each scope would touch, in a stable order so a set is reproducible.
     const targets = useMemo(() => {
         if (!scoped || scope === 'test') return [];
@@ -291,7 +311,7 @@ function PickerPanel({
                         saying it twice cost a line to wrapping and told nobody
                         anything. */}
                     <label className="color-switch">
-                        <select value={paletteId} onChange={e => setPaletteId(e.target.value)} aria-label="Palette">
+                        <select value={paletteId} onChange={e => pickPalette(e.target.value)} aria-label="Palette">
                             {SERIES_PALETTES.map(p => (
                                 <option key={p.id} value={p.id}>
                                     {p.label}{p.safe ? '' : ' (not colorblind-safe)'}
