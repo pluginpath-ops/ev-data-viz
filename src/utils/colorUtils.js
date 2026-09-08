@@ -664,6 +664,34 @@ export function seedPreview(base, count, mode, colors) {
 }
 
 /**
+ * Fold a set of picker answers into a session override map.
+ *
+ * `null` REMOVES a key rather than storing null under it. That is what "Back to
+ * auto" sends, and the two are not the same thing: `resolveChartColors` reads a
+ * null value as falsy and falls through to the run's own stored colour — the
+ * right answer by accident in manual mode, and the wrong one in auto, where the
+ * point of Auto is to hand the run back to the palette.
+ *
+ * One function because the views hold their overrides in different places —
+ * `useStickyChartColors` in session state, EPA Curves in `epaConfig` so they
+ * survive the trip to the pop-out window — while the rule about null belongs to
+ * the picker rather than to either store. It was written twice and a third
+ * caller would have written it a third time.
+ *
+ * @param {Record<string,string>} current  the map as it stands
+ * @param {Record<string,string|null>} changes  one id or a whole derived set
+ * @returns {Record<string,string>} a new map; `current` is not touched
+ */
+export function applyColorOverrides(current, changes) {
+    const next = { ...current };
+    for (const [id, color] of Object.entries(changes)) {
+        if (color == null) delete next[id];
+        else next[id] = color;
+    }
+    return next;
+}
+
+/**
  * The plotted set, in the shape the picker's wider scopes need.
  *
  * Takes the runs a view is ALREADY colouring rather than its selection ids,

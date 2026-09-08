@@ -5,7 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { convSpeed, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
 import { PALETTE } from '../utils/specHelpers';
-import { resolveChartColors } from '../utils/colorUtils';
+import { resolveChartColors, seriesRowsOf, applyColorOverrides } from '../utils/colorUtils';
 import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH, MPG_E_CONVERSION,
@@ -14,7 +14,8 @@ import { buildEpaCurveFromModel, resolveCurveEta, resolvePrimaryCoeffs, correctM
 import { filterRangeRuns } from '../utils/runUtils';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
-import SeriesColorPicker from './SeriesColorPicker';
+import RunSelector from './RunSelector';
+import EpaRecordMeta, { ConfidenceBadge } from './epa/EpaRecordBadges';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
@@ -189,26 +190,21 @@ function convertYValue(val, yAxis, units) {
 
 // ── Confidence badge ──────────────────────────────────────────────────────────
 
-const CONFIDENCE_COLORS = {
-    verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
-    likely:   'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-700',
-    inferred: 'text-secondary bg-[var(--color-surface-muted)] border-[var(--color-border)]',
-};
-
-function ConfidenceBadge({ confidence }) {
-    return (
-        <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${CONFIDENCE_COLORS[confidence] || CONFIDENCE_COLORS.inferred}`}>
-            {confidence}
-        </span>
-    );
-}
-
-
 // ── Default color for a mapping ───────────────────────────────────────────────
 
-function defaultMappingColor(vehicle, vehicleIdx, mappingIdx) {
-    const base = vehicle.color || PALETTE[vehicleIdx % PALETTE.length];
-    return mappingIdx === 0 ? base : base + 'bb';
+/**
+ * The colour a mapping is drawn in before anyone overrides it: the vehicle's
+ * series colour, faded for its second and later configurations so one car's
+ * curves read as a family.
+ *
+ * One function because there were three copies and they disagreed. The picker's
+ * ran `.replace(/[0-9a-f]{2}$/i, '')` over the whole expression, so on a FIRST
+ * mapping — which has no alpha suffix to strip — it chopped two characters off
+ * the colour itself and left a five-digit string. The swatch beside a row could
+ * not be the line on the plot. A third copy sat unused at module scope.
+ */
+function mappingColor(baseColor, mappingIdx) {
+    return mappingIdx === 0 ? baseColor : baseColor + 'bb';
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -244,7 +240,6 @@ export default function EpaCurvesView({
     const chartRef  = useRef(null);
 
     // ── UI state ──────────────────────────────────────────────────────────────
-    const [selectorExpanded, setSelectorExpanded] = useState(false);
     const [urlCopied,        setUrlCopied]        = useState(false);
     // Altitude, temperature, and accessory load are viewing conditions (like the
     // unit toggle): they scale the plotted curve at plot time for ALL curves.
@@ -315,10 +310,12 @@ export default function EpaCurvesView({
         (next) => setEpaConfig(prev => ({ ...prev, selectedMappings: next })),
         [setEpaConfig],
     );
+    // No `setVehicle` here: the shared selector does its own per-vehicle bulk by
+    // emitting the same toggle each row does, so a second path to the selection
+    // would be a second definition of what "this vehicle's rows" are.
     const {
         selected: selectedMappings,
         toggle: toggleMapping,
-        setVehicle: setVehicleMappings,
     } = useRunSelection(selectableRows, {
         value: epaConfig.selectedMappings ?? [],
         onChange: setSelectedMappings,
@@ -349,6 +346,79 @@ export default function EpaCurvesView({
         () => resolveChartColors(vehiclesWithEpa, {}, autoColor ? 'auto' : 'manual'),
         [vehiclesWithEpa, autoColor]
     );
+
+    // ── The selector's rows ───────────────────────────────────────────────────
+
+    /**
+     * `vehicles[].epa_mappings` in the shape the shared `RunSelector` reads.
+     *
+     * The adapter is the whole cost of the reuse, and it is cheap because the
+     * selector never asks a row what it is — only for an id, a name, and
+     * whatever the two render props choose to show. Everything derived is
+     * resolved here rather than in the renderers: a render prop runs on every
+     * keystroke elsewhere in the rail, and `resolveCurveEta` walks a record's
+     * phases.
+     *
+     * The mapping index is taken BEFORE the groupless rows are dropped, because
+     * it selects the fade in `mappingColor` and the curve builder counts the
+     * same way. Filtering first would shift a vehicle's second configuration
+     * onto the first one's colour.
+     */
+    const selectorVehicles = useMemo(() => vehiclesWithEpa.map((vehicle, vi) => {
+        const effectiveVehicle = { ...vehicle, specs: resolveEffectiveSpecs(vehicle, vehicles) };
+        const baseColor = vehicleColorMap[vehicle.id] || vehicle.color || PALETTE[vi % PALETTE.length];
+        return {
+            ...vehicle,
+            name: vehicleLabel(vehicle),
+            runs: (vehicle.epa_mappings ?? []).map((mapping, mi) => {
+                const group = mapping.epaGroup;
+                if (!group) return null;
+                return {
+                    id: mapping.id,
+                    name: group.display_name || group.epa_carline_name,
+                    autoColor: mappingColor(baseColor, mi),
+                    confidence: mapping.confidence,
+                    group,
+                    eta: resolveCurveEta(group),
+                    useableKwh: resolveUseableKwh(group, effectiveVehicle),
+                    useableKwhSource: resolveUseableKwhSource(group, effectiveVehicle),
+                };
+            }).filter(Boolean),
+        };
+    }), [vehiclesWithEpa, vehicles, vehicleColorMap]);
+
+    /**
+     * Everything the picker's wider scopes are allowed to touch.
+     *
+     * Supplying this WITH `onUpdateRunColors` is what puts the scope control in
+     * the colour panel, and its absence is why this view had no "this vehicle"
+     * or "all tests" while the four run charts did. `stored` is null on every
+     * row and correctly so: a curve's colour lives in `epaConfig` for the
+     * session and is never written back, so there is no durable preference for
+     * a session pick to differ from.
+     */
+    const selectorColorSeries = useMemo(
+        () => seriesRowsOf(
+            selectorVehicles.flatMap(v => v.runs),
+            selectorVehicles,
+            id => mappingColors[id] != null,
+        ),
+        [selectorVehicles, mappingColors],
+    );
+
+    /**
+     * What each row's swatch is painted with: the session override if one was
+     * set, the palette's choice otherwise. The same expression the curve is
+     * drawn with, which is the point — the swatch is how a row and a line are
+     * matched, and it could not be trusted to do that before.
+     */
+    const selectorColorMap = useMemo(() => {
+        const out = {};
+        for (const v of selectorVehicles) {
+            for (const row of v.runs) out[row.id] = mappingColors[row.id] ?? row.autoColor;
+        }
+        return out;
+    }, [selectorVehicles, mappingColors]);
 
     // ── Datasets ──────────────────────────────────────────────────────────────
     const { datasets, missingWeightWarnings } = useMemo(() => {
@@ -383,8 +453,7 @@ export default function EpaCurvesView({
 
                 // Color: user override → vehicleColorMap/vehicle color → palette (with alpha for 2nd+ mapping)
                 const baseColor = vehicleColorMap[vehicle.id] || vehicle.color || PALETTE[vi % PALETTE.length];
-                const autoBase  = mi === 0 ? baseColor : baseColor + 'bb';
-                const color = mappingColors[mapping.id] ?? autoBase;
+                const color = mappingColors[mapping.id] ?? mappingColor(baseColor, mi);
                 const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name;
                 const baseLabel = vehiclesWithEpa.length > 1 || mi > 0
                     ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
@@ -705,9 +774,6 @@ export default function EpaCurvesView({
     const methodologyModels = methodologyEntries.filter(e => e.model);
     const methodologyGaps   = methodologyEntries.filter(e => !e.model);
 
-    const totalMappings = vehiclesWithEpa.reduce((n, v) => n + (v.epa_mappings?.length ?? 0), 0);
-    const visibleCount  = selectedMappings.length;
-
     // ── Empty state ───────────────────────────────────────────────────────────
     if (selectedVehicleIds.length === 0) {
         return (
@@ -832,161 +898,54 @@ export default function EpaCurvesView({
                         </div>
                     )}
 
-                    {/* Collapsible EPA test selector */}
+                    {/* ── SELECT ── the certification records this chart draws.
+                      *
+                      * The shared selector, not a fourth hand-written list. This
+                      * was the one picker on the site that built its own rows,
+                      * and every difference was a regression: no per-vehicle
+                      * collapse, a name competing with four readings on a single
+                      * line, and a swatch computed by an expression that could
+                      * not agree with the plot. A mapping is not a run, so the
+                      * rows are adapted rather than the component generalised —
+                      * `selectorVehicles` is the whole of the adapter. */}
                     {vehiclesWithEpa.length > 0 && (
-                        <div>
-                            <div className="run-selector-bar">
-                            <button
-                                onClick={() => setSelectorExpanded(p => !p)}
-                                className="run-selector-header"
-                            >
-                                <span style={{ display: 'inline-block', transform: selectorExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                                <span className="text-control">Select vehicle tests</span>
-                                <span className="run-selector-count">{visibleCount} / {totalMappings}</span>
-                            </button>
-                            </div>
+                        <div className="chart-rail-group">
+                            {/* Once, above the list. It explains the η on every
+                                row, and a row is a <label> around a checkbox —
+                                an ⓘ inside one selects the record you clicked it
+                                to read about. */}
+                            <span className="text-note">
+                                What η means on these rows
+                                <InfoIcon text={EPA_EXPLAINERS.curveEta} />
+                            </span>
+                            <RunSelector
+                                vehicles={selectorVehicles}
+                                selectedRunIds={selectedMappings}
+                                onToggleRun={toggleMapping}
+                                runFilter={() => true}
+                                emptyMessage="No certification records"
+                                colorMap={selectorColorMap}
+                                colorSeries={selectorColorSeries}
+                                onUpdateRunColor={(_vehicleId, mappingId, hex) =>
+                                    setMappingColors(prev => applyColorOverrides(prev, { [mappingId]: hex }))}
+                                onUpdateRunColors={next =>
+                                    setMappingColors(prev => applyColorOverrides(prev, next))}
+                                renderRunBadges={row => <ConfidenceBadge confidence={row.confidence} />}
+                                renderRunMeta={row => <EpaRecordMeta row={row} />}
+                            />
 
-                            {selectorExpanded && (
-                                <div className="mt-3">
-                                    <div className="runs-list">
-                                        {vehiclesWithEpa.map((vehicle, vi) => {
-                                            const effectiveVehicle = {
-                                                ...vehicle,
-                                                specs: resolveEffectiveSpecs(vehicle, vehicles),
-                                            };
-                                            return (
-                                                <div key={vehicle.id} className="vehicle-run-group" style={{ borderColor: vehicleColorMap[vehicle.id] || 'var(--color-primary)' }}>
-                                                    <div className="flex items-center gap-2 mb-1.5">
-                                                        <h4 className="text-sm font-semibold text-secondary truncate">
-                                                            {vehicleLabel(vehicle)}
-                                                        </h4>
-                                                        {/* Bulk helpers, same as the shared run selector: a vehicle
-                                                            can carry a dozen EPA configurations, and ticking them
-                                                            one at a time is the common complaint. */}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setVehicleMappings(vehicle.id, true)}
-                                                            className="run-bulk-link"
-                                                        >
-                                                            all
-                                                        </button>
-                                                        <span className="text-meta text-xs select-none">/</span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setVehicleMappings(vehicle.id, false)}
-                                                            className="run-bulk-link"
-                                                        >
-                                                            none
-                                                        </button>
-                                                    </div>
-                                                    <div className="run-items">
-                                                        {vehicle.epa_mappings.map((mapping, mi) => {
-                                                            const { epaGroup, confidence } = mapping;
-                                                            if (!epaGroup) return null;
-                                                            const isVisible  = shown.has(mapping.id);
-                                                            const baseVehicleColor = vehicleColorMap[vehicle.id] || vehicle.color || PALETTE[vi % PALETTE.length];
-                                                            const color      = mappingColors[mapping.id] ?? (mi === 0 ? baseVehicleColor : baseVehicleColor + 'bb').replace(/[0-9a-f]{2}$/i, '');
-                                                            // Strip any alpha suffix for the color input
-                                                            const pickerColor = (mappingColors[mapping.id] ?? baseVehicleColor).slice(0, 7);
-
-                                                            // η from the DC-side curator derivation (proc 77 → 84 → estimated),
-                                                            // with provenance + sanity flags.
-                                                            const etaResult = resolveCurveEta(epaGroup);
-                                                            const eta = etaResult.value;
-                                                            const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
-                                                            const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
-                                                            const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name;
-
-                                                            return (
-                                                                <div
-                                                                    key={mapping.id}
-                                                                    className={`flex items-start gap-2 ${!isVisible ? 'opacity-50' : ''}`}
-                                                                >
-                                                                    {/* Checkbox */}
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={isVisible}
-                                                                        onChange={() => toggleMapping(mapping.id)}
-                                                                        className="w-4 h-4 mt-0.5 shrink-0"
-                                                                    />
-                                                                    {/* Colour. Session-only: a curve's colour lives in
-                                                                        this view's state and is never written back, so
-                                                                        there is no stored value to differ from. */}
-                                                                    <SeriesColorPicker
-                                                                        value={pickerColor}
-                                                                        label={epaLabel}
-                                                                        onChange={hex => setMappingColors(prev => ({ ...prev, [mapping.id]: hex }))}
-                                                                        onReset={() => setMappingColors(prev => {
-                                                                            const { [mapping.id]: _cleared, ...rest } = prev;
-                                                                            return rest;
-                                                                        })}
-                                                                    />
-                                                                    {/* Label + metadata */}
-                                                                    <div className="run-label min-w-0">
-                                                                        <span className="font-medium">{epaLabel}</span>
-                                                                        <span className="text-sm text-secondary ml-2">{epaGroup.model_year} · {epaGroup.test_group_id}</span>
-                                                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                                                                            <ConfidenceBadge confidence={confidence} />
-                                                                            {epaGroup.label_combined_mpge && epaGroup.label_combined_mpge < 500 ? (
-                                                                                <span>EPA rated: {epaGroup.label_combined_mpge} MPGe</span>
-                                                                            ) : epaGroup.label_hwy_mpge && epaGroup.label_hwy_mpge < 500 ? (
-                                                                                <span title="Highway-only (proc 84); no combined MCT test">
-                                                                                    EPA hwy: {epaGroup.label_hwy_mpge} MPGe
-                                                                                </span>
-                                                                            ) : null}
-                                                                            {eta != null && (
-                                                                                <span>
-                                                                                    η<sub>eff</sub>: {!etaResult.certain && '~'}{(eta * 100).toFixed(1)}%
-                                                                                    {/* The curve runs on the CRUISE basis, so these name where
-                                                                                        that came from. 'measured' used to mean the HWFET phase
-                                                                                        and now means the constant-speed one — a badge left
-                                                                                        saying HWFET would have described the wrong phase of
-                                                                                        the wrong test. */}
-                                                                                    {etaResult.source === 'measured'  && <> · steady-state DC (65 mph)</>}
-                                                                                    {etaResult.source === 'corrected' && (
-                                                                                        <span title="No constant-speed phase on this record, so its highway η was scaled to a cruise basis by the fleet median ratio">
-                                                                                            {' · '}corrected from Hwy DC
-                                                                                        </span>
-                                                                                    )}
-                                                                                    {etaResult.source === 'estimated' && <> · default η</>}
-                                                                                    <InfoIcon text={EPA_EXPLAINERS.curveEta} />
-                                                                                    {etaResult.flags?.includes('correction-nonphysical') && (
-                                                                                        <span title="Correcting this record's highway η put it above 1, so the default is used instead"> ⚠</span>
-                                                                                    )}
-                                                                                </span>
-                                                                            )}
-                                                                            {useableKwh && (
-                                                                                <span>
-                                                                                    {Number(useableKwh).toFixed(1)} kWh
-                                                                                    {useableKwhSource === 'EPA'   && ' (EPA)'}
-                                                                                    {useableKwhSource === 'spec'  && ' (spec)'}
-                                                                                    {useableKwhSource === 'gross' && ' (gross)'}
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Vehicles without EPA data */}
-                                    {vehiclesWithoutEpa.length > 0 && (
-                                        <div className="mt-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                                            <span className="font-medium">No EPA data:</span>{' '}
-                                            {vehiclesWithoutEpa.map(v => vehicleLabel(v)).join(', ')}
-                                            {' '}— link a test group via Edit Vehicle.
-                                        </div>
-                                    )}
-                                </div>
+                            {/* Vehicles without EPA data. Outside the disclosure
+                                now: it says why a car you selected has no rows,
+                                which is exactly the question asked by someone who
+                                has not opened the list. */}
+                            {vehiclesWithoutEpa.length > 0 && (
+                                <p className="text-note">
+                                    No EPA data: {vehiclesWithoutEpa.map(v => vehicleLabel(v)).join(', ')}
+                                    {' '}— link a test group via Edit Vehicle.
+                                </p>
                             )}
                         </div>
                     )}
-
                     {/* All selected vehicles lack EPA data */}
                     {vehiclesWithEpa.length === 0 && vehiclesWithoutEpa.length > 0 && (
                         <div className="mt-4 text-sm" style={{ color: 'var(--color-text-secondary)' }}>

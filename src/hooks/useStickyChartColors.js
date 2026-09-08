@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { resolveChartColors } from '../utils/colorUtils';
+import { resolveChartColors, applyColorOverrides } from '../utils/colorUtils';
 
 const EMPTY = {};
 
@@ -73,12 +73,12 @@ export function useStickyChartColors(runs, { autoColor, resetKey }) {
     const setColorOverride = (runId, color) => {
         setOverrideState(prev => {
             const base = prev.key === sessionKey ? prev.map : EMPTY;
-            if (color == null) {
-                if (!(runId in base)) return prev.key === sessionKey ? prev : { key: sessionKey, map: EMPTY };
-                const { [runId]: _removed, ...rest } = base;
-                return { key: sessionKey, map: rest };
+            // Clearing a run that has no override is a no-op, and returning the
+            // same object keeps the chart from re-solving the palette for it.
+            if (color == null && !(runId in base)) {
+                return prev.key === sessionKey ? prev : { key: sessionKey, map: EMPTY };
             }
-            return { key: sessionKey, map: { ...base, [runId]: color } };
+            return { key: sessionKey, map: applyColorOverrides(base, { [runId]: color }) };
         });
     };
 
@@ -87,17 +87,13 @@ export function useStickyChartColors(runs, { autoColor, resetKey }) {
     // single base, and applying that one at a time would re-render the chart
     // once per run and let a half-applied set be seen.
     const setColorOverrides = (map) => {
-        setOverrideState(prev => {
-            const next = { ...(prev.key === sessionKey ? prev.map : EMPTY) };
-            // A null value REMOVES, matching setColorOverride. That is what the
-            // picker's "Back to auto" sends for a whole scope, and it has to be
-            // one update: clearing twenty runs one at a time would re-solve the
-            // palette after each and shuffle the colours it had not reached yet.
-            for (const [id, color] of Object.entries(map)) {
-                if (color == null) delete next[id]; else next[id] = color;
-            }
-            return { key: sessionKey, map: next };
-        });
+        // One update, not a loop over setColorOverride: clearing twenty runs one
+        // at a time would re-solve the palette after each and shuffle the
+        // colours it had not reached yet.
+        setOverrideState(prev => ({
+            key: sessionKey,
+            map: applyColorOverrides(prev.key === sessionKey ? prev.map : EMPTY, map),
+        }));
     };
 
 
