@@ -4,7 +4,7 @@ import {
     SERIES_PALETTES, DEFAULT_RUN_COLOR, seriesColorNote, isUnsetColor, sameHex,
     paletteSlotOf, hexToHsl, hslToHex, rotatePaletteFrom, rampFrom,
 } from '../utils/colorUtils';
-import { ratioOf } from '../utils/contrast';
+import { ratioOf, AA_LARGE } from '../utils/contrast';
 import { chartTheme } from '../utils/chartTheme';
 
 /**
@@ -131,13 +131,37 @@ function PickerPanel({
     close, plotted, stored, onChange, onReset,
     scoped, seriesId, vehicleId, series, onApplyMany,
 }) {
-    const [base, setBase] = useState(plotted);
     const [paletteId, setPaletteId] = useState(SERIES_PALETTES[0].id);
     const [scope, setScope] = useState('test');
 
+    // ── HSL is the model; the hex is a projection of it ─────────────────────
+    //
+    // Both are held, and that is not redundancy. hex → HSL is LOSSY at the
+    // ends: every hue is white at full lightness and black at none, so there is
+    // no hue for hexToHsl to report back and it can only answer zero.
+    // Re-deriving the sliders from the hex each render therefore destroyed the
+    // hue the moment lightness reached either end — the hue thumb snapped to
+    // red and stayed there, and dragging lightness back gave grey instead of
+    // the colour you started from.
+    //
+    // Saturation is lossy in the same way and for the same reason, which is the
+    // other half of why the model is held rather than recomputed.
+    //
+    // Keeping HSL means the hue survives a trip to white and back. A slider
+    // writes the model and the hex follows; every other route into the panel —
+    // a palette slot, a typed hex — writes the hex and the model follows.
+    const [base, setBaseHex] = useState(plotted);
+    const [hsl, setHsl] = useState(() => hexToHsl(plotted));
+
+    const setBase = (hex) => { setBaseHex(hex); setHsl(hexToHsl(hex)); };
+    const nudge = (patch) => {
+        const next = { ...hsl, ...patch };
+        setHsl(next);
+        setBaseHex(hslToHex(next));
+    };
+
     const palette = SERIES_PALETTES.find(p => p.id === paletteId) ?? SERIES_PALETTES[0];
     const slot = paletteSlotOf(base, palette.colors);
-    const hsl = hexToHsl(base);
 
     // Who each scope would touch, in a stable order so a set is reproducible.
     const targets = useMemo(() => {
@@ -259,12 +283,17 @@ function PickerPanel({
                 <Slider
                     label="Hue" min={0} max={360} value={Math.round(hsl.h)}
                     track="hue"
-                    onChange={h => setBase(hslToHex({ ...hsl, h }))}
+                    onChange={h => nudge({ h })}
+                />
+                <Slider
+                    label="Saturation" min={0} max={100} value={Math.round(hsl.s)}
+                    track="saturation" hue={hsl.h} sat={hsl.s} lit={hsl.l}
+                    onChange={sat => nudge({ s: sat })}
                 />
                 <Slider
                     label="Lightness" min={0} max={100} value={Math.round(hsl.l)}
-                    track="lightness" hue={hsl.h} sat={hsl.s}
-                    onChange={l => setBase(hslToHex({ ...hsl, l }))}
+                    track="lightness" hue={hsl.h} sat={hsl.s} lit={hsl.l}
+                    onChange={l => nudge({ l })}
                 />
 
                 {scoped && targets.length > 1 && (
@@ -290,7 +319,11 @@ function PickerPanel({
 
                 <div className="color-row color-readout">
                     <ColorNote note={seriesColorNote(stored, base)} />
-                    {ratio && <span className="text-caption">{ratio.toFixed(1)}:1 on plot</span>}
+                    {ratio && (
+                        <span className={`text-caption${ratio < AA_LARGE ? ' is-weak' : ''}`}>
+                            {ratio.toFixed(1)}:1 on plot{ratio < AA_LARGE ? ' · faint' : ''}
+                        </span>
+                    )}
                 </div>
 
                 {armed && (
@@ -324,7 +357,7 @@ function PickerPanel({
  * spectrum; the lightness track is the CURRENT hue from black to white, so the
  * slider is a preview of its own result rather than a grey bar with a number.
  */
-function Slider({ label, min, max, value, onChange, track, hue = 0, sat = 100 }) {
+function Slider({ label, min, max, value, onChange, track, hue = 0, sat = 100, lit = 50 }) {
     return (
         <label className="color-slider">
             <span className="text-nano">{label}</span>
@@ -334,9 +367,11 @@ function Slider({ label, min, max, value, onChange, track, hue = 0, sat = 100 })
                 max={max}
                 value={value}
                 className={`color-slider-input is-${track}`}
-                style={track === 'lightness'
-                    ? { '--track-hue': `${hue}`, '--track-sat': `${sat}%` }
-                    : undefined}
+                style={track === 'hue' ? undefined : {
+                    '--track-hue': `${hue}`,
+                    '--track-sat': `${sat}%`,
+                    '--track-lit': `${lit}%`,
+                }}
                 onChange={e => onChange(Number(e.target.value))}
             />
         </label>

@@ -99,6 +99,23 @@ describe('HSL round trip', () => {
         expect(hexToHsl('#9ca3af').s).toBeLessThan(20);
         expect(hexToHsl('#808080').s).toBe(0);
     });
+
+    it('CANNOT recover a hue from white or black, which is why HSL is the model', () => {
+        // Every hue is white at L=100 and black at L=0, so this direction is
+        // lossy at the ends and no cleverness will fix it. The picker holds HSL
+        // as state and treats the hex as a projection precisely because of
+        // this: re-deriving the sliders from the hex each render threw the hue
+        // away the moment lightness reached either end, and the hue thumb
+        // snapped to red and stayed there.
+        for (const hex of ['#FFFFFF', '#000000']) {
+            expect(hexToHsl(hex)).toEqual({ h: 0, s: 0, l: hexToHsl(hex).l });
+        }
+        // Held separately, a hue survives the round trip to white and back.
+        const blue = hexToHsl('#0072B2');
+        const white = { ...blue, l: 100 };
+        expect(hslToHex(white)).toBe('#ffffff');
+        expect(hslToHex({ ...white, l: blue.l }).toLowerCase()).toBe('#0072b2');
+    });
 });
 
 describe('a base seeds the set', () => {

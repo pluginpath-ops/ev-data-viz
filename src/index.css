@@ -4196,6 +4196,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
         hsl(0 100% 50%), hsl(60 100% 50%), hsl(120 100% 50%),
         hsl(180 100% 50%), hsl(240 100% 50%), hsl(300 100% 50%), hsl(360 100% 50%));
 }
+.color-slider-input.is-saturation {
+    background: linear-gradient(to right,
+        hsl(var(--track-hue) 0% var(--track-lit)),
+        hsl(var(--track-hue) 100% var(--track-lit)));
+}
 .color-slider-input.is-lightness {
     background: linear-gradient(to right,
         hsl(var(--track-hue) var(--track-sat) 0%),
@@ -4249,6 +4254,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .color-readout {
     @apply items-baseline;
 }
+/* Below the 3:1 WCAG non-text minimum — a line this close to the plot's own
+   ground is hard to pick out. Stated rather than blocked: a muted series is
+   sometimes exactly what is wanted, and the panel is not the judge of that. */
+.text-caption.is-weak { color: var(--color-accent-orange); }
 
 /* The one place the panel raises its voice, and only for the scope that earns
    it: reseeding the plot takes colours a person set by hand. */
