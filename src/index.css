@@ -4111,6 +4111,60 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
 }
 
+/* ── Auto, at the top and the full width ─────────────────────────────────────
+ *
+ * It used to be a small button beside "slot 3 of 8", where it read as a
+ * property of this one swatch — so choosing "All tests" and pressing it looked
+ * like it should release all of them, and did not. Full width under the scope
+ * strip, it belongs to the scope above it and says which.
+ *
+ * It also states rather than only acts: on means the palette is choosing, and
+ * the control is then inert because there is nothing left to hand back. */
+.color-auto {
+    @apply block w-full;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background: none;
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+.color-auto:hover:not(:disabled) {
+    background-color: var(--color-hover-lift);
+    color: var(--color-text-primary);
+}
+.color-auto.is-on {
+    border-color: transparent;
+    background-color: var(--color-primary);
+    color: var(--color-primary-text, #fff);
+    cursor: default;
+}
+.color-auto:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* Dimmed while Auto holds — NOT disabled and NOT collapsed. Touching one of
+   these is how you take a series off auto, so it has to stay reachable; and
+   collapsing it would move every control below by the height of the block,
+   which is the reflow #304 is about. */
+.color-manual {
+    @apply flex flex-col gap-2.5;
+    transition: opacity 0.15s;
+}
+.color-manual.is-idle { opacity: 0.45; }
+.color-manual.is-idle:hover,
+.color-manual.is-idle:focus-within { opacity: 1; }
+
+/* A checkbox glyph, only where the two derivations are independent. */
+.color-seed-tick {
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-meta);
+    margin-right: 4px;
+}
+
 .color-switch select {
     padding: 1px 4px;
     border: 1px solid var(--color-border);

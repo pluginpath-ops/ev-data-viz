@@ -141,7 +141,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // palette re-solved across what was left, and unrelated runs changed colour
     // — the shuffling that stickiness was meant to end. A stable input cannot
     // shuffle, which is a stronger guarantee than remembering what it assigned.
-    const { colorMap, setColorOverride, setColorOverrides } = useStickyChartColors(allRangeRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(allRangeRuns, {
         autoColor,
         resetKey: selectedVehicles.map(v => v.id).join(','),
     });
@@ -631,7 +631,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}
                     onUpdateRunColor={(_vehicleId, runId, color) => setColorOverride(runId, color)}
-                    colorSeries={seriesRowsOf(plottableRuns, selectedVehicles)}
+                    colorSeries={seriesRowsOf(plottableRuns, selectedVehicles, isColorOverridden)}
                     onUpdateRunColors={setColorOverrides}
                     runFilter={isRangeRun}
                     colorMap={colorMap}

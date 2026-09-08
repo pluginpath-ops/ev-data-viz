@@ -502,6 +502,7 @@ function RunColorControl({ run, vehicleId, onUpdateRunColor, onUpdateRunColors, 
             vehicleId={vehicleId}
             series={colorSeries}
             onApplyMany={onUpdateRunColors}
+            isAuto={colorSeries?.find(s => String(s.id) === String(run.id))?.auto}
         />
     );
 }

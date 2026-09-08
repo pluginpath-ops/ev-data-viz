@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     resolvePairColors, seriesColorNote, DEFAULT_RUN_COLOR, OKABE_ITO_SET,
     hexToHsl, hslToHex, rotatePaletteFrom, paletteSlotOf, rampFrom, seedPreview,
-    seriesRowsOf, expandPalette, OKABE_ITO, SERIES_NEUTRAL, resolveChartColors,
+    seriesRowsOf, expandPalette, OKABE_ITO, SERIES_NEUTRAL, resolveChartColors, seedPlot,
 } from '../colorUtils';
 
 const r = (key, primaryId, baseColor) => ({ key, primaryId, baseColor });
@@ -176,10 +176,19 @@ describe('seriesRowsOf', () => {
 
     it('carries the vehicle through, which is what "this vehicle" scopes on', () => {
         expect(seriesRowsOf([run('a'), run('b'), run('d')], vehicles)).toEqual([
-            { id: 'a', vehicleId: 1, stored: '#FF0000' },
-            { id: 'b', vehicleId: 1, stored: null },
-            { id: 'd', vehicleId: 2, stored: '#0072B2' },
+            { id: 'a', vehicleId: 1, stored: '#FF0000', auto: true },
+            { id: 'b', vehicleId: 1, stored: null, auto: true },
+            { id: 'd', vehicleId: 2, stored: '#0072B2', auto: true },
         ]);
+    });
+
+    it('marks a row not-auto when it is showing a hand-picked colour', () => {
+        // "Auto" is about an override being in force, not about what is stored:
+        // a run with a saved red is still on auto until someone recolours it in
+        // this session, and a run with nothing saved stops being on auto the
+        // moment they do.
+        const rows = seriesRowsOf([run('a'), run('d')], vehicles, id => id === 'a');
+        expect(rows.map(r => r.auto)).toEqual([false, true]);
     });
 
     it('counts a run once however many partners it is plotted against', () => {
@@ -303,5 +312,67 @@ describe('two runs saved with the same colour', () => {
                       '#E69F00', '#56B4E9', '#0072B2', '#D55E00', '#ef4444', '#9ca3af']
             .map((c, i) => at(i + 1, c, i + 1));
         expect(new Set(Object.values(resolveChartColors(rows, {}, 'manual'))).size).toBe(13);
+    });
+});
+
+describe('seedPlot', () => {
+    // Two vehicles, three tests and two tests.
+    const rows = [
+        { id: 'a1', vehicleId: 'v1' }, { id: 'a2', vehicleId: 'v1' }, { id: 'a3', vehicleId: 'v1' },
+        { id: 'b1', vehicleId: 'v2' }, { id: 'b2', vehicleId: 'v2' },
+    ];
+    const P = OKABE_ITO_SET;
+    const hue = h => Math.round(hexToHsl(h).h);
+
+    it('both: one colour per vehicle, one step per test', () => {
+        const out = seedPlot(P[0], rows, { rotate: true, shade: true }, P);
+        // Same hue within a vehicle...
+        expect(hue(out.a1)).toBe(hue(out.a2));
+        expect(hue(out.a2)).toBe(hue(out.a3));
+        expect(hue(out.b1)).toBe(hue(out.b2));
+        // ...different hue between them, and all five still distinct.
+        expect(hue(out.a1)).not.toBe(hue(out.b1));
+        expect(new Set(Object.values(out)).size).toBe(5);
+    });
+
+    it('both: the vehicle you opened from keeps the base exactly', () => {
+        const out = seedPlot(P[0], rows, { rotate: true, shade: true }, P);
+        expect(out.a1).toBe(P[0]);
+    });
+
+    it('rotate only: every series its own colour, ignoring which car it is', () => {
+        const out = seedPlot(P[0], rows, { rotate: true, shade: false }, P);
+        expect(new Set(Object.values(out)).size).toBe(5);
+        // Two tests of ONE vehicle are no longer related — that is the point.
+        expect(hue(out.a1)).not.toBe(hue(out.a2));
+    });
+
+    it('shade only: one hue across the whole plot', () => {
+        const out = seedPlot(P[0], rows, { rotate: false, shade: true }, P);
+        expect(new Set(Object.values(out).map(hue)).size).toBe(1);
+        expect(new Set(Object.values(out)).size).toBe(5);
+    });
+
+    it('a one-test vehicle keeps its rotated colour rather than being shaded off it', () => {
+        const solo = [{ id: 'a1', vehicleId: 'v1' }, { id: 'b1', vehicleId: 'v2' }];
+        const out = seedPlot(P[0], solo, { rotate: true, shade: true }, P);
+        expect(out.a1).toBe(P[0]);
+        expect(out.b1).toBe(P[1]);
+    });
+
+    it('never repeats, even with more vehicles than the palette holds', () => {
+        const many = Array.from({ length: 24 }, (_, i) => ({ id: `r${i}`, vehicleId: `v${i}` }));
+        const out = seedPlot(P[0], many, { rotate: true, shade: true }, P);
+        expect(new Set(Object.values(out)).size).toBe(24);
+    });
+
+    it('falls back to rotation when asked for neither', () => {
+        const out = seedPlot(P[0], rows, { rotate: false, shade: false }, P);
+        expect(new Set(Object.values(out)).size).toBe(5);
+        expect(hue(out.a1)).not.toBe(hue(out.a2));
+    });
+
+    it('survives an empty plot', () => {
+        expect(seedPlot(P[0], [], { rotate: true, shade: true }, P)).toEqual({});
     });
 });

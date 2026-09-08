@@ -474,7 +474,7 @@ export default function ChargeCompareView({
         () => resolvedPairs.map(p => p.rangeRun),
         [resolvedPairs]
     );
-    const { colorMap, setColorOverride, setColorOverrides } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
         autoColor: false,   // this chart has no Auto Color toggle; overrides still apply
         resetKey: selectedVehicleIds.join(','),
     });
@@ -904,7 +904,7 @@ export default function ChargeCompareView({
                         selectedRunIds={selectedRuns}
                         onToggleRun={toggleRun}
                         onUpdateRunColor={(_vehicleId, runId, color) => setColorOverride(runId, color)}
-                        colorSeries={seriesRowsOf(colorableRuns, selectedVehicles)}
+                        colorSeries={seriesRowsOf(colorableRuns, selectedVehicles, isColorOverridden)}
                         onUpdateRunColors={setColorOverrides}
                         // Without this the swatches showed each run's stored
                         // colour while the bars showed the resolved one, so the

@@ -537,8 +537,11 @@ export function rotatePaletteFrom(base, colors, count = 0) {
     return count > rotated.length ? expandPalette(rotated, count) : rotated;
 }
 
-/** How far the light→dark ramp travels across the whole set. */
-const RAMP_SPAN = 0.62;
+/** The most lightness the ramp will travel, in L points. */
+const RAMP_SPAN_L = 58;
+/** Kept clear of pure white and black, which are not series colours at all. */
+const RAMP_L_MIN = 14;
+const RAMP_L_MAX = 88;
 
 /**
  * A lightness ramp of `count` colours, anchored so the base is an END of it.
@@ -551,11 +554,18 @@ const RAMP_SPAN = 0.62;
  */
 export function rampFrom(base, count) {
     if (count <= 1) return [base];
-    const { l } = hexToHsl(base);
+    const { h, s, l } = hexToHsl(base);
     const away = l > 50 ? -1 : 1;
+    // Travel only as far as there is room, so the far end never clamps and
+    // collapses the last two steps onto one colour.
+    const span = Math.min(RAMP_SPAN_L, away > 0 ? RAMP_L_MAX - l : l - RAMP_L_MIN);
     const out = [base];
     for (let i = 1; i < count; i++) {
-        out.push(shiftLightness(base, away * RAMP_SPAN * (i / (count - 1))));
+        // HSL, holding h and s fixed. shiftLightness mixes toward white or
+        // black in RGB, which desaturates AND drags the hue — measured at a
+        // degree per step, so "shades of one hue" was not quite true of its own
+        // output. Here it is exactly true, which is the whole claim.
+        out.push(hslToHex({ h, s, l: l + away * span * (i / (count - 1)) }));
     }
     return out;
 }
@@ -589,9 +599,11 @@ export function seedPreview(base, count, mode, colors) {
  *
  * @param {Array} runs      the runs being coloured, in plot order
  * @param {Array} vehicles  selected vehicles, each with .runs, for the lookup
- * @returns {Array<{id, vehicleId, stored}>}
+ * @param {(id) => boolean} [isOverridden]  whether a run is showing a
+ *        hand-picked colour. Without it every row reads as auto
+ * @returns {Array<{id, vehicleId, stored, auto}>}
  */
-export function seriesRowsOf(runs, vehicles) {
+export function seriesRowsOf(runs, vehicles, isOverridden) {
     const owner = new Map();
     for (const v of vehicles ?? []) {
         for (const r of v.runs ?? []) owner.set(String(r.id), v.id);
@@ -603,7 +615,69 @@ export function seriesRowsOf(runs, vehicles) {
         // the same run arrives more than once. It is still one series colour.
         if (!r || r._synthetic || seen.has(String(r.id))) continue;
         seen.add(String(r.id));
-        rows.push({ id: r.id, vehicleId: owner.get(String(r.id)) ?? null, stored: r.color ?? null });
+        rows.push({
+            id: r.id,
+            vehicleId: owner.get(String(r.id)) ?? null,
+            stored: r.color ?? null,
+            auto: !(isOverridden?.(r.id) ?? false),
+        });
     }
     return rows;
+}
+
+/**
+ * Colour a whole plot from one base — the two derivations, together or apart.
+ *
+ * Applying ONE of them across every series was the mistake this replaces.
+ * Rotation alone gives thirteen unrelated hues and throws away the fact that
+ * four of them are the same car; shading alone gives thirteen steps of one hue
+ * and throws away everything else. Neither is what a multi-vehicle chart wants,
+ * and the panel offered no way to say "both" because the two were a radio.
+ *
+ * Together they are handoff 3c applied to the whole plot: each VEHICLE takes
+ * the next colour of the rotation, and each of that vehicle's TESTS takes a
+ * step along it. A chart then reads as families first and runs second, which is
+ * the entire reason 3c exists.
+ *
+ * Vehicles are ordered by first appearance rather than by id, so the base lands
+ * on the row you opened the panel from and the rest follow in reading order.
+ *
+ * @param {string} base
+ * @param {Array<{id, vehicleId}>} rows  the plotted set, in display order
+ * @param {{rotate?: boolean, shade?: boolean}} how
+ * @param {string[]} colors  the active palette
+ * @returns {Object} row id → colour
+ */
+export function seedPlot(base, rows, { rotate = true, shade = true } = {}, colors) {
+    if (!rows?.length) return {};
+
+    // Neither selected is not a state the panel offers, but a caller can still
+    // ask for it. Rotation is the safer answer: distinct beats identical.
+    const useShade = shade && (rotate || shade);
+    const useRotate = rotate || !useShade;
+
+    if (useRotate && useShade) {
+        const order = [];
+        const byVehicle = new Map();
+        for (const r of rows) {
+            const key = String(r.vehicleId ?? r.id);
+            if (!byVehicle.has(key)) { byVehicle.set(key, []); order.push(key); }
+            byVehicle.get(key).push(r);
+        }
+        const bases = rotatePaletteFrom(base, colors, order.length);
+        const out = {};
+        order.forEach((key, i) => {
+            const group = byVehicle.get(key);
+            // rampFrom returns the base first, so a vehicle with one test keeps
+            // its rotated colour exactly rather than being shaded off it.
+            const shades = rampFrom(bases[i % bases.length], group.length);
+            group.forEach((row, j) => { out[row.id] = shades[j]; });
+        });
+        return out;
+    }
+
+    const flat = useShade
+        ? rampFrom(base, rows.length)
+        : rotatePaletteFrom(base, colors, rows.length);
+    return Object.fromEntries(rows.map((r, i) => [r.id, flat[i % flat.length]]));
 }

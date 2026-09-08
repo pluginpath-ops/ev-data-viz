@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import Popover from './Popover';
 import {
     SERIES_PALETTES, DEFAULT_RUN_COLOR, seriesColorNote, isUnsetColor, sameHex,
-    paletteSlotOf, hexToHsl, hslToHex, rotatePaletteFrom, rampFrom,
+    paletteSlotOf, hexToHsl, hslToHex, rotatePaletteFrom, rampFrom, seedPlot,
 } from '../utils/colorUtils';
 import { ratioOf, AA_LARGE } from '../utils/contrast';
 import { chartTheme } from '../utils/chartTheme';
@@ -67,6 +67,7 @@ export default function SeriesColorPicker({
     vehicleId = null,
     series = null,
     onApplyMany = null,
+    isAuto = null,
     className = '',
 }) {
     const plotted = value || DEFAULT_RUN_COLOR;
@@ -109,6 +110,7 @@ export default function SeriesColorPicker({
                     close={close}
                     plotted={plotted}
                     stored={stored}
+                    autoInForce={isAuto ?? isUnsetColor(stored)}
                     onChange={onChange}
                     onReset={onReset}
                     scoped={scoped}
@@ -128,47 +130,43 @@ export default function SeriesColorPicker({
  * watching for it.
  */
 function PickerPanel({
-    close, plotted, stored, onChange, onReset,
+    close, plotted, stored, onChange, onReset, autoInForce,
     scoped, seriesId, vehicleId, series, onApplyMany,
 }) {
     const [paletteId, setPaletteId] = useState(SERIES_PALETTES[0].id);
 
     // Two axes, not one. SCOPE says who a pick reaches; DERIVATION says what it
-    // does to them. Welding them — one vehicle always gets shades, everything
-    // always gets separate colours — assumed that a family is the only reason
-    // to recolour a vehicle, and it is not: telling four tests of ONE car apart
-    // wants maximum contrast between them, exactly like telling four cars apart.
-    // Each scope still has the derivation it usually wants as its default; the
-    // rows below are how you say otherwise.
+    // does to them. They were welded — one vehicle always got shades, everything
+    // always got separate colours — which assumed a family is the only reason to
+    // recolour a vehicle. It is not: telling four tests of ONE car apart wants
+    // maximum contrast for the same reason telling four cars apart does.
     const [scope, setScope] = useState('test');
-    const [derivation, setDerivation] = useState('shades');
+    const [how, setHow] = useState(DERIVATION_DEFAULTS.vehicle);
     const pickScope = (id) => {
         setScope(id);
-        setDerivation(id === 'all' ? 'distinct' : 'shades');
+        setHow(DERIVATION_DEFAULTS[id] ?? DERIVATION_DEFAULTS.vehicle);
     };
 
     // ── HSL is the model; the hex is a projection of it ─────────────────────
     //
-    // Both are held, and that is not redundancy. hex → HSL is LOSSY at the
-    // ends: every hue is white at full lightness and black at none, so there is
-    // no hue for hexToHsl to report back and it can only answer zero.
-    // Re-deriving the sliders from the hex each render therefore destroyed the
-    // hue the moment lightness reached either end — the hue thumb snapped to
-    // red and stayed there, and dragging lightness back gave grey instead of
-    // the colour you started from.
-    //
-    // Saturation is lossy in the same way and for the same reason, which is the
-    // other half of why the model is held rather than recomputed.
-    //
-    // Keeping HSL means the hue survives a trip to white and back. A slider
-    // writes the model and the hex follows; every other route into the panel —
-    // a palette slot, a typed hex — writes the hex and the model follows.
+    // Both are held, and that is not redundancy. hex → HSL is LOSSY at the ends:
+    // every hue is white at full lightness and black at none, so there is no hue
+    // for hexToHsl to report back and it can only answer zero. Re-deriving the
+    // sliders from the hex each render therefore destroyed the hue the moment
+    // lightness reached either end. Saturation is lossy the same way.
     const [base, setBaseHex] = useState(plotted);
     const [hsl, setHsl] = useState(() => hexToHsl(plotted));
 
-    const setBase = (hex) => { setBaseHex(hex); setHsl(hexToHsl(hex)); };
+    // Touching any colour control means you are choosing by hand, which is what
+    // takes Auto out of force — live, before anything commits, so the panel
+    // stops claiming a state you have already left.
+    const [touched, setTouched] = useState(false);
+    const auto = autoInForce && !touched;
+
+    const setBase = (hex) => { setTouched(true); setBaseHex(hex); setHsl(hexToHsl(hex)); };
     const nudge = (patch) => {
         const next = { ...hsl, ...patch };
+        setTouched(true);
         setHsl(next);
         setBaseHex(hslToHex(next));
     };
@@ -183,23 +181,18 @@ function PickerPanel({
             ? series.filter(s => s.vehicleId === vehicleId)
             : series;
         // The series being edited leads its own set: it is the base, so it must
-        // be the one that actually keeps the colour that was picked.
+        // be the one that keeps the colour that was picked.
         return [...rows].sort((a, b) =>
             (a.id === seriesId ? -1 : 0) - (b.id === seriesId ? -1 : 0));
     }, [scoped, scope, series, vehicleId, seriesId]);
 
     const handSet = targets.filter(t => !isUnsetColor(t.stored)).length;
+    const vehicleCount = new Set(targets.map(t => t.vehicleId)).size;
 
-    // The two derivations, and the scope each one serves.
-    const derived = useMemo(() => {
-        if (!targets.length) return null;
-        const colors = derivation === 'shades'
-            ? rampFrom(base, targets.length)
-            // The count matters: without it the rotation wraps with a modulo and
-            // a twelve-series plot gets eight colours and four duplicates.
-            : rotatePaletteFrom(base, palette.colors, targets.length);
-        return Object.fromEntries(targets.map((t, i) => [t.id, colors[i % colors.length]]));
-    }, [derivation, targets, base, palette]);
+    const derived = useMemo(
+        () => (targets.length ? seedPlot(base, targets, how, palette.colors) : null),
+        [targets, base, how, palette],
+    );
 
     // "All tests" states its blast radius before it will commit; the other two
     // commit on click, because one series and one vehicle are both undoable by
@@ -212,8 +205,27 @@ function PickerPanel({
         close();
     };
 
-    const plotBg = chartTheme().background;
-    const ratio = ratioOf(base, plotBg);
+    // Auto follows the scope, which is the whole reason it moved: with it sitting
+    // beside "slot 3 of 8" it looked like a property of this one swatch, and
+    // choosing "All tests" then pressing it plainly ought to hand ALL of them
+    // back to the palette.
+    const goAuto = () => {
+        if (scope === 'test' || !targets.length) onReset();
+        else onApplyMany(Object.fromEntries(targets.map(t => [t.id, null])));
+        close();
+    };
+
+    const toggleHow = (key) => {
+        // At the widest scope the two are independent and both is the default —
+        // a vehicle per colour, a test per step. Narrower, they are a choice
+        // between, since one vehicle has nothing to rotate through.
+        if (scope !== 'all') { setHow({ rotate: key === 'rotate', shade: key === 'shade' }); return; }
+        const next = { ...how, [key]: !how[key] };
+        if (!next.rotate && !next.shade) return;
+        setHow(next);
+    };
+
+    const ratio = ratioOf(base, chartTheme().background);
 
     return (
         <>
@@ -235,107 +247,99 @@ function PickerPanel({
                     </div>
                 )}
 
-                <div className="color-row">
-                    {onReset && (
-                        <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => { onReset(); close(); }}
-                            title="Hand this series back to the palette"
-                        >
-                            Auto
-                        </button>
-                    )}
-                    <span className="text-caption">
-                        {slot ? `slot ${slot} of ${palette.colors.length}` : 'off-palette'}
-                    </span>
-                </div>
-
-                <div className="color-row">
-                    <span className="text-nano">Palette · {palette.label}</span>
-                    <label className="color-switch">
-                        <span className="sr-only">Palette</span>
-                        <select value={paletteId} onChange={e => setPaletteId(e.target.value)}>
-                            {SERIES_PALETTES.map(p => (
-                                <option key={p.id} value={p.id}>
-                                    {p.label}{p.safe ? '' : ' (not colorblind-safe)'}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                </div>
-
-                <div className="color-slots" role="group" aria-label={`${palette.label} palette`}>
-                    {palette.colors.map((hex, i) => (
-                        <button
-                            key={hex}
-                            type="button"
-                            className={`color-slot${sameHex(hex, base) ? ' is-current' : ''}`}
-                            style={{ backgroundColor: hex }}
-                            aria-label={`Slot ${i + 1}, ${hex}`}
-                            aria-pressed={sameHex(hex, base)}
-                            onClick={() => setBase(hex)}
-                        />
-                    ))}
-                </div>
-
-                <label className="color-hex">
-                    <span className="color-hex-chip" style={{ backgroundColor: base }} />
-                    <input
-                        type="text"
-                        value={base.toUpperCase()}
-                        maxLength={7}
-                        spellCheck={false}
-                        aria-label="Base color, hex"
-                        onChange={e => {
-                            const v = e.target.value.trim();
-                            if (/^#[0-9a-fA-F]{6}$/.test(v)) setBase(v.toLowerCase());
-                        }}
-                    />
-                    <span className="text-nano">base</span>
-                </label>
-
-                <Slider
-                    label="Hue" min={0} max={360} value={Math.round(hsl.h)}
-                    track="hue"
-                    onChange={h => nudge({ h })}
-                />
-                <Slider
-                    label="Saturation" min={0} max={100} value={Math.round(hsl.s)}
-                    track="saturation" hue={hsl.h} sat={hsl.s} lit={hsl.l}
-                    onChange={sat => nudge({ s: sat })}
-                />
-                <Slider
-                    label="Lightness" min={0} max={100} value={Math.round(hsl.l)}
-                    track="lightness" hue={hsl.h} sat={hsl.s} lit={hsl.l}
-                    onChange={l => nudge({ l })}
-                />
-
-                {scoped && targets.length > 1 && (
-                    <div className="color-seed">
-                        {/* No heading. "Base seeds the set" and "3 more series"
-                            were both written from inside the implementation:
-                            they name the mechanism rather than the thing it
-                            produces, and a reader who has not read the code has
-                            no way in. The rows now say what each derivation is
-                            FOR — one hue per vehicle, one step per test — which
-                            is the same sentence handoff 3c uses. */}
-                        <SeedRow
-                            name="Different colors"
-                            hint="Every series a color of its own — maximum contrast"
-                            colors={rotatePaletteFrom(base, palette.colors).slice(0, 4)}
-                            active={derivation === 'distinct'}
-                            onSelect={() => setDerivation('distinct')}
-                        />
-                        <SeedRow
-                            name="Shades of one"
-                            hint="One color in steps — they read as a set"
-                            colors={rampFrom(base, 4)}
-                            active={derivation === 'shades'}
-                            onSelect={() => setDerivation('shades')}
-                        />
-                    </div>
+                {onReset && (
+                    <button
+                        type="button"
+                        className={`color-auto${auto ? ' is-on' : ''}`}
+                        aria-pressed={auto}
+                        disabled={auto}
+                        onClick={goAuto}
+                        title={auto
+                            ? 'The palette is choosing this colour'
+                            : 'Hand it back to the palette'}
+                    >
+                        {auto ? 'Auto — the palette is choosing' : `Back to auto${scopeSuffix(scope, targets.length)}`}
+                    </button>
                 )}
+
+                {/* Dimmed while Auto holds, not disabled: touching anything here
+                    IS how you take it off auto, so it must stay reachable. */}
+                <div className={`color-manual${auto ? ' is-idle' : ''}`}>
+                    <div className="color-row">
+                        <span className="text-nano">Palette · {palette.label}</span>
+                        <label className="color-switch">
+                            <select value={paletteId} onChange={e => setPaletteId(e.target.value)} aria-label="Palette">
+                                {SERIES_PALETTES.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.label}{p.safe ? '' : ' (not colorblind-safe)'}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    </div>
+
+                    <div className="color-slots" role="group" aria-label={`${palette.label} palette`}>
+                        {palette.colors.map((hex, i) => (
+                            <button
+                                key={hex}
+                                type="button"
+                                className={`color-slot${sameHex(hex, base) ? ' is-current' : ''}`}
+                                style={{ backgroundColor: hex }}
+                                aria-label={`Slot ${i + 1}, ${hex}`}
+                                aria-pressed={sameHex(hex, base)}
+                                onClick={() => setBase(hex)}
+                            />
+                        ))}
+                    </div>
+
+                    <label className="color-hex">
+                        <span className="color-hex-chip" style={{ backgroundColor: base }} />
+                        <input
+                            type="text"
+                            value={base.toUpperCase()}
+                            maxLength={7}
+                            spellCheck={false}
+                            aria-label="Base color, hex"
+                            onChange={e => {
+                                const v = e.target.value.trim();
+                                if (/^#[0-9a-fA-F]{6}$/.test(v)) setBase(v.toLowerCase());
+                            }}
+                        />
+                        <span className="text-caption">
+                            {slot ? `slot ${slot} of ${palette.colors.length}` : 'off-palette'}
+                        </span>
+                    </label>
+
+                    <Slider label="Hue" min={0} max={360} value={Math.round(hsl.h)}
+                        track="hue" onChange={h => nudge({ h })} />
+                    <Slider label="Saturation" min={0} max={100} value={Math.round(hsl.s)}
+                        track="saturation" hue={hsl.h} sat={hsl.s} lit={hsl.l}
+                        onChange={sat => nudge({ s: sat })} />
+                    <Slider label="Lightness" min={0} max={100} value={Math.round(hsl.l)}
+                        track="lightness" hue={hsl.h} sat={hsl.s} lit={hsl.l}
+                        onChange={l => nudge({ l })} />
+
+                    {targets.length > 1 && (
+                        <div className="color-seed">
+                            <SeedRow
+                                name="A color per vehicle"
+                                hint="Each vehicle takes the next color of the rotation"
+                                colors={rotatePaletteFrom(base, palette.colors, 4).slice(0, 4)}
+                                active={how.rotate}
+                                multi={armed}
+                                onSelect={() => toggleHow('rotate')}
+                            />
+                            <SeedRow
+                                name="A shade per test"
+                                hint="Each test of one vehicle takes a step along its color"
+                                colors={rampFrom(base, 4)}
+                                active={how.shade}
+                                multi={armed}
+                                onSelect={() => toggleHow('shade')}
+                            />
+                        </div>
+                    )}
+                </div>
 
                 <div className="color-row color-readout">
                     <ColorNote note={seriesColorNote(stored, base)} />
@@ -348,7 +352,10 @@ function PickerPanel({
 
                 {armed && (
                     <p className="color-warning">
-                        Reseeds {targets.length} plotted series from this base.
+                        Reseeds {targets.length} plotted series
+                        {how.rotate && how.shade && vehicleCount > 1
+                            ? ` across ${vehicleCount} vehicles`
+                            : ''} from this base.
                         {handSet > 0 && ` ${handSet} carr${handSet === 1 ? 'ies' : 'y'} a color someone set by hand. Those get overwritten.`}
                     </p>
                 )}
@@ -370,6 +377,24 @@ function PickerPanel({
             </div>
         </>
     );
+}
+
+/**
+ * What each scope starts out doing. One vehicle has nothing to rotate through,
+ * so it shades; the whole plot does both, which is 3c — a color per vehicle and
+ * a shade per test.
+ */
+const DERIVATION_DEFAULTS = {
+    test:    { rotate: false, shade: true },
+    vehicle: { rotate: false, shade: true },
+    all:     { rotate: true,  shade: true },
+};
+
+/** Names what "Back to auto" would release, so the button cannot mislead. */
+function scopeSuffix(scope, count) {
+    if (scope === 'vehicle') return ` — ${count} on this vehicle`;
+    if (scope === 'all') return ` — all ${count}`;
+    return '';
 }
 
 /**
@@ -402,7 +427,7 @@ function Slider({ label, min, max, value, onChange, track, hue = 0, sat = 100, l
  * One derivation, previewed AND selectable — the preview is the control, so
  * there is no separate list of options saying the same thing twice.
  */
-function SeedRow({ name, hint, colors, active, onSelect }) {
+function SeedRow({ name, hint, colors, active, onSelect, multi = false }) {
     return (
         <button
             type="button"
@@ -411,6 +436,7 @@ function SeedRow({ name, hint, colors, active, onSelect }) {
             className={`color-row color-seed-row${active ? ' is-active' : ''}`}
             onClick={onSelect}
         >
+            {multi && <span className="color-seed-tick" aria-hidden="true">{active ? '☑' : '☐'}</span>}
             <span className="color-seed-chips">
                 {colors.map((c, i) => (
                     <span key={`${c}-${i}`} className="series-swatch" style={{ backgroundColor: c }} />

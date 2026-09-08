@@ -41,7 +41,8 @@ const EMPTY = {};
  * @param {boolean} opts.autoColor  auto mode on/off
  * @param {string}  opts.resetKey   changes when the vehicle set changes
  * @returns {{ colorMap: Object, setColorOverride: (runId, color) => void,
- *            setColorOverrides: (map) => void }}
+ *            setColorOverrides: (map) => void,
+ *            isColorOverridden: (runId) => boolean }}
  */
 export function useStickyChartColors(runs, { autoColor, resetKey }) {
     // A MONOTONIC generation, not a key derived from the boolean. Deriving it
@@ -86,10 +87,17 @@ export function useStickyChartColors(runs, { autoColor, resetKey }) {
     // single base, and applying that one at a time would re-render the chart
     // once per run and let a half-applied set be seen.
     const setColorOverrides = (map) => {
-        setOverrideState(prev => ({
-            key: sessionKey,
-            map: { ...(prev.key === sessionKey ? prev.map : EMPTY), ...map },
-        }));
+        setOverrideState(prev => {
+            const next = { ...(prev.key === sessionKey ? prev.map : EMPTY) };
+            // A null value REMOVES, matching setColorOverride. That is what the
+            // picker's "Back to auto" sends for a whole scope, and it has to be
+            // one update: clearing twenty runs one at a time would re-solve the
+            // palette after each and shuffle the colours it had not reached yet.
+            for (const [id, color] of Object.entries(map)) {
+                if (color == null) delete next[id]; else next[id] = color;
+            }
+            return { key: sessionKey, map: next };
+        });
     };
 
 
@@ -130,5 +138,9 @@ export function useStickyChartColors(runs, { autoColor, resetKey }) {
         colorMap,
         setColorOverride,
         setColorOverrides,
+        // Whether a run is showing a hand-picked colour rather than the
+        // palette's. The picker reflects this rather than guessing from the
+        // stored value, which answers a different question entirely.
+        isColorOverridden: (runId) => runId in overrides,
     };
 }

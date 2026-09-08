@@ -616,7 +616,7 @@ export default function RoadTripView({
         () => selectedVehicles.flatMap(v => filterRangeRuns(v.runs)),
         [selectedVehicles]
     );
-    const { colorMap, setColorOverride, setColorOverrides } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
         autoColor,
         resetKey: selectedVehicleIds.join(','),
     });
@@ -1776,7 +1776,7 @@ export default function RoadTripView({
                             selectedRunIds={selectedRunIds}
                             onToggleRun={toggleRunId}
                             onUpdateRunColor={(_vehicleId, runId, color) => setColorOverride(runId, color)}
-                            colorSeries={seriesRowsOf(runEntries.map(e => e.rangeRun), selectedVehicles)}
+                            colorSeries={seriesRowsOf(runEntries.map(e => e.rangeRun), selectedVehicles, isColorOverridden)}
                             onUpdateRunColors={setColorOverrides}
                             colorMap={colorMap}
                             runFilter={(run, vehicle) =>

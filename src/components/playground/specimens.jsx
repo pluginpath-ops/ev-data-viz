@@ -40,62 +40,52 @@ import { OKABE_ITO, LEGACY_PALETTE } from '../../utils/colorUtils';
  * no application data and performs no action outside this component.
  */
 function ColorPickerSeams() {
-    // A plotted set the wider scopes can act on: two vehicles, four series, one
-    // of them carrying a hand-set colour so "Overwrite" has something to warn
-    // about. Shaped exactly like seriesRowsOf's output, because that is what a
-    // chart view hands the picker.
-    const SERIES = [
+    // A plotted set the wider scopes can act on: two vehicles — one with three
+    // tests, one with a single test — so "a color per vehicle, a shade per
+    // test" has something to actually do. One row carries a hand-set colour so
+    // "Overwrite" has something to warn about. Shaped exactly like
+    // seriesRowsOf's output, because that is what a chart view hands the picker.
+    const PLOT = [
         { id: 'r1', vehicleId: 'v1', stored: LEGACY_PALETTE[3] },
         { id: 'r2', vehicleId: 'v1', stored: null },
         { id: 'r3', vehicleId: 'v1', stored: null },
         { id: 'r4', vehicleId: 'v2', stored: null },
     ];
-    const [drawn, setDrawn] = useState({ r1: OKABE_ITO[0], r2: OKABE_ITO[1], r3: OKABE_ITO[2], r4: OKABE_ITO[4] });
-    const [ownerSees, setOwnerSees] = useState('closed');
+    // What the palette would choose, which is what "auto" means here.
+    const AUTO = { r1: OKABE_ITO[0], r2: OKABE_ITO[1], r3: OKABE_ITO[2], r4: OKABE_ITO[4] };
+
+    const [overrides, setOverrides] = useState({});
+    const drawn = id => overrides[id] ?? AUTO[id];
+    const apply = map => setOverrides(prev => {
+        const next = { ...prev };
+        for (const [id, c] of Object.entries(map)) { if (c == null) delete next[id]; else next[id] = c; }
+        return next;
+    });
 
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <SeriesColorPicker
                 label="90 kW test"
-                value={drawn.r1}
-                stored={SERIES[0].stored}
+                value={drawn('r1')}
+                stored={PLOT[0].stored}
                 seriesId="r1"
                 vehicleId="v1"
-                series={SERIES}
-                onChange={hex => setDrawn(d => ({ ...d, r1: hex }))}
-                onReset={() => setDrawn(d => ({ ...d, r1: OKABE_ITO[0] }))}
-                onApplyMany={map => setDrawn(d => ({ ...d, ...map }))}
+                series={PLOT.map(r => ({ ...r, auto: !(r.id in overrides) }))}
+                isAuto={!('r1' in overrides)}
+                onChange={hex => apply({ r1: hex })}
+                onReset={() => apply({ r1: null })}
+                onApplyMany={apply}
             />
             <span className="color-seed-chips">
-                {SERIES.map(s => (
-                    <span key={s.id} className="series-swatch" style={{ backgroundColor: drawn[s.id] }} />
+                {PLOT.map(r => (
+                    <span key={r.id} className="series-swatch" style={{ backgroundColor: drawn(r.id) }} />
                 ))}
             </span>
-            <span className="text-nano">the plotted set</span>
-            {/* A bare Popover beside it, purely to show that the owner is told:
-                the picker keeps its own open state to itself, as it should. */}
-            <Popover
-                title="onOpenChange"
-                onOpenChange={o => setOwnerSees(o ? 'open' : 'closed')}
-                trigger={props => (
-                    <button {...props} type="button" className="btn btn-secondary">Panel</button>
-                )}
-            >
-                {({ close }) => (
-                    <>
-                        <div className="color-picker-body">
-                            <span className="color-note">
-                                The owner reads <b>open</b> while this is showing.
-                            </span>
-                        </div>
-                        <div className="popover-foot">
-                            <span className="popover-foot-gap" />
-                            <button type="button" className="btn btn-secondary" onClick={close}>Done</button>
-                        </div>
-                    </>
-                )}
-            </Popover>
-            <span className="text-nano">owner sees: {ownerSees}</span>
+            <span className="text-nano">
+                {Object.keys(overrides).length
+                    ? `${Object.keys(overrides).length} overridden`
+                    : 'all on auto'}
+            </span>
         </div>
     );
 }

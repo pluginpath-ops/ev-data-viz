@@ -119,7 +119,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         ),
         [selectedVehicles, selectedRuns]
     );
-    const { colorMap, setColorOverride, setColorOverrides } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
         autoColor: chartConfig.autoColor,
         resetKey: selectedVehicleIds.join(','),
     });
@@ -876,7 +876,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}
                     onUpdateRunColor={handleColorChange}
-                    colorSeries={seriesRowsOf(colorableRuns, selectedVehicles)}
+                    colorSeries={seriesRowsOf(colorableRuns, selectedVehicles, isColorOverridden)}
                     onUpdateRunColors={setColorOverrides}
                     runFilter={isChargingRun}
                     colorMap={colorMap}
