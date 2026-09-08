@@ -152,7 +152,7 @@ function PickerPanel({
     // recolour a vehicle. It is not: telling four tests of ONE car apart wants
     // maximum contrast for the same reason telling four cars apart does.
     const [scope, setScope] = useState('test');
-    const [mode, setMode] = useState('shades');
+    const [mode, setMode] = useState('family');
 
     // ── HSL is the model; the hex is a projection of it ─────────────────────
     //
@@ -194,27 +194,21 @@ function PickerPanel({
 
     const handSet = targets.filter(t => !isUnsetColor(t.stored)).length;
 
-    // ── Three outcomes, one choice ──────────────────────────────────────────
+    // ── Two outcomes, one choice ────────────────────────────────────────────
     //
-    // This was two independent toggles with an "at least one" rule, which made
-    // the first row's label depend on the second row's state: rotation means
-    // per-vehicle when shading groups it and per-test when nothing does. That
-    // is a relationship a reader had to derive from two controls before knowing
-    // what either would do. There are only ever three answers, so they are
-    // three answers now, and each says its own name.
+    // This was two independent toggles with an "at least one" rule, then three
+    // named outcomes, and it is two because the third was never a third thing.
+    // "Shades of one color" is what "a color per vehicle" ALREADY does when the
+    // scope holds one vehicle — the rotation has nothing to rotate through, so
+    // it degenerates to exactly that, byte for byte. Offering both meant one
+    // scope showing two identical answers under different names.
     //
-    // "A color per vehicle" needs more than one vehicle to mean anything, so it
-    // is only offered when there is one — which is also why the vehicle scope
-    // shows two options rather than three.
-    const vehicleCount = new Set(targets.map(t => t.vehicleId)).size;
-    const options = DERIVATIONS.filter(d => !d.needsVehicles || vehicleCount > 1);
+    // What is genuinely gone with it is one hue across MANY vehicles, which
+    // reads as a family shape rather than as individual runs. That is a
+    // palette — one colour, many lightnesses — rather than a way of deriving a
+    // set, and it belongs there if it comes back.
     const how = (DERIVATIONS.find(d => d.id === mode) ?? DERIVATIONS[0]).how;
-
-    // A scope change can take the current answer off the menu.
-    const pickScope = (id) => {
-        setScope(id);
-        setMode(id === 'all' ? 'family' : 'shades');
-    };
+    const pickScope = (id) => setScope(id);
 
     // Auto answers for the SCOPE. Asking only about this series said "the
     // palette is choosing" while twelve other rows in the selected scope were
@@ -230,10 +224,7 @@ function PickerPanel({
         [targets, base, how, palette],
     );
 
-    // Chosen "family" and then narrowed the scope to one vehicle: the answer is
-    // no longer on the menu, so fall back rather than silently doing something
-    // the panel is not showing as selected.
-    const active = options.some(o => o.id === mode) ? mode : options[options.length - 1].id;
+
 
     // "All tests" states its blast radius before it will commit; the other two
     // commit on click, because one series and one vehicle are both undoable by
@@ -352,14 +343,14 @@ function PickerPanel({
 
                     {targets.length > 1 && (
                         <div className="color-seed" role="radiogroup" aria-label="How to color the set">
-                            {options.map(o => (
+                            {DERIVATIONS.map(o => (
                                 <SeedRow
                                     key={o.id}
                                     group={`${panelId}-derivation`}
                                     name={o.name}
                                     hint={o.hint}
                                     colors={o.preview(base, palette.colors)}
-                                    active={o.id === active}
+                                    active={o.id === mode}
                                     onSelect={() => setMode(o.id)}
                                 />
                             ))}
@@ -409,7 +400,11 @@ function PickerPanel({
 }
 
 /**
- * Every way a base can seed a set, as named outcomes.
+ * The two ways a base can seed a set, as named outcomes.
+ *
+ * Both apply at every scope, which is why there is no rule about when each is
+ * offered: with one vehicle in scope, "a color per vehicle" simply means this
+ * vehicle's colour with a step per test.
  *
  * Each carries its own preview, and the previews are structurally honest rather
  * than decorative: "a color per vehicle" shows two hues with two steps each,
@@ -429,18 +424,10 @@ const DERIVATIONS = [
         name: 'A color per vehicle',
         hint: 'Each vehicle takes the next color; its own tests step along it',
         how: { rotate: true, shade: true },
-        needsVehicles: true,
         preview: (base, colors) => {
             const [a, b] = rotatePaletteFrom(base, colors, 2);
             return [...rampFrom(a, 2), ...rampFrom(b, 2)];
         },
-    },
-    {
-        id: 'shades',
-        name: 'Shades of one color',
-        hint: 'Everything shares one color, a step apart per test',
-        how: { rotate: false, shade: true },
-        preview: (base) => rampFrom(base, 4),
     },
 ];
 
