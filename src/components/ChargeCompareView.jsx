@@ -16,7 +16,7 @@ import CorrectionControl from './CorrectionControl';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR } from '../utils/colorUtils';
+import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
@@ -473,7 +473,9 @@ export default function ChargeCompareView({
         [resolvedPairs]
     );
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
-        autoColor: false,   // this chart has no Auto Color toggle; overrides still apply
+        // No palette control on this chart; it draws vehicle colours, and a
+        // session override still applies.
+        palette: VEHICLE_PALETTE,
         resetKey: selectedVehicleIds.join(','),
         vehicles: selectedVehicles,
     });

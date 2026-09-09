@@ -1648,16 +1648,29 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* Selected vehicle chip. The rule down its left edge is the series colour, so
    the chip ties to the same vehicle on every chart — a left bar and a tinted
    band rather than a full-row wash, which is what let the old rounded-full
-   pills read as a row of buttons. */
+   pills read as a row of buttons.
+
+   That comment described an intention, not the rule: the edge was a hardcoded
+   `--color-accent-blue`, identical on every chip, and had been since it was
+   written (#308). It reads `--chip-accent` now, which App sets from the
+   vehicle's own colour. The blue survives as the fallback, which is the honest
+   answer for a vehicle nobody has curated — the palette is choosing, so the
+   chip says nothing rather than guessing.
+
+   This is the one place a vehicle's colour appears on EVERY tab, including the
+   four with no plot: Vehicles, Tests & Data, Specifications and EPA. */
 .selected-vehicle-chip {
     @apply flex items-center gap-2;
     padding: 3px 8px 3px 9px;
     /* Square on the colour side — see .vehicle-run-group. */
     border-radius: 0 var(--radius-track) var(--radius-track) 0;
     font-size: calc(var(--fs-body) * var(--fs-step));
-    background-color: var(--color-popover);
-    border-left: 2px solid var(--color-accent-blue);
-    color: var(--color-text-secondary);
+    /* Was written inline on the element, where it overrode two of this rule's
+       own properties — appearance in a style attribute, and the legacy
+       `-light` token rather than `-surface`. */
+    background-color: var(--color-primary-surface);
+    border-left: 2px solid var(--chip-accent, var(--color-accent-blue));
+    color: var(--color-primary-text);
 }
 
 /* OWNER role badge next to user email */

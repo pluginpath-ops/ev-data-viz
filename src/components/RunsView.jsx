@@ -1278,7 +1278,22 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                     }
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-lg leading-tight">{vehicle.name}</h3>
+                    <h3 className="font-bold text-lg leading-tight flex items-center gap-2">
+                        {/* Read-only here: this is where you READ a vehicle's
+                            tests, and the colour is edited on the vehicle form
+                            that Edit Vehicle opens from this same page. An
+                            uncurated vehicle shows no swatch rather than a
+                            placeholder — the palette is choosing, and a grey
+                            square would claim otherwise. */}
+                        {vehicle.color && (
+                            <span
+                                className="series-swatch"
+                                style={{ backgroundColor: vehicle.color }}
+                                title={`Series colour for ${vehicle.name}`}
+                            />
+                        )}
+                        <span className="truncate">{vehicle.name}</span>
+                    </h3>
                     <p className="text-secondary text-sm">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                     <div className="text-sm text-secondary mt-0.5 flex flex-wrap gap-x-3">
                         {vehicle.battery && <span>Battery: {vehicle.battery} kWh</span>}

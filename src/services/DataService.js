@@ -796,19 +796,35 @@ class DataService {
       localStorage.setItem('evData', JSON.stringify(data));
       return;
     }
-    const { error } = await getSupabase().from('vehicles').update({
-      name: updates.name, make: updates.make, model: updates.model, trim: updates.trim || null, year: updates.year,
-      battery: updates.battery ? parseFloat(updates.battery) : null,
-      range: updates.range ? parseFloat(updates.range) : null,
-      power: updates.power ? parseFloat(updates.power) : null,
-      ...(updates.manufacturer_id !== undefined
-        ? { manufacturer_id: updates.manufacturer_id ? Number(updates.manufacturer_id) : null }
-        : {}),
-      // Guarded like manufacturer_id: a caller updating only the name must not
-      // clear the colour, and `|| null` inside the guard is what lets the
-      // picker's Auto hand the vehicle back to the palette.
-      ...(updates.color !== undefined ? { color: updates.color || null } : {}),
-    }).eq('id', vehicleId);
+    // Every field guarded on PRESENCE, so a caller may send a partial update.
+    //
+    // Only manufacturer_id and color used to be. The rest were written
+    // unconditionally, which turned "absent" into "null" -- and `power` has no
+    // input on the edit form at all, so every save through it silently nulled a
+    // column the vehicle record still has. A partial update was therefore not
+    // merely unsupported, it was destructive: sending { color } alone would have
+    // taken the name, make, model, trim, year, battery and range with it.
+    //
+    // Presence, not truthiness: an empty string is a real answer meaning "clear
+    // this", and `|| null` INSIDE the guard is what carries that through.
+    const patch = {};
+    const set = (key, value) => { if (value !== undefined) patch[key] = value; };
+    set('name',   updates.name);
+    set('make',   updates.make);
+    set('model',  updates.model);
+    set('trim',   updates.trim || null);
+    set('year',   updates.year);
+    set('battery', updates.battery ? parseFloat(updates.battery) : (updates.battery === undefined ? undefined : null));
+    set('range',   updates.range   ? parseFloat(updates.range)   : (updates.range   === undefined ? undefined : null));
+    set('power',   updates.power   ? parseFloat(updates.power)   : (updates.power   === undefined ? undefined : null));
+    set('manufacturer_id', updates.manufacturer_id !== undefined
+        ? (updates.manufacturer_id ? Number(updates.manufacturer_id) : null)
+        : undefined);
+    // `|| null` is what lets the picker's Auto hand the vehicle back to the
+    // palette rather than storing an empty string.
+    set('color', updates.color !== undefined ? (updates.color || null) : undefined);
+
+    const { error } = await getSupabase().from('vehicles').update(patch).eq('id', vehicleId);
     if (error) throw error;
   }
 

@@ -267,11 +267,11 @@ function pickBestSlot(orderedCandidates, placed) {
  *
  * Priority per run:
  *   1. sessionOverrides[runId]   — always wins (transient user pick)
- *   2. (manual mode only) the run's VEHICLE colour, shaded across that
+ *   2. (VEHICLE_PALETTE only) the run's VEHICLE colour, shaded across that
  *      vehicle's tests on this chart — one test takes the base exactly
- *   3. Okabe-Ito slot via greedy max-min-ΔE.
- *      In auto mode over a curated vehicle, candidates are sorted by proximity
- *      to its colour first (hue-family bias) before the greedy pass.
+ *   3. A slot from the chosen palette via greedy max-min-ΔE.
+ *      With a palette chosen over a curated vehicle, candidates are sorted by
+ *      proximity to its colour first (hue-family bias) before the greedy pass.
  *
  * Step 2 read `run.color` until #308. Colour is a property of the CAR now: per
  * run it did not survive hundreds of vehicles at two to ten tests each, and it
@@ -284,12 +284,14 @@ function pickBestSlot(orderedCandidates, placed) {
  *
  * @param {Array}  runs             — run objects with { id, created_at }
  * @param {object} sessionOverrides — { [runId]: hexColor }, default {}
- * @param {'manual'|'auto'} mode    — color resolution mode, default 'manual'
+ * @param {string} [palette]        — VEHICLE_PALETTE (default) to honour curated
+ *                                    vehicle colours, or a SERIES_PALETTES id to
+ *                                    assign from that set instead
  * @param {Array}  [vehicles]       — the runs' vehicles, each with .runs and
  *                                    .color; omit to skip step 2 entirely
  * @returns {{ [runId]: string }}   map of run ID → resolved hex color
  */
-export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual', vehicles = null) {
+export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICLE_PALETTE, vehicles = null) {
     if (!runs?.length) return {};
 
     // Stable ordering so color assignments don't shuffle on re-render
@@ -344,7 +346,7 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual',
             result[run.id] = sessionOverrides[run.id];
             continue;
 
-        } else if (mode === 'manual' && curated.has(String(run.id))) {
+        } else if (palette === VEHICLE_PALETTE && curated.has(String(run.id))) {
             // 2. The vehicle's curated colour, shaded across its tests.
             //
             //    Honoured EXACTLY, with no clash nudge — which is the one place
@@ -361,15 +363,19 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual',
             // 3. Assign an Okabe-Ito slot.
             // Extended so there are always at least as many candidates as runs;
             // otherwise every run past the palette length ties and collapses.
-            const pool = expandPalette(OKABE_ITO, sorted.length);
+            // The chosen palette, not a hardcoded one. `resolveChartColors`
+            // always assigned from Okabe-Ito regardless of what the picker was
+            // set to, so choosing House and then clearing an override brought
+            // Okabe-Ito back (#307).
+            const pool = expandPalette(paletteColorsById(palette) ?? OKABE_ITO, sorted.length);
 
-            // Auto mode over a curated vehicle: sort candidates by proximity to
-            // the curated colour, so Auto Color still leans toward the car's own
-            // hue where it can. Auto OVERRIDES the curated colour — that is what
-            // the toggle is for — but a preference expressed as a tiebreak costs
-            // nothing when the palette has room.
+            // A palette over a curated vehicle: sort candidates by proximity to
+            // the curated colour, so a palette still leans toward the car's own
+            // hue where it can. A palette OVERRIDES the curated colour — that is
+            // what choosing one is for — but a preference expressed as a
+            // tiebreak costs nothing when the palette has room.
             const near = curated.get(String(run.id));
-            const candidates = (mode === 'auto' && near)
+            const candidates = (palette !== VEHICLE_PALETTE && near)
                 ? [...pool].sort((a, b) => deltaE(a, near) - deltaE(b, near))
                 : pool;
             chosen = pickBestSlot(candidates, placed);
@@ -561,6 +567,22 @@ export const SERIES_PALETTES = [
     { id: 'mono-ice', label: 'Mono · ice', safe: true, colors: monochrome('#f2f5f9', 8, 93, 30) },
     { id: 'legacy',    label: 'Legacy',         safe: false, colors: LEGACY_PALETTE },
 ];
+
+/**
+ * The default series mode: draw every vehicle in the colour its curator gave it.
+ *
+ * A member of the same field as a palette id rather than a separate boolean,
+ * because it answers the same question — where does a series' colour come from?
+ * As a checkbox called "Auto Color" it was the OFF position of a control whose
+ * on-state assigned Okabe-Ito, which read backwards once vehicles owned their
+ * colours: switching "auto" ON is what threw the curation away.
+ */
+export const VEHICLE_PALETTE = 'vehicle';
+
+/** The colours a palette id names, or null for the vehicle-colour mode. */
+export function paletteColorsById(id) {
+    return SERIES_PALETTES.find(p => p.id === id)?.colors ?? null;
+}
 
 /** Hex equality that does not care how either side was written. */
 export function sameHex(a, b) {

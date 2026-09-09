@@ -13,7 +13,7 @@ import { buildSeriesLabels } from '../utils/seriesLabel';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import CorrectionControl from './CorrectionControl';
 import { sessionFor } from '../utils/testSessions';
-import AutoColorToggle from './AutoColorToggle';
+import SeriesPaletteSelect from './SeriesPaletteSelect';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import {
@@ -24,7 +24,7 @@ import {
 import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, resolvePairColors } from '../utils/colorUtils';
+import { seriesRowsOf, resolvePairColors, VEHICLE_PALETTE } from '../utils/colorUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
@@ -571,7 +571,7 @@ export default function RoadTripView({
     pairings = {},
     setPairings = () => {},
     presentationMode = false,
-    autoColor = true,
+    palette = VEHICLE_PALETTE,
     verboseLabels = false,
     correctionMode = 'none',
     setChartConfig = null,
@@ -616,7 +616,7 @@ export default function RoadTripView({
         [selectedVehicles]
     );
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
-        autoColor,
+        palette,
         resetKey: selectedVehicleIds.join(','),
         vehicles: selectedVehicles,
     });
@@ -1740,7 +1740,7 @@ export default function RoadTripView({
                         <div className="display-grid">
                             {setChartConfig && (
                                 <>
-                                    <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                                    <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
                                     <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                                 </>
                             )}

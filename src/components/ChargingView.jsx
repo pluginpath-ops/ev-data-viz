@@ -14,7 +14,7 @@ import CorrectionControl from './CorrectionControl';
 import { minimumCommonSoc, alignmentExclusion, alignmentOffset, alignSeries, overExtrapolated, clampSoc } from '../utils/socAlignment';
 import { sessionFor } from '../utils/testSessions';
 import { correctionFactor } from '../utils/conditionCorrection';
-import AutoColorToggle from './AutoColorToggle';
+import SeriesPaletteSelect from './SeriesPaletteSelect';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { useRunSelection } from '../hooks/useRunSelection';
@@ -27,7 +27,7 @@ import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, DEFAULT_RUN_COLOR } from '../utils/colorUtils';
+import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
@@ -120,7 +120,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         [selectedVehicles, selectedRuns]
     );
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
-        autoColor: chartConfig.autoColor,
+        palette: chartConfig.seriesPalette ?? VEHICLE_PALETTE,
         resetKey: selectedVehicleIds.join(','),
         vehicles: selectedVehicles,
     });
@@ -722,7 +722,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 toggleRun={toggleRun}
                 setChartConfig={setChartConfig}
                 presentationMode={presentationMode}
-                autoColor={chartConfig.autoColor ?? false}
+                palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                 verboseLabels={chartConfig.verboseLabels ?? false}
                 correctionMode={chartConfig.correctionMode ?? 'none'}
             />
@@ -851,7 +851,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             />
                             <span className="text-sm">Lines</span>
                         </label>
-                        <AutoColorToggle autoColor={chartConfig.autoColor ?? false} setChartConfig={setChartConfig} />
+                        <SeriesPaletteSelect palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE} setChartConfig={setChartConfig} />
                         <label className="toggle-label">
                             <input
                                 type="checkbox"

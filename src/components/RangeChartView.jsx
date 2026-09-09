@@ -9,7 +9,7 @@ import { correctionFactor, correctionNote } from '../utils/conditionCorrection';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
 import VerboseLabelToggle from './VerboseLabelToggle';
-import AutoColorToggle from './AutoColorToggle';
+import SeriesPaletteSelect from './SeriesPaletteSelect';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import {
@@ -21,7 +21,7 @@ import {
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, DEFAULT_RUN_COLOR } from '../utils/colorUtils';
+import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
@@ -67,7 +67,7 @@ const hasDataForType = (run, type) => {
 // view's selection through the shared useRunSelection hook (#176). This file
 // used to roll its own toggle against chartConfig — one more copy of the
 // behaviour, and the reason a run could be switched off here and come back.
-export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, autoColor = false, verboseLabels = false, correctionMode = 'none' }) {
+export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, palette = VEHICLE_PALETTE, verboseLabels = false, correctionMode = 'none' }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
@@ -142,7 +142,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // — the shuffling that stickiness was meant to end. A stable input cannot
     // shuffle, which is a stronger guarantee than remembering what it assigned.
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(allRangeRuns, {
-        autoColor,
+        palette,
         resetKey: selectedVehicles.map(v => v.id).join(','),
         vehicles: selectedVehicles,
     });
@@ -533,7 +533,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // rebuilt every render, so the map is a new object each time while holding
     // the same values — depending on its identity would redraw the chart on
     // every render. Comparing the colours by value redraws only when one moves.
-    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, autoColor, correctionMode]);
+    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, palette, correctionMode]);
 
     // ── The frame's caption ──────────────────────────────────────────────────
     // In the frame, so it is in the export: a bar chart pasted into a thread has
@@ -620,7 +620,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                                 <span className="text-sm">Points</span>
                             </label>
                         )}
-                        <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                        <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
                         <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                     </div>
                     <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />

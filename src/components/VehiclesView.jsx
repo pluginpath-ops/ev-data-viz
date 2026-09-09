@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import SeriesColorPicker from './SeriesColorPicker';
+import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 import { EMPTY_VEHICLE_FORM, vehicleFormFrom } from '../utils/vehicleForm';
 import { useAppContext } from '../context/AppContext';
 import { DATA_CATEGORIES, vehicleDataCategories, hasDataCategory, filterByDataCategories } from '../utils/vehicleDataCategories';
@@ -812,6 +814,33 @@ export default function VehiclesView({
                                     </VehicleMedia>
 
                                     <div className="vehicle-card-body">
+                                        {/* The curator's swatch, in the card BODY rather
+                                            than beside the name — the name sits over the
+                                            photograph behind a scrim, and a control there
+                                            has to fight an arbitrary image the way
+                                            .vehicle-media-badge does. Editing in place is
+                                            the point: colouring a catalogue this size is a
+                                            scroll-and-click pass, and routing each one
+                                            through the full edit form is what would make
+                                            it not worth doing. */}
+                                        {canEdit(vehicle) && (
+                                            <div
+                                                className="flex items-center gap-2 mb-2"
+                                                onClick={e => e.stopPropagation()}
+                                            >
+                                                <SeriesColorPicker
+                                                    value={vehicle.color || DEFAULT_RUN_COLOR}
+                                                    stored={vehicle.color ?? null}
+                                                    label={vehicle.name}
+                                                    onChange={hex => onUpdate(vehicle.id, { color: hex })}
+                                                    onReset={() => onUpdate(vehicle.id, { color: null })}
+                                                />
+                                                <span className="text-caption">
+                                                    {vehicle.color ? 'Series colour' : 'No colour set'}
+                                                </span>
+                                            </div>
+                                        )}
+
                                         {/* Reorder controls — shown in edit order mode */}
                                         {showReorderButtons && (
                                             <div className="reorder-controls mb-2 flex-wrap" onClick={e => e.stopPropagation()}>
@@ -938,6 +967,21 @@ export default function VehiclesView({
                                     {/* Name + make + tags */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 min-w-0">
+                                            {/* The curator's swatch. Editing in place is
+                                                the point: setting a colour per vehicle
+                                                across a catalogue of this size is a
+                                                scroll-and-click pass, and sending each
+                                                one through the full edit form is what
+                                                would make it not worth doing. */}
+                                            {canEdit(vehicle) && (
+                                                <SeriesColorPicker
+                                                    value={vehicle.color || DEFAULT_RUN_COLOR}
+                                                    stored={vehicle.color ?? null}
+                                                    label={vehicle.name}
+                                                    onChange={hex => onUpdate(vehicle.id, { color: hex })}
+                                                    onReset={() => onUpdate(vehicle.id, { color: null })}
+                                                />
+                                            )}
                                             <h3 className="font-bold text-lg leading-tight truncate">{vehicle.name}</h3>
                                             <VisibilityPill vehicle={vehicle} />
                                         </div>

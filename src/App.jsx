@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { VEHICLE_PALETTE } from './utils/colorUtils';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
@@ -185,7 +186,9 @@ export default function App() {
         y2Max: null,
         showLine:   true,
         showPoints: false,
-        autoColor:  true,       // when true, all runs get Okabe-Ito palette assignment
+        // Where series colours come from: each vehicle's curated colour by
+        // default, or a SERIES_PALETTES id to assign from that set instead.
+        seriesPalette: VEHICLE_PALETTE,
         specsField:     null,   // selected field key for Spec Chart mode
         scatterXField:  null,   // selected X field key for Spec Scatter mode
         scatterYField:  null,   // selected Y field key for Spec Scatter mode
@@ -784,7 +787,10 @@ export default function App() {
                                                         setVehicleSelection(next);
                                                     }}
                                                     className="selected-vehicle-chip cursor-grab active:cursor-grabbing"
-                                                    style={{backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)'}}
+                                                    // The vehicle's curated colour, or nothing — an
+                                                    // unset variable falls back inside the rule rather
+                                                    // than being decided here.
+                                                    style={{ '--chip-accent': vehicle.color || undefined }}
                                                     title="Drag to reorder"
                                                 >
                                                     <span>{vehicle.name}</span>
@@ -917,7 +923,7 @@ export default function App() {
                             setRoadTripConfig={setRoadTripConfig}
                             pairings={pairings}
                             setPairings={setPairings}
-                            autoColor={chartConfig.autoColor ?? true}
+                            palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? 'none'}
                             setChartConfig={setChartConfig}
@@ -961,7 +967,7 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                             epaConfig={epaConfig}
                             setEpaConfig={setEpaConfig}
-                            autoColor={chartConfig.autoColor ?? true}
+                            palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? 'none'}
                             setChartConfig={setChartConfig}

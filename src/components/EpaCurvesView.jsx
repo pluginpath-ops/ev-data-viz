@@ -5,7 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { convSpeed, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
 import { PALETTE } from '../utils/specHelpers';
-import { resolveChartColors, seriesRowsOf, applyColorOverrides } from '../utils/colorUtils';
+import { resolveChartColors, seriesRowsOf, applyColorOverrides, VEHICLE_PALETTE } from '../utils/colorUtils';
 import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH, MPG_E_CONVERSION,
@@ -29,7 +29,7 @@ import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
-import AutoColorToggle from './AutoColorToggle';
+import SeriesPaletteSelect from './SeriesPaletteSelect';
 import { useRunSelection } from '../hooks/useRunSelection';
 import ViewingConditions, { useViewingConditions } from './epa/ViewingConditions';
 
@@ -231,7 +231,7 @@ export default function EpaCurvesView({
     epaConfig,
     setEpaConfig,
     presentationMode = false,
-    autoColor = true,
+    palette = VEHICLE_PALETTE,
     setChartConfig = null,
 }) {
     const { units } = useAppContext();
@@ -338,13 +338,19 @@ export default function EpaCurvesView({
     );
 
 
-    // ── Vehicle color map (Okabe-Ito when autoColor) ──────────────────────────
-    // EPA curves are per-vehicle (not per-run), so we resolve colors at the
-    // vehicle level.  We treat each vehicle as a "run" with .id and .color so
-    // resolveChartColors can do its ΔE work.
+    // ── Vehicle colour map ────────────────────────────────────────────────────
+    // EPA curves are per-vehicle (not per-run), so colours resolve at the
+    // vehicle level: each vehicle is passed as its own "run" so the resolver can
+    // do its ΔE work, AND as a vehicle owning that single run, which is what
+    // makes a curated colour reach the curve. `rampFrom` over one row returns
+    // the base, so a curated vehicle is drawn in exactly the colour it was
+    // given rather than a shade off it.
     const vehicleColorMap = useMemo(
-        () => resolveChartColors(vehiclesWithEpa, {}, autoColor ? 'auto' : 'manual'),
-        [vehiclesWithEpa, autoColor]
+        () => resolveChartColors(
+            vehiclesWithEpa, {}, palette,
+            vehiclesWithEpa.map(v => ({ ...v, runs: [{ id: v.id }] })),
+        ),
+        [vehiclesWithEpa, palette]
     );
 
     // ── The selector's rows ───────────────────────────────────────────────────
@@ -893,7 +899,7 @@ export default function EpaCurvesView({
                         <div className="chart-rail-group">
                             <span className="text-micro">Display</span>
                             <div className="display-grid">
-                                <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
+                                <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
                             </div>
                         </div>
                     )}

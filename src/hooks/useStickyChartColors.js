@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { resolveChartColors, applyColorOverrides } from '../utils/colorUtils';
+import { resolveChartColors, applyColorOverrides, VEHICLE_PALETTE } from '../utils/colorUtils';
 
 const EMPTY = {};
 
@@ -30,7 +30,7 @@ const EMPTY = {};
  *
  * Colours are ADDED, never reshuffled. Assignments and overrides both hold until:
  *   • the vehicle set changes  — a different comparison, so a fresh palette
- *   • Auto Color is toggled     — the explicit "redo this" gesture
+ *   • the palette changes       — the explicit "redo this" gesture
  *
  * Both are keyed on a session key rather than cleared by an effect, so a stale
  * map cannot survive even for one render.
@@ -40,7 +40,7 @@ const EMPTY = {};
  *
  * @param {Array}   runs      the runs to colour
  * @param {Object}  opts
- * @param {boolean} opts.autoColor  auto mode on/off
+ * @param {string}  opts.palette    VEHICLE_PALETTE, or a SERIES_PALETTES id
  * @param {string}  opts.resetKey   changes when the vehicle set changes
  * @param {Array}   [opts.vehicles] the runs' vehicles, for their curated
  *                                  colours; without it the palette assigns
@@ -48,16 +48,16 @@ const EMPTY = {};
  *            setColorOverrides: (map) => void,
  *            isColorOverridden: (runId) => boolean }}
  */
-export function useStickyChartColors(runs, { autoColor, resetKey, vehicles = null }) {
+export function useStickyChartColors(runs, { palette = VEHICLE_PALETTE, resetKey, vehicles = null }) {
     // A MONOTONIC generation, not a key derived from the boolean. Deriving it
     // from autoColor looked equivalent and was not: toggling off and back on
     // returned the key to its previous value, so the old overrides came back
     // into view instead of resetting. Counting flips can only go forward.
     const generation = useRef(0);
-    const prevAutoColor = useRef(autoColor);
-    if (prevAutoColor.current !== autoColor) {
+    const prevPalette = useRef(palette);
+    if (prevPalette.current !== palette) {
         generation.current += 1;
-        prevAutoColor.current = autoColor;
+        prevPalette.current = palette;
     }
     const sessionKey = `${resetKey}|${generation.current}`;
 
@@ -107,13 +107,13 @@ export function useStickyChartColors(runs, { autoColor, resetKey, vehicles = nul
             assignedKey.current = sessionKey;
         }
 
-        // Manual mode already honours each vehicle's curated colour, so there
-        // is nothing to hold still — but an override still wins, since the user
-        // asked for it in this session.
-        const mode = autoColor ? 'auto' : 'manual';
-        const seed = autoColor ? { ...assigned.current, ...overrides } : overrides;
+        // Vehicle-colour mode already honours each vehicle's curated colour, so
+        // there is nothing to hold still — but an override still wins, since
+        // the user asked for it in this session.
+        const assigning = palette !== VEHICLE_PALETTE;
+        const seed = assigning ? { ...assigned.current, ...overrides } : overrides;
 
-        const resolved = resolveChartColors(runs, seed, mode, vehicles);
+        const resolved = resolveChartColors(runs, seed, palette, vehicles);
 
         // Remember, so the next call holds these in place. Idempotent: React may
         // run a memo more than once, and re-merging the same answer changes
@@ -125,7 +125,7 @@ export function useStickyChartColors(runs, { autoColor, resetKey, vehicles = nul
         // the override would restore the run to the colour it was just cleared
         // of. An assignment is what the palette chose; an override is what a
         // person chose over it, and only the first is this map's business.
-        if (autoColor) {
+        if (assigning) {
             // An overridden run is DROPPED, not merely skipped. Skipping left
             // its previous assignment sitting in the map while the resolver —
             // seeing the override — handed that same colour to somebody else,
@@ -139,7 +139,7 @@ export function useStickyChartColors(runs, { autoColor, resetKey, vehicles = nul
             );
         }
         return resolved;
-    }, [runs, autoColor, sessionKey, overrides, vehicles]);
+    }, [runs, palette, sessionKey, overrides, vehicles]);
 
     return {
         colorMap,
