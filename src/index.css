@@ -3287,6 +3287,21 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border-radius: var(--radius-mark);
     cursor: pointer;
 }
+/* A hand-set color this run is holding while a palette draws it — parked.
+ *
+ * A chip peeking out behind the swatch, not a replacement for it: the face of
+ * the swatch still reports the DRAWN color, which is the rule the whole colour
+ * vocabulary rests on. This says "and there is another one under here".
+ *
+ * `box-shadow` rather than a pseudo-element, because a ::before with a negative
+ * z-index paints behind its own parent's background and would simply vanish.
+ * Zero blur and a negative spread give a hard-edged square slightly smaller
+ * than the swatch, offset up and left, which reads as a card behind a card. It
+ * follows `border-radius` for free, which a pseudo-element would have to be
+ * told. */
+.series-swatch--button.has-parked {
+    box-shadow: -4px -4px 0 -1px var(--swatch-parked, transparent);
+}
 .series-swatch--button:hover { border-color: var(--color-text-secondary); }
 .series-swatch--button:focus-visible {
     outline: 2px solid var(--color-primary);
@@ -4353,16 +4368,19 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .color-seed-row.is-active .color-seed-name { color: var(--color-text-primary); }
 
+/* The palette switch. It carries `.form-input` in the markup now and this rule
+   only widens it, where it used to restate every one of that class's properties
+   with different values -- its own padding, border-radius, colour and, worst, a
+   `--fs-nano` font size. Nano is the bottom of the whole scale, a step BELOW
+   micro, meant for the legend inside a chip. On a control naming the set the
+   entire plot is drawn from, in a panel whose other controls are body-sized, it
+   read as a caption someone had left in by accident.
+
+   Matching the run picker's selects is the point: they are the same kind of
+   thing -- a select in a chart control -- and there is no reason for the one
+   inside a popover to be four steps smaller than the one outside it. */
 .color-switch { @apply block; }
-.color-switch select {
-    width: 100%;
-    padding: 1px 4px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-mark);
-    background-color: var(--color-surface-input);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-secondary);
-}
+.color-switch select { width: 100%; }
 
 /* One row, never two, whatever the palette's length — wrapping it would make
    the first cell of the second line look like a color that is missing.

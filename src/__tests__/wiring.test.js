@@ -853,3 +853,107 @@ describe('run color is retired, not merely unused', () => {
         expect(writers).toEqual(['src/services/DataService.js']);
     });
 });
+
+/**
+ * ── The picker's palette is the plot's (#307) ────────────────────────────────
+ *
+ * `PickerPanel` falls back to its own `useState` when no `onChartPaletteChange`
+ * reaches it, which is correct for the pickers with no plot behind them — the
+ * vehicle form and the vehicle card edit one durable colour.
+ *
+ * That fallback is also how this silently regresses. A chart that renders
+ * `RunSelector` without the setter keeps working, keeps looking right, and
+ * quietly returns to the bug #307 was opened for: choose House, apply it, reopen
+ * the picker, read Okabe-Ito. Nothing throws and no test of the picker itself
+ * would notice, because the picker is behaving exactly as designed.
+ */
+describe('every chart hands the colour panel its palette', () => {
+    const CHART_VIEWS = [
+        'src/components/ChargingView.jsx',
+        'src/components/RangeChartView.jsx',
+        'src/components/ChargeCompareView.jsx',
+        'src/components/RoadTripView.jsx',
+    ];
+
+    it.each(CHART_VIEWS)('%s passes onChartPaletteChange to RunSelector', (file) => {
+        const text = ALL.find(x => x.file === file)?.text;
+        expect(text, `${file} not found — rename?`).toBeTruthy();
+        expect(text).toMatch(/<RunSelector\b/);
+        expect(text).toMatch(/onChartPaletteChange=/);
+    });
+
+    it('RunSelector forwards it all the way to the picker', () => {
+        const sel = ALL.find(x => x.file === 'src/components/RunSelector.jsx').text;
+        // Named in the props, handed to the colour control, and handed on from
+        // there to SeriesColorPicker — a break at any link is a silent fallback.
+        expect(sel).toMatch(/onChartPaletteChange = null/);
+        expect((sel.match(/onChartPaletteChange=\{onChartPaletteChange\}/g) || []).length)
+            .toBeGreaterThanOrEqual(4);
+    });
+});
+
+/**
+ * ── Picks and assignments must keep different lifetimes ──────────────────────
+ *
+ * `useStickyChartColors` holds two maps. The auto-assignments are keyed on
+ * `sessionKey`, which a monotonic generation bumps on every palette change, so
+ * a new palette genuinely re-assigns. The PICKS are keyed on `resetKey` alone,
+ * so they survive a palette change — that is the whole of the hand-set design:
+ * choosing a palette parks your picks, selecting Hand-set brings them back.
+ *
+ * Collapsing them back onto one key is a one-line "simplification" that looks
+ * harmless and silently removes the feature: parked picks would die with the
+ * palette and there would be nothing to restore. Worse, keying them on a value
+ * that can RETURN to a previous state resurrects the bug the generation counter
+ * was added to fix, where old picks reappeared unbidden.
+ */
+/**
+ * ── A chart that reads `handSet` must be HANDED it ───────────────────────────
+ *
+ * `handSet` defaults to false, which looks like a working chart: the palette
+ * draws, the dropdown offers Hand-set, and selecting it writes chartConfig. What
+ * you cannot do is get back — the prop never arrives, `active` stays false, and
+ * the field snaps to the palette. Nothing throws.
+ *
+ * Range & Efficiency shipped exactly that, because RangeChartView is rendered by
+ * ChargingView rather than by App and so misses whatever App hands the others.
+ * The default is the trap: a required prop that defaults to a plausible value
+ * fails silently, and only at the one interaction nobody tests by hand.
+ */
+describe('every chart that reads handSet is passed it', () => {
+    const RENDERS = [
+        ['RangeChartView', 'src/components/ChargingView.jsx'],
+        ['ChargeCompareView', 'src/App.jsx'],
+        ['RoadTripView', 'src/App.jsx'],
+    ];
+
+    it.each(RENDERS)('%s is given handSet where it is rendered (%s)', (view, file) => {
+        const text = ALL.find(x => x.file === file).text;
+        const open = text.indexOf(`<${view}`);
+        expect(open, `${view} not rendered in ${file}`).toBeGreaterThan(-1);
+        // The props of that one element, up to its self-closing tag.
+        const props = text.slice(open, text.indexOf('/>', open));
+        expect(props).toMatch(/handSet=/);
+    });
+
+    it('ChargingView reads it from chartConfig directly', () => {
+        const text = ALL.find(x => x.file === 'src/components/ChargingView.jsx').text;
+        expect(text).toMatch(/const handSet = chartConfig\.handSet/);
+    });
+});
+
+describe('the picks map outlives the palette', () => {
+    const hook = () => ALL.find(x => x.file === 'src/hooks/useStickyChartColors.js').text;
+
+    it('keys picks on resetKey, not on the session key', () => {
+        const text = hook();
+        expect(text).toMatch(/useState\(\{ key: resetKey, map: EMPTY \}\)/);
+        expect(text).toMatch(/overrideState\.key === resetKey/);
+        // The assignments still reset with the palette.
+        expect(text).toMatch(/assignedKey\.current !== sessionKey/);
+    });
+
+    it('applies picks only while hand-set is in force', () => {
+        expect(hook()).toMatch(/const overrides = handSet \? picks : EMPTY;/);
+    });
+});

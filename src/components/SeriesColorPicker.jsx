@@ -3,6 +3,7 @@ import Popover from './Popover';
 import {
     SERIES_PALETTES, DEFAULT_RUN_COLOR, seriesColorNote, isUnsetColor, sameHex,
     paletteSlotOf, hexToHsl, hslToHex, rotatePaletteFrom, rampFrom, seedPlot,
+    VEHICLE_PALETTE, paletteColorsById,
 } from '../utils/colorUtils';
 import { ratioOf, AA_LARGE } from '../utils/contrast';
 import { chartTheme } from '../utils/chartTheme';
@@ -70,9 +71,23 @@ export default function SeriesColorPicker({
     series = null,
     onApplyMany = null,
     isAuto = null,
+    // A color this series holds by hand that is NOT what is being drawn —
+    // parked under a palette. Shown as a chip behind the swatch.
+    parkedColor = null,
+    // The CHART's palette, and the setter for it. Supplying both makes the
+    // panel's palette switch edit the plot instead of a private copy that dies
+    // with the popover (#307). Without them the panel keeps its own, which is
+    // right for the pickers that have no chart behind them — the vehicle form
+    // and the vehicle card.
+    chartPalette = null,
+    onChartPaletteChange = null,
     className = '',
 }) {
     const plotted = value || DEFAULT_RUN_COLOR;
+    // Only when it differs from what is drawn. In hand-set mode the pick IS the
+    // drawn color, so there is nothing parked and no chip — the mark means
+    // "there is a color here you are not currently seeing".
+    const showParked = Boolean(parkedColor) && !sameHex(parkedColor, plotted);
     const subject = label || 'this series';
 
     // The scope control only appears when the owner can actually honour it.
@@ -100,9 +115,16 @@ export default function SeriesColorPicker({
                 <button
                     {...props}
                     type="button"
-                    className="series-swatch--button"
-                    style={{ backgroundColor: plotted }}
-                    aria-label={`Color for ${subject} — ${plotted}`}
+                    className={`series-swatch--button${showParked ? ' has-parked' : ''}`}
+                    style={{
+                        backgroundColor: plotted,
+                        ...(showParked ? { '--swatch-parked': parkedColor } : {}),
+                    }}
+                    // The parked color is named, not just drawn: a chip behind a
+                    // swatch is a hint, and a hint a screen reader cannot reach
+                    // is not one.
+                    aria-label={`Color for ${subject} — ${plotted}`
+                        + (showParked ? `, hand-set ${parkedColor} parked` : '')}
                     // Three of the call sites sit inside a <label> wrapping the
                     // row's checkbox, so a click reaching the label toggles the
                     // run's selection too. A swatch means "open the color
@@ -121,6 +143,8 @@ export default function SeriesColorPicker({
                     onChange={onChange}
                     onReset={onReset}
                     scoped={scoped}
+                    chartPalette={chartPalette}
+                    onChartPaletteChange={onChartPaletteChange}
                     seriesId={seriesId}
                     vehicleId={vehicleId}
                     series={series}
@@ -138,14 +162,36 @@ export default function SeriesColorPicker({
  */
 function PickerPanel({
     close, plotted, stored, onChange, onReset, autoInForce,
-    scoped, seriesId, vehicleId, series, onApplyMany,
+    scoped, chartPalette, onChartPaletteChange, seriesId, vehicleId, series, onApplyMany,
 }) {
     // Radios group by `name`, so two pickers open at once would share a group
     // and fight. They cannot both be open today — the popover is one at a time
     // — but a name that is only unique by luck is a bug waiting for a second
     // caller.
     const panelId = useId();
-    const [paletteId, setPaletteId] = useState(SERIES_PALETTES[0].id);
+
+    /**
+     * The working palette — the plot's, where there is a plot (#307).
+     *
+     * It was `useState` here, and `PickerPanel` remounts every time the popover
+     * opens, so choosing House, applying it across the plot and reopening the
+     * picker read Okabe-Ito again. A palette is a property of the PLOT, not of
+     * one pick, so it is held at chart level and this reflects it.
+     *
+     * Local state remains the fallback, which keeps the pickers with no plot
+     * behind them working: the vehicle form and the vehicle card edit one
+     * durable colour, and there is no chart for a palette to belong to.
+     *
+     * VEHICLE_PALETTE is not a set of swatches, so when the plot is drawn from
+     * curated vehicle colours the GRID falls back to the default set while the
+     * dropdown still reads "Vehicle color". Those answer different questions:
+     * where the plot's colours come from, and which set to pick a new one from.
+     */
+    const [localPaletteId, setLocalPaletteId] = useState(SERIES_PALETTES[0].id);
+    const lifted = Boolean(onChartPaletteChange);
+    const selectedPaletteId = lifted ? chartPalette : localPaletteId;
+    const paletteId = paletteColorsById(selectedPaletteId) ? selectedPaletteId : SERIES_PALETTES[0].id;
+    const setPaletteId = lifted ? onChartPaletteChange : setLocalPaletteId;
 
     // Two axes, not one. SCOPE says who a pick reaches; DERIVATION says what it
     // does to them. They were welded — one vehicle always got shades, everything
@@ -195,9 +241,13 @@ function PickerPanel({
      * all the same length — House is seven.
      */
     const pickPalette = (id) => {
+        setPaletteId(id);
+        // "Vehicle color" names where the PLOT takes its colours; it is not a
+        // set to move the base into, and moving it would be this panel silently
+        // editing the series you opened it on.
+        if (id === VEHICLE_PALETTE) return;
         const next = SERIES_PALETTES.find(p => p.id === id) ?? SERIES_PALETTES[0];
         const index = Math.min((slot ?? 1) - 1, next.colors.length - 1);
-        setPaletteId(id);
         setBase(next.colors[index]);
     };
 
@@ -312,7 +362,16 @@ function PickerPanel({
                         saying it twice cost a line to wrapping and told nobody
                         anything. */}
                     <label className="color-switch">
-                        <select value={paletteId} onChange={e => pickPalette(e.target.value)} aria-label="Palette">
+                        <select
+                            className="form-input"
+                            value={selectedPaletteId}
+                            onChange={e => pickPalette(e.target.value)}
+                            aria-label="Palette"
+                        >
+                            {/* Offered only where it means something: with no
+                                plot behind this picker there is nothing for
+                                "vehicle color" to describe. */}
+                            {lifted && <option value={VEHICLE_PALETTE}>Vehicle color</option>}
                             {SERIES_PALETTES.map(p => (
                                 <option key={p.id} value={p.id}>
                                     {p.label}{p.safe ? '' : ' (not colorblind-safe)'}
@@ -364,17 +423,22 @@ function PickerPanel({
 
                     {targets.length > 1 && (
                         <div className="color-seed" role="radiogroup" aria-label="How to color the set">
-                            {DERIVATIONS.map(o => (
+                            {DERIVATIONS.map(o => {
+                                // One vehicle in scope renames and re-draws the
+                                // family option — see `atVehicleScope`.
+                                const copy = (scope === 'vehicle' && o.atVehicleScope) || o;
+                                return (
                                 <SeedRow
                                     key={o.id}
                                     group={`${panelId}-derivation`}
-                                    name={o.name}
-                                    hint={o.hint}
-                                    colors={o.preview(base, palette.colors)}
+                                    name={copy.name}
+                                    hint={copy.hint}
+                                    colors={copy.preview(base, palette.colors)}
                                     active={o.id === mode}
                                     onSelect={() => setMode(o.id)}
                                 />
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -431,6 +495,9 @@ function PickerPanel({
  * than decorative: "a color per vehicle" shows two hues with two steps each,
  * because that is the shape of what it does. It is the preview that lets the
  * label stay short enough to fit on one line at 300px.
+ *
+ * Both move together when the scope makes one of them wrong — see
+ * `atVehicleScope` below.
  */
 const DERIVATIONS = [
     {
@@ -448,6 +515,23 @@ const DERIVATIONS = [
         preview: (base, colors) => {
             const [a, b] = rotatePaletteFrom(base, colors, 2);
             return [...rampFrom(a, 2), ...rampFrom(b, 2)];
+        },
+        /**
+         * The same derivation, named for what it does when the scope holds ONE
+         * vehicle. The rotation has nothing to rotate through there, so all that
+         * is left is the shading — and "a color per vehicle" describes a
+         * distinction the scope has already removed. What varies is the shade,
+         * and what it varies across is the tests.
+         *
+         * The preview moves with the name. It is load-bearing rather than
+         * decorative — two hues at two steps each is the SHAPE of the thing —
+         * so leaving it showing two hues under "A shade per test" would have
+         * the label and the picture disagreeing about the same option.
+         */
+        atVehicleScope: {
+            name: 'A shade per test',
+            hint: 'This vehicle\'s tests step along one color',
+            preview: (base) => rampFrom(base, 4),
         },
     },
 ];

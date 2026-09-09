@@ -367,7 +367,7 @@ export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICL
             // always assigned from Okabe-Ito regardless of what the picker was
             // set to, so choosing House and then clearing an override brought
             // Okabe-Ito back (#307).
-            const pool = expandPalette(paletteColorsById(palette) ?? OKABE_ITO, sorted.length);
+            const pool = expandPalette(paletteColorsById(palette) ?? TAB10, sorted.length);
 
             // A palette over a curated vehicle: sort candidates by proximity to
             // the curated color, so a palette still leans toward the car's own
@@ -484,6 +484,37 @@ export const SERIES_NEUTRAL = '#9ca3af';
 export const OKABE_ITO_SET = [...OKABE_ITO, SERIES_NEUTRAL];
 
 /**
+ * The default set series are assigned from — offered as **Colorful**.
+ *
+ * It is matplotlib / seaborn's `tab10`. The constant keeps that name because
+ * that is what the ten values ARE and where to go to check them; the id and the
+ * label are what a curator picks, and "tab10" names a library rather than
+ * anything about the colours.
+ *
+ * It replaced Okabe-Ito in that role by request. The trade is explicit and worth
+ * stating rather than discovering: Okabe-Ito was chosen for being separable by a
+ * colourblind reader, and tab10 is not — it is the set most readers of technical
+ * charts already recognise, and ten hues where Okabe-Ito has seven, which is the
+ * difference between running out at eight series and at eleven.
+ *
+ * Okabe-Ito is still offered and still marked safe, so the accessible answer is
+ * one selection away rather than gone. See #305 on what happens past ~12 series,
+ * where no palette is the answer and line style has to be the second channel.
+ */
+export const TAB10 = [
+    '#1f77b4', // blue
+    '#ff7f0e', // orange
+    '#2ca02c', // green
+    '#d62728', // red
+    '#9467bd', // purple
+    '#8c564b', // brown
+    '#e377c2', // pink
+    '#7f7f7f', // gray
+    '#bcbd22', // olive
+    '#17becf', // cyan
+];
+
+/**
  * The palette that was here before Okabe-Ito, kept switchable rather than
  * deleted: matching an existing screenshot or a partner's brand is a real
  * curator task, and the honest way to allow it is a named palette you have to
@@ -516,7 +547,7 @@ export const LEGACY_PALETTE = [
  * A caveat worth stating where it will be read: the design vocabulary reserves
  * orange as the single active/now signal and lets nothing else use it. That
  * rule is about CHROME. A series color is data, and a curator choosing the
- * house palette is choosing to draw with the house's colors — but if the
+ * EVBench palette is choosing to draw with the site's own colors — but if the
  * orange series ever reads as "this one is selected", this is why.
  */
 export const HOUSE_PALETTE = [
@@ -556,9 +587,13 @@ function monochrome(hex, count, from = 84, to = 24) {
  * at all, so there is none to lose.
  */
 export const SERIES_PALETTES = [
+    // First, and so the default: SERIES_PALETTES[0] is what a picker with no
+    // plot behind it opens on, and what the resolver assigns from.
+    { id: 'colorful',  label: 'Colorful',       safe: false, colors: TAB10 },
     { id: 'okabe-ito', label: 'Okabe-Ito',      safe: true,  colors: OKABE_ITO_SET },
-    { id: 'house',     label: 'House',          safe: false, colors: HOUSE_PALETTE },
+    { id: 'evbench',   label: 'EVBench',        safe: false, colors: HOUSE_PALETTE },
     { id: 'mono-blue', label: 'Mono · blue',    safe: true,  colors: monochrome('#2d7ff9', 8) },
+    { id: 'mono-green', label: 'Mono · green',  safe: true,  colors: monochrome('#009E73', 8) },
     { id: 'mono-orange', label: 'Mono · orange', safe: true, colors: monochrome('#f28b3c', 8) },
     // "Ice" rather than "faint blue", which read as a weaker version of the
     // palette above it rather than as its own thing. It starts lighter than the

@@ -119,7 +119,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         ),
         [selectedVehicles, selectedRuns]
     );
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
+    const handSet = chartConfig.handSet ?? false;
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
+        handSet,
+        onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette: chartConfig.seriesPalette ?? VEHICLE_PALETTE,
         resetKey: selectedVehicleIds.join(','),
         vehicles: selectedVehicles,
@@ -723,6 +726,17 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 setChartConfig={setChartConfig}
                 presentationMode={presentationMode}
                 palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                // Without this the Range sub-tab could never return to Hand-set:
+                // selecting it wrote chartConfig.handSet, the prop defaulted to
+                // false on the way back down, and the field snapped to the
+                // palette. RangeChartView is rendered from HERE rather than from
+                // App, so it misses anything App hands the other charts.
+                handSet={chartConfig.handSet ?? false}
+                // Without this the Range sub-tab could never return to Hand-set:
+                // selecting it wrote chartConfig.handSet, the prop defaulted to
+                // false on the way back down, and the field snapped to the
+                // palette. RangeChartView is rendered from HERE rather than from
+                // App, so it misses anything App hands the other charts.
                 verboseLabels={chartConfig.verboseLabels ?? false}
                 correctionMode={chartConfig.correctionMode ?? 'none'}
             />
@@ -870,12 +884,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         picker rather than a cell of the checkbox grid above — that
                         grid is two columns of a 320px rail, which truncated this
                         control's own default to "Vehicle colou…". */}
-                    <SeriesPaletteSelect palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE} setChartConfig={setChartConfig} />
+                    <SeriesPaletteSelect palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
                     <CorrectionControl mode={chartConfig.correctionMode ?? 'none'} setChartConfig={setChartConfig} />
                 </div>
 
                 {/* ── Collapsible run selector ── */}
                 <RunSelector
+                    handSetColorOf={handSetColorOf}
+                    chartPalette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                    onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
                     vehicles={selectedVehicles}
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}

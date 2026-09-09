@@ -59,10 +59,32 @@ Renaming it is [tracked separately](#deferred-renames).
 | How much of the plot a pick recolors | **scope** | — | this test · this vehicle · all tests |
 
 A series color has two values that routinely differ and must not be called the
-same thing: the **stored** color is the durable `runs.color` preference, and
-the **drawn** color is what is actually on the chart after Auto Color and any
-session override have had their say. The picker says both out loud; before it,
-nothing did.
+same thing: the **stored** color is the durable preference — `vehicles.color`
+since #308, `runs.color` before it — and the **drawn** color is what is actually
+on the chart. The picker says both out loud; before it, nothing did.
+
+The rule that matters here is that the **swatch always reports the drawn color**.
+It exists because the two came apart once: the chip beside a vehicle showed one
+color while the chart drew another, and there was no way to tell which was
+lying. Anything that can change what is drawn has to change the swatch with it.
+
+A parked hand-set color is the one thing a swatch says besides the drawn color,
+and it does not break that rule: the FACE stays the drawn color and the parked
+one peeks out behind it as a chip, so the swatch reads "this is what is on the
+chart, and there is another color under here". Never the other way round.
+
+What has the last say depends on the mode, and the two are named:
+
+| The base every un-picked series is drawn from | **the palette** | the `Colors:` field — a palette, or Vehicle color |
+| A color a person set on one series this session | **a hand-set color**, or **a pick** | session-only; never reaches the database |
+| Hand-set colors applied over the palette | **hand-set mode** | `Colors: Hand-set (3)` |
+| Hand-set colors kept but not drawn | **parked** | choosing a palette parks them; selecting Hand-set brings them back |
+
+In hand-set mode a pick has the last say, which is the older rule and still
+true. Choosing a palette turns the mode off, so the palette draws everything and
+the picks are parked — kept, invisible, and absent from the swatches too, because
+the swatch reports what is drawn. Parking is not discarding: only **Back to
+auto**, at whichever scope, removes a pick.
 
 Say **all tests**, never "all vehicles" — the widest scope reseeds every run
 currently ticked in the run picker, which is a set of tests and may be several
