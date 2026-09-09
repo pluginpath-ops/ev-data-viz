@@ -423,17 +423,22 @@ function PickerPanel({
 
                     {targets.length > 1 && (
                         <div className="color-seed" role="radiogroup" aria-label="How to color the set">
-                            {DERIVATIONS.map(o => (
+                            {DERIVATIONS.map(o => {
+                                // One vehicle in scope renames and re-draws the
+                                // family option — see `atVehicleScope`.
+                                const copy = (scope === 'vehicle' && o.atVehicleScope) || o;
+                                return (
                                 <SeedRow
                                     key={o.id}
                                     group={`${panelId}-derivation`}
-                                    name={o.name}
-                                    hint={o.hint}
-                                    colors={o.preview(base, palette.colors)}
+                                    name={copy.name}
+                                    hint={copy.hint}
+                                    colors={copy.preview(base, palette.colors)}
                                     active={o.id === mode}
                                     onSelect={() => setMode(o.id)}
                                 />
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -490,6 +495,9 @@ function PickerPanel({
  * than decorative: "a color per vehicle" shows two hues with two steps each,
  * because that is the shape of what it does. It is the preview that lets the
  * label stay short enough to fit on one line at 300px.
+ *
+ * Both move together when the scope makes one of them wrong — see
+ * `atVehicleScope` below.
  */
 const DERIVATIONS = [
     {
@@ -507,6 +515,23 @@ const DERIVATIONS = [
         preview: (base, colors) => {
             const [a, b] = rotatePaletteFrom(base, colors, 2);
             return [...rampFrom(a, 2), ...rampFrom(b, 2)];
+        },
+        /**
+         * The same derivation, named for what it does when the scope holds ONE
+         * vehicle. The rotation has nothing to rotate through there, so all that
+         * is left is the shading — and "a color per vehicle" describes a
+         * distinction the scope has already removed. What varies is the shade,
+         * and what it varies across is the tests.
+         *
+         * The preview moves with the name. It is load-bearing rather than
+         * decorative — two hues at two steps each is the SHAPE of the thing —
+         * so leaving it showing two hues under "A shade per test" would have
+         * the label and the picture disagreeing about the same option.
+         */
+        atVehicleScope: {
+            name: 'A shade per test',
+            hint: 'This vehicle\'s tests step along one color',
+            preview: (base) => rampFrom(base, 4),
         },
     },
 ];
