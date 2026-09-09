@@ -3,6 +3,7 @@ import Popover from './Popover';
 import {
     SERIES_PALETTES, DEFAULT_RUN_COLOR, seriesColorNote, isUnsetColor, sameHex,
     paletteSlotOf, hexToHsl, hslToHex, rotatePaletteFrom, rampFrom, seedPlot,
+    VEHICLE_PALETTE, paletteColorsById,
 } from '../utils/colorUtils';
 import { ratioOf, AA_LARGE } from '../utils/contrast';
 import { chartTheme } from '../utils/chartTheme';
@@ -70,6 +71,13 @@ export default function SeriesColorPicker({
     series = null,
     onApplyMany = null,
     isAuto = null,
+    // The CHART's palette, and the setter for it. Supplying both makes the
+    // panel's palette switch edit the plot instead of a private copy that dies
+    // with the popover (#307). Without them the panel keeps its own, which is
+    // right for the pickers that have no chart behind them — the vehicle form
+    // and the vehicle card.
+    chartPalette = null,
+    onChartPaletteChange = null,
     className = '',
 }) {
     const plotted = value || DEFAULT_RUN_COLOR;
@@ -121,6 +129,8 @@ export default function SeriesColorPicker({
                     onChange={onChange}
                     onReset={onReset}
                     scoped={scoped}
+                    chartPalette={chartPalette}
+                    onChartPaletteChange={onChartPaletteChange}
                     seriesId={seriesId}
                     vehicleId={vehicleId}
                     series={series}
@@ -138,14 +148,36 @@ export default function SeriesColorPicker({
  */
 function PickerPanel({
     close, plotted, stored, onChange, onReset, autoInForce,
-    scoped, seriesId, vehicleId, series, onApplyMany,
+    scoped, chartPalette, onChartPaletteChange, seriesId, vehicleId, series, onApplyMany,
 }) {
     // Radios group by `name`, so two pickers open at once would share a group
     // and fight. They cannot both be open today — the popover is one at a time
     // — but a name that is only unique by luck is a bug waiting for a second
     // caller.
     const panelId = useId();
-    const [paletteId, setPaletteId] = useState(SERIES_PALETTES[0].id);
+
+    /**
+     * The working palette — the plot's, where there is a plot (#307).
+     *
+     * It was `useState` here, and `PickerPanel` remounts every time the popover
+     * opens, so choosing House, applying it across the plot and reopening the
+     * picker read Okabe-Ito again. A palette is a property of the PLOT, not of
+     * one pick, so it is held at chart level and this reflects it.
+     *
+     * Local state remains the fallback, which keeps the pickers with no plot
+     * behind them working: the vehicle form and the vehicle card edit one
+     * durable colour, and there is no chart for a palette to belong to.
+     *
+     * VEHICLE_PALETTE is not a set of swatches, so when the plot is drawn from
+     * curated vehicle colours the GRID falls back to the default set while the
+     * dropdown still reads "Vehicle color". Those answer different questions:
+     * where the plot's colours come from, and which set to pick a new one from.
+     */
+    const [localPaletteId, setLocalPaletteId] = useState(SERIES_PALETTES[0].id);
+    const lifted = Boolean(onChartPaletteChange);
+    const selectedPaletteId = lifted ? chartPalette : localPaletteId;
+    const paletteId = paletteColorsById(selectedPaletteId) ? selectedPaletteId : SERIES_PALETTES[0].id;
+    const setPaletteId = lifted ? onChartPaletteChange : setLocalPaletteId;
 
     // Two axes, not one. SCOPE says who a pick reaches; DERIVATION says what it
     // does to them. They were welded — one vehicle always got shades, everything
@@ -195,9 +227,13 @@ function PickerPanel({
      * all the same length — House is seven.
      */
     const pickPalette = (id) => {
+        setPaletteId(id);
+        // "Vehicle color" names where the PLOT takes its colours; it is not a
+        // set to move the base into, and moving it would be this panel silently
+        // editing the series you opened it on.
+        if (id === VEHICLE_PALETTE) return;
         const next = SERIES_PALETTES.find(p => p.id === id) ?? SERIES_PALETTES[0];
         const index = Math.min((slot ?? 1) - 1, next.colors.length - 1);
-        setPaletteId(id);
         setBase(next.colors[index]);
     };
 
@@ -312,7 +348,11 @@ function PickerPanel({
                         saying it twice cost a line to wrapping and told nobody
                         anything. */}
                     <label className="color-switch">
-                        <select value={paletteId} onChange={e => pickPalette(e.target.value)} aria-label="Palette">
+                        <select value={selectedPaletteId} onChange={e => pickPalette(e.target.value)} aria-label="Palette">
+                            {/* Offered only where it means something: with no
+                                plot behind this picker there is nothing for
+                                "vehicle color" to describe. */}
+                            {lifted && <option value={VEHICLE_PALETTE}>Vehicle color</option>}
                             {SERIES_PALETTES.map(p => (
                                 <option key={p.id} value={p.id}>
                                     {p.label}{p.safe ? '' : ' (not colorblind-safe)'}

@@ -900,6 +900,8 @@ export default function ChargeCompareView({
                 </div>
 
                 <RunSelector
+                        chartPalette={palette}
+                        onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
                         vehicles={selectedVehicles}
                         selectedRunIds={selectedRuns}
                         onToggleRun={toggleRun}

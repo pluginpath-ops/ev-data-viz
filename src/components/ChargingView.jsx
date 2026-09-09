@@ -876,6 +876,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
                 {/* ── Collapsible run selector ── */}
                 <RunSelector
+                    chartPalette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                    onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
                     vehicles={selectedVehicles}
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}

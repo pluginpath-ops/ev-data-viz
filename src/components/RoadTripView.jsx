@@ -1770,6 +1770,8 @@ export default function RoadTripView({
 
                     {/* Run selector */}
                     <RunSelector
+                            chartPalette={palette}
+                            onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
                             vehicles={selectedVehicles.filter(v =>
                                 filterChargingRuns(v.runs).length > 0
                             )}

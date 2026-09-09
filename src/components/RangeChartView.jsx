@@ -632,6 +632,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
 
                 {/* ── Run selector ── */}
                 <RunSelector
+                    chartPalette={palette}
+                    onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
                     vehicles={selectedVehicles}
                     selectedRunIds={selectedRuns}
                     onToggleRun={toggleRun}

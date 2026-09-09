@@ -84,6 +84,8 @@ export default function RunSelector({
     colorSeries = null,
     runFilter,
     emptyMessage = 'No runs',
+    chartPalette = null,
+    onChartPaletteChange = null,
     renderRunBadges = null,
     renderRunMeta = null,
     colorMap = {},
@@ -327,6 +329,8 @@ export default function RunSelector({
                                                         renderRunBadges={renderRunBadges}
                                                         renderRunMeta={renderRunMeta}
                                                         colorMap={colorMap}
+                                                        chartPalette={chartPalette}
+                                                        onChartPaletteChange={onChartPaletteChange}
                                                     />
                                                 ) : (
                                                     <RunRow
@@ -341,6 +345,8 @@ export default function RunSelector({
                                                         renderRunBadges={renderRunBadges}
                                                         renderRunMeta={renderRunMeta}
                                                         colorMap={colorMap}
+                                                        chartPalette={chartPalette}
+                                                        onChartPaletteChange={onChartPaletteChange}
                                                     />
                                                 ))}
                                             </div>
@@ -369,6 +375,7 @@ function PairRows({
     partnerLabel, singlePartner,
     selectedRunIds, onToggleRun, onSetPartner, onAddPartner, onRemovePartner,
     onUpdateRunColor, onUpdateRunColors, colorSeries, renderRunBadges, renderRunMeta, colorMap,
+    chartPalette, onChartPaletteChange,
 }) {
     // What the resolver would pick with nothing pinned — shown as the dropdown's
     // placeholder so an unpaired row still says where its miles come from.
@@ -427,6 +434,8 @@ function PairRows({
                             onUpdateRunColors={onUpdateRunColors}
                             colorSeries={colorSeries}
                             colorMap={colorMap}
+                            chartPalette={chartPalette}
+                            onChartPaletteChange={onChartPaletteChange}
                         />
                     )}
 
@@ -444,6 +453,8 @@ function PairRows({
                                 onUpdateRunColors={onUpdateRunColors}
                                 colorSeries={colorSeries}
                                 colorMap={colorMap}
+                                chartPalette={chartPalette}
+                                onChartPaletteChange={onChartPaletteChange}
                             />
                             <span className="truncate" title={run.name}>{run.name}</span>
                             {/* Identity markers only. Conditions moved to their
@@ -552,7 +563,7 @@ function PairRows({
  * here is a SESSION override and reaches no database, and that "Auto" means
  * handing the run back to the palette rather than clearing a stored value.
  */
-function RunColorControl({ run, vehicle, vehicleId, vehicleName, onUpdateRunColor, onUpdateRunColors, colorSeries, colorMap = {} }) {
+function RunColorControl({ run, vehicle, vehicleId, vehicleName, onUpdateRunColor, onUpdateRunColors, colorSeries, colorMap = {}, chartPalette, onChartPaletteChange }) {
     if (!onUpdateRunColor) return null;
     // Synthetic rows (the EPA range option) have no run behind them to color.
     if (run._synthetic) return null;
@@ -575,6 +586,8 @@ function RunColorControl({ run, vehicle, vehicleId, vehicleName, onUpdateRunColo
             vehicleId={vehicleId}
             series={colorSeries}
             onApplyMany={onUpdateRunColors}
+            chartPalette={chartPalette}
+            onChartPaletteChange={onChartPaletteChange}
             isAuto={colorSeries?.find(s => String(s.id) === String(run.id))?.auto}
         />
     );
@@ -590,7 +603,7 @@ function RunColorControl({ run, vehicle, vehicleId, vehicleName, onUpdateRunColo
  * and "Charging test"; the names carry that now, and in a rail it was spending
  * a third of the identity line on a fact nobody was comparing.
  */
-function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, onUpdateRunColors, colorSeries, renderRunBadges, renderRunMeta, colorMap = {} }) {
+function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, onUpdateRunColors, colorSeries, renderRunBadges, renderRunMeta, colorMap = {}, chartPalette, onChartPaletteChange }) {
     const meta = renderRunMeta?.(run);
     return (
         <label className={`pair-row ${isChecked ? '' : 'opacity-60 hover:opacity-100'}`}>
@@ -609,6 +622,8 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, onUpdateR
                     onUpdateRunColors={onUpdateRunColors}
                     colorSeries={colorSeries}
                     colorMap={colorMap}
+                    chartPalette={chartPalette}
+                    onChartPaletteChange={onChartPaletteChange}
                 />
                 <span className="truncate" title={run.name}>{run.name}</span>
                 {renderRunBadges?.(run)}

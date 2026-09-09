@@ -853,3 +853,41 @@ describe('run color is retired, not merely unused', () => {
         expect(writers).toEqual(['src/services/DataService.js']);
     });
 });
+
+/**
+ * ── The picker's palette is the plot's (#307) ────────────────────────────────
+ *
+ * `PickerPanel` falls back to its own `useState` when no `onChartPaletteChange`
+ * reaches it, which is correct for the pickers with no plot behind them — the
+ * vehicle form and the vehicle card edit one durable colour.
+ *
+ * That fallback is also how this silently regresses. A chart that renders
+ * `RunSelector` without the setter keeps working, keeps looking right, and
+ * quietly returns to the bug #307 was opened for: choose House, apply it, reopen
+ * the picker, read Okabe-Ito. Nothing throws and no test of the picker itself
+ * would notice, because the picker is behaving exactly as designed.
+ */
+describe('every chart hands the colour panel its palette', () => {
+    const CHART_VIEWS = [
+        'src/components/ChargingView.jsx',
+        'src/components/RangeChartView.jsx',
+        'src/components/ChargeCompareView.jsx',
+        'src/components/RoadTripView.jsx',
+    ];
+
+    it.each(CHART_VIEWS)('%s passes onChartPaletteChange to RunSelector', (file) => {
+        const text = ALL.find(x => x.file === file)?.text;
+        expect(text, `${file} not found — rename?`).toBeTruthy();
+        expect(text).toMatch(/<RunSelector\b/);
+        expect(text).toMatch(/onChartPaletteChange=/);
+    });
+
+    it('RunSelector forwards it all the way to the picker', () => {
+        const sel = ALL.find(x => x.file === 'src/components/RunSelector.jsx').text;
+        // Named in the props, handed to the colour control, and handed on from
+        // there to SeriesColorPicker — a break at any link is a silent fallback.
+        expect(sel).toMatch(/onChartPaletteChange = null/);
+        expect((sel.match(/onChartPaletteChange=\{onChartPaletteChange\}/g) || []).length)
+            .toBeGreaterThanOrEqual(4);
+    });
+});
