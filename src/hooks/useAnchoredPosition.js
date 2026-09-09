@@ -84,7 +84,7 @@ export function useAnchoredPosition(openKey, onScrollAway) {
      * A panel that outgrows its own placement.
      *
      * Placement happens once, against the height the panel had when it
-     * attached. Content can change that afterwards — the colour picker gains
+     * attached. Content can change that afterwards — the color picker gains
      * rows and a warning when its scope widens — and a box placed for 400px
      * that becomes 520px runs off the bottom of the screen, capped at 70vh and
      * scrolling internally but with its lower half unreachable.

@@ -1,7 +1,7 @@
 /**
  * The chart palette, read from the stylesheet instead of retyped in JS.
  *
- * Chart.js takes colours as strings, so every chart view carried its own copy
+ * Chart.js takes colors as strings, so every chart view carried its own copy
  * of the theme:
  *
  *     const tickColor   = isDark ? 'rgb(226,232,240)' : 'rgb(107,114,128)';
@@ -11,7 +11,7 @@
  * — eleven files, forty-eight literals, none of them reachable from the token
  * layer. The re-skin re-valued the tokens and every one of these kept painting
  * the old palette. The clearest symptom: all five PNG exports flattened onto
- * `rgb(8,12,28)`, the card colour from BEFORE the re-skin, so an exported chart
+ * `rgb(8,12,28)`, the card color from BEFORE the re-skin, so an exported chart
  * had a background the site no longer used anywhere.
  *
  * ── Why a function and not a constant ───────────────────────────────────────
@@ -174,7 +174,7 @@ export function chartTheme() {
         legend:     read('--color-text-secondary', FALLBACK.legend),
         grid:       read('--color-chart-grid', FALLBACK.grid),
         axis:       read('--color-chart-axis', FALLBACK.axis),
-        // Not a data colour. The one canvas surface that needs it is the
+        // Not a data color. The one canvas surface that needs it is the
         // wordmark on a PNG export, whose second half is the same accent the
         // frame paints on screen — see .plot-frame-mark in index.css.
         accent:     read('--color-accent-blue', FALLBACK.accent),

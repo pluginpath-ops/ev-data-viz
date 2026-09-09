@@ -21,7 +21,7 @@ import { OKABE_ITO, LEGACY_PALETTE } from '../../utils/colorUtils';
  * The only LIVE specimen on this page, and the one that has to be.
  *
  * Every other entry here is markup: a class on an empty element, which is all
- * you need to check an appearance. A colour picker is not an appearance — it is
+ * you need to check an appearance. A color picker is not an appearance — it is
  * a mechanism, and the things worth checking about it cannot be shown by static
  * markup because they are all about time and communication:
  *
@@ -30,9 +30,9 @@ import { OKABE_ITO, LEGACY_PALETTE } from '../../utils/colorUtils';
  *   • content that closes its own panel, via the `{ close }` it is handed
  *   • an owner that is told, via `onOpenChange`
  *   • discard on dismiss — Cancel, ×, Escape and an outside click all leave
- *     the committed colour alone; only Apply writes
+ *     the committed color alone; only Apply writes
  *
- * This was a mock of the colour control while the control did not exist. It is
+ * This was a mock of the color control while the control did not exist. It is
  * now the control itself, which is strictly better: a mock proves the seams of
  * a copy, and drifts from the real one the first time either changes.
  *
@@ -42,7 +42,7 @@ import { OKABE_ITO, LEGACY_PALETTE } from '../../utils/colorUtils';
 function ColorPickerSeams() {
     // A plotted set the wider scopes can act on: two vehicles — one with three
     // tests, one with a single test — so "a color per vehicle, a shade per
-    // test" has something to actually do. One row carries a hand-set colour so
+    // test" has something to actually do. One row carries a hand-set color so
     // "Overwrite" has something to warn about. Shaped exactly like
     // seriesRowsOf's output, because that is what a chart view hands the picker.
     const PLOT = [
@@ -92,7 +92,7 @@ function ColorPickerSeams() {
 
 /**
  * The three states of the read-only swatch, side by side — which is the only
- * way to see that "hollow" and "coloured" are the same box, and that the
+ * way to see that "hollow" and "colored" are the same box, and that the
  * qualifier dot clears the corner of both.
  */
 function SeriesSwatches() {

@@ -466,14 +466,14 @@ export default function ChargeCompareView({
     // Road Trip and anything added later behave identically when the data shifts
     // underneath them — pruning, repin carry-over and first-sighting bootstrap
     // were three separate implementations that each got a different part wrong.
-    // Bars are coloured by the range test (the row's subject). The hook gives the
+    // Bars are colored by the range test (the row's subject). The hook gives the
     // same session-override behaviour as the other charts without a DB write.
     const colorableRuns = useMemo(
         () => resolvedPairs.map(p => p.rangeRun),
         [resolvedPairs]
     );
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
-        // No palette control on this chart; it draws vehicle colours, and a
+        // No palette control on this chart; it draws vehicle colors, and a
         // session override still applies.
         palette: VEHICLE_PALETTE,
         resetKey: selectedVehicleIds.join(','),
@@ -525,7 +525,7 @@ export default function ChargeCompareView({
         const active = resolvedPairs.filter(p => selectedRuns.includes(p.key));
         const labels = buildSeriesLabels(active, { supplied: ['year', 'make', 'model', 'trim'] });
         // One range test paired with two charging curves used to render two bars
-        // in the SAME colour, since colour came from the range test alone. Shade
+        // in the SAME color, since color came from the range test alone. Shade
         // by partner within the range test's own hue so the rows still read as
         // related — see resolvePairColors.
         const pairColors = resolvePairColors(active.map(p => ({
@@ -812,7 +812,7 @@ export default function ChargeCompareView({
     // activePairs, not just selectedRuns: changing a row's partner can leave the
     // selection array identical (same row, different pairing) while every bar's
     // value changes, and the chart would keep the previous partner's numbers.
-    // It also carries the labels and colours, so a Full Labels toggle redraws —
+    // It also carries the labels and colors, so a Full Labels toggle redraws —
     // depending on resolvedPairs alone left that toggle inert, since it changes
     // neither the pairs nor the selection.
     }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, activePairs, units, isDark]);
@@ -906,7 +906,7 @@ export default function ChargeCompareView({
                         colorSeries={seriesRowsOf(colorableRuns, selectedVehicles, isColorOverridden)}
                         onUpdateRunColors={setColorOverrides}
                         // Without this the swatches showed each run's stored
-                        // colour while the bars showed the resolved one, so the
+                        // color while the bars showed the resolved one, so the
                         // picker and the chart disagreed from the first render.
                         colorMap={colorMap}
                         runFilter={(run, vehicle) =>

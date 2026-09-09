@@ -3,7 +3,7 @@
 One name per thing, and where that thing lives.
 
 This exists because three words drifted. "Rail" was used for the chart sidebar,
-the sub-nav, *and* the coloured left edge of a vehicle card. "Chrome" was used
+the sub-nav, *and* the colored left edge of a vehicle card. "Chrome" was used
 both as a category ("blue leads the chrome") and as the name of one specific
 region. A word with no fixed referent attracts whatever needs naming next, and
 by the time you notice, two people are describing different objects with the
@@ -49,25 +49,25 @@ Renaming it is [tracked separately](#deferred-renames).
 | The strip of PNG / URL / Reset-zoom buttons | **toolbar** | WAI-ARIA `toolbar` | `.chart-export-strip` |
 | The thumbnail of what PNG just copied | **export preview** | — | [useChartPng.js](../src/hooks/useChartPng.js), `.chart-png-preview` |
 | Canvas type sizes derived from `--fs-body` | **chart fonts** | — | [chartTheme.js](../src/utils/chartTheme.js) `chartFonts()` |
-| Canvas colours read from the tokens | **chart theme** | — | [chartTheme.js](../src/utils/chartTheme.js) `chartTheme()` |
-| The colour one plotted series is drawn in | **series colour** | — | [colorUtils.js](../src/utils/colorUtils.js) `resolveChartColors()` |
-| The small square REPORTING that colour | **series swatch** | common web | `.series-swatch` — 10px, read-only |
-| The bigger one that CHANGES it | **series colour picker** | — | [SeriesColorPicker.jsx](../src/components/SeriesColorPicker.jsx), `.series-swatch--button` |
-| The colour a pick becomes slot 1 of | **the base** | — | the rest of the set is re-derived from it |
+| Canvas colors read from the tokens | **chart theme** | — | [chartTheme.js](../src/utils/chartTheme.js) `chartTheme()` |
+| The color one plotted series is drawn in | **series color** | — | [colorUtils.js](../src/utils/colorUtils.js) `resolveChartColors()` |
+| The small square REPORTING that color | **series swatch** | common web | `.series-swatch` — 10px, read-only |
+| The bigger one that CHANGES it | **series color picker** | — | [SeriesColorPicker.jsx](../src/components/SeriesColorPicker.jsx), `.series-swatch--button` |
+| The color a pick becomes slot 1 of | **the base** | — | the rest of the set is re-derived from it |
 | Re-ordering a palette to lead with the base | **rotation** | — | `rotatePaletteFrom()` — different hues, for unrelated tests |
 | One hue in lightness steps from the base | **the ramp**, or light→dark | — | `rampFrom()` — one vehicle's runs, handoff 3c |
-| How much of the plot a pick recolours | **scope** | — | this test · this vehicle · all tests |
+| How much of the plot a pick recolors | **scope** | — | this test · this vehicle · all tests |
 
-A series colour has two values that routinely differ and must not be called the
-same thing: the **stored** colour is the durable `runs.color` preference, and
-the **drawn** colour is what is actually on the chart after Auto Color and any
+A series color has two values that routinely differ and must not be called the
+same thing: the **stored** color is the durable `runs.color` preference, and
+the **drawn** color is what is actually on the chart after Auto Color and any
 session override have had their say. The picker says both out loud; before it,
 nothing did.
 
 Say **all tests**, never "all vehicles" — the widest scope reseeds every run
 currently ticked in the run picker, which is a set of tests and may be several
 per vehicle. Nothing at any scope writes to the database: the charting page has
-no durable colour path, whatever role you hold. The durable preference is edited
+no durable color path, whatever role you hold. The durable preference is edited
 in Tests & Data, which is the screen that owns it.
 
 **Careful with "rail."** Material Design 3 has a *navigation rail* — a slim
@@ -79,27 +79,27 @@ rail.
 
 | Thing | Call it | Established by | Lives in |
 |---|---|---|---|
-| The coloured left edge encoding state | **accent border** | CSS `border-left`; common in design systems | `.vehicle-card`, `.vehicle-row`, `.vehicle-run-group`, `.routing-row` |
+| The colored left edge encoding state | **accent border** | CSS `border-left`; common in design systems | `.vehicle-card`, `.vehicle-row`, `.vehicle-run-group`, `.routing-row` |
 | The ✓ on a selected card | **selected indicator** | ARIA `aria-selected` | `.vehicle-card.is-selected::before` |
 | The photo band with the title over a scrim | **media band** | Material *media* | [VehicleMedia.jsx](../src/components/vehicles/VehicleMedia.jsx), `.vehicle-media` |
 | A full-width labelled divider inside the sidebar | **section band** | — | `.run-selector-header`, `.subgroup-header` |
 | Small mono state labels inside a bar or row | **badges** | Material *badge* | `.badge-micro`, `.badge-default`, `.badge-status` |
 
-Accent-border colours carry meaning and are not decorative: orange = selected or
-overridden, red = queued for deletion, per-run colour = series identity.
+Accent-border colors carry meaning and are not decorative: orange = selected or
+overridden, red = queued for deletion, per-run color = series identity.
 
-## Type and colour
+## Type and color
 
 | Thing | Call it | Lives in |
 |---|---|---|
 | The one type axis every size derives from | **the scale** — `--fs-body` × `--fs-step` | [index.css](../src/index.css) TYPOGRAPHY SYSTEM |
-| Named size + weight + colour, picked as a set | **a role** — `.text-body`, `.text-micro`, `.text-nano`, `.text-caption` | same |
+| Named size + weight + color, picked as a set | **a role** — `.text-body`, `.text-micro`, `.text-nano`, `.text-caption` | same |
 | The global size multiplier | **the UI scale** — `--ui-scale` | [typographyKnobs.js](../src/styles/typographyKnobs.js) |
-| Named colour values | **tokens** — `--color-*` | [index.css](../src/index.css) Color Tokens |
+| Named color values | **tokens** — `--color-*` | [index.css](../src/index.css) Color Tokens |
 | Un-tokenised appearance, counted | **drift** | [driftProbes.js](../scripts/driftProbes.js), `npm run drift` |
 | A count asserted with `toBe` so a fall fails too | **a ratchet** | drift ledger, `KNOWN_OFFENDERS`, the dark-override cap |
 
-Colour vocabulary, from the design handoff: **blue** leads the chrome, **orange**
+Color vocabulary, from the design handoff: **blue** leads the chrome, **orange**
 is the single active/now signal and means nothing else, **green** is data and
 status and is never chrome.
 

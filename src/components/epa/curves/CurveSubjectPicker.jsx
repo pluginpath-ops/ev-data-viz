@@ -133,7 +133,7 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                                         checked={selected.includes(s.key)}
                                         onChange={() => onToggle(s.key)}
                                     />
-                                    {/* The colour the curve is drawn in, so a row
+                                    {/* The color the curve is drawn in, so a row
                                         and a line can be matched. */}
                                     <span
                                         className={`series-swatch${colors?.get(s.key) ? '' : ' is-empty'}`

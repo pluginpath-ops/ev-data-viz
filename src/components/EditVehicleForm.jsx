@@ -214,8 +214,8 @@ export default function EditVehicleForm({
                     <input placeholder="EPA Range (mi)" value={formData.range}   onChange={(e) => onFormChange({ ...formData, range: e.target.value })}   className="form-input form-input" />
                 </div>
 
-                {/* ── Series colour (#308) ──────────────────────────────────
-                  * The vehicle's own, not a run's. Colour used to be curated per
+                {/* ── Series color (#308) ──────────────────────────────────
+                  * The vehicle's own, not a run's. Color used to be curated per
                   * TEST, which does not survive contact with hundreds of cars at
                   * two to ten tests each — and it was never what a reader wanted
                   * anyway. What you recognise on a chart is the car.
@@ -225,7 +225,7 @@ export default function EditVehicleForm({
                   * control — there is nothing to scope, a vehicle being one
                   * series base. */}
                 <div className="form-section mt-5">
-                    <label className="block font-medium mb-2">Series colour</label>
+                    <label className="block font-medium mb-2">Series color</label>
                     <div className="flex items-center gap-3">
                         <SeriesColorPicker
                             value={formData.color || DEFAULT_RUN_COLOR}
@@ -237,7 +237,7 @@ export default function EditVehicleForm({
                         <span className="text-note">
                             {formData.color
                                 ? 'Every chart draws this vehicle from here, shading its tests off it.'
-                                : 'Unset — the palette chooses. The press-car colour is usually the one that stands out.'}
+                                : 'Unset — the palette chooses. The press-car color is usually the one that stands out.'}
                         </span>
                     </div>
                 </div>

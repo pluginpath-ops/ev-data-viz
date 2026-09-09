@@ -286,7 +286,7 @@ export default function SpecsView({ selectedVehicleIds }) {
                                 <th className="specs-th specs-col-label">Specification</th>
                                 {resolvedVehicles.map((rv, i) => (
                                     <th key={String(rv.id)} className="specs-th">
-                                        {/* The column carries the vehicle's series colour, so a
+                                        {/* The column carries the vehicle's series color, so a
                                             column ties to the same vehicle on every chart. Same
                                             helper the charts use, so they cannot disagree. */}
                                         <span

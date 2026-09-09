@@ -22,7 +22,7 @@ const GAP = 10;
  * Render a Chart.js instance onto an offscreen canvas and return a PNG data URL.
  *
  * @param {object} chartInstance
- * @param {object|string} options  Legacy callers pass a background colour string.
+ * @param {object|string} options  Legacy callers pass a background color string.
  * @param {string} [options.background]  Flat fill. Defaults to the panel token.
  * @param {string} [options.title]       Drawn above the plot, as in the frame.
  * @param {string} [options.subtitle]    The conditions the plot was drawn under.

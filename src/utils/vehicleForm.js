@@ -4,11 +4,11 @@
  * It was written out six times — an empty literal and a from-vehicle literal in
  * each of VehiclesView and RunsView, plus two more resets — and the copies had
  * already drifted apart in how they spelled a missing value. Adding the vehicle
- * colour (#308) would have been a seventh and eighth edit, with the failure mode
+ * color (#308) would have been a seventh and eighth edit, with the failure mode
  * that a form missing the field does not error: it sends `color: undefined`,
  * `updateVehicle` skips the key, and the write silently does nothing.
  *
- * `null` for colour rather than `''`: the column is nullable and null means "the
+ * `null` for color rather than `''`: the column is nullable and null means "the
  * palette chooses", so the form's empty state and the database's are the same
  * value rather than two things that have to be mapped between.
  */

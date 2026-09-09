@@ -138,9 +138,9 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
       _specLinkId:        link.id,
       _sourceVehicleId:   vInfo?.vehicleId,
       _sourceVehicleName: vInfo?.vehicleName,
-      // The link's own colour still overrides, and is a separate stored value
-      // from the retired run colour. Without one the inherited run falls through
-      // to the TARGET vehicle's curated colour, which is the vehicle it is
+      // The link's own color still overrides, and is a separate stored value
+      // from the retired run color. Without one the inherited run falls through
+      // to the TARGET vehicle's curated color, which is the vehicle it is
       // being read as — see #308.
       color:          link.color ?? RETIRED_RUN_COLOR,
       // is_default on the link row gives per-run default precision.
@@ -242,10 +242,10 @@ class DataService {
         tags:  (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
         runs:  (v.runs || []).map(r => ({
           ...r,
-          // Colour belongs to the vehicle now (#308). The stored value is left
+          // Color belongs to the vehicle now (#308). The stored value is left
           // in the database and replaced HERE, at the one door every run comes
           // through, so a read we missed anywhere downstream paints magenta
-          // rather than silently keeping the old per-run colour alive.
+          // rather than silently keeping the old per-run color alive.
           color: RETIRED_RUN_COLOR,
           // Normalise DB snake_case to the camelCase used throughout the app.
           isDefault: !!r.is_default,
@@ -780,7 +780,7 @@ class DataService {
       power: vehicle.power ? parseFloat(vehicle.power) : null,
       manufacturer_id: vehicle.manufacturer_id ? Number(vehicle.manufacturer_id) : null,
       // Null rather than a default: null means "the palette chooses", and a
-      // vehicle created without a colour has not made a claim about one.
+      // vehicle created without a color has not made a claim about one.
       color: vehicle.color || null,
       visibility: 'private'
     }).select().single();
@@ -925,7 +925,7 @@ class DataService {
     if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
-      // No colour assigned: a run does not own one since #308, and the chart
+      // No color assigned: a run does not own one since #308, and the chart
       // resolves it from the vehicle. The vehicle lookup that used to sit here
       // existed only to index the per-run palette by run count.
       const newRun = { ...run, id: Date.now() };

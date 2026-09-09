@@ -140,8 +140,8 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
     };
 
     /**
-     * Colour per vehicle, shared across all four charts so a car is the same
-     * colour everywhere — the whole point of stacking them.
+     * Color per vehicle, shared across all four charts so a car is the same
+     * color everywhere — the whole point of stacking them.
      */
     const vehicleColors = useMemo(
         () => resolveChartColors(selected.map(v => ({ id: v.id, color: null, created_at: v.created_at })), {}, 'manual'),
@@ -314,7 +314,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                 <p className="text-xs text-secondary">
                     Every bar is a tested figure, whoever produced it — results derived from
                     imported sessions rank alongside published ones, marked ✦. Manufacturer
-                    claims are excluded. A vehicle keeps its colour across all four charts.
+                    claims are excluded. A vehicle keeps its color across all four charts.
                 </p>
             </div>}
 

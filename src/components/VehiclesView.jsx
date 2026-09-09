@@ -819,7 +819,7 @@ export default function VehiclesView({
                                             photograph behind a scrim, and a control there
                                             has to fight an arbitrary image the way
                                             .vehicle-media-badge does. Editing in place is
-                                            the point: colouring a catalogue this size is a
+                                            the point: coloring a catalogue this size is a
                                             scroll-and-click pass, and routing each one
                                             through the full edit form is what would make
                                             it not worth doing. */}
@@ -836,7 +836,7 @@ export default function VehiclesView({
                                                     onReset={() => onUpdate(vehicle.id, { color: null })}
                                                 />
                                                 <span className="text-caption">
-                                                    {vehicle.color ? 'Series colour' : 'No colour set'}
+                                                    {vehicle.color ? 'Series color' : 'No color set'}
                                                 </span>
                                             </div>
                                         )}
@@ -968,7 +968,7 @@ export default function VehiclesView({
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 min-w-0">
                                             {/* The curator's swatch. Editing in place is
-                                                the point: setting a colour per vehicle
+                                                the point: setting a color per vehicle
                                                 across a catalogue of this size is a
                                                 scroll-and-click pass, and sending each
                                                 one through the full edit form is what

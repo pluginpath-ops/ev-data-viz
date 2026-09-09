@@ -15,7 +15,7 @@ const dist = (x, y) => {
     return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 };
 
-describe('pair colours', () => {
+describe('pair colors', () => {
     it('leaves an unpaired primary exactly as it was', () => {
         const out = resolvePairColors([r('a', 1, '#0072B2'), r('b', 2, '#D55E00')]);
         expect(out).toEqual({ a: '#0072B2', b: '#D55E00' });
@@ -42,12 +42,12 @@ describe('pair colours', () => {
         expect(out.c).toBe('#D55E00');
     });
 
-    it('gives six partners of one primary distinct colours', () => {
+    it('gives six partners of one primary distinct colors', () => {
         const out = resolvePairColors([1,2,3,4,5,6].map(i => r(`k${i}`, 9, '#009E73')));
         expect(new Set(Object.values(out)).size).toBeGreaterThanOrEqual(5);
     });
 
-    it('still yields usable distinct colours with no base colour', () => {
+    it('still yields usable distinct colors with no base color', () => {
         const out = resolvePairColors([r('a', 1, null), r('b', 1, undefined)]);
         expect(out.a).toMatch(/^#[0-9a-f]{6}$/i);
         expect(out.a).not.toBe(out.b);
@@ -60,13 +60,13 @@ describe('pair colours', () => {
 });
 
 describe('seriesColorNote', () => {
-    it('reads an unset colour as auto, whichever way it is unset', () => {
+    it('reads an unset color as auto, whichever way it is unset', () => {
         for (const unset of [null, undefined, '', DEFAULT_RUN_COLOR]) {
             expect(seriesColorNote(unset, '#E69F00').kind).toBe('auto');
         }
     });
 
-    it('says nothing when the stored colour is the one being drawn', () => {
+    it('says nothing when the stored color is the one being drawn', () => {
         expect(seriesColorNote('#E69F00', '#E69F00').kind).toBe('saved');
     });
 
@@ -77,12 +77,12 @@ describe('seriesColorNote', () => {
         expect(seriesColorNote('#e69f00', '#E69F00').kind).toBe('saved');
     });
 
-    it('reports both colours when they differ', () => {
+    it('reports both colors when they differ', () => {
         expect(seriesColorNote('#0072B2', '#E69F00'))
             .toEqual({ kind: 'diverged', stored: '#0072B2', plotted: '#E69F00' });
     });
 
-    it('calls the sentinel unset even against a plotted colour equal to it', () => {
+    it('calls the sentinel unset even against a plotted color equal to it', () => {
         // Auto Color off, nothing stored: the resolver hands back the sentinel
         // itself. That is still "the palette is choosing", not a saved blue.
         expect(seriesColorNote(DEFAULT_RUN_COLOR, DEFAULT_RUN_COLOR).kind).toBe('auto');
@@ -90,9 +90,9 @@ describe('seriesColorNote', () => {
 });
 
 describe('HSL round trip', () => {
-    it('returns every palette colour unchanged', () => {
+    it('returns every palette color unchanged', () => {
         // The sliders read HSL and write hex back on every drag, so a lossy
-        // round trip would walk a colour away from its slot one nudge at a time.
+        // round trip would walk a color away from its slot one nudge at a time.
         for (const hex of OKABE_ITO_SET) {
             expect(hslToHex(hexToHsl(hex)).toLowerCase()).toBe(hex.toLowerCase());
         }
@@ -148,7 +148,7 @@ describe('a base seeds the set', () => {
         const ramp = rampFrom('#F0E442', 4);
         const light = ramp.map(c => hexToHsl(c).l);
         expect(ramp[0]).toBe('#F0E442');
-        // Every derived colour is darker than the base, and monotonically so.
+        // Every derived color is darker than the base, and monotonically so.
         for (let i = 1; i < light.length; i++) expect(light[i]).toBeLessThan(light[i - 1]);
     });
 
@@ -185,9 +185,9 @@ describe('seriesRowsOf', () => {
         ]);
     });
 
-    it('marks a row not-auto when it is showing a hand-picked colour', () => {
+    it('marks a row not-auto when it is showing a hand-picked color', () => {
         // "Auto" is about an override being in force, not about what is stored:
-        // a run with a saved red is still on auto until someone recolours it in
+        // a run with a saved red is still on auto until someone recolors it in
         // this session, and a run with nothing saved stops being on auto the
         // moment they do.
         const rows = seriesRowsOf([run('a'), run('d')], vehicles, id => id === 'a');
@@ -196,12 +196,12 @@ describe('seriesRowsOf', () => {
 
     it('counts a run once however many partners it is plotted against', () => {
         // Pair mode plots one range run per charging partner: three rows on the
-        // chart, one colour. Counting three would make "Overwrite N" lie.
+        // chart, one color. Counting three would make "Overwrite N" lie.
         expect(seriesRowsOf([run('a'), run('a'), run('a'), run('d')], vehicles).map(r => r.id))
             .toEqual(['a', 'd']);
     });
 
-    it('drops synthetic rows — there is no run behind them to colour', () => {
+    it('drops synthetic rows — there is no run behind them to color', () => {
         expect(seriesRowsOf([run('a'), { id: 'epa', _synthetic: true }], vehicles).map(r => r.id))
             .toEqual(['a']);
     });
@@ -221,9 +221,9 @@ describe('seriesRowsOf', () => {
 });
 
 describe('extending the palette past its length', () => {
-    it('never repeats a colour, however many series are asked for', () => {
+    it('never repeats a color, however many series are asked for', () => {
         // The bug this exists for: the picker's rotation wrapped with a modulo,
-        // so a twelve-car chart got eight colours and four exact duplicates —
+        // so a twelve-car chart got eight colors and four exact duplicates —
         // precisely what a reader assumes the tool is preventing.
         for (const n of [8, 12, 20, 30, 48]) {
             const set = expandPalette(OKABE_ITO_SET, n);
@@ -238,7 +238,7 @@ describe('extending the palette past its length', () => {
 
     it('varies saturation as well as lightness', () => {
         // Lightness alone was what this did before, and a second pass that is
-        // only "the same colour, lighter" reads as a faded first pass rather
+        // only "the same color, lighter" reads as a faded first pass rather
         // than as its own series.
         const set = expandPalette(OKABE_ITO, 14);
         const base = hexToHsl(OKABE_ITO[0]);
@@ -248,7 +248,7 @@ describe('extending the palette past its length', () => {
     });
 
     it('does not breed the neutral slot', () => {
-        // Varying a colour with no hue only makes more colours with no hue, and
+        // Varying a color with no hue only makes more colors with no hue, and
         // they collide with every other pale variant. Measured: the worst pair
         // in a 16-series set used to be two pale variants of the grey.
         const set = expandPalette(OKABE_ITO_SET, 30);
@@ -256,7 +256,7 @@ describe('extending the palette past its length', () => {
         expect(greys).toEqual([SERIES_NEUTRAL]);
     });
 
-    it('keeps every colour clear of pure white and black', () => {
+    it('keeps every color clear of pure white and black', () => {
         for (const c of expandPalette(OKABE_ITO_SET, 40)) {
             const { l } = hexToHsl(c);
             expect(l).toBeGreaterThan(10);
@@ -272,22 +272,22 @@ describe('extending the palette past its length', () => {
         expect(twelve[0]).toBe(OKABE_ITO_SET[2]);
     });
 
-    it('gives resolveChartColors a distinct colour per run well past the palette', () => {
+    it('gives resolveChartColors a distinct color per run well past the palette', () => {
         const runs = Array.from({ length: 20 }, (_, i) => ({ id: i + 1, color: null, created_at: `2026-01-${i + 1}` }));
         const assigned = Object.values(resolveChartColors(runs, {}, 'auto'));
         expect(new Set(assigned).size).toBe(20);
     });
 });
 
-describe('a vehicle colour is the family base (#308)', () => {
-    // Colour moved from the run to the vehicle. These replace the suite that
-    // covered `run.color` and its clash nudge — a stored run colour was often
+describe('a vehicle color is the family base (#308)', () => {
+    // Color moved from the run to the vehicle. These replace the suite that
+    // covered `run.color` and its clash nudge — a stored run color was often
     // incidental, so two of them sharing a hex was an accident worth correcting;
-    // a curated VEHICLE colour is a deliberate statement and is honoured exactly.
+    // a curated VEHICLE color is a deliberate statement and is honoured exactly.
     const at = (id, day) => ({ id, created_at: `2026-01-${String(day).padStart(2, '0')}` });
     const vehicle = (id, color, runs) => ({ id, color, runs });
 
-    it('one test takes the curated colour exactly', () => {
+    it('one test takes the curated color exactly', () => {
         const runs = [at(1, 1)];
         const out = resolveChartColors(runs, {}, VEHICLE_PALETTE, [vehicle('v1', '#009E73', runs)]);
         expect(out[1]).toBe('#009E73');
@@ -296,7 +296,7 @@ describe('a vehicle colour is the family base (#308)', () => {
     it('several tests shade off it, staying in the hue', () => {
         const runs = [at(1, 1), at(2, 2), at(3, 3)];
         const out = resolveChartColors(runs, {}, VEHICLE_PALETTE, [vehicle('v1', '#009E73', runs)]);
-        // The first keeps the base, so a curated colour is on the chart as picked.
+        // The first keeps the base, so a curated color is on the chart as picked.
         expect(out[1]).toBe('#009E73');
         // The rest are distinct, and all of them are still that green.
         expect(new Set([out[1], out[2], out[3]]).size).toBe(3);
@@ -306,7 +306,7 @@ describe('a vehicle colour is the family base (#308)', () => {
         }
     });
 
-    it('two curated vehicles keep their own colours', () => {
+    it('two curated vehicles keep their own colors', () => {
         const a = [at(1, 1)], b = [at(2, 2)];
         const out = resolveChartColors([...a, ...b], {}, VEHICLE_PALETTE,
             [vehicle('v1', '#009E73', a), vehicle('v2', '#CC79A7', b)]);
@@ -329,7 +329,7 @@ describe('a vehicle colour is the family base (#308)', () => {
         expect(reverse).toEqual(forward);
     });
 
-    it('a chosen palette overrides the curated colour — that is what choosing one is for', () => {
+    it('a chosen palette overrides the curated color — that is what choosing one is for', () => {
         const runs = [at(1, 1)];
         const out = resolveChartColors(runs, {}, 'okabe-ito', [vehicle('v1', '#009E73', runs)]);
         expect(out[1]).not.toBe('#009E73');
@@ -348,7 +348,7 @@ describe('a vehicle colour is the family base (#308)', () => {
         expect(new Set(Object.values(out)).size).toBe(2);
     });
 
-    it('a session override still wins over the curated colour', () => {
+    it('a session override still wins over the curated color', () => {
         const runs = [at(1, 1)];
         const out = resolveChartColors(runs, { 1: '#E69F00' }, VEHICLE_PALETTE,
             [vehicle('v1', '#009E73', runs)]);
@@ -365,7 +365,7 @@ describe('seedPlot', () => {
     const P = OKABE_ITO_SET;
     const hue = h => Math.round(hexToHsl(h).h);
 
-    it('both: one colour per vehicle, one step per test', () => {
+    it('both: one color per vehicle, one step per test', () => {
         const out = seedPlot(P[0], rows, { rotate: true, shade: true }, P);
         // Same hue within a vehicle...
         expect(hue(out.a1)).toBe(hue(out.a2));
@@ -381,7 +381,7 @@ describe('seedPlot', () => {
         expect(out.a1).toBe(P[0]);
     });
 
-    it('rotate only: every series its own colour, ignoring which car it is', () => {
+    it('rotate only: every series its own color, ignoring which car it is', () => {
         const out = seedPlot(P[0], rows, { rotate: true, shade: false }, P);
         expect(new Set(Object.values(out)).size).toBe(5);
         // Two tests of ONE vehicle are no longer related — that is the point.
@@ -394,7 +394,7 @@ describe('seedPlot', () => {
         expect(new Set(Object.values(out)).size).toBe(5);
     });
 
-    it('a one-test vehicle keeps its rotated colour rather than being shaded off it', () => {
+    it('a one-test vehicle keeps its rotated color rather than being shaded off it', () => {
         const solo = [{ id: 'a1', vehicleId: 'v1' }, { id: 'b1', vehicleId: 'v2' }];
         const out = seedPlot(P[0], solo, { rotate: true, shade: true }, P);
         expect(out.a1).toBe(P[0]);
@@ -428,7 +428,7 @@ describe('the palettes on offer', () => {
         }
     });
 
-    it('no palette repeats a colour within itself', () => {
+    it('no palette repeats a color within itself', () => {
         for (const p of SERIES_PALETTES) {
             const seen = p.colors.map(c => c.toLowerCase());
             expect(new Set(seen).size, p.id).toBe(seen.length);
@@ -450,10 +450,10 @@ describe('the palettes on offer', () => {
             const hsl = p.colors.map(hexToHsl);
             // A tolerance, not equality: eight bits per channel cannot hold one
             // exact hue at every lightness. Hue lives in the DIFFERENCES between
-            // channels, so the less saturated the colour the fewer units carry
+            // channels, so the less saturated the color the fewer units carry
             // it and the coarser the rounding — mono-orange spans 1 degree at
             // s=88, mono-ice spans 3 at s=37. Five is still nowhere near a
-            // different colour: the palette's own neighbours sit 40 apart.
+            // different color: the palette's own neighbours sit 40 apart.
             const hues = hsl.map(c => c.h);
             expect(Math.max(...hues) - Math.min(...hues), p.id).toBeLessThan(5);
             for (let i = 1; i < hsl.length; i++) {
@@ -472,7 +472,7 @@ describe('the palettes on offer', () => {
         }
     });
 
-    it('draws the house palette from the theme rather than new colours', () => {
+    it('draws the house palette from the theme rather than new colors', () => {
         // The dark theme's own --color-accent-* values, plus --color-text-primary
         // standing in for white. A house palette that invented its own blue
         // would be the drift the token system exists to stop.
@@ -482,12 +482,12 @@ describe('the palettes on offer', () => {
     });
 });
 
-describe('a colour pinned to a run that sorts later', () => {
+describe('a color pinned to a run that sorts later', () => {
     const at = (id, color, day) => ({ id, color, created_at: `2026-01-${String(day).padStart(2, '0')}` });
 
     it('is not handed to an earlier run that had none', () => {
         // The bug this exists for. `placed` only knew about runs already
-        // visited, so a free run early in the order could take a colour a LATER
+        // visited, so a free run early in the order could take a color a LATER
         // run was pinned to, and nothing ever compared them. It needed the
         // pinned run to sort AFTER the free one — which is what happens when
         // runs are ticked in a different order from their creation dates.
@@ -506,8 +506,8 @@ describe('a colour pinned to a run that sorts later', () => {
         for (const [id, hex] of Object.entries(pinned)) expect(out[id]).toBe(hex);
     });
 
-    it('still returns the pinned colour itself, unchanged and uncounted', () => {
-        // Pre-seeding `placed` must not make a pinned colour look twice-used and
+    it('still returns the pinned color itself, unchanged and uncounted', () => {
+        // Pre-seeding `placed` must not make a pinned color look twice-used and
         // push everything else away from it more than it deserves.
         const runs = [at(1, null, 1), at(2, null, 2), at(3, null, 3)];
         const out = resolveChartColors(runs, { 1: '#E69F00' }, 'auto');

@@ -1280,7 +1280,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-lg leading-tight flex items-center gap-2">
                         {/* Read-only here: this is where you READ a vehicle's
-                            tests, and the colour is edited on the vehicle form
+                            tests, and the color is edited on the vehicle form
                             that Edit Vehicle opens from this same page. An
                             uncurated vehicle shows no swatch rather than a
                             placeholder — the palette is choosing, and a grey
@@ -1289,7 +1289,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             <span
                                 className="series-swatch"
                                 style={{ backgroundColor: vehicle.color }}
-                                title={`Series colour for ${vehicle.name}`}
+                                title={`Series color for ${vehicle.name}`}
                             />
                         )}
                         <span className="truncate">{vehicle.name}</span>
@@ -2530,7 +2530,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     )}
                                                 </div>
                                                 {/* The two scaling knobs, one per line — see
-                                                    .run-actions-stack. A colour picker used to lead
+                                                    .run-actions-stack. A color picker used to lead
                                                     this stack; it wrote runs.color, which the
                                                     vehicle owns now (#308). spec_links.color is a
                                                     separate stored value and is left alone until

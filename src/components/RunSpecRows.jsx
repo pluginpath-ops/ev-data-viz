@@ -33,12 +33,12 @@ import { runKindFrom } from '../utils/runUtils';
  * auto-fit track grid: as many columns as the run actually records, no padding
  * columns for the fields it does not.
  *
- * ── And the colours are gone ─────────────────────────────────────────────────
+ * ── And the colors are gone ─────────────────────────────────────────────────
  *
  * Speed was amber, temperature orange, wind cyan, distance green, energy and
  * efficiency blue — seven hues across three rows where no hue meant anything,
  * which is the exact pattern the re-skin exists to remove. A reading is a
- * reading; the one distinction worth a colour is whether it can be trusted at
+ * reading; the one distinction worth a color is whether it can be trusted at
  * face value, so a qualified figure is marked and everything else is neutral.
  */
 
@@ -262,7 +262,7 @@ export default function RunSpecRows({ run, units, socRange, fieldMeta = [], calc
                 const pct = Math.abs(run.charge_energy_kwh - check.kwh) / Math.max(run.charge_energy_kwh, check.kwh) * 100;
                 // Agreement is the expected case and takes the neutral badge —
                 // an intent is for the few that are actually saying something is
-                // wrong. Only the disagreement is coloured.
+                // wrong. Only the disagreement is colored.
                 results.push({
                     key: 'cmp', label: 'Cross-check',
                     tone: pct > 5 ? 'warning' : undefined,

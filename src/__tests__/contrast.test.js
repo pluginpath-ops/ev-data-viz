@@ -6,14 +6,14 @@
  * That failure has shipped three times — a cream panel of towing inputs under
  * light text, a data cell that turned white while you typed into it, a
  * reorder box the same — and each time it was found by a person opening that
- * screen and squinting, because nothing here could see a colour.
+ * screen and squinting, because nothing here could see a color.
  *
  * ── Why the token layer is the right place to check ─────────────────────────
  *
  * A rendered sweep would need a browser, a running server and a route for every
  * screen, and would still only cover the screens someone remembered to list.
  * The tokens are where the answer actually lives: a component that takes its
- * colours from `--color-warning-text` on `--color-warning-surface` is legible
+ * colors from `--color-warning-text` on `--color-warning-surface` is legible
  * exactly when that PAIR is legible, in both themes, and there are a few dozen
  * pairs rather than a few hundred screens.
  *
@@ -82,7 +82,7 @@ const BASE = { light: '--color-card', dark: '--color-card' };
  * Every text-on-surface pairing the design actually intends.
  *
  * Listed rather than derived from a cross product: most combinations are not
- * pairings anyone would write, and asserting them would fail on colours that
+ * pairings anyone would write, and asserting them would fail on colors that
  * are never put together. Each entry is a claim that some component does — or
  * reasonably could — put this text on this surface.
  */
@@ -107,7 +107,7 @@ const PAIRINGS = [
     ['--color-primary-text', '--color-primary-light'],
 
     // A status panel sits on a card, so its text must clear the card too — a
-    // 10% wash barely moves the background and cannot rescue a colour that
+    // 10% wash barely moves the background and cannot rescue a color that
     // fails against what is underneath it.
     ['--color-warning-text', '--color-card'],
     ['--color-danger-text',  '--color-card'],
@@ -217,7 +217,7 @@ describe('every intended text/surface pairing is readable, in both themes', () =
  * Light is deferred during the re-skin: the design handoff draws dark only, and
  * light's values for anything the re-skin introduced are provisional
  * placeholders. What must not happen is a token reaching dark and never reaching
- * light at all — that one does not degrade to "an unpolished colour", it
+ * light at all — that one does not degrade to "an unpolished color", it
  * degrades to no declaration, so the property falls back through the cascade to
  * whatever an ancestor happened to set, or to nothing.
  *
@@ -305,7 +305,7 @@ describe('the two themes declare the same tokens', () => {
 describe('the callout triad inverts between themes', () => {
     // The bug in one line. A light theme puts DARK text on a pale tint; a dark
     // theme must put LIGHT text on a dark wash. Carrying the light theme's text
-    // colour across is exactly how amber-800 ended up on a dark panel.
+    // color across is exactly how amber-800 ended up on a dark panel.
     for (const intent of ['warning', 'danger', 'success']) {
         it(`${intent} text is dark in light mode and light in dark mode`, () => {
             const lum = (c) => {
@@ -337,7 +337,7 @@ function jsxFiles(dir, acc = []) {
 /**
  * A light background written inline, with no dark counterpart.
  *
- * `bg-amber-50` and `bg-white` are fixed light colours. In dark mode the text
+ * `bg-amber-50` and `bg-white` are fixed light colors. In dark mode the text
  * on them is light too, and the result is the invisible-input bug. A
  * `dark:bg-…` beside it means someone thought about it; nothing beside it means
  * nobody did.
@@ -374,7 +374,7 @@ function offenders() {
  * backlog of them to hide a new one in.
  *
  * The one deliberate exception is Google's sign-in button, whose white
- * background is a brand requirement rather than a colour choice. It lives in
+ * background is a brand requirement rather than a color choice. It lives in
  * `.auth-provider-btn.is-google` in the stylesheet — named, commented, and out
  * of the JSX this rule scans, so the exception is written down instead of
  * being subtracted from a number.

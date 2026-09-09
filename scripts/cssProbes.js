@@ -30,7 +30,7 @@
  *
  *   - `redefined` counts SOLO selectors only. A grouped rule — shared metrics
  *     for `.import-badge-create, -update, -skip, -error` followed by one rule
- *     per variant for its colour — is good practice, and a naive count called
+ *     per variant for its color — is good practice, and a naive count called
  *     it 25 redefinitions. Excluding groups takes it to 8, and all 8 are
  *     genuinely two places to look for one class.
  *
@@ -70,7 +70,7 @@ export const CONSTRUCTED = {
     'is-lightness':  'SeriesColorPicker builds `color-slider-input is-${track}`.',
     'is-saturation': 'SeriesColorPicker builds `color-slider-input is-${track}`.',
     'is-weak':       'SeriesColorPicker builds `text-caption${weak ? \' is-weak\' : \'\'}` '
-        + 'when a colour falls under the 3:1 non-text contrast minimum.',
+        + 'when a color falls under the 3:1 non-text contrast minimum.',
     'step-1': 'StatsHistogram builds `step-${n}` for its four-step fill.',
     'step-2': 'StatsHistogram builds `step-${n}` for its four-step fill.',
     'step-3': 'StatsHistogram builds `step-${n}` for its four-step fill.',

@@ -5,17 +5,17 @@ import SeriesColorPicker from './SeriesColorPicker';
 import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 
 /**
- * The colour a row is drawn in: an Okabe-Ito slot in auto mode, a session
+ * The color a row is drawn in: an Okabe-Ito slot in auto mode, a session
  * override where one was set, the stored preference otherwise.
  *
  * A function rather than the expression written twice, because the second
  * reader of it is the group's accent border — and an accent that claims to be
- * a row's colour while computing it differently is the bug this file just had.
+ * a row's color while computing it differently is the bug this file just had.
  */
 function plottedColorOf(run, colorMap, vehicle) {
-    // The vehicle's curated colour is the fallback, not a neutral, because
+    // The vehicle's curated color is the fallback, not a neutral, because
     // `colorMap` only covers runs that are actually PLOTTED. An unticked row
-    // used to preview its own stored colour; a run owns none since #308, so
+    // used to preview its own stored color; a run owns none since #308, so
     // without this every unselected row previewed the same default blue and the
     // rail stopped telling you which car a row belonged to before you ticked it.
     return colorMap[run.id] || vehicle?.color || DEFAULT_RUN_COLOR;
@@ -32,7 +32,7 @@ function plottedColorOf(run, colorMap, vehicle) {
  *   onUpdateRunColor — (vehicleId, runId, color) => void, or null to hide color inputs
  *   onUpdateRunColors — (map) => void, a whole derived set at once. Supplying
  *                     it WITH colorSeries is what puts the scope control in the
- *                     colour panel; without both, a pick is one series
+ *                     color panel; without both, a pick is one series
  *   colorSeries     — [{id, vehicleId, stored}] for everything plotted, from
  *                     colorUtils.seriesRowsFor. What "this vehicle" and "all
  *                     tests" are allowed to touch
@@ -132,31 +132,31 @@ export default function RunSelector({
     };
 
     /**
-     * The colour a vehicle's group edge carries: the tests of its that are
+     * The color a vehicle's group edge carries: the tests of its that are
      * ACTUALLY on the chart, and nothing at all when none of them are.
      *
-     * `.vehicle-run-group` was written for "the vehicle's series colour — the
+     * `.vehicle-run-group` was written for "the vehicle's series color — the
      * only thing in the selector that is also on the plot", and for as long as
      * this component has existed it passed the brand blue instead, so the edge
      * said the same thing about every car. On EPA Curves, which did supply a
-     * colour, it was worse than uniform: it kept the palette's first answer
-     * after the rows had been recoloured by hand, naming a colour that was on
+     * color, it was worse than uniform: it kept the palette's first answer
+     * after the rows had been recolored by hand, naming a color that was on
      * no line.
      *
      * Anchoring it to the active rows is what keeps the promise. It reads their
-     * plotted colours through the same function the swatches do, so the two
+     * plotted colors through the same function the swatches do, so the two
      * cannot come apart again, and an edge over a group with nothing selected
-     * has no series to name — so it goes, rather than falling back to a colour
+     * has no series to name — so it goes, rather than falling back to a color
      * that would be a claim about a plot the vehicle is not on.
      *
      * Several active tests fade across all of them rather than taking the
-     * first: a vehicle contributing four lines in four colours is not
+     * first: a vehicle contributing four lines in four colors is not
      * represented by any one of them, and the edge is the only place the group
-     * as a whole can be said. Returned as a `background` value — one colour or
+     * as a whole can be said. Returned as a `background` value — one color or
      * a gradient — which is why the strip is painted rather than a border.
      */
     const accentFor = (vehicle, runs) => {
-        // Nothing plots a synthetic row, so it has no colour to speak for.
+        // Nothing plots a synthetic row, so it has no color to speak for.
         const active = runs
             .filter(run => !run._synthetic && isRunActive(run))
             .map(run => plottedColorOf(run, colorMap, vehicle));
@@ -359,7 +359,7 @@ export default function RunSelector({
 /**
  * One charging test and its range partner(s) — a row per pair.
  *
- * The first row carries the checkbox, colour and charging-test name; additional
+ * The first row carries the checkbox, color and charging-test name; additional
  * partners are continuation rows showing only their own dropdown, so a single
  * curve compared across three conditions reads as one block rather than three
  * unrelated entries.
@@ -537,10 +537,10 @@ function PairRows({
 }
 
 /**
- * The colour control for one run, in a chart sidebar.
+ * The color control for one run, in a chart sidebar.
  *
  * Extracted from RunRow so pair rows get the same control: they had a swatch
- * that merely looked like a button, which left no way to change a colour once
+ * that merely looked like a button, which left no way to change a color once
  * the pair charts stopped using the flat list.
  *
  * Everything this used to do itself now belongs to SeriesColorPicker, and one
@@ -554,7 +554,7 @@ function PairRows({
  */
 function RunColorControl({ run, vehicle, vehicleId, vehicleName, onUpdateRunColor, onUpdateRunColors, colorSeries, colorMap = {} }) {
     if (!onUpdateRunColor) return null;
-    // Synthetic rows (the EPA range option) have no run behind them to colour.
+    // Synthetic rows (the EPA range option) have no run behind them to color.
     if (run._synthetic) return null;
 
     const plotted = plottedColorOf(run, colorMap, vehicle);
@@ -563,8 +563,8 @@ function RunColorControl({ run, vehicle, vehicleId, vehicleName, onUpdateRunColo
         <SeriesColorPicker
             value={plotted}
             // No stored preference to differ from: a run does not own a
-            // colour since #308, and what a chart sidebar writes has always
-            // been a session override. The vehicle's curated colour is the
+            // color since #308, and what a chart sidebar writes has always
+            // been a session override. The vehicle's curated color is the
             // durable one, and it is edited on the vehicle form.
             stored={null}
             label={run.name}
@@ -582,7 +582,7 @@ function RunColorControl({ run, vehicle, vehicleId, vehicleName, onUpdateRunColo
 
 /**
  * Two lines, the same shape as a paired row: what this run IS, then what it
- * measured. It was one line — checkbox, colour, name, source link, date, and
+ * measured. It was one line — checkbox, color, name, source link, date, and
  * however many metric badges the view wanted — which wrapped into a ragged
  * block the moment it met a 320px rail.
  *

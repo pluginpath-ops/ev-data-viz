@@ -192,18 +192,18 @@ describe('the seams that broke before', () => {
         }
     });
 
-    it('takes chart colours from the stylesheet, not from retyped literals', () => {
-        // The seam this closes: Chart.js takes colours as strings, so every
+    it('takes chart colors from the stylesheet, not from retyped literals', () => {
+        // The seam this closes: Chart.js takes colors as strings, so every
         // chart view carried its own `isDark ? 'rgb(226,232,240)' : …` copy of
         // the theme — eleven files, forty-eight literals, none of them reachable
         // from the token layer. The re-skin re-valued the tokens and every one
         // of these kept painting the old palette. All five PNG exports were
-        // still flattening onto rgb(8,12,28), the card colour from before the
+        // still flattening onto rgb(8,12,28), the card color from before the
         // re-skin, so an exported chart had a background the site no longer
         // used anywhere.
         //
         // Scoped to the AXIS FURNITURE — ticks, gridlines, the legend and the
-        // export background — because that is what chartTheme resolves. Colours
+        // export background — because that is what chartTheme resolves. Colors
         // drawn inside the canvas by a plugin (badge fills, marker strokes,
         // tooltip boxes) are still literals; they belong to the phases that
         // rebuild those charts, and adding them here before then would assert a
@@ -211,7 +211,7 @@ describe('the seams that broke before', () => {
         // Asserted as the ABSENCE of the old shape, not the presence of the new
         // one. `toMatch(/chartTheme\(\)/)` over a whole file passes as soon as
         // the file mentions chartTheme anywhere — a view that took its export
-        // background from the token and went on retyping its axis colours would
+        // background from the token and went on retyping its axis colors would
         // have sailed through. Checked by mutating one back; it did not bite.
         const RETYPED = /\b(tickColor|gridColor|legendColor|tick|grid|legend|text|bgColor|bg)\s*=\s*isDark\s*\?/;
         const offenders = ALL
@@ -226,11 +226,11 @@ describe('the seams that broke before', () => {
         const users = ALL.filter(x => /\.jsx$/.test(x.file) && /chartTheme\(\)/.test(x.text));
         expect(users.length).toBeGreaterThan(5);
 
-        // And nothing anywhere may reach for the pre-re-skin card colour again.
+        // And nothing anywhere may reach for the pre-re-skin card color again.
         const stale = ALL.filter(x => /rgb\(8\s*,\s*12\s*,\s*28\)/.test(x.text)
             && !/utils\/chartTheme\.js$/.test(x.file));
         expect(stale.map(x => x.file),
-            'rgb(8,12,28) was the card colour BEFORE the re-skin — use chartTheme().background')
+            'rgb(8,12,28) was the card color BEFORE the re-skin — use chartTheme().background')
             .toEqual([]);
     });
 
@@ -812,9 +812,9 @@ describe('components import what they use', () => {
 });
 
 /**
- * ── The retired run colour (#308) ────────────────────────────────────────────
+ * ── The retired run color (#308) ────────────────────────────────────────────
  *
- * Colour belongs to the vehicle. `runs.color` is still in the database — perhaps
+ * Color belongs to the vehicle. `runs.color` is still in the database — perhaps
  * ten to twenty rows carry a deliberately set value — because dropping a column
  * in the same change that stops reading it leaves no way back. Instead every run
  * arrives from DataService carrying RETIRED_RUN_COLOR, so a path nobody found
@@ -825,15 +825,15 @@ describe('components import what they use', () => {
  * branch could sit unnoticed for exactly the weeks the tripwire is meant to be
  * counting, and the column would be dropped on a false all-clear.
  */
-describe('run colour is retired, not merely unused', () => {
-    it('nothing reads a colour off a run', () => {
+describe('run color is retired, not merely unused', () => {
+    it('nothing reads a color off a run', () => {
         // `\w+.color` where the receiver is a run-shaped name. Deliberately not
         // a blanket `.color` ban: vehicle.color is the whole point of #308, and
         // link.color is a separate stored value that outlives this change.
         const offenders = [];
         for (const { file, text } of ALL) {
             // Comments stripped first. Half this file's job is explaining WHY
-            // run colour went away, and prose saying `runs.color` is the record
+            // run color went away, and prose saying `runs.color` is the record
             // of that decision — a guard that forbids naming the thing it
             // retired makes the codebase unable to describe its own history.
             const code = text

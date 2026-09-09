@@ -22,9 +22,9 @@ export default function PerformanceRunSelector({
     vehicles,          // [{ id, name, runs: [{ id, name, driveMode, zeroTo60, color, sourceUrl }] }]
     selectedRunIds,     // array of ids, or null meaning "everything"
     onChange,           // (nextIds: array) => void
-    colorMap = {},      // resolved colour per run id, for the swatch
+    colorMap = {},      // resolved color per run id, for the swatch
     onUpdateColor,       // (runId, hex|null) => void; omit to hide the pickers
-    colorPicked,         // (runId) => bool — has this run been recoloured here?
+    colorPicked,         // (runId) => bool — has this run been recolored here?
 }) {
     const [expanded, setExpanded] = useState(false);
     const [collapsed, setCollapsed] = useState({});

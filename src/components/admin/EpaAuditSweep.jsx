@@ -30,12 +30,12 @@ const TONE_CLASS = {
 
 function VerdictPill({ verdict }) {
     const meta = AUDIT_VERDICTS.find(v => v.key === verdict) ?? AUDIT_VERDICTS.at(-1);
-    const colour = meta.tone === 'disagrees' ? 'var(--color-danger)'
+    const color = meta.tone === 'disagrees' ? 'var(--color-danger)'
         : meta.tone === 'close' ? 'var(--color-warning)'
         : meta.tone === 'agrees' ? 'var(--color-success)'
         : 'var(--color-text-meta)';
     return (
-        <span className="text-note font-medium whitespace-nowrap" style={{ color: colour }}>
+        <span className="text-note font-medium whitespace-nowrap" style={{ color: color }}>
             {meta.label}
         </span>
     );

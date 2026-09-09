@@ -8,19 +8,19 @@ import { ratioOf, AA_LARGE } from '../utils/contrast';
 import { chartTheme } from '../utils/chartTheme';
 
 /**
- * Pick the colour a series is drawn in — and, through it, the set.
+ * Pick the color a series is drawn in — and, through it, the set.
  *
  * ── Why this is not an <input type="color"> ─────────────────────────────────
  *
  * It was, in five places. That control opens the browser's own dialog: one
- * colour at a time, over the top of the chart, with no view of the set you are
- * picking against — which is the entire problem, because a series colour only
+ * color at a time, over the top of the chart, with no view of the set you are
+ * picking against — which is the entire problem, because a series color only
  * means anything RELATIVE to the other series on the same plot. It also varies
- * by browser, so "the colour picker" was not even one control.
+ * by browser, so "the color picker" was not even one control.
  *
- * ── A pick is a BASE, not one series' colour ────────────────────────────────
+ * ── A pick is a BASE, not one series' color ────────────────────────────────
  *
- * Setting a colour here fixes it as slot 1 and the rest of the set is
+ * Setting a color here fixes it as slot 1 and the rest of the set is
  * re-derived from it. That is what the two derivations mean, and they are the
  * same two the scope control offers:
  *
@@ -43,12 +43,12 @@ import { chartTheme } from '../utils/chartTheme';
  * this control has no scope selector because there is nothing to scope — a
  * vehicle is one series base.
  *
- * @param {string}  value       the colour actually being drawn right now
+ * @param {string}  value       the color actually being drawn right now
  * @param {string}  [stored]    the durable preference, where one can differ
  * @param {(hex: string) => void} onChange   commit for this series alone
  * @param {() => void} [onReset]  hand it back to the palette. Supplying it is
  *                              what puts "Auto" in the panel
- * @param {string}  [label]     what is being coloured
+ * @param {string}  [label]     what is being colored
  * @param {string|number} [seriesId]   this series' id, and
  * @param {string|number} [vehicleId]  the vehicle it belongs to — both needed
  *                              before a scope wider than one series means anything
@@ -105,7 +105,7 @@ export default function SeriesColorPicker({
                     aria-label={`Color for ${subject} — ${plotted}`}
                     // Three of the call sites sit inside a <label> wrapping the
                     // row's checkbox, so a click reaching the label toggles the
-                    // run's selection too. A swatch means "open the colour
+                    // run's selection too. A swatch means "open the color
                     // panel" and never anything an ancestor has a claim on, so
                     // it is stopped here, once, rather than at each site.
                     onClick={e => { e.stopPropagation(); onClick(e); }}
@@ -149,8 +149,8 @@ function PickerPanel({
 
     // Two axes, not one. SCOPE says who a pick reaches; DERIVATION says what it
     // does to them. They were welded — one vehicle always got shades, everything
-    // always got separate colours — which assumed a family is the only reason to
-    // recolour a vehicle. It is not: telling four tests of ONE car apart wants
+    // always got separate colors — which assumed a family is the only reason to
+    // recolor a vehicle. It is not: telling four tests of ONE car apart wants
     // maximum contrast for the same reason telling four cars apart does.
     const [scope, setScope] = useState('test');
     const [mode, setMode] = useState('family');
@@ -165,7 +165,7 @@ function PickerPanel({
     const [base, setBaseHex] = useState(plotted);
     const [hsl, setHsl] = useState(() => hexToHsl(plotted));
 
-    // Touching any colour control means you are choosing by hand, which is what
+    // Touching any color control means you are choosing by hand, which is what
     // takes Auto out of force — live, before anything commits, so the panel
     // stops claiming a state you have already left.
     const [touched, setTouched] = useState(false);
@@ -190,7 +190,7 @@ function PickerPanel({
      * orange chip in a blue palette. Picking a palette IS the statement that
      * you want to work in it.
      *
-     * The SLOT survives rather than the colour, so switching sets keeps "the
+     * The SLOT survives rather than the color, so switching sets keeps "the
      * third one" and stays predictable. Clamped, because palettes are no longer
      * all the same length — House is seven.
      */
@@ -208,7 +208,7 @@ function PickerPanel({
             ? series.filter(s => s.vehicleId === vehicleId)
             : series;
         // The series being edited leads its own set: it is the base, so it must
-        // be the one that keeps the colour that was picked.
+        // be the one that keeps the color that was picked.
         return [...rows].sort((a, b) =>
             (a.id === seriesId ? -1 : 0) - (b.id === seriesId ? -1 : 0));
     }, [scoped, scope, series, vehicleId, seriesId]);
@@ -226,7 +226,7 @@ function PickerPanel({
     //
     // What is genuinely gone with it is one hue across MANY vehicles, which
     // reads as a family shape rather than as individual runs. That is a
-    // palette — one colour, many lightnesses — rather than a way of deriving a
+    // palette — one color, many lightnesses — rather than a way of deriving a
     // set, and it belongs there if it comes back.
     const how = (DERIVATIONS.find(d => d.id === mode) ?? DERIVATIONS[0]).how;
     const pickScope = (id) => setScope(id);
@@ -298,7 +298,7 @@ function PickerPanel({
                         disabled={auto}
                         onClick={goAuto}
                         title={auto
-                            ? 'The palette is choosing this colour'
+                            ? 'The palette is choosing this color'
                             : 'Hand it back to the palette'}
                     >
                         {auto ? autoOnLabel(scope, targets.length) : `Back to auto${scopeSuffix(scope, targets.length)}`}
@@ -425,7 +425,7 @@ function PickerPanel({
  *
  * Both apply at every scope, which is why there is no rule about when each is
  * offered: with one vehicle in scope, "a color per vehicle" simply means this
- * vehicle's colour with a step per test.
+ * vehicle's color with a step per test.
  *
  * Each carries its own preview, and the previews are structurally honest rather
  * than decorative: "a color per vehicle" shows two hues with two steps each,
@@ -528,7 +528,7 @@ function SeedRow({ group, name, hint, colors, active, onSelect }) {
 
 /**
  * The stored-versus-drawn sentence. Silent in the one case where there is
- * genuinely nothing to report — a stored colour that is also the drawn one —
+ * genuinely nothing to report — a stored color that is also the drawn one —
  * because a line that always shows up stops being read.
  */
 function ColorNote({ note }) {

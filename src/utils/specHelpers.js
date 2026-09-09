@@ -120,7 +120,7 @@ export function makeVehicleFields(units) {
 
 /**
  * Re-exported, not declared. The eight live in colorUtils beside the palette
- * the picker offers instead of them, so "which set is this colour from?" has
+ * the picker offers instead of them, so "which set is this color from?" has
  * one place to be answered. Four views import PALETTE from here; the name
  * stays so they do not have to care.
  */

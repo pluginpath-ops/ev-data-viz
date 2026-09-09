@@ -60,8 +60,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         [selectedVehicleIds, vehicles],
     );
 
-    // Chart-side colour edits are a SESSION OVERRIDE, never a database write.
-    // The durable colour is edited in Tests & Data; changing it while reading a
+    // Chart-side color edits are a SESSION OVERRIDE, never a database write.
+    // The durable color is edited in Tests & Data; changing it while reading a
     // chart would edit stored data for every visitor, and a stored value could
     // not honour the reset rules the override follows.
     const handleColorChange = (_vehicleId, runId, color) => setColorOverride(runId, color);
@@ -111,7 +111,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // Resolve display colors for all selected runs.
     // In 'manual' mode only default-blue runs get nudged; in 'auto' mode all
     // runs get Okabe-Ito assignment with hue-family bias toward their stored color.
-    // Sticky in auto mode: toggling a run adds or removes ONE colour instead of
+    // Sticky in auto mode: toggling a run adds or removes ONE color instead of
     // re-solving the whole set and shuffling every series (hooks/useStickyChartColors).
     const colorableRuns = useMemo(
         () => selectedVehicles.flatMap(v =>
@@ -851,7 +851,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             />
                             <span className="text-sm">Lines</span>
                         </label>
-                        <SeriesPaletteSelect palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE} setChartConfig={setChartConfig} />
                         <label className="toggle-label">
                             <input
                                 type="checkbox"
@@ -867,6 +866,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         </label>
                         <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
                     </div>
+                    {/* A select, so it takes a row of its own beside the correction
+                        picker rather than a cell of the checkbox grid above — that
+                        grid is two columns of a 320px rail, which truncated this
+                        control's own default to "Vehicle colou…". */}
+                    <SeriesPaletteSelect palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE} setChartConfig={setChartConfig} />
                     <CorrectionControl mode={chartConfig.correctionMode ?? 'none'} setChartConfig={setChartConfig} />
                 </div>
 

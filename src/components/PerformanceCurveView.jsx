@@ -25,7 +25,7 @@ import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 
-/** Okabe-Ito, matching the palette the other charts use for run colours. */
+/** Okabe-Ito, matching the palette the other charts use for run colors. */
 const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
 
 // What distinguishes two curves beyond the vehicle: the drive mode, then which
@@ -57,11 +57,11 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     // Only consulted when grouping is 'all'; null means "not curated yet", which
     // shows everything rather than an empty chart on first switch.
     const [pickedRunIds, setPickedRunIds] = useState(null);
-    // Colour picks are LOCAL TO THIS VIEW and deliberately not written to the
-    // database. Recolouring a line to read a chart is a viewing preference, not
+    // Color picks are LOCAL TO THIS VIEW and deliberately not written to the
+    // database. Recoloring a line to read a chart is a viewing preference, not
     // a change to the data — and persisting it would need contributor rights,
-    // so a signed-out visitor would recolour a line, see it change, and have it
-    // silently revert on reload. Anyone can recolour here; nobody's choice
+    // so a signed-out visitor would recolor a line, see it change, and have it
+    // silently revert on reload. Anyone can recolor here; nobody's choice
     // leaks onto anyone else's view.
     const [colorEdits, setColorEdits] = useState({});
     // Acceleration between points, as a second axis. Off by default — it's a
@@ -123,8 +123,8 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     );
 
     /**
-     * Colour per run, from the same Okabe-Ito resolver the charging and range
-     * charts use — so a run keeps its colour across both, and unset runs get
+     * Color per run, from the same Okabe-Ito resolver the charging and range
+     * charts use — so a run keeps its color across both, and unset runs get
      * maximally distinct hues rather than a fixed rotation.
      */
     const colorMap = useMemo(() => {
@@ -251,7 +251,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         const { grid, tick } = chartTheme();
         const fonts = applyChartDefaults(Chart);
 
-        // Traced runs take their resolved colour first; reconstructed curves then
+        // Traced runs take their resolved color first; reconstructed curves then
         // fill from the palette AROUND those, so a dashed line can't land on the
         // same hue as a solid one and be mistaken for it.
         const taken = new Set(

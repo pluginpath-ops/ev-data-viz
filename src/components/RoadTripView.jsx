@@ -168,7 +168,7 @@ const PALETTE = [
 // row is a (range test × charging test) pair, and one charging run can appear in
 // several rows against different range tests — so a run id would have made two
 // distinct simulations share one override, and collide as React keys besides.
-// Every other per-row thing here (colour, label, selection) is already keyed
+// Every other per-row thing here (color, label, selection) is already keyed
 // this way.
 // Dedicated collapsible section listing the selected rows with per-row overrides
 // of the charging strategy: en-route Charger Arrival SoC (minSoc) and the
@@ -606,11 +606,11 @@ export default function RoadTripView({
 
     // ── Resolve chart colors ─────────────────────────────────────────────────
     // Keyed on the RANGE test, not the charging run. This view enumerates range
-    // tests and its selector lists them as the primary, so colouring by the
+    // tests and its selector lists them as the primary, so coloring by the
     // charging half meant two range tests sharing one charging curve drew in the
-    // same colour, and the selector's colour picker recoloured a row other than
+    // same color, and the selector's color picker recolored a row other than
     // the one it sat next to. Charge Compare already keys on the range test, so
-    // a given pair now reads the same colour on both charts.
+    // a given pair now reads the same color on both charts.
     const colorableRuns = useMemo(
         () => selectedVehicles.flatMap(v => filterRangeRuns(v.runs)),
         [selectedVehicles]
@@ -1740,11 +1740,13 @@ export default function RoadTripView({
                         <div className="display-grid">
                             {setChartConfig && (
                                 <>
-                                    <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
                                     <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                                 </>
                             )}
                         </div>
+                        {setChartConfig && (
+                            <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
+                        )}
                         {setChartConfig && (
                             <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                         )}

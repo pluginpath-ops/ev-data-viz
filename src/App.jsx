@@ -146,7 +146,7 @@ export default function App() {
     const [pairings, setPairings] = useState({});
     const [epaConfig, setEpaConfig] = useState({
         yAxis: 'kwh100mi', xMin: null, xMax: null, yMin: null, yMax: null,
-        // Which curves are drawn, and any colours overridden for them (#221).
+        // Which curves are drawn, and any colors overridden for them (#221).
         // Held here rather than inside EpaCurvesView so they reach the URL and
         // the pop-out, exactly as every other chart's selection does.
         selectedMappings: [], mappingColors: {},
@@ -186,7 +186,7 @@ export default function App() {
         y2Max: null,
         showLine:   true,
         showPoints: false,
-        // Where series colours come from: each vehicle's curated colour by
+        // Where series colors come from: each vehicle's curated color by
         // default, or a SERIES_PALETTES id to assign from that set instead.
         seriesPalette: VEHICLE_PALETTE,
         specsField:     null,   // selected field key for Spec Chart mode
@@ -787,7 +787,7 @@ export default function App() {
                                                         setVehicleSelection(next);
                                                     }}
                                                     className="selected-vehicle-chip cursor-grab active:cursor-grabbing"
-                                                    // The vehicle's curated colour, or nothing — an
+                                                    // The vehicle's curated color, or nothing — an
                                                     // unset variable falls back inside the rule rather
                                                     // than being decided here.
                                                     style={{ '--chip-accent': vehicle.color || undefined }}
