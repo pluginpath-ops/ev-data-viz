@@ -619,6 +619,7 @@ export default function RoadTripView({
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
         autoColor,
         resetKey: selectedVehicleIds.join(','),
+        vehicles: selectedVehicles,
     });
 
     // ── One entry per (range test × charging test) pair ───────────────────────
@@ -676,7 +677,7 @@ export default function RoadTripView({
                         // Assume 70 mph if neither the range test nor its source says
                         testSpeedMph:   rangeRun.speed_mph ?? src.sourceRun?.speed_mph ?? null,
                         batteryKwh:     vehicle.battery,
-                        color:          colorMap[rangeRun.id] || rangeRun.color || chargingRun.color || PALETTE[colorIdx % PALETTE.length],
+                        color:          colorMap[rangeRun.id] || PALETTE[colorIdx % PALETTE.length],
                         efficiencyNote: src.note,
                     });
                     colorIdx++;

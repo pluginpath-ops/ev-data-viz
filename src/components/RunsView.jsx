@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, Fragment } from 'react';
+import { EMPTY_VEHICLE_FORM, vehicleFormFrom } from '../utils/vehicleForm';
 import { useAppContext } from '../context/AppContext';
 import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
@@ -401,7 +402,7 @@ const DeriveAxisPanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, updateRunColor, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     // ── Sub-tabs ──────────────────────────────────────────────────────────────
@@ -413,24 +414,13 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [showEditVehicle, setShowEditVehicle] = useState(false);
     const [showEditSpecs, setShowEditSpecs] = useState(false);
     const [showViewSpecs, setShowViewSpecs] = useState(false);
-    const [vehicleFormData, setVehicleFormData] = useState({
-        name: '', make: '', model: '', trim: '', year: '', battery: '', range: '', manufacturer_id: null,
-    });
+    const [vehicleFormData, setVehicleFormData] = useState(EMPTY_VEHICLE_FORM);
     const [vehicleFormTags, setVehicleFormTags] = useState([]);
     const [vehicleNewTagName, setVehicleNewTagName] = useState('');
     const [vehicleImageUploading, setVehicleImageUploading] = useState(false);
 
     const openEditVehicle = () => {
-        setVehicleFormData({
-            name: vehicle.name,
-            make: vehicle.make || '',
-            model: vehicle.model || '',
-            trim: vehicle.trim || '',
-            year: vehicle.year || '',
-            battery: vehicle.battery || '',
-            range: vehicle.range || '',
-            manufacturer_id: vehicle.manufacturer?.id ?? null,
-        });
+        setVehicleFormData(vehicleFormFrom(vehicle));
         setVehicleFormTags(vehicle.tags || []);
         setVehicleNewTagName('');
         setShowEditVehicle(true);
@@ -2427,7 +2417,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     .find(v => String(v.id) === String(run._sourceVehicleId));
                                 const linkId = run._specLinkId;
                                 const isChargingLink = runKindFrom(run) === 'charging';
-                                const runColor = run.color || '#9ca3af';
 
                                 // Both knobs, saved the same way. `edits` holds the in-progress
                                 // string so a half-typed "1." is not parsed and written.
@@ -2525,16 +2514,13 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         </button>
                                                     )}
                                                 </div>
-                                                {/* Rows 2-4: colour, then the two scaling knobs,
-                                                    one per line — see .run-actions-stack. */}
+                                                {/* The two scaling knobs, one per line — see
+                                                    .run-actions-stack. A colour picker used to lead
+                                                    this stack; it wrote runs.color, which the
+                                                    vehicle owns now (#308). spec_links.color is a
+                                                    separate stored value and is left alone until
+                                                    the column question is settled. */}
                                                 <div className="run-actions-stack">
-                                                    <SeriesColorPicker
-                                                        value={runColor}
-                                                        stored={run.color}
-                                                        label={run.name}
-                                                        onChange={hex => updateRunColor(vehicle.id, run.id, hex)}
-                                                        onReset={() => updateRunColor(vehicle.id, run.id, null)}
-                                                    />
                                                     {factors.map(f => (isContributor && canEdit(vehicle) ? (
                                                         <FactorInput
                                                             key={f.key}

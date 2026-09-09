@@ -38,9 +38,10 @@ import { chartTheme } from '../utils/chartTheme';
  * Every scope is a SESSION override. Reading a chart must never edit stored
  * data for every other visitor, whatever role you hold — so the charting page
  * has no durable path at all, and 3c's per-run steps are computed at render
- * rather than stored. The durable `runs.color` preference is edited in Tests &
- * Data, which is the screen that owns it; there, this control has no scope
- * selector because there is nothing to scope.
+ * rather than stored. The durable preference belongs to the VEHICLE since #308
+ * and is edited on the vehicle form, which is the screen that owns it; there,
+ * this control has no scope selector because there is nothing to scope — a
+ * vehicle is one series base.
  *
  * @param {string}  value       the colour actually being drawn right now
  * @param {string}  [stored]    the durable preference, where one can differ

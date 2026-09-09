@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { RETIRED_RUN_COLOR } from '../utils/colorUtils';
 import { fetchSiteSettings, updateCachedSetting, MODEL_CONSTANTS_KEY } from './siteSettings';
 import { vehicleLabel } from '../utils/specHelpers';
 import { roundTo, } from '../utils/unitConversions';
@@ -137,8 +138,11 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
       _specLinkId:        link.id,
       _sourceVehicleId:   vInfo?.vehicleId,
       _sourceVehicleName: vInfo?.vehicleName,
-      // Link color overrides the source run's color; fall back to gray.
-      color:          link.color ?? run.color ?? '#9ca3af',
+      // The link's own colour still overrides, and is a separate stored value
+      // from the retired run colour. Without one the inherited run falls through
+      // to the TARGET vehicle's curated colour, which is the vehicle it is
+      // being read as — see #308.
+      color:          link.color ?? RETIRED_RUN_COLOR,
       // is_default on the link row gives per-run default precision.
       isDefault:      !!link.is_default,
       // Which factor reaches which field is the arithmetic that makes the two
@@ -238,6 +242,11 @@ class DataService {
         tags:  (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
         runs:  (v.runs || []).map(r => ({
           ...r,
+          // Colour belongs to the vehicle now (#308). The stored value is left
+          // in the database and replaced HERE, at the one door every run comes
+          // through, so a read we missed anywhere downstream paints magenta
+          // rather than silently keeping the old per-run colour alive.
+          color: RETIRED_RUN_COLOR,
           // Normalise DB snake_case to the camelCase used throughout the app.
           isDefault: !!r.is_default,
           isHidden:  !!r.is_hidden,
@@ -770,6 +779,9 @@ class DataService {
       range: vehicle.range ? parseFloat(vehicle.range) : null,
       power: vehicle.power ? parseFloat(vehicle.power) : null,
       manufacturer_id: vehicle.manufacturer_id ? Number(vehicle.manufacturer_id) : null,
+      // Null rather than a default: null means "the palette chooses", and a
+      // vehicle created without a colour has not made a claim about one.
+      color: vehicle.color || null,
       visibility: 'private'
     }).select().single();
     if (error) throw error;
@@ -792,6 +804,10 @@ class DataService {
       ...(updates.manufacturer_id !== undefined
         ? { manufacturer_id: updates.manufacturer_id ? Number(updates.manufacturer_id) : null }
         : {}),
+      // Guarded like manufacturer_id: a caller updating only the name must not
+      // clear the colour, and `|| null` inside the guard is what lets the
+      // picker's Auto hand the vehicle back to the palette.
+      ...(updates.color !== undefined ? { color: updates.color || null } : {}),
     }).eq('id', vehicleId);
     if (error) throw error;
   }
@@ -894,9 +910,9 @@ class DataService {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
       const vehicle = data.vehicles.find(v => v.id === vehicleId);
-      const runCount = vehicle?.runs?.length || 0;
-      const colorPalette = ['#3b82f6', '#ef4444', '#22c55e', '#a855f7', '#fb923c', '#0ea5e9', '#ec4899', '#84cc16'];
-      const newRun = { ...run, id: Date.now(), color: colorPalette[runCount % colorPalette.length] };
+      // No colour assigned: a run does not own one since #308, and the chart
+      // resolves it from the vehicle.
+      const newRun = { ...run, id: Date.now() };
       data.vehicles = data.vehicles.map(v => v.id === vehicleId ? { ...v, runs: [...(v.runs || []), newRun] } : v);
       localStorage.setItem('evData', JSON.stringify(data));
       return newRun;
@@ -912,7 +928,6 @@ class DataService {
       vehicle_id: vehicleId, name: run.name, date: run.date,
       software_version: coalesce(run.softwareVersion,   run.software_version)  || null,
       conditions: run.conditions || null,
-      color: run.color || '#3b82f6',
       is_default: coalesce(run.isDefault,  run.is_default)  || false,
       synthetic:  coalesce(run.synthetic,  run.synthetic)   || false,
       kind: runKindFrom(run),
@@ -967,7 +982,7 @@ class DataService {
     }
     const { error } = await getSupabase().from('runs').update({
       name: updates.name, date: updates.date,
-      software_version: updates.softwareVersion, conditions: updates.conditions, color: updates.color,
+      software_version: updates.softwareVersion, conditions: updates.conditions,
       ...(updates.calculated_fields !== undefined ? { calculated_fields: updates.calculated_fields } : {}),
       ...(updates.kind !== undefined ? { kind: updates.kind } : {}),
       ...(updates.source !== undefined ? { source: updates.source || null } : {}),
@@ -1067,19 +1082,6 @@ class DataService {
     if (error) throw error;
   }
 
-  async updateRunColor(vehicleId, runId, color) {
-    if (!this.useSupabase || !this.user) {
-      const saved = localStorage.getItem('evData');
-      const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
-      data.vehicles = data.vehicles.map(v =>
-        v.id === vehicleId ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, color } : r) } : v
-      );
-      localStorage.setItem('evData', JSON.stringify(data));
-      return;
-    }
-    const { error } = await getSupabase().from('runs').update({ color }).eq('id', runId);
-    if (error) throw error;
-  }
 
   async deleteRun(vehicleId, runId) {
     if (!this.useSupabase || !this.user) {
@@ -1274,7 +1276,6 @@ class DataService {
   async importTableauSessions(sessions, vehicleMap) {
     if (!this.useSupabase || !this.user) throw new Error('Must be logged in to import.');
     console.log('[DataService] importTableauSessions — starting, sessions:', sessions.length);
-    const colorPalette = ['#3b82f6', '#ef4444', '#22c55e', '#a855f7', '#fb923c', '#0ea5e9', '#ec4899', '#84cc16'];
     const results = { vehiclesCreated: 0, runsImported: 0, runsSkipped: 0, pointsImported: 0 };
     // Cache of existing run names per vehicle (lowercased) to skip duplicates on retry
     const existingRunNames = {}; // vehicleId → Set<string>
@@ -1339,12 +1340,10 @@ class DataService {
         continue;
       }
 
-      const colorIndex = results.runsImported % colorPalette.length;
       await this.addRun(vehicleId, {
         name: session.runName,
         date: session.date,
         synthetic: session.synthetic,
-        color: colorPalette[colorIndex],
         data: runData,
       });
       // Add to cache so a second session with the same name in this batch is also skipped

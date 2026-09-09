@@ -5,6 +5,8 @@ import { useState, useRef, useCallback } from 'react';
 import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { FULL_MAX, buildRenditions, displayImageUrl } from '../utils/imageRenditions';
+import SeriesColorPicker from './SeriesColorPicker';
+import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 
 const ASPECT = 16 / 9;
 
@@ -210,6 +212,34 @@ export default function EditVehicleForm({
                     <input placeholder="Year"           value={formData.year}    onChange={(e) => onFormChange({ ...formData, year: e.target.value })}    className="form-input form-input" />
                     <input placeholder="Battery (kWh)"  value={formData.battery} onChange={(e) => onFormChange({ ...formData, battery: e.target.value })} className="form-input form-input" />
                     <input placeholder="EPA Range (mi)" value={formData.range}   onChange={(e) => onFormChange({ ...formData, range: e.target.value })}   className="form-input form-input" />
+                </div>
+
+                {/* ── Series colour (#308) ──────────────────────────────────
+                  * The vehicle's own, not a run's. Colour used to be curated per
+                  * TEST, which does not survive contact with hundreds of cars at
+                  * two to ten tests each — and it was never what a reader wanted
+                  * anyway. What you recognise on a chart is the car.
+                  *
+                  * The same picker the chart sidebars use, deliberately: this is
+                  * the one place the value is DURABLE, so it gets no scope
+                  * control — there is nothing to scope, a vehicle being one
+                  * series base. */}
+                <div className="form-section mt-5">
+                    <label className="block font-medium mb-2">Series colour</label>
+                    <div className="flex items-center gap-3">
+                        <SeriesColorPicker
+                            value={formData.color || DEFAULT_RUN_COLOR}
+                            stored={formData.color ?? null}
+                            label={formData.name?.trim() || 'this vehicle'}
+                            onChange={hex => onFormChange({ ...formData, color: hex })}
+                            onReset={() => onFormChange({ ...formData, color: null })}
+                        />
+                        <span className="text-note">
+                            {formData.color
+                                ? 'Every chart draws this vehicle from here, shading its tests off it.'
+                                : 'Unset — the palette chooses. The press-car colour is usually the one that stands out.'}
+                        </span>
+                    </div>
                 </div>
 
                 {/* Tags — edit mode only */}

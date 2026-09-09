@@ -810,3 +810,46 @@ describe('components import what they use', () => {
         });
     }
 });
+
+/**
+ * ── The retired run colour (#308) ────────────────────────────────────────────
+ *
+ * Colour belongs to the vehicle. `runs.color` is still in the database — perhaps
+ * ten to twenty rows carry a deliberately set value — because dropping a column
+ * in the same change that stops reading it leaves no way back. Instead every run
+ * arrives from DataService carrying RETIRED_RUN_COLOR, so a path nobody found
+ * paints hot magenta on a chart someone is looking at.
+ *
+ * This is the other half of that guard: the sentinel only catches what escapes
+ * at RUNTIME, and only on a screen somebody opens. A read added to a rarely-hit
+ * branch could sit unnoticed for exactly the weeks the tripwire is meant to be
+ * counting, and the column would be dropped on a false all-clear.
+ */
+describe('run colour is retired, not merely unused', () => {
+    it('nothing reads a colour off a run', () => {
+        // `\w+.color` where the receiver is a run-shaped name. Deliberately not
+        // a blanket `.color` ban: vehicle.color is the whole point of #308, and
+        // link.color is a separate stored value that outlives this change.
+        const offenders = [];
+        for (const { file, text } of ALL) {
+            // Comments stripped first. Half this file's job is explaining WHY
+            // run colour went away, and prose saying `runs.color` is the record
+            // of that decision — a guard that forbids naming the thing it
+            // retired makes the codebase unable to describe its own history.
+            const code = text
+                .replace(/\/\*[\s\S]*?\*\//g, '')
+                .replace(/^\s*\/\/.*$/gm, '');
+            for (const m of code.matchAll(/\b\w*[rR]un\w*\.color\b/g)) {
+                offenders.push(`${file}: ${m[0]}`);
+            }
+        }
+        expect(offenders).toEqual([]);
+    });
+
+    it('the sentinel is applied where runs enter the app, and only there', () => {
+        const writers = ALL
+            .filter(x => /color:\s*RETIRED_RUN_COLOR/.test(x.text))
+            .map(x => x.file);
+        expect(writers).toEqual(['src/services/DataService.js']);
+    });
+});

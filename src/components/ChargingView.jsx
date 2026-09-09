@@ -27,7 +27,7 @@ import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf } from '../utils/colorUtils';
+import { seriesRowsOf, DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
@@ -122,6 +122,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
         autoColor: chartConfig.autoColor,
         resetKey: selectedVehicleIds.join(','),
+        vehicles: selectedVehicles,
     });
 
     // A pairing change invalidates cached range values: the derived range is
@@ -513,7 +514,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // effect without refetching. Declared before getX and the point
             // mapping that read it.
             const rangeK = rangeFactorFor(run.id);
-            const color = colorMap[run.id] || run.color || '#3b82f6';
+            const color = colorMap[run.id] || DEFAULT_RUN_COLOR;
 
             // 1. Apply race-mode trim (slice from anchor; exclude if ineligible)
             let workingData = rawData;

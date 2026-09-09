@@ -18,11 +18,13 @@ const EMPTY = {};
  *
  * ── Two kinds of colour, deliberately separate ───────────────────────────────
  *
- * The picker in Tests & Data writes runs.color, the durable "this run is always
- * green". The picker in a chart's run selector calls setColorOverride here and
- * writes NOTHING to the database — it means "recolour this for now". Mixing the
- * two would make reading a chart quietly edit stored data for every visitor, and
- * would break the reset rules below, since a stored value does not reset.
+ * The picker on the vehicle form writes vehicles.color, the durable "this car is
+ * always green" (#308 — it used to be runs.color, per test, which did not
+ * survive hundreds of vehicles). The picker in a chart's run selector calls
+ * setColorOverride here and writes NOTHING to the database — it means "recolour
+ * this for now". Mixing the two would make reading a chart quietly edit stored
+ * data for every visitor, and would break the reset rules below, since a stored
+ * value does not reset.
  *
  * ── Resetting ────────────────────────────────────────────────────────────────
  *
@@ -40,11 +42,13 @@ const EMPTY = {};
  * @param {Object}  opts
  * @param {boolean} opts.autoColor  auto mode on/off
  * @param {string}  opts.resetKey   changes when the vehicle set changes
+ * @param {Array}   [opts.vehicles] the runs' vehicles, for their curated
+ *                                  colours; without it the palette assigns
  * @returns {{ colorMap: Object, setColorOverride: (runId, color) => void,
  *            setColorOverrides: (map) => void,
  *            isColorOverridden: (runId) => boolean }}
  */
-export function useStickyChartColors(runs, { autoColor, resetKey }) {
+export function useStickyChartColors(runs, { autoColor, resetKey, vehicles = null }) {
     // A MONOTONIC generation, not a key derived from the boolean. Deriving it
     // from autoColor looked equivalent and was not: toggling off and back on
     // returned the key to its previous value, so the old overrides came back
@@ -103,13 +107,13 @@ export function useStickyChartColors(runs, { autoColor, resetKey }) {
             assignedKey.current = sessionKey;
         }
 
-        // Manual mode already honours each run's own stored colour, so there is
-        // nothing to hold still — but an override still wins, since the user
+        // Manual mode already honours each vehicle's curated colour, so there
+        // is nothing to hold still — but an override still wins, since the user
         // asked for it in this session.
         const mode = autoColor ? 'auto' : 'manual';
         const seed = autoColor ? { ...assigned.current, ...overrides } : overrides;
 
-        const resolved = resolveChartColors(runs, seed, mode);
+        const resolved = resolveChartColors(runs, seed, mode, vehicles);
 
         // Remember, so the next call holds these in place. Idempotent: React may
         // run a memo more than once, and re-merging the same answer changes

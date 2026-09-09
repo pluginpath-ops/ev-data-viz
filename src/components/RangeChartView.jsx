@@ -21,7 +21,7 @@ import {
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf } from '../utils/colorUtils';
+import { seriesRowsOf, DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
@@ -144,6 +144,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(allRangeRuns, {
         autoColor,
         resetKey: selectedVehicles.map(v => v.id).join(','),
+        vehicles: selectedVehicles,
     });
 
     // Value-identity for the resolved colours — see the render effect's deps.
@@ -181,8 +182,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             const datasets = [{
                 label:           yLabel,
                 data:            plottableRuns.map(r => getY(r)),
-                backgroundColor: plottableRuns.map(r => colorMap[r.id] || r.color || '#3b82f6'),
-                borderColor:     plottableRuns.map(r => colorMap[r.id] || r.color || '#3b82f6'),
+                backgroundColor: plottableRuns.map(r => colorMap[r.id] || DEFAULT_RUN_COLOR),
+                borderColor:     plottableRuns.map(r => colorMap[r.id] || DEFAULT_RUN_COLOR),
                 borderRadius:    4,
                 borderSkipped:   false,
             }];
@@ -226,7 +227,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         run:      r,
                         x:        isSpeed ? convSpeed(r.speed_mph, units) : convTemp(r.temperature_f, units),
                         y:        getY(r),
-                        _color:   colorMap[r.id] || r.color || '#3b82f6',
+                        _color:   colorMap[r.id] || DEFAULT_RUN_COLOR,
                         _runName: r.name,
                     }))
                     .filter(p => p.x != null && p.y != null)
@@ -235,7 +236,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
 
                 // Line stroke = first run's color; individual points use their
                 // own run color so multiple runs per vehicle are distinguishable.
-                const lineColor   = colorMap[runs[0].id] || runs[0].color || '#3b82f6';
+                const lineColor   = colorMap[runs[0].id] || DEFAULT_RUN_COLOR;
                 const pointColors = runPoints.map(p => p._color);
                 // Keep run objects parallel to points for tooltip access
                 const runMetas    = runPoints.map(p => p.run);

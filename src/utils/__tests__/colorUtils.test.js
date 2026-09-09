@@ -277,42 +277,73 @@ describe('extending the palette past its length', () => {
     });
 });
 
-describe('two runs saved with the same colour', () => {
-    const at = (id, color, day) => ({ id, color, created_at: `2026-01-${String(day).padStart(2, '0')}` });
+describe('a vehicle colour is the family base (#308)', () => {
+    // Colour moved from the run to the vehicle. These replace the suite that
+    // covered `run.color` and its clash nudge — a stored run colour was often
+    // incidental, so two of them sharing a hex was an accident worth correcting;
+    // a curated VEHICLE colour is a deliberate statement and is honoured exactly.
+    const at = (id, day) => ({ id, created_at: `2026-01-${String(day).padStart(2, '0')}` });
+    const vehicle = (id, color, runs) => ({ id, color, runs });
 
-    it('keeps the first and nudges the second, in manual mode', () => {
-        const out = resolveChartColors([at(1, '#009E73', 1), at(2, '#009E73', 2)], {}, 'manual');
+    it('one test takes the curated colour exactly', () => {
+        const runs = [at(1, 1)];
+        const out = resolveChartColors(runs, {}, 'manual', [vehicle('v1', '#009E73', runs)]);
         expect(out[1]).toBe('#009E73');
-        expect(out[2]).not.toBe('#009E73');
     });
 
-    it('nudges within the hue family rather than across the wheel', () => {
-        // A clashing green should become another green. Jumping to blue would
-        // discard the one thing the curator did express.
-        const out = resolveChartColors([at(1, '#009E73', 1), at(2, '#009E73', 2)], {}, 'manual');
-        const { h } = hexToHsl(out[2]);
+    it('several tests shade off it, staying in the hue', () => {
+        const runs = [at(1, 1), at(2, 2), at(3, 3)];
+        const out = resolveChartColors(runs, {}, 'manual', [vehicle('v1', '#009E73', runs)]);
+        // The first keeps the base, so a curated colour is on the chart as picked.
+        expect(out[1]).toBe('#009E73');
+        // The rest are distinct, and all of them are still that green.
+        expect(new Set([out[1], out[2], out[3]]).size).toBe(3);
         const green = hexToHsl('#009E73').h;
-        expect(Math.abs(h - green)).toBeLessThan(60);
+        for (const id of [1, 2, 3]) {
+            expect(Math.abs(hexToHsl(out[id]).h - green)).toBeLessThan(30);
+        }
     });
 
-    it('still honours a colour nobody else is using', () => {
-        const out = resolveChartColors([at(1, '#009E73', 1), at(2, '#CC79A7', 2)], {}, 'manual');
+    it('two curated vehicles keep their own colours', () => {
+        const a = [at(1, 1)], b = [at(2, 2)];
+        const out = resolveChartColors([...a, ...b], {}, 'manual',
+            [vehicle('v1', '#009E73', a), vehicle('v2', '#CC79A7', b)]);
         expect(out[1]).toBe('#009E73');
         expect(out[2]).toBe('#CC79A7');
     });
 
-    it('is decided by the stable order, not by which run was passed first', () => {
-        const rows = [at(2, '#009E73', 2), at(1, '#009E73', 1)];
-        expect(resolveChartColors(rows, {}, 'manual')[1]).toBe('#009E73');
-        expect(resolveChartColors([...rows].reverse(), {}, 'manual')[1]).toBe('#009E73');
+    it('an uncurated vehicle falls through to the palette', () => {
+        const runs = [at(1, 1), at(2, 2)];
+        const out = resolveChartColors(runs, {}, 'manual', [vehicle('v1', null, runs)]);
+        expect(new Set(Object.values(out)).size).toBe(2);
+        expect(out[1]).not.toBe(null);
     });
 
-    it('gives thirteen runs sharing three colours thirteen distinct ones', () => {
-        // The shape measured on the live chart before this.
-        const rows = ['#F0E442', '#F0E442', '#009E73', '#009E73', '#009E73', '#CC79A7', '#CC79A7',
-                      '#E69F00', '#56B4E9', '#0072B2', '#D55E00', '#ef4444', '#9ca3af']
-            .map((c, i) => at(i + 1, c, i + 1));
-        expect(new Set(Object.values(resolveChartColors(rows, {}, 'manual'))).size).toBe(13);
+    it('the shade a run gets does not depend on the order it was passed in', () => {
+        const runs = [at(1, 1), at(2, 2), at(3, 3)];
+        const v = [vehicle('v1', '#009E73', runs)];
+        const forward = resolveChartColors(runs, {}, 'manual', v);
+        const reverse = resolveChartColors([...runs].reverse(), {}, 'manual', v);
+        expect(reverse).toEqual(forward);
+    });
+
+    it('auto mode overrides the curated colour — that is what the toggle is for', () => {
+        const runs = [at(1, 1)];
+        const out = resolveChartColors(runs, {}, 'auto', [vehicle('v1', '#009E73', runs)]);
+        expect(out[1]).not.toBe('#009E73');
+    });
+
+    it('called without vehicles, every run is palette-assigned', () => {
+        const runs = [at(1, 1), at(2, 2)];
+        const out = resolveChartColors(runs, {}, 'manual');
+        expect(new Set(Object.values(out)).size).toBe(2);
+    });
+
+    it('a session override still wins over the curated colour', () => {
+        const runs = [at(1, 1)];
+        const out = resolveChartColors(runs, { 1: '#E69F00' }, 'manual',
+            [vehicle('v1', '#009E73', runs)]);
+        expect(out[1]).toBe('#E69F00');
     });
 });
 

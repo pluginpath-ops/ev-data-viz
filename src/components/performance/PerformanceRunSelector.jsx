@@ -118,8 +118,8 @@ export default function PerformanceRunSelector({
                                                             />
                                                             {onUpdateColor && (
                                                                 <SeriesColorPicker
-                                                                    value={colorMap[run.id] || run.color || DEFAULT_RUN_COLOR}
-                                                                    stored={run.color}
+                                                                    value={colorMap[run.id] || DEFAULT_RUN_COLOR}
+                                                                    stored={null}
                                                                     label={run.name}
                                                                     onChange={hex => onUpdateColor(run.id, hex)}
                                                                     onReset={colorPicked?.(run.id)

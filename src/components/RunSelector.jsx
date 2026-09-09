@@ -12,8 +12,13 @@ import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
  * reader of it is the group's accent border — and an accent that claims to be
  * a row's colour while computing it differently is the bug this file just had.
  */
-function plottedColorOf(run, colorMap) {
-    return colorMap[run.id] || run.color || DEFAULT_RUN_COLOR;
+function plottedColorOf(run, colorMap, vehicle) {
+    // The vehicle's curated colour is the fallback, not a neutral, because
+    // `colorMap` only covers runs that are actually PLOTTED. An unticked row
+    // used to preview its own stored colour; a run owns none since #308, so
+    // without this every unselected row previewed the same default blue and the
+    // rail stopped telling you which car a row belonged to before you ticked it.
+    return colorMap[run.id] || vehicle?.color || DEFAULT_RUN_COLOR;
 }
 
 /**
@@ -150,11 +155,11 @@ export default function RunSelector({
      * as a whole can be said. Returned as a `background` value — one colour or
      * a gradient — which is why the strip is painted rather than a border.
      */
-    const accentFor = (runs) => {
+    const accentFor = (vehicle, runs) => {
         // Nothing plots a synthetic row, so it has no colour to speak for.
         const active = runs
             .filter(run => !run._synthetic && isRunActive(run))
-            .map(run => plottedColorOf(run, colorMap));
+            .map(run => plottedColorOf(run, colorMap, vehicle));
         if (!active.length) return null;
         return active.length === 1 ? active[0] : `linear-gradient(180deg, ${active.join(', ')})`;
     };
@@ -263,7 +268,7 @@ export default function RunSelector({
                                 <div
                                     key={vehicle.id}
                                     className="vehicle-run-group"
-                                    style={{ '--group-accent': accentFor(filteredRuns) ?? 'transparent' }}
+                                    style={{ '--group-accent': accentFor(vehicle, filteredRuns) ?? 'transparent' }}
                                 >
                                     {/* mb-1.5, not mb-2: this margin is a third of
                                         the distance between the accent strip's top
@@ -415,6 +420,7 @@ function PairRows({
                     {idx > 0 && (
                         <RunColorControl
                             run={run}
+                            vehicle={vehicle}
                             vehicleId={vehicle.id}
                             vehicleName={vehicle.name}
                             onUpdateRunColor={onUpdateRunColor}
@@ -431,6 +437,7 @@ function PairRows({
                         <span className="pair-charging-label">
                             <RunColorControl
                                 run={run}
+                                vehicle={vehicle}
                                 vehicleId={vehicle.id}
                                 vehicleName={vehicle.name}
                                 onUpdateRunColor={onUpdateRunColor}
@@ -545,20 +552,21 @@ function PairRows({
  * here is a SESSION override and reaches no database, and that "Auto" means
  * handing the run back to the palette rather than clearing a stored value.
  */
-function RunColorControl({ run, vehicleId, vehicleName, onUpdateRunColor, onUpdateRunColors, colorSeries, colorMap = {} }) {
+function RunColorControl({ run, vehicle, vehicleId, vehicleName, onUpdateRunColor, onUpdateRunColors, colorSeries, colorMap = {} }) {
     if (!onUpdateRunColor) return null;
     // Synthetic rows (the EPA range option) have no run behind them to colour.
     if (run._synthetic) return null;
 
-    const plotted = plottedColorOf(run, colorMap);
+    const plotted = plottedColorOf(run, colorMap, vehicle);
 
     return (
         <SeriesColorPicker
             value={plotted}
-            // The stored preference, so the panel can say when the chart is
-            // drawing something else. This is the screen where those two come
-            // apart most — Auto Color assigns over the top of every one of them.
-            stored={run.color}
+            // No stored preference to differ from: a run does not own a
+            // colour since #308, and what a chart sidebar writes has always
+            // been a session override. The vehicle's curated colour is the
+            // durable one, and it is edited on the vehicle form.
+            stored={null}
             label={run.name}
             vehicleName={vehicleName}
             onChange={hex => onUpdateRunColor(vehicleId, run.id, hex)}
@@ -594,6 +602,7 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, onUpdateR
             <span className="pair-charging-label">
                 <RunColorControl
                     run={run}
+                    vehicle={vehicle}
                     vehicleId={vehicle.id}
                     vehicleName={vehicle.name}
                     onUpdateRunColor={onUpdateRunColor}

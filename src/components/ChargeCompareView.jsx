@@ -16,7 +16,7 @@ import CorrectionControl from './CorrectionControl';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf } from '../utils/colorUtils';
+import { seriesRowsOf, DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 import { resolvePairColors } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
@@ -477,6 +477,7 @@ export default function ChargeCompareView({
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
         autoColor: false,   // this chart has no Auto Color toggle; overrides still apply
         resetKey: selectedVehicleIds.join(','),
+        vehicles: selectedVehicles,
     });
 
     const selectionRows = useMemo(
@@ -530,7 +531,7 @@ export default function ChargeCompareView({
         const pairColors = resolvePairColors(active.map(p => ({
             key:        p.key,
             primaryId:  p.rangeRun.id,
-            baseColor:  colorMap[p.rangeRun.id] || p.rangeRun.color || p.chargingRun.color,
+            baseColor:  colorMap[p.rangeRun.id] || DEFAULT_RUN_COLOR,
         })));
 
         return active.map(p => ({
@@ -579,7 +580,7 @@ export default function ChargeCompareView({
                 fullName:        fullLabel,
                 vehicleName:     rangeRun.vehicleName,
                 vehicleId:       rangeRun.vehicleId,
-                color:           pairColor || colorMap[rangeRun.id] || rangeRun.color || chargingRun.color || '#3b82f6',
+                color:           pairColor || colorMap[rangeRun.id] || DEFAULT_RUN_COLOR,
                 // Each pill describes the half it came from: speed and conditions
                 // belong to the range test, which is what this row enumerates.
                 speed_mph:       rangeRun.speed_mph,

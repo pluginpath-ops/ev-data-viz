@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { EMPTY_VEHICLE_FORM, vehicleFormFrom } from '../utils/vehicleForm';
 import { useAppContext } from '../context/AppContext';
 import { DATA_CATEGORIES, vehicleDataCategories, hasDataCategory, filterByDataCategories } from '../utils/vehicleDataCategories';
 import { distanceValue, distanceUnit } from '../utils/unitConversions';
@@ -67,10 +68,7 @@ export default function VehiclesView({
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    const [formData, setFormData] = useState({
-        name: '', make: '', model: '', trim: '', year: '',
-        battery: '', range: '', manufacturer_id: null,
-    });
+    const [formData, setFormData] = useState(EMPTY_VEHICLE_FORM);
     const [mfgFilterStates, setMfgFilterStates] = useState(savedState?.mfgFilterStates ?? {}); // { [mfgId]: 'or' | 'not' }
     const [modelFilter, setModelFilter] = useState(savedState?.modelFilter ?? new Set());
     const [formTags, setFormTags] = useState([]);
@@ -133,22 +131,13 @@ export default function VehiclesView({
             onAdd(formData);
         }
         setFormTags([]);
-        setFormData({ name: '', make: '', model: '', trim: '', year: '', battery: '', range: '', manufacturer_id: null });
+        setFormData(EMPTY_VEHICLE_FORM);
         setShowForm(false);
     };
 
     const handleEdit = (vehicle, e) => {
         e.stopPropagation();
-        setFormData({
-            name: vehicle.name,
-            make: vehicle.make || '',
-            model: vehicle.model || '',
-            trim: vehicle.trim || '',
-            year: vehicle.year || '',
-            battery: vehicle.battery || '',
-            range: vehicle.range || '',
-            manufacturer_id: vehicle.manufacturer?.id ?? null,
-        });
+        setFormData(vehicleFormFrom(vehicle));
         setFormTags(vehicle.tags || []);
         setEditingId(vehicle.id);
         setShowForm(true);
@@ -159,7 +148,7 @@ export default function VehiclesView({
         setEditingId(null);
         setFormTags([]);
         setNewTagName('');
-        setFormData({ name: '', make: '', model: '', trim: '', year: '', battery: '', range: '', manufacturer_id: null });
+        setFormData(EMPTY_VEHICLE_FORM);
     };
 
     const handleDuplicateVehicle = async (vehicle, e) => {

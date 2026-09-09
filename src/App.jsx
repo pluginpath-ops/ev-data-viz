@@ -73,7 +73,6 @@ export default function App() {
         addRun,
         updateRun,
         setDefaultRun,
-        updateRunColor,
         deleteRun,
         tags,
         createTag,

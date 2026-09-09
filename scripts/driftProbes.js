@@ -225,7 +225,7 @@ export const LEDGER = [
     },
     {
         key: 'hex-literal',
-        count: 51,
+        count: 44,
         scope: 'src/**/*.jsx',
         what: 'Raw hex colours in component source. Mostly canvas drawing and the '
             + '`#3b82f6` default series colour, repeated at eight call sites rather '

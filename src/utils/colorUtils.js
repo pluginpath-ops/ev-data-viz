@@ -49,6 +49,25 @@ export const OKABE_ITO_NAMES = [
  */
 export const DEFAULT_RUN_COLOR = '#3b82f6';
 
+/**
+ * The colour a run reports now that colour belongs to the VEHICLE (#308).
+ *
+ * `runs.color` still exists in the database and still holds whatever a curator
+ * set — perhaps ten to twenty rows across the corpus — because dropping a column
+ * in the same change that stops reading it leaves no way back if the new look is
+ * wrong. So the column stays and the APP stops seeing it: every run arrives
+ * carrying this instead.
+ *
+ * It is hot magenta on purpose. A code path we failed to find does not throw and
+ * does not quietly look plausible — it draws in a colour no curator would ever
+ * choose and no palette contains, on a chart someone is looking at. Loud, and
+ * still a working chart.
+ *
+ * If nothing has gone magenta after a few weeks, the column can be dropped and
+ * this constant with it.
+ */
+export const RETIRED_RUN_COLOR = '#FF00FF';
+
 // ── CIE Lab math ─────────────────────────────────────────────────────────────
 
 function hexToRgb(hex) {
@@ -241,31 +260,6 @@ function pickBestSlot(orderedCandidates, placed) {
     return bestColor;
 }
 
-/** How far apart two series have to be before they read as different lines. */
-const CLASH_MIN_DELTA = 15;
-
-/**
- * The nearest colour to `want` that is still clearly apart from everything
- * placed — for a run whose saved colour is already taken.
- *
- * `pickBestSlot` cannot answer this. It maximises distance from what is placed,
- * so handed a second green it returns whatever is FURTHEST from green, and the
- * curator's one expressed wish is the first thing discarded. Here proximity
- * leads and distinctness is the constraint: the nearest candidate that clears
- * the threshold, so a clashing green becomes another green.
- *
- * Falls back to the greedy pick when nothing clears it — past a certain density
- * there is no near-and-distinct colour left, and distinct is the half worth
- * keeping.
- */
-function pickNearestDistinct(want, candidates, placed) {
-    const byProximity = [...candidates].sort((a, b) => deltaE(a, want) - deltaE(b, want));
-    for (const c of byProximity) {
-        if (placed.every(p => deltaE(c, p) >= CLASH_MIN_DELTA)) return c;
-    }
-    return pickBestSlot(candidates, placed);
-}
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -273,20 +267,29 @@ function pickNearestDistinct(want, candidates, placed) {
  *
  * Priority per run:
  *   1. sessionOverrides[runId]   — always wins (transient user pick)
- *   2. (manual mode only) run.color !== DEFAULT — contributor-set; used as-is
+ *   2. (manual mode only) the run's VEHICLE colour, shaded across that
+ *      vehicle's tests on this chart — one test takes the base exactly
  *   3. Okabe-Ito slot via greedy max-min-ΔE.
- *      In auto mode with an explicit stored color, candidates are sorted by
- *      proximity to that color first (hue-family bias) before the greedy pass.
+ *      In auto mode over a curated vehicle, candidates are sorted by proximity
+ *      to its colour first (hue-family bias) before the greedy pass.
+ *
+ * Step 2 read `run.color` until #308. Colour is a property of the CAR now: per
+ * run it did not survive hundreds of vehicles at two to ten tests each, and it
+ * was never what a reader was trying to recognise. Passing `vehicles` is what
+ * turns step 2 on; without it every run falls through to the palette, which is
+ * what the callers that do not know their vehicles get.
  *
  * Runs are processed in stable created_at → id order so assignments are
  * deterministic across re-renders.
  *
- * @param {Array}  runs             — run objects with { id, color, created_at }
+ * @param {Array}  runs             — run objects with { id, created_at }
  * @param {object} sessionOverrides — { [runId]: hexColor }, default {}
  * @param {'manual'|'auto'} mode    — color resolution mode, default 'manual'
+ * @param {Array}  [vehicles]       — the runs' vehicles, each with .runs and
+ *                                    .color; omit to skip step 2 entirely
  * @returns {{ [runId]: string }}   map of run ID → resolved hex color
  */
-export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual') {
+export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual', vehicles = null) {
     if (!runs?.length) return {};
 
     // Stable ordering so color assignments don't shuffle on re-render
@@ -310,6 +313,28 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual')
     // and a resolver that returns thirteen distinct ones when asked directly.
     const placed = sorted.map(r => sessionOverrides[r.id]).filter(Boolean);
 
+    // What each run takes from its VEHICLE's curated colour (#308).
+    //
+    // Colour used to be stored per run, and a run's own hex was consulted here.
+    // It is stored per vehicle now, so the family is resolved in one pass before
+    // the loop: `rampFrom` needs to know how many of a vehicle's runs are on this
+    // chart before it can space their shades, which a run-at-a-time walk cannot
+    // answer. It returns the base first, so a vehicle contributing one test is
+    // drawn in exactly the colour the curator picked rather than a shade off it.
+    const curated = new Map();
+    if (vehicles?.length) {
+        const onChart = new Set(sorted.map(r => String(r.id)));
+        for (const vehicle of vehicles) {
+            if (isUnsetColor(vehicle.color)) continue;
+            // In `sorted` order, so the shade a run gets does not depend on the
+            // order its vehicle happens to list its runs in.
+            const mine = sorted.filter(r => (vehicle.runs ?? []).some(
+                vr => String(vr.id) === String(r.id) && onChart.has(String(r.id))));
+            const shades = rampFrom(vehicle.color, mine.length);
+            mine.forEach((run, i) => curated.set(String(run.id), shades[i]));
+        }
+    }
+
     for (const run of sorted) {
         let chosen;
 
@@ -319,21 +344,18 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual')
             result[run.id] = sessionOverrides[run.id];
             continue;
 
-        } else if (mode === 'manual' && !isUnsetColor(run.color)
-                   && !placed.some(p => sameHex(p, run.color))) {
-            // 2. Manual mode: contributor-set color wins, seeds the placed list
-            //    so nudged runs avoid clashing with it.
+        } else if (mode === 'manual' && curated.has(String(run.id))) {
+            // 2. The vehicle's curated colour, shaded across its tests.
             //
-            //    UNLESS it is already on the chart. Two runs saved with the same
-            //    hex used to draw as one line twice and the legend was the only
-            //    way to tell them apart — measured live at 13 series in 9
-            //    colours, none of it the palette running out. Honouring a stored
-            //    colour means honouring it as an identity, and an identity two
-            //    series share is not one. First in the stable order keeps it;
-            //    the later one is nudged, staying in the same hue family through
-            //    the bias below, so a clashing green becomes another green
-            //    rather than jumping to blue.
-            chosen = run.color;
+            //    Honoured EXACTLY, with no clash nudge — which is the one place
+            //    this departs from the per-run behaviour it replaces. A stored
+            //    run colour was often incidental, so two runs sharing a hex was
+            //    usually an accident worth correcting; a curated vehicle colour
+            //    is a deliberate statement that this car is always drawn this
+            //    way, and nudging it would break that on the charts where it
+            //    matters most. Two cars given the same colour is a curation
+            //    question, visible to whoever asks it.
+            chosen = curated.get(String(run.id));
 
         } else {
             // 3. Assign an Okabe-Ito slot.
@@ -341,20 +363,16 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual')
             // otherwise every run past the palette length ties and collapses.
             const pool = expandPalette(OKABE_ITO, sorted.length);
 
-            if (mode === 'manual' && !isUnsetColor(run.color)) {
-                // Only reachable as a clash: a stored colour already on the
-                // chart. Stay in its family — see pickNearestDistinct.
-                chosen = pickNearestDistinct(run.color, pool, placed);
-            } else {
-                // Auto mode with an explicit color: sort candidates by proximity
-                // to the stored color so the family preference is expressed as a
-                // tiebreak. Default / unset colors: use the standard palette order.
-                const candidates =
-                    mode === 'auto' && !isUnsetColor(run.color)
-                        ? [...pool].sort((a, b) => deltaE(a, run.color) - deltaE(b, run.color))
-                        : pool;
-                chosen = pickBestSlot(candidates, placed);
-            }
+            // Auto mode over a curated vehicle: sort candidates by proximity to
+            // the curated colour, so Auto Color still leans toward the car's own
+            // hue where it can. Auto OVERRIDES the curated colour — that is what
+            // the toggle is for — but a preference expressed as a tiebreak costs
+            // nothing when the palette has room.
+            const near = curated.get(String(run.id));
+            const candidates = (mode === 'auto' && near)
+                ? [...pool].sort((a, b) => deltaE(a, near) - deltaE(b, near))
+                : pool;
+            chosen = pickBestSlot(candidates, placed);
         }
 
         result[run.id] = chosen;
@@ -432,7 +450,8 @@ export function resolvePairColors(rows) {
  *   saved     stored and drawn in the same colour, so there is nothing to say
  *   diverged  stored one thing, drawn another. The only one worth words
  *
- * @param {string|null} stored   the durable preference (runs.color), if any
+ * @param {string|null} stored   the durable preference — the VEHICLE's curated
+ *                                colour (#308) — where the caller has one
  * @param {string} plotted       what is actually on the chart right now
  * @returns {{kind: 'auto'|'saved'|'diverged', stored?: string, plotted: string}}
  */
