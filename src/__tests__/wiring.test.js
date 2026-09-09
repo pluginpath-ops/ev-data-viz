@@ -907,6 +907,41 @@ describe('every chart hands the colour panel its palette', () => {
  * that can RETURN to a previous state resurrects the bug the generation counter
  * was added to fix, where old picks reappeared unbidden.
  */
+/**
+ * ── A chart that reads `handSet` must be HANDED it ───────────────────────────
+ *
+ * `handSet` defaults to false, which looks like a working chart: the palette
+ * draws, the dropdown offers Hand-set, and selecting it writes chartConfig. What
+ * you cannot do is get back — the prop never arrives, `active` stays false, and
+ * the field snaps to the palette. Nothing throws.
+ *
+ * Range & Efficiency shipped exactly that, because RangeChartView is rendered by
+ * ChargingView rather than by App and so misses whatever App hands the others.
+ * The default is the trap: a required prop that defaults to a plausible value
+ * fails silently, and only at the one interaction nobody tests by hand.
+ */
+describe('every chart that reads handSet is passed it', () => {
+    const RENDERS = [
+        ['RangeChartView', 'src/components/ChargingView.jsx'],
+        ['ChargeCompareView', 'src/App.jsx'],
+        ['RoadTripView', 'src/App.jsx'],
+    ];
+
+    it.each(RENDERS)('%s is given handSet where it is rendered (%s)', (view, file) => {
+        const text = ALL.find(x => x.file === file).text;
+        const open = text.indexOf(`<${view}`);
+        expect(open, `${view} not rendered in ${file}`).toBeGreaterThan(-1);
+        // The props of that one element, up to its self-closing tag.
+        const props = text.slice(open, text.indexOf('/>', open));
+        expect(props).toMatch(/handSet=/);
+    });
+
+    it('ChargingView reads it from chartConfig directly', () => {
+        const text = ALL.find(x => x.file === 'src/components/ChargingView.jsx').text;
+        expect(text).toMatch(/const handSet = chartConfig\.handSet/);
+    });
+});
+
 describe('the picks map outlives the palette', () => {
     const hook = () => ALL.find(x => x.file === 'src/hooks/useStickyChartColors.js').text;
 

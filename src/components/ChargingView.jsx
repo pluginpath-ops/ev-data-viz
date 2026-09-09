@@ -726,6 +726,17 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 setChartConfig={setChartConfig}
                 presentationMode={presentationMode}
                 palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                // Without this the Range sub-tab could never return to Hand-set:
+                // selecting it wrote chartConfig.handSet, the prop defaulted to
+                // false on the way back down, and the field snapped to the
+                // palette. RangeChartView is rendered from HERE rather than from
+                // App, so it misses anything App hands the other charts.
+                handSet={chartConfig.handSet ?? false}
+                // Without this the Range sub-tab could never return to Hand-set:
+                // selecting it wrote chartConfig.handSet, the prop defaulted to
+                // false on the way back down, and the field snapped to the
+                // palette. RangeChartView is rendered from HERE rather than from
+                // App, so it misses anything App hands the other charts.
                 verboseLabels={chartConfig.verboseLabels ?? false}
                 correctionMode={chartConfig.correctionMode ?? 'none'}
             />
