@@ -5,11 +5,11 @@ banner. Specimens for all of them are on `?tab=playground`.
 
 ## One axis
 
-**A role carries its own size, weight and colour. Pick exactly one and you are
-done.** There is no colour tier to compose with.
+**A role carries its own size, weight and color. Pick exactly one and you are
+done.** There is no color tier to compose with.
 
-It used to be two axes — a size class plus a colour class — and the pair
-drifted. `.text-caption` alone appeared with three different colours across 55
+It used to be two axes — a size class plus a color class — and the pair
+drifted. `.text-caption` alone appeared with three different colors across 55
 sites, so "caption" had come to mean nothing except "one step down". A role says
 what the text *is*, and the appearance follows from that (#277).
 
@@ -107,10 +107,10 @@ never the database.
 - `--ui-scale` on the root font-size scales every rem-based size at once
 
 To expose a new tunable: variable-ise the property in the role, then add a knob
-entry to `TYPO_GROUPS`. Colour is not a knob — it is theme-specific, and a role
-owning its own colour is the point of the one-axis model.
+entry to `TYPO_GROUPS`. Color is not a knob — it is theme-specific, and a role
+owning its own color is the point of the one-axis model.
 
 ## See also
 
-- [`design-tokens.md`](design-tokens.md) — the colour and radius tokens
+- [`design-tokens.md`](design-tokens.md) — the color and radius tokens
 - [`vocabulary.md`](vocabulary.md) — one name per thing

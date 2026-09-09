@@ -9,7 +9,7 @@ import { useIsCompact } from '../hooks/useIsCompact';
  *
  * The mechanism only: measuring, placing, dismissing, focus, and the sheet it
  * becomes on a narrow screen. It has no opinion about what opens it or what is
- * inside — `InfoIcon` is one caller, the colour control (#299) will be another,
+ * inside — `InfoIcon` is one caller, the color control (#299) will be another,
  * and they share nothing but this.
  *
  * ── Three states ────────────────────────────────────────────────────────────
@@ -171,7 +171,7 @@ export default function Popover({
                 // PROGRAMMATICALLY, and treating that as a hover left a gloss
                 // hanging beside a pointer that was two hundred pixels away,
                 // with no pointerleave ever coming to clear it. Anything that
-                // closes itself hit this: the colour picker's Apply, an
+                // closes itself hit this: the color picker's Apply, an
                 // InfoIcon's ×.
                 onFocus: (e) => {
                     if (isCompact || isOpen) return;

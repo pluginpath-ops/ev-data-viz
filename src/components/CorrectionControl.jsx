@@ -17,12 +17,16 @@ import { CORRECTION_MODES } from '../utils/conditionCorrection';
  */
 export default function CorrectionControl({ mode = 'none', setChartConfig }) {
     return (
-        <label className="flex items-center gap-1.5" title="Re-price measured range and efficiency to a common basis: 70 mph, sea level, 70°F. Only the aerodynamic effect of temperature is modelled.">
-            <span className="text-sm font-medium text-secondary">Correct:</span>
+        <label className="rail-select-row" title="Re-price measured range and efficiency to a common basis: 70 mph, sea level, 70°F. Only the aerodynamic effect of temperature is modelled.">
+            {/* .text-label rather than a hand-written `text-sm font-medium
+                text-secondary`: it is the semantic class for exactly this, and
+                sharing it is what makes this row and the color row above it
+                read as one block. */}
+            <span className="text-label">Correct:</span>
             <select
                 value={mode}
                 onChange={e => setChartConfig(prev => ({ ...prev, correctionMode: e.target.value }))}
-                className="form-input form-input"
+                className="form-input"
             >
                 {CORRECTION_MODES.map(m => (
                     <option key={m.key} value={m.key}>{m.label}</option>

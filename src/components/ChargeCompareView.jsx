@@ -13,11 +13,11 @@ import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from 
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
+import SeriesPaletteSelect from './SeriesPaletteSelect';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf } from '../utils/colorUtils';
-import { resolvePairColors } from '../utils/colorUtils';
+import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
@@ -172,7 +172,6 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     });
                 } else {
                     // Vertical bars: stacked top-to-bottom
-                    const barH = bar.base - bar.y;
                     const barW = bar.width;
                     const gap = 3, topPad = 6;
                     let drawY = bar.y + topPad;
@@ -330,6 +329,7 @@ export default function ChargeCompareView({
     presentationMode = false,
     verboseLabels = false,
     correctionMode = 'none',
+    palette = VEHICLE_PALETTE,
     setChartConfig = null,
 }) {
     const { units, testSessions } = useAppContext();
@@ -468,15 +468,16 @@ export default function ChargeCompareView({
     // Road Trip and anything added later behave identically when the data shifts
     // underneath them — pruning, repin carry-over and first-sighting bootstrap
     // were three separate implementations that each got a different part wrong.
-    // Bars are coloured by the range test (the row's subject). The hook gives the
+    // Bars are colored by the range test (the row's subject). The hook gives the
     // same session-override behaviour as the other charts without a DB write.
     const colorableRuns = useMemo(
         () => resolvedPairs.map(p => p.rangeRun),
         [resolvedPairs]
     );
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
-        autoColor: false,   // this chart has no Auto Color toggle; overrides still apply
+        palette,
         resetKey: selectedVehicleIds.join(','),
+        vehicles: selectedVehicles,
     });
 
     const selectionRows = useMemo(
@@ -524,13 +525,13 @@ export default function ChargeCompareView({
         const active = resolvedPairs.filter(p => selectedRuns.includes(p.key));
         const labels = buildSeriesLabels(active, { supplied: ['year', 'make', 'model', 'trim'] });
         // One range test paired with two charging curves used to render two bars
-        // in the SAME colour, since colour came from the range test alone. Shade
+        // in the SAME color, since color came from the range test alone. Shade
         // by partner within the range test's own hue so the rows still read as
         // related — see resolvePairColors.
         const pairColors = resolvePairColors(active.map(p => ({
             key:        p.key,
             primaryId:  p.rangeRun.id,
-            baseColor:  colorMap[p.rangeRun.id] || p.rangeRun.color || p.chargingRun.color,
+            baseColor:  colorMap[p.rangeRun.id] || DEFAULT_RUN_COLOR,
         })));
 
         return active.map(p => ({
@@ -579,7 +580,7 @@ export default function ChargeCompareView({
                 fullName:        fullLabel,
                 vehicleName:     rangeRun.vehicleName,
                 vehicleId:       rangeRun.vehicleId,
-                color:           pairColor || colorMap[rangeRun.id] || rangeRun.color || chargingRun.color || '#3b82f6',
+                color:           pairColor || colorMap[rangeRun.id] || DEFAULT_RUN_COLOR,
                 // Each pill describes the half it came from: speed and conditions
                 // belong to the range test, which is what this row enumerates.
                 speed_mph:       rangeRun.speed_mph,
@@ -811,7 +812,7 @@ export default function ChargeCompareView({
     // activePairs, not just selectedRuns: changing a row's partner can leave the
     // selection array identical (same row, different pairing) while every bar's
     // value changes, and the chart would keep the previous partner's numbers.
-    // It also carries the labels and colours, so a Full Labels toggle redraws —
+    // It also carries the labels and colors, so a Full Labels toggle redraws —
     // depending on resolvedPairs alone left that toggle inert, since it changes
     // neither the pairs nor the selection.
     }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, activePairs, units, isDark]);
@@ -892,6 +893,7 @@ export default function ChargeCompareView({
                             <div className="display-grid">
                                 <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                             </div>
+                            <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
                             <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                         </>
                     )}
@@ -905,7 +907,7 @@ export default function ChargeCompareView({
                         colorSeries={seriesRowsOf(colorableRuns, selectedVehicles, isColorOverridden)}
                         onUpdateRunColors={setColorOverrides}
                         // Without this the swatches showed each run's stored
-                        // colour while the bars showed the resolved one, so the
+                        // color while the bars showed the resolved one, so the
                         // picker and the chart disagreed from the first render.
                         colorMap={colorMap}
                         runFilter={(run, vehicle) =>

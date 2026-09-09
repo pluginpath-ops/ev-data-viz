@@ -13,7 +13,7 @@ import { buildSeriesLabels } from '../utils/seriesLabel';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import CorrectionControl from './CorrectionControl';
 import { sessionFor } from '../utils/testSessions';
-import AutoColorToggle from './AutoColorToggle';
+import SeriesPaletteSelect from './SeriesPaletteSelect';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import {
@@ -24,8 +24,7 @@ import {
 import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf } from '../utils/colorUtils';
-import { resolvePairColors } from '../utils/colorUtils';
+import { seriesRowsOf, resolvePairColors, VEHICLE_PALETTE } from '../utils/colorUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
@@ -169,7 +168,7 @@ const PALETTE = [
 // row is a (range test × charging test) pair, and one charging run can appear in
 // several rows against different range tests — so a run id would have made two
 // distinct simulations share one override, and collide as React keys besides.
-// Every other per-row thing here (colour, label, selection) is already keyed
+// Every other per-row thing here (color, label, selection) is already keyed
 // this way.
 // Dedicated collapsible section listing the selected rows with per-row overrides
 // of the charging strategy: en-route Charger Arrival SoC (minSoc) and the
@@ -572,7 +571,7 @@ export default function RoadTripView({
     pairings = {},
     setPairings = () => {},
     presentationMode = false,
-    autoColor = true,
+    palette = VEHICLE_PALETTE,
     verboseLabels = false,
     correctionMode = 'none',
     setChartConfig = null,
@@ -607,18 +606,19 @@ export default function RoadTripView({
 
     // ── Resolve chart colors ─────────────────────────────────────────────────
     // Keyed on the RANGE test, not the charging run. This view enumerates range
-    // tests and its selector lists them as the primary, so colouring by the
+    // tests and its selector lists them as the primary, so coloring by the
     // charging half meant two range tests sharing one charging curve drew in the
-    // same colour, and the selector's colour picker recoloured a row other than
+    // same color, and the selector's color picker recolored a row other than
     // the one it sat next to. Charge Compare already keys on the range test, so
-    // a given pair now reads the same colour on both charts.
+    // a given pair now reads the same color on both charts.
     const colorableRuns = useMemo(
         () => selectedVehicles.flatMap(v => filterRangeRuns(v.runs)),
         [selectedVehicles]
     );
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
-        autoColor,
+        palette,
         resetKey: selectedVehicleIds.join(','),
+        vehicles: selectedVehicles,
     });
 
     // ── One entry per (range test × charging test) pair ───────────────────────
@@ -676,7 +676,7 @@ export default function RoadTripView({
                         // Assume 70 mph if neither the range test nor its source says
                         testSpeedMph:   rangeRun.speed_mph ?? src.sourceRun?.speed_mph ?? null,
                         batteryKwh:     vehicle.battery,
-                        color:          colorMap[rangeRun.id] || rangeRun.color || chargingRun.color || PALETTE[colorIdx % PALETTE.length],
+                        color:          colorMap[rangeRun.id] || PALETTE[colorIdx % PALETTE.length],
                         efficiencyNote: src.note,
                     });
                     colorIdx++;
@@ -1740,11 +1740,13 @@ export default function RoadTripView({
                         <div className="display-grid">
                             {setChartConfig && (
                                 <>
-                                    <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
                                     <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                                 </>
                             )}
                         </div>
+                        {setChartConfig && (
+                            <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
+                        )}
                         {setChartConfig && (
                             <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                         )}

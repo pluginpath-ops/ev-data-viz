@@ -20,7 +20,7 @@ import { guideConflicts } from '../../utils/feGuidePromotion';
  * often has no row in its own model year — VW has filed nothing for 2027, so a
  * 2027 ID. Buzz has only 2025 and 2026 to draw on — and a borrowed year is a
  * legitimate link, just one the curator has to make knowingly. Same-year rows
- * sort first and any other year is badged in warning colour, here and in the
+ * sort first and any other year is badged in warning color, here and in the
  * list below.
  */
 /**
@@ -44,7 +44,7 @@ function CandidateFacts({ row, exactYear, score }) {
             {row.label_comb_mpge != null && ` · ${row.label_comb_mpge} MPGe`}
             {row.motor_count != null && ` · ${row.motor_count} motor${row.motor_count === 1 ? '' : 's'}`}
             {' · '}
-            {/* Warning colour marks a borrowed year: a real difference, not a
+            {/* Warning color marks a borrowed year: a real difference, not a
                 weaker match. The year shows either way — see above. */}
             <span style={exactYear ? undefined : { color: 'var(--color-warning)' }}>
                 {row.model_year}

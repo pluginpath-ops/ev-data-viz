@@ -1,5 +1,5 @@
 /**
- * The colour arithmetic the contrast checks rest on.
+ * The color arithmetic the contrast checks rest on.
  *
  * Worth testing directly rather than only through the sweep, because every bug
  * this module has had produced a plausible NUMBER rather than an error — and a
@@ -65,7 +65,7 @@ describe('compositing', () => {
     const white = { r: 255, g: 255, b: 255, a: 1 };
     const black = { r: 0, g: 0, b: 0, a: 1 };
 
-    it('lays a translucent colour over an opaque one', () => {
+    it('lays a translucent color over an opaque one', () => {
         expect(composite({ r: 0, g: 0, b: 0, a: 0.5 }, white))
             .toEqual({ r: 127.5, g: 127.5, b: 127.5, a: 1 });
     });
@@ -78,13 +78,13 @@ describe('compositing', () => {
         expect(twice.r).toBeLessThan(once.r);
     });
 
-    it('ignores null layers so an unparseable colour is skipped, not fatal', () => {
+    it('ignores null layers so an unparseable color is skipped, not fatal', () => {
         expect(compositeStack(white, null, undefined)).toEqual(white);
     });
 });
 
 describe('contrastRatio', () => {
-    it('is 21 for black on white and 1 for a colour on itself', () => {
+    it('is 21 for black on white and 1 for a color on itself', () => {
         expect(contrastRatio({ r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 })).toBeCloseTo(21, 1);
         expect(contrastRatio({ r: 80, g: 80, b: 80 }, { r: 80, g: 80, b: 80 })).toBeCloseTo(1, 5);
     });
@@ -108,13 +108,13 @@ describe('ratioOf', () => {
     });
 
     it('composites translucent TEXT onto its own background', () => {
-        // Faint text at low alpha is barely there; measuring the declared colour
+        // Faint text at low alpha is barely there; measuring the declared color
         // reports it as perfectly readable.
         const faint = ratioOf('rgba(0, 0, 0, 0.1)', 'rgb(255, 255, 255)', 'rgb(255, 255, 255)');
         expect(faint).toBeLessThan(1.5);
     });
 
-    it('returns null when either colour cannot be read', () => {
+    it('returns null when either color cannot be read', () => {
         expect(ratioOf('transparent', 'rgb(255,255,255)')).toBeNull();
         expect(ratioOf('rgb(0,0,0)', 'var(--x)')).toBeNull();
     });

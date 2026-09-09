@@ -9,7 +9,7 @@ import { correctionFactor, correctionNote } from '../utils/conditionCorrection';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
 import VerboseLabelToggle from './VerboseLabelToggle';
-import AutoColorToggle from './AutoColorToggle';
+import SeriesPaletteSelect from './SeriesPaletteSelect';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import {
@@ -21,7 +21,7 @@ import {
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf } from '../utils/colorUtils';
+import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
@@ -67,7 +67,7 @@ const hasDataForType = (run, type) => {
 // view's selection through the shared useRunSelection hook (#176). This file
 // used to roll its own toggle against chartConfig — one more copy of the
 // behaviour, and the reason a run could be switched off here and come back.
-export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, autoColor = false, verboseLabels = false, correctionMode = 'none' }) {
+export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, palette = VEHICLE_PALETTE, verboseLabels = false, correctionMode = 'none' }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
@@ -133,20 +133,21 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // Perceptual color resolution.  In auto mode every run gets an Okabe-Ito
     // slot (with hue-family bias toward the stored color); in manual mode only
     // default-blue runs are nudged.
-    // Sticky in auto mode — see hooks/useStickyChartColors. Colours are added as
+    // Sticky in auto mode — see hooks/useStickyChartColors. Colors are added as
     // runs are selected and held until the vehicle set changes or Auto Color is
-    // cycled, so the chart you were reading does not recolour under you.
+    // cycled, so the chart you were reading does not recolor under you.
     // Every range run of every selected vehicle, NOT just the plotted ones.
     // Feeding the filtered set meant unticking a run shrank the input, the
-    // palette re-solved across what was left, and unrelated runs changed colour
+    // palette re-solved across what was left, and unrelated runs changed color
     // — the shuffling that stickiness was meant to end. A stable input cannot
     // shuffle, which is a stronger guarantee than remembering what it assigned.
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(allRangeRuns, {
-        autoColor,
+        palette,
         resetKey: selectedVehicles.map(v => v.id).join(','),
+        vehicles: selectedVehicles,
     });
 
-    // Value-identity for the resolved colours — see the render effect's deps.
+    // Value-identity for the resolved colors — see the render effect's deps.
     const colorSignature = allRangeRuns.map(r => `${r.id}:${colorMap[r.id] ?? ''}`).join(',');
 
 
@@ -181,8 +182,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             const datasets = [{
                 label:           yLabel,
                 data:            plottableRuns.map(r => getY(r)),
-                backgroundColor: plottableRuns.map(r => colorMap[r.id] || r.color || '#3b82f6'),
-                borderColor:     plottableRuns.map(r => colorMap[r.id] || r.color || '#3b82f6'),
+                backgroundColor: plottableRuns.map(r => colorMap[r.id] || DEFAULT_RUN_COLOR),
+                borderColor:     plottableRuns.map(r => colorMap[r.id] || DEFAULT_RUN_COLOR),
                 borderRadius:    4,
                 borderSkipped:   false,
             }];
@@ -226,7 +227,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         run:      r,
                         x:        isSpeed ? convSpeed(r.speed_mph, units) : convTemp(r.temperature_f, units),
                         y:        getY(r),
-                        _color:   colorMap[r.id] || r.color || '#3b82f6',
+                        _color:   colorMap[r.id] || DEFAULT_RUN_COLOR,
                         _runName: r.name,
                     }))
                     .filter(p => p.x != null && p.y != null)
@@ -235,7 +236,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
 
                 // Line stroke = first run's color; individual points use their
                 // own run color so multiple runs per vehicle are distinguishable.
-                const lineColor   = colorMap[runs[0].id] || runs[0].color || '#3b82f6';
+                const lineColor   = colorMap[runs[0].id] || DEFAULT_RUN_COLOR;
                 const pointColors = runPoints.map(p => p._color);
                 // Keep run objects parallel to points for tooltip access
                 const runMetas    = runPoints.map(p => p.run);
@@ -340,7 +341,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         const px = bar.x - pw / 2;
                         const rr = 3;
 
-                        // Semi-transparent dark pill — bar colour shows through
+                        // Semi-transparent dark pill — bar color shows through
                         ctx2.fillStyle = 'rgba(0,0,0,0.28)';
                         ctx2.beginPath();
                         ctx2.moveTo(px + rr, drawY);
@@ -523,7 +524,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 chartInstance.current = null;
             }
         };
-    // The colours and Full Labels belong here: a colour picked in the selector
+    // The colors and Full Labels belong here: a color picked in the selector
     // and a label toggle both change what is drawn without changing the
     // selection, and the chart used to keep the old canvas until some unrelated
     // toggle forced it to redraw.
@@ -531,8 +532,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // A SIGNATURE, not colorMap itself. The arrays feeding the resolver are
     // rebuilt every render, so the map is a new object each time while holding
     // the same values — depending on its identity would redraw the chart on
-    // every render. Comparing the colours by value redraws only when one moves.
-    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, autoColor, correctionMode]);
+    // every render. Comparing the colors by value redraws only when one moves.
+    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, palette, correctionMode]);
 
     // ── The frame's caption ──────────────────────────────────────────────────
     // In the frame, so it is in the export: a bar chart pasted into a thread has
@@ -619,9 +620,13 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                                 <span className="text-sm">Points</span>
                             </label>
                         )}
-                        <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
                         <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                     </div>
+                    {/* A select, so it takes a row of its own beside the correction
+                        picker rather than a cell of the checkbox grid above — that
+                        grid is two columns of a 320px rail, which truncated this
+                        control's own default to "Vehicle colou…". */}
+                    <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
                     <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                 </div>
 

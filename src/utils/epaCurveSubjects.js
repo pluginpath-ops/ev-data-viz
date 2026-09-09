@@ -4,7 +4,7 @@
  * `EpaCurvesView` plots curve-per-MAPPING: it walks selected vehicles, follows
  * `epa_mappings` to a certification group, and hands the group to
  * `buildEpaCurveFromModel`. The maths never sees the vehicle — it contributes a
- * label, a colour, and a battery fallback.
+ * label, a color, and a battery fallback.
  *
  * So a certification group can be a subject on its own, and 210 of 211 carry
  * the coefficients a curve needs. This module is that subject: what to call it,
@@ -13,7 +13,7 @@
  *
  * Deliberately NOT a synthetic vehicle. A vehicle is an identity with runs,
  * specs and pairings; inventing one for a certification record would make every
- * selector, colour map and URL parameter in the app learn about a thing that
+ * selector, color map and URL parameter in the app learn about a thing that
  * has none of those.
  */
 import { resolvePrimaryCoeffs, resolveCurveEta, pickDerivationTest } from './epaDerivations';
@@ -152,7 +152,7 @@ export function curveSubjects(groups) {
 /**
  * The three lines of a curve tooltip.
  *
- * Name first (the colour swatch sits beside it), then each axis with its unit:
+ * Name first (the color swatch sits beside it), then each axis with its unit:
  *
  *     ■ Blazer EV AWD
  *     60 mph

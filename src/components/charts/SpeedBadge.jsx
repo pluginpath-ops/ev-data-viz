@@ -7,9 +7,9 @@
  * the speed, which is where the trouble was: it broke the rhythm of a row of
  * short readings, and it sat next to the figure it qualifies rather than on it.
  *
- * Here the qualification is the figure's own styling plus a dagger. Not colour
+ * Here the qualification is the figure's own styling plus a dagger. Not color
  * alone — a marker that only exists as a hue is invisible to a reader who
- * cannot see the hue, and this project already picks colourblind-safe series
+ * cannot see the hue, and this project already picks colorblind-safe series
  * palettes for exactly that reason.
  *
  * One component because three views print a test speed, and the wiring suite

@@ -14,7 +14,7 @@ import CorrectionControl from './CorrectionControl';
 import { minimumCommonSoc, alignmentExclusion, alignmentOffset, alignSeries, overExtrapolated, clampSoc } from '../utils/socAlignment';
 import { sessionFor } from '../utils/testSessions';
 import { correctionFactor } from '../utils/conditionCorrection';
-import AutoColorToggle from './AutoColorToggle';
+import SeriesPaletteSelect from './SeriesPaletteSelect';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { useRunSelection } from '../hooks/useRunSelection';
@@ -27,7 +27,7 @@ import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf } from '../utils/colorUtils';
+import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
@@ -60,8 +60,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         [selectedVehicleIds, vehicles],
     );
 
-    // Chart-side colour edits are a SESSION OVERRIDE, never a database write.
-    // The durable colour is edited in Tests & Data; changing it while reading a
+    // Chart-side color edits are a SESSION OVERRIDE, never a database write.
+    // The durable color is edited in Tests & Data; changing it while reading a
     // chart would edit stored data for every visitor, and a stored value could
     // not honour the reset rules the override follows.
     const handleColorChange = (_vehicleId, runId, color) => setColorOverride(runId, color);
@@ -111,7 +111,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // Resolve display colors for all selected runs.
     // In 'manual' mode only default-blue runs get nudged; in 'auto' mode all
     // runs get Okabe-Ito assignment with hue-family bias toward their stored color.
-    // Sticky in auto mode: toggling a run adds or removes ONE colour instead of
+    // Sticky in auto mode: toggling a run adds or removes ONE color instead of
     // re-solving the whole set and shuffling every series (hooks/useStickyChartColors).
     const colorableRuns = useMemo(
         () => selectedVehicles.flatMap(v =>
@@ -120,8 +120,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         [selectedVehicles, selectedRuns]
     );
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
-        autoColor: chartConfig.autoColor,
+        palette: chartConfig.seriesPalette ?? VEHICLE_PALETTE,
         resetKey: selectedVehicleIds.join(','),
+        vehicles: selectedVehicles,
     });
 
     // A pairing change invalidates cached range values: the derived range is
@@ -513,7 +514,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // effect without refetching. Declared before getX and the point
             // mapping that read it.
             const rangeK = rangeFactorFor(run.id);
-            const color = colorMap[run.id] || run.color || '#3b82f6';
+            const color = colorMap[run.id] || DEFAULT_RUN_COLOR;
 
             // 1. Apply race-mode trim (slice from anchor; exclude if ineligible)
             let workingData = rawData;
@@ -721,7 +722,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 toggleRun={toggleRun}
                 setChartConfig={setChartConfig}
                 presentationMode={presentationMode}
-                autoColor={chartConfig.autoColor ?? false}
+                palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                 verboseLabels={chartConfig.verboseLabels ?? false}
                 correctionMode={chartConfig.correctionMode ?? 'none'}
             />
@@ -850,7 +851,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             />
                             <span className="text-sm">Lines</span>
                         </label>
-                        <AutoColorToggle autoColor={chartConfig.autoColor ?? false} setChartConfig={setChartConfig} />
                         <label className="toggle-label">
                             <input
                                 type="checkbox"
@@ -866,6 +866,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         </label>
                         <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
                     </div>
+                    {/* A select, so it takes a row of its own beside the correction
+                        picker rather than a cell of the checkbox grid above — that
+                        grid is two columns of a 320px rail, which truncated this
+                        control's own default to "Vehicle colou…". */}
+                    <SeriesPaletteSelect palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE} setChartConfig={setChartConfig} />
                     <CorrectionControl mode={chartConfig.correctionMode ?? 'none'} setChartConfig={setChartConfig} />
                 </div>
 

@@ -62,11 +62,11 @@ export const NOT_CATALOGUED = {
     'run-stat-badges':   'Layout wrapper — a flex row of badges.',
     'guide-chip-count':  'The count suffix inside .guide-chip; shown as part of that specimen.',
     'text-control': 'A size, not a role — the one step down that control surfaces run at. '
-        + 'It has no colour of its own, so a specimen would be body text at 12px.',
+        + 'It has no color of its own, so a specimen would be body text at 12px.',
     'text-caption': 'Shown inside the histogram and run-band composites, which is where it '
         + 'is actually used: a count beside a heading, an axis end.',
     'state-panel-title': 'The heading inside a state panel; it takes the panel\'s own '
-        + 'colour rather than restating it, so it is shown by those specimens.',
+        + 'color rather than restating it, so it is shown by those specimens.',
     'guide-facet-panel-search': 'The filter box that appears above eight options; shown by '
         + 'the facet-menu composite only when the list is long enough to need it.',
     'guide-facet-label': 'Superseded by the menu button — a leftover of the chip wall 5a '
@@ -159,7 +159,7 @@ export const SECTIONS = [
             { cls: 'guide-facet-btn', as: 'button', label: 'Make ▾', note: 'Resting — nothing selected.' },
             { cls: 'guide-facet-btn active', as: 'button', label: 'Make Rivian ▾', note: 'Narrowing something.' },
             { cls: 'disclosure-caret', as: 'span', label: '▾',
-              note: 'The glyph that says a thing opens. Secondary at rest, primary on the button\'s hover — it was --color-text-faint, which in dark is the DISABLED colour.' },
+              note: 'The glyph that says a thing opens. Secondary at rest, primary on the button\'s hover — it was --color-text-faint, which in dark is the DISABLED color.' },
             { cls: 'popover popover--below', as: 'span', label: 'Popover',
               note: 'The base every floating surface uses — one fill, one radius, one shadow, one layer. Width comes from --popover-w, placement from a --<placement> modifier.' },
             { composite: 'facet-panel', label: 'Facet menu, open',
@@ -186,15 +186,15 @@ export const SECTIONS = [
               note: 'There is no hover to peek with on touch, so a tap opens this directly rather than reproducing a hover tier as a tap.' },
             { composite: 'series-swatch', label: 'Series swatch — the read-only one',
               covers: ['series-swatch'],
-              note: 'The 10px sibling of the picker\'s trigger: it REPORTS which line a row is, it does not change it. Hollow when the row is not plotted, so it says "not on the chart" rather than claiming a colour it does not have; orange dot when the series rests on an assumption.' },
-            { composite: 'series-color-picker', label: 'Series colour picker (live)',
+              note: 'The 10px sibling of the picker\'s trigger: it REPORTS which line a row is, it does not change it. Hollow when the row is not plotted, so it says "not on the chart" rather than claiming a color it does not have; orange dot when the series rests on an assumption.' },
+            { composite: 'series-color-picker', label: 'Series color picker (live)',
               covers: ['popover-anchor', 'popover-foot', 'series-swatch--button',
                        'color-picker-body', 'color-row', 'color-scope', 'color-switch',
                        'color-slots', 'color-slot', 'color-hex', 'color-hex-chip',
                        'color-auto', 'color-manual', 'color-seed-radio', 'color-seed-name',
                        'color-slider', 'color-slider-input', 'color-seed', 'color-seed-row',
                        'color-seed-chips', 'color-readout', 'color-warning', 'color-note'],
-              note: 'The one live specimen on this page, because a picker is a mechanism rather than an appearance. It replaced five <input type="color"> boxes — the browser\'s own dialog, one colour at a time, with no view of the set you are picking against. A pick here is a BASE: it becomes slot 1 and the rest of the set is re-derived from it, by rotation across hues or by lightness steps along one. Scope decides who that set is. Nothing at any scope reaches the database. Cancel, ×, Escape and an outside click all discard.' },
+              note: 'The one live specimen on this page, because a picker is a mechanism rather than an appearance. It replaced five <input type="color"> boxes — the browser\'s own dialog, one color at a time, with no view of the set you are picking against. A pick here is a BASE: it becomes slot 1 and the rest of the set is re-derived from it, by rotation across hues or by lightness steps along one. Scope decides who that set is. Nothing at any scope reaches the database. Cancel, ×, Escape and an outside click all discard.' },
             { composite: 'nav-menu', label: 'Nav menu, collapsed',
               covers: ['nav-menu', 'nav-menu-main', 'nav-menu-sub', 'nav-menu-btn', 'nav-menu-current', 'nav-menu-panel', 'nav-menu-item-hint'],
               note: 'A gated destination says WHY in the row — a title attribute is invisible on touch, which is the only place this form appears.' },
@@ -259,7 +259,7 @@ export const SECTIONS = [
         title: 'Pills, chips & badges',
         blurb: 'Rounded-full, and now ONE size: guide-chip, tag-filter-btn, path-chip, '
              + 'brand-alias-chip and fe-picker-badge share their metrics and differ only in '
-             + 'colour. Badges keep their own shape — a label you read is not a control you '
+             + 'color. Badges keep their own shape — a label you read is not a control you '
              + 'press. See #277.',
         specimens: [
             { cls: 'guide-chip',        as: 'button', label: 'Filter chip',  note: 'The shared chip metrics — text-xs, px-2 py-0.5.' },
@@ -285,13 +285,13 @@ export const SECTIONS = [
             { cls: 'badge-micro is-warning', as: 'span', label: 'Micro badge · warning' },
             { cls: 'badge-micro is-danger',  as: 'span', label: 'Micro badge · danger' },
             { cls: 'badge-default',   as: 'span', label: 'Default',
-              note: 'DEF. The one accent-coloured marker, because it is the only one saying which row is privileged rather than what a row measured.' },
+              note: 'DEF. The one accent-colored marker, because it is the only one saying which row is privileged rather than what a row measured.' },
             { cls: 'badge-hidden',    as: 'span', label: 'Hidden' },
             { cls: 'badge-status',    as: 'span', label: 'Status' },
             { cls: 'owner-badge',     as: 'span', label: 'Owner' },
             { cls: 'badge-micro is-qualified', as: 'span', label: 'Corrected' },
             { cls: 'guide-narrowed-chip', as: 'button', label: '2026 ✕',
-              note: 'Removes its own value. The opposite of the chips it replaced, which selected one — hence the ✕ and the danger-coloured hover.' },
+              note: 'Removes its own value. The opposite of the chips it replaced, which selected one — hence the ✕ and the danger-colored hover.' },
             { cls: 'fe-picker-badge', as: 'span', label: 'FE picker' },
             { cls: 'pair-more-badge', as: 'span', label: '+2 more' },
             { cls: 'spec-link-kind-pill', as: 'span', label: 'Link kind' },
@@ -315,14 +315,14 @@ export const SECTIONS = [
             { cls: 'data-cell-input', as: 'input', label: 'Data cell',
               note: 'The one field that is NOT .form-input, deliberately: it is transparent until hover or focus, because a hundred-row grid of bordered boxes is a wall. Hover it.' },
             { cls: 'form-input reorder-position-input', as: 'input', label: 'Reorder position',
-              note: 'A modifier ON .form-input now — it only sets width, height and centring. It used to restate the surface, border and text colour, which is three chances to drift from the field it imitates.' },
+              note: 'A modifier ON .form-input now — it only sets width, height and centring. It used to restate the surface, border and text color, which is three chances to drift from the field it imitates.' },
         ],
     },
     {
         id: 'type',
         title: 'Typography',
-        blurb: 'ONE axis: a role carries its own size, weight and colour, and you pick '
-             + 'exactly one. The colour tiers are gone — text-muted folded into '
+        blurb: 'ONE axis: a role carries its own size, weight and color, and you pick '
+             + 'exactly one. The color tiers are gone — text-muted folded into '
              + 'text-secondary, text-faint into text-meta, text-caption dissolved. Sizes '
              + 'derive from --fs-body through --fs-step, so one dial moves the scale (#277). '
              + 'The micro tier at the bottom arrived with the re-skin: the scale used to '
@@ -342,7 +342,7 @@ export const SECTIONS = [
             { cls: 'text-micro',     as: 'div', label: 'text-micro',
               note: 'A label naming a region — NARROWED BY, AXES, DISTRIBUTION. Mono, uppercased in CSS so the source string stays readable, and tracked so it reads as apparatus rather than as a very small sentence.' },
             { cls: 'text-nano',      as: 'div', label: 'text-nano',
-              note: 'The same one step down: the legend inside a chip, the caption on a swatch. The handoff sets its colour at #5a6474, which measures 3.07:1 — below AA at this size, so both micro roles resolve to text-meta instead.' },
+              note: 'The same one step down: the legend inside a chip, the caption on a swatch. The handoff sets its color at #5a6474, which measures 3.07:1 — below AA at this size, so both micro roles resolve to text-meta instead.' },
         ],
     },
 ];

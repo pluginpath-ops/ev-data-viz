@@ -218,7 +218,7 @@ export default function ViewingConditions({ conditions }) {
 
             {/* A disclosure, not a button. It reveals two fields rather than
                 doing something, and as a filled primary button it read as an
-                action — and as the only accent-coloured control in the row, as
+                action — and as the only accent-colored control in the row, as
                 the most important one. Orange when open, because an elevation
                 adjustment IS changing the curve. */}
             {/* The glyph sits OUTSIDE the toggle, not inside it. A button

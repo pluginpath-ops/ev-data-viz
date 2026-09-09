@@ -41,13 +41,32 @@ export const OKABE_ITO_NAMES = [
  * The "no preference" sentinel stored when a run color is unset.
  *
  * It is a SENTINEL, not a choice, and the difference matters now that a person
- * can pick a colour by hand: a run explicitly set to this exact blue is
+ * can pick a color by hand: a run explicitly set to this exact blue is
  * indistinguishable from one nobody has touched, and gets reassigned. The
  * picker avoids minting it — `onReset` writes null rather than this — but a
  * Custom pick can still land on it. Telling the two apart needs a stored flag,
  * which is a schema change and is filed, not smuggled in here.
  */
 export const DEFAULT_RUN_COLOR = '#3b82f6';
+
+/**
+ * The color a run reports now that color belongs to the VEHICLE (#308).
+ *
+ * `runs.color` still exists in the database and still holds whatever a curator
+ * set — perhaps ten to twenty rows across the corpus — because dropping a column
+ * in the same change that stops reading it leaves no way back if the new look is
+ * wrong. So the column stays and the APP stops seeing it: every run arrives
+ * carrying this instead.
+ *
+ * It is hot magenta on purpose. A code path we failed to find does not throw and
+ * does not quietly look plausible — it draws in a color no curator would ever
+ * choose and no palette contains, on a chart someone is looking at. Loud, and
+ * still a working chart.
+ *
+ * If nothing has gone magenta after a few weeks, the column can be dropped and
+ * this constant with it.
+ */
+export const RETIRED_RUN_COLOR = '#FF00FF';
 
 // ── CIE Lab math ─────────────────────────────────────────────────────────────
 
@@ -87,7 +106,7 @@ function deltaE(hexA, hexB) {
 }
 
 /**
- * Is this colour "unset"? Null, empty, or the sentinel — the three ways a run
+ * Is this color "unset"? Null, empty, or the sentinel — the three ways a run
  * says it has no stored preference. Exported so the picker asks the resolver's
  * own question rather than reimplementing it and drifting.
  */
@@ -102,8 +121,8 @@ export function isUnsetColor(color) {
  * element wins ties), which is used in auto mode to express hue preference.
  */
 /**
- * Shift a hex colour's lightness, keeping its hue. Used to extend the palette
- * past its length: the second time round every base colour reappears lighter,
+ * Shift a hex color's lightness, keeping its hue. Used to extend the palette
+ * past its length: the second time round every base color reappears lighter,
  * the third time darker, so a 15-run chart still reads as 15 distinguishable
  * lines rather than repeats of the same seven.
  *
@@ -123,14 +142,14 @@ function shiftLightness(hex, amount) {
  * Successive passes through the palette, as HSL deltas.
  *
  * Both axes move, and that is the point. Lightness alone was what this did
- * before, and a second pass that is only "the same colour, lighter" reads as a
+ * before, and a second pass that is only "the same color, lighter" reads as a
  * faded version of the first rather than as its own series — worse on a plot
- * than a slightly different colour would be. Pulling saturation at the same
+ * than a slightly different color would be. Pulling saturation at the same
  * time separates the passes from each other as well as from the base.
  *
  * Contrast within a pass stays Okabe-Ito's; contrast BETWEEN passes is
  * deliberately weaker than that. Past seven series there is no arrangement of
- * colours that is all strongly distinct, so the honest goal is that no two are
+ * colors that is all strongly distinct, so the honest goal is that no two are
  * ever the SAME — which is what the caller can actually rely on.
  */
 const PALETTE_PASSES = [
@@ -146,19 +165,19 @@ const PASS_HUE_NUDGE = 11;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-/** Below this saturation a colour has no usable hue to vary. */
+/** Below this saturation a color has no usable hue to vary. */
 const ACHROMATIC_S = 20;
 
 /**
- * One palette colour, on a given pass, or null where it should not be varied.
+ * One palette color, on a given pass, or null where it should not be varied.
  *
- * Clamped away from pure white and black, which are not series colours at all —
+ * Clamped away from pure white and black, which are not series colors at all —
  * invisible on one theme or the other.
  *
  * A near-grey is skipped entirely after the first pass. Measured: the worst
  * pair in a 16-series set was #dccfd6 against #d3d7de at ΔE 6.3, and BOTH were
- * pale variants of the neutral slot. Varying a colour with no hue only produces
- * more colours with no hue, and they then collide with every other pale variant
+ * pale variants of the neutral slot. Varying a color with no hue only produces
+ * more colors with no hue, and they then collide with every other pale variant
  * in the set. The grey stays available as itself; it just stops breeding.
  */
 function passVariant(hex, pass, skipAchromatic = true) {
@@ -175,21 +194,21 @@ function passVariant(hex, pass, skipAchromatic = true) {
 }
 
 /**
- * The palette extended to at least `count` colours, never repeating one.
+ * The palette extended to at least `count` colors, never repeating one.
  *
  * The repeat is the whole reason this exists. Auto Color has always extended
  * the palette this way; the picker's own rotation did not, and wrapped with a
- * modulo — so a twelve-car chart recoloured from one base got eight colours and
+ * modulo — so a twelve-car chart recolored from one base got eight colors and
  * four exact duplicates, which is precisely what a reader assumes the tool is
  * preventing. One function now, used by both, so they cannot drift apart again.
  *
  * Duplicates are skipped rather than counted: clamping can land two passes of a
- * very light colour on the same lightness, and a candidate list containing the
- * same hex twice would hand two series one colour by construction.
+ * very light color on the same lightness, and a candidate list containing the
+ * same hex twice would hand two series one color by construction.
  */
 export function expandPalette(colors, count) {
     // Whether skipping the greys is affordable. In a palette that is ALL grey —
-    // a monochrome one — refusing to vary them would return fewer colours than
+    // a monochrome one — refusing to vary them would return fewer colors than
     // asked for, and the caller would fall back to a modulo and repeat.
     const hasChromatic = colors.some(c => hexToHsl(c).s >= ACHROMATIC_S);
     const out = [];
@@ -211,7 +230,7 @@ export function expandPalette(colors, count) {
 /**
  * Pick the candidate furthest from everything already used.
  *
- * Ties are broken by how many times a colour has already been placed, then by
+ * Ties are broken by how many times a color has already been placed, then by
  * palette order. Without the usage tiebreak, once every candidate has been used
  * they all score deltaE 0 against `placed`, the strict `>` never fires again,
  * and every remaining run collapses onto `orderedCandidates[0]` — which is
@@ -241,31 +260,6 @@ function pickBestSlot(orderedCandidates, placed) {
     return bestColor;
 }
 
-/** How far apart two series have to be before they read as different lines. */
-const CLASH_MIN_DELTA = 15;
-
-/**
- * The nearest colour to `want` that is still clearly apart from everything
- * placed — for a run whose saved colour is already taken.
- *
- * `pickBestSlot` cannot answer this. It maximises distance from what is placed,
- * so handed a second green it returns whatever is FURTHEST from green, and the
- * curator's one expressed wish is the first thing discarded. Here proximity
- * leads and distinctness is the constraint: the nearest candidate that clears
- * the threshold, so a clashing green becomes another green.
- *
- * Falls back to the greedy pick when nothing clears it — past a certain density
- * there is no near-and-distinct colour left, and distinct is the half worth
- * keeping.
- */
-function pickNearestDistinct(want, candidates, placed) {
-    const byProximity = [...candidates].sort((a, b) => deltaE(a, want) - deltaE(b, want));
-    for (const c of byProximity) {
-        if (placed.every(p => deltaE(c, p) >= CLASH_MIN_DELTA)) return c;
-    }
-    return pickBestSlot(candidates, placed);
-}
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -273,20 +267,31 @@ function pickNearestDistinct(want, candidates, placed) {
  *
  * Priority per run:
  *   1. sessionOverrides[runId]   — always wins (transient user pick)
- *   2. (manual mode only) run.color !== DEFAULT — contributor-set; used as-is
- *   3. Okabe-Ito slot via greedy max-min-ΔE.
- *      In auto mode with an explicit stored color, candidates are sorted by
- *      proximity to that color first (hue-family bias) before the greedy pass.
+ *   2. (VEHICLE_PALETTE only) the run's VEHICLE color, shaded across that
+ *      vehicle's tests on this chart — one test takes the base exactly
+ *   3. A slot from the chosen palette via greedy max-min-ΔE.
+ *      With a palette chosen over a curated vehicle, candidates are sorted by
+ *      proximity to its color first (hue-family bias) before the greedy pass.
+ *
+ * Step 2 read `run.color` until #308. Color is a property of the CAR now: per
+ * run it did not survive hundreds of vehicles at two to ten tests each, and it
+ * was never what a reader was trying to recognise. Passing `vehicles` is what
+ * turns step 2 on; without it every run falls through to the palette, which is
+ * what the callers that do not know their vehicles get.
  *
  * Runs are processed in stable created_at → id order so assignments are
  * deterministic across re-renders.
  *
- * @param {Array}  runs             — run objects with { id, color, created_at }
+ * @param {Array}  runs             — run objects with { id, created_at }
  * @param {object} sessionOverrides — { [runId]: hexColor }, default {}
- * @param {'manual'|'auto'} mode    — color resolution mode, default 'manual'
+ * @param {string} [palette]        — VEHICLE_PALETTE (default) to honour curated
+ *                                    vehicle colors, or a SERIES_PALETTES id to
+ *                                    assign from that set instead
+ * @param {Array}  [vehicles]       — the runs' vehicles, each with .runs and
+ *                                    .color; omit to skip step 2 entirely
  * @returns {{ [runId]: string }}   map of run ID → resolved hex color
  */
-export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual') {
+export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICLE_PALETTE, vehicles = null) {
     if (!runs?.length) return {};
 
     // Stable ordering so color assignments don't shuffle on re-render
@@ -298,17 +303,39 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual')
 
     const result = {};
 
-    // Every colour the caller has already fixed — a session override, or an
+    // Every color the caller has already fixed — a session override, or an
     // assignment useStickyChartColors is holding still — is on the chart no
     // matter where its run falls in this order. They go in UP FRONT.
     //
     // Without that, `placed` only knew about runs already visited, so an
-    // unassigned run could take a colour that a LATER run was pinned to and
+    // unassigned run could take a color that a LATER run was pinned to and
     // nothing would ever compare them. It needed the pinned run to sort after
     // the free one, which is why it showed up only once runs were ticked in an
-    // order different from their creation dates: thirteen runs, nine colours,
+    // order different from their creation dates: thirteen runs, nine colors,
     // and a resolver that returns thirteen distinct ones when asked directly.
     const placed = sorted.map(r => sessionOverrides[r.id]).filter(Boolean);
+
+    // What each run takes from its VEHICLE's curated color (#308).
+    //
+    // Color used to be stored per run, and a run's own hex was consulted here.
+    // It is stored per vehicle now, so the family is resolved in one pass before
+    // the loop: `rampFrom` needs to know how many of a vehicle's runs are on this
+    // chart before it can space their shades, which a run-at-a-time walk cannot
+    // answer. It returns the base first, so a vehicle contributing one test is
+    // drawn in exactly the color the curator picked rather than a shade off it.
+    const curated = new Map();
+    if (vehicles?.length) {
+        const onChart = new Set(sorted.map(r => String(r.id)));
+        for (const vehicle of vehicles) {
+            if (isUnsetColor(vehicle.color)) continue;
+            // In `sorted` order, so the shade a run gets does not depend on the
+            // order its vehicle happens to list its runs in.
+            const mine = sorted.filter(r => (vehicle.runs ?? []).some(
+                vr => String(vr.id) === String(r.id) && onChart.has(String(r.id))));
+            const shades = rampFrom(vehicle.color, mine.length);
+            mine.forEach((run, i) => curated.set(String(run.id), shades[i]));
+        }
+    }
 
     for (const run of sorted) {
         let chosen;
@@ -319,42 +346,39 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual')
             result[run.id] = sessionOverrides[run.id];
             continue;
 
-        } else if (mode === 'manual' && !isUnsetColor(run.color)
-                   && !placed.some(p => sameHex(p, run.color))) {
-            // 2. Manual mode: contributor-set color wins, seeds the placed list
-            //    so nudged runs avoid clashing with it.
+        } else if (palette === VEHICLE_PALETTE && curated.has(String(run.id))) {
+            // 2. The vehicle's curated color, shaded across its tests.
             //
-            //    UNLESS it is already on the chart. Two runs saved with the same
-            //    hex used to draw as one line twice and the legend was the only
-            //    way to tell them apart — measured live at 13 series in 9
-            //    colours, none of it the palette running out. Honouring a stored
-            //    colour means honouring it as an identity, and an identity two
-            //    series share is not one. First in the stable order keeps it;
-            //    the later one is nudged, staying in the same hue family through
-            //    the bias below, so a clashing green becomes another green
-            //    rather than jumping to blue.
-            chosen = run.color;
+            //    Honoured EXACTLY, with no clash nudge — which is the one place
+            //    this departs from the per-run behaviour it replaces. A stored
+            //    run color was often incidental, so two runs sharing a hex was
+            //    usually an accident worth correcting; a curated vehicle color
+            //    is a deliberate statement that this car is always drawn this
+            //    way, and nudging it would break that on the charts where it
+            //    matters most. Two cars given the same color is a curation
+            //    question, visible to whoever asks it.
+            chosen = curated.get(String(run.id));
 
         } else {
             // 3. Assign an Okabe-Ito slot.
             // Extended so there are always at least as many candidates as runs;
             // otherwise every run past the palette length ties and collapses.
-            const pool = expandPalette(OKABE_ITO, sorted.length);
+            // The chosen palette, not a hardcoded one. `resolveChartColors`
+            // always assigned from Okabe-Ito regardless of what the picker was
+            // set to, so choosing House and then clearing an override brought
+            // Okabe-Ito back (#307).
+            const pool = expandPalette(paletteColorsById(palette) ?? OKABE_ITO, sorted.length);
 
-            if (mode === 'manual' && !isUnsetColor(run.color)) {
-                // Only reachable as a clash: a stored colour already on the
-                // chart. Stay in its family — see pickNearestDistinct.
-                chosen = pickNearestDistinct(run.color, pool, placed);
-            } else {
-                // Auto mode with an explicit color: sort candidates by proximity
-                // to the stored color so the family preference is expressed as a
-                // tiebreak. Default / unset colors: use the standard palette order.
-                const candidates =
-                    mode === 'auto' && !isUnsetColor(run.color)
-                        ? [...pool].sort((a, b) => deltaE(a, run.color) - deltaE(b, run.color))
-                        : pool;
-                chosen = pickBestSlot(candidates, placed);
-            }
+            // A palette over a curated vehicle: sort candidates by proximity to
+            // the curated color, so a palette still leans toward the car's own
+            // hue where it can. A palette OVERRIDES the curated color — that is
+            // what choosing one is for — but a preference expressed as a
+            // tiebreak costs nothing when the palette has room.
+            const near = curated.get(String(run.id));
+            const candidates = (palette !== VEHICLE_PALETTE && near)
+                ? [...pool].sort((a, b) => deltaE(a, near) - deltaE(b, near))
+                : pool;
+            chosen = pickBestSlot(candidates, placed);
         }
 
         result[run.id] = chosen;
@@ -364,21 +388,21 @@ export function resolveChartColors(runs, sessionOverrides = {}, mode = 'manual')
     return result;
 }
 
-// ── Pair colours ─────────────────────────────────────────────────────────────
+// ── Pair colors ─────────────────────────────────────────────────────────────
 
 /**
  * Lightness offsets for the successive partners of one primary. The first
- * partner keeps the primary's colour exactly, so a chart where nothing is
+ * partner keeps the primary's color exactly, so a chart where nothing is
  * paired more than once looks precisely as it did before.
  */
 const PARTNER_SHADES = [0, 0.3, -0.26, 0.52, -0.44];
 
 /**
- * Colour a set of paired series so related ones read as related.
+ * Color a set of paired series so related ones read as related.
  *
  * The pairing work let one range test appear several times, once per charging
- * partner. Colour came from the range test alone, so those rows rendered in the
- * SAME colour and only the label told them apart — on a bar chart, two identical
+ * partner. Color came from the range test alone, so those rows rendered in the
+ * SAME color and only the label told them apart — on a bar chart, two identical
  * bars side by side.
  *
  * Giving each row an unrelated palette slot would fix the collision and lose the
@@ -387,10 +411,10 @@ const PARTNER_SHADES = [0, 0.3, -0.26, 0.52, -0.44];
  * of one blue read as "the same test, two charging curves" at a glance.
  *
  * Only primaries that actually appear more than once are shaded. A primary with
- * one partner keeps its colour untouched, so this is invisible until it matters.
+ * one partner keeps its color untouched, so this is invisible until it matters.
  *
  * @param {Array} rows  [{ key, primaryId, baseColor }] in display order
- * @returns {Object} key → colour
+ * @returns {Object} key → color
  */
 export function resolvePairColors(rows) {
     const byPrimary = new Map();
@@ -406,7 +430,7 @@ export function resolvePairColors(rows) {
             const base = row.baseColor || DEFAULT_RUN_COLOR;
             const shade = group.length > 1 ? PARTNER_SHADES[i % PARTNER_SHADES.length] : 0;
             // Pass a zero offset straight through: shiftLightness would return
-            // the same colour lower-cased, and stored hexes get compared as
+            // the same color lower-cased, and stored hexes get compared as
             // strings elsewhere.
             out[row.key] = shade === 0 ? base : shiftLightness(base, shade);
         });
@@ -414,10 +438,10 @@ export function resolvePairColors(rows) {
     return out;
 }
 
-// ── What the picker says about a colour ──────────────────────────────────────
+// ── What the picker says about a color ──────────────────────────────────────
 
 /**
- * Reconcile the colour a series HAS with the colour it is DRAWN in.
+ * Reconcile the color a series HAS with the color it is DRAWN in.
  *
  * These come apart routinely and nothing said so. Auto Color assigns an
  * Okabe-Ito slot over the stored preference; a session override replaces both;
@@ -429,10 +453,11 @@ export function resolvePairColors(rows) {
  * Three states, because there are three:
  *
  *   auto      nothing stored — the palette is choosing, and that is fine
- *   saved     stored and drawn in the same colour, so there is nothing to say
+ *   saved     stored and drawn in the same color, so there is nothing to say
  *   diverged  stored one thing, drawn another. The only one worth words
  *
- * @param {string|null} stored   the durable preference (runs.color), if any
+ * @param {string|null} stored   the durable preference — the VEHICLE's curated
+ *                                color (#308) — where the caller has one
  * @param {string} plotted       what is actually on the chart right now
  * @returns {{kind: 'auto'|'saved'|'diverged', stored?: string, plotted: string}}
  */
@@ -451,7 +476,7 @@ export function seriesColorNote(stored, plotted) {
  *
  * Canonical Okabe-Ito is eight including black. Black is invisible on a dark
  * plot, so the slot carries a mid grey instead — the same grey a spec-linked
- * run already falls back to, rather than a ninth colour nobody chose.
+ * run already falls back to, rather than a ninth color nobody chose.
  */
 export const SERIES_NEUTRAL = '#9ca3af';
 
@@ -467,8 +492,8 @@ export const OKABE_ITO_SET = [...OKABE_ITO, SERIES_NEUTRAL];
  * It lives here, not in specHelpers, so the picker and `vehicleColor()` read
  * one definition. DataService still carries its own eight for newly imported
  * and duplicated runs, and those had ALREADY drifted from this set — a
- * different eight colours entirely. Left alone here because changing them
- * changes what colour new records are born with, which is a data decision
+ * different eight colors entirely. Left alone here because changing them
+ * changes what color new records are born with, which is a data decision
  * rather than a picker one.
  */
 export const LEGACY_PALETTE = [
@@ -479,7 +504,7 @@ export const LEGACY_PALETTE = [
 /**
  * The house accents, as a series palette.
  *
- * Values are the dark theme's own `--color-accent-*` tokens, not new colours:
+ * Values are the dark theme's own `--color-accent-*` tokens, not new colors:
  * blue #2d7ff9, orange #f28b3c, green #23b47e, violet #9b8cf0, grey #6b7a8f.
  * "White" is `--color-text-primary`, #f2f5f9, which is an extremely faint blue
  * rather than a true white — a real white on a dark plot is a glare, and this
@@ -490,8 +515,8 @@ export const LEGACY_PALETTE = [
  *
  * A caveat worth stating where it will be read: the design vocabulary reserves
  * orange as the single active/now signal and lets nothing else use it. That
- * rule is about CHROME. A series colour is data, and a curator choosing the
- * house palette is choosing to draw with the house's colours — but if the
+ * rule is about CHROME. A series color is data, and a curator choosing the
+ * house palette is choosing to draw with the house's colors — but if the
  * orange series ever reads as "this one is selected", this is why.
  */
 export const HOUSE_PALETTE = [
@@ -505,7 +530,7 @@ export const HOUSE_PALETTE = [
 ];
 
 /**
- * `count` evenly spaced lightness steps of one colour, light to dark.
+ * `count` evenly spaced lightness steps of one color, light to dark.
  *
  * Not `rampFrom`: that anchors an END on a base a person picked and travels
  * away from it, which is right for deriving a set and wrong for building a
@@ -526,7 +551,7 @@ function monochrome(hex, count, from = 84, to = 24) {
  * monochrome palette IS that look, and says so by its name rather than by a
  * derivation nobody could tell from its neighbour.
  *
- * `safe` marks a palette a colourblind reader can separate. The monochromes
+ * `safe` marks a palette a colorblind reader can separate. The monochromes
  * qualify for a different reason from Okabe-Ito: they carry no hue information
  * at all, so there is none to lose.
  */
@@ -543,15 +568,31 @@ export const SERIES_PALETTES = [
     { id: 'legacy',    label: 'Legacy',         safe: false, colors: LEGACY_PALETTE },
 ];
 
+/**
+ * The default series mode: draw every vehicle in the color its curator gave it.
+ *
+ * A member of the same field as a palette id rather than a separate boolean,
+ * because it answers the same question — where does a series' color come from?
+ * As a checkbox called "Auto Color" it was the OFF position of a control whose
+ * on-state assigned Okabe-Ito, which read backwards once vehicles owned their
+ * colors: switching "auto" ON is what threw the curation away.
+ */
+export const VEHICLE_PALETTE = 'vehicle';
+
+/** The colors a palette id names, or null for the vehicle-color mode. */
+export function paletteColorsById(id) {
+    return SERIES_PALETTES.find(p => p.id === id)?.colors ?? null;
+}
+
 /** Hex equality that does not care how either side was written. */
 export function sameHex(a, b) {
     return String(a).toLowerCase() === String(b).toLowerCase();
 }
 
 /**
- * Which slot a colour occupies, 1-based, or null when it is off-palette.
+ * Which slot a color occupies, 1-based, or null when it is off-palette.
  *
- * The picker says "slot 3 of 8" so that a colour has an ADDRESS and not just a
+ * The picker says "slot 3 of 8" so that a color has an ADDRESS and not just a
  * value: the whole set is never visible at once, and knowing you are on slot 3
  * is what makes "rotate from here" a sentence you can predict the result of.
  */
@@ -597,7 +638,7 @@ export function hslToHex({ h, s, l }) {
 /**
  * The palette re-ordered so `base` leads it.
  *
- * A pick is a BASE, not just one series' colour: it becomes slot 1 and
+ * A pick is a BASE, not just one series' color: it becomes slot 1 and
  * everything else is re-derived from where it landed. Rotating rather than
  * re-sorting keeps the palette's own spacing — Okabe-Ito's order is already
  * chosen so that neighbours are far apart, and sorting by distance from the
@@ -617,25 +658,25 @@ export function rotatePaletteFrom(base, colors, count = 0) {
 
 /** The most lightness the ramp will travel, in L points. */
 const RAMP_SPAN_L = 58;
-/** Kept clear of pure white and black, which are not series colours at all. */
+/** Kept clear of pure white and black, which are not series colors at all. */
 const RAMP_L_MIN = 14;
 const RAMP_L_MAX = 88;
 
 /**
- * A lightness ramp of `count` colours, anchored so the base is an END of it.
+ * A lightness ramp of `count` colors, anchored so the base is an END of it.
  *
  * The direction is chosen by the base rather than fixed: a light base darkens,
  * a dark base lightens. That is the difference between a ramp that runs AWAY
  * from the base and one that runs THROUGH it — and running through it is what
  * `PALETTE_PASSES` does today, which is why a pale yellow base there produces
- * a set whose lightest member is lighter than the colour you actually chose.
+ * a set whose lightest member is lighter than the color you actually chose.
  */
 export function rampFrom(base, count) {
     if (count <= 1) return [base];
     const { h, s, l } = hexToHsl(base);
     const away = l > 50 ? -1 : 1;
     // Travel only as far as there is room, so the far end never clamps and
-    // collapses the last two steps onto one colour.
+    // collapses the last two steps onto one color.
     const span = Math.min(RAMP_SPAN_L, away > 0 ? RAMP_L_MAX - l : l - RAMP_L_MIN);
     const out = [base];
     for (let i = 1; i < count; i++) {
@@ -668,7 +709,7 @@ export function seedPreview(base, count, mode, colors) {
  *
  * `null` REMOVES a key rather than storing null under it. That is what "Back to
  * auto" sends, and the two are not the same thing: `resolveChartColors` reads a
- * null value as falsy and falls through to the run's own stored colour — the
+ * null value as falsy and falls through to the run's own stored color — the
  * right answer by accident in manual mode, and the wrong one in auto, where the
  * point of Auto is to hand the run back to the palette.
  *
@@ -694,7 +735,7 @@ export function applyColorOverrides(current, changes) {
 /**
  * The plotted set, in the shape the picker's wider scopes need.
  *
- * Takes the runs a view is ALREADY colouring rather than its selection ids,
+ * Takes the runs a view is ALREADY coloring rather than its selection ids,
  * and that is the whole point: two of the four chart views key selection by
  * pair rather than by run, so a helper reading `selectedRunIds` would quietly
  * return nothing there and the scope control would vanish with no error. Every
@@ -703,10 +744,10 @@ export function applyColorOverrides(current, changes) {
  * The vehicle comes from a lookup because a run does not carry its owner, and
  * "this vehicle" is the scope that needs it.
  *
- * @param {Array} runs      the runs being coloured, in plot order
+ * @param {Array} runs      the runs being colored, in plot order
  * @param {Array} vehicles  selected vehicles, each with .runs, for the lookup
  * @param {(id) => boolean} [isOverridden]  whether a run is showing a
- *        hand-picked colour. Without it every row reads as auto
+ *        hand-picked color. Without it every row reads as auto
  * @returns {Array<{id, vehicleId, stored, auto}>}
  */
 export function seriesRowsOf(runs, vehicles, isOverridden) {
@@ -718,7 +759,7 @@ export function seriesRowsOf(runs, vehicles, isOverridden) {
     const rows = [];
     for (const r of runs ?? []) {
         // Pair mode plots one range run against several charging partners, so
-        // the same run arrives more than once. It is still one series colour.
+        // the same run arrives more than once. It is still one series color.
         if (!r || r._synthetic || seen.has(String(r.id))) continue;
         seen.add(String(r.id));
         rows.push({
@@ -732,7 +773,7 @@ export function seriesRowsOf(runs, vehicles, isOverridden) {
 }
 
 /**
- * Colour a whole plot from one base — the two derivations, together or apart.
+ * Color a whole plot from one base — the two derivations, together or apart.
  *
  * Applying ONE of them across every series was the mistake this replaces.
  * Rotation alone gives thirteen unrelated hues and throws away the fact that
@@ -741,7 +782,7 @@ export function seriesRowsOf(runs, vehicles, isOverridden) {
  * and the panel offered no way to say "both" because the two were a radio.
  *
  * Together they are handoff 3c applied to the whole plot: each VEHICLE takes
- * the next colour of the rotation, and each of that vehicle's TESTS takes a
+ * the next color of the rotation, and each of that vehicle's TESTS takes a
  * step along it. A chart then reads as families first and runs second, which is
  * the entire reason 3c exists.
  *
@@ -752,7 +793,7 @@ export function seriesRowsOf(runs, vehicles, isOverridden) {
  * @param {Array<{id, vehicleId}>} rows  the plotted set, in display order
  * @param {{rotate?: boolean, shade?: boolean}} how
  * @param {string[]} colors  the active palette
- * @returns {Object} row id → colour
+ * @returns {Object} row id → color
  */
 export function seedPlot(base, rows, { rotate = true, shade = true } = {}, colors) {
     if (!rows?.length) return {};
@@ -775,7 +816,7 @@ export function seedPlot(base, rows, { rotate = true, shade = true } = {}, color
         order.forEach((key, i) => {
             const group = byVehicle.get(key);
             // rampFrom returns the base first, so a vehicle with one test keeps
-            // its rotated colour exactly rather than being shaded off it.
+            // its rotated color exactly rather than being shaded off it.
             const shades = rampFrom(bases[i % bases.length], group.length);
             group.forEach((row, j) => { out[row.id] = shades[j]; });
         });

@@ -16,7 +16,13 @@ import reactRefresh from 'eslint-plugin-react-refresh';
  * stays reviewable.
  */
 export default [
-    { ignores: ['dist', 'node_modules', 'coverage'] },
+    // `.claude/worktrees` holds throwaway git worktrees — a second, stale copy of
+    // the whole codebase, pinned to whatever commit a past session branched from.
+    // git excludes it; ESLint did not, so every run linted both copies and CI
+    // annotated files that were not in the pull request. One left over from a
+    // merged branch produced a phantom "'updateRunColor' is assigned but never
+    // used" on #312, against a line no longer in the source.
+    { ignores: ['dist', 'node_modules', 'coverage', '.claude/worktrees'] },
     {
         files: ['**/*.{js,jsx}'],
         languageOptions: {

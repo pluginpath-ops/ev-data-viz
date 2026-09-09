@@ -7,7 +7,7 @@
  * `src/__tests__/contrast.test.js`. It watches 61 things, and it reads as
  * though it watches "drift". It does not. It matches one narrow shape — a
  * LIGHT background utility with no `dark:` on the same line — which is about
- * 13% of the colour drift here and none of the size drift. Everything else
+ * 13% of the color drift here and none of the size drift. Everything else
  * has been growing unwatched: 272 `text-<palette>-<shade>`, 102 `text-[Npx]`,
  * 62 raw hex literals.
  *
@@ -26,9 +26,9 @@
  * eventually delete. So every probe here has been checked against what it
  * actually matches, and two candidate probes were DROPPED for failing that:
  *
- *   - Literal colours inside inline `style={{…}}`. There are 91 inline style
- *     blocks and, measured, ZERO of them hold a literal colour — they are all
- *     runtime values like `backgroundColor: run.color`, a series colour that
+ *   - Literal colors inside inline `style={{…}}`. There are 91 inline style
+ *     blocks and, measured, ZERO of them hold a literal color — they are all
+ *     runtime values like `backgroundColor: run.color`, a series color that
  *     can never be a class. Counting the blocks would have put 91 legitimate
  *     lines in the ledger on day one.
  *   - `#nnn` three-digit hex. Half the matches were issue references in
@@ -60,7 +60,7 @@ export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', '__tests__', '.git']);
 
-/** Tailwind's default colour families. Deliberately not `[a-z]+` — that would */
+/** Tailwind's default color families. Deliberately not `[a-z]+` — that would */
 /** swallow `text-primary`, `bg-card` and every other token-backed class. */
 const FAMILY = 'slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime'
     + '|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
@@ -172,11 +172,11 @@ export const LEDGER = [
         key: 'palette-text',
         count: 194,
         scope: 'src/**/*.jsx',
-        what: 'Text colours written as Tailwind palette utilities. These sit outside '
+        what: 'Text colors written as Tailwind palette utilities. These sit outside '
             + 'the theme: when the re-skin re-valued the tokens, every one of these '
             + 'kept painting the old palette.',
         fix: 'The typography tiers — .text-secondary / .text-meta / .text-faint — or '
-            + 'a semantic class carrying the colour.',
+            + 'a semantic class carrying the color.',
         scan: () => scanJsx('palette-text', paletteFor('text')),
     },
     {
@@ -195,7 +195,7 @@ export const LEDGER = [
         key: 'palette-border',
         count: 30,
         scope: 'src/**/*.jsx',
-        what: 'Border colours written as palette utilities.',
+        what: 'Border colors written as palette utilities.',
         fix: '--color-border, --color-border-strong, --color-border-subtle.',
         scan: () => scanJsx('palette-border', paletteFor('border')),
     },
@@ -203,7 +203,7 @@ export const LEDGER = [
         key: 'palette-other',
         count: 1,
         scope: 'src/**/*.jsx',
-        what: 'Palette colours on the remaining properties — ring, divide, gradient '
+        what: 'Palette colors on the remaining properties — ring, divide, gradient '
             + 'stops, fill, stroke. Small, and kept as its own probe so a new one '
             + 'cannot slip through the gap between the three probes above.',
         fix: 'The same tokens; these are usually --color-border in disguise.',
@@ -225,13 +225,13 @@ export const LEDGER = [
     },
     {
         key: 'hex-literal',
-        count: 51,
+        count: 44,
         scope: 'src/**/*.jsx',
-        what: 'Raw hex colours in component source. Mostly canvas drawing and the '
-            + '`#3b82f6` default series colour, repeated at eight call sites rather '
+        what: 'Raw hex colors in component source. Mostly canvas drawing and the '
+            + '`#3b82f6` default series color, repeated at eight call sites rather '
             + 'than exported once.',
         fix: 'chartTheme() already reads the tokens for canvas work. A default series '
-            + 'colour wants to be one exported constant.',
+            + 'color wants to be one exported constant.',
         // Six or eight digits, or a short form containing a hex LETTER — so an
         // issue reference in a comment (`#221`) can never move this number.
         scan: () => scanJsx(
@@ -243,7 +243,7 @@ export const LEDGER = [
         key: 'rgb-literal',
         count: 22,
         scope: 'src/**/*.jsx',
-        what: 'rgb()/rgba()/hsl() colour literals, almost all of them canvas fills and '
+        what: 'rgb()/rgba()/hsl() color literals, almost all of them canvas fills and '
             + 'alpha washes drawn by chart plugins. Canvas cannot take a class — but '
             + 'it can read a token, which is what chartTheme() is for.',
         fix: 'chartTheme(), or a token read through getComputedStyle at plugin-build '
@@ -268,9 +268,9 @@ export const LEDGER = [
         key: 'apply-palette',
         count: 17,
         scope: 'src/index.css',
-        what: 'Semantic classes whose @apply line reaches for a palette colour. These '
+        what: 'Semantic classes whose @apply line reaches for a palette color. These '
             + 'are the sharpest kind of drift: the class NAME says the right thing, so '
-            + 'nothing at the call site looks wrong, and the colour still misses the '
+            + 'nothing at the call site looks wrong, and the color still misses the '
             + 'theme.',
         fix: 'Replace the utility with the token — `background-color: '
             + 'var(--color-warning-surface)` beside the @apply, not inside it.',

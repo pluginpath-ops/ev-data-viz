@@ -3,7 +3,7 @@
  *
  * Written because a dark-mode panel of inputs shipped unreadable three separate
  * times, each found by a person opening that screen and squinting. Nothing in
- * the test suite can see a colour, so the failure mode is invisible until
+ * the test suite can see a color, so the failure mode is invisible until
  * someone reports it — which is exactly the shape of defect worth spending a
  * test on.
  *
@@ -30,7 +30,7 @@ function luminance({ r, g, b }) {
 /**
  * `oklch(L C H)` / `oklch(L C H / a)` → sRGB 0-255.
  *
- * Not an optional extra. **Tailwind v4 emits every palette colour as oklch**, so
+ * Not an optional extra. **Tailwind v4 emits every palette color as oklch**, so
  * `bg-blue-500` computes to `oklch(0.623 0.214 259.815)` and not to an rgb
  * triple. Without this, `parseColor` returned null for it, the surface was
  * skipped as if transparent, and the measurement fell through to the page
@@ -85,7 +85,7 @@ function parseOklch(s) {
  * `rgb()` / `rgba()` / `oklch()` / `#rgb` / `#rrggbb` → { r, g, b, a }.
  *
  * Returns null rather than throwing on anything else — `transparent`, a
- * `var()` that did not resolve, a colour space this does not handle. A caller
+ * `var()` that did not resolve, a color space this does not handle. A caller
  * sweeping a stylesheet meets those constantly and a null is a "skip", not a
  * failure.
  */
@@ -147,7 +147,7 @@ export function compositeStack(base, ...layers) {
 }
 
 /**
- * WCAG contrast ratio between two opaque colours, 1–21.
+ * WCAG contrast ratio between two opaque colors, 1–21.
  *
  * Translucent input is a caller error rather than something to guess at: there
  * is no correct answer without knowing what is behind it, and quietly assuming
@@ -163,7 +163,7 @@ export function contrastRatio(fg, bg) {
 export const AA_NORMAL = 4.5;
 export const AA_LARGE = 3;
 
-/** Ratio of two colour STRINGS, compositing `fg` and `bg` onto `base` first. */
+/** Ratio of two color STRINGS, compositing `fg` and `bg` onto `base` first. */
 export function ratioOf(fgStr, bgStr, baseStr = 'rgb(255, 255, 255)') {
     const base = parseColor(baseStr);
     const fg = parseColor(fgStr);

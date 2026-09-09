@@ -1,6 +1,6 @@
 # Design tokens
 
-Every colour and radius the app is allowed to use, defined in `src/index.css` in
+Every color and radius the app is allowed to use, defined in `src/index.css` in
 two blocks: `:root, [data-theme="light"]` and `[data-theme="dark"]`. All 65 are
 defined in both — there is no token with only one value.
 
@@ -9,7 +9,7 @@ Specimens, live contrast ratios and a side-by-side of the two themes are on
 
 ## The three rules
 
-**1. Colour never goes inline.** Not `bg-blue-50`, not `#3b82f6`, not
+**1. Color never goes inline.** Not `bg-blue-50`, not `#3b82f6`, not
 `rgb(...)`. A palette utility is fixed — it looks right in one theme and wrong
 in the other — and a literal is outside the system entirely. `npm run drift`
 counts what remains; `npm run health` shows it beside every other ratchet.
@@ -149,7 +149,7 @@ should go.
 That is the only reason it answers "where am I" from across the room. 41 uses:
 the wordmark, the selected sub-tab, the median tick, the live charging pair.
 
-**Status is a triad, not a colour.** Each of warning / danger / success carries
+**Status is a triad, not a color.** Each of warning / danger / success carries
 `-surface`, `-border` and `-text`, and they are used together. A component
 picking one and inventing the other two is how `bg-amber-50 text-amber-700
 border-amber-200` ended up written inline eight times.

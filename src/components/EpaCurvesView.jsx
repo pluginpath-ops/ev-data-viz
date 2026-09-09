@@ -5,7 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { convSpeed, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
 import { PALETTE } from '../utils/specHelpers';
-import { resolveChartColors, seriesRowsOf, applyColorOverrides } from '../utils/colorUtils';
+import { resolveChartColors, seriesRowsOf, applyColorOverrides, VEHICLE_PALETTE } from '../utils/colorUtils';
 import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH, MPG_E_CONVERSION,
@@ -29,7 +29,7 @@ import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
-import AutoColorToggle from './AutoColorToggle';
+import SeriesPaletteSelect from './SeriesPaletteSelect';
 import { useRunSelection } from '../hooks/useRunSelection';
 import ViewingConditions, { useViewingConditions } from './epa/ViewingConditions';
 
@@ -193,14 +193,14 @@ function convertYValue(val, yAxis, units) {
 // ── Default color for a mapping ───────────────────────────────────────────────
 
 /**
- * The colour a mapping is drawn in before anyone overrides it: the vehicle's
- * series colour, faded for its second and later configurations so one car's
+ * The color a mapping is drawn in before anyone overrides it: the vehicle's
+ * series color, faded for its second and later configurations so one car's
  * curves read as a family.
  *
  * One function because there were three copies and they disagreed. The picker's
  * ran `.replace(/[0-9a-f]{2}$/i, '')` over the whole expression, so on a FIRST
  * mapping — which has no alpha suffix to strip — it chopped two characters off
- * the colour itself and left a five-digit string. The swatch beside a row could
+ * the color itself and left a five-digit string. The swatch beside a row could
  * not be the line on the plot. A third copy sat unused at module scope.
  */
 function mappingColor(baseColor, mappingIdx) {
@@ -231,7 +231,7 @@ export default function EpaCurvesView({
     epaConfig,
     setEpaConfig,
     presentationMode = false,
-    autoColor = true,
+    palette = VEHICLE_PALETTE,
     setChartConfig = null,
 }) {
     const { units } = useAppContext();
@@ -325,7 +325,7 @@ export default function EpaCurvesView({
     // mapping on every rebuild.
     const shown = useMemo(() => new Set(selectedMappings), [selectedMappings]);
 
-    // Colours move into epaConfig for the same reason the selection does — a
+    // Colors move into epaConfig for the same reason the selection does — a
     // pop-out was losing them. Memoised because `?? {}` allocates, and a fresh
     // object every render invalidates every dependency array holding it.
     const mappingColors = useMemo(() => epaConfig.mappingColors ?? {}, [epaConfig.mappingColors]);
@@ -338,13 +338,19 @@ export default function EpaCurvesView({
     );
 
 
-    // ── Vehicle color map (Okabe-Ito when autoColor) ──────────────────────────
-    // EPA curves are per-vehicle (not per-run), so we resolve colors at the
-    // vehicle level.  We treat each vehicle as a "run" with .id and .color so
-    // resolveChartColors can do its ΔE work.
+    // ── Vehicle color map ────────────────────────────────────────────────────
+    // EPA curves are per-vehicle (not per-run), so colors resolve at the
+    // vehicle level: each vehicle is passed as its own "run" so the resolver can
+    // do its ΔE work, AND as a vehicle owning that single run, which is what
+    // makes a curated color reach the curve. `rampFrom` over one row returns
+    // the base, so a curated vehicle is drawn in exactly the color it was
+    // given rather than a shade off it.
     const vehicleColorMap = useMemo(
-        () => resolveChartColors(vehiclesWithEpa, {}, autoColor ? 'auto' : 'manual'),
-        [vehiclesWithEpa, autoColor]
+        () => resolveChartColors(
+            vehiclesWithEpa, {}, palette,
+            vehiclesWithEpa.map(v => ({ ...v, runs: [{ id: v.id }] })),
+        ),
+        [vehiclesWithEpa, palette]
     );
 
     // ── The selector's rows ───────────────────────────────────────────────────
@@ -362,7 +368,7 @@ export default function EpaCurvesView({
      * The mapping index is taken BEFORE the groupless rows are dropped, because
      * it selects the fade in `mappingColor` and the curve builder counts the
      * same way. Filtering first would shift a vehicle's second configuration
-     * onto the first one's colour.
+     * onto the first one's color.
      */
     const selectorVehicles = useMemo(() => vehiclesWithEpa.map((vehicle, vi) => {
         const effectiveVehicle = { ...vehicle, specs: resolveEffectiveSpecs(vehicle, vehicles) };
@@ -391,9 +397,9 @@ export default function EpaCurvesView({
      * Everything the picker's wider scopes are allowed to touch.
      *
      * Supplying this WITH `onUpdateRunColors` is what puts the scope control in
-     * the colour panel, and its absence is why this view had no "this vehicle"
+     * the color panel, and its absence is why this view had no "this vehicle"
      * or "all tests" while the four run charts did. `stored` is null on every
-     * row and correctly so: a curve's colour lives in `epaConfig` for the
+     * row and correctly so: a curve's color lives in `epaConfig` for the
      * session and is never written back, so there is no durable preference for
      * a session pick to differ from.
      */
@@ -892,9 +898,9 @@ export default function EpaCurvesView({
                     {setChartConfig && (
                         <div className="chart-rail-group">
                             <span className="text-micro">Display</span>
-                            <div className="display-grid">
-                                <AutoColorToggle autoColor={autoColor} setChartConfig={setChartConfig} />
-                            </div>
+                            {/* No .display-grid: that is a two-column grid for
+                                checkboxes, and this group holds one select. */}
+                            <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
                         </div>
                     )}
 

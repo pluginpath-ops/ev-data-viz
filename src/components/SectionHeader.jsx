@@ -7,7 +7,7 @@
  * on the EPA tab, where it did nothing useful.
  *
  * Actions here are boxed pills rather than text links. On a long tab a bare
- * coloured word reads as prose until you hover it; a box says it is a control
+ * colored word reads as prose until you hover it; a box says it is a control
  * before anyone tries. The originals stay where they are — these sections run
  * long enough that an action is worth having at both ends.
  */

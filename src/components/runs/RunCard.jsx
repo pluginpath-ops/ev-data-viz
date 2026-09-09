@@ -2,8 +2,6 @@ import SessionControl from '../SessionControl';
 import RunSpecRows from '../RunSpecRows';
 import { RunVoteButtons } from '../VoteButtons';
 import RunSourceLinks from '../RunSourceLinks';
-import SeriesColorPicker from '../SeriesColorPicker';
-import { DEFAULT_RUN_COLOR } from '../../utils/colorUtils';
 import { RunKindPill, FIELD_META, inferRunFlags } from './runDisplay';
 import { filterChargingRuns, defaultChargingRun, runKindFrom } from '../../utils/runUtils';
 
@@ -250,17 +248,6 @@ export default function RunCard({
                             </>
                         )}
                     </div>
-                </div>
-                {/* Colour — lower right. This one is DURABLE: it writes
-                    runs.color and every visitor sees it. */}
-                <div className="run-actions-row">
-                    <SeriesColorPicker
-                        value={run.color || DEFAULT_RUN_COLOR}
-                        stored={run.color}
-                        label={run.name}
-                        onChange={hex => onUpdateRun(run.id, { color: hex })}
-                        onReset={() => onUpdateRun(run.id, { color: null })}
-                    />
                 </div>
             </div>
         </div>

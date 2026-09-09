@@ -19,7 +19,7 @@ import { columnByKey, formatCell, barPercent, clusterByTestGroup } from '../../.
  *
  * Pinning needs `border-collapse: separate` (collapsed borders do not render on
  * sticky cells) and opaque backgrounds on the pinned cells, so the row's own
- * hover and selected colours are re-applied to them in CSS rather than
+ * hover and selected colors are re-applied to them in CSS rather than
  * inherited.
  */
 function SortHeader({ col, sortKey, sortDir, onSort }) {

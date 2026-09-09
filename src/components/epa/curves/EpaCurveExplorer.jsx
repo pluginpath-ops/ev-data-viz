@@ -70,7 +70,7 @@ function valueAt(points, x) {
  * beside the chart so that it survives the PNG export, which is the only form
  * most of these ever get read in.
  *
- * Colours come from chartTheme(), including the callout orange — the canvas is
+ * Colors come from chartTheme(), including the callout orange — the canvas is
  * the one surface the stylesheet cannot reach, and the alternative is the hex
  * literal this file used to carry.
  */
@@ -346,7 +346,7 @@ export default function EpaCurveExplorer() {
                         },
                     },
                     tooltip: {
-                        // Three lines: the name with its colour, then each axis
+                        // Three lines: the name with its color, then each axis
                         // with its unit. The default put the x value in the
                         // title and crammed name and y value onto one line,
                         // which read differently from every other chart here.

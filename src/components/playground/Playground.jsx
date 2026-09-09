@@ -8,7 +8,7 @@ import { parseColor, compositeStack, contrastRatio, AA_NORMAL, AA_LARGE } from '
  *
  * The problem it solves is that divergence is invisible one tab at a time. The
  * Vehicles tag filter and the EPA filter chip do the same job at two sizes in
- * two colour systems, and nobody saw it for months because the two are never on
+ * two color systems, and nobody saw it for months because the two are never on
  * screen together. Here they are three rows apart.
  *
  * ── Live, not a screenshot ─────────────────────────────────────────────────
@@ -20,7 +20,7 @@ import { parseColor, compositeStack, contrastRatio, AA_NORMAL, AA_LARGE } from '
  * ── Contrast is measured here, not asserted ────────────────────────────────
  *
  * `contrast.test.js` guards the TOKENS. This measures what the browser actually
- * painted, which catches the other half: a class that resolves to a colour
+ * painted, which catches the other half: a class that resolves to a color
  * pairing nobody declared. It reads from the live DOM through the same
  * compositing the test uses, so the two agree by construction rather than by
  * two implementations happening to match.
@@ -81,7 +81,7 @@ function Specimen({ spec }) {
         // really at 5.6:1. Two frames, because the first only guarantees layout.
         let raf = requestAnimationFrame(() => { raf = requestAnimationFrame(remeasure); });
 
-        // The theme is switched by an attribute on <html>, and every colour on
+        // The theme is switched by an attribute on <html>, and every color on
         // the page moves with it. Without this the numbers keep describing the
         // theme you were in when the page loaded.
         const obs = new MutationObserver(remeasure);
@@ -144,7 +144,7 @@ function Specimen({ spec }) {
     );
 }
 
-/** The colour tokens, both roles of each, measured against their own surface. */
+/** The color tokens, both roles of each, measured against their own surface. */
 function TokenGrid() {
     const [tokens, setTokens] = useState([]);
 
@@ -239,7 +239,7 @@ export default function Playground() {
             </div>
 
             <section className="pg-section">
-                <h3 className="section-title">Status colour tokens</h3>
+                <h3 className="section-title">Status color tokens</h3>
                 <p className="text-note pg-blurb">
                     The triad each status carries: a solid fill, and a tinted surface with
                     a matching border and readable text. Every card below is drawn from its

@@ -416,33 +416,6 @@ export function AppProvider({ children }) {
         }
     };
 
-    const updateRunColor = async (vehicleId, runId, color) => {
-        try {
-            if (typeof runId === 'string' && runId.startsWith('inherited_')) {
-                // Update local state immediately for responsiveness
-                setVehicles(prev => prev.map(v =>
-                    v.id === vehicleId
-                        ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, color } : r) }
-                        : v
-                ));
-                // Persist on the spec_link so it survives page reload
-                const run = vehicles.find(v => v.id === vehicleId)?.runs?.find(r => r.id === runId);
-                if (run?._specLinkId) {
-                    await dataService.updateSpecLink(run._specLinkId, { color });
-                }
-                return;
-            }
-            await dataService.updateRunColor(vehicleId, runId, color);
-            setVehicles(prev => prev.map(v =>
-                v.id === vehicleId
-                    ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, color } : r) }
-                    : v
-            ));
-        } catch (error) {
-            logIfUnauthorized('update_run_color', 'run', runId, error);
-            showError('Error updating run color: ' + error.message);
-        }
-    };
 
     const deleteRun = async (vehicleId, runId) => {
         try {
@@ -1666,7 +1639,6 @@ export function AppProvider({ children }) {
         addRun,
         updateRun,
         setDefaultRun,
-        updateRunColor,
         setPairedChargingRun,
         deleteRun,
         tags,
