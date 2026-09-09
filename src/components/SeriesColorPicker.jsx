@@ -348,7 +348,12 @@ function PickerPanel({
                         saying it twice cost a line to wrapping and told nobody
                         anything. */}
                     <label className="color-switch">
-                        <select value={selectedPaletteId} onChange={e => pickPalette(e.target.value)} aria-label="Palette">
+                        <select
+                            className="form-input"
+                            value={selectedPaletteId}
+                            onChange={e => pickPalette(e.target.value)}
+                            aria-label="Palette"
+                        >
                             {/* Offered only where it means something: with no
                                 plot behind this picker there is nothing for
                                 "vehicle color" to describe. */}
