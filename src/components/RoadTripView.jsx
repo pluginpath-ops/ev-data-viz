@@ -24,8 +24,7 @@ import {
 import { useRunSelection } from '../hooks/useRunSelection';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf } from '../utils/colorUtils';
-import { resolvePairColors } from '../utils/colorUtils';
+import { seriesRowsOf, resolvePairColors } from '../utils/colorUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';

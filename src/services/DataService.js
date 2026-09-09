@@ -909,9 +909,9 @@ class DataService {
     if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
-      const vehicle = data.vehicles.find(v => v.id === vehicleId);
       // No colour assigned: a run does not own one since #308, and the chart
-      // resolves it from the vehicle.
+      // resolves it from the vehicle. The vehicle lookup that used to sit here
+      // existed only to index the per-run palette by run count.
       const newRun = { ...run, id: Date.now() };
       data.vehicles = data.vehicles.map(v => v.id === vehicleId ? { ...v, runs: [...(v.runs || []), newRun] } : v);
       localStorage.setItem('evData', JSON.stringify(data));

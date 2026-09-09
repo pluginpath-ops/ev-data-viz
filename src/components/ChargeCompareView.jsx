@@ -16,8 +16,7 @@ import CorrectionControl from './CorrectionControl';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, DEFAULT_RUN_COLOR } from '../utils/colorUtils';
-import { resolvePairColors } from '../utils/colorUtils';
+import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
@@ -172,7 +171,6 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     });
                 } else {
                     // Vertical bars: stacked top-to-bottom
-                    const barH = bar.base - bar.y;
                     const barW = bar.width;
                     const gap = 3, topPad = 6;
                     let drawY = bar.y + topPad;

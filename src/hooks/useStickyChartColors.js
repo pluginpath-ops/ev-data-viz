@@ -139,7 +139,7 @@ export function useStickyChartColors(runs, { autoColor, resetKey, vehicles = nul
             );
         }
         return resolved;
-    }, [runs, autoColor, sessionKey, overrides]);
+    }, [runs, autoColor, sessionKey, overrides, vehicles]);
 
     return {
         colorMap,
