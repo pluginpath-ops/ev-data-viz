@@ -943,6 +943,7 @@ export default function App() {
                             setPairings={setPairings}
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? 'none'}
+                            palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                             setChartConfig={setChartConfig}
                         />
                     )}

@@ -1,4 +1,5 @@
 import ChargingView from './ChargingView';
+import { VEHICLE_PALETTE } from '../utils/colorUtils';
 import ChargeCompareView from './ChargeCompareView';
 import RoadTripView from './RoadTripView';
 import SpecsChartView from './SpecsChartView';
@@ -74,6 +75,7 @@ export default function PopoutView({
                     pairings={pairings}
                     setRoadTripConfig={() => {}}
                     verboseLabels={chartConfig?.verboseLabels ?? false}
+                    palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
                     presentationMode
                 />
             )}
@@ -102,6 +104,7 @@ export default function PopoutView({
                     startSoc={compareConfig.startSoc}
                     pairings={pairings}
                     verboseLabels={chartConfig?.verboseLabels ?? false}
+                    palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
                     presentationMode
                 />
             )}
@@ -112,6 +115,7 @@ export default function PopoutView({
                     selectedVehicleIds={selectedVehicles}
                     epaConfig={epaConfig || { yAxis: 'kwh100mi' }}
                     setEpaConfig={() => {}}
+                    palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
                     presentationMode
                 />
             )}

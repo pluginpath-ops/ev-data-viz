@@ -13,6 +13,7 @@ import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from 
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
+import SeriesPaletteSelect from './SeriesPaletteSelect';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
@@ -328,6 +329,7 @@ export default function ChargeCompareView({
     presentationMode = false,
     verboseLabels = false,
     correctionMode = 'none',
+    palette = VEHICLE_PALETTE,
     setChartConfig = null,
 }) {
     const { units, testSessions } = useAppContext();
@@ -473,9 +475,7 @@ export default function ChargeCompareView({
         [resolvedPairs]
     );
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
-        // No palette control on this chart; it draws vehicle colors, and a
-        // session override still applies.
-        palette: VEHICLE_PALETTE,
+        palette,
         resetKey: selectedVehicleIds.join(','),
         vehicles: selectedVehicles,
     });
@@ -893,6 +893,7 @@ export default function ChargeCompareView({
                             <div className="display-grid">
                                 <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                             </div>
+                            <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
                             <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                         </>
                     )}
