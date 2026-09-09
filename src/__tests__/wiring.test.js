@@ -891,3 +891,34 @@ describe('every chart hands the colour panel its palette', () => {
             .toBeGreaterThanOrEqual(4);
     });
 });
+
+/**
+ * ── Picks and assignments must keep different lifetimes ──────────────────────
+ *
+ * `useStickyChartColors` holds two maps. The auto-assignments are keyed on
+ * `sessionKey`, which a monotonic generation bumps on every palette change, so
+ * a new palette genuinely re-assigns. The PICKS are keyed on `resetKey` alone,
+ * so they survive a palette change — that is the whole of the hand-set design:
+ * choosing a palette parks your picks, selecting Hand-set brings them back.
+ *
+ * Collapsing them back onto one key is a one-line "simplification" that looks
+ * harmless and silently removes the feature: parked picks would die with the
+ * palette and there would be nothing to restore. Worse, keying them on a value
+ * that can RETURN to a previous state resurrects the bug the generation counter
+ * was added to fix, where old picks reappeared unbidden.
+ */
+describe('the picks map outlives the palette', () => {
+    const hook = () => ALL.find(x => x.file === 'src/hooks/useStickyChartColors.js').text;
+
+    it('keys picks on resetKey, not on the session key', () => {
+        const text = hook();
+        expect(text).toMatch(/useState\(\{ key: resetKey, map: EMPTY \}\)/);
+        expect(text).toMatch(/overrideState\.key === resetKey/);
+        // The assignments still reset with the palette.
+        expect(text).toMatch(/assignedKey\.current !== sessionKey/);
+    });
+
+    it('applies picks only while hand-set is in force', () => {
+        expect(hook()).toMatch(/const overrides = handSet \? picks : EMPTY;/);
+    });
+});

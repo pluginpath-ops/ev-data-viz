@@ -67,7 +67,8 @@ const hasDataForType = (run, type) => {
 // view's selection through the shared useRunSelection hook (#176). This file
 // used to roll its own toggle against chartConfig — one more copy of the
 // behaviour, and the reason a run could be switched off here and come back.
-export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, palette = VEHICLE_PALETTE, verboseLabels = false, correctionMode = 'none' }) {
+export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, palette = VEHICLE_PALETTE,
+    handSet = false, verboseLabels = false, correctionMode = 'none' }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
@@ -141,7 +142,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // palette re-solved across what was left, and unrelated runs changed color
     // — the shuffling that stickiness was meant to end. A stable input cannot
     // shuffle, which is a stronger guarantee than remembering what it assigned.
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(allRangeRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount } = useStickyChartColors(allRangeRuns, {
+        handSet,
+        onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
         resetKey: selectedVehicles.map(v => v.id).join(','),
         vehicles: selectedVehicles,
@@ -626,7 +629,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         picker rather than a cell of the checkbox grid above — that
                         grid is two columns of a 320px rail, which truncated this
                         control's own default to "Vehicle colou…". */}
-                    <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
+                    <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
                     <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                 </div>
 

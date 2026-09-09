@@ -330,6 +330,7 @@ export default function ChargeCompareView({
     verboseLabels = false,
     correctionMode = 'none',
     palette = VEHICLE_PALETTE,
+    handSet = false,
     setChartConfig = null,
 }) {
     const { units, testSessions } = useAppContext();
@@ -474,7 +475,9 @@ export default function ChargeCompareView({
         () => resolvedPairs.map(p => p.rangeRun),
         [resolvedPairs]
     );
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount } = useStickyChartColors(colorableRuns, {
+        handSet,
+        onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
         resetKey: selectedVehicleIds.join(','),
         vehicles: selectedVehicles,
@@ -893,7 +896,7 @@ export default function ChargeCompareView({
                             <div className="display-grid">
                                 <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                             </div>
-                            <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
+                            <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
                             <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
                         </>
                     )}

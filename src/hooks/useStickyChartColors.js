@@ -48,7 +48,9 @@ const EMPTY = {};
  *            setColorOverrides: (map) => void,
  *            isColorOverridden: (runId) => boolean }}
  */
-export function useStickyChartColors(runs, { palette = VEHICLE_PALETTE, resetKey, vehicles = null }) {
+export function useStickyChartColors(runs, {
+    palette = VEHICLE_PALETTE, handSet = false, resetKey, vehicles = null, onHandSet = null,
+}) {
     // A MONOTONIC generation, not a key derived from the boolean. Deriving it
     // from autoColor looked equivalent and was not: toggling off and back on
     // returned the key to its previous value, so the old overrides came back
@@ -63,11 +65,41 @@ export function useStickyChartColors(runs, { palette = VEHICLE_PALETTE, resetKey
 
     const assigned = useRef({});               // runId → color, auto-assigned
     const assignedKey = useRef(sessionKey);
-    const [overrideState, setOverrideState] = useState({ key: sessionKey, map: EMPTY });
 
-    // Derived, not cleared: an override from a previous session key is simply
-    // not read, so it can never be applied to the wrong set of runs.
-    const overrides = overrideState.key === sessionKey ? overrideState.map : EMPTY;
+    /**
+     * ── Two maps, two lifetimes, and they must not be collapsed back together ──
+     *
+     * `assigned` is keyed on `sessionKey`, which the generation counter bumps on
+     * every palette change — so choosing a new palette genuinely re-assigns, and
+     * nothing from the old one is held still.
+     *
+     * The PICKS are keyed on `resetKey` alone. A pick has to survive a palette
+     * change, because that is the whole of the hand-set design: choosing a
+     * palette PARKS your picks rather than discarding them, and selecting
+     * "Hand-set" brings them back. Keyed on the session key they died with the
+     * palette, and there was nothing to bring back.
+     *
+     * The trap this is one step away from: keying picks on a value that returns
+     * to a previous state makes them reappear UNBIDDEN, which is the bug the
+     * monotonic generation was introduced to fix. The difference now is that
+     * `handSet` decides whether they are applied, and only a person selecting
+     * "Hand-set" sets it. Surviving is not the same as being in force, and
+     * keeping those two apart is what makes this safe. Collapse them and the old
+     * bug comes straight back.
+     *
+     * They still reset together when the VEHICLE SET changes, which is right —
+     * a different comparison is a different plot, and a pick names a run that
+     * may not be on it any more.
+     */
+    const [overrideState, setOverrideState] = useState({ key: resetKey, map: EMPTY });
+    const picks = overrideState.key === resetKey ? overrideState.map : EMPTY;
+
+    // What actually reaches the chart. Parked picks are stored, not drawn — and
+    // because the swatch beside a run reads this same map, a parked pick does
+    // not show there either. That is the point: the swatch has to report the
+    // DRAWN colour, or it recreates the chip-vs-chart disconnect the colour
+    // vocabulary was written to stop.
+    const overrides = handSet ? picks : EMPTY;
 
     // A null color REMOVES the override rather than storing null, which is what
     // the picker's "Auto" means: hand this run back to the palette. Storing null
@@ -75,14 +107,18 @@ export function useStickyChartColors(runs, { palette = VEHICLE_PALETTE, resetKey
     // run would fall through to its stored color instead — the same outcome by
     // accident in manual mode, and the wrong one in auto.
     const setColorOverride = (runId, color) => {
+        // Setting a colour by hand IS the gesture that turns hand-set on; there
+        // is no separate "apply my picks" step. Clearing one is not, or "Back to
+        // auto" on the last pick would switch the mode on as it emptied it.
+        if (color != null) onHandSet?.(true);
         setOverrideState(prev => {
-            const base = prev.key === sessionKey ? prev.map : EMPTY;
+            const base = prev.key === resetKey ? prev.map : EMPTY;
             // Clearing a run that has no override is a no-op, and returning the
             // same object keeps the chart from re-solving the palette for it.
             if (color == null && !(runId in base)) {
-                return prev.key === sessionKey ? prev : { key: sessionKey, map: EMPTY };
+                return prev.key === resetKey ? prev : { key: resetKey, map: EMPTY };
             }
-            return { key: sessionKey, map: applyColorOverrides(base, { [runId]: color }) };
+            return { key: resetKey, map: applyColorOverrides(base, { [runId]: color }) };
         });
     };
 
@@ -91,12 +127,13 @@ export function useStickyChartColors(runs, { palette = VEHICLE_PALETTE, resetKey
     // single base, and applying that one at a time would re-render the chart
     // once per run and let a half-applied set be seen.
     const setColorOverrides = (map) => {
+        if (Object.values(map).some(c => c != null)) onHandSet?.(true);
         // One update, not a loop over setColorOverride: clearing twenty runs one
         // at a time would re-solve the palette after each and shuffle the
         // colors it had not reached yet.
         setOverrideState(prev => ({
-            key: sessionKey,
-            map: applyColorOverrides(prev.key === sessionKey ? prev.map : EMPTY, map),
+            key: resetKey,
+            map: applyColorOverrides(prev.key === resetKey ? prev.map : EMPTY, map),
         }));
     };
 
@@ -145,6 +182,13 @@ export function useStickyChartColors(runs, { palette = VEHICLE_PALETTE, resetKey
         colorMap,
         setColorOverride,
         setColorOverrides,
+        // How many picks are being held — in force or parked. The dropdown says
+        // it out loud ("Hand-set (3)"), because a parked pick is otherwise
+        // invisible: park three, work for an hour, come back and selecting
+        // Hand-set repaints three series in colours you no longer remember
+        // choosing. It is also what makes the option disappear at zero, so a
+        // mode that would do nothing is never offered.
+        handSetCount: Object.keys(picks).length,
         // Whether a run is showing a hand-picked color rather than the
         // palette's. The picker reflects this rather than guessing from the
         // stored value, which answers a different question entirely.

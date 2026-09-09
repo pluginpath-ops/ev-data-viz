@@ -119,7 +119,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         ),
         [selectedVehicles, selectedRuns]
     );
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
+    const handSet = chartConfig.handSet ?? false;
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount } = useStickyChartColors(colorableRuns, {
+        handSet,
+        onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette: chartConfig.seriesPalette ?? VEHICLE_PALETTE,
         resetKey: selectedVehicleIds.join(','),
         vehicles: selectedVehicles,
@@ -870,7 +873,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         picker rather than a cell of the checkbox grid above — that
                         grid is two columns of a 320px rail, which truncated this
                         control's own default to "Vehicle colou…". */}
-                    <SeriesPaletteSelect palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE} setChartConfig={setChartConfig} />
+                    <SeriesPaletteSelect palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
                     <CorrectionControl mode={chartConfig.correctionMode ?? 'none'} setChartConfig={setChartConfig} />
                 </div>
 

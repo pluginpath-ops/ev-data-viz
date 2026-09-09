@@ -572,6 +572,7 @@ export default function RoadTripView({
     setPairings = () => {},
     presentationMode = false,
     palette = VEHICLE_PALETTE,
+    handSet = false,
     verboseLabels = false,
     correctionMode = 'none',
     setChartConfig = null,
@@ -615,7 +616,9 @@ export default function RoadTripView({
         () => selectedVehicles.flatMap(v => filterRangeRuns(v.runs)),
         [selectedVehicles]
     );
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount } = useStickyChartColors(colorableRuns, {
+        handSet,
+        onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
         resetKey: selectedVehicleIds.join(','),
         vehicles: selectedVehicles,
@@ -1745,7 +1748,7 @@ export default function RoadTripView({
                             )}
                         </div>
                         {setChartConfig && (
-                            <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
+                            <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
                         )}
                         {setChartConfig && (
                             <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />

@@ -189,6 +189,9 @@ export default function App() {
         // Where series colors come from: each vehicle's curated color by
         // default, or a SERIES_PALETTES id to assign from that set instead.
         seriesPalette: VEHICLE_PALETTE,
+        // Whether hand-set colors are in force over that base. Choosing a
+        // palette parks them; selecting Hand-set brings them back.
+        handSet: false,
         specsField:     null,   // selected field key for Spec Chart mode
         scatterXField:  null,   // selected X field key for Spec Scatter mode
         scatterYField:  null,   // selected Y field key for Spec Scatter mode
@@ -924,6 +927,7 @@ export default function App() {
                             pairings={pairings}
                             setPairings={setPairings}
                             palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                            handSet={chartConfig.handSet ?? false}
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? 'none'}
                             setChartConfig={setChartConfig}
@@ -944,6 +948,7 @@ export default function App() {
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? 'none'}
                             palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                            handSet={chartConfig.handSet ?? false}
                             setChartConfig={setChartConfig}
                         />
                     )}
@@ -969,6 +974,7 @@ export default function App() {
                             epaConfig={epaConfig}
                             setEpaConfig={setEpaConfig}
                             palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                            handSet={chartConfig.handSet ?? false}
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? 'none'}
                             setChartConfig={setChartConfig}

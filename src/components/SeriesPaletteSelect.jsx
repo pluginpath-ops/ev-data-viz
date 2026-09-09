@@ -23,7 +23,38 @@ import { SERIES_PALETTES, VEHICLE_PALETTE } from '../utils/colorUtils';
  * identity — a screenshot, or a plot of one car's many tests where every series
  * shares a base and telling them apart is the whole job.
  */
-export default function SeriesPaletteSelect({ palette = VEHICLE_PALETTE, setChartConfig }) {
+/** The value that means "my picks, over whatever base is selected". */
+export const HAND_SET = '__hand-set';
+
+export default function SeriesPaletteSelect({
+    palette = VEHICLE_PALETTE, handSet = false, handSetCount = 0, setChartConfig,
+}) {
+    // Offered only once there is something to apply, and it stops being the
+    // selected value the moment the last pick is released — computed rather
+    // than stored, so `handSet` left true over an empty map cannot strand the
+    // control on a mode that would do nothing.
+    const offered = handSetCount > 0;
+    const active = handSet && offered;
+
+    /**
+     * One field, two pieces of state — deliberately, and it is the same
+     * conflation #307 was opened about, so it is worth saying why it is allowed
+     * here. The base and the pick layer are not orthogonal in use: you choose a
+     * palette, then layer picks on top of it. Read as "what is the plot showing
+     * right now?" the field has one answer, and making it the whole control is
+     * what lets it double as revert and reapply — select a palette to set the
+     * picks aside, select Hand-set to bring them back — with no second widget
+     * and nothing to go hunting for.
+     */
+    const choose = (value) => setChartConfig(prev => (
+        value === HAND_SET
+            ? { ...prev, handSet: true }
+            // Choosing a base turns the layer off but does NOT clear it. Parking
+            // is not discarding; "Back to auto" in the colour panel is the only
+            // thing that removes a pick.
+            : { ...prev, seriesPalette: value, handSet: false }
+    ));
+
     return (
         // Labelled, and in the same row shape as the correction picker beneath
         // it. The options name themselves well enough to stand alone, but the
@@ -34,9 +65,12 @@ export default function SeriesPaletteSelect({ palette = VEHICLE_PALETTE, setChar
             <span className="text-label">Colors:</span>
             <select
                 className="form-input"
-                value={palette}
-                onChange={e => setChartConfig(prev => ({ ...prev, seriesPalette: e.target.value }))}
+                value={active ? HAND_SET : palette}
+                onChange={e => choose(e.target.value)}
             >
+                {offered && (
+                    <option value={HAND_SET}>Hand-set ({handSetCount})</option>
+                )}
                     <option value={VEHICLE_PALETTE}>Vehicle color</option>
                 {SERIES_PALETTES.map(p => (
                     // No safety mark here. A bare "·" after a name is a legend
