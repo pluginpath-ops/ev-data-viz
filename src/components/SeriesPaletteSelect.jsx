@@ -39,10 +39,12 @@ export default function SeriesPaletteSelect({ palette = VEHICLE_PALETTE, setChar
             >
                     <option value={VEHICLE_PALETTE}>Vehicle color</option>
                 {SERIES_PALETTES.map(p => (
-                    // The colorblind-safe mark travels with the palette rather
-                    // than being explained once somewhere else — the moment you
-                    // need it is the moment you are choosing.
-                    <option key={p.id} value={p.id}>{p.label}{p.safe ? '' : ' ·'}</option>
+                    // No safety mark here. A bare "·" after a name is a legend
+                    // with no key: it cannot say WHICH property it is marking,
+                    // and a reader who does not already know is told nothing. The
+                    // colour panel has room to say "(not colorblind-safe)" in
+                    // words, so that is where it says it.
+                    <option key={p.id} value={p.id}>{p.label}</option>
                 ))}
             </select>
         </label>

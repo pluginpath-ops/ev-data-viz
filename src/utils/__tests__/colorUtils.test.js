@@ -337,9 +337,9 @@ describe('a vehicle color is the family base (#308)', () => {
 
     it('a chosen palette assigns from THAT palette, not a hardcoded one (#307)', () => {
         const runs = [at(1, 1), at(2, 2), at(3, 3)];
-        const out = resolveChartColors(runs, {}, 'house');
-        const house = new Set(paletteColorsById('house').map(c => c.toLowerCase()));
-        for (const id of [1, 2, 3]) expect(house.has(out[id].toLowerCase())).toBe(true);
+        const out = resolveChartColors(runs, {}, 'evbench');
+        const evbench = new Set(paletteColorsById('evbench').map(c => c.toLowerCase()));
+        for (const id of [1, 2, 3]) expect(evbench.has(out[id].toLowerCase())).toBe(true);
     });
 
     it('called without vehicles, every run is palette-assigned', () => {
