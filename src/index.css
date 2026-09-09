@@ -3287,6 +3287,21 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border-radius: var(--radius-mark);
     cursor: pointer;
 }
+/* A hand-set color this run is holding while a palette draws it — parked.
+ *
+ * A chip peeking out behind the swatch, not a replacement for it: the face of
+ * the swatch still reports the DRAWN color, which is the rule the whole colour
+ * vocabulary rests on. This says "and there is another one under here".
+ *
+ * `box-shadow` rather than a pseudo-element, because a ::before with a negative
+ * z-index paints behind its own parent's background and would simply vanish.
+ * Zero blur and a negative spread give a hard-edged square slightly smaller
+ * than the swatch, offset up and left, which reads as a card behind a card. It
+ * follows `border-radius` for free, which a pseudo-element would have to be
+ * told. */
+.series-swatch--button.has-parked {
+    box-shadow: -4px -4px 0 -1px var(--swatch-parked, transparent);
+}
 .series-swatch--button:hover { border-color: var(--color-text-secondary); }
 .series-swatch--button:focus-visible {
     outline: 2px solid var(--color-primary);

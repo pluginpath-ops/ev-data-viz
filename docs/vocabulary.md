@@ -68,6 +68,11 @@ It exists because the two came apart once: the chip beside a vehicle showed one
 color while the chart drew another, and there was no way to tell which was
 lying. Anything that can change what is drawn has to change the swatch with it.
 
+A parked hand-set color is the one thing a swatch says besides the drawn color,
+and it does not break that rule: the FACE stays the drawn color and the parked
+one peeks out behind it as a chip, so the swatch reads "this is what is on the
+chart, and there is another color under here". Never the other way round.
+
 What has the last say depends on the mode, and the two are named:
 
 | The base every un-picked series is drawn from | **the palette** | the `Colors:` field — a palette, or Vehicle color |

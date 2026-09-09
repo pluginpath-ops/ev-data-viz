@@ -475,7 +475,7 @@ export default function ChargeCompareView({
         () => resolvedPairs.map(p => p.rangeRun),
         [resolvedPairs]
     );
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
@@ -903,6 +903,7 @@ export default function ChargeCompareView({
                 </div>
 
                 <RunSelector
+                        handSetColorOf={handSetColorOf}
                         chartPalette={palette}
                         onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
                         vehicles={selectedVehicles}

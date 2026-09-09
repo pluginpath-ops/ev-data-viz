@@ -120,7 +120,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         [selectedVehicles, selectedRuns]
     );
     const handSet = chartConfig.handSet ?? false;
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette: chartConfig.seriesPalette ?? VEHICLE_PALETTE,
@@ -879,6 +879,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
                 {/* ── Collapsible run selector ── */}
                 <RunSelector
+                    handSetColorOf={handSetColorOf}
                     chartPalette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                     onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
                     vehicles={selectedVehicles}

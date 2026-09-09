@@ -616,7 +616,7 @@ export default function RoadTripView({
         () => selectedVehicles.flatMap(v => filterRangeRuns(v.runs)),
         [selectedVehicles]
     );
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
@@ -1773,6 +1773,7 @@ export default function RoadTripView({
 
                     {/* Run selector */}
                     <RunSelector
+                            handSetColorOf={handSetColorOf}
                             chartPalette={palette}
                             onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
                             vehicles={selectedVehicles.filter(v =>

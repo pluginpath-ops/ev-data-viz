@@ -189,6 +189,17 @@ export function useStickyChartColors(runs, {
         // choosing. It is also what makes the option disappear at zero, so a
         // mode that would do nothing is never offered.
         handSetCount: Object.keys(picks).length,
+        /**
+         * The color this run holds by hand, in force or PARKED — or null.
+         *
+         * Deliberately not `isColorOverridden`, which answers "is a pick being
+         * drawn right now?". This answers "is there a pick here at all?", and
+         * the two differ exactly when a palette is selected: that is the state
+         * where a run silently holds a color nothing on screen mentions. The
+         * swatch wears it as a chip behind the drawn color, so which runs are
+         * carrying one is visible without opening anything.
+         */
+        handSetColorOf: (runId) => picks[runId] ?? null,
         // Whether a run is showing a hand-picked color rather than the
         // palette's. The picker reflects this rather than guessing from the
         // stored value, which answers a different question entirely.

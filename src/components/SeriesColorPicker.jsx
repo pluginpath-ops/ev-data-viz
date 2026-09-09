@@ -71,6 +71,9 @@ export default function SeriesColorPicker({
     series = null,
     onApplyMany = null,
     isAuto = null,
+    // A color this series holds by hand that is NOT what is being drawn —
+    // parked under a palette. Shown as a chip behind the swatch.
+    parkedColor = null,
     // The CHART's palette, and the setter for it. Supplying both makes the
     // panel's palette switch edit the plot instead of a private copy that dies
     // with the popover (#307). Without them the panel keeps its own, which is
@@ -81,6 +84,10 @@ export default function SeriesColorPicker({
     className = '',
 }) {
     const plotted = value || DEFAULT_RUN_COLOR;
+    // Only when it differs from what is drawn. In hand-set mode the pick IS the
+    // drawn color, so there is nothing parked and no chip — the mark means
+    // "there is a color here you are not currently seeing".
+    const showParked = Boolean(parkedColor) && !sameHex(parkedColor, plotted);
     const subject = label || 'this series';
 
     // The scope control only appears when the owner can actually honour it.
@@ -108,9 +115,16 @@ export default function SeriesColorPicker({
                 <button
                     {...props}
                     type="button"
-                    className="series-swatch--button"
-                    style={{ backgroundColor: plotted }}
-                    aria-label={`Color for ${subject} — ${plotted}`}
+                    className={`series-swatch--button${showParked ? ' has-parked' : ''}`}
+                    style={{
+                        backgroundColor: plotted,
+                        ...(showParked ? { '--swatch-parked': parkedColor } : {}),
+                    }}
+                    // The parked color is named, not just drawn: a chip behind a
+                    // swatch is a hint, and a hint a screen reader cannot reach
+                    // is not one.
+                    aria-label={`Color for ${subject} — ${plotted}`
+                        + (showParked ? `, hand-set ${parkedColor} parked` : '')}
                     // Three of the call sites sit inside a <label> wrapping the
                     // row's checkbox, so a click reaching the label toggles the
                     // run's selection too. A swatch means "open the color
