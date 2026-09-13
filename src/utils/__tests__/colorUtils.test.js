@@ -354,6 +354,46 @@ describe('a vehicle color is the family base (#308)', () => {
             [vehicle('v1', '#009E73', runs)]);
         expect(out[1]).toBe('#E69F00');
     });
+
+    describe('plottedIds narrows the shading to what is actually on the chart', () => {
+        // RangeChartView keeps every range run of a selected vehicle in
+        // `runs`, even unticked ones, so toggling one doesn't reshuffle an
+        // unrelated vehicle's Okabe-Ito slot. Left alone, that same wide
+        // input also widened the vehicle-shading ramp: a car with four
+        // tests but only two selected got its two shaded as if it had four,
+        // landing them on distant, muted colors with no clash to avoid.
+        const runs = [at(1, 1), at(2, 2), at(3, 3), at(4, 4)];
+        const v = [vehicle('v1', '#009E73', runs)];
+
+        it('ramps only across the plotted runs, not every run kept for stability', () => {
+            const withoutFilter = resolveChartColors(runs, {}, VEHICLE_PALETTE, v);
+            const withFilter = resolveChartColors(runs, {}, VEHICLE_PALETTE, v, [1, 3]);
+
+            // Unfiltered, run 3 is the third of four shades — a step this
+            // test exists to show is too far from the base once only two
+            // of the four are actually selected.
+            expect(withoutFilter[3]).not.toBe(withFilter[3]);
+            // Filtered to two plotted runs, it matches a plain two-run ramp.
+            expect([withFilter[1], withFilter[3]]).toEqual(rampFrom('#009E73', 2));
+        });
+
+        it('an unplotted run gets no chart color — the run selector falls back to the vehicle color', () => {
+            const out = resolveChartColors(runs, {}, VEHICLE_PALETTE, v, [1, 3]);
+            expect(out[2]).toBeUndefined();
+            expect(out[4]).toBeUndefined();
+        });
+
+        it('the plotted run still takes the curated base exactly when it is the only one selected', () => {
+            const out = resolveChartColors(runs, {}, VEHICLE_PALETTE, v, [3]);
+            expect(out[3]).toBe('#009E73');
+        });
+
+        it('omitting plottedIds keeps the old (unfiltered) behaviour', () => {
+            const withoutArg = resolveChartColors(runs, {}, VEHICLE_PALETTE, v);
+            const withNull = resolveChartColors(runs, {}, VEHICLE_PALETTE, v, null);
+            expect(withNull).toEqual(withoutArg);
+        });
+    });
 });
 
 describe('seedPlot', () => {

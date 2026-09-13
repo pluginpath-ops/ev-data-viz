@@ -44,12 +44,18 @@ const EMPTY = {};
  * @param {string}  opts.resetKey   changes when the vehicle set changes
  * @param {Array}   [opts.vehicles] the runs' vehicles, for their curated
  *                                  colors; without it the palette assigns
+ * @param {Array}   [opts.plottedIds] run IDs actually drawn, when `runs` is
+ *                                  kept wider than that for stability (see
+ *                                  RangeChartView). Narrows VEHICLE_PALETTE
+ *                                  shading to this set — see
+ *                                  resolveChartColors. Omit when `runs`
+ *                                  already IS the plotted set.
  * @returns {{ colorMap: Object, setColorOverride: (runId, color) => void,
  *            setColorOverrides: (map) => void,
  *            isColorOverridden: (runId) => boolean }}
  */
 export function useStickyChartColors(runs, {
-    palette = VEHICLE_PALETTE, handSet = false, resetKey, vehicles = null, onHandSet = null,
+    palette = VEHICLE_PALETTE, handSet = false, resetKey, vehicles = null, onHandSet = null, plottedIds = null,
 }) {
     // A MONOTONIC generation, not a key derived from the boolean. Deriving it
     // from autoColor looked equivalent and was not: toggling off and back on
@@ -150,7 +156,7 @@ export function useStickyChartColors(runs, {
         const assigning = palette !== VEHICLE_PALETTE;
         const seed = assigning ? { ...assigned.current, ...overrides } : overrides;
 
-        const resolved = resolveChartColors(runs, seed, palette, vehicles);
+        const resolved = resolveChartColors(runs, seed, palette, vehicles, plottedIds);
 
         // Remember, so the next call holds these in place. Idempotent: React may
         // run a memo more than once, and re-merging the same answer changes
@@ -176,7 +182,7 @@ export function useStickyChartColors(runs, {
             );
         }
         return resolved;
-    }, [runs, palette, sessionKey, overrides, vehicles]);
+    }, [runs, palette, sessionKey, overrides, vehicles, plottedIds]);
 
     return {
         colorMap,

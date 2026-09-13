@@ -289,9 +289,19 @@ function pickBestSlot(orderedCandidates, placed) {
  *                                    assign from that set instead
  * @param {Array}  [vehicles]       — the runs' vehicles, each with .runs and
  *                                    .color; omit to skip step 2 entirely
+ * @param {Array}  [plottedIds]     — run IDs actually drawn on the chart, when
+ *                                    `runs` is wider than that (a caller may
+ *                                    pass every run of a vehicle to keep
+ *                                    Okabe-Ito slots from reshuffling on
+ *                                    toggle — see RangeChartView). Narrows
+ *                                    step 2's shade count to this set; step 3
+ *                                    (and step 2 membership itself) still see
+ *                                    the full `runs`, so that stability is
+ *                                    unaffected. Omit when `runs` already IS
+ *                                    the plotted set.
  * @returns {{ [runId]: string }}   map of run ID → resolved hex color
  */
-export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICLE_PALETTE, vehicles = null) {
+export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICLE_PALETTE, vehicles = null, plottedIds = null) {
     if (!runs?.length) return {};
 
     // Stable ordering so color assignments don't shuffle on re-render
@@ -324,6 +334,7 @@ export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICL
     // answer. It returns the base first, so a vehicle contributing one test is
     // drawn in exactly the color the curator picked rather than a shade off it.
     const curated = new Map();
+    const plotted = plottedIds ? new Set(plottedIds.map(String)) : null;
     if (vehicles?.length) {
         const onChart = new Set(sorted.map(r => String(r.id)));
         for (const vehicle of vehicles) {
@@ -332,8 +343,17 @@ export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICL
             // order its vehicle happens to list its runs in.
             const mine = sorted.filter(r => (vehicle.runs ?? []).some(
                 vr => String(vr.id) === String(r.id) && onChart.has(String(r.id))));
-            const shades = rampFrom(vehicle.color, mine.length);
-            mine.forEach((run, i) => curated.set(String(run.id), shades[i]));
+            // The ramp is spaced across what `plottedIds` says is actually on
+            // the chart, not `mine` — a caller widening `runs` for step-3
+            // stability (RangeChartView keeps every range test of a selected
+            // vehicle in the input so toggling one doesn't reshuffle another
+            // vehicle's Okabe-Ito slot) would otherwise space a two-run
+            // comparison across all five tests that vehicle has ever
+            // recorded, landing both selected runs on muted, far-apart
+            // shades despite there being no clash to avoid.
+            const plottedMine = plotted ? mine.filter(r => plotted.has(String(r.id))) : mine;
+            const shades = rampFrom(vehicle.color, plottedMine.length);
+            plottedMine.forEach((run, i) => curated.set(String(run.id), shades[i]));
         }
     }
 
@@ -358,6 +378,15 @@ export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICL
             //    matters most. Two cars given the same color is a curation
             //    question, visible to whoever asks it.
             chosen = curated.get(String(run.id));
+
+        } else if (palette === VEHICLE_PALETTE && plotted && !plotted.has(String(run.id))) {
+            // A run kept in `runs` only for step-3 stability but not actually
+            // plotted: no shade to assign it (it lost the ramp above), and no
+            // reason to spend an Okabe-Ito slot on a run nothing is drawing.
+            // Leaving it out of `result` is deliberate — the run selector's
+            // own fallback (the vehicle's flat color) already covers an
+            // unticked row's preview.
+            continue;
 
         } else {
             // 3. Assign an Okabe-Ito slot.
