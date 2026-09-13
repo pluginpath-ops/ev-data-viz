@@ -98,6 +98,16 @@ function isSimUnrealistic(sim) {
 const TOWING_NOTE = 'Full system efficiency (vehicle + trailer), replacing every '
     + "vehicle's measured figure. Battery capacity and charging speed still vary per vehicle.";
 
+// Named "Dest" rather than a second "min" on purpose: it is a floor for the
+// ARRIVAL, independent of the en-route one, and it is useful in both
+// directions. Lower is the one people miss — see the note.
+const DEST_SOC_NOTE = 'What to arrive with. Independent of the en-route minimum, '
+    + 'and it can be LOWER: the en-route floor buys confidence against a public charger '
+    + 'being broken or busy, which is not the bet you are making pulling into your own '
+    + 'driveway. Setting it lower lets the last leg run further and can save a stop. '
+    + 'Higher means arriving with a reserve, topped up at the destination if the trip '
+    + 'would not otherwise get there.';
+
 const SIM_MODES = [
     { value: 'distance',     mode: 'distance', towing: false, label: 'Fixed charge amount' },
     { value: 'time',         mode: 'time',     towing: false, label: 'Fixed charge time' },
@@ -1668,7 +1678,7 @@ export default function RoadTripView({
                                 <span className="scenario-unit">% SoC</span>
                             </label>
                             <label className="scenario-row">
-                                <span className="scenario-key">Dest</span>
+                                <span className="scenario-key">Dest <InfoIcon text={DEST_SOC_NOTE} /></span>
                                 <input type="number" className="form-input"
                                     value={destinationMinSoc}
                                     onChange={e => setField('destinationMinSoc', Number(e.target.value))} />

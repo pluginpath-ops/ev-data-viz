@@ -106,17 +106,26 @@ export function simulateRoadTrip({
     const warnings = [];
     const segments = [];
 
-    // Arrival buffer defaults to the en-route floor (no behaviour change until set),
-    // and can never drop BELOW it either — asking to arrive with less charge than
-    // the ordinary running buffer isn't a meaningful request, and leaving destFloor
-    // free to go lower fed a per-stop target formula (`destFloor + socForMiles(...)`)
-    // that assumes destFloor is the higher, binding floor. Once destFloor sat below
-    // minSoc, that formula came out lower than the "never charge zero" safety floor
-    // of `currentSoc + 1` on every en-route stop near the end, forcing a full extra
-    // stop for each single point of range still needed instead of recognizing the
-    // trip could just finish normally. Clamping here fixes every downstream use at
-    // once, including the destination top-up's own `destFloor > minSoc` check.
-    const destFloor = Math.max(minSoc, (destinationMinSoc != null && !isNaN(destinationMinSoc)) ? destinationMinSoc : minSoc);
+    // Arrival buffer, defaulting to the en-route floor (no behaviour change until
+    // set). It is meaningful in BOTH directions, and the two are not symmetric:
+    //
+    //   ABOVE minSoc — arrive with more in reserve than an en-route stop keeps.
+    //     Handled AFTER the loop by a top-up at the destination, because no
+    //     en-route stop should blow past its leg budget chasing it.
+    //
+    //   BELOW minSoc — the destination is somewhere the last of the battery is
+    //     safe to spend: home, where charging is certain, cheap, and a shortfall
+    //     costs you a slow evening rather than a tow. minSoc buys confidence
+    //     against a public charger being broken, occupied or slow; arriving home
+    //     is not that bet, so the final leg is allowed to run past it. Handled in
+    //     the drive step below, since it changes how FAR the last leg goes.
+    //
+    // Which is why this is NOT clamped to minSoc. It was, briefly, to fix
+    // repeated 1%-charge stops near the end of a trip — but the clamp threw out
+    // the case above to do it, and the real fault was the drive step ignoring
+    // destFloor entirely, so a final leg that could have run past minSoc instead
+    // stopped short and charged a single point at a time to creep the rest.
+    const destFloor = (destinationMinSoc != null && !isNaN(destinationMinSoc)) ? destinationMinSoc : minSoc;
 
     // Speed correction — use higher aero fraction when towing (trailer raises Cd×A of system)
     const aeroFrac = towingMode ? TOWING_AERO_FRACTION : AERO_FRACTION;
@@ -150,20 +159,31 @@ export function simulateRoadTrip({
 
     const timeAtSoc = soc => interpolate(curveBySoc, 'soc', 'time', soc, true, true);
 
-    // The en-route loop never reasons about destFloor at all — it drives to
-    // minSoc and charges one leg at a time exactly as it did before a
-    // destination buffer was a thing a trip could ask for. A stop this close
-    // to the end still stops EARLY if `destFloor + socForMiles(remaining)` is
-    // less than a full leg (no need to add a whole leg just to cover the
-    // last 40 miles), but never charges MORE than its own leg cap to chase
-    // destFloor — a gap a single stop can't close on its own is left for the
+    // En-route, the loop drives to minSoc and charges one leg at a time exactly
+    // as it did before a destination buffer was a thing a trip could ask for. A
+    // stop close to the end still stops EARLY if `destFloor + socForMiles(
+    // remaining)` is less than a full leg (no need to add a whole leg just to
+    // cover the last 40 miles), but never charges MORE than its own leg cap to
+    // chase destFloor — a gap a single stop can't close is left for the
     // destination top-up below, not forced into this one stop.
     while (currentDist < totalDistanceMi && iterations < MAX_ITERATIONS) {
         iterations++;
 
         // ── DRIVE ────────────────────────────────────────────────────────
         const remainingTrip = totalDistanceMi - currentDist;
-        const driveDist = Math.max(0, Math.min(rangeFrom(currentSoc, minSoc), remainingTrip));
+
+        // The FINAL leg answers to destFloor; every other leg stops at minSoc.
+        // That only changes anything when destFloor is BELOW minSoc — arriving
+        // somewhere the last of the battery is safe to spend — and then it lets
+        // the last leg run past the en-route floor instead of stopping short to
+        // charge for miles it does not need. With destFloor at or above minSoc
+        // this branch agrees with the one below it (the higher floor reaches
+        // less far, so it can only ever fire when minSoc would have finished
+        // the trip too) and any shortfall is the top-up's job after the loop.
+        const canFinishAtDestFloor = rangeFrom(currentSoc, destFloor) >= remainingTrip - 0.01;
+        const driveDist = canFinishAtDestFloor
+            ? remainingTrip
+            : Math.max(0, Math.min(rangeFrom(currentSoc, minSoc), remainingTrip));
 
         if (driveDist < MIN_DRIVE_MI) {
             warnings.push('Battery depleted: cannot drive far enough to reach next charger');

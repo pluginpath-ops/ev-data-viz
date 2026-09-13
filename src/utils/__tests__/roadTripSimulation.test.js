@@ -80,32 +80,51 @@ describe('destination SoC requirement (road trip)', () => {
         expect(last.endSoc).toBeLessThan(15);
     });
 
-    it('a destination floor BELOW minSoc is a no-op, not a source of tiny repeated stops', () => {
-        // destFloor(5) below minSoc(10) used to leak into the per-stop target
-        // formula (`destFloor + socForMiles(remaining)`), which came out lower
-        // than the "never charge zero" `currentSoc + 1` floor on every en-route
-        // stop near the end — forcing a full extra stop for each single point
-        // of range still needed instead of just finishing normally.
-        const result = simulateRoadTrip({
+    describe('a destination floor BELOW minSoc — arriving somewhere charging is certain', () => {
+        // minSoc buys confidence against a public charger being broken, occupied
+        // or slow. Arriving home is not that bet, so the last leg is allowed to
+        // spend past it — which is the whole point of setting it lower.
+        const lowFloorTrip = {
             ...baseParams,
             startSoc: 100,
             minSoc: 10,
-            destinationMinSoc: 5,
             legDistanceMi: 50,
             totalDistanceMi: 143, // lands 3 mi past the last minSoc-triggered stop
             mode: 'distance',
+        };
+
+        it('lets the final leg run past minSoc, saving a stop', () => {
+            const low  = simulateRoadTrip({ ...lowFloorTrip, destinationMinSoc: 5 });
+            const same = simulateRoadTrip({ ...lowFloorTrip, destinationMinSoc: 10 });
+
+            expect(low.completed).toBe(true);
+            expect(low.warnings).toEqual([]);
+            // The same trip that needs a second stop to land on minSoc finishes
+            // on one when the last of the battery is safe to spend.
+            expect(low.chargeStops).toBeLessThan(same.chargeStops);
+            expect(low.segments[low.segments.length - 1].endSoc).toBeCloseTo(5, 1);
         });
 
-        expect(result.completed).toBe(true);
-        expect(result.chargeStops).toBeLessThanOrEqual(2);
-        const chargeSegs = result.segments.filter(s => s.type === 'charge');
-        // No run of consecutive 1-point charges — each stop should size itself
-        // to what the remaining trip actually needs, not to a forced minimum.
-        for (const seg of chargeSegs) {
-            expect(seg.endSoc - seg.startSoc).not.toBeCloseTo(1, 1);
-        }
-        const last = result.segments[result.segments.length - 1];
-        expect(last.endSoc).toBeGreaterThanOrEqual(9.5); // arrives at minSoc, not destFloor
+        it('does not creep to the finish one point of charge at a time', () => {
+            // The drive step used to ignore destFloor, so a final leg that could
+            // have run past minSoc stopped short instead and charged a single
+            // point at a time — one whole stop per point still needed.
+            const result = simulateRoadTrip({ ...lowFloorTrip, destinationMinSoc: 5 });
+
+            for (const seg of result.segments.filter(s => s.type === 'charge')) {
+                expect(seg.endSoc - seg.startSoc).not.toBeCloseTo(1, 1);
+            }
+        });
+
+        it('applies in fixed-time mode too', () => {
+            const low  = simulateRoadTrip({
+                ...lowFloorTrip, mode: 'time', chargeTimeMinutes: 20, destinationMinSoc: 5,
+            });
+
+            expect(low.completed).toBe(true);
+            expect(low.warnings).toEqual([]);
+            expect(low.segments[low.segments.length - 1].endSoc).toBeCloseTo(5, 1);
+        });
     });
 
     it('a high destination floor still converges via a single top-up at the end', () => {
