@@ -503,7 +503,7 @@ export default function ChargeCompareView({
     );
 
     // Bars are colored by the range test (the row's subject). The hook gives the
-    // same session-override behaviour as the other charts without a DB write.
+    // same session-override behavior as the other charts without a DB write.
     //
     // `colorableRuns` stays every range run across every resolved pair, not just
     // the selected ones, for the same reason RangeChartView and Road Trip keep

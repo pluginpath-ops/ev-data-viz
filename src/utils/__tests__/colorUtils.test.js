@@ -388,7 +388,7 @@ describe('a vehicle color is the family base (#308)', () => {
             expect(out[3]).toBe('#009E73');
         });
 
-        it('omitting plottedIds keeps the old (unfiltered) behaviour', () => {
+        it('omitting plottedIds keeps the old (unfiltered) behavior', () => {
             const withoutArg = resolveChartColors(runs, {}, VEHICLE_PALETTE, v);
             const withNull = resolveChartColors(runs, {}, VEHICLE_PALETTE, v, null);
             expect(withNull).toEqual(withoutArg);
@@ -397,7 +397,7 @@ describe('a vehicle color is the family base (#308)', () => {
 
     describe("the vehicle's default run leads the ramp", () => {
         // Without this, the base color went to whichever test was entered
-        // first — often not the one a reader would actually recognise the
+        // first — often not the one a reader would actually recognize the
         // car by — and the DEFAULT test could land on the most-shaded end
         // of its own family, the opposite of what "default" should mean.
         const runs = [at(1, 1), { ...at(2, 2), isDefault: true }, at(3, 3)];

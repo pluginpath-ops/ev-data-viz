@@ -65,6 +65,17 @@ const RETIRED = [
     },
 ];
 
+/**
+ * The two files that hold every retired word on purpose.
+ *
+ * Caught by the check on its own first run, which is the right kind of proof
+ * that it works — but a checker that fails on its own source, and a glossary
+ * that fails for listing the words it retires, are both nonsense. Named
+ * explicitly rather than pattern-matched, so a third file cannot quietly join
+ * them.
+ */
+const SELF_EXEMPT = new Set(['scripts/vocabCheck.js', 'docs/vocabulary.md']);
+
 const args    = process.argv.slice(2);
 const flag    = (f) => args.includes(f);
 const textArg = args[args.indexOf('--text') + 1];
@@ -108,6 +119,7 @@ function subject() {
 const { label, lines } = subject();
 const hits = [];
 for (const { file, line, text } of lines) {
+    if (SELF_EXEMPT.has(file)) continue;
     for (const rule of RETIRED) {
         rule.pattern.lastIndex = 0;
         const found = text.match(rule.pattern);

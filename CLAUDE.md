@@ -86,7 +86,7 @@ After a PR merges, pull `main` and delete the local branch before starting the n
 **Before every commit, and again on the PR title and description**, check what
 you wrote against the docs — `docs/vocabulary.md` above all, then
 `docs/design-tokens.md` and `docs/typography.md` for anything that names a
-colour or a size.
+color or a size.
 
 `npm run vocab` does the mechanical half. It reads the **Retired** table and
 scans only the lines you added, so it is fast and it never nags about the
@@ -109,7 +109,7 @@ checked against.** One line. Not a ritual — a forcing function, because the
 failure it prevents is not writing the wrong word, it is never opening the file
 at all:
 
-> Vocabulary: checked against docs/vocabulary.md — "series colour" and "the
+> Vocabulary: checked against docs/vocabulary.md — "series color" and "the
 > ramp" are its terms. `npm run vocab` clean. New name `plottedIds` has no
 > entry; it is not user-facing so it does not need one.
 

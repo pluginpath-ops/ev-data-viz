@@ -356,7 +356,7 @@ export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICL
             // of `sorted`'s created_at order — so it draws in the curated
             // color exactly. Without this, the base color went to whichever
             // test happened to be entered first, and a vehicle's own default
-            // could land on the most-shaded (least recognisable) end of its
+            // could land on the most-shaded (least recognizable) end of its
             // own family. `sort` is stable, so ties keep the creation order.
             const ranked = [...plottedMine].sort((a, b) =>
                 Number(!(a.isDefault || a.is_default)) - Number(!(b.isDefault || b.is_default)));

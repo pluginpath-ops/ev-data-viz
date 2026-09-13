@@ -64,7 +64,7 @@ describe('destination SoC requirement (road trip)', () => {
         expect(last.endSoc).toBeGreaterThanOrEqual(19.5);
     });
 
-    it('without a destination floor, behaviour is unchanged: the trip ends near minSoc', () => {
+    it('without a destination floor, behavior is unchanged: the trip ends near minSoc', () => {
         const result = simulateRoadTrip({
             ...baseParams,
             startSoc: 100,

@@ -106,7 +106,7 @@ export function simulateRoadTrip({
     const warnings = [];
     const segments = [];
 
-    // Arrival buffer, defaulting to the en-route floor (no behaviour change until
+    // Arrival buffer, defaulting to the en-route floor (no behavior change until
     // set). It is meaningful in BOTH directions, and the two are not symmetric:
     //
     //   ABOVE minSoc — arrive with more in reserve than an en-route stop keeps.
