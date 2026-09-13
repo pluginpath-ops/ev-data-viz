@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "drift": "node scripts/drift.js",
+    "vocab": "node scripts/vocabCheck.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "css": "node scripts/css.js",

@@ -373,16 +373,27 @@ export default function EpaCurvesView({
     const selectorVehicles = useMemo(() => vehiclesWithEpa.map((vehicle, vi) => {
         const effectiveVehicle = { ...vehicle, specs: resolveEffectiveSpecs(vehicle, vehicles) };
         const baseColor = vehicleColorMap[vehicle.id] || vehicle.color || PALETTE[vi % PALETTE.length];
+        // The fade index counts only SHOWN mappings, not every mapping this
+        // vehicle has — a lone plotted mapping has nothing to be faded
+        // relative to, and used to draw faded anyway whenever it wasn't
+        // literally the vehicle's first configuration. Iterated in the
+        // vehicle's own (unfiltered) mapping order, same as before, so a
+        // groupless sibling being dropped still can't renumber this one —
+        // only an UNTICKED one now can, which is the point.
+        let shownIdx = 0;
         return {
             ...vehicle,
             name: vehicleLabel(vehicle),
-            runs: (vehicle.epa_mappings ?? []).map((mapping, mi) => {
+            runs: (vehicle.epa_mappings ?? []).map((mapping) => {
                 const group = mapping.epaGroup;
                 if (!group) return null;
+                const isShown = shown.has(mapping.id);
+                const autoColor = isShown ? mappingColor(baseColor, shownIdx) : baseColor;
+                if (isShown) shownIdx++;
                 return {
                     id: mapping.id,
                     name: group.display_name || group.epa_carline_name,
-                    autoColor: mappingColor(baseColor, mi),
+                    autoColor,
                     confidence: mapping.confidence,
                     group,
                     eta: resolveCurveEta(group),
@@ -391,7 +402,7 @@ export default function EpaCurvesView({
                 };
             }).filter(Boolean),
         };
-    }), [vehiclesWithEpa, vehicles, vehicleColorMap]);
+    }), [vehiclesWithEpa, vehicles, vehicleColorMap, shown]);
 
     /**
      * Everything the picker's wider scopes are allowed to touch.

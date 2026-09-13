@@ -81,6 +81,49 @@ gh pr create --base main
 
 After a PR merges, pull `main` and delete the local branch before starting the next feature.
 
+### The docs check, and the pledge
+
+**Before every commit, and again on the PR title and description**, check what
+you wrote against the docs — `docs/vocabulary.md` above all, then
+`docs/design-tokens.md` and `docs/typography.md` for anything that names a
+color or a size.
+
+`npm run vocab` does the mechanical half. It reads the **Retired** table and
+scans only the lines you added, so it is fast and it never nags about the
+retired words the tree keeps on purpose (see "Deferred renames"). Point it at
+prose too, which is the half that otherwise goes unchecked:
+
+```
+npm run vocab                                    # changed lines vs main
+npm run vocab -- --staged                        # just what is staged
+npm run vocab -- --text "$(gh pr view --json body -q .body)"
+```
+
+**It only covers four of the eight Retired rows, and it cannot be made to cover
+the rest** — `"chrome"` for the header, `"Runs"` in UI text, `"pinning"`, and a
+bare `"band"` are all correct words in their right place, so only a reader can
+tell. That is what the pledge is for.
+
+**The pledge: say in the commit or PR body that you checked, and what you
+checked against.** One line. Not a ritual — a forcing function, because the
+failure it prevents is not writing the wrong word, it is never opening the file
+at all:
+
+> Vocabulary: checked against docs/vocabulary.md — "series color" and "the
+> ramp" are its terms. `npm run vocab` clean. New name `plottedIds` has no
+> entry; it is not user-facing so it does not need one.
+
+Naming something the vocabulary has no word for is the case that matters most.
+CLAUDE.md already says to stop and ask rather than guess; the other half of that
+is to write the answer down. A name still being argued over goes in **Open
+names** rather than into the code under a guess.
+
+And if you touched a comment that turns out to contradict the schema or a
+migration, fix it in the same commit. A stale comment is worse than no comment:
+it stops the next reader looking. `rangeSource.js` claimed `is_default` was
+charging-only for three migrations after that stopped being true, and it was
+believed.
+
 ## Site Overview
 
 EVBench is a tool for comparing real-world EV charging and range performance across vehicles. It combines raw test data (uploaded from CSV/Tableau exports) with crowd-sourced accuracy signals (votes, flags) and structured vehicle specs.
@@ -91,7 +134,7 @@ EVBench is a tool for comparing real-world EV charging and range performance acr
 The home view. Shows a card/list grid of all vehicles in the database. Users select one or more vehicles here to drive the Charts and Compare Specs tabs. Admins and contributors can add, edit, reorder, duplicate, and delete vehicles. Each card shows battery size, EPA range, test count, and tags.
 
 **Tests & Data**
-Per-vehicle view of charging and range test runs. Each run has metadata (date, tester, speed, temperature, notes) and an attached dataset of time-series data points (`soc`, `time`, `range`, `charge_rate`, `temperature`). Users upload data via CSV or Tableau export. Runs are marked `has_charging` or `has_range` to drive chart routing. One run per vehicle can be marked `is_default` as the fallback charging source for the Charge Compare chart.
+Per-vehicle view of charging and range test runs. Each run has metadata (date, tester, speed, temperature, notes) and an attached dataset of time-series data points (`soc`, `time`, `range`, `charge_rate`, `temperature`). Users upload data via CSV or Tableau export. Each run has a single `kind` (`'charging'` or `'range'`) that drives chart routing — migration 046 split the last rows that had carried both roles at once and dropped the `has_charging`/`has_range` boolean pair `kind` replaced. A vehicle can have `is_default` set on one run PER KIND — a default charging run (the fallback curve for Charge Compare) and a default range test (rank 2 of the range-source resolution order, see `utils/rangeSource.js`) are independent and can both be set at once (migration 049/050; before that, a DB trigger bug cleared one kind's default whenever the other was set).
 
 **Charts**
 Visualizations for selected vehicles. Three sub-tabs:

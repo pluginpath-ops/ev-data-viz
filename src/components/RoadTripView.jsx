@@ -8,8 +8,9 @@ import { useTheme } from '../hooks/useTheme';
 import { MI_TO_KM, convDistance, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
-import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
+import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels } from '../utils/seriesLabel';
+import { clampSoc } from '../utils/socAlignment';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import CorrectionControl from './CorrectionControl';
 import { sessionFor } from '../utils/testSessions';
@@ -97,6 +98,16 @@ function isSimUnrealistic(sim) {
  *  screen to explain two numbers. */
 const TOWING_NOTE = 'Full system efficiency (vehicle + trailer), replacing every '
     + "vehicle's measured figure. Battery capacity and charging speed still vary per vehicle.";
+
+// Named "Dest" rather than a second "min" on purpose: it is a floor for the
+// ARRIVAL, independent of the en-route one, and it is useful in both
+// directions. Lower is the one people miss — see the note.
+const DEST_SOC_NOTE = 'What to arrive with. Independent of the en-route minimum, '
+    + 'and it can be LOWER: the en-route floor buys confidence against a public charger '
+    + 'being broken or busy, which is not the bet you are making pulling into your own '
+    + 'driveway. Setting it lower lets the last leg run further and can save a stop. '
+    + 'Higher means arriving with a reserve, topped up at the destination if the trip '
+    + 'would not otherwise get there.';
 
 const SIM_MODES = [
     { value: 'distance',     mode: 'distance', towing: false, label: 'Fixed charge amount' },
@@ -605,26 +616,7 @@ export default function RoadTripView({
         [vehicles, selectedVehicleIds]
     );
 
-    // ── Resolve chart colors ─────────────────────────────────────────────────
-    // Keyed on the RANGE test, not the charging run. This view enumerates range
-    // tests and its selector lists them as the primary, so coloring by the
-    // charging half meant two range tests sharing one charging curve drew in the
-    // same color, and the selector's color picker recolored a row other than
-    // the one it sat next to. Charge Compare already keys on the range test, so
-    // a given pair now reads the same color on both charts.
-    const colorableRuns = useMemo(
-        () => selectedVehicles.flatMap(v => filterRangeRuns(v.runs)),
-        [selectedVehicles]
-    );
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
-        handSet,
-        onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
-        palette,
-        resetKey: selectedVehicleIds.join(','),
-        vehicles: selectedVehicles,
-    });
-
-    // ── One entry per (range test × charging test) pair ───────────────────────
+    // ── One entry per (range test × charging test) pair — structure only ──────
     // Range-primary, matching Charge Compare: a charging curve is a property of
     // the car and varies little, while a range test is a property of the day —
     // wind, temperature, HVAC, tyres, elevation, load. Each pair is its own trip
@@ -632,9 +624,13 @@ export default function RoadTripView({
     //
     // A Map, not an object: insertion order is the display order, and the keys
     // are pair-key strings.
-    const allPairsInfo = useMemo(() => {
+    //
+    // Deliberately colorless: colors need to know what's actually SELECTED
+    // (below), and selection is derived from this same structure, so building
+    // it before resolving colors is the only order that isn't circular. See
+    // "Resolve chart colors" below for the pass that attaches `.color`.
+    const pairStructure = useMemo(() => {
         const map = new Map();
-        let colorIdx = 0;
         for (const vehicle of selectedVehicles) {
             const chargingRuns = filterChargingRuns(vehicle.runs);
             if (!chargingRuns.length) continue;
@@ -679,30 +675,20 @@ export default function RoadTripView({
                         // Assume 70 mph if neither the range test nor its source says
                         testSpeedMph:   rangeRun.speed_mph ?? src.sourceRun?.speed_mph ?? null,
                         batteryKwh:     vehicle.battery,
-                        color:          colorMap[rangeRun.id] || PALETTE[colorIdx % PALETTE.length],
                         efficiencyNote: src.note,
                     });
-                    colorIdx++;
                 }
             }
         }
-        // Shade successive partners of one range test within its own hue, so a
-        // range test paired with two charging curves gives two related lines
-        // rather than two identical ones.
-        const pairColors = resolvePairColors([...map.values()].map(e => ({
-            key: e.key, primaryId: e.rangeRun.id, baseColor: e.color,
-        })));
-        for (const entry of map.values()) entry.color = pairColors[entry.key] ?? entry.color;
-
         return map;
-    }, [selectedVehicles, colorMap, pairings, correctionMode, testSessions]);
+    }, [selectedVehicles, pairings, correctionMode, testSessions]);
 
     // Selection lives in the shared hook (hooks/useRunSelection.js), the same one
     // Charge Compare uses. Previously this view had its own copy, whose bootstrap
     // refilled any vehicle that happened to be empty — so clearing one vehicle
     // and then changing another vehicle's dropdown brought the first one back.
     const selectionRows = useMemo(
-        () => [...allPairsInfo.values()].map(e => ({
+        () => [...pairStructure.values()].map(e => ({
             key: e.key,
             vehicleId: e.vehicle.id,
             // Scoped to the vehicle: the EPA row's id is a shared sentinel, so a
@@ -710,7 +696,7 @@ export default function RoadTripView({
             // hook's carry rule would select them all together.
             groupId: `${e.vehicle.id}:${e.rangeRun.id}`,
         })),
-        [allPairsInfo]
+        [pairStructure]
     );
 
     // One row per vehicle on arrival, not every range test. A car with a dozen
@@ -733,6 +719,61 @@ export default function RoadTripView({
     const { selected: selectedRunIds, toggle: toggleRunId } = useRunSelection(
         selectionRows, { initial: initialRunIds, shouldBootstrap: bootstrapOneRow }
     );
+
+    // ── Resolve chart colors ─────────────────────────────────────────────────
+    // Keyed on the RANGE test, not the charging run. This view enumerates range
+    // tests and its selector lists them as the primary, so coloring by the
+    // charging half meant two range tests sharing one charging curve drew in the
+    // same color, and the selector's color picker recolored a row other than
+    // the one it sat next to. Charge Compare already keys on the range test, so
+    // a given pair now reads the same color on both charts.
+    //
+    // `colorableRuns` stays every range run of the selected vehicle(s), not just
+    // the ticked ones — same tradeoff as RangeChartView: a stable input is what
+    // keeps an Okabe-Ito slot from reshuffling under an unrelated toggle.
+    // `plottedIds` (the selected pairs' underlying range-run ids, read straight
+    // off the pair key — no need to wait on `allPairsInfo`) narrows just the
+    // vehicle-color shading to what's actually on the chart, so a car with six
+    // range tests and one selected gets that one test in its exact curated
+    // color rather than a shade sized for all six.
+    const colorableRuns = useMemo(
+        () => selectedVehicles.flatMap(v => filterRangeRuns(v.runs)),
+        [selectedVehicles]
+    );
+    const plottedIds = useMemo(
+        () => selectedRunIds.map(k => parsePairKey(k).rangeRunId),
+        [selectedRunIds]
+    );
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
+        handSet,
+        onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
+        palette,
+        resetKey: selectedVehicleIds.join(','),
+        vehicles: selectedVehicles,
+        plottedIds,
+    });
+
+    // ── Attach colors, now that colorMap knows what's actually selected ───────
+    const allPairsInfo = useMemo(() => {
+        const map = new Map();
+        let colorIdx = 0;
+        for (const entry of pairStructure.values()) {
+            map.set(entry.key, {
+                ...entry,
+                color: colorMap[entry.rangeRun.id] || PALETTE[colorIdx % PALETTE.length],
+            });
+            colorIdx++;
+        }
+        // Shade successive partners of one range test within its own hue, so a
+        // range test paired with two charging curves gives two related lines
+        // rather than two identical ones.
+        const pairColors = resolvePairColors([...map.values()].map(e => ({
+            key: e.key, primaryId: e.rangeRun.id, baseColor: e.color,
+        })));
+        for (const entry of map.values()) entry.color = pairColors[entry.key] ?? entry.color;
+
+        return map;
+    }, [pairStructure, colorMap]);
 
     // ── Active run entries — ordered by vehicle pill position ─────────────────
     const runEntries = useMemo(() => {
@@ -1623,25 +1664,36 @@ export default function RoadTripView({
                     <div className="chart-rail-group">
                         <span className="text-micro">Trip</span>
                         <div className="axis-rows">
+                            {/* A pack holds 0–100%, so the fields say so: the
+                                spinner stops there, and a typed value is
+                                clamped on the way in. `clampSoc` falls back to
+                                the CURRENT value rather than 0 for an emptied
+                                field — Number('') is 0, which would read as a
+                                flat battery the moment someone cleared a box to
+                                retype it. Falling back leaves state on the last
+                                good number while the box itself sits empty. */}
                             <label className="scenario-row">
                                 <span className="scenario-key">Start</span>
                                 <input type="number" className="form-input"
+                                    min="0" max="100"
                                     value={startSoc}
-                                    onChange={e => setField('startSoc', Number(e.target.value))} />
+                                    onChange={e => setField('startSoc', clampSoc(e.target.value, startSoc))} />
                                 <span className="scenario-unit">% SoC</span>
                             </label>
                             <label className="scenario-row">
                                 <span className="scenario-key">Min</span>
                                 <input type="number" className="form-input"
+                                    min="0" max="100"
                                     value={minSoc}
-                                    onChange={e => setField('minSoc', Number(e.target.value))} />
+                                    onChange={e => setField('minSoc', clampSoc(e.target.value, minSoc))} />
                                 <span className="scenario-unit">% SoC</span>
                             </label>
                             <label className="scenario-row">
-                                <span className="scenario-key">Dest</span>
+                                <span className="scenario-key">Dest <InfoIcon text={DEST_SOC_NOTE} /></span>
                                 <input type="number" className="form-input"
+                                    min="0" max="100"
                                     value={destinationMinSoc}
-                                    onChange={e => setField('destinationMinSoc', Number(e.target.value))} />
+                                    onChange={e => setField('destinationMinSoc', clampSoc(e.target.value, destinationMinSoc))} />
                                 <span className="scenario-unit">% SoC</span>
                             </label>
                             {mode === 'distance' ? (

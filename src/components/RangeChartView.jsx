@@ -142,12 +142,20 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // palette re-solved across what was left, and unrelated runs changed color
     // — the shuffling that stickiness was meant to end. A stable input cannot
     // shuffle, which is a stronger guarantee than remembering what it assigned.
+    //
+    // That stability is only step 3's (Okabe-Ito) concern, though — step 2's
+    // vehicle-color shading has no such need and paid for the wider input
+    // anyway: a two-run comparison got shaded across every test the vehicle
+    // has ever recorded, landing both selected runs on distant, muted shades
+    // with no clash to avoid. `plottedIds` narrows the shading to what is
+    // actually selected while `allRangeRuns` still holds step 3 steady.
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(allRangeRuns, {
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
         resetKey: selectedVehicles.map(v => v.id).join(','),
         vehicles: selectedVehicles,
+        plottedIds: selectedRangeRuns.map(r => r.id),
     });
 
     // Value-identity for the resolved colors — see the render effect's deps.

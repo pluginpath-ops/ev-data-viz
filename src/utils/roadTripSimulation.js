@@ -106,7 +106,25 @@ export function simulateRoadTrip({
     const warnings = [];
     const segments = [];
 
-    // Arrival buffer defaults to the en-route floor (no behaviour change until set).
+    // Arrival buffer, defaulting to the en-route floor (no behavior change until
+    // set). It is meaningful in BOTH directions, and the two are not symmetric:
+    //
+    //   ABOVE minSoc — arrive with more in reserve than an en-route stop keeps.
+    //     Handled AFTER the loop by a top-up at the destination, because no
+    //     en-route stop should blow past its leg budget chasing it.
+    //
+    //   BELOW minSoc — the destination is somewhere the last of the battery is
+    //     safe to spend: home, where charging is certain, cheap, and a shortfall
+    //     costs you a slow evening rather than a tow. minSoc buys confidence
+    //     against a public charger being broken, occupied or slow; arriving home
+    //     is not that bet, so the final leg is allowed to run past it. Handled in
+    //     the drive step below, since it changes how FAR the last leg goes.
+    //
+    // Which is why this is NOT clamped to minSoc. It was, briefly, to fix
+    // repeated 1%-charge stops near the end of a trip — but the clamp threw out
+    // the case above to do it, and the real fault was the drive step ignoring
+    // destFloor entirely, so a final leg that could have run past minSoc instead
+    // stopped short and charged a single point at a time to creep the rest.
     const destFloor = (destinationMinSoc != null && !isNaN(destinationMinSoc)) ? destinationMinSoc : minSoc;
 
     // Speed correction — use higher aero fraction when towing (trailer raises Cd×A of system)
@@ -139,19 +157,35 @@ export function simulateRoadTrip({
     let chargeStops = 0;
     let iterations  = 0;
 
+    const timeAtSoc = soc => interpolate(curveBySoc, 'soc', 'time', soc, true, true);
+
+    // En-route, the loop drives to minSoc and charges one leg at a time exactly
+    // as it did before a destination buffer was a thing a trip could ask for. A
+    // stop close to the end still stops EARLY if `destFloor + socForMiles(
+    // remaining)` is less than a full leg (no need to add a whole leg just to
+    // cover the last 40 miles), but never charges MORE than its own leg cap to
+    // chase destFloor — a gap a single stop can't close is left for the
+    // destination top-up below, not forced into this one stop.
     while (currentDist < totalDistanceMi && iterations < MAX_ITERATIONS) {
         iterations++;
 
         // ── DRIVE ────────────────────────────────────────────────────────
         const remainingTrip = totalDistanceMi - currentDist;
 
-        // Final leg if we can reach the destination while keeping ≥ destFloor;
-        // otherwise drive down to the en-route floor (minSoc) and charge.
-        const driveDist = (rangeFrom(currentSoc, destFloor) >= remainingTrip - 0.01)
+        // The FINAL leg answers to destFloor; every other leg stops at minSoc.
+        // That only changes anything when destFloor is BELOW minSoc — arriving
+        // somewhere the last of the battery is safe to spend — and then it lets
+        // the last leg run past the en-route floor instead of stopping short to
+        // charge for miles it does not need. With destFloor at or above minSoc
+        // this branch agrees with the one below it (the higher floor reaches
+        // less far, so it can only ever fire when minSoc would have finished
+        // the trip too) and any shortfall is the top-up's job after the loop.
+        const canFinishAtDestFloor = rangeFrom(currentSoc, destFloor) >= remainingTrip - 0.01;
+        const driveDist = canFinishAtDestFloor
             ? remainingTrip
             : Math.max(0, Math.min(rangeFrom(currentSoc, minSoc), remainingTrip));
 
-        if (driveDist < MIN_DRIVE_MI && currentDist < totalDistanceMi) {
+        if (driveDist < MIN_DRIVE_MI) {
             warnings.push('Battery depleted: cannot drive far enough to reach next charger');
             break;
         }
@@ -173,46 +207,37 @@ export function simulateRoadTrip({
         currentDist += driveDist;
         currentSoc  -= socUsed;
 
-        // Trip complete?
+        // Trip complete? (May still be short of destFloor — closed below.)
         if (currentDist >= totalDistanceMi - 0.01) break;
 
         // ── CHARGE ───────────────────────────────────────────────────────
         chargeStops++;
         let chargeTime, targetSoc;
 
-        // SoC needed here to finish the whole remaining trip arriving at destFloor.
         const remaining = totalDistanceMi - currentDist;
-        const arrivalRequiredSoc = destFloor + socForMiles(remaining);
-        const canFinishNext = arrivalRequiredSoc <= 100 + 1e-6;
-
-        const timeAtSoc = soc => interpolate(curveBySoc, 'soc', 'time', soc, true, true);
         const tStart = timeAtSoc(currentSoc);
 
         if (mode === 'distance') {
-            // Final (short) leg once the remaining trip fits within ~one leg — charge
-            // only enough to cover it and arrive at destFloor. A <2 mi leftover is
-            // absorbed into this leg to avoid a phantom tiny final stop. Otherwise add
-            // exactly one leg's worth of range (never the whole remaining trip).
-            const isLastLeg = remaining <= legDistanceMi + 2.0;
-            if (isLastLeg) {
-                targetSoc = Math.min(100, Math.max(destFloor + socForMiles(remaining), currentSoc + 1));
-            } else {
-                targetSoc = Math.min(currentSoc + socForMiles(legDistanceMi), 100);
-                targetSoc = Math.max(targetSoc, currentSoc + 1);
-            }
+            const legTargetSoc = Math.max(Math.min(currentSoc + socForMiles(legDistanceMi), 100), currentSoc + 1);
+            // Enough to finish the trip arriving at destFloor, capped at the
+            // leg's own budget — never the other way around.
+            targetSoc = Math.min(legTargetSoc, Math.max(destFloor + socForMiles(remaining), currentSoc + 1));
             const tEnd = timeAtSoc(targetSoc);
             chargeTime = (tStart != null && tEnd != null)
                 ? Math.max(0, tEnd - tStart)
                 : (targetSoc - currentSoc) * 0.5; // fallback: ~0.5 min per %
         } else {
-            // Fixed-time mode. On the final approach, charge only as long as needed
-            // to reach the destination rather than the full fixed duration.
-            const timeToArrival = (canFinishNext && tStart != null) ? (timeAtSoc(arrivalRequiredSoc) - tStart) : Infinity;
-            if (canFinishNext && isFinite(timeToArrival) && timeToArrival <= chargeTimeMinutes) {
+            // Fixed-time mode: charge only as long as needed to finish at
+            // destFloor, capped at the stop's own fixed duration.
+            const arrivalRequiredSoc = destFloor + socForMiles(remaining);
+            const canFinishHere = arrivalRequiredSoc <= 100 + 1e-6;
+            const timeToArrival = (canFinishHere && tStart != null) ? (timeAtSoc(arrivalRequiredSoc) - tStart) : Infinity;
+
+            if (canFinishHere && isFinite(timeToArrival) && timeToArrival <= chargeTimeMinutes) {
                 targetSoc  = Math.min(100, Math.max(arrivalRequiredSoc, currentSoc + 1));
                 chargeTime = Math.max(0, timeToArrival);
             } else {
-                // Normal full-duration stop.
+                // Full-duration stop — never more than chargeTimeMinutes.
                 if (tStart == null) {
                     warnings.push(`Charging data incomplete at SoC ${round1(currentSoc)}%`);
                     targetSoc = Math.min(currentSoc + chargeTimeMinutes * 2, 100); // rough fallback
@@ -249,9 +274,47 @@ export function simulateRoadTrip({
     if (iterations >= MAX_ITERATIONS && !completed) {
         warnings.push('Could not complete trip: too many charging stops required');
     }
+
+    // Destination top-up: the en-route loop above only ever aimed for
+    // minSoc/destFloor-if-cheap, so arrival can still land short of destFloor
+    // — close that here with one stop AT the destination, not bound by the
+    // leg/duration cap (there is no more driving left for that cap to
+    // budget). Charges to destFloor, or as far as 100% gets if that still
+    // isn't enough — the SoC a user enters can never exceed 100.
+    //
+    // Compares only to destFloor, not minSoc: the en-route loop already
+    // guarantees arrival at or above minSoc on its own, and destFloor is
+    // clamped to never sit below it (see its definition above) — so a
+    // separate minSoc check here could only ever agree with this one.
+    if (completed && currentSoc < destFloor - 0.01) {
+        const targetSoc = Math.min(100, destFloor);
+        if (targetSoc > currentSoc + 0.01) {
+            const tStart = timeAtSoc(currentSoc);
+            const tEnd   = timeAtSoc(targetSoc);
+            const chargeTime = ((tStart != null && tEnd != null)
+                ? Math.max(0, tEnd - tStart)
+                : (targetSoc - currentSoc) * 0.5) + overheadMinutes;
+
+            segments.push({
+                type: 'charge',
+                startTime: currentTime,
+                endTime:   currentTime + chargeTime,
+                startDist: currentDist,
+                endDist:   currentDist,
+                startSoc:  round1(currentSoc),
+                endSoc:    round1(targetSoc),
+            });
+
+            currentTime += chargeTime;
+            currentSoc   = targetSoc;
+            chargeStops++;
+        }
+    }
+
     // Reached the destination but below the requested arrival buffer (the buffer was
-    // unachievable given battery / efficiency / charging limits).
-    if (completed && destFloor > minSoc && currentSoc < destFloor - 0.5) {
+    // unachievable given battery / efficiency / charging limits — even a top-up to
+    // 100% wasn't enough). Compares only to destFloor — see the top-up above.
+    if (completed && currentSoc < destFloor - 0.5) {
         warnings.push(`Arrived at ${round1(currentSoc)}% — below the ${round1(destFloor)}% destination minimum`);
     }
 

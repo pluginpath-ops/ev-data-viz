@@ -354,6 +354,85 @@ describe('a vehicle color is the family base (#308)', () => {
             [vehicle('v1', '#009E73', runs)]);
         expect(out[1]).toBe('#E69F00');
     });
+
+    describe('plottedIds narrows the shading to what is actually on the chart', () => {
+        // RangeChartView keeps every range run of a selected vehicle in
+        // `runs`, even unticked ones, so toggling one doesn't reshuffle an
+        // unrelated vehicle's Okabe-Ito slot. Left alone, that same wide
+        // input also widened the vehicle-shading ramp: a car with four
+        // tests but only two selected got its two shaded as if it had four,
+        // landing them on distant, muted colors with no clash to avoid.
+        const runs = [at(1, 1), at(2, 2), at(3, 3), at(4, 4)];
+        const v = [vehicle('v1', '#009E73', runs)];
+
+        it('ramps only across the plotted runs, not every run kept for stability', () => {
+            const withoutFilter = resolveChartColors(runs, {}, VEHICLE_PALETTE, v);
+            const withFilter = resolveChartColors(runs, {}, VEHICLE_PALETTE, v, [1, 3]);
+
+            // Unfiltered, run 3 is the third of four shades — a step this
+            // test exists to show is too far from the base once only two
+            // of the four are actually selected.
+            expect(withoutFilter[3]).not.toBe(withFilter[3]);
+            // Filtered to two plotted runs, it matches a plain two-run ramp.
+            expect([withFilter[1], withFilter[3]]).toEqual(rampFrom('#009E73', 2));
+        });
+
+        it('an unplotted run gets no chart color — the run selector falls back to the vehicle color', () => {
+            const out = resolveChartColors(runs, {}, VEHICLE_PALETTE, v, [1, 3]);
+            expect(out[2]).toBeUndefined();
+            expect(out[4]).toBeUndefined();
+        });
+
+        it('the plotted run still takes the curated base exactly when it is the only one selected', () => {
+            const out = resolveChartColors(runs, {}, VEHICLE_PALETTE, v, [3]);
+            expect(out[3]).toBe('#009E73');
+        });
+
+        it('omitting plottedIds keeps the old (unfiltered) behavior', () => {
+            const withoutArg = resolveChartColors(runs, {}, VEHICLE_PALETTE, v);
+            const withNull = resolveChartColors(runs, {}, VEHICLE_PALETTE, v, null);
+            expect(withNull).toEqual(withoutArg);
+        });
+    });
+
+    describe("the vehicle's default run leads the ramp", () => {
+        // Without this, the base color went to whichever test was entered
+        // first — often not the one a reader would actually recognize the
+        // car by — and the DEFAULT test could land on the most-shaded end
+        // of its own family, the opposite of what "default" should mean.
+        const runs = [at(1, 1), { ...at(2, 2), isDefault: true }, at(3, 3)];
+        const v = [vehicle('v1', '#009E73', runs)];
+
+        it('the default run gets the curated base exactly, even though it was entered second', () => {
+            const out = resolveChartColors(runs, {}, VEHICLE_PALETTE, v);
+            expect(out[2]).toBe('#009E73');
+        });
+
+        it('holds with plottedIds narrowing the set too', () => {
+            const out = resolveChartColors(runs, {}, VEHICLE_PALETTE, v, [1, 2]);
+            expect(out[2]).toBe('#009E73');
+            expect(out[1]).not.toBe('#009E73');
+        });
+
+        it('non-default runs keep their relative creation order after the default', () => {
+            const out = resolveChartColors(runs, {}, VEHICLE_PALETTE, v);
+            const [base, second, third] = rampFrom('#009E73', 3);
+            expect(out[2]).toBe(base);   // default, first regardless of entry order
+            expect(out[1]).toBe(second); // created before run 3
+            expect(out[3]).toBe(third);
+        });
+
+        it('is a no-op when the DB row uses the snake_case column instead', () => {
+            const snakeRuns = [at(1, 1), { ...at(2, 2), is_default: true }];
+            const out = resolveChartColors(snakeRuns, {}, VEHICLE_PALETTE, [vehicle('v1', '#009E73', snakeRuns)]);
+            expect(out[2]).toBe('#009E73');
+        });
+
+        it('an uncurated vehicle is unaffected — there is no ramp to lead', () => {
+            const out = resolveChartColors(runs, {}, VEHICLE_PALETTE, [vehicle('v1', null, runs)]);
+            expect(new Set(Object.values(out)).size).toBe(3);
+        });
+    });
 });
 
 describe('seedPlot', () => {
