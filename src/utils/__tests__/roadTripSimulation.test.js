@@ -13,13 +13,22 @@ const baseParams = {
     overheadMinutes: 0,
 };
 
+// A stop's own leg (distance mode) or duration (time mode) budget: the most
+// SoC one en-route charge is ever allowed to add.
+const legCapSoc = (params) => params.mode === 'time'
+    ? params.chargeTimeMinutes // LINEAR_CURVE is 1 min per %, so minutes == points
+    : (params.legDistanceMi / (params.batteryKwh * params.miPerKwh)) * 100;
+
 describe('destination SoC requirement (road trip)', () => {
-    // Reproduces the reported bug: with a 10% en-route floor and a 20%
-    // destination floor, a remaining stretch that fits within range-to-10%
-    // but not range-to-20% used to let the trip "complete" below the
-    // destination buffer instead of taking one more stop to close the gap.
-    it('inserts an extra stop to arrive at the destination floor, not just the en-route floor', () => {
-        const result = simulateRoadTrip({
+    // The en-route loop (drive-to-minSoc, charge-one-leg) never reasons about
+    // destFloor at all. Only a dedicated stop AT the destination — after the
+    // loop, not bound by the leg/duration cap since no more driving follows
+    // it — closes a shortfall. This is the bug as originally reported: the
+    // trip used to "complete" the moment it could reach the destination
+    // without dropping below minSoc, even when that left it below destFloor,
+    // because nothing ever checked destFloor during the drive itself.
+    it('adds a destination top-up when arrival would otherwise fall short of destFloor', () => {
+        const params = {
             ...baseParams,
             startSoc: 100,
             minSoc: 10,
@@ -27,15 +36,18 @@ describe('destination SoC requirement (road trip)', () => {
             legDistanceMi: 50,
             totalDistanceMi: 135,
             mode: 'distance',
-        });
+        };
+        const result = simulateRoadTrip(params);
 
         expect(result.completed).toBe(true);
         expect(result.warnings.some(w => w.includes('below the'))).toBe(false);
         const last = result.segments[result.segments.length - 1];
+        expect(last.type).toBe('charge');
+        expect(last.endDist).toBe(params.totalDistanceMi);
         expect(last.endSoc).toBeGreaterThanOrEqual(19.5);
     });
 
-    it('same shortfall in fixed-time mode also gets a top-up stop', () => {
+    it('same shortfall in fixed-time mode also gets a destination top-up', () => {
         const result = simulateRoadTrip({
             ...baseParams,
             startSoc: 100,
@@ -68,11 +80,7 @@ describe('destination SoC requirement (road trip)', () => {
         expect(last.endSoc).toBeLessThan(15);
     });
 
-    it('a high destination floor still converges, even needing its own late top-up', () => {
-        // destFloor (90) sits close to 100, so nearly every en-route stop
-        // charges well past what the destination alone would need — the
-        // buffer only starts to matter, and force a dedicated stop, on the
-        // final stretch.
+    it('a high destination floor still converges via a single top-up at the end', () => {
         const result = simulateRoadTrip({
             ...baseParams,
             startSoc: 100,
@@ -89,60 +97,154 @@ describe('destination SoC requirement (road trip)', () => {
         expect(last.endSoc).toBeGreaterThanOrEqual(89.5);
     });
 
-    // A charge stop close enough to the end to be sized for arrival at
-    // destFloor used to target `destFloor + socForMiles(remaining)` with no
-    // cap — jumping straight to 100% (or as close as the curve allows)
-    // whenever the destination buffer implied more than one leg's worth,
-    // even on a stop that had plenty of room to just take a normal,
-    // leg-sized charge and keep driving. Every stop's own budget (one leg's
-    // worth of range) is now the hard cap; only a stop that CAN'T clear
-    // destFloor without also exceeding the cap gets a second, merged helping
-    // (covered by the next test) — this one has room to spare and shouldn't
-    // need it.
-    it('a stop near the end still respects the leg cap when that leaves room above destFloor', () => {
+    it('a destination top-up is uncapped by the leg budget, so even a steep floor is always reachable', () => {
+        // legDistanceMi (50) is far smaller than the destFloor-minSoc gap
+        // (95-10), so no en-route stop alone could ever bridge it — but the
+        // top-up isn't leg-capped, so the trip still lands exactly on
+        // destFloor rather than warning about a shortfall.
         const result = simulateRoadTrip({
             ...baseParams,
             startSoc: 100,
             minSoc: 10,
-            destinationMinSoc: 50,
-            legDistanceMi: 60,
-            totalDistanceMi: 245, // arranged so a 55 mi remainder lands on a stop at minSoc
+            destinationMinSoc: 95,
+            legDistanceMi: 50,
+            totalDistanceMi: 300,
             mode: 'distance',
         });
 
         expect(result.completed).toBe(true);
         expect(result.warnings.some(w => w.includes('below the'))).toBe(false);
-        for (const seg of result.segments.filter(s => s.type === 'charge')) {
-            expect(seg.endSoc - seg.startSoc).toBeLessThanOrEqual(60 + 0.1);
-        }
-        // None of that charging needed to reach all the way to 100%: the
-        // destination buffer was well inside one leg's reach the whole trip.
-        expect(result.segments.some(s => s.type === 'charge' && s.endSoc >= 99.9)).toBe(false);
+        const last = result.segments[result.segments.length - 1];
+        expect(last.endSoc).toBeGreaterThanOrEqual(94.5);
+        expect(last.endSoc).toBeLessThanOrEqual(100);
     });
 
-    // The flip side: when even a full leg's worth of charge from minSoc
-    // can't clear destFloor, a second stop at the same spot is genuinely
-    // required (the car can't drive at all below the buffer) — the two
-    // leg-capped helpings are merged into one reported stop rather than
-    // shown (and charged an extra overhead) as two.
-    it('merges a forced back-to-back top-up into one stop instead of double-counting it', () => {
-        const result = simulateRoadTrip({
+    // The property this whole feature exists to guarantee: no EN-ROUTE stop
+    // — including the last one before arrival — ever adds more than its own
+    // leg (or, in time mode, duration) budget. The destination top-up is the
+    // one deliberate exception (checked separately below), because nothing
+    // drives after it.
+    describe('en-route stops never exceed their own leg/duration cap', () => {
+        it('distance mode: a stop close to the end still stops EARLY when destFloor needs less than a full leg', () => {
+            // Battery/efficiency scaled so a "leg" is a moderate fraction of
+            // the pack (not a rounding-error's difference from 100%) —
+            // mirrors reaching a charger with plenty of trip left, wanting
+            // only a partial top-up to clear destFloor at the finish.
+            const params = {
+                ...baseParams,
+                batteryKwh: 300,
+                startSoc: 100,
+                minSoc: 10,
+                destinationMinSoc: 15,
+                legDistanceMi: 150, // 50% of the pack
+                totalDistanceMi: 490,
+                mode: 'distance',
+            };
+            const result = simulateRoadTrip(params);
+            const cap = legCapSoc(params);
+
+            expect(result.completed).toBe(true);
+            expect(result.warnings).toEqual([]);
+            const enRouteCharges = result.segments
+                .filter(s => s.type === 'charge')
+                .filter(s => s.endDist < params.totalDistanceMi); // exclude any destination top-up
+            expect(enRouteCharges.length).toBeGreaterThan(0);
+            for (const seg of enRouteCharges) {
+                expect(seg.endSoc - seg.startSoc).toBeLessThanOrEqual(cap + 0.1);
+            }
+            // The last en-route stop had room to spare — it should have
+            // stopped short of a full leg, not maxed it out or hit 100%.
+            const lastEnRoute = enRouteCharges[enRouteCharges.length - 1];
+            expect(lastEnRoute.endSoc - lastEnRoute.startSoc).toBeLessThan(cap - 0.1);
+            expect(lastEnRoute.endSoc).toBeLessThan(99.9);
+        });
+
+        it('distance mode: a stop that CANNOT clear destFloor within one leg still takes only one leg', () => {
+            // destFloor (80) is far above minSoc (10) relative to one leg —
+            // this is the exact scenario that used to jump an en-route stop
+            // straight to 100%.
+            const params = {
+                ...baseParams,
+                batteryKwh: 82,
+                miPerKwh: 3.8,
+                testSpeedMph: 70,
+                speedMph: 70,
+                overheadMinutes: 5,
+                startSoc: 90,
+                minSoc: 10,
+                destinationMinSoc: 80,
+                legDistanceMi: 150,
+                totalDistanceMi: 500,
+                mode: 'distance',
+            };
+            const result = simulateRoadTrip(params);
+            const cap = legCapSoc(params);
+
+            expect(result.completed).toBe(true);
+            expect(result.warnings.some(w => w.includes('below the'))).toBe(false);
+            const enRouteCharges = result.segments
+                .filter(s => s.type === 'charge')
+                .filter(s => s.endDist < params.totalDistanceMi);
+            expect(enRouteCharges.length).toBeGreaterThan(0);
+            for (const seg of enRouteCharges) {
+                expect(seg.endSoc - seg.startSoc).toBeLessThanOrEqual(cap + 0.1);
+            }
+        });
+
+        it('time mode: an en-route stop never exceeds chargeTimeMinutes, even close to the end', () => {
+            const params = {
+                ...baseParams,
+                batteryKwh: 82,
+                miPerKwh: 3.8,
+                testSpeedMph: 70,
+                speedMph: 70,
+                overheadMinutes: 5,
+                startSoc: 90,
+                minSoc: 10,
+                destinationMinSoc: 80,
+                chargeTimeMinutes: 30,
+                totalDistanceMi: 500,
+                mode: 'time',
+            };
+            const result = simulateRoadTrip(params);
+            const cap = legCapSoc(params);
+
+            expect(result.completed).toBe(true);
+            const enRouteCharges = result.segments
+                .filter(s => s.type === 'charge')
+                .filter(s => s.endDist < params.totalDistanceMi);
+            expect(enRouteCharges.length).toBeGreaterThan(0);
+            for (const seg of enRouteCharges) {
+                // chargeTime includes overhead; the curve here is 1 min/%,
+                // so the SoC delta alone (excluding overhead) is the bound.
+                expect(seg.endSoc - seg.startSoc).toBeLessThanOrEqual(cap + 0.1);
+            }
+        });
+    });
+
+    it('the destination top-up is the one stop allowed to exceed a leg — capped only at 100%', () => {
+        const params = {
             ...baseParams,
+            batteryKwh: 82,
+            miPerKwh: 3.8,
+            testSpeedMph: 70,
+            speedMph: 70,
             overheadMinutes: 5,
             startSoc: 90,
             minSoc: 10,
             destinationMinSoc: 80,
-            legDistanceMi: 48,
+            legDistanceMi: 150,
             totalDistanceMi: 500,
             mode: 'distance',
-        });
+        };
+        const result = simulateRoadTrip(params);
+        const cap = legCapSoc(params);
 
-        expect(result.completed).toBe(true);
-        expect(result.warnings.some(w => w.includes('below the'))).toBe(false);
-        // No two charge segments sit at the exact same distance — a forced
-        // continuation extends the prior segment instead of logging a
-        // separate (and separately-overheaded) one right behind it.
-        const chargeDists = result.segments.filter(s => s.type === 'charge').map(s => s.startDist);
-        expect(new Set(chargeDists).size).toBe(chargeDists.length);
+        const topUp = result.segments[result.segments.length - 1];
+        expect(topUp.type).toBe('charge');
+        expect(topUp.endDist).toBe(params.totalDistanceMi);
+        expect(topUp.endSoc).toBeLessThanOrEqual(100);
+        // This is the one stop expected to add more than a leg's worth.
+        expect(topUp.endSoc - topUp.startSoc).toBeGreaterThan(cap);
     });
 });
