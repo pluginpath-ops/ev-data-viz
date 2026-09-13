@@ -194,10 +194,17 @@ export function simulateRoadTrip({
         }
         // driveDist < MIN_DRIVE_MI with needsTopUp: already at the buffer
         // floor (or a negligible sliver short of it) — go straight to a
-        // charge stop rather than logging a token drive segment.
+        // charge stop rather than logging a token drive segment. If the
+        // PREVIOUS iteration also skipped its drive (the leg cap above cut
+        // that stop short of closing the destFloor gap in one go), this is a
+        // second helping at the same charger, not a separate stop — extend
+        // it below rather than logging two stops (and two overheads) for
+        // what a driver would experience as one.
+        const continuingCharge = driveDist < MIN_DRIVE_MI &&
+            segments.length > 0 && segments[segments.length - 1].type === 'charge';
 
         // ── CHARGE ───────────────────────────────────────────────────────
-        chargeStops++;
+        if (!continuingCharge) chargeStops++;
         let chargeTime, targetSoc;
 
         // SoC needed here to finish the whole remaining trip arriving at destFloor.
@@ -209,16 +216,27 @@ export function simulateRoadTrip({
         const tStart = timeAtSoc(currentSoc);
 
         if (mode === 'distance') {
+            // One leg's worth is the hard cap on every stop, last leg included —
+            // arriving with a destFloor buffer can demand more charge than a
+            // normal en-route stop would, but not more than THIS stop's own
+            // budget. Left uncapped, a "last leg" close enough to trigger this
+            // branch by distance could still be most of a full leg away, and
+            // `destFloor + socForMiles(remaining)` would jump straight for
+            // however much the WHOLE remaining trip needs — every point of it
+            // in one stop, all the way to 100% if that wasn't enough — instead
+            // of the usual one-leg increment. Capping lets a stubborn gap take
+            // however many normal-sized stops it needs, exactly like an
+            // en-route (minSoc) stop already does.
+            const legTargetSoc = Math.max(Math.min(currentSoc + socForMiles(legDistanceMi), 100), currentSoc + 1);
             // Final (short) leg once the remaining trip fits within ~one leg — charge
             // only enough to cover it and arrive at destFloor. A <2 mi leftover is
             // absorbed into this leg to avoid a phantom tiny final stop. Otherwise add
-            // exactly one leg's worth of range (never the whole remaining trip).
+            // up to one leg's worth of range (never more than the leg cap).
             const isLastLeg = remaining <= legDistanceMi + 2.0;
             if (isLastLeg) {
-                targetSoc = Math.min(100, Math.max(destFloor + socForMiles(remaining), currentSoc + 1));
+                targetSoc = Math.min(legTargetSoc, Math.max(destFloor + socForMiles(remaining), currentSoc + 1));
             } else {
-                targetSoc = Math.min(currentSoc + socForMiles(legDistanceMi), 100);
-                targetSoc = Math.max(targetSoc, currentSoc + 1);
+                targetSoc = legTargetSoc;
             }
             const tEnd = timeAtSoc(targetSoc);
             chargeTime = (tStart != null && tEnd != null)
@@ -249,17 +267,23 @@ export function simulateRoadTrip({
             }
         }
 
-        chargeTime += overheadMinutes;
+        if (!continuingCharge) chargeTime += overheadMinutes;
 
-        segments.push({
-            type: 'charge',
-            startTime: currentTime,
-            endTime:   currentTime + chargeTime,
-            startDist: currentDist,
-            endDist:   currentDist, // no distance during charging
-            startSoc:  round1(currentSoc),
-            endSoc:    round1(targetSoc),
-        });
+        if (continuingCharge) {
+            const last = segments[segments.length - 1];
+            last.endTime = round1(currentTime + chargeTime);
+            last.endSoc  = round1(targetSoc);
+        } else {
+            segments.push({
+                type: 'charge',
+                startTime: currentTime,
+                endTime:   currentTime + chargeTime,
+                startDist: currentDist,
+                endDist:   currentDist, // no distance during charging
+                startSoc:  round1(currentSoc),
+                endSoc:    round1(targetSoc),
+            });
+        }
 
         currentTime += chargeTime;
         currentSoc   = targetSoc;

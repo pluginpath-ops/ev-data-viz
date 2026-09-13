@@ -88,4 +88,61 @@ describe('destination SoC requirement (road trip)', () => {
         const last = result.segments[result.segments.length - 1];
         expect(last.endSoc).toBeGreaterThanOrEqual(89.5);
     });
+
+    // A charge stop close enough to the end to be sized for arrival at
+    // destFloor used to target `destFloor + socForMiles(remaining)` with no
+    // cap — jumping straight to 100% (or as close as the curve allows)
+    // whenever the destination buffer implied more than one leg's worth,
+    // even on a stop that had plenty of room to just take a normal,
+    // leg-sized charge and keep driving. Every stop's own budget (one leg's
+    // worth of range) is now the hard cap; only a stop that CAN'T clear
+    // destFloor without also exceeding the cap gets a second, merged helping
+    // (covered by the next test) — this one has room to spare and shouldn't
+    // need it.
+    it('a stop near the end still respects the leg cap when that leaves room above destFloor', () => {
+        const result = simulateRoadTrip({
+            ...baseParams,
+            startSoc: 100,
+            minSoc: 10,
+            destinationMinSoc: 50,
+            legDistanceMi: 60,
+            totalDistanceMi: 245, // arranged so a 55 mi remainder lands on a stop at minSoc
+            mode: 'distance',
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.warnings.some(w => w.includes('below the'))).toBe(false);
+        for (const seg of result.segments.filter(s => s.type === 'charge')) {
+            expect(seg.endSoc - seg.startSoc).toBeLessThanOrEqual(60 + 0.1);
+        }
+        // None of that charging needed to reach all the way to 100%: the
+        // destination buffer was well inside one leg's reach the whole trip.
+        expect(result.segments.some(s => s.type === 'charge' && s.endSoc >= 99.9)).toBe(false);
+    });
+
+    // The flip side: when even a full leg's worth of charge from minSoc
+    // can't clear destFloor, a second stop at the same spot is genuinely
+    // required (the car can't drive at all below the buffer) — the two
+    // leg-capped helpings are merged into one reported stop rather than
+    // shown (and charged an extra overhead) as two.
+    it('merges a forced back-to-back top-up into one stop instead of double-counting it', () => {
+        const result = simulateRoadTrip({
+            ...baseParams,
+            overheadMinutes: 5,
+            startSoc: 90,
+            minSoc: 10,
+            destinationMinSoc: 80,
+            legDistanceMi: 48,
+            totalDistanceMi: 500,
+            mode: 'distance',
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.warnings.some(w => w.includes('below the'))).toBe(false);
+        // No two charge segments sit at the exact same distance — a forced
+        // continuation extends the prior segment instead of logging a
+        // separate (and separately-overheaded) one right behind it.
+        const chargeDists = result.segments.filter(s => s.type === 'charge').map(s => s.startDist);
+        expect(new Set(chargeDists).size).toBe(chargeDists.length);
+    });
 });
