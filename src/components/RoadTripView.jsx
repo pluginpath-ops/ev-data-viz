@@ -10,6 +10,7 @@ import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } fr
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels } from '../utils/seriesLabel';
+import { clampSoc } from '../utils/socAlignment';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import CorrectionControl from './CorrectionControl';
 import { sessionFor } from '../utils/testSessions';
@@ -1663,25 +1664,36 @@ export default function RoadTripView({
                     <div className="chart-rail-group">
                         <span className="text-micro">Trip</span>
                         <div className="axis-rows">
+                            {/* A pack holds 0–100%, so the fields say so: the
+                                spinner stops there, and a typed value is
+                                clamped on the way in. `clampSoc` falls back to
+                                the CURRENT value rather than 0 for an emptied
+                                field — Number('') is 0, which would read as a
+                                flat battery the moment someone cleared a box to
+                                retype it. Falling back leaves state on the last
+                                good number while the box itself sits empty. */}
                             <label className="scenario-row">
                                 <span className="scenario-key">Start</span>
                                 <input type="number" className="form-input"
+                                    min="0" max="100"
                                     value={startSoc}
-                                    onChange={e => setField('startSoc', Number(e.target.value))} />
+                                    onChange={e => setField('startSoc', clampSoc(e.target.value, startSoc))} />
                                 <span className="scenario-unit">% SoC</span>
                             </label>
                             <label className="scenario-row">
                                 <span className="scenario-key">Min</span>
                                 <input type="number" className="form-input"
+                                    min="0" max="100"
                                     value={minSoc}
-                                    onChange={e => setField('minSoc', Number(e.target.value))} />
+                                    onChange={e => setField('minSoc', clampSoc(e.target.value, minSoc))} />
                                 <span className="scenario-unit">% SoC</span>
                             </label>
                             <label className="scenario-row">
                                 <span className="scenario-key">Dest <InfoIcon text={DEST_SOC_NOTE} /></span>
                                 <input type="number" className="form-input"
+                                    min="0" max="100"
                                     value={destinationMinSoc}
-                                    onChange={e => setField('destinationMinSoc', Number(e.target.value))} />
+                                    onChange={e => setField('destinationMinSoc', clampSoc(e.target.value, destinationMinSoc))} />
                                 <span className="scenario-unit">% SoC</span>
                             </label>
                             {mode === 'distance' ? (
