@@ -80,6 +80,34 @@ describe('destination SoC requirement (road trip)', () => {
         expect(last.endSoc).toBeLessThan(15);
     });
 
+    it('a destination floor BELOW minSoc is a no-op, not a source of tiny repeated stops', () => {
+        // destFloor(5) below minSoc(10) used to leak into the per-stop target
+        // formula (`destFloor + socForMiles(remaining)`), which came out lower
+        // than the "never charge zero" `currentSoc + 1` floor on every en-route
+        // stop near the end — forcing a full extra stop for each single point
+        // of range still needed instead of just finishing normally.
+        const result = simulateRoadTrip({
+            ...baseParams,
+            startSoc: 100,
+            minSoc: 10,
+            destinationMinSoc: 5,
+            legDistanceMi: 50,
+            totalDistanceMi: 143, // lands 3 mi past the last minSoc-triggered stop
+            mode: 'distance',
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.chargeStops).toBeLessThanOrEqual(2);
+        const chargeSegs = result.segments.filter(s => s.type === 'charge');
+        // No run of consecutive 1-point charges — each stop should size itself
+        // to what the remaining trip actually needs, not to a forced minimum.
+        for (const seg of chargeSegs) {
+            expect(seg.endSoc - seg.startSoc).not.toBeCloseTo(1, 1);
+        }
+        const last = result.segments[result.segments.length - 1];
+        expect(last.endSoc).toBeGreaterThanOrEqual(9.5); // arrives at minSoc, not destFloor
+    });
+
     it('a high destination floor still converges via a single top-up at the end', () => {
         const result = simulateRoadTrip({
             ...baseParams,

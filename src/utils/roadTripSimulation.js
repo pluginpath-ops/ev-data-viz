@@ -106,8 +106,17 @@ export function simulateRoadTrip({
     const warnings = [];
     const segments = [];
 
-    // Arrival buffer defaults to the en-route floor (no behaviour change until set).
-    const destFloor = (destinationMinSoc != null && !isNaN(destinationMinSoc)) ? destinationMinSoc : minSoc;
+    // Arrival buffer defaults to the en-route floor (no behaviour change until set),
+    // and can never drop BELOW it either — asking to arrive with less charge than
+    // the ordinary running buffer isn't a meaningful request, and leaving destFloor
+    // free to go lower fed a per-stop target formula (`destFloor + socForMiles(...)`)
+    // that assumes destFloor is the higher, binding floor. Once destFloor sat below
+    // minSoc, that formula came out lower than the "never charge zero" safety floor
+    // of `currentSoc + 1` on every en-route stop near the end, forcing a full extra
+    // stop for each single point of range still needed instead of recognizing the
+    // trip could just finish normally. Clamping here fixes every downstream use at
+    // once, including the destination top-up's own `destFloor > minSoc` check.
+    const destFloor = Math.max(minSoc, (destinationMinSoc != null && !isNaN(destinationMinSoc)) ? destinationMinSoc : minSoc);
 
     // Speed correction — use higher aero fraction when towing (trailer raises Cd×A of system)
     const aeroFrac = towingMode ? TOWING_AERO_FRACTION : AERO_FRACTION;
@@ -252,7 +261,12 @@ export function simulateRoadTrip({
     // leg/duration cap (there is no more driving left for that cap to
     // budget). Charges to destFloor, or as far as 100% gets if that still
     // isn't enough — the SoC a user enters can never exceed 100.
-    if (completed && destFloor > minSoc && currentSoc < destFloor - 0.01) {
+    //
+    // Compares only to destFloor, not minSoc: the en-route loop already
+    // guarantees arrival at or above minSoc on its own, and destFloor is
+    // clamped to never sit below it (see its definition above) — so a
+    // separate minSoc check here could only ever agree with this one.
+    if (completed && currentSoc < destFloor - 0.01) {
         const targetSoc = Math.min(100, destFloor);
         if (targetSoc > currentSoc + 0.01) {
             const tStart = timeAtSoc(currentSoc);
@@ -279,8 +293,8 @@ export function simulateRoadTrip({
 
     // Reached the destination but below the requested arrival buffer (the buffer was
     // unachievable given battery / efficiency / charging limits — even a top-up to
-    // 100% wasn't enough).
-    if (completed && destFloor > minSoc && currentSoc < destFloor - 0.5) {
+    // 100% wasn't enough). Compares only to destFloor — see the top-up above.
+    if (completed && currentSoc < destFloor - 0.5) {
         warnings.push(`Arrived at ${round1(currentSoc)}% — below the ${round1(destFloor)}% destination minimum`);
     }
 
