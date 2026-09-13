@@ -91,7 +91,7 @@ EVBench is a tool for comparing real-world EV charging and range performance acr
 The home view. Shows a card/list grid of all vehicles in the database. Users select one or more vehicles here to drive the Charts and Compare Specs tabs. Admins and contributors can add, edit, reorder, duplicate, and delete vehicles. Each card shows battery size, EPA range, test count, and tags.
 
 **Tests & Data**
-Per-vehicle view of charging and range test runs. Each run has metadata (date, tester, speed, temperature, notes) and an attached dataset of time-series data points (`soc`, `time`, `range`, `charge_rate`, `temperature`). Users upload data via CSV or Tableau export. Runs are marked `has_charging` or `has_range` to drive chart routing. One run per vehicle can be marked `is_default` as the fallback charging source for the Charge Compare chart.
+Per-vehicle view of charging and range test runs. Each run has metadata (date, tester, speed, temperature, notes) and an attached dataset of time-series data points (`soc`, `time`, `range`, `charge_rate`, `temperature`). Users upload data via CSV or Tableau export. Each run has a single `kind` (`'charging'` or `'range'`) that drives chart routing — migration 046 split the last rows that had carried both roles at once and dropped the `has_charging`/`has_range` boolean pair `kind` replaced. A vehicle can have `is_default` set on one run PER KIND — a default charging run (the fallback curve for Charge Compare) and a default range test (rank 2 of the range-source resolution order, see `utils/rangeSource.js`) are independent and can both be set at once (migration 049/050; before that, a DB trigger bug cleared one kind's default whenever the other was set).
 
 **Charts**
 Visualizations for selected vehicles. Three sub-tabs:

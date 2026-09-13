@@ -145,9 +145,16 @@ export function hasUsableRangeData(run, batteryKwh) {
  * The vehicle's default range test: an explicitly-defaulted one first, then the
  * most recent that carries usable data.
  *
- * `is_default` is currently scoped to charging runs; #155 scopes it per kind, at
- * which point the first branch starts firing for range tests too. Until then
- * this resolves to most-recent, which is what RoadTripView already did.
+ * `is_default` has been scoped PER KIND since #155 (migration 046 split dual-
+ * role runs into one kind per row) and #183 (migration 049, `runs.kind`-aware
+ * `ensure_single_default_run` trigger — the DB was clearing a range default
+ * the moment a charging default was set on the same vehicle, and vice versa,
+ * since the trigger cleared every default row regardless of kind). A vehicle
+ * can hold both a default charging run AND a default range test at once; this
+ * function's first branch has read the range one since #155 shipped. The
+ * most-recent fallback only fires for a vehicle whose range side has never
+ * had one curated — this comment used to describe that as the ONLY case, back
+ * when the trigger bug made a curated range default unreliable in practice.
  */
 export function defaultRangeRun(vehicle, batteryKwh = vehicle?.battery) {
     const candidates = (vehicle?.runs || []).filter(r => hasUsableRangeData(r, batteryKwh));

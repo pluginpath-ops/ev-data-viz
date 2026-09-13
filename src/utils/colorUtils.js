@@ -352,8 +352,16 @@ export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICL
             // recorded, landing both selected runs on muted, far-apart
             // shades despite there being no clash to avoid.
             const plottedMine = plotted ? mine.filter(r => plotted.has(String(r.id))) : mine;
-            const shades = rampFrom(vehicle.color, plottedMine.length);
-            plottedMine.forEach((run, i) => curated.set(String(run.id), shades[i]));
+            // The vehicle's DEFAULT test leads the ramp — sorted first, ahead
+            // of `sorted`'s created_at order — so it draws in the curated
+            // color exactly. Without this, the base color went to whichever
+            // test happened to be entered first, and a vehicle's own default
+            // could land on the most-shaded (least recognisable) end of its
+            // own family. `sort` is stable, so ties keep the creation order.
+            const ranked = [...plottedMine].sort((a, b) =>
+                Number(!(a.isDefault || a.is_default)) - Number(!(b.isDefault || b.is_default)));
+            const shades = rampFrom(vehicle.color, ranked.length);
+            ranked.forEach((run, i) => curated.set(String(run.id), shades[i]));
         }
     }
 
