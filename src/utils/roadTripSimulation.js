@@ -145,36 +145,56 @@ export function simulateRoadTrip({
         // ── DRIVE ────────────────────────────────────────────────────────
         const remainingTrip = totalDistanceMi - currentDist;
 
-        // Final leg if we can reach the destination while keeping ≥ destFloor;
-        // otherwise drive down to the en-route floor (minSoc) and charge.
-        const driveDist = (rangeFrom(currentSoc, destFloor) >= remainingTrip - 0.01)
-            ? remainingTrip
-            : Math.max(0, Math.min(rangeFrom(currentSoc, minSoc), remainingTrip));
+        // Final leg if we can reach the destination while keeping ≥ destFloor.
+        // Otherwise the usual en-route move is to drive down to minSoc and
+        // charge — except when destFloor sits above minSoc and the remaining
+        // trip is short enough to finish without ever touching minSoc. Left
+        // alone, `min(rangeToMinSoc, remainingTrip)` picks remainingTrip there
+        // and the loop exits having "completed" the trip below destFloor,
+        // with no charge stop ever having been asked to close that gap — the
+        // destination buffer was never wired to the stop-insertion logic,
+        // only checked for after the fact (the warning below). Drive only to
+        // the buffer floor instead, leaving a short remainder for one more
+        // (correctly sized) charge stop to close.
+        const canFinishAtDestFloor = rangeFrom(currentSoc, destFloor) >= remainingTrip - 0.01;
+        const rangeToMinSoc = rangeFrom(currentSoc, minSoc);
+        const needsTopUp = !canFinishAtDestFloor && rangeToMinSoc >= remainingTrip - 0.01;
 
-        if (driveDist < MIN_DRIVE_MI && currentDist < totalDistanceMi) {
+        const driveDist = canFinishAtDestFloor
+            ? remainingTrip
+            : needsTopUp
+                ? Math.max(0, rangeFrom(currentSoc, destFloor))
+                : Math.max(0, Math.min(rangeToMinSoc, remainingTrip));
+
+        if (driveDist < MIN_DRIVE_MI && !needsTopUp) {
             warnings.push('Battery depleted: cannot drive far enough to reach next charger');
             break;
         }
 
-        const socUsed   = socForMiles(driveDist);
-        const driveTime = (driveDist / speedMph) * 60; // minutes
+        if (driveDist >= MIN_DRIVE_MI) {
+            const socUsed   = socForMiles(driveDist);
+            const driveTime = (driveDist / speedMph) * 60; // minutes
 
-        segments.push({
-            type: 'drive',
-            startTime: currentTime,
-            endTime:   currentTime + driveTime,
-            startDist: currentDist,
-            endDist:   currentDist + driveDist,
-            startSoc:  round1(currentSoc),
-            endSoc:    round1(currentSoc - socUsed),
-        });
+            segments.push({
+                type: 'drive',
+                startTime: currentTime,
+                endTime:   currentTime + driveTime,
+                startDist: currentDist,
+                endDist:   currentDist + driveDist,
+                startSoc:  round1(currentSoc),
+                endSoc:    round1(currentSoc - socUsed),
+            });
 
-        currentTime += driveTime;
-        currentDist += driveDist;
-        currentSoc  -= socUsed;
+            currentTime += driveTime;
+            currentDist += driveDist;
+            currentSoc  -= socUsed;
 
-        // Trip complete?
-        if (currentDist >= totalDistanceMi - 0.01) break;
+            // Trip complete?
+            if (currentDist >= totalDistanceMi - 0.01) break;
+        }
+        // driveDist < MIN_DRIVE_MI with needsTopUp: already at the buffer
+        // floor (or a negligible sliver short of it) — go straight to a
+        // charge stop rather than logging a token drive segment.
 
         // ── CHARGE ───────────────────────────────────────────────────────
         chargeStops++;
