@@ -9,7 +9,7 @@ import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, speedBasisNote, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
-import { pairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
+import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
@@ -469,20 +469,6 @@ export default function ChargeCompareView({
     // Road Trip and anything added later behave identically when the data shifts
     // underneath them — pruning, repin carry-over and first-sighting bootstrap
     // were three separate implementations that each got a different part wrong.
-    // Bars are colored by the range test (the row's subject). The hook gives the
-    // same session-override behaviour as the other charts without a DB write.
-    const colorableRuns = useMemo(
-        () => resolvedPairs.map(p => p.rangeRun),
-        [resolvedPairs]
-    );
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
-        handSet,
-        onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
-        palette,
-        resetKey: selectedVehicleIds.join(','),
-        vehicles: selectedVehicles,
-    });
-
     const selectionRows = useMemo(
         () => resolvedPairs.map(p => ({
             key: p.key,
@@ -515,6 +501,33 @@ export default function ChargeCompareView({
     const { selected: selectedRuns, toggle: toggleRun } = useRunSelection(
         selectionRows, { shouldBootstrap: bootstrapOneRow }
     );
+
+    // Bars are colored by the range test (the row's subject). The hook gives the
+    // same session-override behaviour as the other charts without a DB write.
+    //
+    // `colorableRuns` stays every range run across every resolved pair, not just
+    // the selected ones, for the same reason RangeChartView and Road Trip keep
+    // theirs wide: a stable input is what keeps an unrelated toggle from
+    // reshuffling an Okabe-Ito slot. `plottedIds` (the selected pairs' range-run
+    // ids, via `selectedRuns` above — now available since selection moved ahead
+    // of color resolution) narrows just the vehicle-color shading to what's
+    // actually drawn.
+    const colorableRuns = useMemo(
+        () => resolvedPairs.map(p => p.rangeRun),
+        [resolvedPairs]
+    );
+    const plottedIds = useMemo(
+        () => selectedRuns.map(k => parsePairKey(k).rangeRunId),
+        [selectedRuns]
+    );
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
+        handSet,
+        onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
+        palette,
+        resetKey: selectedVehicleIds.join(','),
+        vehicles: selectedVehicles,
+        plottedIds,
+    });
 
     // Name each bar by what distinguishes it from the OTHER BARS ON SCREEN, so
     // the labels answer the comparison you are actually looking at. Minimising
