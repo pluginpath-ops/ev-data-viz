@@ -50,7 +50,7 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
                      'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
-                     'epaBandEvidence.js'];
+                     'epaBandEvidence.js', 'dataChecks.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -412,6 +412,53 @@ describe('the seams that broke before', () => {
 
         const missing = [...needed].filter(k => !selected.has(k));
         expect(missing, `candidate columns read but not selected: ${missing.join(', ')}`).toEqual([]);
+    });
+
+    it('reaches Data Checks from the Admin view, on limits an admin can publish', () => {
+        // Read-only and built on modules that already existed, so nothing would
+        // break if it were never mounted — the shape this suite exists for.
+        const admin = read('src/components/AdminView.jsx');
+        expect(admin, 'AdminView must mount the panel').toMatch(/<DataChecksPanel\s*\/>/);
+
+        const panel = read('src/components/admin/DataChecksPanel.jsx');
+        expect(panel, 'the panel must run the checks').toMatch(/runDataChecks\(/);
+        // Performance results are not on the vehicle object. Without these two
+        // fetches the performance checks report nothing, and nothing says why.
+        expect(panel).toMatch(/getPerformanceSummaries\(/);
+        expect(panel).toMatch(/getPerformanceSessions\(/);
+
+        // A limit that is not a knob can be tried on the panel but never kept
+        // for anyone else.
+        const knobs = read('src/constants/knobs.js');
+        const checks = read('src/utils/dataChecks.js');
+        const start = checks.indexOf('export const LIMIT_KEYS');
+        const keys = [...checks.slice(start, checks.indexOf('];', start)).matchAll(/'(\w+)'/g)].map(m => m[1]);
+        expect(keys.length).toBeGreaterThan(0);
+        for (const key of keys) {
+            expect(knobs, `limit ${key} has no knob, so it can never be published`).toContain(`key: '${key}'`);
+        }
+
+        // EPA tested must come from the test the derivations use, or a finding
+        // describes a different run from the one the curator card shows.
+        expect(checks).toMatch(/preferredMctTest\(/);
+
+        // Skips (migration 066). A skip recorded but never passed back into the
+        // checks would be written and then ignored — the finding would stay on
+        // screen after the curator was told it was skipped.
+        expect(panel, 'the panel must load recorded skips').toMatch(/getDataCheckSkips\(/);
+        expect(panel, 'the panel must be able to record and clear a skip').toMatch(/setDataCheckSkip\(/);
+        expect(panel, 'the loaded skips must reach the checks').toMatch(/runDataChecks\([^)]*skips/s);
+
+        // The upsert's conflict target must be the constraint the migration
+        // creates, or re-skipping a finding fails instead of replacing it.
+        const svc = read('src/services/DataService.js');
+        const setter = svc.slice(svc.indexOf('async setDataCheckSkip'));
+        expect(setter.slice(0, setter.indexOf('\n  }'))).toMatch(/onConflict:\s*'vehicle_id,check_key'/);
+        // "Skip all" is one write, on the same conflict target.
+        expect(panel, 'Skip all must go through the batch write').toMatch(/recordDataCheckSkips\(/);
+        const batch = svc.slice(svc.indexOf('async recordDataCheckSkips'));
+        expect(batch.slice(0, batch.indexOf('\n  }'))).toMatch(/onConflict:\s*'vehicle_id,check_key'/);
+        expect(read('supabase/migrations/066_data_check_skips.sql')).toMatch(/UNIQUE \(vehicle_id, check_key\)/);
     });
 
     it('reaches the reconciliation sweep from the Admin view', () => {

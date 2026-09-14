@@ -81,7 +81,7 @@ function mctTestsOf(tests) {
  * derives the same way — an arbitrary pick that changes between loads is worse
  * than a wrong one that holds still.
  */
-function preferredMctTest(tests, preferredTestNumber = null) {
+export function preferredMctTest(tests, preferredTestNumber = null) {
     const mcts = mctTestsOf(tests);
     if (mcts.length <= 1) return mcts[0] ?? null;
 

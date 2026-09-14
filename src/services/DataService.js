@@ -2158,6 +2158,74 @@ class DataService {
   }
 
   /**
+   * Every recorded Data Checks skip (#321, migration 066).
+   *
+   * `available` is false until the table exists. The panel still shows every
+   * finding; it just cannot remember a decision yet — better than an Admin view
+   * that will not load, which is 058's fallback for the same reason.
+   */
+  async getDataCheckSkips() {
+    if (!this.useSupabase) return { skips: [], available: false };
+    const { data, error } = await getSupabase()
+      .from('data_check_skips')
+      .select('vehicle_id, check_key, fingerprint, note, skipped_at');
+    if (error) {
+      if (isMissingRelation(error)) return { skips: [], available: false };
+      throw error;
+    }
+    return { skips: data || [], available: true };
+  }
+
+  /**
+   * Skip a finding, recording the values it was judged on — or clear the skip
+   * when `fingerprint` is null.
+   *
+   * Skipping again replaces the earlier judgement rather than adding a second:
+   * one per (vehicle, check), which is the unique constraint the upsert targets.
+   * A skip is kept against its fingerprint, so a finding whose values later
+   * change returns on its own; nothing here has to notice.
+   */
+  async setDataCheckSkip(vehicleId, checkKey, fingerprint, note = null) {
+    if (!this.useSupabase) return;
+    const table = getSupabase().from('data_check_skips');
+    const { error } = fingerprint == null
+      ? await table.delete().eq('vehicle_id', vehicleId).eq('check_key', checkKey)
+      : await table.upsert({
+          vehicle_id: vehicleId,
+          check_key: checkKey,
+          fingerprint,
+          note,
+          skipped_at: new Date().toISOString(),
+          skipped_by: this.user?.id ?? null,
+        }, { onConflict: 'vehicle_id,check_key' });
+    if (error) throw error;
+  }
+
+  /**
+   * Skip several findings in one write — "Skip all" on a vehicle.
+   *
+   * One upsert rather than a loop over setDataCheckSkip: a vehicle can carry a
+   * dozen findings, and a dozen round trips is exactly the lag this replaces.
+   *
+   * @param {Array<{ vehicleId, checkKey, fingerprint, note }>} skips
+   */
+  async recordDataCheckSkips(skips = []) {
+    if (!this.useSupabase || !skips.length) return;
+    const skippedAt = new Date().toISOString();
+    const { error } = await getSupabase()
+      .from('data_check_skips')
+      .upsert(skips.map(s => ({
+        vehicle_id: s.vehicleId,
+        check_key: s.checkKey,
+        fingerprint: s.fingerprint,
+        note: s.note ?? null,
+        skipped_at: skippedAt,
+        skipped_by: this.user?.id ?? null,
+      })), { onConflict: 'vehicle_id,check_key' });
+    if (error) throw error;
+  }
+
+  /**
    * Link many groups in one operation (#238).
    *
    * Exists because the per-link path in AppContext refreshes every vehicle in

@@ -5176,6 +5176,51 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .epa-audit-row:hover { background: var(--color-surface-muted); }
 
+/* Admin → Data Checks (#321). One row per vehicle, ruled like the
+   reconciliation sweep above, for the same reason: it is scanned worst-first. */
+.data-check-row {
+    @apply border-b border-[var(--color-border)] last:border-b-0;
+}
+.data-check-row:hover { background: var(--color-surface-muted); }
+
+/* One finding. The leading edge says which kind before the sentence is read:
+   a disagreement crossed a limit; a gap is something missing with no limit
+   behind it, so it stays neutral rather than borrowing a status color. */
+.data-check-finding {
+    @apply flex flex-col gap-0.5 p-2 rounded;
+    border-left: 3px solid var(--color-border);
+    background: var(--color-surface-2, transparent);
+}
+.data-check-finding.is-disagrees { border-left-color: var(--color-danger); }
+.data-check-finding.is-gap       { border-left-color: var(--color-border-strong); }
+/* Shown only under "Show skipped", and quieter than an open finding: a decision
+   already made, kept findable rather than hidden. */
+.data-check-finding.is-skipped   { @apply opacity-60; }
+
+/* A vehicle's "Skip all", which becomes "Record skips" on the first click. One
+   width in both states, so a quick second click lands on the same button rather
+   than wherever the relabel pushed it. */
+.data-check-skip-all {
+    @apply justify-center shrink-0;
+    min-width: 8rem;
+}
+
+/* How many of each kind a vehicle has, beside its name. */
+.data-check-tally {
+    @apply text-xs font-medium whitespace-nowrap tabular-nums;
+    color: var(--color-text-meta);
+}
+.data-check-tally.is-disagrees { color: var(--color-danger); }
+
+/* The limits the checks run against, edited in place. */
+.data-check-limits {
+    @apply grid gap-x-6 gap-y-2 mb-4;
+    grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr));
+}
+.data-check-limit {
+    @apply flex items-center justify-between gap-3;
+}
+
 .epa-check-agrees    { border-left-color: var(--color-success); }
 .epa-check-close     { border-left-color: var(--color-warning); }
 .epa-check-disagrees { border-left-color: var(--color-danger); }
@@ -6843,7 +6888,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: rgba(59, 130, 246, 0.15);
 }
 
-.sweep-skip-ask {
+/* The inline prompt that records a skip, with its optional note. Shared by the
+   Fuel Economy Guide link sweep and Data Checks: the same act in both places. */
+.skip-ask {
     @apply flex flex-wrap items-center gap-2 p-2 rounded;
     background-color: rgba(245, 158, 11, 0.12);
     border: 1px solid var(--color-warning);

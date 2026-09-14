@@ -12,11 +12,13 @@ import FeGuideLinkSweep from './admin/FeGuideLinkSweep';
 import EpaAuditSweep from './admin/EpaAuditSweep';
 import BrandRegistry from './admin/BrandRegistry';
 import TagRegistry from './admin/TagRegistry';
+import DataChecksPanel from './admin/DataChecksPanel';
 
 const SUBTABS = [
     { id: 'roles',     label: 'Roles & Permissions' },
     { id: 'epa',       label: 'EPA Data' },
     { id: 'feguide',   label: 'Fuel Economy Guide' },
+    { id: 'checks',    label: 'Data Checks' },
     { id: 'brands',    label: 'Brands & Tags' },
     { id: 'constants', label: 'Model Constants' },
     { id: 'interface', label: 'Interface Settings' },
@@ -33,6 +35,7 @@ const SUBTITLES = {
     roles:     'Manage registered users and their roles.',
     epa:       'Browse, edit, link, and delete imported EPA test groups — and see which of them do not reconcile.',
     feguide:   'Import EPA\'s published label figures, and link them to certification groups.',
+    checks:    'Every vehicle against its own sources — range, battery capacity, weight, drive type, voltage and performance — with the limits tunable in place.',
     brands:    'One brand list for vehicles and EPA filings. Rename, merge, and map EPA\'s division spellings.',
     constants: 'Tune the EPA model math (local sandbox).',
     interface: 'Site-wide appearance settings.',
@@ -210,6 +213,8 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                     <FeGuideLinkSweep />
                 </div>
             )}
+
+            {subtab === 'checks' && <DataChecksPanel />}
 
             {subtab === 'brands' && (
                 <div className="flex flex-col gap-6">

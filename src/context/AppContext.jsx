@@ -1234,6 +1234,11 @@ export function AppProvider({ children }) {
     const getGroupsAwaitingFeLink = (opts) => dataService.getGroupsAwaitingFeLink(opts);
     const getFeLinkProgress = () => dataService.getFeLinkProgress();
     const setFeLinkSkipped = (id, skipped, note) => dataService.setFeLinkSkipped(id, skipped, note);
+    // Data Checks skips (#321, migration 066).
+    const getDataCheckSkips = () => dataService.getDataCheckSkips();
+    const setDataCheckSkip = (vehicleId, checkKey, fingerprint, note) =>
+        dataService.setDataCheckSkip(vehicleId, checkKey, fingerprint, note);
+    const recordDataCheckSkips = (skips) => dataService.recordDataCheckSkips(skips);
     // The public browser (#235). Both are read-once-per-mount loads over small
     // result sets, so they are plain pass-throughs with no caching layer here.
     const getFeGuideRows = () => dataService.getFeGuideRows();
@@ -1701,6 +1706,9 @@ export function AppProvider({ children }) {
         getGroupsAwaitingFeLink,
         getFeLinkProgress,
         setFeLinkSkipped,
+        getDataCheckSkips,
+        setDataCheckSkip,
+        recordDataCheckSkips,
         getBrandAliases,
         getBrandDivisionSummary,
         getBrandUsageSummary,
