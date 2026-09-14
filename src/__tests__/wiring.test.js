@@ -454,6 +454,10 @@ describe('the seams that broke before', () => {
         const svc = read('src/services/DataService.js');
         const setter = svc.slice(svc.indexOf('async setDataCheckSkip'));
         expect(setter.slice(0, setter.indexOf('\n  }'))).toMatch(/onConflict:\s*'vehicle_id,check_key'/);
+        // "Skip all" is one write, on the same conflict target.
+        expect(panel, 'Skip all must go through the batch write').toMatch(/recordDataCheckSkips\(/);
+        const batch = svc.slice(svc.indexOf('async recordDataCheckSkips'));
+        expect(batch.slice(0, batch.indexOf('\n  }'))).toMatch(/onConflict:\s*'vehicle_id,check_key'/);
         expect(read('supabase/migrations/066_data_check_skips.sql')).toMatch(/UNIQUE \(vehicle_id, check_key\)/);
     });
 

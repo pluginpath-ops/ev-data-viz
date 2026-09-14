@@ -2202,6 +2202,30 @@ class DataService {
   }
 
   /**
+   * Skip several findings in one write — "Skip all" on a vehicle.
+   *
+   * One upsert rather than a loop over setDataCheckSkip: a vehicle can carry a
+   * dozen findings, and a dozen round trips is exactly the lag this replaces.
+   *
+   * @param {Array<{ vehicleId, checkKey, fingerprint, note }>} skips
+   */
+  async recordDataCheckSkips(skips = []) {
+    if (!this.useSupabase || !skips.length) return;
+    const skippedAt = new Date().toISOString();
+    const { error } = await getSupabase()
+      .from('data_check_skips')
+      .upsert(skips.map(s => ({
+        vehicle_id: s.vehicleId,
+        check_key: s.checkKey,
+        fingerprint: s.fingerprint,
+        note: s.note ?? null,
+        skipped_at: skippedAt,
+        skipped_by: this.user?.id ?? null,
+      })), { onConflict: 'vehicle_id,check_key' });
+    if (error) throw error;
+  }
+
+  /**
    * Link many groups in one operation (#238).
    *
    * Exists because the per-link path in AppContext refreshes every vehicle in

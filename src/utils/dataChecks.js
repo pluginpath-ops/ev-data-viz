@@ -442,6 +442,29 @@ export function groupPerformanceByVehicle(summaries = [], sessions = []) {
     return out;
 }
 
+/** How a skip is addressed: one per vehicle and check, as migration 066's unique constraint. */
+export const skipKey = (vehicleId, checkKey) => `${vehicleId}:${checkKey}`;
+
+/**
+ * Recorded skips with this session's unconfirmed changes laid over them.
+ *
+ * The panel applies a skip the moment it is clicked and writes it in the
+ * background. Waiting for the write and then a reload before anything moved is
+ * what made skipping feel slow; a failed write is taken back out of `pending`.
+ *
+ * @param {Array} loaded                   data_check_skips rows, as fetched
+ * @param {Map<string, Object|null>} pending  skipKey → the row it will become,
+ *                                            or null for an un-skip
+ */
+export function overlaySkips(loaded = [], pending = new Map()) {
+    const byKey = new Map(loaded.map(s => [skipKey(s.vehicle_id, s.check_key), s]));
+    for (const [key, row] of pending) {
+        if (row) byKey.set(key, row);
+        else byKey.delete(key);
+    }
+    return [...byKey.values()];
+}
+
 /**
  * Attach any recorded skip to each finding.
  *
@@ -451,7 +474,7 @@ export function groupPerformanceByVehicle(summaries = [], sessions = []) {
  */
 function applySkips(vehicle, findings, skipsByKey) {
     return findings.map(f => {
-        const skip = skipsByKey.get(`${vehicle.id}:${f.check}`) ?? null;
+        const skip = skipsByKey.get(skipKey(vehicle.id, f.check)) ?? null;
         const skipped = !!skip && skip.fingerprint === f.fingerprint;
         return { ...f, skip, skipped, resurfaced: !!skip && !skipped };
     });

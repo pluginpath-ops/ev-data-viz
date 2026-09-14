@@ -5197,6 +5197,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    already made, kept findable rather than hidden. */
 .data-check-finding.is-skipped   { @apply opacity-60; }
 
+/* A vehicle's "Skip all", which becomes "Record skips" on the first click. One
+   width in both states, so a quick second click lands on the same button rather
+   than wherever the relabel pushed it. */
+.data-check-skip-all {
+    @apply justify-center shrink-0;
+    min-width: 8rem;
+}
+
 /* How many of each kind a vehicle has, beside its name. */
 .data-check-tally {
     @apply text-xs font-medium whitespace-nowrap tabular-nums;

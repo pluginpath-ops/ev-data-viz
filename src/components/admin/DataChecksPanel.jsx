@@ -7,6 +7,7 @@ import { vehicleLabel } from '../../utils/specHelpers';
 import {
     CHECK_FIGURES, DATA_CHECKS, TESTED_RULES, LIMIT_KEYS, LOADED_LIMITS,
     runDataChecks, checkCounts, sourceNameVariants, groupPerformanceByVehicle,
+    overlaySkips, skipKey,
 } from '../../utils/dataChecks';
 
 /**
@@ -21,14 +22,18 @@ import {
  * The one thing it writes is a skip (migration 066): a curator's decision that
  * a finding is correct as it stands. A skip holds while the finding's values
  * hold, so nothing here has to notice when it lapses — the checks do.
+ *
+ * Skips apply the moment they are clicked and are written behind the scenes.
+ * A recompute of the whole fleet measured under a millisecond; the lag was the
+ * write and a reload of every skip before anything moved.
  */
 
 const KNOB_BY_KEY = Object.fromEntries(KNOB_GROUPS.flatMap(g => g.knobs).map(k => [k.key, k]));
 const CHECK_LABEL = Object.fromEntries(DATA_CHECKS.map(c => [c.key, c.label]));
+const NOTE_PLACEHOLDER = 'Why is this correct as it stands? (optional)';
 
 const sameLimit = (a, b) => (Array.isArray(a) ? a[0] === b[0] && a[1] === b[1] : a === b);
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-const skipKey = (vehicleId, check) => `${vehicleId}:${check}`;
 
 /** A cleared input keeps the previous value rather than becoming 0, which would flag everything. */
 const numberOr = (raw, fallback) => {
@@ -82,27 +87,32 @@ function Tally({ row }) {
 /**
  * One finding, with the controls to skip or un-skip it.
  *
+ * While its vehicle's "Skip all" is armed, an open finding shows only a note
+ * field — the vehicle's button records them together, so a per-finding button
+ * would be a second way to do the same thing mid-way through the first.
+ *
  * A resurfaced finding — skipped once, values changed since — says so, and
  * shows the old note, because the curator's earlier reasoning is exactly what
  * is needed to decide whether it still applies.
  */
-function FindingItem({ finding: f, canSkip, busy, onSkip, onUnskip }) {
+function FindingItem({ finding: f, canSkip, armed, armedNote, onArmedNote, onSkip, onUnskip }) {
     const [asking, setAsking] = useState(false);
     const [note, setNote] = useState('');
     const when = f.skip?.skipped_at ? new Date(f.skip.skipped_at).toLocaleDateString() : null;
     const earlierNote = f.skip?.note;
+    const armedHere = armed && !f.skipped;
 
     return (
         <div className={`data-check-finding is-${f.kind}${f.skipped ? ' is-skipped' : ''}`}>
             <div className="flex items-start justify-between gap-3">
                 <span className="text-note">{f.text}</span>
-                {canSkip && !asking && (
+                {canSkip && !asking && !armedHere && (
                     f.skipped ? (
-                        <button type="button" className="btn btn-secondary text-sm shrink-0" disabled={busy} onClick={onUnskip}>
+                        <button type="button" className="btn btn-secondary text-sm shrink-0" onClick={onUnskip}>
                             Un-skip
                         </button>
                     ) : (
-                        <button type="button" className="btn btn-secondary text-sm shrink-0" disabled={busy} onClick={() => setAsking(true)}>
+                        <button type="button" className="btn btn-secondary text-sm shrink-0" onClick={() => setAsking(true)}>
                             Skip
                         </button>
                     )
@@ -121,23 +131,30 @@ function FindingItem({ finding: f, canSkip, busy, onSkip, onUnskip }) {
                 </span>
             )}
 
-            {asking && (
+            {armedHere && (
+                <input
+                    className="form-input w-full"
+                    value={armedNote}
+                    onChange={e => onArmedNote(e.target.value)}
+                    placeholder={NOTE_PLACEHOLDER}
+                />
+            )}
+
+            {asking && !armedHere && (
                 <div className="skip-ask">
                     <input
                         className="form-input flex-1"
                         value={note}
                         onChange={e => setNote(e.target.value)}
-                        placeholder="Why is this correct as it stands? (optional)"
+                        placeholder={NOTE_PLACEHOLDER}
                     />
                     <button
                         type="button"
                         className="btn btn-warning"
-                        disabled={busy}
-                        onClick={async () => {
-                            if (await onSkip(note.trim() || null)) {
-                                setAsking(false);
-                                setNote('');
-                            }
+                        onClick={() => {
+                            onSkip(note.trim() || null);
+                            setAsking(false);
+                            setNote('');
                         }}
                     >
                         Record skip
@@ -149,23 +166,68 @@ function FindingItem({ finding: f, canSkip, busy, onSkip, onUnskip }) {
     );
 }
 
-function VehicleRow({ row, findings, open, onToggle, canSkip, busyKey, onSkip, onUnskip }) {
+/**
+ * One vehicle and its findings.
+ *
+ * "Skip all" arms on the first click — opening a note field under every open
+ * finding — and records on the second. So a quick double click skips the whole
+ * vehicle without notes, and nothing needs to tell a double click from two
+ * singles. The button sits in the header, above the fields it reveals, and holds
+ * one width in both states, so the second click lands where the first did.
+ */
+function VehicleRow({ row, findings, open, onToggle, canSkip, onSkip, onUnskip, onSkipAll }) {
+    const [armed, setArmed] = useState(false);
+    const [notes, setNotes] = useState({});
+    const openFindings = findings.filter(f => !f.skipped);
+    const showSkipAll = canSkip && (armed || openFindings.length > 0);
+
+    const disarm = () => {
+        setArmed(false);
+        setNotes({});
+    };
+    const clickSkipAll = () => {
+        if (!armed) {
+            if (!open) onToggle();
+            setArmed(true);
+            return;
+        }
+        onSkipAll(openFindings.map(f => ({ finding: f, note: notes[f.check]?.trim() || null })));
+        disarm();
+    };
+
     return (
         <div className="data-check-row">
-            <button
-                type="button"
-                onClick={onToggle}
-                aria-expanded={open}
-                className="w-full text-left flex items-start justify-between gap-3 py-1"
-            >
-                <span className="min-w-0">
-                    <span className="text-secondary truncate block">{vehicleLabel(row.vehicle)}</span>
-                    <span className="text-meta block truncate">
-                        {[...new Set(findings.map(f => CHECK_LABEL[f.check]))].join(' · ')}
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={onToggle}
+                    aria-expanded={open}
+                    className="flex-1 min-w-0 text-left flex items-start justify-between gap-3 py-1"
+                >
+                    <span className="min-w-0">
+                        <span className="text-secondary truncate block">{vehicleLabel(row.vehicle)}</span>
+                        <span className="text-meta block truncate">
+                            {[...new Set(findings.map(f => CHECK_LABEL[f.check]))].join(' · ')}
+                        </span>
                     </span>
-                </span>
-                <Tally row={row} />
-            </button>
+                    <Tally row={row} />
+                </button>
+                {armed && (
+                    <button type="button" className="btn btn-secondary text-sm" onClick={disarm}>Cancel</button>
+                )}
+                {showSkipAll && (
+                    <button
+                        type="button"
+                        className={`btn ${armed ? 'btn-warning' : 'btn-secondary'} text-sm data-check-skip-all`}
+                        title={armed
+                            ? `Record ${plural(openFindings.length, 'skip')}, with any notes written below`
+                            : 'Skip every finding shown for this vehicle. Click again to record — or double click to skip without notes.'}
+                        onClick={clickSkipAll}
+                    >
+                        {armed ? 'Record skips' : 'Skip all'}
+                    </button>
+                )}
+            </div>
             {open && (
                 <div className="flex flex-col gap-1 pl-2 pb-2">
                     {findings.map(f => (
@@ -173,7 +235,9 @@ function VehicleRow({ row, findings, open, onToggle, canSkip, busyKey, onSkip, o
                             key={f.check}
                             finding={f}
                             canSkip={canSkip}
-                            busy={busyKey === skipKey(row.vehicle.id, f.check)}
+                            armed={armed}
+                            armedNote={notes[f.check] ?? ''}
+                            onArmedNote={(text) => setNotes(prev => ({ ...prev, [f.check]: text }))}
                             onSkip={(note) => onSkip(row.vehicle.id, f, note)}
                             onUnskip={() => onUnskip(row.vehicle.id, f)}
                         />
@@ -186,7 +250,8 @@ function VehicleRow({ row, findings, open, onToggle, canSkip, busyKey, onSkip, o
 
 export default function DataChecksPanel() {
     const {
-        vehicles, getPerformanceSummaries, getPerformanceSessions, getDataCheckSkips, setDataCheckSkip,
+        vehicles, getPerformanceSummaries, getPerformanceSessions,
+        getDataCheckSkips, setDataCheckSkip, recordDataCheckSkips,
     } = useAppContext();
     const fleet = useMemo(() => vehicles ?? [], [vehicles]);
 
@@ -210,10 +275,14 @@ export default function DataChecksPanel() {
         [perfData],
     );
 
+    // Skips as loaded, with this session's changes laid over them. The overlay
+    // is what the screen shows; there is no reload after a write, because the
+    // overlay already says what the write made true.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const loadSkips = useCallback(() => getDataCheckSkips(), []);
-    const { data: skipData, reload: reloadSkips } = useAsyncResource(loadSkips, []);
-    const skips = useMemo(() => skipData?.skips ?? [], [skipData]);
+    const { data: skipData } = useAsyncResource(loadSkips, []);
+    const [pending, setPending] = useState(() => new Map());
+    const skips = useMemo(() => overlaySkips(skipData?.skips ?? [], pending), [skipData, pending]);
     const canSkip = skipData?.available === true;
 
     const [limits, setLimits]           = useState(() => ({ ...LOADED_LIMITS }));
@@ -223,7 +292,6 @@ export default function DataChecksPanel() {
     const [open, setOpen]               = useState(() => new Set());
     const [kept, setKept]               = useState(false);
     const [showSkipped, setShowSkipped] = useState(false);
-    const [busyKey, setBusyKey]         = useState(null);
     const [writeError, setWriteError]   = useState(null);
 
     const rows   = useMemo(() => runDataChecks(fleet, { limits, testedRule: rule, performance, skips }), [fleet, limits, rule, performance, skips]);
@@ -249,23 +317,54 @@ export default function DataChecksPanel() {
         setKept(true);
     };
 
-    /** Record or clear one skip. Resolves true on success, so the prompt knows to close. */
-    async function writeSkip(vehicleId, f, fingerprint, note = null) {
-        setBusyKey(skipKey(vehicleId, f.check));
+    /**
+     * Show skip changes at once, then write them. A failed write takes them back
+     * out, so the screen never claims a skip the database refused.
+     *
+     * @param {Array<{ vehicleId, finding, note?, skip: boolean }>} changes
+     * @param {Function} write  the database call that makes them true
+     */
+    async function applySkipChanges(changes, write) {
+        const keys = changes.map(c => skipKey(c.vehicleId, c.finding.check));
+        // What each key held before, so a failure restores exactly that.
+        const previous = new Map(keys.map(k => [k, pending.has(k) ? pending.get(k) : undefined]));
+        const skippedAt = new Date().toISOString();
+        setPending(prev => {
+            const next = new Map(prev);
+            for (const c of changes) {
+                next.set(skipKey(c.vehicleId, c.finding.check), c.skip
+                    ? { vehicle_id: c.vehicleId, check_key: c.finding.check, fingerprint: c.finding.fingerprint, note: c.note ?? null, skipped_at: skippedAt }
+                    : null);
+            }
+            return next;
+        });
         setWriteError(null);
         try {
-            await setDataCheckSkip(vehicleId, f.check, fingerprint, note);
-            reloadSkips();
-            return true;
+            await write();
         } catch (e) {
-            setWriteError(e.message);
-            return false;
-        } finally {
-            setBusyKey(null);
+            setPending(prev => {
+                const next = new Map(prev);
+                for (const [k, v] of previous) {
+                    if (v === undefined) next.delete(k);
+                    else next.set(k, v);
+                }
+                return next;
+            });
+            setWriteError(`Not saved, so it has been put back: ${e.message}`);
         }
     }
-    const recordSkip = (vehicleId, f, note) => writeSkip(vehicleId, f, f.fingerprint, note);
-    const clearSkip  = (vehicleId, f) => writeSkip(vehicleId, f, null);
+
+    const recordSkip = (vehicleId, f, note) => applySkipChanges(
+        [{ vehicleId, finding: f, note, skip: true }],
+        () => setDataCheckSkip(vehicleId, f.check, f.fingerprint, note));
+    const clearSkip = (vehicleId, f) => applySkipChanges(
+        [{ vehicleId, finding: f, skip: false }],
+        () => setDataCheckSkip(vehicleId, f.check, null));
+    const skipAll = (vehicleId, entries) => applySkipChanges(
+        entries.map(({ finding, note }) => ({ vehicleId, finding, note, skip: true })),
+        () => recordDataCheckSkips(entries.map(({ finding, note }) => ({
+            vehicleId, checkKey: finding.check, fingerprint: finding.fingerprint, note,
+        }))));
 
     const skippedTotal = rows.reduce((n, r) => n + r.skipped, 0);
     const outstanding = rows.filter(r => r.disagrees || r.gaps);
@@ -403,9 +502,9 @@ export default function DataChecksPanel() {
                         open={open.has(row.vehicle.id)}
                         onToggle={() => toggle(row.vehicle.id)}
                         canSkip={canSkip}
-                        busyKey={busyKey}
                         onSkip={recordSkip}
                         onUnskip={clearSkip}
+                        onSkipAll={(entries) => skipAll(row.vehicle.id, entries)}
                     />
                 ))}
                 {!shown.length && <p className="text-note">Nothing matches.</p>}

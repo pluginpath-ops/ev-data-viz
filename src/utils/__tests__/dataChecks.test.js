@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    runDataChecks, checkCounts, sourceNameVariants, groupPerformanceByVehicle,
+    runDataChecks, checkCounts, sourceNameVariants, groupPerformanceByVehicle, overlaySkips, skipKey,
     DATA_CHECKS, LIMIT_KEYS, LOADED_LIMITS,
 } from '../dataChecks';
 
@@ -313,5 +313,34 @@ describe('skips', () => {
         const [f] = findingsFor(v);
         const rows = runDataChecks([v, w], { limits: LIMITS, skips: [skipOf(v, f)] });
         expect(rangeFinding(rows.find(r => r.vehicle === w)).skipped).toBe(false);
+    });
+});
+
+describe('skips applied before the write returns', () => {
+    const row = (vehicle_id, check_key, fingerprint = '{}') => ({ vehicle_id, check_key, fingerprint });
+
+    it('adds a pending skip on top of what was loaded', () => {
+        const pending = new Map([[skipKey(2, 'drive-vs-epa'), row(2, 'drive-vs-epa')]]);
+        expect(overlaySkips([row(1, 'range-vs-label')], pending)).toHaveLength(2);
+    });
+
+    it('replaces a loaded skip with a pending re-skip, never duplicating it', () => {
+        const pending = new Map([[skipKey(1, 'range-vs-label'), row(1, 'range-vs-label', '{"range":345}')]]);
+        const out = overlaySkips([row(1, 'range-vs-label', '{"range":337}')], pending);
+        expect(out).toEqual([row(1, 'range-vs-label', '{"range":345}')]);
+    });
+
+    it('removes a loaded skip for a pending un-skip', () => {
+        const pending = new Map([[skipKey(1, 'range-vs-label'), null]]);
+        expect(overlaySkips([row(1, 'range-vs-label')], pending)).toEqual([]);
+    });
+
+    it('hides a finding the moment its skip is pending', () => {
+        const v = vehicle({ range: 337 }, [group({ label_range_published: 311 })]);
+        const f = runDataChecks([v], { limits: LIMITS })[0].findings[0];
+        const pending = new Map([[skipKey(v.id, f.check), row(v.id, f.check, f.fingerprint)]]);
+        const [r] = runDataChecks([v], { limits: LIMITS, skips: overlaySkips([], pending) });
+        expect(r.disagrees).toBe(0);
+        expect(r.skipped).toBe(1);
     });
 });

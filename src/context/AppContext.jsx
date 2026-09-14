@@ -1238,6 +1238,7 @@ export function AppProvider({ children }) {
     const getDataCheckSkips = () => dataService.getDataCheckSkips();
     const setDataCheckSkip = (vehicleId, checkKey, fingerprint, note) =>
         dataService.setDataCheckSkip(vehicleId, checkKey, fingerprint, note);
+    const recordDataCheckSkips = (skips) => dataService.recordDataCheckSkips(skips);
     // The public browser (#235). Both are read-once-per-mount loads over small
     // result sets, so they are plain pass-throughs with no caching layer here.
     const getFeGuideRows = () => dataService.getFeGuideRows();
@@ -1707,6 +1708,7 @@ export function AppProvider({ children }) {
         setFeLinkSkipped,
         getDataCheckSkips,
         setDataCheckSkip,
+        recordDataCheckSkips,
         getBrandAliases,
         getBrandDivisionSummary,
         getBrandUsageSummary,
