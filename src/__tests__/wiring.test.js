@@ -50,7 +50,7 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
                      'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
-                     'epaBandEvidence.js', 'dataChecks.js'];
+                     'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -440,7 +440,8 @@ describe('the seams that broke before', () => {
 
         // EPA tested must come from the test the derivations use, or a finding
         // describes a different run from the one the curator card shows.
-        expect(checks).toMatch(/preferredMctTest\(/);
+        expect(read('src/utils/epaConfiguration.js')).toMatch(/preferredMctTest\(/);
+        expect(checks).toMatch(/epaConfigurationFigures\(/);
 
         // Skips (migration 066). A skip recorded but never passed back into the
         // checks would be written and then ignored — the finding would stay on
@@ -459,6 +460,32 @@ describe('the seams that broke before', () => {
         const batch = svc.slice(svc.indexOf('async recordDataCheckSkips'));
         expect(batch.slice(0, batch.indexOf('\n  }'))).toMatch(/onConflict:\s*'vehicle_id,check_key'/);
         expect(read('supabase/migrations/066_data_check_skips.sql')).toMatch(/UNIQUE \(vehicle_id, check_key\)/);
+    });
+
+    it('lets a curator choose the primary EPA configuration, and the checks follow it', () => {
+        // The picker, the write and the checks are three files that each work
+        // alone. A picker never mounted, or a choice the checks never read,
+        // would store a primary that changes nothing anyone can see.
+        const section = read('src/components/EpaVehicleSection.jsx');
+        expect(section, 'the EPA section must mount the picker').toMatch(/<PrimaryConfigurationPicker[\s\S]*?onChoose=\{onSetPrimary\}/);
+        expect(read('src/components/RunsView.jsx'), 'RunsView must hand the write to the section')
+            .toMatch(/onSetPrimary=\{setPrimaryEpaMapping\}/);
+        expect(read('src/context/AppContext.jsx')).toMatch(/dataService\.setPrimaryEpaMapping\(/);
+        expect(read('src/utils/dataChecks.js'), 'the checks must judge against the primary').toMatch(/primaryEpaMapping\(/);
+
+        // getVehicles backs the whole app. Naming a column before its migration
+        // is applied fails the entire query (055), so the mapping is a wildcard
+        // and `is_primary` is only ever read off the row.
+        const svc = read('src/services/DataService.js');
+        const select = svc.slice(svc.indexOf('async getVehicles'), svc.indexOf('.order(', svc.indexOf('async getVehicles')));
+        // (`epa_coefficient_sets` names its own, older `is_primary` — that one is fine.)
+        expect(select).toMatch(/epa_vehicle_mappings\(\*, epa_test_groups\(/);
+
+        // The client writes one UPDATE; the index and the trigger that make
+        // that safe must both be in the migration.
+        const migration = read('supabase/migrations/067_primary_epa_configuration.sql');
+        expect(migration).toMatch(/ON epa_vehicle_mappings\(vehicle_id\)\s+WHERE is_primary/);
+        expect(migration).toMatch(/BEFORE INSERT OR UPDATE OF is_primary ON epa_vehicle_mappings/);
     });
 
     it('reaches the reconciliation sweep from the Admin view', () => {

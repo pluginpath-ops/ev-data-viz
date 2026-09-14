@@ -402,7 +402,7 @@ const DeriveAxisPanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     // ── Sub-tabs ──────────────────────────────────────────────────────────────
@@ -2930,6 +2930,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                     onCreate={createAndLinkEpaTestGroup}
                     onUnlink={unlinkEpaTestGroup}
                     onUpdateConfidence={updateEpaMapping}
+                    onSetPrimary={setPrimaryEpaMapping}
                     onUpdateDisplayName={(testGroupId, name) =>
                         updateEpaTestGroup(testGroupId, { display_name: name || null })
                     }
