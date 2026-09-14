@@ -234,7 +234,70 @@ export const EPA_DEFAULTS = {
     // this was 60 while the speed was a guess, and correcting it raises every
     // steady-state η by roughly eight points.
     SS_CYCLE_SPEED_MPH: 65,
+
+    // ── Data Checks (#321) ──────────────────────────────────────────────────
+    // The limits Admin → Data Checks measures each vehicle against. Curation
+    // judgements rather than facts, set from the 2026-09-10 corpus, and tried
+    // live on that panel before anything is kept.
+
+    // How far apart one vehicle's linked EPA configurations may read on range
+    // before it is listed as needing one chosen to represent it. Wheel and trim
+    // variants of one car sit a few percent apart; 21 vehicles link to several,
+    // up to 33% apart.
+    LABEL_SPREAD_PCT: 5,
+
+    // How far EPA tested pack energy may sit from the NEARER of the
+    // manufacturer's Usable and Gross. The depletion test lands on whichever
+    // label matches the pack — Gross on R1S, CLA 350 and Macan RWD, Usable on
+    // Taycan and ID.Buzz — so 10 of the 12 vehicles carrying both sit within 5%
+    // of one. The two beyond it, at 15% and 24%, read as the wrong configuration
+    // linked rather than a pack.
+    TESTED_CAPACITY_TOLERANCE_PCT: 5,
+
+    // How far EPA tested may vary across one vehicle's linked configurations
+    // before it reads as two packs on one vehicle row, or a wrong link.
+    TESTED_SPREAD_PCT: 5,
+
+    // The share of Gross a manufacturer holds back from Usable. Most EVs hold
+    // 3–10%; 0% usually means one figure was entered in both fields.
+    PACK_BUFFER_PCT_BAND: [3, 10],
+
+    // EPA test weight minus curb weight. EPA tests at curb + 300 lb rounded to
+    // an inertia class, so a few hundred pounds above is expected: 16 of the 18
+    // vehicles carrying both sit 70–568 lb above, and the other two more than
+    // 1,200 lb above.
+    TEST_WEIGHT_OFFSET_LBS_BAND: [0, 600],
+
+    // Pack voltage for the 400 V and 800 V classes the spec field holds. A spec
+    // value inside one names that class, and EPA's nominal pack voltage must
+    // fall inside the same one — they are different quantities, so this is a
+    // plausibility check, not equality. Observed EPA packs: 335–403 V on
+    // 400-class vehicles, 552–850 V on 800-class ones.
+    VOLTAGE_400_CLASS_BAND: [300, 500],
+    VOLTAGE_800_CLASS_BAND: [550, 1000],
+
+    // How much quicker a claimed 0–60 may be than the quickest tested result
+    // before it is listed. Rollout conventions alone differ by about 0.3 s.
+    CLAIMED_060_GAP_SEC: 0.5,
 };
+
+// Data Checks limits (#321). The panel starts from these and tries others live.
+export const LABEL_SPREAD_PCT =
+    resolve('LABEL_SPREAD_PCT', EPA_DEFAULTS.LABEL_SPREAD_PCT);
+export const TESTED_CAPACITY_TOLERANCE_PCT =
+    resolve('TESTED_CAPACITY_TOLERANCE_PCT', EPA_DEFAULTS.TESTED_CAPACITY_TOLERANCE_PCT);
+export const TESTED_SPREAD_PCT =
+    resolve('TESTED_SPREAD_PCT', EPA_DEFAULTS.TESTED_SPREAD_PCT);
+export const PACK_BUFFER_PCT_BAND =
+    resolve('PACK_BUFFER_PCT_BAND', EPA_DEFAULTS.PACK_BUFFER_PCT_BAND);
+export const TEST_WEIGHT_OFFSET_LBS_BAND =
+    resolve('TEST_WEIGHT_OFFSET_LBS_BAND', EPA_DEFAULTS.TEST_WEIGHT_OFFSET_LBS_BAND);
+export const VOLTAGE_400_CLASS_BAND =
+    resolve('VOLTAGE_400_CLASS_BAND', EPA_DEFAULTS.VOLTAGE_400_CLASS_BAND);
+export const VOLTAGE_800_CLASS_BAND =
+    resolve('VOLTAGE_800_CLASS_BAND', EPA_DEFAULTS.VOLTAGE_800_CLASS_BAND);
+export const CLAIMED_060_GAP_SEC =
+    resolve('CLAIMED_060_GAP_SEC', EPA_DEFAULTS.CLAIMED_060_GAP_SEC);
 
 // Resolved values (override ∥ default). These are what the math imports.
 export const DEFAULT_ETA         = resolve('DEFAULT_ETA',         EPA_DEFAULTS.DEFAULT_ETA);

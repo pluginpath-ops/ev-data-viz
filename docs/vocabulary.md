@@ -134,6 +134,25 @@ status and is never chrome.
 | Several runs from one outing | **a session** | [testSessions.js](../src/utils/testSessions.js) |
 | An EPA config with its coefficients and tests | **a test group** | `epa_test_groups` |
 | The person maintaining EPA records | **the curator** | admin + contributor |
+| The manufacturer's usable and gross pack capacity | **Usable** / **Gross** | `specs.charging.battery_usable_kwh`, `specs.powertrain.battery_gross_kwh` |
+| The DC energy EPA measured on the multi-cycle depletion test | **EPA tested** | `epa_tests.total_dc_energy_kwh`, procedure 77 |
+| The Admin sub-tab listing vehicles that disagree with their own sources | **Data Checks** | [DataChecksPanel.jsx](../src/components/admin/DataChecksPanel.jsx), [dataChecks.js](../src/utils/dataChecks.js) |
+| Two sources for one figure further apart than a limit | **disagrees**, a disagreement | `.data-check-finding.is-disagrees` |
+| Something missing that would let a figure be checked | **a gap** | `.data-check-finding.is-gap` |
+
+**Say "EPA tested", never a bare "Tested", for capacity.** The vehicle card's
+*Tested* range is an EVBench range test set against EPA
+([TestedFigure.jsx](../src/components/vehicles/TestedFigure.jsx)). A bare
+"Tested capacity" beside it would use one word for two sources.
+
+**A Data Checks finding is not a flag.** Community members *flag* suspect spec
+values (`flagged_specs`), which is a different act by different people. A
+finding *disagrees*, or is *a gap*.
+
+**Checks, not integrity.** `epaIntegrity` asks whether a record is possible
+against ITSELF; a check compares a figure against ANOTHER source, the sense
+`labelRangeCheck` and `epaDerivationCheck` already use. Data Checks are the
+second kind.
 
 ## Statistics and uncertainty
 
