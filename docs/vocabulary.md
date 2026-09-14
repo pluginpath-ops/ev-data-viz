@@ -133,6 +133,8 @@ status and is never chrome.
 | A range run tied to a charging run | **a pairing** | [pairings.js](../src/utils/pairings.js) |
 | Several runs from one outing | **a session** | [testSessions.js](../src/utils/testSessions.js) |
 | An EPA config with its coefficients and tests | **a test group** | `epa_test_groups` |
+| A test group as linked to a vehicle — one vehicle can link several | **a configuration**, or **EPA configuration** | `epa_vehicle_mappings` |
+| The linked configuration whose label range, EPA tested and test weight are the vehicle's | **the primary configuration** | `epa_vehicle_mappings.is_primary`, [epaConfiguration.js](../src/utils/epaConfiguration.js), [PrimaryConfigurationPicker.jsx](../src/components/epa/PrimaryConfigurationPicker.jsx) |
 | The person maintaining EPA records | **the curator** | admin + contributor |
 | The manufacturer's usable and gross pack capacity | **Usable** / **Gross** | `specs.charging.battery_usable_kwh`, `specs.powertrain.battery_gross_kwh` |
 | The DC energy EPA measured on the multi-cycle depletion test | **EPA tested** | `epa_tests.total_dc_energy_kwh`, procedure 77 |

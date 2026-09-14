@@ -199,9 +199,12 @@ class DataService {
     // brings the new columns back as undefined instead, which reads as a null
     // factor, which reads as 1 — so inheritance is merely unscaled until the
     // migration lands, and every other vehicle still renders.
+    //
+    // epa_vehicle_mappings is a wildcard for the same reason: `is_primary`
+    // arrives with migration 067, and naming it would blank the site until then.
     const { data, error } = await getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*), epa_vehicle_mappings(id, confidence, notes, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
+      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*), epa_vehicle_mappings(*, epa_test_groups(test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))))`)
       .order('created_at', { ascending: false });
 
     // Never swallow this. Destructuring only `data` made a failed query look
@@ -237,6 +240,9 @@ class DataService {
           id:        m.id,
           confidence: m.confidence,
           notes:     m.notes,
+          // Undefined before migration 067, which reads as not primary;
+          // primaryEpaMapping still treats a sole link as the vehicle's.
+          isPrimary: m.is_primary === true,
           epaGroup:  m.epa_test_groups,
         })),
         tags:  (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
@@ -1706,6 +1712,22 @@ class DataService {
     const { error } = await getSupabase()
       .from('epa_vehicle_mappings')
       .update(updates)
+      .eq('id', mappingId);
+    if (error) throw error;
+  }
+
+  /**
+   * Make a link the vehicle's primary EPA configuration (#322).
+   *
+   * One UPDATE: migration 067's trigger clears the vehicle's previous primary
+   * in the same statement, so the one-primary index is never violated.
+   * Contributor-level, like confidence.
+   */
+  async setPrimaryEpaMapping(mappingId) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase()
+      .from('epa_vehicle_mappings')
+      .update({ is_primary: true })
       .eq('id', mappingId);
     if (error) throw error;
   }

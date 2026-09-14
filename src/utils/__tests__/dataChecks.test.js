@@ -344,3 +344,72 @@ describe('skips applied before the write returns', () => {
         expect(r.skipped).toBe(1);
     });
 });
+
+describe('the primary configuration (#322)', () => {
+    /** `v` with the link to `g` marked primary and every other link not. */
+    const withPrimary = (v, g) => ({
+        ...v,
+        epa_mappings: v.epa_mappings.map(m => ({ ...m, isPrimary: m.epaGroup === g })),
+    });
+
+    it('reports several configurations with none primary as a gap', () => {
+        const v = vehicle({}, [group(), group()]);
+        const f = findingsFor(v).find(x => x.check === 'no-primary');
+        expect(f.kind).toBe('gap');
+        expect(f.text).toMatch(/2 linked EPA configurations/);
+    });
+
+    it('does not ask for a choice when there is nothing to choose between', () => {
+        expect(checksFor(vehicle({}, [group()]))).not.toContain('no-primary');
+    });
+
+    it('stops asking once one is primary', () => {
+        const a = group();
+        expect(checksFor(withPrimary(vehicle({}, [a, group()]), a))).not.toContain('no-primary');
+    });
+
+    it('fingerprints the gap on which configurations are linked, not their order', () => {
+        const a = group(), b = group();
+        const one = findingsFor(vehicle({}, [a, b])).find(x => x.check === 'no-primary');
+        const two = findingsFor(vehicle({}, [b, a])).find(x => x.check === 'no-primary');
+        expect(one.fingerprint).toBe(two.fingerprint);
+    });
+
+    it('judges range against the primary alone', () => {
+        // Mach E again: 300 agrees with the 300 label — but the primary is the 240 pack.
+        const short = group({ label_range_published: 240 });
+        const v = withPrimary(vehicle({ range: 300 }, [short, group({ label_range_published: 300 })]), short);
+        const f = findingsFor(v).find(x => x.check === 'range-vs-label');
+        expect(f).toBeTruthy();
+        expect(f.text).toMatch(/primary configuration, 240 mi/);
+        expect(f.evidence.labels).toEqual([240]);
+    });
+
+    it('no longer reports label spread once the choice is made', () => {
+        const a = group({ label_range_published: 337 });
+        const v = vehicle({ range: 337 }, [a, group({ label_range_published: 450 })]);
+        expect(checksFor(v)).toContain('label-spread');
+        expect(checksFor(withPrimary(v, a))).not.toContain('label-spread');
+    });
+
+    it('still reports two packs under one vehicle, whichever is primary', () => {
+        const a = group({ epa_tests: [mct(80)] });
+        const v = withPrimary(vehicle({}, [a, group({ epa_tests: [mct(100)] })]), a);
+        expect(checksFor(v)).toContain('tested-spread');
+    });
+
+    it('judges EPA tested against the primary alone', () => {
+        // Usable 99 agrees with the 99 kWh configuration, not with the primary 80.
+        const small = group({ epa_tests: [mct(80)] });
+        const specs = { charging: { battery_usable_kwh: 99 } };
+        const v = vehicle({ specs }, [small, group({ epa_tests: [mct(99)] })]);
+        expect(checksFor(v)).not.toContain('tested-vs-label');
+        expect(checksFor(withPrimary(v, small))).toContain('tested-vs-label');
+    });
+
+    it('names a primary that has no label, rather than counting links', () => {
+        const bare = group();
+        const v = withPrimary(vehicle({ range: 300 }, [bare, group({ label_range_published: 300 })]), bare);
+        expect(findingsFor(v).find(x => x.check === 'range-no-label').text).toMatch(/its primary configuration, .* has no EPA label/);
+    });
+});

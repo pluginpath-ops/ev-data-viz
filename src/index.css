@@ -814,19 +814,23 @@ body {
     background-color: var(--color-surface-muted);
     color: var(--color-text-primary);
 }
+/* The intent surfaces are translucent on the dark theme (rgba, ~0.14 alpha) —
+ * right for a tint inside a card, wrong for a bar floating over the page, where
+ * the content scrolling underneath showed through the message. So the tint is
+ * laid as an image over the opaque base above, never as the background itself. */
 .fixed-action-bar.is-good {
     border-top-color: var(--color-success-border);
-    background-color: var(--color-success-surface);
+    background-image: linear-gradient(var(--color-success-surface), var(--color-success-surface));
     color: var(--color-success-text);
 }
 .fixed-action-bar.is-danger {
     border-top-color: var(--color-danger-border);
-    background-color: var(--color-danger-surface);
+    background-image: linear-gradient(var(--color-danger-surface), var(--color-danger-surface));
     color: var(--color-danger-text);
 }
 .fixed-action-bar.is-info {
     border-top-color: var(--color-primary-border);
-    background-color: var(--color-primary-surface);
+    background-image: linear-gradient(var(--color-primary-surface), var(--color-primary-surface));
     color: var(--color-primary-text);
 }
 
@@ -5178,6 +5182,33 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Admin → Data Checks (#321). One row per vehicle, ruled like the
    reconciliation sweep above, for the same reason: it is scanned worst-first. */
+/* ── Primary configuration picker (#322) ─────────────────────────────────────
+   The linked EPA configurations a vehicle chooses its primary from, each with
+   the figures the choice settles. Rows are .option-row, so hover and the
+   selected state match every other one-of-a-list choice. */
+.primary-config-picker {
+    @apply mt-3 mb-3 rounded-lg border overflow-x-auto;
+    border-color: var(--color-border);
+}
+.primary-config-option {
+    display: grid;
+    /* Fixed widths, not auto: every row is its own grid, so an auto column
+       sized by a radio in one row and by nothing in the header does not line up. */
+    grid-template-columns: 1rem minmax(10rem, 1fr) repeat(3, 6rem);
+    align-items: center;
+    column-gap: 1rem;
+}
+.primary-config-option.is-header {
+    @apply px-3 pt-2 pb-1;
+    color: var(--color-text-meta);
+}
+.primary-config-option.is-readonly { cursor: default; }
+.primary-config-figure { @apply font-mono text-right whitespace-nowrap; }
+.primary-config-note {
+    @apply px-3 py-2 border-t;
+    border-color: var(--color-border);
+}
+
 .data-check-row {
     @apply border-b border-[var(--color-border)] last:border-b-0;
 }

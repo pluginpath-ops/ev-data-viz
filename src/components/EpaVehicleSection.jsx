@@ -11,6 +11,7 @@ import InfoIcon from './InfoIcon';
 import SectionHeader, { SectionAction } from './SectionHeader';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import DerivedValues from './epa/DerivedValues';
+import PrimaryConfigurationPicker from './epa/PrimaryConfigurationPicker';
 import EpaDerivationChecks from './epa/EpaDerivationChecks';
 import EpaCuratorEditor from './epa/EpaCuratorEditor';
 import FeGuidePicker from './epa/FeGuidePicker';
@@ -215,6 +216,11 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                     <div className="text-xs text-secondary mt-0.5">
                         {g.model_year}{g.make ? ` · ${g.make}` : ''}{g.drive ? ` · ${g.drive}` : ''}
                         {g.transmission ? ` · ${g.transmission}` : ''}
+                        {/* After the text, so a primary moving between cards
+                            never shifts anything a curator is about to click. */}
+                        {mapping.isPrimary && vehicle?.epa_mappings?.length > 1 && (
+                            <span className="badge-micro is-accent ml-2" title="The configuration that stands for this vehicle">PRIMARY</span>
+                        )}
                     </div>
                     <div className="font-mono text-xs text-meta mt-0.5">
                         {g.test_group_id}
@@ -353,7 +359,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
 
 const EPA_SOURCE_URL = 'https://dis.epa.gov/otaqpub/publist1.jsp';
 
-export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroups, onLink, onCreate, onUnlink, onUpdateConfidence, onUpdateDisplayName, onGroupChanged }) {
+export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroups, onLink, onCreate, onUnlink, onUpdateConfidence, onSetPrimary, onUpdateDisplayName, onGroupChanged }) {
     const [query, setQuery]               = useState('');
     const [results, setResults]           = useState([]);
     const [searching, setSearching]       = useState(false);
@@ -606,7 +612,14 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                     {canEdit && ' Use the search below to assign one.'}
                 </p>
             ) : (
-                mappings.map(m => (
+                <>
+                <PrimaryConfigurationPicker
+                    vehicle={vehicle}
+                    mappings={mappings}
+                    canEdit={canEdit}
+                    onChoose={onSetPrimary}
+                />
+                {mappings.map(m => (
                     <EpaGroupCard
                         key={m.id}
                         mapping={m}
@@ -618,7 +631,8 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                         onUpdateConfidence={onUpdateConfidence}
                         onUpdateDisplayName={onUpdateDisplayName}
                     />
-                ))
+                ))}
+                </>
             )}
 
         </div>

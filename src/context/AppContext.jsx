@@ -1298,6 +1298,29 @@ export function AppProvider({ children }) {
         }
     };
 
+    /**
+     * Make a link the vehicle's primary EPA configuration (#322).
+     *
+     * Applied at once and written behind it, like a Data Checks skip: every
+     * figure on the vehicle follows the choice, and waiting on a full
+     * getVehicles() before the radio moved would read as a missed click. A
+     * failed write puts the previous primary back.
+     */
+    const setPrimaryEpaMapping = async (vehicleId, mappingId) => {
+        const previous = vehicles.find(v => v.id === vehicleId)?.epa_mappings?.find(m => m.isPrimary)?.id ?? null;
+        const mark = (pickId) => setVehicles(prev => prev.map(v => v.id !== vehicleId ? v : {
+            ...v,
+            epa_mappings: (v.epa_mappings ?? []).map(m => ({ ...m, isPrimary: m.id === pickId })),
+        }));
+        mark(mappingId);
+        try {
+            await dataService.setPrimaryEpaMapping(mappingId);
+        } catch (error) {
+            mark(previous);
+            showError('Primary configuration not saved, so it has been put back: ' + error.message);
+        }
+    };
+
     const unlinkEpaTestGroup = async (mappingId) => {
         try {
             await dataService.unlinkEpaTestGroup(mappingId);
@@ -1721,6 +1744,7 @@ export function AppProvider({ children }) {
         acceptFeGuideValues,
         getExistingEpaTestGroupIds,
         updateEpaMapping,
+        setPrimaryEpaMapping,
         unlinkEpaTestGroup,
         importEpaTestGroups,
         getEpaTestGroupsAdmin,
