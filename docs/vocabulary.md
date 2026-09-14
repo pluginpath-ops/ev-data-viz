@@ -139,6 +139,12 @@ status and is never chrome.
 | The Admin sub-tab listing vehicles that disagree with their own sources | **Data Checks** | [DataChecksPanel.jsx](../src/components/admin/DataChecksPanel.jsx), [dataChecks.js](../src/utils/dataChecks.js) |
 | Two sources for one figure further apart than a limit | **disagrees**, a disagreement | `.data-check-finding.is-disagrees` |
 | Something missing that would let a figure be checked | **a gap** | `.data-check-finding.is-gap` |
+| A curator's recorded decision that something needs no action, still visible under a filter | **a skip** — skipped, un-skip | `epa_test_groups.fe_guide_skipped_at` (link sweep), `data_check_skips` (Data Checks), `.skip-ask` |
+
+**A skip is a decision, not a deletion.** The same word in both places because
+it is the same act: someone looked, and nothing needs doing. A Data Checks skip
+holds only while the values it was judged on hold — change them and the finding
+comes back, marked as skipped before. Moving a limit does not bring it back.
 
 **Say "EPA tested", never a bare "Tested", for capacity.** The vehicle card's
 *Tested* range is an EVBench range test set against EPA

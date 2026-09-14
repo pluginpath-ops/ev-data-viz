@@ -12,11 +12,15 @@ import {
 /**
  * Admin → Data Checks (#321): which vehicles disagree with their own sources.
  *
- * READ-ONLY. It measures how big each problem in #320 is before anything is
- * restructured, and it is where the limits get tuned — so the limits are local
- * state, applied on every keystroke, rather than the resolved constants, which
- * only change on a reload. Keeping a value writes the same local layer Model
- * Constants edits, so it shows there as local and is published from there.
+ * It measures how big each problem in #320 is before anything is restructured,
+ * and it is where the limits get tuned — so the limits are local state, applied
+ * on every keystroke, rather than the resolved constants, which only change on
+ * a reload. Keeping a value writes the same local layer Model Constants edits,
+ * so it shows there as local and is published from there.
+ *
+ * The one thing it writes is a skip (migration 066): a curator's decision that
+ * a finding is correct as it stands. A skip holds while the finding's values
+ * hold, so nothing here has to notice when it lapses — the checks do.
  */
 
 const KNOB_BY_KEY = Object.fromEntries(KNOB_GROUPS.flatMap(g => g.knobs).map(k => [k.key, k]));
@@ -24,6 +28,7 @@ const CHECK_LABEL = Object.fromEntries(DATA_CHECKS.map(c => [c.key, c.label]));
 
 const sameLimit = (a, b) => (Array.isArray(a) ? a[0] === b[0] && a[1] === b[1] : a === b);
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const skipKey = (vehicleId, check) => `${vehicleId}:${check}`;
 
 /** A cleared input keeps the previous value rather than becoming 0, which would flag everything. */
 const numberOr = (raw, fallback) => {
@@ -69,12 +74,82 @@ function Tally({ row }) {
                 <span className="data-check-tally is-disagrees">{plural(row.disagrees, 'disagreement')}</span>
             )}
             {row.gaps > 0 && <span className="data-check-tally">{plural(row.gaps, 'gap')}</span>}
+            {row.skipped > 0 && <span className="data-check-tally">{row.skipped} skipped</span>}
         </span>
     );
 }
 
-function VehicleRow({ row, only, open, onToggle }) {
-    const shown = only ? row.findings.filter(f => f.check === only) : row.findings;
+/**
+ * One finding, with the controls to skip or un-skip it.
+ *
+ * A resurfaced finding — skipped once, values changed since — says so, and
+ * shows the old note, because the curator's earlier reasoning is exactly what
+ * is needed to decide whether it still applies.
+ */
+function FindingItem({ finding: f, canSkip, busy, onSkip, onUnskip }) {
+    const [asking, setAsking] = useState(false);
+    const [note, setNote] = useState('');
+    const when = f.skip?.skipped_at ? new Date(f.skip.skipped_at).toLocaleDateString() : null;
+    const earlierNote = f.skip?.note;
+
+    return (
+        <div className={`data-check-finding is-${f.kind}${f.skipped ? ' is-skipped' : ''}`}>
+            <div className="flex items-start justify-between gap-3">
+                <span className="text-note">{f.text}</span>
+                {canSkip && !asking && (
+                    f.skipped ? (
+                        <button type="button" className="btn btn-secondary text-sm shrink-0" disabled={busy} onClick={onUnskip}>
+                            Un-skip
+                        </button>
+                    ) : (
+                        <button type="button" className="btn btn-secondary text-sm shrink-0" disabled={busy} onClick={() => setAsking(true)}>
+                            Skip
+                        </button>
+                    )
+                )}
+            </div>
+
+            {f.skipped && (
+                <span className="text-meta">
+                    Skipped{when ? ` ${when}` : ''}{earlierNote ? `: ${earlierNote}` : ''}
+                </span>
+            )}
+            {f.resurfaced && (
+                <span className="text-meta">
+                    Skipped{when ? ` ${when}` : ''}, but its values have changed since
+                    {earlierNote ? ` — the note said: ${earlierNote}` : '.'}
+                </span>
+            )}
+
+            {asking && (
+                <div className="skip-ask">
+                    <input
+                        className="form-input flex-1"
+                        value={note}
+                        onChange={e => setNote(e.target.value)}
+                        placeholder="Why is this correct as it stands? (optional)"
+                    />
+                    <button
+                        type="button"
+                        className="btn btn-warning"
+                        disabled={busy}
+                        onClick={async () => {
+                            if (await onSkip(note.trim() || null)) {
+                                setAsking(false);
+                                setNote('');
+                            }
+                        }}
+                    >
+                        Record skip
+                    </button>
+                    <button type="button" className="btn btn-secondary" onClick={() => setAsking(false)}>Cancel</button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function VehicleRow({ row, findings, open, onToggle, canSkip, busyKey, onSkip, onUnskip }) {
     return (
         <div className="data-check-row">
             <button
@@ -86,17 +161,22 @@ function VehicleRow({ row, only, open, onToggle }) {
                 <span className="min-w-0">
                     <span className="text-secondary truncate block">{vehicleLabel(row.vehicle)}</span>
                     <span className="text-meta block truncate">
-                        {[...new Set(shown.map(f => CHECK_LABEL[f.check]))].join(' · ')}
+                        {[...new Set(findings.map(f => CHECK_LABEL[f.check]))].join(' · ')}
                     </span>
                 </span>
                 <Tally row={row} />
             </button>
             {open && (
                 <div className="flex flex-col gap-1 pl-2 pb-2">
-                    {shown.map((f, i) => (
-                        <div key={i} className={`data-check-finding is-${f.kind}`}>
-                            <span className="text-note">{f.text}</span>
-                        </div>
+                    {findings.map(f => (
+                        <FindingItem
+                            key={f.check}
+                            finding={f}
+                            canSkip={canSkip}
+                            busy={busyKey === skipKey(row.vehicle.id, f.check)}
+                            onSkip={(note) => onSkip(row.vehicle.id, f, note)}
+                            onUnskip={() => onUnskip(row.vehicle.id, f)}
+                        />
                     ))}
                 </div>
             )}
@@ -105,7 +185,9 @@ function VehicleRow({ row, only, open, onToggle }) {
 }
 
 export default function DataChecksPanel() {
-    const { vehicles, getPerformanceSummaries, getPerformanceSessions } = useAppContext();
+    const {
+        vehicles, getPerformanceSummaries, getPerformanceSessions, getDataCheckSkips, setDataCheckSkip,
+    } = useAppContext();
     const fleet = useMemo(() => vehicles ?? [], [vehicles]);
 
     // Performance results are not on the vehicle object — getVehicles keeps the
@@ -128,14 +210,23 @@ export default function DataChecksPanel() {
         [perfData],
     );
 
-    const [limits, setLimits] = useState(() => ({ ...LOADED_LIMITS }));
-    const [rule, setRule]     = useState('nearer');
-    const [only, setOnly]     = useState(null);
-    const [query, setQuery]   = useState('');
-    const [open, setOpen]     = useState(() => new Set());
-    const [kept, setKept]     = useState(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const loadSkips = useCallback(() => getDataCheckSkips(), []);
+    const { data: skipData, reload: reloadSkips } = useAsyncResource(loadSkips, []);
+    const skips = useMemo(() => skipData?.skips ?? [], [skipData]);
+    const canSkip = skipData?.available === true;
 
-    const rows   = useMemo(() => runDataChecks(fleet, { limits, testedRule: rule, performance }), [fleet, limits, rule, performance]);
+    const [limits, setLimits]           = useState(() => ({ ...LOADED_LIMITS }));
+    const [rule, setRule]               = useState('nearer');
+    const [only, setOnly]               = useState(null);
+    const [query, setQuery]             = useState('');
+    const [open, setOpen]               = useState(() => new Set());
+    const [kept, setKept]               = useState(false);
+    const [showSkipped, setShowSkipped] = useState(false);
+    const [busyKey, setBusyKey]         = useState(null);
+    const [writeError, setWriteError]   = useState(null);
+
+    const rows   = useMemo(() => runDataChecks(fleet, { limits, testedRule: rule, performance, skips }), [fleet, limits, rule, performance, skips]);
     const counts = useMemo(() => checkCounts(rows), [rows]);
 
     // What each rule would report, so the choice between them is made against numbers.
@@ -143,8 +234,8 @@ export default function DataChecksPanel() {
         r.key,
         r.key === rule
             ? counts['tested-vs-label']
-            : checkCounts(runDataChecks(fleet, { limits, testedRule: r.key, performance }))['tested-vs-label'],
-    ])), [fleet, limits, rule, performance, counts]);
+            : checkCounts(runDataChecks(fleet, { limits, testedRule: r.key, performance, skips }))['tested-vs-label'],
+    ])), [fleet, limits, rule, performance, skips, counts]);
 
     const variants = useMemo(() => sourceNameVariants(perfData?.summaries ?? []), [perfData]);
 
@@ -158,11 +249,32 @@ export default function DataChecksPanel() {
         setKept(true);
     };
 
-    const reporting = rows.filter(r => r.findings.length);
+    /** Record or clear one skip. Resolves true on success, so the prompt knows to close. */
+    async function writeSkip(vehicleId, f, fingerprint, note = null) {
+        setBusyKey(skipKey(vehicleId, f.check));
+        setWriteError(null);
+        try {
+            await setDataCheckSkip(vehicleId, f.check, fingerprint, note);
+            reloadSkips();
+            return true;
+        } catch (e) {
+            setWriteError(e.message);
+            return false;
+        } finally {
+            setBusyKey(null);
+        }
+    }
+    const recordSkip = (vehicleId, f, note) => writeSkip(vehicleId, f, f.fingerprint, note);
+    const clearSkip  = (vehicleId, f) => writeSkip(vehicleId, f, null);
+
+    const skippedTotal = rows.reduce((n, r) => n + r.skipped, 0);
+    const outstanding = rows.filter(r => r.disagrees || r.gaps);
     const q = query.trim().toLowerCase();
-    const shown = reporting.filter(r =>
-        (!only || r.findings.some(f => f.check === only))
-        && (!q || vehicleLabel(r.vehicle).toLowerCase().includes(q)));
+    const visibleFindings = (row) => row.findings.filter(f =>
+        (showSkipped || !f.skipped) && (!only || f.check === only));
+    const shown = rows
+        .map(row => ({ row, findings: visibleFindings(row) }))
+        .filter(({ row, findings }) => findings.length && (!q || vehicleLabel(row.vehicle).toLowerCase().includes(q)));
 
     const toggle = (id) => setOpen(prev => {
         const next = new Set(prev);
@@ -177,9 +289,10 @@ export default function DataChecksPanel() {
             <p className="text-note mb-4">
                 Every vehicle against its own sources: range against its EPA labels, the
                 manufacturer’s Usable and Gross against EPA tested, curb weight against EPA test
-                weight, drive type and voltage against EPA, and claimed against tested 0–60.
-                Read-only. A vehicle linked to several EPA configurations disagrees only when none
-                of them agrees, because nothing yet says which one represents it.
+                weight, drive type and voltage against EPA, and claimed against tested 0–60. A
+                vehicle linked to several EPA configurations disagrees only when none of them agrees,
+                because nothing yet says which one represents it. Skip a finding that is correct as
+                it stands; it comes back if its values change.
             </p>
 
             <h4 className="subsection-title">Limits</h4>
@@ -235,7 +348,8 @@ export default function DataChecksPanel() {
             )}
 
             {/* Counts first, grouped by figure: the question is how many, and of
-                what kind. Each doubles as the filter. */}
+                what kind. Each doubles as the filter. Skipped findings are not
+                counted — the numbers are what is still outstanding. */}
             <div className="flex flex-col gap-2 mt-4 mb-3">
                 {CHECK_FIGURES.map(fig => (
                     <div key={fig.key} className="flex flex-wrap items-center gap-2">
@@ -244,7 +358,7 @@ export default function DataChecksPanel() {
                             <button
                                 key={c.key}
                                 type="button"
-                                disabled={!counts[c.key]}
+                                disabled={!counts[c.key] && only !== c.key}
                                 title={c.kind === 'gap' ? 'A gap: something missing, no limit crossed' : 'A disagreement past its limit'}
                                 onClick={() => setOnly(only === c.key ? null : c.key)}
                                 className={`guide-chip ${only === c.key ? 'active' : ''} disabled:opacity-40`}
@@ -257,26 +371,41 @@ export default function DataChecksPanel() {
                 ))}
             </div>
 
-            <input
-                type="text"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Filter by vehicle…"
-                className="form-input w-full mb-2"
-            />
+            <div className="flex flex-wrap items-center gap-3 mb-2">
+                <input
+                    type="text"
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    placeholder="Filter by vehicle…"
+                    className="form-input flex-1"
+                />
+                <label className="flex items-center gap-2 text-note">
+                    <input type="checkbox" checked={showSkipped} onChange={e => setShowSkipped(e.target.checked)} />
+                    Show skipped ({skippedTotal})
+                </label>
+            </div>
             <p className="text-meta mb-2">
-                {reporting.length} of {plural(rows.length, 'vehicle')} have something to report
+                {outstanding.length} of {plural(rows.length, 'vehicle')} have something outstanding
+                {skippedTotal > 0 && ` · ${plural(skippedTotal, 'finding')} skipped`}
                 {(only || q) && ` · ${shown.length} shown`}
             </p>
+            {skipData && !canSkip && (
+                <p className="text-note mb-2">Skips cannot be recorded until migration 066 is applied.</p>
+            )}
+            {writeError && <div className="note-panel is-danger mb-2">{writeError}</div>}
 
             <div className="flex flex-col gap-1">
-                {shown.map(r => (
+                {shown.map(({ row, findings }) => (
                     <VehicleRow
-                        key={r.vehicle.id}
-                        row={r}
-                        only={only}
-                        open={open.has(r.vehicle.id)}
-                        onToggle={() => toggle(r.vehicle.id)}
+                        key={row.vehicle.id}
+                        row={row}
+                        findings={findings}
+                        open={open.has(row.vehicle.id)}
+                        onToggle={() => toggle(row.vehicle.id)}
+                        canSkip={canSkip}
+                        busyKey={busyKey}
+                        onSkip={recordSkip}
+                        onUnskip={clearSkip}
                     />
                 ))}
                 {!shown.length && <p className="text-note">Nothing matches.</p>}

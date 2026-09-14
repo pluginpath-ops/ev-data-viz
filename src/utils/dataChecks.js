@@ -18,6 +18,14 @@
  * Deliberately not called flags: community members already flag suspect spec
  * values (`flagged_specs`), and that is a different act by different people.
  *
+ * ── Skips ───────────────────────────────────────────────────────────────────
+ *
+ * A curator can skip a finding that is correct as it stands (migration 066).
+ * Every finding carries `evidence` — the source values it was judged on, never
+ * the limits — and a skip applies only while its stored fingerprint matches.
+ * Change the values and the finding returns, marked as skipped before; move a
+ * limit and it stays skipped, because the facts it was about have not changed.
+ *
  * ── No primary configuration yet ────────────────────────────────────────────
  *
  * A vehicle can link to several EPA configurations and nothing says which one
@@ -122,6 +130,7 @@ const positive = (v) => {
 const pctFrom = (value, base) => (Math.abs(value - base) / base) * 100;
 const spreadPct = (values) => ((Math.max(...values) - Math.min(...values)) / Math.min(...values)) * 100;
 const inside = (v, [lo, hi]) => v >= lo && v <= hi;
+const ascending = (values) => [...values].sort((a, b) => a - b);
 
 const oneDp = (v) => Math.round(v * 10) / 10;
 const kwh = (v) => `${oneDp(v)} kWh`;
@@ -132,8 +141,20 @@ const kwhSpan = (values) => `${oneDp(Math.min(...values))}–${oneDp(Math.max(..
 const lb  = (v) => `${Math.round(v).toLocaleString('en-US')} lb`;
 const pct = (v) => `${v.toFixed(1)}%`;
 
-const finding = (check, text) => ({
-    check, text, figure: CHECK_BY_KEY[check].figure, kind: CHECK_BY_KEY[check].kind,
+/**
+ * A finding, with the source values it was judged on.
+ *
+ * `evidence` must hold VALUES ONLY — never a limit, never wording. It is what a
+ * skip is fingerprinted against, and a limit in it would make every skip lapse
+ * the moment someone tried a different tolerance. Arrays are sorted by the
+ * caller, so link order cannot change a fingerprint.
+ */
+const finding = (check, text, evidence) => ({
+    check, text, evidence,
+    figure: CHECK_BY_KEY[check].figure,
+    kind: CHECK_BY_KEY[check].kind,
+    // Stable: keys sorted, so the same values always produce the same string.
+    fingerprint: JSON.stringify(evidence, Object.keys(evidence).sort()),
 });
 
 /** EPA's drive description in the spec schema's vocabulary, or null when blank or unreadable. */
@@ -201,14 +222,15 @@ function rangeFindings(vehicle, configs, limits) {
     const out = [];
     const range = positive(vehicle.range);
     const labelled = configs.filter(c => c.labelRangeMi);
-    const labels = labelled.map(c => c.labelRangeMi);
+    const labels = ascending(labelled.map(c => c.labelRangeMi));
 
     if (labelled.length > 1) {
         const spread = spreadPct(labels);
         if (spread > limits.LABEL_SPREAD_PCT) {
             out.push(finding('label-spread',
                 `${labelled.length} linked EPA configurations read ${miSpan(labels)}, `
-                + `${pct(spread)} apart, and none is chosen to represent the vehicle.`));
+                + `${pct(spread)} apart, and none is chosen to represent the vehicle.`,
+                { labels }));
         }
     }
 
@@ -219,20 +241,23 @@ function rangeFindings(vehicle, configs, limits) {
             const dir = check.deltaMi > 0 ? 'below' : 'above';
             out.push(finding('range-vs-label',
                 `Range ${mi(range)} is ${pct(Math.abs(check.deltaPct))} ${dir} the nearest EPA label, ${mi(c.labelRangeMi)} on ${c.name}`
-                + (labelled.length > 1 ? `; none of the ${labelled.length} labels is within ${limits.LABEL_RANGE_TOLERANCE_PCT}%.` : '.')));
+                + (labelled.length > 1 ? `; none of the ${labelled.length} labels is within ${limits.LABEL_RANGE_TOLERANCE_PCT}%.` : '.'),
+                { range, labels }));
         }
     }
 
     if (labelled.length && !range) {
         out.push(finding('label-no-range', labelled.length === 1
             ? `No range on the vehicle; its EPA label reads ${mi(labels[0])}.`
-            : `No range on the vehicle; its ${labelled.length} EPA labels read ${miSpan(labels)}.`));
+            : `No range on the vehicle; its ${labelled.length} EPA labels read ${miSpan(labels)}.`,
+            { labels }));
     }
 
     if (range && !labelled.length) {
         out.push(finding('range-no-label', configs.length
             ? `Range ${mi(range)}, but none of its ${configs.length} linked EPA configuration${configs.length === 1 ? '' : 's'} has a label.`
-            : `Range ${mi(range)}, but no EPA configuration is linked.`));
+            : `Range ${mi(range)}, but no EPA configuration is linked.`,
+            { range, linked: configs.length }));
     }
 
     return out;
@@ -243,7 +268,7 @@ function rangeFindings(vehicle, configs, limits) {
  *
  * @param {number} testedKwh
  * @param {Array<{name, kwh}>} labels  Usable and/or Gross, whichever exist
- * @returns {{ ok: boolean, nearest: {name, kwh, pct} }}
+ * @returns {{ ok: boolean, nearest: {name, kwh, pct}, offsets }}
  */
 function testedAgreement(testedKwh, labels, tolerancePct, rule) {
     const offsets = labels.map(l => ({ ...l, pct: pctFrom(testedKwh, l.kwh) }));
@@ -263,7 +288,7 @@ function capacityFindings(vehicle, configs, ctx, limits, testedRule) {
 
     if (usable && gross) {
         if (usable > gross) {
-            out.push(finding('usable-over-gross', `${usableText} is larger than ${grossText}.`));
+            out.push(finding('usable-over-gross', `${usableText} is larger than ${grossText}.`, { usable, gross }));
         } else {
             // Only when the two are in the right order — a negative buffer is
             // already reported above, and saying it twice doubles its weight.
@@ -272,19 +297,21 @@ function capacityFindings(vehicle, configs, ctx, limits, testedRule) {
             if (!inside(buffer, limits.PACK_BUFFER_PCT_BAND)) {
                 out.push(finding('buffer-outside',
                     `${grossText} holds back ${pct(buffer)} from ${usableText}, outside ${lo}–${hi}%`
-                    + (buffer === 0 ? ' — often one figure entered twice.' : '.')));
+                    + (buffer === 0 ? ' — often one figure entered twice.' : '.'),
+                    { usable, gross }));
             }
         }
     }
 
     const tested = configs.filter(c => c.testedKwh);
+    const testedValues = ascending(tested.map(c => c.testedKwh));
     if (tested.length > 1) {
-        const values = tested.map(c => c.testedKwh);
-        const spread = spreadPct(values);
+        const spread = spreadPct(testedValues);
         if (spread > limits.TESTED_SPREAD_PCT) {
             out.push(finding('tested-spread',
-                `EPA tested reads ${kwhSpan(values)} across ${tested.length} linked `
-                + `configurations, ${pct(spread)} apart — more than one pack on one vehicle, or a wrong link.`));
+                `EPA tested reads ${kwhSpan(testedValues)} across ${tested.length} linked `
+                + `configurations, ${pct(spread)} apart — more than one pack on one vehicle, or a wrong link.`,
+                { tested: testedValues }));
         }
     }
 
@@ -295,11 +322,14 @@ function capacityFindings(vehicle, configs, ctx, limits, testedRule) {
             // Name the closest case, so the curator starts from the least-bad link.
             const best = verdicts.reduce((a, b) => (b.nearest.pct < a.nearest.pct ? b : a));
             const against = best.offsets.map(o => `${pct(o.pct)} from ${o.name} ${kwh(o.kwh)}`).join(', ');
+            const inheritedLabel = inheritedNote(ctx, 'charging', 'battery_usable_kwh') || inheritedNote(ctx, 'powertrain', 'battery_gross_kwh');
+            // The rule is not evidence: switching it changes which findings
+            // show, exactly as moving a limit does.
             out.push(finding('tested-vs-label',
                 `EPA tested ${kwh(best.c.testedKwh)} on ${best.c.name} is ${against}`
                 + (testedRule === 'each' ? ` — not within ${limits.TESTED_CAPACITY_TOLERANCE_PCT}% of every label.` : ` — neither is within ${limits.TESTED_CAPACITY_TOLERANCE_PCT}%.`)
-                + (ctx.inherited.size && (inheritedNote(ctx, 'charging', 'battery_usable_kwh') || inheritedNote(ctx, 'powertrain', 'battery_gross_kwh'))
-                    ? ` The label is inherited from ${ctx.parentName}.` : '')));
+                + (inheritedLabel ? ` The label is inherited from ${ctx.parentName}.` : ''),
+                { tested: testedValues, usable, gross }));
         }
     }
 
@@ -311,7 +341,8 @@ function capacityFindings(vehicle, configs, ctx, limits, testedRule) {
         if (!matches.length) {
             out.push(finding('battery-unsorted', labels.length
                 ? `vehicles.battery ${kwh(battery)} matches neither ${[usableText, grossText].filter(Boolean).join(' nor ')}.`
-                : `vehicles.battery ${kwh(battery)} has no Usable or Gross figure to be sorted into.`));
+                : `vehicles.battery ${kwh(battery)} has no Usable or Gross figure to be sorted into.`,
+                { battery, usable, gross }));
         }
     }
 
@@ -333,16 +364,18 @@ function weightFindings(configs, ctx, limits) {
     return [finding('test-weight-offset',
         `EPA test weight ${lb(c.testWeightLbs)} on ${c.name} sits ${where} curb weight ${lb(curb)}`
         + `${inheritedNote(ctx, 'performance', 'weight_lbs')}; expected ${band[0]}–${band[1]} lb above `
-        + '(curb + 300 lb, rounded to an inertia class).')];
+        + '(curb + 300 lb, rounded to an inertia class).',
+        { curb, testWeights: ascending(weighed.map(x => x.testWeightLbs)) })];
 }
 
 function driveFindings(configs, ctx) {
     const spec = specValue(ctx, 'powertrain', 'drive_type');
     // A blank EPA drive is not a disagreement — it is blank on many linked groups.
-    const epa = [...new Set(configs.map(c => c.driveType).filter(Boolean))];
+    const epa = [...new Set(configs.map(c => c.driveType).filter(Boolean))].sort();
     if (!spec || !epa.length || epa.includes(spec)) return [];
     return [finding('drive-vs-epa',
-        `Drive type is ${spec}${inheritedNote(ctx, 'powertrain', 'drive_type')}; EPA lists ${epa.join(' / ')}.`)];
+        `Drive type is ${spec}${inheritedNote(ctx, 'powertrain', 'drive_type')}; EPA lists ${epa.join(' / ')}.`,
+        { spec, epa })];
 }
 
 /**
@@ -353,7 +386,7 @@ function driveFindings(configs, ctx) {
  */
 function voltageFindings(configs, ctx, limits) {
     const spec = positive(specValue(ctx, 'charging', 'battery_nominal_voltage_v'));
-    const packs = configs.map(c => c.packVoltage).filter(Boolean);
+    const packs = ascending([...new Set(configs.map(c => c.packVoltage).filter(Boolean))]);
     if (!spec || !packs.length) return [];
 
     const classes = [
@@ -366,7 +399,8 @@ function voltageFindings(configs, ctx, limits) {
 
     return [finding('voltage-vs-epa',
         `Voltage ${spec} V${inheritedNote(ctx, 'charging', 'battery_nominal_voltage_v')} reads as the ${cls.name} class `
-        + `(${cls.band[0]}–${cls.band[1]} V), but EPA's pack voltage is ${[...new Set(packs)].join(' / ')} V.`)];
+        + `(${cls.band[0]}–${cls.band[1]} V), but EPA's pack voltage is ${packs.join(' / ')} V.`,
+        { spec, packs })];
 }
 
 /**
@@ -390,7 +424,8 @@ function performanceFindings(ctx, perf, limits) {
     return [finding('claimed-060-quicker',
         `Claimed 0–60 ${claimed} s${inheritedNote(ctx, 'performance', 'zero_to_60_mph_sec')} is `
         + `${(best.value - claimed).toFixed(1)} s quicker than the quickest tested result, ${best.value} s`
-        + (best.basis?.sourceName ? ` (${best.basis.sourceName}).` : '.'))];
+        + (best.basis?.sourceName ? ` (${best.basis.sourceName}).` : '.'),
+        { claimed, quickestTested: best.value })];
 }
 
 // ── The fleet ───────────────────────────────────────────────────────────────
@@ -408,6 +443,21 @@ export function groupPerformanceByVehicle(summaries = [], sessions = []) {
 }
 
 /**
+ * Attach any recorded skip to each finding.
+ *
+ *   skipped     a skip exists and its fingerprint matches — hidden by default
+ *   resurfaced  a skip exists but the values have changed since — shown, and
+ *               marked, because the judgement was about different numbers
+ */
+function applySkips(vehicle, findings, skipsByKey) {
+    return findings.map(f => {
+        const skip = skipsByKey.get(`${vehicle.id}:${f.check}`) ?? null;
+        const skipped = !!skip && skip.fingerprint === f.fingerprint;
+        return { ...f, skip, skipped, resurfaced: !!skip && !skipped };
+    });
+}
+
+/**
  * Run every check on every vehicle.
  *
  * @param {Array}  vehicles     the app's vehicle objects (getVehicles shape)
@@ -417,39 +467,49 @@ export function groupPerformanceByVehicle(summaries = [], sessions = []) {
  * @param {Object|null} [opts.performance]  groupPerformanceByVehicle output, or
  *                                          null while it loads — performance
  *                                          checks are then skipped, not failed
- * @returns {Array<{ vehicle, findings, disagrees: number, gaps: number }>}
- *          worst first
+ * @param {Array} [opts.skips]         data_check_skips rows
+ * @returns {Array<{ vehicle, findings, disagrees, gaps, skipped }>} worst first;
+ *          the two counts are of findings NOT skipped
  */
-export function runDataChecks(vehicles = [], { limits = LOADED_LIMITS, testedRule = 'nearer', performance = null } = {}) {
+export function runDataChecks(vehicles = [], {
+    limits = LOADED_LIMITS, testedRule = 'nearer', performance = null, skips = [],
+} = {}) {
+    const skipsByKey = new Map(skips.map(s => [`${s.vehicle_id}:${s.check_key}`, s]));
     return vehicles
         .map(vehicle => {
             const configs = linkedConfigurations(vehicle);
             const ctx = specContext(vehicle, vehicles);
             const perf = performance ? (performance[vehicle.id] ?? { summaries: [], sessions: [] }) : null;
-            const findings = [
+            const findings = applySkips(vehicle, [
                 ...rangeFindings(vehicle, configs, limits),
                 ...capacityFindings(vehicle, configs, ctx, limits, testedRule),
                 ...weightFindings(configs, ctx, limits),
                 ...driveFindings(configs, ctx),
                 ...voltageFindings(configs, ctx, limits),
                 ...performanceFindings(ctx, perf, limits),
-            ];
+            ], skipsByKey);
+            const open = findings.filter(f => !f.skipped);
             return {
                 vehicle,
                 findings,
-                disagrees: findings.filter(f => f.kind === 'disagrees').length,
-                gaps:      findings.filter(f => f.kind === 'gap').length,
+                disagrees: open.filter(f => f.kind === 'disagrees').length,
+                gaps:      open.filter(f => f.kind === 'gap').length,
+                skipped:   findings.length - open.length,
             };
         })
         .sort((a, b) => b.disagrees - a.disagrees || b.gaps - a.gaps
             || vehicleLabel(a.vehicle).localeCompare(vehicleLabel(b.vehicle)));
 }
 
-/** How many vehicles each check reports. Every check key is present, zero included. */
+/**
+ * How many vehicles each check reports, counting only findings not skipped —
+ * the counts are what is still outstanding. Every check key is present, zero
+ * included.
+ */
 export function checkCounts(rows = []) {
     const counts = Object.fromEntries(DATA_CHECKS.map(c => [c.key, 0]));
     for (const row of rows) {
-        for (const key of new Set(row.findings.map(f => f.check))) counts[key] += 1;
+        for (const key of new Set(row.findings.filter(f => !f.skipped).map(f => f.check))) counts[key] += 1;
     }
     return counts;
 }

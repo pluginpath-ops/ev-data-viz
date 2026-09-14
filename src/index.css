@@ -5193,6 +5193,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .data-check-finding.is-disagrees { border-left-color: var(--color-danger); }
 .data-check-finding.is-gap       { border-left-color: var(--color-border-strong); }
+/* Shown only under "Show skipped", and quieter than an open finding: a decision
+   already made, kept findable rather than hidden. */
+.data-check-finding.is-skipped   { @apply opacity-60; }
 
 /* How many of each kind a vehicle has, beside its name. */
 .data-check-tally {
@@ -6877,7 +6880,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: rgba(59, 130, 246, 0.15);
 }
 
-.sweep-skip-ask {
+/* The inline prompt that records a skip, with its optional note. Shared by the
+   Fuel Economy Guide link sweep and Data Checks: the same act in both places. */
+.skip-ask {
     @apply flex flex-wrap items-center gap-2 p-2 rounded;
     background-color: rgba(245, 158, 11, 0.12);
     border: 1px solid var(--color-warning);

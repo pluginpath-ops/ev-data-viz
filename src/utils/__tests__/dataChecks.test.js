@@ -257,3 +257,61 @@ describe('source name variants', () => {
         expect(sourceNameVariants([{ source_name: 'EVBench' }, { source_name: 'Edmunds' }])).toEqual([]);
     });
 });
+
+describe('skips', () => {
+    // Model Y LR again: 337 against a 311 label.
+    const disagreeing = () => vehicle({ range: 337 }, [group({ label_range_published: 311 })]);
+    const skipOf = (v, f) => ({ vehicle_id: v.id, check_key: f.check, fingerprint: f.fingerprint, note: 'correct as is' });
+    const rangeFinding = (row) => row.findings.find(f => f.check === 'range-vs-label');
+
+    it('keeps a skipped finding on the row but out of every count', () => {
+        const v = disagreeing();
+        const [f] = findingsFor(v);
+        const rows = runDataChecks([v], { limits: LIMITS, skips: [skipOf(v, f)] });
+        expect(rangeFinding(rows[0]).skipped).toBe(true);
+        expect(rows[0].disagrees).toBe(0);
+        expect(rows[0].skipped).toBe(1);
+        expect(checkCounts(rows)['range-vs-label']).toBe(0);
+    });
+
+    it('stays skipped when only a limit moves — the facts have not changed', () => {
+        const v = disagreeing();
+        const [f] = findingsFor(v);
+        const tighter = { ...LIMITS, LABEL_RANGE_TOLERANCE_PCT: 2 };
+        const [row] = runDataChecks([v], { limits: tighter, skips: [skipOf(v, f)] });
+        expect(rangeFinding(row).skipped).toBe(true);
+    });
+
+    it('comes back, marked, when the values it was judged on change', () => {
+        const v = disagreeing();
+        const [f] = findingsFor(v);
+        const edited = { ...v, range: 345 };
+        const again = rangeFinding(runDataChecks([edited], { limits: LIMITS, skips: [skipOf(v, f)] })[0]);
+        expect(again.skipped).toBe(false);
+        expect(again.resurfaced).toBe(true);
+        expect(again.skip.note).toBe('correct as is');
+    });
+
+    it('fingerprints the same values the same way whatever order the links arrive in', () => {
+        const a = vehicle({ range: 400 }, [group({ label_range_published: 311 }), group({ label_range_published: 330 })]);
+        const b = { ...a, epa_mappings: [...a.epa_mappings].reverse() };
+        const fa = rangeFinding(runDataChecks([a], { limits: LIMITS })[0]);
+        const fb = rangeFinding(runDataChecks([b], { limits: LIMITS })[0]);
+        expect(fb.fingerprint).toBe(fa.fingerprint);
+    });
+
+    it('never puts a limit or the rule in the evidence', () => {
+        const v = vehicle({ specs: { charging: { battery_usable_kwh: 98 }, powertrain: { battery_gross_kwh: 105 } } },
+            [group({ epa_tests: [mct(99.7)] })]);
+        const each = findingsFor(v, { testedRule: 'each' }).find(f => f.check === 'tested-vs-label');
+        expect(Object.keys(each.evidence).sort()).toEqual(['gross', 'tested', 'usable']);
+    });
+
+    it('applies a skip only to its own vehicle and check', () => {
+        const v = disagreeing();
+        const w = disagreeing();
+        const [f] = findingsFor(v);
+        const rows = runDataChecks([v, w], { limits: LIMITS, skips: [skipOf(v, f)] });
+        expect(rangeFinding(rows.find(r => r.vehicle === w)).skipped).toBe(false);
+    });
+});
