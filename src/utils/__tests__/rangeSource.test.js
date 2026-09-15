@@ -6,7 +6,7 @@ const rangeRun = (over = {}) => ({
     distance_miles: 240, energy_kwh: 75, speed_mph: 70, temperature_f: 70, altitude_ft: 0, ...over,
 });
 const charging = { id: 1, kind: 'charging', name: 'C' };
-const veh = r => ({ id: 9, battery: 80, runs: [charging, r] });
+const veh = r => ({ id: 9, socWindowKwh: 80, runs: [charging, r] });
 const resolve = (r, opts) => resolveRangeSource(charging, { vehicle: veh(r), explicitPairing: r, ...opts });
 
 describe('correction at the range-source chokepoint', () => {

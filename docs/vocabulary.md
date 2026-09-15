@@ -138,6 +138,11 @@ status and is never chrome.
 | The person maintaining EPA records | **the curator** | admin + contributor |
 | The manufacturer's usable and gross pack capacity | **Usable** / **Gross** | `specs.charging.battery_usable_kwh`, `specs.powertrain.battery_gross_kwh` |
 | The DC energy EPA measured on the multi-cycle depletion test | **EPA tested** | `epa_tests.total_dc_energy_kwh`, procedure 77 |
+| The energy between the car's own 0% and 100% — what calculations turn %SoC into kWh with | **the SoC window**, `socWindowKwh` | [vehicleFigures.js](../src/utils/vehicleFigures.js): EPA tested, else Usable, else Gross, else unsorted |
+| Where a resolved figure came from | **its basis** — `socWindowBasis`, `epaRangeBasis` | `.stat-cell-basis` |
+| A vehicle's EPA range as the app reads it | **EPA range**, `epaRangeMi` | the primary configuration's label, else Expected EPA Range, else unsorted |
+| A curator's figure for a vehicle with no EPA label, with its basis (Manufacturer, Independent test) | **Expected EPA Range** | `specs.range.expected_epa_mi`, `expected_epa_basis` |
+| A value from `vehicles.battery` or `vehicles.range`, which no source confirms yet | **unsorted** | the last tier of each resolver, deleted with its column (#324, #325) |
 | The Admin sub-tab listing vehicles that disagree with their own sources | **Data Checks** | [DataChecksPanel.jsx](../src/components/admin/DataChecksPanel.jsx), [dataChecks.js](../src/utils/dataChecks.js) |
 | Two sources for one figure further apart than a limit | **disagrees**, a disagreement | `.data-check-finding.is-disagrees` |
 | Something missing that would let a figure be checked | **a gap** | `.data-check-finding.is-gap` |

@@ -413,3 +413,23 @@ describe('the primary configuration (#322)', () => {
         expect(findingsFor(v).find(x => x.check === 'range-no-label').text).toMatch(/its primary configuration, .* has no EPA label/);
     });
 });
+
+describe('Expected EPA Range beside a label (#324)', () => {
+    const expecting = (mi) => ({ range: { expected_epa_mi: mi, expected_epa_basis: 'Manufacturer' } });
+
+    it('reports an expectation far from the label that replaced it', () => {
+        const v = vehicle({ specs: expecting(360) }, [group({ label_range_published: 300 })]);
+        const f = findingsFor(v).find(x => x.check === 'expected-vs-label');
+        expect(f.kind).toBe('disagrees');
+        expect(f.text).toMatch(/Expected EPA range 360 mi/);
+    });
+
+    it('stays quiet when the expectation was close', () => {
+        const v = vehicle({ specs: expecting(305) }, [group({ label_range_published: 300 })]);
+        expect(checksFor(v)).not.toContain('expected-vs-label');
+    });
+
+    it('says nothing without a label — that is what the field is for', () => {
+        expect(checksFor(vehicle({ specs: expecting(360) }))).not.toContain('expected-vs-label');
+    });
+});

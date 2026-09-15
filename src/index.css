@@ -2761,6 +2761,16 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-meta);
     white-space: nowrap;
 }
+/* Where the figure came from — "Gross", "EPA tested", "expected" (#323, #324).
+   The unit's size and color, in the body face so it reads as a word. */
+.stat-cell-basis {
+    margin-left: 4px;
+    font-family: var(--font-body);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    font-weight: 500;
+    color: var(--color-text-meta);
+    white-space: nowrap;
+}
 
 /* Nothing recorded. A dim em dash rather than an empty cell, so missing data is
    visible instead of invisible. */

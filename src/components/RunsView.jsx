@@ -5,6 +5,7 @@ import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as ge
 import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
 import { packKwh } from '../utils/specHelpers';
+import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
 import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
@@ -183,7 +184,7 @@ const DeriveAxisPanel = ({
     onPreview, onApply,
 }) => {
     const cfg = DERIVE_MODES[mode];
-    const batteryMissing = !vehicle?.battery;
+    const batteryMissing = !vehicle?.socWindowKwh;
     const validAnchors = anchors.filter(
         a => a.x !== '' && a.y !== '' && !isNaN(Number(a.x)) && !isNaN(Number(a.y))
     );
@@ -734,7 +735,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         // Apply opted-in estimations
         const calculatedFields = [];
         if (estimations.range) {
-            const ratedRange = estimations.range === 'measured' ? effectiveRangeFromTest : vehicle.range;
+            const ratedRange = estimations.range === 'measured' ? effectiveRangeFromTest : vehicle.epaRangeMi;
             if (ratedRange) {
                 transformedData = transformedData.map(row => ({
                     ...row,
@@ -779,7 +780,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
         // Apply opted-in estimations
         if (estimations.range) {
-            const ratedRange = estimations.range === 'measured' ? effectiveRangeFromTest : vehicle.range;
+            const ratedRange = estimations.range === 'measured' ? effectiveRangeFromTest : vehicle.epaRangeMi;
             if (ratedRange) {
                 transformedData = transformedData.map(row => ({
                     ...row,
@@ -1069,7 +1070,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         try {
             const result = deriveChargingAxis({
                 dataPoints:   editData,
-                batteryKwh:   vehicle.battery,
+                batteryKwh:   vehicle.socWindowKwh,
                 target:       estimateMode,
                 anchors:      buildDeriveAnchors(),
                 shiftToZero:  estimateShift,
@@ -1296,8 +1297,16 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                     </h3>
                     <p className="text-secondary text-sm">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                     <div className="text-sm text-secondary mt-0.5 flex flex-wrap gap-x-3">
-                        {vehicle.battery && <span>Battery: {vehicle.battery} kWh</span>}
-                        {vehicle.range && <span>Range: {vehicle.range} mi</span>}
+                        {vehicle.socWindowKwh && (
+                            <span title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}>
+                                Battery: {vehicle.socWindowKwh} kWh ({SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label})
+                            </span>
+                        )}
+                        {vehicle.epaRangeMi && (
+                            <span title={EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note}>
+                                {EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.label} range: {vehicle.epaRangeMi} mi
+                            </span>
+                        )}
                     </div>
                 </div>
                 <div className="flex flex-col gap-1 flex-shrink-0 items-stretch w-28">
@@ -2138,7 +2147,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <div className="mt-3">
                                             {/* Range estimation offer — shown when range is absent but SoC exists */}
                                             {(() => {
-                                                const epaRange = vehicle?.range ? parseFloat(vehicle.range) : null;
+                                                const epaRange = vehicle?.epaRangeMi ?? null;
+                                                const epaName  = EPA_RANGE_BASIS[vehicle?.epaRangeBasis]?.label ?? 'EPA';
                                                 const hasAnyOption = effectiveRangeFromTest || epaRange;
                                                 if (!canEdit(vehicle) || editDataLoading || editData === null) return null;
                                                 if (!editData.some(r => r.soc != null)) return null;
@@ -2167,9 +2177,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 <button
                                                                     onClick={() => handleEstimateRangeInEdit(epaRange)}
                                                                     className="text-xs px-3 py-1 rounded border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
-                                                                    title={`Use vehicle's EPA-rated range (${epaRange} mi) as the 100% SoC baseline`}
+                                                                    title={`Use the vehicle's ${epaName} range (${epaRange} mi) as the 100% SoC baseline`}
                                                                 >
-                                                                    EPA ({epaRange} mi)
+                                                                    {epaName} ({epaRange} mi)
                                                                 </button>
                                                             )}
                                                         </div>
@@ -2181,7 +2191,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 SoC-implied pack energy (ΔSoC × capacity) by the charging loss.
                                                 Green when that excess is 0 to +10% of capacity. */}
                                             {!editDataLoading && editData != null && (editFormData.dataFlags || ['charging']).includes('charging') && (() => {
-                                                const cap    = vehicle?.battery ? Number(vehicle.battery) : null;
+                                                const cap    = vehicle?.socWindowKwh ?? null;
                                                 const manual = editFormData.chargeEnergyKwh !== '' ? parseFloat(editFormData.chargeEnergyKwh) : NaN;
                                                 const hasManual = !isNaN(manual) && manual > 0;
                                                 const socs   = (editData || []).filter(r => r.soc != null).map(r => Number(r.soc));
@@ -2597,8 +2607,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         // battery figure — a silent 1.0 would be indistinguishable
                         // from "same pack".
                         const capacityRatio = (() => {
-                            const src = packKwh(selectedSrc, vehicles);
-                            const tgt = packKwh(vehicle, vehicles);
+                            const src = packKwh(selectedSrc);
+                            const tgt = packKwh(vehicle);
                             return src && tgt ? tgt / src : null;
                         })();
                         const suggestCapacity = () => {
@@ -2613,8 +2623,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         // inherited EFFICIENCY by the capacity ratio too.
                         const suggestEfficiency = () => {
                             if (!selectedSrc) return;
-                            const srcRange = parseFloat(selectedSrc.range);
-                            const tgtRange = parseFloat(vehicle.range);
+                            const srcRange = selectedSrc.epaRangeMi;
+                            const tgtRange = vehicle.epaRangeMi;
                             if (!srcRange || !tgtRange) return;
                             const entered = parseFloat(newLinkCapacity);
                             const cap = entered > 0 ? entered : (capacityRatio ?? 1);

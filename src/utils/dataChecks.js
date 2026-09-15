@@ -50,6 +50,9 @@
 
 import { resolveEffectiveSpecs, mergeInheritedSpecs, vehicleLabel } from './specHelpers';
 import { epaConfigurationFigures, primaryEpaMapping } from './epaConfiguration';
+// The same agreement test the capacity resolver uses, so a vehicle Data Checks
+// passes is one whose EPA tested the calculations actually use.
+import { testedAgreement } from './vehicleFigures';
 import { labelRangeCheck } from './labelRangeCheck';
 import { deriveTested } from './performanceDerivations';
 import {
@@ -77,6 +80,7 @@ export const DATA_CHECKS = [
     { key: 'label-spread',       figure: 'range',       kind: 'disagrees', label: 'EPA configurations disagree on range' },
     { key: 'label-no-range',     figure: 'range',       kind: 'gap',       label: 'EPA label, no range on the vehicle' },
     { key: 'range-no-label',     figure: 'range',       kind: 'gap',       label: 'Range with no EPA label' },
+    { key: 'expected-vs-label',  figure: 'range',       kind: 'disagrees', label: 'Expected EPA range disagrees with the EPA label' },
     { key: 'tested-vs-label',    figure: 'capacity',    kind: 'disagrees', label: 'EPA tested disagrees with Usable/Gross' },
     { key: 'tested-spread',      figure: 'capacity',    kind: 'disagrees', label: 'EPA tested differs across configurations' },
     { key: 'usable-over-gross',  figure: 'capacity',    kind: 'disagrees', label: 'Usable larger than Gross' },
@@ -134,7 +138,6 @@ const positive = (v) => {
 };
 
 /** How far `value` sits from `base`, as a percentage of `base`. */
-const pctFrom = (value, base) => (Math.abs(value - base) / base) * 100;
 const spreadPct = (values) => ((Math.max(...values) - Math.min(...values)) / Math.min(...values)) * 100;
 const inside = (v, [lo, hi]) => v >= lo && v <= hi;
 const ascending = (values) => [...values].sort((a, b) => a - b);
@@ -225,7 +228,7 @@ const inheritedNote = (ctx, category, field) =>
 
 // ── The checks ──────────────────────────────────────────────────────────────
 
-function rangeFindings(vehicle, links, limits) {
+function rangeFindings(vehicle, links, ctx, limits) {
     const out = [];
     const range = positive(vehicle.range);
     const labelled = links.judged.filter(c => c.labelRangeMi);
@@ -272,23 +275,24 @@ function rangeFindings(vehicle, links, limits) {
         out.push(finding('range-no-label', text, { range, linked: links.all.length }));
     }
 
-    return out;
-}
+    // An Expected EPA Range is for a vehicle with no label. Once one arrives the
+    // label is used, so a close expectation is harmless; a far one says the
+    // expectation, or the link, was wrong.
+    const expected = positive(specValue(ctx, 'range', 'expected_epa_mi'));
+    if (expected && labelled.length) {
+        const checks = labelled.map(c => ({ c, check: labelRangeCheck(c.labelRangeMi, expected, limits.LABEL_RANGE_TOLERANCE_PCT) }));
+        if (checks.every(x => x.check.mismatch)) {
+            const { c, check } = checks.reduce((a, b) => (Math.abs(b.check.deltaPct) < Math.abs(a.check.deltaPct) ? b : a));
+            const dir = check.deltaMi > 0 ? 'below' : 'above';
+            out.push(finding('expected-vs-label',
+                `Expected EPA range ${mi(expected)}${inheritedNote(ctx, 'range', 'expected_epa_mi')} is `
+                + `${pct(Math.abs(check.deltaPct))} ${dir} the EPA label, ${mi(c.labelRangeMi)} on ${c.name}. `
+                + 'The label is what the site uses.',
+                { expected, labels }));
+        }
+    }
 
-/**
- * Does EPA tested agree with the manufacturer's labels, under a rule?
- *
- * @param {number} testedKwh
- * @param {Array<{name, kwh}>} labels  Usable and/or Gross, whichever exist
- * @returns {{ ok: boolean, nearest: {name, kwh, pct}, offsets }}
- */
-function testedAgreement(testedKwh, labels, tolerancePct, rule) {
-    const offsets = labels.map(l => ({ ...l, pct: pctFrom(testedKwh, l.kwh) }));
-    const nearest = offsets.reduce((a, b) => (b.pct < a.pct ? b : a));
-    const ok = rule === 'each'
-        ? offsets.every(o => o.pct <= tolerancePct)
-        : nearest.pct <= tolerancePct;
-    return { ok, nearest, offsets };
+    return out;
 }
 
 function capacityFindings(vehicle, links, ctx, limits, testedRule) {
@@ -520,7 +524,7 @@ export function runDataChecks(vehicles = [], {
             const perf = performance ? (performance[vehicle.id] ?? { summaries: [], sessions: [] }) : null;
             const findings = applySkips(vehicle, [
                 ...primaryFindings(links),
-                ...rangeFindings(vehicle, links, limits),
+                ...rangeFindings(vehicle, links, ctx, limits),
                 ...capacityFindings(vehicle, links, ctx, limits, testedRule),
                 ...weightFindings(links, ctx, limits),
                 ...driveFindings(links, ctx),

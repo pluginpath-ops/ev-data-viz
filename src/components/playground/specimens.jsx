@@ -249,7 +249,7 @@ export const COMPOSITES = {
         <div style={{ display: 'flex', gap: 12 }}>
             <div className="stat-cell">
                 <span className="text-nano">Battery</span>
-                <span className="stat-cell-value">82<span className="stat-cell-unit">kWh</span></span>
+                <span className="stat-cell-value">82<span className="stat-cell-unit">kWh</span><span className="stat-cell-basis">Usable</span></span>
             </div>
             <div className="stat-cell">
                 <span className="text-nano">EPA range</span>

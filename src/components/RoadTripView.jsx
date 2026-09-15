@@ -653,7 +653,7 @@ export default function RoadTripView({
                     // test carries no usable data.
                     const src = resolveRangeSource(chargingRun, {
                         vehicle,
-                        batteryKwh: vehicle.battery,
+                        batteryKwh: vehicle.socWindowKwh,
                         explicitPairing: isEpaPartnerId(rangeRun.id) ? EPA_PARTNER_ID : rangeRun,
                         correction: { mode: correctionMode },
                         session: sessionFor(testSessions, rangeRun),
@@ -674,7 +674,7 @@ export default function RoadTripView({
                         miPerKwh:       src.miPerKwh,
                         // Assume 70 mph if neither the range test nor its source says
                         testSpeedMph:   rangeRun.speed_mph ?? src.sourceRun?.speed_mph ?? null,
-                        batteryKwh:     vehicle.battery,
+                        batteryKwh:     vehicle.socWindowKwh,
                         efficiencyNote: src.note,
                     });
                 }

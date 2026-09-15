@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { withVehicleFigures } from '../utils/vehicleFigures';
 import { dataService } from '../services/DataService';
 import { applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
 import { toSessionRow } from '../utils/testSessions';
@@ -1629,9 +1630,16 @@ export function AppProvider({ children }) {
     // Admins/contributors can hide a run's test data (disputed, incomplete) without
     // deleting it. Everyone else — including anonymous viewers — never sees it, in
     // Tests & Data or in any chart/compare tab, since all of those read from `vehicles`.
+    //
+    // Capacity and EPA range are attached here too (#323, #324): resolved from
+    // specs, the primary EPA configuration and inheritance, on every change to
+    // any of them — including the optimistic ones that never refetch, like
+    // choosing a primary. Resolved in getVehicles() they went stale until reload.
     const visibleVehicles = useMemo(() => {
-        if (isContributor) return vehicles;
-        return vehicles.map(v => ({ ...v, runs: (v.runs || []).filter(r => !r.isHidden) }));
+        const shown = isContributor
+            ? vehicles
+            : vehicles.map(v => ({ ...v, runs: (v.runs || []).filter(r => !r.isHidden) }));
+        return withVehicleFigures(shown);
     }, [vehicles, isContributor]);
 
     const value = {

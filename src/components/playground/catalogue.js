@@ -211,7 +211,7 @@ export const SECTIONS = [
               covers: ['plot-frame', 'plot-frame-head', 'plot-frame-title', 'plot-frame-subtitle', 'plot-frame-mark'],
               note: 'The figure boundary a PNG export captures — title, subtitle, and the accent mark.' },
             { composite: 'stat-cell', label: 'Stat cell',
-              covers: ['stat-cell', 'stat-cell-value', 'stat-cell-unit', 'stat-cell-empty'],
+              covers: ['stat-cell', 'stat-cell-value', 'stat-cell-unit', 'stat-cell-basis', 'stat-cell-empty'],
               note: 'A measured figure with its name above and its unit beside. Unrecorded is a dim dash, never blank.' },
             { composite: 'distribution-bar', label: 'Distribution bar',
               covers: ['stats-box-track', 'stats-box-whisker', 'stats-box-iqr', 'stats-box-median'],

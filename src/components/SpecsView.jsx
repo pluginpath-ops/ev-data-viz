@@ -4,6 +4,7 @@ import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { formatSpecValue } from '../utils/unitConversions';
 import { SpecFieldFlagButton } from './VoteButtons';
 import { mergeInheritedSpecs, resolveEffectiveSpecs, vehicleLabel, vehicleColor } from '../utils/specHelpers';
+import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
 import SpecsControls from './specs/SpecsControls';
 import { bestIndices, labelWithoutUnit, rowDiffers, rowIsEmpty } from '../utils/specCompare';
 
@@ -192,7 +193,10 @@ export default function SpecsView({ selectedVehicleIds }) {
         buildRow('vehicle.model',   'Model',   v => v.model),
         buildRow('vehicle.trim',    'Trim',    v => v.trim),
         buildRow('vehicle.year',    'Year',    v => v.year),
-        buildRow('vehicle.battery', 'Battery (kWh, usable)', v => v.battery),
+        // The resolved figures and where each came from (#323, #324). Row keys
+        // are unchanged so flags and hidden rows keep their place.
+        buildRow('vehicle.battery', 'Battery (kWh)', v => v.socWindowKwh),
+        buildRow('vehicle.socWindowBasis', 'Battery basis', v => SOC_WINDOW_BASIS[v.socWindowBasis]?.label),
         // The RAW number, formatted by unitGroup. Passing `fmtDistance(...)`
         // here made the row's value the string "405 mi", which `Number()` reads
         // as NaN — so the one core row with a better direction could never have
@@ -200,7 +204,8 @@ export default function SpecsView({ selectedVehicleIds }) {
         // No unit in the label: the value carries the converted one, and the
         // label was the half that could not follow a unit-system change.
         buildRow('vehicle.range',   'EPA Range',
-            v => v.range, { unitGroup: 'distance', better: 'higher' }),
+            v => v.epaRangeMi, { unitGroup: 'distance', better: 'higher' }),
+        buildRow('vehicle.epaRangeBasis', 'EPA Range basis', v => EPA_RANGE_BASIS[v.epaRangeBasis]?.label),
         buildRow('vehicle.runs',    'Test Runs', v => v.runs?.length ?? 0),
     ];
 

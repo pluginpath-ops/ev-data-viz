@@ -489,8 +489,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             ...run,
                             vehicle,
                             vehicleName: vehicleLabel(vehicle),
-                            vehicleBattery: vehicle.battery ?? null,
-                            vehicleRange: vehicle.range ?? null,
+                            vehicleBattery: vehicle.socWindowKwh ?? null,
+                            vehicleRange: vehicle.epaRangeMi ?? null,
                         });
                     }
                 });

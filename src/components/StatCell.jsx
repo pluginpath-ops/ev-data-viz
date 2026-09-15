@@ -13,7 +13,12 @@
  * A missing value renders a dim em dash, never an empty cell: unrecorded and
  * zero are different answers, and a blank says neither.
  */
-export default function StatCell({ label, value, unit, title }) {
+/*
+ * `basis` names where a figure came from when that changes how it reads — a
+ * battery figure that is Gross, a range that is only expected. After the unit,
+ * in the unit's voice: it qualifies the number, it is not a second one.
+ */
+export default function StatCell({ label, value, unit, title, basis }) {
     const missing = value === null || value === undefined || value === '';
 
     return (
@@ -25,6 +30,7 @@ export default function StatCell({ label, value, unit, title }) {
                 <span className="stat-cell-value">
                     {value}
                     {unit && <span className="stat-cell-unit">{unit}</span>}
+                    {basis && <span className="stat-cell-basis">{basis}</span>}
                 </span>
             )}
         </div>

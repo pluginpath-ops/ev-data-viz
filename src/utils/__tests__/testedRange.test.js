@@ -18,7 +18,7 @@ const rangeRun = (over = {}) => ({
     start_soc: 100, end_soc: 2, speed_mph: 70, temperature_f: 72,
     date: '2025-03-14', ...over,
 });
-const vehicle = (runs, over = {}) => ({ battery: 84, range: 318, runs, ...over });
+const vehicle = (runs, over = {}) => ({ socWindowKwh: 84, epaRangeMi: 318, runs, ...over });
 
 describe('socWindow', () => {
     it('is the span the run covered, whichever direction it ran', () => {
