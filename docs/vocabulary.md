@@ -136,6 +136,9 @@ status and is never chrome.
 | A test group as linked to a vehicle — one vehicle can link several | **a configuration**, or **EPA configuration** | `epa_vehicle_mappings` |
 | The linked configuration whose label range, EPA tested and test weight are the vehicle's | **the primary configuration** | `epa_vehicle_mappings.is_primary`, [epaConfiguration.js](../src/utils/epaConfiguration.js), [PrimaryConfigurationPicker.jsx](../src/components/epa/PrimaryConfigurationPicker.jsx) |
 | The person maintaining EPA records | **the curator** | admin + contributor |
+| Who published or recorded a performance result — a magazine, a channel, EVBench itself | **a source**; its other spellings are **aliases** | `sources`, `source_id`, [sources.js](../src/utils/sources.js), [SourcePicker.jsx](../src/components/SourcePicker.jsx) |
+| Whether a printed 0–60 counts the first foot | **the rollout basis** — *1-ft rollout omitted* or *standing start* | `ROLLOUT_BASES`, `sources.default_rollout_basis` |
+| The Admin sub-tab importing results in bulk beside the source list | **Published Results** | [PublishedResultsPanel.jsx](../src/components/admin/PublishedResultsPanel.jsx), [publishedResultsBatch.js](../src/utils/publishedResultsBatch.js) |
 | The manufacturer's usable and gross pack capacity | **Usable** / **Gross** | `specs.charging.battery_usable_kwh`, `specs.powertrain.battery_gross_kwh` |
 | The DC energy EPA measured on the multi-cycle depletion test | **EPA tested** | `epa_tests.total_dc_energy_kwh`, procedure 77 |
 | The energy between the car's own 0% and 100% — what calculations turn %SoC into kWh with | **the SoC window**, `socWindowKwh` | [vehicleFigures.js](../src/utils/vehicleFigures.js): EPA tested, else Usable, else Gross, else unsorted |

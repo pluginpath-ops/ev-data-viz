@@ -12,6 +12,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { parseVehicleImportText } from '../utils/parseVehicleImport';
+import { downloadText } from '../utils/downloadText';
 import {
     buildImportPlan, selectPlanRows, fieldPathLabel, fieldShortLabel,
     buildCsvTemplate, buildJsonTemplate,
@@ -23,15 +24,6 @@ const ACTION_STYLES = {
     skip:   { label: '– nothing', className: 'import-badge-skip' },
     error:  { label: '⚠ error',   className: 'import-badge-error' },
 };
-
-function downloadText(filename, text, mime) {
-    const url = URL.createObjectURL(new Blob([text], { type: mime }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-}
 
 /**
  * Inline note cell — names the fields that were adjusted or skipped rather than

@@ -21,6 +21,9 @@ import PerformanceSessionCard from './performance/PerformanceSessionCard';
 import PerformanceSummaryCard from './performance/PerformanceSummaryCard';
 import LazyBoundary from './LazyBoundary';
 import { PerformanceImportModal, PastePublishedResultsModal } from './lazyComponents';
+import SourcePicker from './SourcePicker';
+import { pickedSource } from '../utils/sources';
+import { useSources } from '../hooks/useSources';
 
 const SECTION_HELP =
     'Independently-tested acceleration and braking results. Separate from the ' +
@@ -40,7 +43,9 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
         deletePerformanceSummary,
         savePerformanceInterval,
         deletePerformanceInterval,
+        ensureSourceId,
     } = useAppContext();
+    const { sources, available: sourcesAvailable } = useSources();
 
     const [sessions, setSessions] = useState([]);
     // `loaded`, not `loading`: starting from "not yet loaded" means the empty
@@ -50,7 +55,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
     const [showImport, setShowImport] = useState(false);
     const [addingResult, setAddingResult] = useState(false);
     const [showPaste, setShowPaste] = useState(false);
-    const [newSource, setNewSource] = useState('');
+    const [newSource, setNewSource] = useState({ sourceId: null, newName: null });
     const [newTrim, setNewTrim]     = useState('');
     const [creating, setCreating]   = useState(false);
 
@@ -115,12 +120,15 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
     const handleAddResult = async () => {
         setCreating(true);
         try {
+            const picked = pickedSource(sources, newSource);
+            const sourceId = sourcesAvailable ? await ensureSourceId(picked) : null;
             await savePerformanceSummary({
                 vehicle_id: vehicle.id,
-                source_name: newSource.trim() || null,
+                ...(sourceId != null ? { source_id: sourceId } : {}),
+                source_name: picked.source?.name ?? picked.newName ?? null,
                 trim_label: newTrim.trim() || null,
             });
-            setNewSource('');
+            setNewSource({ sourceId: null, newName: null });
             setNewTrim('');
             setAddingResult(false);
             reload();
@@ -254,12 +262,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="text-xs">
                             <span className="text-secondary block mb-0.5">Source</span>
-                            <input
-                                type="text" autoFocus value={newSource}
-                                onChange={e => setNewSource(e.target.value)}
-                                placeholder="e.g. Out of Spec"
-                                className="form-input form-input w-44"
-                            />
+                            <SourcePicker sources={sources} value={newSource} onChange={setNewSource} />
                         </label>
                         <label className="text-xs">
                             <span className="text-secondary block mb-0.5">Trim / config</span>

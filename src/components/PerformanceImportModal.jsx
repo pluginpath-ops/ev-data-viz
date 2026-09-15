@@ -9,13 +9,17 @@
 import { useState } from 'react';
 import { parsePerformanceCSV } from '../utils/parsePerformanceCSV';
 import { useAppContext } from '../context/AppContext';
+import { pickedSource } from '../utils/sources';
+import { useSources } from '../hooks/useSources';
+import SourcePicker from './SourcePicker';
 
 export default function PerformanceImportModal({ vehicle, onImport, onMerge, onClose }) {
-    const { findMatchingPerformanceRuns } = useAppContext();
+    const { findMatchingPerformanceRuns, ensureSourceId } = useAppContext();
+    const { sources, available: sourcesAvailable } = useSources();
     const [parsed, setParsed]     = useState(null);
     const [fileName, setFileName] = useState(null);
     const [testType, setTestType] = useState('accel');
-    const [sourceName, setSourceName] = useState('');
+    const [sourcePick, setSourcePick] = useState({ sourceId: null, newName: null });
     const [sourceUrl, setSourceUrl] = useState('');
     const [busy, setBusy]         = useState(false);
     const [error, setError]       = useState(null);
@@ -49,8 +53,11 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
             if (match) {
                 await onMerge(match, parsed.runs);
             } else {
+                const picked = pickedSource(sources, sourcePick, sourceUrl);
+                const sourceId = sourcesAvailable ? await ensureSourceId(picked) : null;
                 await onImport(vehicle.id, parsed, {
-                    sourceName: sourceName.trim() || null,
+                    sourceId,
+                    sourceName: picked.source?.name ?? picked.newName ?? null,
                     sourceUrl: sourceUrl.trim() || null,
                 });
             }
@@ -91,12 +98,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                     </label>
                     <label className="text-xs flex-1 min-w-[10rem]">
                         <span className="text-secondary block mb-0.5">Source (optional)</span>
-                        <input
-                            type="text" value={sourceName}
-                            onChange={e => setSourceName(e.target.value)}
-                            placeholder="e.g. Out of Spec"
-                            className="form-input form-input w-full"
-                        />
+                        <SourcePicker sources={sources} value={sourcePick} onChange={setSourcePick} url={sourceUrl} />
                     </label>
                     <label className="text-xs flex-1 min-w-[12rem]">
                         <span className="text-secondary block mb-0.5">Source link (optional)</span>

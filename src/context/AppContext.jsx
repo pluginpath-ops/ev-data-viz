@@ -1531,6 +1531,73 @@ export function AppProvider({ children }) {
     };
 
     /** Create a published result and its speed windows from a parsed paste. */
+    // ── Sources (#327) ────────────────────────────────────────────────────────
+
+    const getSources = () => dataService.getSources();
+
+    const saveSource = async (row) => {
+        try {
+            return await dataService.saveSource(row);
+        } catch (error) {
+            // 23505: the unique index on lower(name).
+            showError('Source not saved: ' + (error.code === '23505' ? 'a source with that name already exists.' : error.message));
+            throw error;
+        }
+    };
+
+    const deleteSource = async (id) => {
+        try {
+            await dataService.deleteSource(id);
+            showSuccess('Source deleted. Its results keep the name as text.');
+        } catch (error) {
+            showError('Source not deleted: ' + error.message);
+            throw error;
+        }
+    };
+
+    /**
+     * The id to write for a picked source, creating it first when it is new.
+     * `picked` is what utils/sources.pickedSource returns.
+     */
+    const ensureSourceId = async ({ source = null, newName = null } = {}) => {
+        if (source?.id != null) return source.id;
+        if (!newName) return null;
+        const saved = await saveSource({ name: newName });
+        return saved?.id ?? null;
+    };
+
+    /**
+     * Write a planned batch of published results (#327), and report once.
+     *
+     * One row at a time, and a failure does not stop the rest: each result is
+     * written atomically with its speed windows, so a partial batch is a set of
+     * whole results plus a list of the lines that were not imported.
+     *
+     * @param {Array<{ line, updateId: number|null, write: { fields, intervals } }>} writes
+     * @returns {{ created: number, updated: number, failures: Array<{ line, message }> }}
+     */
+    const importPublishedResults = async (writes) => {
+        let created = 0;
+        let updated = 0;
+        const failures = [];
+        for (const w of writes) {
+            try {
+                if (w.updateId != null) {
+                    await dataService.replacePublishedResult(w.updateId, w.write);
+                    updated++;
+                } else {
+                    await dataService.importPublishedResult(w.write);
+                    created++;
+                }
+            } catch (error) {
+                failures.push({ line: w.line, message: error.message });
+            }
+        }
+        if (failures.length) showError(`${failures.length} of ${writes.length} results were not imported.`);
+        else showSuccess(`Imported ${created + updated} result${created + updated === 1 ? '' : 's'}.`);
+        return { created, updated, failures };
+    };
+
     const importPublishedResult = async (parsed) => {
         try {
             const saved = await dataService.importPublishedResult(parsed);
@@ -1777,6 +1844,11 @@ export function AppProvider({ children }) {
         deletePerformanceSession,
         savePerformanceSummary,
         importPublishedResult,
+        importPublishedResults,
+        getSources,
+        saveSource,
+        deleteSource,
+        ensureSourceId,
         deletePerformanceSummary,
         savePerformanceInterval,
         deletePerformanceInterval,
