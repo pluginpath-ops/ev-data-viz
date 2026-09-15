@@ -50,10 +50,14 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
                      'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
-                     'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js'];
+                     'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
+        'vehicleFigures.resolveSocWindow':
+            'Reached through withVehicleFigures in AppContext; exported so its tiers are tested one at a time.',
+        'vehicleFigures.resolveEpaRange':
+            'Reached through withVehicleFigures in AppContext; exported so its tiers are tested one at a time.',
         'testSessions.suggestedPairing':
             'Built and tested; surfacing it is a curation action awaiting its own review (#184).',
         'conditionCorrection.DEFAULT_CORRECTION_MODE':
@@ -486,6 +490,38 @@ describe('the seams that broke before', () => {
         const migration = read('supabase/migrations/067_primary_epa_configuration.sql');
         expect(migration).toMatch(/ON epa_vehicle_mappings\(vehicle_id\)\s+WHERE is_primary/);
         expect(migration).toMatch(/BEFORE INSERT OR UPDATE OF is_primary ON epa_vehicle_mappings/);
+    });
+
+    it('reads capacity and EPA range from the resolvers, not the hand-typed columns', () => {
+        // vehicles.battery was Usable on some vehicles and Gross on others, and
+        // seven readers disagreed about which (#323). A new reader of the column
+        // brings that back without a single test failing, so they are counted.
+        // Not after a quote: 'vehicle.battery' as a Compare Specs row KEY names
+        // the row, and reads nothing.
+        const COLUMN_READ = /(?<!['"`])\b(?:vehicle|v|veh|current|selectedSrc|parent|source|target)\??\.(battery|range)\b/;
+        // Where the COLUMN itself is the subject, and why.
+        const ALLOWED = {
+            'src/utils/vehicleFigures.js':   'the resolvers — their unsorted tier, deleted with the column',
+            'src/utils/vehicleForm.js':      'the edit form writes the column until it is retired (#324 step 3, #325)',
+            'src/services/DataService.js':   'writes the column',
+            'src/utils/dataChecks.js':       'checks the column itself: battery-unsorted, range-vs-label',
+            'src/context/AppContext.jsx':    'the vehicle import resends the current column values',
+            'src/utils/labelRangeCheck.js':  'documents the column it compares',
+            'src/components/epa/EpaCuratorEditor.jsx': 'compares the label with the column; goes to Data Checks with the column',
+        };
+        const offenders = sourceFiles()
+            .filter(f => !(f in ALLOWED))
+            .filter(f => COLUMN_READ.test(read(f)))
+            .map(f => `${f}: ${read(f).split('\n').find(l => COLUMN_READ.test(l)).trim()}`);
+        expect(offenders, 'read vehicle.socWindowKwh / vehicle.epaRangeMi instead').toEqual([]);
+
+        // The figures must be attached where every view gets its vehicles.
+        expect(read('src/context/AppContext.jsx')).toMatch(/withVehicleFigures\(/);
+
+        // An allowance that stops matching is a retired column nobody took off the list.
+        for (const f of Object.keys(ALLOWED)) {
+            expect(COLUMN_READ.test(read(f)), `${f} no longer reads the column — remove it from ALLOWED`).toBe(true);
+        }
     });
 
     it('reaches the reconciliation sweep from the Admin view', () => {

@@ -631,7 +631,7 @@ export default function App() {
         // EPA rated range is a valid pairing side with no run behind it, so its
         // per-vehicle ids would otherwise be pruned as unknown on every change.
         for (const v of vehicles) {
-            if (selectedVehicles.includes(v.id) && v.range > 0) liveRunIds.push(`epa:${v.id}`);
+            if (selectedVehicles.includes(v.id) && v.epaRangeMi > 0) liveRunIds.push(`epa:${v.id}`);
         }
         setPairings(prev => {
             const pruned = prunePairings(prev, liveRunIds);

@@ -154,6 +154,18 @@ export const SPEC_CATEGORIES = [
         ],
     },
     {
+        // For a vehicle with no EPA label — not certified yet, or never sold in
+        // the US (#324). An EPA label always wins over it, and Data Checks lists
+        // a vehicle carrying both. Stored in miles, like every distance here.
+        key: 'range',
+        label: 'Range',
+        fields: [
+            { key: 'expected_epa_mi',    label: 'Expected EPA Range',          type: 'number', unitGroup: 'distance' },
+            { key: 'expected_epa_basis', label: 'Expected EPA Range — Basis', type: 'enum',
+              options: ['Manufacturer', 'Independent test'] },
+        ],
+    },
+    {
         key: 'interior',
         label: 'Interior & Comfort',
         fields: [

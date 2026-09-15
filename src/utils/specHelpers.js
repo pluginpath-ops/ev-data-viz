@@ -42,25 +42,16 @@ export function resolveEffectiveSpecs(vehicle, vehicles, _visited = new Set()) {
  * A vehicle's battery capacity in kWh, for sizing one vehicle's pack against
  * another's (the capacity factor on an inherited test, #185).
  *
- * Usable is preferred over gross because it is what a test actually consumes,
- * and it reads through spec inheritance — a trim that shares its parent's pack
- * has no battery figure of its own, and the honest answer there is the
- * parent's, not "unknown".
- *
- * The same order as resolveUseableKwh in epaPhysics, minus its EPA tier: that
- * one is resolving the pack behind an EPA test group, which has a reported
- * figure of its own to prefer. This is comparing two app vehicles.
+ * The resolved `socWindowKwh` (vehicleFigures.js, attached in AppContext):
+ * EPA tested, else Usable, else Gross, through spec inheritance — a trim that
+ * shares its parent's pack has no battery figure of its own, and the honest
+ * answer there is the parent's, not "unknown".
  *
  * Returns null rather than 0 when nothing is recorded, so a caller can tell
  * "no battery figure" from a real value and decline to suggest a ratio.
  */
-export function packKwh(vehicle, vehicles) {
-    if (!vehicle) return null;
-    const specs  = resolveEffectiveSpecs(vehicle, vehicles ?? []);
-    const usable = Number(specs?.charging?.battery_usable_kwh);
-    if (usable > 0) return usable;
-    const gross = Number(vehicle.battery);
-    return gross > 0 ? gross : null;
+export function packKwh(vehicle) {
+    return vehicle?.socWindowKwh > 0 ? vehicle.socWindowKwh : null;
 }
 
 /**
@@ -111,8 +102,9 @@ export function mergeInheritedSpecs(ownSpecs, sourceSpecs) {
 export function makeVehicleFields(units) {
     return [
         { key: 'vehicle.year',    label: 'Year',                              type: 'integer' },
-        { key: 'vehicle.battery', label: 'Battery (kWh)',                     type: 'number'  },
-        { key: 'vehicle.range',   label: `EPA Range (${distanceLabel(units)})`, type: 'number', unitGroup: 'distance' },
+        // The resolved figures, not the hand-typed columns (#323, #324).
+        { key: 'vehicle.socWindowKwh', label: 'Battery (kWh)',                     type: 'number'  },
+        { key: 'vehicle.epaRangeMi',   label: `EPA Range (${distanceLabel(units)})`, type: 'number', unitGroup: 'distance' },
     ];
 }
 

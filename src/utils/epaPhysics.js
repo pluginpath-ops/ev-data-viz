@@ -184,34 +184,32 @@ export function buildEpaCurve(epaGroup, useableKwh) {
  * Resolve the best available useable battery capacity (kWh).
  *
  * Priority:
- *   1. epa_test_groups.useable_kwh          — EPA's own reported value (often absent)
- *   2. vehicle.specs.charging.battery_usable_kwh — contributor-entered spec
- *   3. vehicle.battery                       — gross capacity as-is
+ *   1. epa_test_groups.useable_kwh  — this record's own reported value (often
+ *                                     absent). Kept first for curve work: the
+ *                                     curve is drawn for THIS group.
+ *   2. vehicle.socWindowKwh         — the vehicle's resolved capacity (EPA
+ *                                     tested, Usable, Gross), see vehicleFigures.js
  *
- * Returns null when none of the above yield a positive number.
+ * Returns null when neither yields a positive number.
  *
  * @param {object} epaGroup — row from epa_test_groups
- * @param {object} vehicle  — app vehicle object
+ * @param {object} vehicle  — app vehicle object, as AppContext provides it
  * @returns {number|null}
  */
 export function resolveUseableKwh(epaGroup, vehicle) {
     if (epaGroup?.useable_kwh > 0) return epaGroup.useable_kwh;
-    const specUsable = vehicle?.specs?.charging?.battery_usable_kwh;
-    if (specUsable > 0) return specUsable;
-    if (vehicle?.battery > 0) return vehicle.battery;
+    if (vehicle?.socWindowKwh > 0) return vehicle.socWindowKwh;
     return null;
 }
 
 /**
- * Return a short label describing which source resolveUseableKwh() used.
- * Matches the priority order exactly.
+ * Which source resolveUseableKwh() used. Matches its order exactly.
  *
- * @returns {'EPA'|'spec'|'gross'|null}
+ * @returns {'EPA'|'epa-tested'|'usable'|'gross'|'unsorted'|null}
+ *          'EPA' is the group's own figure; the rest are vehicle.socWindowBasis
  */
 export function resolveUseableKwhSource(epaGroup, vehicle) {
     if (epaGroup?.useable_kwh > 0) return 'EPA';
-    const specUsable = vehicle?.specs?.charging?.battery_usable_kwh;
-    if (specUsable > 0) return 'spec';
-    if (vehicle?.battery > 0) return 'gross';
+    if (vehicle?.socWindowKwh > 0) return vehicle.socWindowBasis ?? null;
     return null;
 }

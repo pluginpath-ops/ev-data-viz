@@ -85,10 +85,26 @@ export function isEpaPartnerId(id) {
     return s === EPA_PARTNER_ID || s.startsWith(`${EPA_PARTNER_ID}:`);
 }
 
-/** The EPA option for a vehicle's partner dropdown, or null when it has no rated range. */
+/**
+ * What the EPA option is called, by where the vehicle's range came from (#324).
+ * A vehicle with no EPA label keeps its row rather than dropping out of the
+ * chart, and says what its figure is instead.
+ */
+function epaRangeName(vehicle) {
+    switch (vehicle?.epaRangeBasis) {
+        case 'expected': {
+            const source = vehicle.epaRange?.expectedSource;
+            return `Expected EPA range${source ? ` (${source})` : ''}`;
+        }
+        case 'unsorted': return 'EPA range (unsorted)';
+        default:         return 'EPA range';
+    }
+}
+
+/** The EPA option for a vehicle's partner dropdown, or null when it has no EPA range. */
 export function epaRangeOption(vehicle) {
-    return vehicle?.range > 0
-        ? { id: epaPartnerId(vehicle), name: 'EPA range', _synthetic: true }
+    return vehicle?.epaRangeMi > 0
+        ? { id: epaPartnerId(vehicle), name: epaRangeName(vehicle), _synthetic: true }
         : null;
 }
 
@@ -156,7 +172,7 @@ export function hasUsableRangeData(run, batteryKwh) {
  * had one curated — this comment used to describe that as the ONLY case, back
  * when the trigger bug made a curated range default unreliable in practice.
  */
-export function defaultRangeRun(vehicle, batteryKwh = vehicle?.battery) {
+export function defaultRangeRun(vehicle, batteryKwh = vehicle?.socWindowKwh) {
     const candidates = (vehicle?.runs || []).filter(r => hasUsableRangeData(r, batteryKwh));
     if (candidates.length === 0) return null;
     return candidates.find(r => r.isDefault || r.is_default)
@@ -189,7 +205,7 @@ function buildNote(source, sourceRun, energyMethod) {
  * @param {Object}  opts
  * @param {Object}  opts.vehicle            owning vehicle (for the default range test)
  * @param {Object}  [opts.explicitPairing]  range run chosen for this chart session
- * @param {number}  [opts.batteryKwh]       usable capacity; defaults to vehicle.battery
+ * @param {number}  [opts.batteryKwh]       capacity; defaults to vehicle.socWindowKwh
  * @param {boolean} [opts.hasRecordedRange] whether the charging run's data points
  *                                          carry range_value — the caller knows,
  *                                          this module deliberately does not
@@ -229,7 +245,7 @@ function correctBasis(basis, run, correction, session) {
 export function resolveRangeSource(chargingRun, {
     vehicle,
     explicitPairing = null,
-    batteryKwh = vehicle?.battery,
+    batteryKwh = vehicle?.socWindowKwh,
     hasRecordedRange = false,
     // Condition correction (#188). Applied HERE because this is the single
     // place a series' range basis is decided, so every chart corrects
@@ -250,14 +266,14 @@ export function resolveRangeSource(chargingRun, {
     // explicit choice — it is never resolved automatically, because a real
     // measured test on this vehicle is always the better default.
     const wantsEpa = isEpaPartnerId(explicitPairing) || isEpaPartnerId(explicitPairing?.id);
-    if (wantsEpa && vehicle?.range > 0) {
+    if (wantsEpa && vehicle?.epaRangeMi > 0) {
         return {
             source: 'epa',
             sourceRun: epaRangeOption(vehicle),
-            miPerSoc: vehicle.range / 100,
-            miPerKwh: batteryKwh > 0 ? vehicle.range / batteryKwh : null,
+            miPerSoc: vehicle.epaRangeMi / 100,
+            miPerKwh: batteryKwh > 0 ? vehicle.epaRangeMi / batteryKwh : null,
             energyMethod: 'epa-rated',
-            note: 'EPA rated range',
+            note: epaRangeName(vehicle),
         };
     }
 

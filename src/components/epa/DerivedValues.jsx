@@ -7,6 +7,7 @@
  */
 import { deriveAll, SS_CYCLE_SPEED_MPH } from '../../utils/epaDerivations';
 import { resolveUseableKwh, resolveUseableKwhSource } from '../../utils/epaPhysics';
+import { SOC_WINDOW_BASIS } from '../../utils/vehicleFigures';
 import InfoIcon from '../InfoIcon';
 import { EPA_EXPLAINERS } from '../../utils/epaExplainers';
 
@@ -83,8 +84,9 @@ export default function DerivedValues({ group, vehicle = null }) {
                 label="Battery kWh"
                 result={{
                     value: resolveUseableKwh(group, vehicle),
-                    source: resolveUseableKwhSource(group, vehicle),
-                    certain: resolveUseableKwhSource(group, vehicle) === 'EPA',
+                    source: SOC_WINDOW_BASIS[resolveUseableKwhSource(group, vehicle)]?.label
+                        ?? resolveUseableKwhSource(group, vehicle),
+                    certain: ['EPA', 'epa-tested'].includes(resolveUseableKwhSource(group, vehicle)),
                 }}
                 format={v => `${v.toFixed(1)} kWh`}
             />

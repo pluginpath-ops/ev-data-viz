@@ -15,6 +15,23 @@ import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 import LazyBoundary from './LazyBoundary';
 import { EditVehicleForm, ImportVehiclesModal } from './lazyComponents';
+import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
+
+/**
+ * The card's EPA range figure: the resolved range, or — with several EPA
+ * configurations and no primary — the span of their labels, rather than one
+ * picked silently.
+ */
+function epaRangeValue(vehicle, units) {
+    if (vehicle.epaRangeMi) return distanceValue(vehicle.epaRangeMi, units);
+    const span = vehicle.epaRange?.spanMi;
+    return span ? span.map(mi => distanceValue(mi, units)).join('–') : null;
+}
+
+/** A word beside the range only when it is not an EPA label. */
+function epaRangeBasisMark(vehicle) {
+    return ['expected', 'unsorted'].includes(vehicle.epaRangeBasis) ? vehicle.epaRangeBasis : null;
+}
 
 // ── Test-count row ────────────────────────────────────────────────────────────
 
@@ -868,11 +885,18 @@ export default function VehiclesView({
                                             LABELS the loudest thing on a card whose whole
                                             job is to compare numbers. */}
                                         <div className="stat-grid">
-                                            <StatCell label="Battery" value={vehicle.battery} unit="kWh" />
+                                            <StatCell
+                                                label="Battery"
+                                                value={vehicle.socWindowKwh}
+                                                unit="kWh"
+                                                basis={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label}
+                                                title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}
+                                            />
                                             <StatCell
                                                 label="EPA range"
-                                                value={vehicle.range ? distanceValue(vehicle.range, units) : null}
+                                                value={epaRangeValue(vehicle, units)}
                                                 unit={distanceUnit(units)}
+                                                basis={epaRangeBasisMark(vehicle)}
                                             />
                                             {vehicle.power != null && (
                                                 <StatCell label="Power" value={vehicle.power} unit="kW" />
@@ -992,12 +1016,19 @@ export default function VehiclesView({
                                     {/* Specs */}
                                     <div className="w-64 flex-shrink-0 hidden md:flex flex-col gap-1.5">
                                         <div className="stat-grid">
-                                            <StatCell label="Battery" value={vehicle.battery} unit="kWh" />
+                                            <StatCell
+                                                label="Battery"
+                                                value={vehicle.socWindowKwh}
+                                                unit="kWh"
+                                                basis={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label}
+                                                title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}
+                                            />
                                             <StatCell
                                                 label="Range"
-                                                value={vehicle.range ? distanceValue(vehicle.range, units) : null}
+                                                value={epaRangeValue(vehicle, units)}
                                                 unit={distanceUnit(units)}
-                                                title="EPA range"
+                                                basis={epaRangeBasisMark(vehicle)}
+                                                title={EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note ?? 'EPA range'}
                                             />
                                         </div>
                                         <TestedFigure tested={testedRangeSummary(vehicle)} units={units} />
