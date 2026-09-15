@@ -146,6 +146,7 @@ status and is never chrome.
 | The Admin sub-tab listing vehicles that disagree with their own sources | **Data Checks** | [DataChecksPanel.jsx](../src/components/admin/DataChecksPanel.jsx), [dataChecks.js](../src/utils/dataChecks.js) |
 | Two sources for one figure further apart than a limit | **disagrees**, a disagreement | `.data-check-finding.is-disagrees` |
 | Something missing that would let a figure be checked | **a gap** | `.data-check-finding.is-gap` |
+| A change a curator makes from a finding — a move out of a retiring column, a spec field, the primary | **a fix**; a column fix is **a move** | [dataCheckFixes.js](../src/utils/dataCheckFixes.js), `.data-check-fixes` |
 | A curator's recorded decision that something needs no action, still visible under a filter | **a skip** — skipped, un-skip | `epa_test_groups.fe_guide_skipped_at` (link sweep), `data_check_skips` (Data Checks), `.skip-ask` |
 
 **A skip is a decision, not a deletion.** The same word in both places because
