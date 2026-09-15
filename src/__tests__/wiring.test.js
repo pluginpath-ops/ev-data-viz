@@ -518,6 +518,15 @@ describe('the seams that broke before', () => {
         // The figures must be attached where every view gets its vehicles.
         expect(read('src/context/AppContext.jsx')).toMatch(/withVehicleFigures\(/);
 
+        // And every chart whose plotted values rest on them must say which
+        // source each series used — mixed sources looked identical before.
+        for (const chart of ['ChargingView', 'ChargeCompareView', 'RoadTripView']) {
+            expect(read(`src/components/${chart}.jsx`), `${chart} must name its figure sources`).toMatch(/figureSources\(/);
+        }
+        for (const chart of ['SpecsChartView', 'SpecsScatterView']) {
+            expect(read(`src/components/${chart}.jsx`), `${chart} must name its figure sources`).toMatch(/fieldFigureSource\(/);
+        }
+
         // An allowance that stops matching is a retired column nobody took off the list.
         for (const f of Object.keys(ALLOWED)) {
             expect(COLUMN_READ.test(read(f)), `${f} no longer reads the column — remove it from ALLOWED`).toBe(true);

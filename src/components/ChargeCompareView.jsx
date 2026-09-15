@@ -9,6 +9,7 @@ import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, speedBasisNote, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
+import { figureSources } from '../utils/vehicleFigures';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import { sessionFor } from '../utils/testSessions';
@@ -120,6 +121,7 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     if (run.speed_mph   != null) badges.push({ text: fmtSpeed(run.speed_mph, units), alertAmt: 0, type: 'speed' });
                     if (speedBasisNote(run))     badges.push({ text: speedBasisNote(run), alertAmt: 0, type: 'speed' });
                     if (run.temperature_f != null) badges.push({ text: fmtTemp(run.temperature_f, units), alertAmt: 0 });
+                    for (const s of run._figureSources ?? []) badges.push({ text: s.short, alertAmt: 0, type: 'source' });
                 }
                 if (badges.length === 0) return;
 
@@ -150,9 +152,10 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
 
                 if (isHorizontal) {
                     // Horizontal bars: bar.x=right, bar.base=left, bar.y=center, bar.height=bar height
-                    // Show only: primary value, SoC, speed (data-rich tooltip covers the rest)
+                    // Show only: primary value, SoC, speed, and where an EPA
+                    // row's miles came from (data-rich tooltip covers the rest)
                     const displayBadges = badges.filter(b =>
-                        b.primary || b.alertAmt > 0 || b.type === 'speed'
+                        b.primary || b.alertAmt > 0 || b.type === 'speed' || b.type === 'source'
                     );
                     const gap = 4, leftPad = 6;
                     let drawX = bar.base + leftPad;
@@ -610,6 +613,12 @@ export default function ChargeCompareView({
                 _rangeSource:    rangeSrc?.source ?? 'none',
                 _rangeSourceNote: rangeSrc?.note ?? null,
                 _rangeSourceRun:  rangeSrc?.sourceRun?.name ?? null,
+                // An EPA row prices its miles from the vehicle's EPA range, which
+                // may be a label, an expectation or an unsorted figure (#324).
+                // The short series label can elide the row name that says so.
+                _figureSources:  rangeSrc?.source === 'epa'
+                    ? figureSources(selectedVehicles.find(v => v.id === rangeRun.vehicleId), { range: true }, units)
+                    : [],
             };
 
             // No charging run resolved, or data not yet loaded
@@ -801,6 +810,7 @@ export default function ChargeCompareView({
                                             : run._rangeSourceRun && run._rangeSourceRun !== run.name
                                                 ? `Range basis: ${run._rangeSourceRun}`
                                                 : null,
+                                        ...(run._figureSources ?? []).map(s => s.line),
                                     ].filter(Boolean), units);
                                 },
                             },

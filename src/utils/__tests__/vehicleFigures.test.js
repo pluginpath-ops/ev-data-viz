@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSocWindow, resolveEpaRange, withVehicleFigures, testedAgreement } from '../vehicleFigures';
+import { resolveSocWindow, resolveEpaRange, withVehicleFigures, testedAgreement, figureSources, fieldFigureSource } from '../vehicleFigures';
 
 let nextId = 1;
 const group = (over = {}) => ({
@@ -104,6 +104,34 @@ describe('withVehicleFigures', () => {
             socWindowKwh: 80, socWindowBasis: 'unsorted', epaRangeMi: 300, epaRangeBasis: 'unsorted',
         });
         expect(out.epaRange.spanMi).toBeNull();
+    });
+});
+
+describe('figureSources', () => {
+    const lightning = { socWindowKwh: 125.1, socWindowBasis: 'epa-tested', epaRangeMi: 300, epaRangeBasis: 'epa-label', epaRange: {} };
+
+    it('names only the figures asked for', () => {
+        expect(figureSources(lightning)).toEqual([]);
+        expect(figureSources(lightning, { capacity: true })).toEqual([
+            { figure: 'capacity', basis: 'EPA tested', short: '125.1 kWh EPA tested', line: 'Capacity: 125.1 kWh, EPA tested' },
+        ]);
+        expect(figureSources(lightning, { capacity: true, range: true }).map(s => s.figure)).toEqual(['capacity', 'range']);
+    });
+
+    it('carries an Expected EPA Range’s basis, in the chart’s units', () => {
+        const v = { epaRangeMi: 300, epaRangeBasis: 'expected', epaRange: { expectedSource: 'Manufacturer' } };
+        expect(figureSources(v, { range: true })[0].short).toBe('300 mi Expected EPA (Manufacturer)');
+        expect(figureSources(v, { range: true }, 'metric')[0].line).toBe('EPA range: 483 km, Expected EPA (Manufacturer)');
+    });
+
+    it('leaves out a figure the vehicle does not have', () => {
+        expect(figureSources({ socWindowKwh: null }, { capacity: true, range: true })).toEqual([]);
+    });
+
+    it('names a spec field’s source only when the field is a resolved figure', () => {
+        expect(fieldFigureSource(lightning, 'vehicle.socWindowKwh').basis).toBe('EPA tested');
+        expect(fieldFigureSource(lightning, 'vehicle.epaRangeMi').basis).toBe('EPA');
+        expect(fieldFigureSource(lightning, 'performance.weight_lbs')).toBeNull();
     });
 });
 

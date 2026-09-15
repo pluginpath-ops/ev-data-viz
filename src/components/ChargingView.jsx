@@ -9,6 +9,19 @@ import AxisScaleControls from './AxisScaleControls';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
+import { figureSources } from '../utils/vehicleFigures';
+
+/**
+ * The resolved vehicle figures each derived axis divides or multiplies by
+ * (#323, #324). A series plotted on one of these names where its figure came
+ * from, because two vehicles' curves can rest on different kinds of number.
+ */
+const AXIS_FIGURES = {
+    cRate:         ['capacity'],
+    rangeRate:     ['capacity', 'range'],
+    rangeEpa:      ['range'],
+    deltaRangeEpa: ['range'],
+};
 import VerboseLabelToggle from './VerboseLabelToggle';
 import CorrectionControl from './CorrectionControl';
 import { minimumCommonSoc, alignmentExclusion, alignmentOffset, alignSeries, overExtrapolated, clampSoc } from '../utils/socAlignment';
@@ -510,9 +523,21 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             return chartConfig.verboseLabels ? l.full : l.short;
         };
 
+        // The axes actually plotted — race mode replaces X with time.
+        const plottedAxes = [raceActive ? null : chartConfig.xAxis, chartConfig.yAxis, chartConfig.y2Axis].filter(Boolean);
+        const axisFigures = new Set(plottedAxes.flatMap(a => AXIS_FIGURES[a] ?? []));
+        const plotsTestedRange = plottedAxes.some(a => a === 'range' || a === 'deltaRange');
+
         const datasets = allSelectedRuns.flatMap((run) => {
             const rawData = runDataCache[run.id] ?? run.data ?? [];
             const { vehicleBattery, vehicleRange } = run;
+            // A tested-range axis priced from the EPA option rests on the EPA
+            // range too, the same as the EPA axes do.
+            const pricedByEpa = plotsTestedRange && isEpaPartnerId(rangePartnersOfCharging(pairings, run.id)[0]);
+            const sources = figureSources(run.vehicle, {
+                capacity: axisFigures.has('capacity'),
+                range:    axisFigures.has('range') || pricedByEpa,
+            }, units);
             // One multiplier for this run's range axes, so the dropdown takes
             // effect without refetching. Declared before getX and the point
             // mapping that read it.
@@ -549,7 +574,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             const showPts = chartConfig.showPoints || false;
 
             const result = [{
-                label:            runLabel(run),
+                // The legend is the only thing identifying a curve, and it is
+                // what a PNG export keeps — so the source goes in it, not only
+                // in the tooltip.
+                label:            sources.length ? `${runLabel(run)} · ${sources.map(s => s.short).join(' · ')}` : runLabel(run),
+                figureSources:    sources,
                 data:             y1Points,
                 backgroundColor:  color,
                 borderColor:      color,
@@ -579,6 +608,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         borderDash:       chartConfig.showLine ? [6, 3] : undefined,
                         tension:          0.1,
                         yAxisID:          'y2',
+                        figureSources:    sources,
                     });
                 }
             }
@@ -631,7 +661,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                 return [`${xl}: ${ctx.parsed.x}`, `${yl}: ${ctx.parsed.y}`];
                             },
                             afterLabel(ctx) {
-                                return runTooltipLines(ctx.dataset?.runMeta, [], units);
+                                return runTooltipLines(ctx.dataset?.runMeta, (ctx.dataset?.figureSources ?? []).map(s => s.line), units);
                             },
                         },
                     },
