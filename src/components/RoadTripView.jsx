@@ -8,6 +8,7 @@ import { useTheme } from '../hooks/useTheme';
 import { MI_TO_KM, convDistance, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
+import { figureSources } from '../utils/vehicleFigures';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import { clampSoc } from '../utils/socAlignment';
@@ -792,13 +793,28 @@ export default function RoadTripView({
     // series would otherwise collide. Customize routing was printing the range
     // run alone, which is neither the leading component nor unique: four rows
     // read "OoS 10% Challenge" against four different vehicles.
-    const seriesLabels = useMemo(() => buildSeriesLabels(validEntries.map(e => ({
-        key:         e.key,
-        vehicle:     e.vehicle,
-        rangeRun:    e.rangeRun,
-        chargingRun: e.run,
-        sessionName: sharedSessionName(e.rangeRun, e.run, testSessions),
-    }))), [validEntries, testSessions]);
+    //
+    // Every simulation walks the pack in kWh, so every series also says whose
+    // capacity it used (#323): EPA tested and a Gross that reads high sat side by
+    // side with nothing to tell them apart. Appended here so the legends and the
+    // routing rows, which print these same labels, agree.
+    const seriesLabels = useMemo(() => {
+        const labels = buildSeriesLabels(validEntries.map(e => ({
+            key:         e.key,
+            vehicle:     e.vehicle,
+            rangeRun:    e.rangeRun,
+            chargingRun: e.run,
+            sessionName: sharedSessionName(e.rangeRun, e.run, testSessions),
+        })));
+        for (const e of validEntries) {
+            const label = labels.get(e.key);
+            const [capacity] = figureSources(e.vehicle, { capacity: true }, units);
+            if (label && capacity) {
+                labels.set(e.key, { ...label, short: `${label.short} · ${capacity.short}`, full: `${label.full} · ${capacity.short}` });
+            }
+        }
+        return labels;
+    }, [validEntries, testSessions, units]);
     const skippedEntries = runEntries.filter(e => !e.miPerKwh || !e.batteryKwh);
 
     // Vehicles with no charging runs at all (need separate warning)
@@ -2095,6 +2111,9 @@ export default function RoadTripView({
                                                     <div>
                                                         <div className="font-medium">{vehicleLabel(entry.vehicle)}</div>
                                                         <div className="text-xs text-meta">{entry.label}</div>
+                                                        <div className="text-xs text-meta">
+                                                            {figureSources(entry.vehicle, { capacity: true }, units)[0]?.line}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>

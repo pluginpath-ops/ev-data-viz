@@ -49,6 +49,7 @@
 import { resolveEffectiveSpecs } from './specHelpers';
 import { epaConfigurationFigures, primaryEpaMapping } from './epaConfiguration';
 import { TESTED_CAPACITY_TOLERANCE_PCT } from '../constants/epa';
+import { distanceValue, distanceUnit } from './unitConversions';
 
 // Absent stays absent: Number(null) is 0, and a 0 kWh pack is a figure the data
 // never gave.
@@ -167,6 +168,53 @@ export function resolveEpaRange(vehicle, vehicles = []) {
     const legacy = positive(vehicle?.range);
     if (legacy) return { ...none, mi: legacy, basis: 'unsorted', spanMi };
     return { ...none, spanMi };
+}
+
+/**
+ * What a chart says about the resolved figures behind a series.
+ *
+ * One vehicle's C-rate can divide by EPA tested while the next divides by a
+ * Gross figure that reads high; plotted side by side, nothing said so. A chart
+ * asks only for the figures its plotted value actually depends on, so a SoC
+ * curve names nothing and a C-rate curve names its capacity.
+ *
+ * @param {Object} vehicle   as AppContext provides it (withVehicleFigures)
+ * @param {{capacity?: boolean, range?: boolean}} uses
+ * @param {'imperial'|'metric'} [units]
+ * @returns {Array<{ figure: 'capacity'|'range', short: string, line: string }>}
+ *          `short` for a legend or badge ("125.1 kWh EPA tested"), `line` for a
+ *          tooltip ("Capacity: 125.1 kWh, EPA tested"); a figure the vehicle
+ *          lacks is left out
+ */
+export function figureSources(vehicle, { capacity = false, range = false } = {}, units = 'imperial') {
+    const out = [];
+    if (capacity && vehicle?.socWindowKwh > 0) {
+        const basis = SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label ?? 'unknown';
+        const value = `${vehicle.socWindowKwh} kWh`;
+        out.push({ figure: 'capacity', basis, short: `${value} ${basis}`, line: `Capacity: ${value}, ${basis}` });
+    }
+    if (range && vehicle?.epaRangeMi > 0) {
+        const source = vehicle.epaRange?.expectedSource;
+        const basis = `${EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.label ?? 'unknown'}${source ? ` (${source})` : ''}`;
+        const value = `${Math.round(distanceValue(vehicle.epaRangeMi, units))} ${distanceUnit(units)}`;
+        out.push({ figure: 'range', basis, short: `${value} ${basis}`, line: `EPA range: ${value}, ${basis}` });
+    }
+    return out;
+}
+
+/** The Spec Chart / Scatter fields that ARE a resolved figure (specHelpers.makeVehicleFields). */
+const FIELD_FIGURE = {
+    'vehicle.socWindowKwh': 'capacity',
+    'vehicle.epaRangeMi':   'range',
+};
+
+/**
+ * The source of a spec field's value, when that field is a resolved figure;
+ * null for every ordinary spec field, which has one home and needs no word.
+ */
+export function fieldFigureSource(vehicle, fieldKey, units = 'imperial') {
+    const figure = FIELD_FIGURE[fieldKey];
+    return figure ? (figureSources(vehicle, { [figure]: true }, units)[0] ?? null) : null;
 }
 
 /**

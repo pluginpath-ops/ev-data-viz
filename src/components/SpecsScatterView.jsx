@@ -8,6 +8,7 @@ import {
     makeVehicleFields, buildFieldGroups, getFieldDef, extractValue,
     vehicleColor, formatNumericLabel,
 } from '../utils/specHelpers';
+import { fieldFigureSource } from '../utils/vehicleFigures';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
@@ -152,6 +153,9 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
                 pointHoverRadius: 11,
                 _rawX: rawX,
                 _rawY: rawY,
+                // Resolved figures name their source (#323, #324); null otherwise.
+                _sourceX: fieldFigureSource(v, xField, units),
+                _sourceY: fieldFigureSource(v, yField, units),
                 _manufacturer: v.manufacturer?.name ?? null,
                 _year: v.year ?? null,
             };
@@ -219,9 +223,10 @@ export default function SpecsScatterView({ vehicles, xField: xProp, yField: yPro
                             },
                             label: ctx => {
                                 const ds = ctx.dataset;
+                                const basis = (source) => (source ? ` (${source.basis})` : '');
                                 return [
-                                    `${xLabel}: ${formatVal(ds._rawX, xDef)}`,
-                                    `${yLabel}: ${formatVal(ds._rawY, yDef)}`,
+                                    `${xLabel}: ${formatVal(ds._rawX, xDef)}${basis(ds._sourceX)}`,
+                                    `${yLabel}: ${formatVal(ds._rawY, yDef)}${basis(ds._sourceY)}`,
                                 ];
                             },
                         },

@@ -8,6 +8,7 @@ import {
     makeVehicleFields, buildFieldGroups, getFieldDef, extractValue,
     detectMode, formatNumericLabel, vehicleColor,
 } from '../utils/specHelpers';
+import { fieldFigureSource } from '../utils/vehicleFigures';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
@@ -131,8 +132,14 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
             );
             const insideLabels = barData.map((n, i) => {
                 if (n === null) return null;
-                if (fieldDef.unitGroup) return formatSpecValue(rawValues[i], fieldDef.unitGroup, units);
-                return formatNumericLabel(n);
+                const text = fieldDef.unitGroup
+                    ? formatSpecValue(rawValues[i], fieldDef.unitGroup, units)
+                    : formatNumericLabel(n);
+                // Battery and EPA range are resolved per vehicle, so two bars
+                // can be different kinds of figure (#323, #324). Said on the bar,
+                // which is what a PNG export keeps.
+                const source = fieldFigureSource(vehicles[i], selectedField, units);
+                return source ? `${text} · ${source.basis}` : text;
             });
             insideLabelFn = i => insideLabels[i];
             valueAxisOptions = { display: true, beginAtZero: true, ticks: { color: tickColor }, grid: { color: gridColor } };
@@ -171,8 +178,9 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                                 const raw = rawValues[ctx.dataIndex];
                                 if (raw === null || raw === undefined || raw === '') return 'N/A';
                                 if (mode === 'boolean') return raw ? 'Yes' : 'No';
-                                if (fieldDef.unitGroup) return formatSpecValue(raw, fieldDef.unitGroup, units);
-                                return String(raw);
+                                const value = fieldDef.unitGroup ? formatSpecValue(raw, fieldDef.unitGroup, units) : String(raw);
+                                const source = fieldFigureSource(vehicles[ctx.dataIndex], selectedField, units);
+                                return source ? [value, source.line] : value;
                             },
                         },
                     },
