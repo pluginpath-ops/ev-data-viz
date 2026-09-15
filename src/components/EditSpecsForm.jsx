@@ -109,7 +109,8 @@ function fmtInheritedHint(value, field) {
     return String(value);
 }
 
-function SpecField({ field, value, onChange, inheritedValue }) {
+/** One spec field's input, by schema type. Also used inline by Data Checks. */
+export function SpecField({ field, value, onChange, inheritedValue }) {
     const hasInherited = inheritedValue !== null && inheritedValue !== undefined;
     const isEmpty      = value === null || value === undefined || value === '';
     const hint         = hasInherited && isEmpty ? fmtInheritedHint(inheritedValue, field) : null;

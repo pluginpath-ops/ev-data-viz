@@ -176,9 +176,13 @@ export function AppProvider({ children }) {
                 }
                 return updated;
             }));
+            return true;
         } catch (error) {
             logIfUnauthorized('update_vehicle', 'vehicle', vehicleId, error);
             showError('Error updating vehicle: ' + error.message);
+            // Reported here, and returned, so a caller chaining writes — Data
+            // Checks moving a value between columns — can stop at the first failure.
+            return false;
         }
     };
 
@@ -609,9 +613,11 @@ export function AppProvider({ children }) {
                 }
                 return next;
             });
+            return true;
         } catch (error) {
             logIfUnauthorized('update_specs', 'vehicle', vehicleId, error);
             showError('Error updating specs: ' + error.message);
+            return false;
         }
     };
 

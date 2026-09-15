@@ -50,7 +50,7 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
                      'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
-                     'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js'];
+                     'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -530,6 +530,28 @@ describe('the seams that broke before', () => {
         // An allowance that stops matching is a retired column nobody took off the list.
         for (const f of Object.keys(ALLOWED)) {
             expect(COLUMN_READ.test(read(f)), `${f} no longer reads the column — remove it from ALLOWED`).toBe(true);
+        }
+    });
+
+    it('fixes a finding from Data Checks without losing the value it moves', () => {
+        const panel = read('src/components/admin/DataChecksPanel.jsx');
+        expect(panel, 'the panel must offer the column moves').toMatch(/columnMoves\(/);
+        expect(panel, 'the panel must edit the fields a check compares').toMatch(/checkFields\(/);
+        expect(panel, 'no-primary must be fixable in place').toMatch(/<PrimaryConfigurationPicker/);
+
+        // A move writes the spec and then clears the column. Clearing first, or
+        // clearing after a refused spec write, deletes the only copy of the value.
+        const start = panel.indexOf('const moveValue');
+        const body = panel.slice(start, panel.indexOf('\n    };', start));
+        expect(body).toMatch(/const ok = await updateVehicleSpecs\([\s\S]*if \(!ok\) return;[\s\S]*updateVehicle\(/);
+
+        // Which depends on the context REPORTING a failure; it used to swallow it.
+        const ctx = read('src/context/AppContext.jsx');
+        for (const fn of ['updateVehicle', 'updateVehicleSpecs']) {
+            const at = ctx.indexOf(`const ${fn} = async`);
+            const block = ctx.slice(at, ctx.indexOf('\n    };', at));
+            expect(block, `${fn} must return true on success`).toMatch(/return true;/);
+            expect(block, `${fn} must return false on failure`).toMatch(/return false;/);
         }
     });
 

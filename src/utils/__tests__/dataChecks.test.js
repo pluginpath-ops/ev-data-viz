@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    runDataChecks, checkCounts, sourceNameVariants, groupPerformanceByVehicle, overlaySkips, skipKey,
+    runDataChecks, checkCounts, sourceNameVariants, groupPerformanceByVehicle, overlaySkips, skipKey, keepOrder,
     DATA_CHECKS, LIMIT_KEYS, LOADED_LIMITS,
 } from '../dataChecks';
 
@@ -85,8 +85,10 @@ describe('range', () => {
         expect(checksFor(v)).toContain('label-spread');
     });
 
-    it('reports a gap in either direction', () => {
-        expect(checksFor(vehicle({}, [group({ label_range_published: 330 })]))).toEqual(['label-no-range']);
+    it('reports a typed range with no label, but not a label with no typed range', () => {
+        // Since #324 the label IS the vehicle's range: nothing typed beside it is
+        // where every vehicle is headed.
+        expect(checksFor(vehicle({}, [group({ label_range_published: 330 })]))).toEqual([]);
         expect(checksFor(vehicle({ range: 100 }))).toEqual(['range-no-label']);
         expect(findingsFor(vehicle({ range: 100 }, [group()]))[0].text).toMatch(/none of its 1 linked/);
     });
@@ -431,5 +433,20 @@ describe('Expected EPA Range beside a label (#324)', () => {
 
     it('says nothing without a label — that is what the field is for', () => {
         expect(checksFor(vehicle({ specs: expecting(360) }))).not.toContain('expected-vs-label');
+    });
+});
+
+describe('keepOrder: rows hold their places while a curator works', () => {
+    it('keeps every held vehicle in place, resolved or not', () => {
+        // B was fixed, so the live order no longer has it and C now outranks A.
+        expect(keepOrder(['A', 'B', 'C'], ['C', 'A'])).toEqual(['A', 'B', 'C']);
+    });
+
+    it('adds a vehicle that newly has a finding at the end, pushing nothing down', () => {
+        expect(keepOrder(['A', 'B'], ['D', 'A', 'B'])).toEqual(['A', 'B', 'D']);
+    });
+
+    it('is the live order when nothing is held', () => {
+        expect(keepOrder([], ['C', 'A'])).toEqual(['C', 'A']);
     });
 });

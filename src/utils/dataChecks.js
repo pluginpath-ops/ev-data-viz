@@ -78,7 +78,6 @@ export const DATA_CHECKS = [
     { key: 'no-primary',         figure: 'configuration', kind: 'gap',     label: 'Several EPA configurations, none primary' },
     { key: 'range-vs-label',     figure: 'range',       kind: 'disagrees', label: 'Range disagrees with the EPA label' },
     { key: 'label-spread',       figure: 'range',       kind: 'disagrees', label: 'EPA configurations disagree on range' },
-    { key: 'label-no-range',     figure: 'range',       kind: 'gap',       label: 'EPA label, no range on the vehicle' },
     { key: 'range-no-label',     figure: 'range',       kind: 'gap',       label: 'Range with no EPA label' },
     { key: 'expected-vs-label',  figure: 'range',       kind: 'disagrees', label: 'Expected EPA range disagrees with the EPA label' },
     { key: 'tested-vs-label',    figure: 'capacity',    kind: 'disagrees', label: 'EPA tested disagrees with Usable/Gross' },
@@ -259,12 +258,8 @@ function rangeFindings(vehicle, links, ctx, limits) {
         }
     }
 
-    if (labelled.length && !range) {
-        out.push(finding('label-no-range', labelled.length === 1
-            ? `No range on the vehicle; ${links.chosen ? 'its primary configuration\'s' : 'its'} EPA label reads ${mi(labels[0])}.`
-            : `No range on the vehicle; its ${labelled.length} EPA labels read ${miSpan(labels)}.`,
-            { labels }));
-    }
+    // No `label-no-range`: since #324 the EPA label IS the vehicle's range, so a
+    // label with nothing typed beside it is where every vehicle is headed, not a gap.
 
     if (range && !labelled.length) {
         const text = links.chosen
@@ -542,6 +537,24 @@ export function runDataChecks(vehicles = [], {
         })
         .sort((a, b) => b.disagrees - a.disagrees || b.gaps - a.gaps
             || vehicleLabel(a.vehicle).localeCompare(vehicleLabel(b.vehicle)));
+}
+
+/**
+ * The panel's row order, held steady while a curator works through it.
+ *
+ * Rows come back worst first, so every fix and every skip re-sorted the list —
+ * the vehicle being worked on slid down under the cursor. The panel holds the
+ * order it last showed and lays live results over it: every held vehicle keeps
+ * its place, fixed or not, and a vehicle that has newly gained a finding joins
+ * at the end rather than pushing anything down. A fresh order is taken only
+ * when the curator asks for a different list.
+ *
+ * @param {Array} heldIds  vehicle ids in the order last shown
+ * @param {Array} liveIds  vehicle ids that have something to show now, worst first
+ */
+export function keepOrder(heldIds = [], liveIds = []) {
+    const held = new Set(heldIds);
+    return [...heldIds, ...liveIds.filter(id => !held.has(id))];
 }
 
 /**

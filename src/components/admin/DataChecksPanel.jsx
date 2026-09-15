@@ -3,11 +3,14 @@ import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
 import { KNOB_GROUPS } from '../../constants/knobs';
 import { setOverride } from '../../constants/overrides';
-import { vehicleLabel } from '../../utils/specHelpers';
+import { vehicleLabel, resolveEffectiveSpecs } from '../../utils/specHelpers';
+import { columnMoves, checkFields, withSpecValues, epaSectionHref, EPA_SECTION_CHECKS } from '../../utils/dataCheckFixes';
+import { SpecField } from '../EditSpecsForm';
+import PrimaryConfigurationPicker from '../epa/PrimaryConfigurationPicker';
 import {
     CHECK_FIGURES, DATA_CHECKS, TESTED_RULES, LIMIT_KEYS, LOADED_LIMITS,
     runDataChecks, checkCounts, sourceNameVariants, groupPerformanceByVehicle,
-    overlaySkips, skipKey,
+    overlaySkips, skipKey, keepOrder,
 } from '../../utils/dataChecks';
 
 /**
@@ -85,6 +88,92 @@ function Tally({ row }) {
 }
 
 /**
+ * One spec field a finding compares, edited where the finding is.
+ *
+ * Save is always present and disabled until the value changes, so typing never
+ * moves a control a curator is about to click. The caller keys this by the
+ * stored value, so a save from elsewhere resets the draft.
+ */
+function FixField({ vehicle, category, field, def, inheritedValue, onSave }) {
+    const own = vehicle.specs?.[category]?.[field] ?? null;
+    const [draft, setDraft] = useState(own);
+    const [saving, setSaving] = useState(false);
+    const dirty = (draft ?? null) !== own;
+    const save = async () => {
+        setSaving(true);
+        await onSave(category, { [field]: draft });
+        setSaving(false);
+    };
+    return (
+        <span className="data-check-fix-field">
+            <span className="text-note">{def.label}</span>
+            <SpecField field={def} value={draft} onChange={setDraft} inheritedValue={inheritedValue} />
+            <button type="button" className="btn btn-secondary text-sm" disabled={!dirty || saving} onClick={save}>
+                {saving ? 'Saving…' : 'Save'}
+            </button>
+        </span>
+    );
+}
+
+/**
+ * What can be done about one finding (#321): moves out of the retiring columns,
+ * the spec fields it compares, the primary configuration, and its EPA section.
+ * See utils/dataCheckFixes.js for which finding offers what.
+ */
+function FindingFixes({ finding: f, vehicle, fleet, onMove, onSaveSpec, onChoosePrimary }) {
+    const [busy, setBusy] = useState(false);
+    const moves = columnMoves(f);
+    const fields = checkFields(f.check).filter(x => x.def);
+    const toEpa = EPA_SECTION_CHECKS.has(f.check);
+    const choosePrimary = f.check === 'no-primary';
+    if (!moves.length && !fields.length && !toEpa && !choosePrimary) return null;
+
+    // The parent's values, shown as the hint an empty own field inherits.
+    const parent = vehicle.spec_source_vehicle_id ? fleet.find(v => v.id === vehicle.spec_source_vehicle_id) : null;
+    const inherited = fields.length && parent ? resolveEffectiveSpecs(parent, fleet) : null;
+
+    const move = async (m) => {
+        setBusy(true);
+        await onMove(vehicle, m);
+        setBusy(false);
+    };
+
+    return (
+        <div className="data-check-fixes">
+            {moves.map(m => (
+                <button key={m.key} type="button" className="btn btn-secondary text-sm" title={m.title} disabled={busy} onClick={() => move(m)}>
+                    {m.label}
+                </button>
+            ))}
+            {fields.map(({ category, field, def }) => (
+                <FixField
+                    key={`${category}.${field}:${vehicle.specs?.[category]?.[field] ?? ''}`}
+                    vehicle={vehicle}
+                    category={category}
+                    field={field}
+                    def={def}
+                    inheritedValue={inherited?.[category]?.[field] ?? null}
+                    onSave={(cat, values) => onSaveSpec(vehicle, cat, values)}
+                />
+            ))}
+            {toEpa && (
+                <a className="btn btn-secondary text-sm" href={epaSectionHref(vehicle.id)}>Open EPA section</a>
+            )}
+            {choosePrimary && (
+                <div className="w-full">
+                    <PrimaryConfigurationPicker
+                        vehicle={vehicle}
+                        mappings={vehicle.epa_mappings ?? []}
+                        canEdit
+                        onChoose={onChoosePrimary}
+                    />
+                </div>
+            )}
+        </div>
+    );
+}
+
+/**
  * One finding, with the controls to skip or un-skip it.
  *
  * While its vehicle's "Skip all" is armed, an open finding shows only a note
@@ -95,7 +184,7 @@ function Tally({ row }) {
  * shows the old note, because the curator's earlier reasoning is exactly what
  * is needed to decide whether it still applies.
  */
-function FindingItem({ finding: f, canSkip, armed, armedNote, onArmedNote, onSkip, onUnskip }) {
+function FindingItem({ finding: f, fixes, canSkip, armed, armedNote, onArmedNote, onSkip, onUnskip }) {
     const [asking, setAsking] = useState(false);
     const [note, setNote] = useState('');
     const when = f.skip?.skipped_at ? new Date(f.skip.skipped_at).toLocaleDateString() : null;
@@ -118,6 +207,9 @@ function FindingItem({ finding: f, canSkip, armed, armedNote, onArmedNote, onSki
                     )
                 )}
             </div>
+
+            {/* A skipped finding needs nothing doing — that is what the skip said. */}
+            {!f.skipped && fixes}
 
             {f.skipped && (
                 <span className="text-meta">
@@ -175,7 +267,7 @@ function FindingItem({ finding: f, canSkip, armed, armedNote, onArmedNote, onSki
  * singles. The button sits in the header, above the fields it reveals, and holds
  * one width in both states, so the second click lands where the first did.
  */
-function VehicleRow({ row, findings, open, onToggle, canSkip, onSkip, onUnskip, onSkipAll }) {
+function VehicleRow({ row, findings, fleet, open, onToggle, canSkip, onSkip, onUnskip, onSkipAll, onMove, onSaveSpec, onChoosePrimary }) {
     const [armed, setArmed] = useState(false);
     const [notes, setNotes] = useState({});
     const openFindings = findings.filter(f => !f.skipped);
@@ -207,7 +299,9 @@ function VehicleRow({ row, findings, open, onToggle, canSkip, onSkip, onUnskip, 
                     <span className="min-w-0">
                         <span className="text-secondary truncate block">{vehicleLabel(row.vehicle)}</span>
                         <span className="text-meta block truncate">
-                            {[...new Set(findings.map(f => CHECK_LABEL[f.check]))].join(' · ')}
+                            {findings.length
+                                ? [...new Set(findings.map(f => CHECK_LABEL[f.check]))].join(' · ')
+                                : 'Nothing outstanding. It leaves the list on Re-sort.'}
                         </span>
                     </span>
                     <Tally row={row} />
@@ -234,6 +328,16 @@ function VehicleRow({ row, findings, open, onToggle, canSkip, onSkip, onUnskip, 
                         <FindingItem
                             key={f.check}
                             finding={f}
+                            fixes={(
+                                <FindingFixes
+                                    finding={f}
+                                    vehicle={row.vehicle}
+                                    fleet={fleet}
+                                    onMove={onMove}
+                                    onSaveSpec={onSaveSpec}
+                                    onChoosePrimary={onChoosePrimary}
+                                />
+                            )}
                             canSkip={canSkip}
                             armed={armed}
                             armedNote={notes[f.check] ?? ''}
@@ -252,13 +356,19 @@ export default function DataChecksPanel() {
     const {
         vehicles, getPerformanceSummaries, getPerformanceSessions,
         getDataCheckSkips, setDataCheckSkip, recordDataCheckSkips,
+        updateVehicle, updateVehicleSpecs, setPrimaryEpaMapping,
     } = useAppContext();
     const fleet = useMemo(() => vehicles ?? [], [vehicles]);
 
     // Performance results are not on the vehicle object — getVehicles keeps the
     // performance tables out on purpose — so this page fetches them for itself,
     // and nothing outside Admin pays for it.
-    const vehicleIds = useMemo(() => fleet.map(v => v.id), [fleet]);
+    // Keyed on the ids themselves, not the fleet array: every save hands back a
+    // new array, and keying on it refetched performance after each fix — and
+    // flipped the panel back to loading, which released the held row order.
+    const idsKey = fleet.map(v => v.id).join(',');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const vehicleIds = useMemo(() => fleet.map(v => v.id), [idsKey]);
     const loadPerformance = useCallback(async () => {
         const [summaries, sessions] = await Promise.all([
             getPerformanceSummaries(),
@@ -280,7 +390,7 @@ export default function DataChecksPanel() {
     // overlay already says what the write made true.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const loadSkips = useCallback(() => getDataCheckSkips(), []);
-    const { data: skipData } = useAsyncResource(loadSkips, []);
+    const { data: skipData, loading: skipsLoading } = useAsyncResource(loadSkips, []);
     const [pending, setPending] = useState(() => new Map());
     const skips = useMemo(() => overlaySkips(skipData?.skips ?? [], pending), [skipData, pending]);
     const canSkip = skipData?.available === true;
@@ -366,14 +476,57 @@ export default function DataChecksPanel() {
             vehicleId, checkKey: finding.check, fingerprint: finding.fingerprint, note,
         }))));
 
+    /**
+     * A move out of vehicles.battery or vehicles.range: the spec first, the
+     * column only once the spec is saved. The context reports a failed write
+     * itself and returns false, so a refused spec leaves the column — until then
+     * the only copy of the value — untouched.
+     */
+    const moveValue = async (vehicle, move) => {
+        if (move.spec) {
+            const ok = await updateVehicleSpecs(vehicle.id, withSpecValues(vehicle.specs, move.spec.category, move.spec.values));
+            if (!ok) return;
+        }
+        await updateVehicle(vehicle.id, { [move.clear]: null });
+    };
+    const saveSpec = (vehicle, category, values) =>
+        updateVehicleSpecs(vehicle.id, withSpecValues(vehicle.specs, category, values));
+
     const skippedTotal = rows.reduce((n, r) => n + r.skipped, 0);
     const outstanding = rows.filter(r => r.disagrees || r.gaps);
     const q = query.trim().toLowerCase();
     const visibleFindings = (row) => row.findings.filter(f =>
         (showSkipped || !f.skipped) && (!only || f.check === only));
-    const shown = rows
-        .map(row => ({ row, findings: visibleFindings(row) }))
-        .filter(({ row, findings }) => findings.length && (!q || vehicleLabel(row.vehicle).toLowerCase().includes(q)));
+    const matchesQuery = (row) => !q || vehicleLabel(row.vehicle).toLowerCase().includes(q);
+    const liveIds = rows.filter(row => visibleFindings(row).length && matchesQuery(row)).map(row => row.vehicle.id);
+
+    // Rows hold their places while fixes and skips land (see keepOrder) — but
+    // only once the first load is complete. Until vehicles, performance results
+    // and skips have all arrived the list is still filling in, and holding it
+    // then would pin an order missing whatever came last. A failed load counts
+    // as arrived: it is not going to change the list.
+    //
+    // After that, a new order is taken only when the curator asks for a
+    // different list: a filter, the search, a limit, the rule, Show skipped, or
+    // Re-sort. Set during render, React's pattern for state derived from a
+    // changed input, so no frame shows the old order.
+    //
+    // Latched: once the first load is done it stays done. A later refetch must
+    // not release the held order — that is what made a fixed vehicle vanish and
+    // come back.
+    const [firstLoadDone, setFirstLoadDone] = useState(false);
+    if (!firstLoadDone && fleet.length > 0 && !perfLoading && !skipsLoading) setFirstLoadDone(true);
+    const loaded = firstLoadDone;
+    const listKey = JSON.stringify([limits, rule, only, q, showSkipped]);
+    const [order, setOrder] = useState({ key: null, ids: [] });
+    if (loaded && order.key !== listKey) setOrder({ key: listKey, ids: liveIds });
+    const displayIds = loaded && order.key === listKey ? keepOrder(order.ids, liveIds) : liveIds;
+    const outOfOrder = displayIds.join() !== liveIds.join();
+    const rowById = new Map(rows.map(r => [r.vehicle.id, r]));
+    const shown = displayIds
+        .map(id => rowById.get(id))
+        .filter(Boolean)
+        .map(row => ({ row, findings: visibleFindings(row) }));
 
     const toggle = (id) => setOpen(prev => {
         const next = new Set(prev);
@@ -389,9 +542,11 @@ export default function DataChecksPanel() {
                 Every vehicle against its own sources: range against its EPA labels, the
                 manufacturer’s Usable and Gross against EPA tested, curb weight against EPA test
                 weight, drive type and voltage against EPA, and claimed against tested 0–60. A
-                vehicle linked to several EPA configurations disagrees only when none of them agrees,
-                because nothing yet says which one represents it. Skip a finding that is correct as
-                it stands; it comes back if its values change.
+                vehicle is judged against its primary EPA configuration; with several and none
+                chosen, it disagrees only when none of them agrees. Fix a finding from under it —
+                sort a typed battery or range into the field that says what it is, edit the spec it
+                compares, or choose the primary — or skip it if it is correct as it stands. A skip
+                comes back if its values change.
             </p>
 
             <h4 className="subsection-title">Limits</h4>
@@ -482,6 +637,16 @@ export default function DataChecksPanel() {
                     <input type="checkbox" checked={showSkipped} onChange={e => setShowSkipped(e.target.checked)} />
                     Show skipped ({skippedTotal})
                 </label>
+                {/* Always present, so it can never appear under the cursor. */}
+                <button
+                    type="button"
+                    className="btn btn-secondary text-sm"
+                    disabled={!outOfOrder}
+                    title="Rows keep their places while you fix and skip. Re-sort to put the worst first and drop what is resolved."
+                    onClick={() => setOrder({ key: listKey, ids: liveIds })}
+                >
+                    Re-sort
+                </button>
             </div>
             <p className="text-meta mb-2">
                 {outstanding.length} of {plural(rows.length, 'vehicle')} have something outstanding
@@ -499,6 +664,10 @@ export default function DataChecksPanel() {
                         key={row.vehicle.id}
                         row={row}
                         findings={findings}
+                        fleet={fleet}
+                        onMove={moveValue}
+                        onSaveSpec={saveSpec}
+                        onChoosePrimary={setPrimaryEpaMapping}
                         open={open.has(row.vehicle.id)}
                         onToggle={() => toggle(row.vehicle.id)}
                         canSkip={canSkip}

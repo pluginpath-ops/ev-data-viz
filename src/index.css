@@ -5219,6 +5219,16 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border-color: var(--color-border);
 }
 
+/* What can be done about a finding, under its text (#321): moves out of the
+   retiring columns, the spec fields that settle it, the way to its EPA section. */
+.data-check-fixes {
+    @apply flex flex-wrap items-center gap-2 mt-1;
+}
+.data-check-fix-field {
+    @apply flex items-center gap-2;
+}
+.data-check-fix-field .form-input { @apply w-36; }
+
 .data-check-row {
     @apply border-b border-[var(--color-border)] last:border-b-0;
 }
