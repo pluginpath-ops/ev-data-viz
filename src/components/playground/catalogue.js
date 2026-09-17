@@ -176,7 +176,7 @@ export const SECTIONS = [
             { cls: 'info-icon-glyph', as: 'button', label: 'ⓘ',
               note: 'A real button, not a glyph in a span: before the popover pass there was no keyboard route to any of the 21 of them, and the four carrying a reference table had no accessible name at all.' },
             { composite: 'popover-peek', label: 'Peek — hover or focus',
-              covers: ['popover--peek', 'popover-more'],
+              covers: ['popover--peek', 'popover-more', 'popover--fit'],
               note: 'Pointer-transparent, so it never eats a click on what it explains, and it closes on scroll rather than being scrolled. The height cap fits the copy: the design asked for four lines, but the shortest explainer measured five and the longest twenty.' },
             { composite: 'popover-pinned', label: 'Pinned — click',
               covers: ['popover--pinned', 'popover-head', 'popover-title', 'popover-close'],

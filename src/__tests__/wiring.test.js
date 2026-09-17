@@ -564,6 +564,12 @@ describe('the seams that broke before', () => {
         // selection change wipes the reader's columns, sort and filters.
         expect(app).toMatch(/startsWith\(VEHICLE_TABLE_PARAM_PREFIX\)/);
 
+        // Its tab is a way to pick vehicles, so it must never wait for a pick:
+        // the top nav gates on the modes, and entering lands on one that works.
+        expect(read('src/components/shell/AppNav.jsx')).toMatch(/modes\.every\(modeNeedsSelection\)/);
+        expect(app).toMatch(/entryModeFor\(/);
+        expect(app, 'sub-tabs must disable the charts that need a selection').toMatch(/disabled: selectedVehicles\.length === 0 && modeNeedsSelection/);
+
         // Selecting here IS the app's selection — no second, local notion of chosen.
         const table = read('src/components/VehicleTable.jsx');
         expect(table).toMatch(/toggleVehicleSelection/);
@@ -575,6 +581,27 @@ describe('the seams that broke before', () => {
         // The mechanisms are shared, not copied.
         for (const f of ['src/components/VehicleTable.jsx', 'src/components/epa/guide/GuideTable.jsx']) {
             expect(read(f), `${f} must use the shared sort header`).toMatch(/import SortHeader from/);
+            // Cells go through TableCell, which restates clipped text on hover;
+            // a bare <td> for data would clip silently again.
+            expect(read(f), `${f} must draw data cells through TableCell`).toMatch(/<TableCell/);
+            expect(read(f), `${f} must not draw its own bar markup`).not.toMatch(/guide-spark/);
+            // ...and the restatement is the shared peek, not a browser title.
+            expect(read(f), `${f} must restate clipped cells with useCellPeek`).toMatch(/useCellPeek\(\)[\s\S]*\{\.\.\.peekProps\}[\s\S]*\{cellPeek\}/);
+        }
+        // Community flags reach the table's cells (flagging itself stays in View Specs).
+        expect(table).toMatch(/flagged=\{row\.flagged\.has\(col\.key\)\}/);
+        expect(read('src/hooks/useCellPeek.jsx'), 'a flagged cell must peek even when it fits').toMatch(/dataset\.peek !== 'always'/);
+        // Widths by what a column holds are one vocabulary in both column lists,
+        // and the shared header is what turns it into a class.
+        expect(read('src/components/tables/SortHeader.jsx')).toMatch(/col\.holds/);
+        for (const f of ['src/utils/vehicleTable.js', 'src/utils/feGuideBrowse.js']) {
+            expect(read(f), `${f} must size columns with holds`).toMatch(/holds: 'short-values'/);
+            expect(read(f), `${f} must size columns with holds`).toMatch(/holds: 'long-text'/);
+        }
+        // Sorting and bar scaling are one implementation for both tables.
+        for (const f of ['src/utils/vehicleTable.js', 'src/utils/feGuideBrowse.js']) {
+            expect(read(f), `${f} must sort and scale through tableColumns`).toMatch(/sortByColumn[\s\S]*barMaximaOf[\s\S]*barPercentOf|from '\.\/tableColumns'/);
+            expect(read(f)).not.toMatch(/Number\.isFinite\(n\) && n > max/);
         }
         expect(read('src/components/epa/guide/GuideColumnPicker.jsx')).toMatch(/<ColumnPicker/);
         expect(table).toMatch(/<ColumnPicker/);

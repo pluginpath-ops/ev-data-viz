@@ -4,6 +4,7 @@ import {
     buildVehicleRows, formatVehicleCell, filterVehicleRows, sortVehicleRows, vehicleFacets,
     vehicleBarMaxima, vehicleBarPercent, firstSortDir,
     encodeVehicleTableParams, decodeVehicleTableParams, EMPTY_VEHICLE_FILTERS,
+    vehicleTableStartSearch, vehicleTableMemory,
 } from '../vehicleTable';
 
 const vehicle = (over = {}) => ({
@@ -121,5 +122,65 @@ describe('URL', () => {
         expect(out.columns).toEqual(['name', 'powertrain.motors']);
         expect(out.sortKey).toBe('name');
         expect(decodeVehicleTableParams('vt_cols=bogus').columns).toEqual(DEFAULT_VEHICLE_COLUMNS);
+    });
+});
+
+describe('vehicle table memory', () => {
+    const state = {
+        columns: ['name', 'powertrain.horsepower_hp'],
+        sortKey: 'powertrain.horsepower_hp',
+        sortDir: 'desc',
+        filters: { ...EMPTY_VEHICLE_FILTERS, makes: ['Ford'], search: 'mach' },
+    };
+
+    it('keeps columns and sort apart from filters', () => {
+        const memory = vehicleTableMemory(state);
+        expect(memory.view).toContain('vt_cols=');
+        expect(memory.view).not.toContain('vt_mk');
+        expect(memory.filters).toContain('vt_mk=Ford');
+        expect(memory.filters).not.toContain('vt_cols');
+    });
+
+    it('restores the whole state from memory when the URL carries none of it', () => {
+        const search = vehicleTableStartSearch('?tab=specifications&v=1,2', vehicleTableMemory(state));
+        expect(decodeVehicleTableParams(search)).toEqual(state);
+    });
+
+    it('lets a link with any table parameter win over memory', () => {
+        const search = vehicleTableStartSearch('?tab=specifications&vt_sort=powertrain.drive_type', vehicleTableMemory(state));
+        const decoded = decodeVehicleTableParams(search);
+        expect(decoded.sortKey).toBe('powertrain.drive_type');
+        expect(decoded.columns).toEqual(DEFAULT_VEHICLE_COLUMNS);
+        expect(decoded.filters).toEqual(EMPTY_VEHICLE_FILTERS);
+    });
+
+    it('drops a remembered column that no longer exists', () => {
+        const search = vehicleTableStartSearch('', { view: 'vt_cols=name,specs.retired_field,powertrain.horsepower_hp' });
+        expect(decodeVehicleTableParams(search).columns).toEqual(['name', 'powertrain.horsepower_hp']);
+    });
+});
+
+describe('column widths', () => {
+    it('narrows yes/no and bar-less counts, widens free text, and leaves figures and enums alone', () => {
+        const holds = (key) => vehicleColumnByKey(key)?.holds ?? null;
+        expect(holds('compute.lidar')).toBe('short-values');
+        expect(holds('compute.ultrasonics')).toBe('short-values');
+        expect(holds('compute.processing_chip')).toBe('long-text');
+        expect(holds('powertrain.horsepower_hp')).toBeNull();
+        expect(holds('powertrain.drive_type')).toBeNull();
+        expect(holds('tags')).toBe('long-text');
+    });
+});
+
+describe('flags', () => {
+    it('lands a community flag on its spec cell, and ignores keys that are not spec columns', () => {
+        const [row] = buildVehicleRows([vehicle({
+            flagged_specs: ['powertrain.horsepower_hp', 'figures.epaRangeMi', 'powertrain.no_such_field'],
+        })]);
+        expect([...row.flagged]).toEqual(['powertrain.horsepower_hp']);
+    });
+
+    it('has no flags for a vehicle that was never flagged', () => {
+        expect(buildVehicleRows([vehicle()])[0].flagged.size).toBe(0);
     });
 });

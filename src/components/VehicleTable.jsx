@@ -23,6 +23,8 @@ import { useAppContext } from '../context/AppContext';
 import { useAsyncResource } from '../hooks/useAsyncResource';
 import SortHeader from './tables/SortHeader';
 import ColumnPicker from './tables/ColumnPicker';
+import TableCell from './tables/TableCell';
+import { useCellPeek } from '../hooks/useCellPeek';
 import GuideFacetMenu from './epa/guide/GuideFacetMenu';
 import ViewSpecsModal from './ViewSpecsModal';
 import { vehicleColor } from '../utils/specHelpers';
@@ -32,7 +34,30 @@ import {
     vehicleColumnByKey, unitFor, needsPerformance, buildVehicleRows, formatVehicleCell,
     filterVehicleRows, sortVehicleRows, firstSortDir, vehicleFacets, facetValues,
     vehicleBarMaxima, vehicleBarPercent, encodeVehicleTableParams, decodeVehicleTableParams,
+    vehicleTableStartSearch, vehicleTableMemory,
 } from '../utils/vehicleTable';
+
+/*
+ * Columns and sort are kept across visits, filters for the session; the
+ * reasoning is at vehicleTableStartSearch. Storage can be missing or refuse a
+ * write (a private window, blocked site data), and the table must still work,
+ * so every touch is guarded and a failure just means no memory.
+ */
+const VIEW_KEY = 'evbench.vehicleTable.view';
+const FILTERS_KEY = 'evbench.vehicleTable.filters';
+
+function readMemory() {
+    const read = (store, key) => { try { return store.getItem(key) ?? ''; } catch { return ''; } };
+    return { view: read(window.localStorage, VIEW_KEY), filters: read(window.sessionStorage, FILTERS_KEY) };
+}
+
+function writeMemory({ view, filters }) {
+    const write = (store, key, value) => {
+        try { if (value) store.setItem(key, value); else store.removeItem(key); } catch { /* no memory, no harm */ }
+    };
+    write(window.localStorage, VIEW_KEY, view);
+    write(window.sessionStorage, FILTERS_KEY, filters);
+}
 
 const FACETS = [
     { key: 'makes',  label: 'Make' },
@@ -57,29 +82,25 @@ function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen 
                 const text = formatVehicleCell(row, col, units);
                 if (col.key === 'name') {
                     return (
-                        <td key={col.key} className="guide-td sticky-name">
+                        <TableCell key={col.key} className="sticky-name" restate={text}>
                             <span className="vehicle-table-name">
                                 {/* The vehicle's series color, so a row ties to the
                                     same vehicle on every chart. */}
                                 <span className="series-swatch" style={{ backgroundColor: vehicleColor(row.vehicle, row.index) }} aria-hidden="true" />
-                                <span className="truncate" title={text}>{text}</span>
+                                <span className="guide-cell-name">{text}</span>
                             </span>
-                        </td>
+                        </TableCell>
                     );
                 }
-                const note = row.notes[col.key];
-                const pct = vehicleBarPercent(row, col, maxima);
                 return (
-                    <td key={col.key} className={`guide-td ${col.numeric ? 'numeric' : ''}`} title={note ? `${text} · ${note}` : undefined}>
-                        {pct == null && !note ? text : (
-                            <span className="guide-cell-stack">
-                                <span>{text}</span>
-                                {pct != null && <span className="guide-spark" style={{ '--bar-fill': `${pct}%` }} aria-hidden="true" />}
-                                {/* Where a resolved or tested figure came from. */}
-                                {note && <span className="vehicle-table-note">{note}</span>}
-                            </span>
-                        )}
-                    </td>
+                    <TableCell
+                        key={col.key}
+                        numeric={col.numeric}
+                        text={text}
+                        pct={vehicleBarPercent(row, col, maxima)}
+                        note={row.notes[col.key]}
+                        flagged={row.flagged.has(col.key)}
+                    />
                 );
             })}
         </tr>
@@ -92,7 +113,9 @@ export default function VehicleTable() {
         getPerformanceSummaries, getPerformanceSessions,
     } = useAppContext();
 
-    const [initial] = useState(() => decodeVehicleTableParams(window.location.search));
+    const [initial] = useState(() => decodeVehicleTableParams(
+        vehicleTableStartSearch(window.location.search, readMemory()),
+    ));
     const [columns, setColumns] = useState(initial.columns);
     const [sortKey, setSortKey] = useState(initial.sortKey);
     const [sortDir, setSortDir] = useState(initial.sortDir);
@@ -110,6 +133,7 @@ export default function VehicleTable() {
             params.append(key, value);
         }
         window.history.replaceState(window.history.state, '', `?${params.toString()}`);
+        writeMemory(vehicleTableMemory({ columns, sortKey, sortDir, filters }));
     }, [columns, sortKey, sortDir, filters]);
 
     // Tested results are fetched only while a tested column is shown or sorted
@@ -126,6 +150,8 @@ export default function VehicleTable() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [wantsPerformance, idsKey]);
     const { data: performance, loading: performanceLoading } = useAsyncResource(loadPerformance, [loadPerformance]);
+    // One peek for every clipped cell in the table, rather than one per cell.
+    const { tableProps: peekProps, panel: cellPeek } = useCellPeek();
 
     const rows     = useMemo(() => buildVehicleRows(vehicles, { performance }), [vehicles, performance]);
     const facets   = useMemo(() => vehicleFacets(rows), [rows]);
@@ -214,7 +240,7 @@ export default function VehicleTable() {
             </div>
 
             <div className="guide-table-container">
-                <table className="guide-table">
+                <table className="guide-table" {...peekProps}>
                     <thead>
                         <tr>
                             <th className="guide-th guide-th-select sticky-select" />
@@ -245,6 +271,7 @@ export default function VehicleTable() {
                         ))}
                     </tbody>
                 </table>
+                {cellPeek}
                 {bodyRows.length === 0 && selectedRows.length === 0 && (
                     <div className="empty-state">
                         {rows.length ? 'No vehicles match these filters.' : 'No vehicles yet.'}

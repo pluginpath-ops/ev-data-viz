@@ -22,7 +22,7 @@ import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/AdminView';
 import Playground from './components/playground/Playground';
 import EpaSection, { EPA_SUBTABS, DEFAULT_EPA_SUBTAB, epaSubtabFromParam } from './components/epa/EpaSection';
-import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory } from './constants/chartNav';
+import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor } from './constants/chartNav';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
 
@@ -236,9 +236,8 @@ export default function App() {
     const navigateToChartCategory = (categoryKey) => {
         const category = categoryByKey(categoryKey);
         if (!category) return;
-        const remembered = lastModeByCategory.current[categoryKey];
-        const valid = remembered && category.modes.some(m => m.key === remembered);
-        handleChartModeChange(valid ? remembered : category.modes[0].key);
+        const mode = entryModeFor(category, lastModeByCategory.current[categoryKey], selectedVehicles.length > 0);
+        if (mode) handleChartModeChange(mode);
     };
 
     const { isPopout, sendState } = useChartSync({
@@ -730,7 +729,11 @@ export default function App() {
                         />
                     ) : (
                         <SubTabStrip
-                            items={activeChartCategory?.modes ?? []}
+                            items={(activeChartCategory?.modes ?? []).map(m => ({
+                                ...m,
+                                // A chart with nothing to plot is not somewhere to go.
+                                disabled: selectedVehicles.length === 0 && modeNeedsSelection(m),
+                            }))}
                             activeKey={chartMode}
                             onSelect={handleChartModeChange}
                             end={activeChartCategory && (

@@ -33,6 +33,7 @@ import { resolveEffectiveSpecs, vehicleLabel } from './specHelpers';
 import { convValue } from './unitConversions';
 import { deriveTested } from './performanceDerivations';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from './vehicleFigures';
+import { sortByColumn, barMaximaOf, barPercentOf } from './tableColumns';
 
 // ── Units ───────────────────────────────────────────────────────────────────
 
@@ -72,8 +73,8 @@ const IDENTITY_COLUMNS = [
     { key: 'make',  label: 'Make',    group: 'Vehicle' },
     { key: 'model', label: 'Model',   group: 'Vehicle' },
     { key: 'trim',  label: 'Trim',    group: 'Vehicle' },
-    { key: 'year',  label: 'Year',    group: 'Vehicle' },
-    { key: 'tags',  label: 'Tags',    group: 'Vehicle' },
+    { key: 'year',  label: 'Year',    group: 'Vehicle', holds: 'short-values' },
+    { key: 'tags',  label: 'Tags',    group: 'Vehicle', holds: 'long-text' },
 ];
 
 const FIGURE_COLUMNS = [
@@ -99,6 +100,25 @@ const TESTED_COLUMNS = [
     { key: 'tested.skidpad_g',             label: 'Skidpad',     unit: 'g', better: 'higher' },
 ].map(c => ({ ...c, group: 'Tested performance', numeric: true, bar: true }));
 
+/**
+ * What a column's values are like, which sets its width (#315).
+ *
+ * One width per kind of column gave LIDAR ("No") the same room as Front
+ * Suspension, which is a sentence and clipped on every row. So widths follow
+ * the schema type:
+ *   short-values  yes/no, and counts with no bar (cameras, seats)
+ *   long-text     free text, which also wraps to two lines
+ * Everything else keeps the default: figures their figure width, enums and
+ * identity text the text width. A bar needs the figure width to be readable,
+ * so a count that has one is not narrowed.
+ */
+function holdsFor(field) {
+    if (field.type === 'boolean') return 'short-values';
+    if (field.type === 'integer' && !field.better) return 'short-values';
+    if (field.type === 'text') return 'long-text';
+    return null;
+}
+
 const SPEC_COLUMNS = SPEC_CATEGORIES.flatMap(cat => cat.fields.map(f => {
     const { label, unit } = splitUnit(f.label);
     return {
@@ -111,6 +131,7 @@ const SPEC_COLUMNS = SPEC_CATEGORIES.flatMap(cat => cat.fields.map(f => {
         numeric: f.type === 'number' || f.type === 'integer',
         better: f.better ?? null,
         bar: !!f.better,
+        holds: holdsFor(f),
         spec: [cat.key, f.key],
     };
 }));
@@ -120,6 +141,10 @@ export const VEHICLE_COLUMNS = [...IDENTITY_COLUMNS, ...FIGURE_COLUMNS, ...TESTE
 
 const BY_KEY = new Map(VEHICLE_COLUMNS.map(c => [c.key, c]));
 export const vehicleColumnByKey = (key) => BY_KEY.get(key) ?? null;
+
+// A vehicle row keeps its figures under `values`, beside the vehicle itself.
+const vehicleValue = (row, col) => row?.values?.[col.key];
+const vehicleScale = (col) => col.scale ?? col.key;
 
 /** What the table opens with. */
 export const DEFAULT_VEHICLE_COLUMNS = [
@@ -186,7 +211,13 @@ export function buildVehicleRows(vehicles = [], { performance = null } = {}) {
             for (const col of TESTED_COLUMNS) values[col.key] = null;
         }
 
-        return { id: vehicle.id, index, vehicle, values, notes };
+        // Community flags are stored as the spec's own `category.field` key,
+        // which is exactly a spec column's key, so a flag lands on its cell
+        // with no mapping. Only spec columns can carry one: figures and tested
+        // results are worked out, not entered, and nobody flags them.
+        const flagged = new Set((vehicle.flagged_specs ?? []).filter(k => BY_KEY.get(k)?.spec));
+
+        return { id: vehicle.id, index, vehicle, values, notes, flagged };
     });
 }
 
@@ -246,25 +277,11 @@ export function filterVehicleRows(rows = [], filters = EMPTY_VEHICLE_FILTERS) {
     });
 }
 
-/**
- * Sort by one column. Nulls last in both directions: they are absences, and
- * floating them to the top would bury the answer under rows that have none.
- */
+/** Sort by one column; blanks last, as in every sortable table (tableColumns). */
 export function sortVehicleRows(rows = [], key = 'name', dir = 'asc') {
     const col = vehicleColumnByKey(key);
     if (!col) return rows;
-    const sign = dir === 'desc' ? -1 : 1;
-    return [...rows].sort((a, b) => {
-        const av = a.values[key];
-        const bv = b.values[key];
-        const aNull = av == null || av === '';
-        const bNull = bv == null || bv === '';
-        if (aNull && bNull) return 0;
-        if (aNull) return 1;
-        if (bNull) return -1;
-        if (col.numeric) return sign * (Number(av) - Number(bv));
-        return sign * String(av).localeCompare(String(bv), undefined, { numeric: true });
-    });
+    return sortByColumn(rows, col, dir, vehicleValue);
 }
 
 /** Which way a column sorts on its first click: best first where there is a best. */
@@ -273,36 +290,17 @@ export const firstSortDir = (col) => (col?.better === 'higher' ? 'desc' : 'asc')
 // ── Bars ────────────────────────────────────────────────────────────────────
 
 /**
- * The largest value behind each bar, over the filtered rows — so filtering to
- * pickups scales against the longest-range pickup, as the guide table does.
- * Columns share a scale only when they declare one.
+ * The largest value behind each bar, over the filtered rows, as the guide table
+ * does. Columns share a scale only when they declare one.
  */
 export function vehicleBarMaxima(rows = [], columns = VEHICLE_COLUMNS) {
-    const maxima = {};
-    for (const col of columns) {
-        if (!col?.bar) continue;
-        const scale = col.scale ?? col.key;
-        let max = maxima[scale] ?? 0;
-        for (const row of rows) {
-            const n = Number(row.values[col.key]);
-            if (row.values[col.key] != null && Number.isFinite(n) && n > max) max = n;
-        }
-        maxima[scale] = max;
-    }
-    return maxima;
+    return barMaximaOf(rows, columns, vehicleValue, vehicleScale);
 }
-
-const BAR_MIN_PCT = 2;
 
 /** A bar's fill, or null for no bar — an absent value draws nothing, not an empty bar. */
 export function vehicleBarPercent(row, col, maxima) {
     if (!col?.bar) return null;
-    const raw = row?.values?.[col.key];
-    if (raw == null || raw === '') return null;
-    const n = Number(raw);
-    const max = maxima?.[col.scale ?? col.key];
-    if (!Number.isFinite(n) || !(max > 0)) return null;
-    return Math.max(BAR_MIN_PCT, Math.min(100, (n / max) * 100));
+    return barPercentOf(vehicleValue(row, col), maxima?.[vehicleScale(col)]);
 }
 
 // ── URL ─────────────────────────────────────────────────────────────────────
@@ -345,5 +343,39 @@ export function decodeVehicleTableParams(search) {
         sortKey: BY_KEY.has(p.get('vt_sort')) ? p.get('vt_sort') : 'name',
         sortDir: p.get('vt_dir') === 'desc' ? 'desc' : 'asc',
         filters,
+    };
+}
+
+// ── Memory ──────────────────────────────────────────────────────────────────
+
+/**
+ * Where the table's settings come from when it mounts (#315).
+ *
+ * Leaving the tab rebuilds the query string without the table's parameters, so
+ * a table that read only the URL came back to its defaults, losing a column set
+ * someone had arranged by hand. It now remembers, in the same encoding the URL
+ * uses, so the one decoder validates both and a retired column key drops out
+ * of a memory exactly as it does out of an old link.
+ *
+ * Two lifetimes, because they are two kinds of setting:
+ * - `view`: columns and sort. A preference, kept across visits.
+ * - `filters`: search and facets. A question being asked now, kept for the
+ *   session; coming back next week to twelve rows of 94 and no memory of why
+ *   is the wrong surprise.
+ *
+ * A link that carries any table parameter wins outright. It is the sender's
+ * view, and blending the reader's memory into it would show neither.
+ */
+export function vehicleTableStartSearch(urlSearch, { view = '', filters = '' } = {}) {
+    const url = new URLSearchParams(urlSearch ?? '');
+    if ([...url.keys()].some(k => k.startsWith(VEHICLE_TABLE_PARAM_PREFIX))) return url.toString();
+    return [view, filters].filter(Boolean).join('&');
+}
+
+/** The two remembered strings for a state; see vehicleTableStartSearch. */
+export function vehicleTableMemory({ columns, sortKey, sortDir, filters }) {
+    return {
+        view: encodeVehicleTableParams({ columns, sortKey, sortDir, filters: EMPTY_VEHICLE_FILTERS }).toString(),
+        filters: encodeVehicleTableParams({ columns: DEFAULT_VEHICLE_COLUMNS, filters }).toString(),
     };
 }

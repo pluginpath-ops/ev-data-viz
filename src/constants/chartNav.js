@@ -63,7 +63,9 @@ export const CHART_CATEGORIES = [
         modes: [
             // Key kept: it is the URL and chart-help identifier (see the note
             // at the top). The table it names became the vehicle table in #315.
-            { key: 'specstable',  label: 'Vehicle Table' },
+            // It needs no selection because it is where one is made, which
+            // keeps the whole Specifications tab reachable with nothing chosen.
+            { key: 'specstable',  label: 'Vehicle Table', needsSelection: false },
             { key: 'specs',       label: 'Spec Chart' },
             { key: 'specscatter', label: 'Spec Scatter' },
         ],
@@ -90,6 +92,22 @@ export function categoryByKey(view) {
 /** The category containing `mode`, or the first category if it isn't found. */
 export function categoryForMode(mode) {
     return CHART_CATEGORIES.find(c => c.modes.some(m => m.key === mode)) ?? CHART_CATEGORIES[0];
+}
+
+/**
+ * Whether a mode can show anything with no vehicles selected. Every chart
+ * plots the selection, so that is the default; a mode opts out by saying so.
+ */
+export const modeNeedsSelection = (mode) => mode?.needsSelection !== false;
+
+/**
+ * The mode to open a category on. The remembered one when it can show
+ * something, otherwise the first mode that can — so a tab entered with nothing
+ * selected lands on a view that works rather than on an empty chart.
+ */
+export function entryModeFor(category, remembered, hasSelection) {
+    const usable = category.modes.filter(m => hasSelection || !modeNeedsSelection(m));
+    return usable.find(m => m.key === remembered)?.key ?? usable[0]?.key ?? null;
 }
 
 /** Human label for a mode key, for titles and tooltips. */

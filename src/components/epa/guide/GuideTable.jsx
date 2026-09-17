@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { columnByKey, formatCell, barPercent, clusterByTestGroup } from '../../../utils/feGuideBrowse';
 import SortHeader from '../../tables/SortHeader';
+import TableCell from '../../tables/TableCell';
+import { useCellPeek } from '../../../hooks/useCellPeek';
 
 /**
  * The browse table (#235).
@@ -44,52 +46,40 @@ function GuideRow({ row, cols, selectedIds, onToggleSelect, onOpenRow, vehicleLi
                 />
             </td>
             {cols.map((col) => {
-                const pct = barPercent(row, col, barMaxima);
+                const text = formatCell(row, col);
+                const className = col.sticky ? 'sticky-name' : '';
+                if (col.key !== 'carline') {
+                    return <TableCell key={col.key} className={className} numeric={col.numeric} text={text} pct={barPercent(row, col, barMaxima)} />;
+                }
                 return (
-                    <td
-                        key={col.key}
-                        className={`guide-td ${col.numeric ? 'numeric' : ''} ${col.sticky ? 'sticky-name' : ''}`}
-                    >
-                        {col.key === 'carline' ? (
-                            <span className="guide-carline">
-                                {/* 40 of 50 names are clipped at phone width, and
-                                    the pin cannot be widened without taking the
-                                    table back. A tap already opens the detail,
-                                    whose heading is the full name; this is the
-                                    same answer for a pointer. */}
-                                <span className="guide-carline-name" title={row.carline}>{row.carline}</span>
-                                {/* Badges ride on the name rather than holding columns of
-                                    their own — at 30 columns the horizontal budget is the
-                                    scarce one. */}
-                                {vehicles.length > 0 && (
-                                    <span
-                                        className="guide-badge guide-badge-tested"
-                                        title={`We hold test data for ${vehicles.map(v => `${v.year} ${v.name}`).join(', ')}`}
-                                    >
-                                        tested
-                                    </span>
-                                )}
-                                {row.is_collapsed && (
-                                    <span
-                                        className="guide-badge guide-badge-multi"
-                                        title="EPA collapsed several configurations into this row — its motor count and power are a union, not one vehicle"
-                                    >
-                                        multi
-                                    </span>
-                                )}
-                            </span>
-                        ) : pct != null ? (
-                            /* The value, then its bar beneath it. */
-                            <span className="guide-cell-stack">
-                                <span>{formatCell(row, col)}</span>
+                    <TableCell key={col.key} className={className} numeric={col.numeric} restate={row.carline}>
+                        <span className="guide-carline">
+                            {/* 40 of 50 names are clipped at phone width, and the
+                                pinned column cannot be widened without taking the
+                                table back. A tap opens the detail, whose heading is
+                                the full name; a pointer gets the cell's tooltip. */}
+                            <span className="guide-carline-name guide-cell-name">{row.carline}</span>
+                            {/* Badges ride on the name rather than holding columns of
+                                their own — at 30 columns the horizontal budget is the
+                                scarce one. */}
+                            {vehicles.length > 0 && (
                                 <span
-                                    className="guide-spark"
-                                    style={{ '--bar-fill': `${pct}%` }}
-                                    aria-hidden="true"
-                                />
-                            </span>
-                        ) : formatCell(row, col)}
-                    </td>
+                                    className="guide-badge guide-badge-tested"
+                                    title={`We hold test data for ${vehicles.map(v => `${v.year} ${v.name}`).join(', ')}`}
+                                >
+                                    tested
+                                </span>
+                            )}
+                            {row.is_collapsed && (
+                                <span
+                                    className="guide-badge guide-badge-multi"
+                                    title="EPA collapsed several configurations into this row — its motor count and power are a union, not one vehicle"
+                                >
+                                    multi
+                                </span>
+                            )}
+                        </span>
+                    </TableCell>
                 );
             })}
         </tr>
@@ -197,12 +187,14 @@ export default function GuideTable({
     // the order the reader arranged is the order they get, and filtering would
     // silently restore the constant's.
     const cols = visibleColumns.map(columnByKey).filter(Boolean);
+    // One peek for every clipped cell in the table, rather than one per cell.
+    const { tableProps: peekProps, panel: cellPeek } = useCellPeek();
     const span = cols.length + 1;
     const rowProps = { cols, selectedIds, onToggleSelect, onOpenRow, vehicleLinks, barMaxima };
 
     return (
         <div className="guide-table-container">
-            <table className="guide-table">
+            <table className="guide-table" {...peekProps}>
                 <thead>
                     <tr>
                         <th className="guide-th guide-th-select sticky-select" />
@@ -265,6 +257,7 @@ export default function GuideTable({
                         ))}
                 </tbody>
             </table>
+            {cellPeek}
             {rows.length === 0 && pinnedRows.length === 0 && (
                 <div className="empty-state">No configurations match these filters.</div>
             )}
