@@ -50,7 +50,7 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
                      'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
-                     'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js'];
+                     'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js', 'vehicleTable.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -553,6 +553,31 @@ describe('the seams that broke before', () => {
             expect(block, `${fn} must return true on success`).toMatch(/return true;/);
             expect(block, `${fn} must return false on failure`).toMatch(/return false;/);
         }
+    });
+
+    it('makes the vehicle table a selection surface over the whole fleet', () => {
+        const app = read('src/App.jsx');
+        // Mounted with no selection gate: the table is where a selection is made.
+        expect(app, 'App must mount the vehicle table for specstable').toMatch(/chartMode === 'specstable' && <VehicleTable \/>/);
+        expect(app).not.toMatch(/selectedVehicles\.length > 0 && chartMode === 'specstable'/);
+        // The chart URL writer must carry the table's own parameters, or every
+        // selection change wipes the reader's columns, sort and filters.
+        expect(app).toMatch(/startsWith\(VEHICLE_TABLE_PARAM_PREFIX\)/);
+
+        // Selecting here IS the app's selection — no second, local notion of chosen.
+        const table = read('src/components/VehicleTable.jsx');
+        expect(table).toMatch(/toggleVehicleSelection/);
+        expect(table).toMatch(/selectedVehicles\.map/);
+        expect(table, 'the table must not keep its own selected ids').not.toMatch(/useState\([^)]*[Ss]elected/);
+        // "Pin is local, select is global": the word stays out of this table.
+        expect(table.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')).not.toMatch(/pin/i);
+
+        // The mechanisms are shared, not copied.
+        for (const f of ['src/components/VehicleTable.jsx', 'src/components/epa/guide/GuideTable.jsx']) {
+            expect(read(f), `${f} must use the shared sort header`).toMatch(/import SortHeader from/);
+        }
+        expect(read('src/components/epa/guide/GuideColumnPicker.jsx')).toMatch(/<ColumnPicker/);
+        expect(table).toMatch(/<ColumnPicker/);
     });
 
     it('reaches the reconciliation sweep from the Admin view', () => {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { columnByKey, formatCell, barPercent, clusterByTestGroup } from '../../../utils/feGuideBrowse';
+import SortHeader from '../../tables/SortHeader';
 
 /**
  * The browse table (#235).
@@ -22,28 +23,6 @@ import { columnByKey, formatCell, barPercent, clusterByTestGroup } from '../../.
  * hover and selected colors are re-applied to them in CSS rather than
  * inherited.
  */
-function SortHeader({ col, sortKey, sortDir, onSort }) {
-    const active = sortKey === col.key;
-    return (
-        <th
-            className={`guide-th ${col.numeric ? 'numeric' : ''} ${active ? 'active' : ''} ${col.sticky ? 'sticky-name' : ''}`}
-            onClick={() => onSort(col.key)}
-            title={col.hint || `Sort by ${col.label}`}
-            aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-        >
-            {/* Two lines: the name carries the weight, the unit sits under it
-                rather than competing with it on the same line. The unit line is
-                always rendered so every header is the same height — a ragged
-                header row is harder to scan than a slightly taller one. */}
-            <span className="guide-th-name">
-                {col.label}
-                <span className="guide-sort-caret">{active ? (sortDir === 'asc' ? '▲' : '▼') : ''}</span>
-            </span>
-            <span className="guide-th-unit">{col.unit ?? ' '}</span>
-        </th>
-    );
-}
-
 /**
  * One configuration. Rendered by the pinned band and by the body from the same
  * component, so a pinned row cannot drift into looking like a different thing

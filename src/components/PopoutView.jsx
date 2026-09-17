@@ -4,7 +4,7 @@ import ChargeCompareView from './ChargeCompareView';
 import RoadTripView from './RoadTripView';
 import SpecsChartView from './SpecsChartView';
 import SpecsScatterView from './SpecsScatterView';
-import SpecsView from './SpecsView';
+import VehicleTable from './VehicleTable';
 import EpaCurvesView from './EpaCurvesView';
 import PerformanceCompareView from './PerformanceCompareView';
 import PerformanceCurveView from './PerformanceCurveView';
@@ -22,7 +22,7 @@ export default function PopoutView({
         <div className="popout-root">
             <div className="popout-watermark">EVBench | Live</div>
 
-            {selectedVehicles.length === 0 && (
+            {selectedVehicles.length === 0 && chartMode !== 'specstable' && (
                 <div className="popout-waiting">
                     Waiting for selection in main tab…
                 </div>
@@ -52,11 +52,9 @@ export default function PopoutView({
                 />
             )}
 
-            {/* Compare Specs — the table. Moved under the Charts nav, so it pops
-                out like every other view there. */}
-            {selectedVehicles.length > 0 && chartMode === 'specstable' && (
-                <SpecsView selectedVehicleIds={selectedVehicles} />
-            )}
+            {/* The vehicle table pops out like every other view under the Charts
+                nav, and needs no selection — it is where one is made (#315). */}
+            {chartMode === 'specstable' && <VehicleTable />}
 
             {selectedVehicles.length > 0 && chartMode === 'specscatter' && (
                 <SpecsScatterView

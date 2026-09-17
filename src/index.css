@@ -6323,6 +6323,36 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border: none;
 }
 
+/* ── The vehicle table's selected band (#315) ────────────────────────────────
+   The pinned band's look with a selection's meaning: these rows are the
+   vehicles on every chart, not rows kept in one table. Their own classes, so
+   "pin" appears nowhere in the vehicle table — see docs/vocabulary.md, Tables.
+   The rows themselves are .guide-row.selected. */
+.vehicle-table-band td {
+    padding: 6px 12px;
+    background-color: var(--color-pinned-head);
+    border-bottom: 1px solid var(--color-border);
+}
+.vehicle-table-band-spacer td {
+    height: 7px;
+    padding: 0;
+    border: none;
+}
+/* The fixed name cell: the vehicle's series swatch, then its name. */
+.vehicle-table-name {
+    @apply flex items-center gap-2 min-w-0;
+}
+/* Where a resolved or tested figure came from, under it — "EPA tested",
+   "Car and Driver". In the unit's voice: it qualifies the figure. */
+.vehicle-table-note {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+
 /* Badges ride on the configuration name rather than holding their own columns. */
 .guide-badge {
     @apply inline-block px-1.5 py-0.5 rounded uppercase shrink-0;

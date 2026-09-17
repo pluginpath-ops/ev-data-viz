@@ -12,7 +12,8 @@ import ChargingView from './components/ChargingView';
 import ChargeCompareView from './components/ChargeCompareView';
 import RoadTripView from './components/RoadTripView';
 import PopoutView from './components/PopoutView';
-import SpecsView from './components/SpecsView';
+import VehicleTable from './components/VehicleTable';
+import { VEHICLE_TABLE_PARAM_PREFIX } from './utils/vehicleTable';
 import SpecsChartView from './components/SpecsChartView';
 import SpecsScatterView from './components/SpecsScatterView';
 import EpaCurvesView from './components/EpaCurvesView';
@@ -568,6 +569,14 @@ export default function App() {
             if (epaConfig.selectedMappings?.length) p.set('epa_m', epaConfig.selectedMappings.join(','));
         }
 
+        // The vehicle table writes its own columns, sort and filters (vt_*);
+        // carry them over rather than wiping them on every selection change.
+        if (chartMode === 'specstable') {
+            for (const [key, value] of new URLSearchParams(window.location.search)) {
+                if (key.startsWith(VEHICLE_TABLE_PARAM_PREFIX)) p.append(key, value);
+            }
+        }
+
         history.replaceState({ view, chartMode }, '', '?' + p.toString());
     }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings]);
 
@@ -992,11 +1001,9 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                         />
                     )}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specstable' && (
-                        <SpecsView
-                            selectedVehicleIds={selectedVehicles}
-                        />
-                    )}
+                    {/* No selection gate: the vehicle table is where a selection is
+                        made, over the whole fleet (#315). */}
+                    {activeChartCategory && chartMode === 'specstable' && <VehicleTable />}
                     {view === 'epa' && <EpaSection subtab={epaSubtab} />}
 
                     {/* The playground, ungated and unlinked.

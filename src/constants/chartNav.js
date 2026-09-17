@@ -61,7 +61,9 @@ export const CHART_CATEGORIES = [
         key: 'specifications',
         label: 'Specifications',
         modes: [
-            { key: 'specstable',  label: 'Compare Specs' },
+            // Key kept: it is the URL and chart-help identifier (see the note
+            // at the top). The table it names became the vehicle table in #315.
+            { key: 'specstable',  label: 'Vehicle Table' },
             { key: 'specs',       label: 'Spec Chart' },
             { key: 'specscatter', label: 'Spec Scatter' },
         ],
