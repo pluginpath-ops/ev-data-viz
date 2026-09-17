@@ -2935,6 +2935,9 @@ class DataService {
       cloud_cover_pct: session.cloudCoverPct ?? null,
       visibility_mi: session.visibilityMi ?? null,
       source_name: meta.sourceName ?? null,
+      // Only when there is one, so a session with no source still writes
+      // against a database without migration 068.
+      ...(meta.sourceId != null ? { source_id: meta.sourceId } : {}),
       source_url: meta.sourceUrl ?? null,
       spreadsheet_url: meta.spreadsheetUrl ?? null,
       notes: meta.notes ?? null,
@@ -3048,6 +3051,89 @@ class DataService {
       throw new Error(`Speed windows could not be saved (${error.message}). Nothing was imported.`);
     }
     return summary;
+  }
+
+  /**
+   * Replace an earlier import of the same result — same vehicle, source and
+   * link — with a fresh read of it (#327).
+   *
+   * The new speed windows go in BEFORE the old ones come out, so a failed
+   * insert leaves the earlier result whole instead of a result with none —
+   * which would read as a source that reported no windows.
+   */
+  async replacePublishedResult(summaryId, { fields, intervals = [] }) {
+    if (!this.useSupabase) return null;
+    const db = getSupabase();
+    const { data: old, error: readError } = await db
+      .from('performance_intervals').select('id').eq('summary_id', summaryId);
+    if (readError) throw readError;
+
+    if (intervals.length) {
+      const { error } = await db
+        .from('performance_intervals')
+        .insert(intervals.map(iv => ({ ...iv, summary_id: summaryId })));
+      if (error) throw new Error(`Speed windows could not be saved (${error.message}). The earlier result is unchanged.`);
+    }
+    const oldIds = (old ?? []).map(r => r.id);
+    if (oldIds.length) {
+      const { error } = await db.from('performance_intervals').delete().in('id', oldIds);
+      if (error) throw error;
+    }
+    return this.savePerformanceSummary({ ...fields, id: summaryId });
+  }
+
+  // ── Sources (#327, migration 068) ─────────────────────────────────────────
+
+  /** The source list. `available` is false until migration 068 is applied. */
+  async getSources() {
+    if (!this.useSupabase) return { sources: [], available: false };
+    const { data, error } = await getSupabase().from('sources').select('*').order('name');
+    if (error) {
+      if (isMissingRelation(error)) return { sources: [], available: false };
+      throw error;
+    }
+    return { sources: data || [], available: true };
+  }
+
+  /**
+   * Insert (no id) or update (with id) a source.
+   *
+   * Aliases and domains are stored trimmed and de-duplicated; a domain is
+   * stored as a bare host, so "https://www.caranddriver.com/" and
+   * "caranddriver.com" are one entry. A rename is carried onto every result
+   * linked to the source, so the text column never keeps the old name.
+   */
+  async saveSource(row) {
+    if (!this.useSupabase) return null;
+    const unique = (list) => [...new Set((list ?? []).map(s => String(s).trim()).filter(Boolean))];
+    const { id, ...fields } = row;
+    if ('name' in fields) fields.name = String(fields.name ?? '').trim();
+    if ('aliases' in fields) fields.aliases = unique(fields.aliases);
+    if ('domains' in fields) {
+      fields.domains = unique(fields.domains.map(d => String(d).trim().toLowerCase()
+        .replace(/^[a-z][a-z0-9+.-]*:\/\//, '').replace(/^www\./, '').replace(/[/?#].*$/, '')));
+    }
+    const db = getSupabase();
+    const q = id
+      ? db.from('sources').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', id)
+      : db.from('sources').insert(fields);
+    const { data, error } = await q.select().single();
+    if (error) throw error;
+
+    if (id && 'name' in fields) {
+      for (const table of ['performance_summaries', 'performance_sessions']) {
+        const { error: renameError } = await db.from(table).update({ source_name: data.name }).eq('source_id', id);
+        if (renameError) throw renameError;
+      }
+    }
+    return data;
+  }
+
+  /** Delete a source. Its results keep their source_name text; the foreign key unlinks them. */
+  async deleteSource(id) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase().from('sources').delete().eq('id', id);
+    if (error) throw error;
   }
 
   async deletePerformanceSummary(id) {

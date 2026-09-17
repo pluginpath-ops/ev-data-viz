@@ -14,6 +14,10 @@
 import { useState, useMemo } from 'react';
 import { parsePublishedResults, buildSummaryPayload, describeInterval } from '../utils/parsePublishedResults';
 import { summaryFieldLabel } from '../utils/performanceSummaryFields';
+import { pickedSource } from '../utils/sources';
+import { useSources } from '../hooks/useSources';
+import { useAppContext } from '../context/AppContext';
+import SourcePicker from './SourcePicker';
 
 const PLACEHOLDER = `60 mph: 3.9 sec
 100 mph: 9.1 sec
@@ -27,7 +31,10 @@ Roadholding, 300-ft Skidpad: 0.88 g`;
 
 export default function PastePublishedResultsModal({ vehicle, onImport, onClose }) {
     const [text, setText]             = useState('');
-    const [sourceName, setSourceName] = useState('');
+    // From the one source list (#327); free text here is how "C&D" split off.
+    const [sourcePick, setSourcePick] = useState({ sourceId: null, newName: null });
+    const { sources, available: sourcesAvailable } = useSources();
+    const { ensureSourceId } = useAppContext();
     const [trimLabel, setTrimLabel]   = useState('');
     const [sourceUrl, setSourceUrl]   = useState('');
     const [basis, setBasis]           = useState(null);   // null = follow the footnote
@@ -51,9 +58,12 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
     const footnoteBasis = parsed?.rollout?.stated === 'omit' ? 'rollout'
         : parsed?.rollout?.stated === 'include' ? 'none'
         : null;
-    // Falls back to the rollout convention, which is what published road-test
-    // figures now use — the footnote still wins when the block has one.
-    const effectiveBasis = basis ?? footnoteBasis ?? 'rollout';
+    // Falls back to the source's own default, then to the rollout convention,
+    // which is what published road-test figures now use — the footnote still
+    // wins when the block has one.
+    const picked = pickedSource(sources, sourcePick, sourceUrl);
+    const sourceBasis = picked.source?.default_rollout_basis ?? null;
+    const effectiveBasis = basis ?? footnoteBasis ?? sourceBasis ?? 'rollout';
 
     const payload = useMemo(
         () => (parsed ? buildSummaryPayload(parsed, { rolloutBasis: effectiveBasis }) : null),
@@ -75,11 +85,13 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
         setBusy(true);
         setError(null);
         try {
+            const sourceId = sourcesAvailable ? await ensureSourceId(picked) : null;
             await onImport({
                 fields: {
                     ...payload.fields,
                     vehicle_id: vehicle.id,
-                    source_name: sourceName.trim() || null,
+                    ...(sourceId != null ? { source_id: sourceId } : {}),
+                    source_name: picked.source?.name ?? picked.newName ?? null,
                     trim_label: trimLabel.trim() || null,
                     source_url: sourceUrl.trim() || null,
                 },
@@ -218,9 +230,9 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                             </p>
                         ) : (
                             <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-2">
-                                No footnote in this block. Defaulted to the rollout convention, which
-                                is what published road-test figures now use — check the source’s own
-                                wording.
+                                {sourceBasis
+                                    ? `No footnote in this block. Defaulted to how ${picked.source.name} usually prints 0–60 — check this article’s own wording.`
+                                    : 'No footnote in this block. Defaulted to the rollout convention, which is what published road-test figures now use — check the source’s own wording.'}
                             </p>
                         )}
 
@@ -263,12 +275,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                 <div className="flex flex-wrap items-end gap-3 mt-3">
                     <label className="text-xs">
                         <span className="text-secondary block mb-0.5">Source</span>
-                        <input
-                            type="text" value={sourceName}
-                            onChange={e => setSourceName(e.target.value)}
-                            placeholder="e.g. Car and Driver"
-                            className="form-input form-input w-44"
-                        />
+                        <SourcePicker sources={sources} value={sourcePick} onChange={setSourcePick} url={sourceUrl} />
                     </label>
                     <label className="text-xs">
                         <span className="text-secondary block mb-0.5">Trim / config</span>

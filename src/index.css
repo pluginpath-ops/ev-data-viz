@@ -5247,6 +5247,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border-color: var(--color-border);
 }
 
+/* A result's source, chosen from the one list or named as new (#327). */
+.source-picker {
+    @apply inline-flex flex-wrap items-center gap-2;
+}
+
 /* What can be done about a finding, under its text (#321): moves out of the
    retiring columns, the spec fields that settle it, the way to its EPA section. */
 .data-check-fixes {

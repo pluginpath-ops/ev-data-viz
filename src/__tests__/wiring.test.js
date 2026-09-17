@@ -50,10 +50,23 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
                      'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
-                     'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js', 'vehicleTable.js'];
+                     'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
+                     'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
+        'sources.domainOf':
+            'Reached through findSource and pickedSource; exported so link reading is tested on its own.',
+        'publishedResultsBatch.splitBatchText':
+            'Reached through readBatch; exported so header splitting is tested on its own.',
+        'publishedResultsBatch.matchVehicle':
+            'Reached through planRow; exported so vehicle matching is tested on its own.',
+        'publishedResultsBatch.findDuplicate':
+            'Reached through planRow; exported so duplicate detection is tested on its own.',
+        'publishedResultsBatch.rolloutBasisFor':
+            'Reached through planRow; exported so the basis order is tested on its own.',
+        'publishedResultsBatch.TABLE_COLUMNS':
+            'The templates are built from it; exported so a test holds them to the same columns.',
         'vehicleFigures.resolveSocWindow':
             'Reached through withVehicleFigures in AppContext; exported so its tiers are tested one at a time.',
         'vehicleFigures.resolveEpaRange':
@@ -555,6 +568,32 @@ describe('the seams that broke before', () => {
         }
     });
 
+    it('imports published results in bulk, against one list of sources', () => {
+        expect(read('src/components/AdminView.jsx'), 'AdminView must mount the panel').toMatch(/<PublishedResultsPanel\s*\/>/);
+
+        const batch = read('src/components/admin/ResultsBatchImport.jsx');
+        for (const call of ['readBatch(', 'planRow(', 'rowWrite(', 'importPublishedResults(', 'ensureSourceId(']) {
+            expect(batch, `the batch import must call ${call}`).toContain(call);
+        }
+
+        // Every way a result or session gets a source picks from the same list.
+        // Free text at any one of them is how "C&D" split from "Car and Driver".
+        for (const f of ['src/components/PastePublishedResultsModal.jsx', 'src/components/PerformanceImportModal.jsx']) {
+            expect(read(f), `${f} must use the source list`).toMatch(/<SourcePicker/);
+        }
+
+        // Re-importing replaces a result's speed windows without ever leaving it
+        // with none: the new rows go in before the old ones come out.
+        const svc = read('src/services/DataService.js');
+        const start = svc.indexOf('async replacePublishedResult');
+        const body = svc.slice(start, svc.indexOf('\n  }\n', start));
+        expect(body.indexOf('.insert(')).toBeGreaterThan(-1);
+        expect(body.indexOf('.insert(')).toBeLessThan(body.indexOf('.delete()'));
+
+        // Deleting a source must never delete what it published.
+        expect(read('supabase/migrations/068_sources.sql')).toMatch(/source_id bigint REFERENCES sources\(id\) ON DELETE SET NULL/);
+    });
+
     it('makes the vehicle table a selection surface over the whole fleet', () => {
         const app = read('src/App.jsx');
         // Mounted with no selection gate: the table is where a selection is made.
@@ -591,7 +630,7 @@ describe('the seams that broke before', () => {
         // Clicking the name picks the row in both tables; other cells open details.
         expect(table).toMatch(/onClick=\{\(e\) => \{ e\.stopPropagation\(\); onToggle\(row\.id\); \}\}/);
         expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/onClick=\{\(e\) => \{ e\.stopPropagation\(\); onToggleSelect\(row\.id\); \}\}/);
-                // Community flags reach the table's cells (flagging itself stays in View Specs).
+        // Community flags reach the table's cells (flagging itself stays in View Specs).
         expect(table).toMatch(/flagged=\{row\.flagged\.has\(col\.key\)\}/);
         expect(read('src/hooks/useCellPeek.jsx'), 'a flagged cell must peek even when it fits').toMatch(/dataset\.peek !== 'always'/);
         // Widths by what a column holds are one vocabulary in both column lists,

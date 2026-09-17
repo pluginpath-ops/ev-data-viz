@@ -54,6 +54,7 @@ import { epaConfigurationFigures, primaryEpaMapping } from './epaConfiguration';
 // passes is one whose EPA tested the calculations actually use.
 import { testedAgreement } from './vehicleFigures';
 import { labelRangeCheck } from './labelRangeCheck';
+import { sameSource } from './sources';
 import { deriveTested } from './performanceDerivations';
 import {
     LABEL_RANGE_TOLERANCE_PCT, LABEL_SPREAD_PCT,
@@ -572,24 +573,8 @@ export function checkCounts(rows = []) {
 
 // ── Across the fleet: one source, several spellings ─────────────────────────
 
-const STOP_WORDS = new Set(['and', 'the', 'of']);
-const letters = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-const initials = (name, dropStopWords) => name
-    .split(/[\s&]+/)
-    .filter(Boolean)
-    .filter(w => !dropStopWords || !STOP_WORDS.has(w.toLowerCase()))
-    .map(w => w[0].toLowerCase())
-    .join('');
-
-/** Same source under two spellings: punctuation and case, or an abbreviation of the words. */
-function sameSource(a, b) {
-    if (letters(a) === letters(b)) return true;
-    const [short, long] = letters(a).length <= letters(b).length ? [a, b] : [b, a];
-    const abbrev = letters(short);
-    if (abbrev.length < 2 || long.trim().split(/\s+/).length < 2) return false;
-    // "C&D" is Car and Driver without the "and"; "OoS" is Out of Spec with the "of".
-    return abbrev === initials(long, true) || abbrev === initials(long, false);
-}
+// sameSource lives with the source list (sources.js), which uses it to recognise
+// a pasted spelling; this still reports spellings that were never linked.
 
 /**
  * Source names on published results that look like one source spelled more than
