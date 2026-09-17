@@ -1645,7 +1645,8 @@ class DataService {
   }
 
   /**
-   * Remove a flag from a specific spec field. Admin only (enforced in AppContext).
+   * Clear a flag from a specific spec field. Admin only, enforced in the RPC
+   * (migration 069); signed-out callers cannot execute it at all.
    */
   async unflagSpecField(vehicleId, fieldKey) {
     if (!this.useSupabase) return;
