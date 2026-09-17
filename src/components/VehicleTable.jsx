@@ -82,7 +82,15 @@ function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen 
                 const text = formatVehicleCell(row, col, units);
                 if (col.key === 'name') {
                     return (
-                        <TableCell key={col.key} className="sticky-name" restate={text}>
+                        // The name selects, like the checkbox beside it: it is the
+                        // biggest target in the row and the one the eye lands on.
+                        // Every other cell still opens View Specs.
+                        <TableCell
+                            key={col.key}
+                            className="sticky-name"
+                            restate={text}
+                            onClick={(e) => { e.stopPropagation(); onToggle(row.id); }}
+                        >
                             <span className="vehicle-table-name">
                                 {/* The vehicle's series color, so a row ties to the
                                     same vehicle on every chart. */}

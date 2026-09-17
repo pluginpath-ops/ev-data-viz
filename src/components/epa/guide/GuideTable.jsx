@@ -52,12 +52,22 @@ function GuideRow({ row, cols, selectedIds, onToggleSelect, onOpenRow, vehicleLi
                     return <TableCell key={col.key} className={className} numeric={col.numeric} text={text} pct={barPercent(row, col, barMaxima)} />;
                 }
                 return (
-                    <TableCell key={col.key} className={className} numeric={col.numeric} restate={row.carline}>
+                    // The name picks the row for comparison, like the checkbox
+                    // beside it, as the vehicle table's name selects (#315).
+                    // Every other cell still opens the detail.
+                    <TableCell
+                        key={col.key}
+                        className={className}
+                        numeric={col.numeric}
+                        restate={row.carline}
+                        onClick={(e) => { e.stopPropagation(); onToggleSelect(row.id); }}
+                    >
                         <span className="guide-carline">
                             {/* 40 of 50 names are clipped at phone width, and the
                                 pinned column cannot be widened without taking the
-                                table back. A tap opens the detail, whose heading is
-                                the full name; a pointer gets the cell's tooltip. */}
+                                table back. A pointer gets the cell's peek; a tap on
+                                any other cell opens the detail, whose heading is
+                                the full name. */}
                             <span className="guide-carline-name guide-cell-name">{row.carline}</span>
                             {/* Badges ride on the name rather than holding columns of
                                 their own — at 30 columns the horizontal budget is the

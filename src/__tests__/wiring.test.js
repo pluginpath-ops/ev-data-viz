@@ -588,7 +588,10 @@ describe('the seams that broke before', () => {
             // ...and the restatement is the shared peek, not a browser title.
             expect(read(f), `${f} must restate clipped cells with useCellPeek`).toMatch(/useCellPeek\(\)[\s\S]*\{\.\.\.peekProps\}[\s\S]*\{cellPeek\}/);
         }
-        // Community flags reach the table's cells (flagging itself stays in View Specs).
+        // Clicking the name picks the row in both tables; other cells open details.
+        expect(table).toMatch(/onClick=\{\(e\) => \{ e\.stopPropagation\(\); onToggle\(row\.id\); \}\}/);
+        expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/onClick=\{\(e\) => \{ e\.stopPropagation\(\); onToggleSelect\(row\.id\); \}\}/);
+                // Community flags reach the table's cells (flagging itself stays in View Specs).
         expect(table).toMatch(/flagged=\{row\.flagged\.has\(col\.key\)\}/);
         expect(read('src/hooks/useCellPeek.jsx'), 'a flagged cell must peek even when it fits').toMatch(/dataset\.peek !== 'always'/);
         // Widths by what a column holds are one vocabulary in both column lists,

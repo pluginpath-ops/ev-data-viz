@@ -20,6 +20,9 @@
  * the value would take width from a fixed column and wrap a line that fits.
  * Flagging and clearing stay in View Specs; the table only shows the state.
  *
+ * `onClick` is for a cell that does something other than its row: both tables
+ * make the name cell pick the row, and every other cell opens the details.
+ *
  * Children, when given, replace the default content (the name cells carry a
  * swatch or badges, and wrap their name with `.guide-cell-name`). Otherwise the
  * cell draws its text, and beneath it the bar and the note when there are any.
@@ -39,7 +42,7 @@ export function isClipped(el) {
 export const FLAGGED_NOTE = 'Flagged as possibly inaccurate';
 
 export default function TableCell({
-    text, note = null, pct = null, numeric = false, flagged = false, restate, className = '', children,
+    text, note = null, pct = null, numeric = false, flagged = false, restate, className = '', onClick, children,
 }) {
     const said = restate ?? (note ? `${text} · ${note}` : text);
     // A flag can sit on a blank (someone thinks a value is missing), and
@@ -52,6 +55,7 @@ export default function TableCell({
             className={`guide-td ${numeric ? 'numeric' : 'wraps'} ${flagged ? 'is-flagged' : ''} ${className}`}
             data-restate={full || undefined}
             data-peek={flagged ? 'always' : undefined}
+            onClick={onClick}
         >
             {flagged && <span className="guide-td-flag" aria-label={FLAGGED_NOTE}>{'\u2691'}</span>}
             {children ?? (hasStack ? (
