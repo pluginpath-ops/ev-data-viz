@@ -108,13 +108,19 @@ const TESTED_COLUMNS = [
  * the schema type:
  *   short-values  yes/no, and counts with no bar (cameras, seats)
  *   long-text     free text, which also wraps to two lines
- * Everything else keeps the default: figures their figure width, enums and
- * identity text the text width. A bar needs the figure width to be readable,
- * so a count that has one is not narrowed.
+ * An enum is sized by its longest option, since the schema lists every value
+ * it can hold: Drive Type (FWD, RWD, AWD) is short, Motor Type ("Switched
+ * Reluctance") is not. Everything else keeps the default: figures their figure
+ * width, identity text the text width. A bar needs the figure width to be
+ * readable, so a count that has one is not narrowed.
  */
+const SHORT_OPTION_CHARS = 7;
+
 function holdsFor(field) {
     if (field.type === 'boolean') return 'short-values';
     if (field.type === 'integer' && !field.better) return 'short-values';
+    if (field.type === 'enum' && field.options?.length
+        && Math.max(...field.options.map(o => String(o).length)) <= SHORT_OPTION_CHARS) return 'short-values';
     if (field.type === 'text') return 'long-text';
     return null;
 }

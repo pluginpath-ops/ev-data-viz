@@ -161,13 +161,15 @@ describe('vehicle table memory', () => {
 });
 
 describe('column widths', () => {
-    it('narrows yes/no and bar-less counts, widens free text, and leaves figures and enums alone', () => {
+    it('narrows yes/no, bar-less counts and short enums, widens free text, and leaves figures alone', () => {
         const holds = (key) => vehicleColumnByKey(key)?.holds ?? null;
         expect(holds('compute.lidar')).toBe('short-values');
         expect(holds('compute.ultrasonics')).toBe('short-values');
         expect(holds('compute.processing_chip')).toBe('long-text');
         expect(holds('powertrain.horsepower_hp')).toBeNull();
-        expect(holds('powertrain.drive_type')).toBeNull();
+        expect(holds('powertrain.drive_type')).toBe('short-values');   // FWD / RWD / AWD
+        expect(holds('powertrain.motor_type')).toBeNull();             // "Switched Reluctance"
+        expect(holds('charging.charge_port')).toBe('short-values');   // CHAdeMO is the longest
         expect(holds('tags')).toBe('long-text');
     });
 });

@@ -6041,10 +6041,12 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     table-layout: fixed;
 }
 
-/* Header: name on one line, unit beneath. The unit line is always present so
-   every header is the same height. */
+/* Header: the name, then its unit beneath, or the name's own second line when
+   there is no unit. Top-aligned, so every name starts on the same line and the
+   eye reads across the header row. Bottom alignment dropped a unitless name a
+   line below its neighbours, so a row of labels looked like two rows. */
 .guide-th {
-    @apply px-3 py-2 text-left align-bottom whitespace-nowrap cursor-pointer select-none;
+    @apply px-3 py-2 text-left align-top whitespace-nowrap cursor-pointer select-none;
     background-color: var(--color-surface-muted);
     border-bottom: 1px solid var(--color-border);
     position: sticky;
@@ -6755,7 +6757,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* ── Summary table ───────────────────────────────────────────────────────── */
 
-.stats-table .guide-th { @apply cursor-default; }
+/* The stats table keeps the bottom alignment it was designed with: its
+   Distribution header is two lines (the word, then the unit) and every other
+   header is one, which sits level with that unit line. It has no two-line
+   names to line up, which is what moved the browse tables to the top. */
+.stats-table .guide-th { @apply cursor-default align-bottom; }
 .stats-th-dist { @apply w-1/2; }
 
 /* ── Sortable headings ───────────────────────────────────────────────────────
