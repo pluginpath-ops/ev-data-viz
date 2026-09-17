@@ -151,6 +151,10 @@ status and is never chrome.
 | Something missing that would let a figure be checked | **a gap** | `.data-check-finding.is-gap` |
 | A change a curator makes from a finding — a move out of a retiring column, a spec field, the primary | **a fix**; a column fix is **a move** | [dataCheckFixes.js](../src/utils/dataCheckFixes.js), `.data-check-fixes` |
 | A curator's recorded decision that something needs no action, still visible under a filter | **a skip** — skipped, un-skip | `epa_test_groups.fe_guide_skipped_at` (link sweep), `data_check_skips` (Data Checks), `.skip-ask` |
+| A vehicle whose specs, tests, color, photo and tags come from another vehicle until set on it — the same car with a stated difference (battery, weight, wheels) | **a variant**; it **inherits from** its source. Created with **＋ Variant** | `spec_source_vehicle_id`, [vehicleInheritance.js](../src/utils/vehicleInheritance.js), [NewVariantButton.jsx](../src/components/NewVariantButton.jsx) |
+| What a variant shows that is not set on it | **inherited** — "Inherited from *source*" | `vehicle.inheritedFrom`, `.vehicle-tag.is-inherited` |
+| A vehicle's values as stored, before inheritance: what an editor reads and writes | **its own** color, photo, tags | `vehicle.own`, `ownValues()` |
+| A new vehicle holding its own duplicates of another's values and tests | **a copy** — "⧉ Copy" | `duplicateVehicle` |
 | Anyone's signal that data looks right or wrong, taken together | **accuracy signals** | `votes`, `vehicles.flagged_specs`, [VoteButtons.jsx](../src/components/VoteButtons.jsx) |
 | Saying a vehicle's specs, or a run, look accurate | **a vouch** — vouch, vouched, "Vouch for accuracy" | `votes.vote_type = 'vouch'`; `SpecVouchButton` (whole vehicle), `RunVoteButtons` (run) |
 | Saying one spec value, or a run, may be inaccurate | **a flag** — flag, flagged | spec field: `vehicles.flagged_specs`, `SpecFieldFlagButton`; run: `votes.vote_type = 'flag'` |
@@ -167,6 +171,17 @@ comes back, marked as skipped before. Moving a limit does not bring it back.
 *Tested* range is an EVBench range test set against EPA
 ([TestedFigure.jsx](../src/components/vehicles/TestedFigure.jsx)). A bare
 "Tested capacity" beside it would use one word for two sources.
+
+**A variant is a vehicle record; a wheel or trim variant is not.** EPA prose
+uses "variant" loosely for the configurations one certification covers ("the
+20-inch variant"). That stays fine when qualified. Unqualified in UI text,
+"variant" means the vehicle record, so an EPA configuration is called a
+configuration.
+
+**A variant points; a copy duplicates.** Change the source's photo, color,
+tags or a spec, and every variant that has not set its own shows the change.
+A copy never does. The difference is why both buttons exist. Tags are one set:
+a variant with any tags of its own shows only those.
 
 **Vouch and flag mean the same act on a spec and on a run, but they are not
 the same record.** A run's vouch and flag are *counted*, one per browser

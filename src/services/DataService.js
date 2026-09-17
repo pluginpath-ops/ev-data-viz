@@ -890,6 +890,46 @@ class DataService {
     return newVehicle;
   }
 
+  /**
+   * A vehicle that inherits everything from `source` and owns nothing yet.
+   *
+   * Identity fields are copied, because they are what the curator edits first:
+   * the name gets " (variant)" so the new card is findable. Everything a reader
+   * sees beyond that comes from the source at read time — specs through
+   * `spec_source_vehicle_id`, color, photo and tags through the same pointer
+   * (vehicleInheritance.js), and tests through one spec link per run in
+   * `links` (variantLinkPlan). Color stays null on purpose: null inherits.
+   *
+   * Not atomic: a failure part-way leaves the vehicle with fewer links, which
+   * the Tests & Data link list shows and can finish. The vehicle row is written
+   * first so there is never a link without a vehicle.
+   */
+  async createVariant(source, links = []) {
+    const newVehicle = await this.addVehicle({
+      name: `${source.name} (variant)`,
+      make: source.make, model: source.model, trim: source.trim, year: source.year,
+      manufacturer_id: source.manufacturer_id ?? source.manufacturer?.id ?? null,
+      color: null,
+    });
+    if (!this.useSupabase || !this.user) {
+      // localStorage mode has no spec links; the pointer alone still inherits
+      // specs, color, photo and tags.
+      const saved = JSON.parse(localStorage.getItem('evData') || '{"vehicles":[]}');
+      saved.vehicles = saved.vehicles.map(v => v.id === newVehicle.id ? { ...v, spec_source_vehicle_id: source.id } : v);
+      localStorage.setItem('evData', JSON.stringify(saved));
+      return { ...newVehicle, spec_source_vehicle_id: source.id };
+    }
+    const { error } = await getSupabase()
+      .from('vehicles')
+      .update({ spec_source_vehicle_id: source.id })
+      .eq('id', newVehicle.id);
+    if (error) throw error;
+    for (const link of links) {
+      await this.addSpecLink({ targetVehicleId: newVehicle.id, ...link, notes: null });
+    }
+    return { ...newVehicle, spec_source_vehicle_id: source.id };
+  }
+
   async duplicateRun(vehicleId, run) {
     const points = await this.getRunData(run.id);
     return await this.addRun(vehicleId, {

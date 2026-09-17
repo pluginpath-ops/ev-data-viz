@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { withVehicleFigures } from '../utils/vehicleFigures';
+import { withInheritance, variantLinkPlan } from '../utils/vehicleInheritance';
 import { dataService } from '../services/DataService';
 import { applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
 import { toSessionRow } from '../utils/testSessions';
@@ -208,6 +209,27 @@ export function AppProvider({ children }) {
             return newVehicle;
         } catch (error) {
             showError('Error duplicating vehicle: ' + error.message);
+        }
+    };
+
+    /**
+     * A new vehicle that inherits everything from `sourceId`: specs, tests,
+     * color, photo and tags. The counterpart of Copy, which writes its own
+     * duplicates of all of them. Returns the new vehicle for the edit form, where
+     * the curator names it and sets only what differs.
+     */
+    const createVariant = async (sourceId) => {
+        try {
+            const source = vehicles.find(v => v.id === sourceId);
+            if (!source) throw new Error('Vehicle not found');
+            const newVehicle = await dataService.createVariant(source, variantLinkPlan(source));
+            // Same refresh as Copy, for the same reason: no setLoading, or the
+            // edit form unmounts before it opens.
+            dataService.getVehicles().then(setVehicles).catch(() => {});
+            return newVehicle;
+        } catch (error) {
+            logIfUnauthorized('create_variant', 'vehicle', sourceId, error);
+            showError('Error creating variant: ' + error.message);
         }
     };
 
@@ -1712,11 +1734,16 @@ export function AppProvider({ children }) {
     // specs, the primary EPA configuration and inheritance, on every change to
     // any of them — including the optimistic ones that never refetch, like
     // choosing a primary. Resolved in getVehicles() they went stale until reload.
+    //
+    // Color, photo and tags come down the inheritance chain here for the same
+    // reason (vehicleInheritance.js): a variant points at its source rather than
+    // holding copies, so a replaced photo reaches it on the next render. The
+    // resolved values take the usual keys; editors read `own`.
     const visibleVehicles = useMemo(() => {
         const shown = isContributor
             ? vehicles
             : vehicles.map(v => ({ ...v, runs: (v.runs || []).filter(r => !r.isHidden) }));
-        return withVehicleFigures(shown);
+        return withVehicleFigures(withInheritance(shown));
     }, [vehicles, isContributor]);
 
     const value = {
@@ -1746,6 +1773,7 @@ export function AppProvider({ children }) {
         updateVehicle,
         reorderVehicles,
         duplicateVehicle,
+        createVariant,
         deleteVehicle,
         copyRunToVehicle,
         duplicateRun,

@@ -1,3 +1,5 @@
+import NewVariantButton from './NewVariantButton';
+import { ownValues } from '../utils/vehicleInheritance';
 import { useState, useMemo, useEffect, Fragment } from 'react';
 import { EMPTY_VEHICLE_FORM, vehicleFormFrom } from '../utils/vehicleForm';
 import { useAppContext } from '../context/AppContext';
@@ -402,7 +404,7 @@ const DeriveAxisPanel = ({
     );
 };
 
-export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange }) {
+export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange }) {
     const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
@@ -422,7 +424,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
     const openEditVehicle = () => {
         setVehicleFormData(vehicleFormFrom(vehicle));
-        setVehicleFormTags(vehicle.tags || []);
+        setVehicleFormTags(ownValues(vehicle).tags);
         setVehicleNewTagName('');
         setShowEditVehicle(true);
     };
@@ -1349,6 +1351,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         >
                             {duplicatingVehicle ? <><span className="spinner-inline"/>Copying…</> : '⧉ Copy'}
                         </button>
+                    )}
+                    {canEdit(vehicle) && onCreateVariant && (
+                        <NewVariantButton
+                            disabled={duplicatingVehicle}
+                            onCreate={() => onCreateVariant(vehicle.id)}
+                        />
                     )}
                     {canDelete(vehicle) && (
                         <button

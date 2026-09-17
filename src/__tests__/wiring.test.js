@@ -51,7 +51,8 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
-                     'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js'];
+                     'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
+                     'vehicleInheritance.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -592,6 +593,29 @@ describe('the seams that broke before', () => {
 
         // Deleting a source must never delete what it published.
         expect(read('supabase/migrations/068_sources.sql')).toMatch(/source_id bigint REFERENCES sources\(id\) ON DELETE SET NULL/);
+    });
+
+    it('lets a variant inherit color, photo and tags by pointer, and keeps editors on own values', () => {
+        // Resolved where the figures are, so every reader of the fleet sees it.
+        const ctx = read('src/context/AppContext.jsx');
+        expect(ctx).toMatch(/withVehicleFigures\(withInheritance\(shown\)\)/);
+        expect(ctx, 'createVariant must link every run the source shows').toMatch(/dataService\.createVariant\(source, variantLinkPlan\(source\)\)/);
+
+        // Editors read own values. A form seeded from the resolved ones saves
+        // the source's color or tags onto the variant and cuts the pointer.
+        expect(read('src/utils/vehicleForm.js')).toMatch(/vehicle\.own \? vehicle\.own\.color/);
+        expect(read('src/components/VehiclesView.jsx')).toMatch(/setFormTags\(ownValues\(vehicle\)\.tags\)/);
+        expect(read('src/components/RunsView.jsx')).toMatch(/setVehicleFormTags\(ownValues\(vehicle\)\.tags\)/);
+        expect(read('src/components/admin/TagRegistry.jsx')).toMatch(/ownValues\(v\)\.tags/);
+        const cardPickers = read('src/components/VehiclesView.jsx').match(/stored=\{ownValues\(vehicle\)\.color\}/g) ?? [];
+        expect(cardPickers.length, 'both card color pickers must store the own color').toBe(2);
+        expect(read('src/components/EditVehicleForm.jsx')).toMatch(/ownValues\(editingVehicle \?\? \{\}\)\.image_url/);
+
+        // The button sits beside Copy wherever Copy is.
+        for (const f of ['src/components/VehiclesView.jsx', 'src/components/RunsView.jsx']) {
+            expect(read(f), `${f} must offer New variant beside Copy`).toMatch(/<NewVariantButton/);
+        }
+        expect(read('src/App.jsx').match(/onCreateVariant=/g)?.length).toBe(2);
     });
 
     it('makes the vehicle table a selection surface over the whole fleet', () => {

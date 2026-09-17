@@ -158,7 +158,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                         not what the curator is stuck on. */}
                     {!item.proposal && !hasCsiDetail(g) && (
                         <div className="sweep-needs-csi" title="The covered-models table and the manufacturer's note come from a CSI PDF. This group was imported from the certification CSV, so neither exists for it.">
-                            no CSI detail — import this certificate for wheel and variant clues
+                            no CSI detail — import this certificate for wheel and trim clues
                         </div>
                     )}
                     {comments.map((c, k) => (
@@ -207,8 +207,8 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                                 <div className="sweep-shared-note">
                                     These {item.shared.count} candidates are <strong>one certification</strong>
                                     {' '}({item.shared.smogTestGroup}) — EPA tested them once and the guide lists
-                                    the wheel or tyre options separately. Nothing distinguishes them on our side,
-                                    so pick the variant you mean.
+                                    the wheel or tire options separately. Nothing distinguishes them on our side,
+                                    so pick the configuration you mean.
                                 </div>
                             )}
                         </div>

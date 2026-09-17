@@ -2909,6 +2909,28 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .vehicle-tags {
     @apply flex flex-wrap gap-1;
 }
+/* One of a vehicle's tags. It was an inline cluster in two places (the card and
+   the edit form) painting the same primary tint. */
+.vehicle-tag {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+    border: 1px solid transparent;
+    background-color: var(--color-primary-light);
+    color: var(--color-primary-text);
+}
+/* In the edit form, a size up: these are targets with a remove button. */
+.vehicle-tag.is-editable { @apply px-3 py-1 text-sm; }
+/* A tag that came from the vehicle's source (it has none of its own): outlined,
+   not filled, so it reads as the source's set showing through rather than one
+   set here. */
+.vehicle-tag.is-inherited {
+    background-color: transparent;
+    border-style: dashed;
+    border-color: var(--color-border);
+    color: var(--color-text-secondary);
+}
+.vehicle-tag-remove {
+    @apply ml-1 rounded-full w-4 h-4 flex items-center justify-center hover:opacity-70;
+}
 
 /* Reorder arrow button cluster (Up/Down/Top/Bottom/±10) */
 .reorder-controls {

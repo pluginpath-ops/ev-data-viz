@@ -70,6 +70,7 @@ export default function App() {
         updateVehicle,
         reorderVehicles,
         duplicateVehicle,
+        createVariant,
         deleteVehicle,
         duplicateRun,
         addRun,
@@ -872,6 +873,7 @@ export default function App() {
                             onUploadVehicleImage={uploadVehicleImage}
                             onReorderVehicles={reorderVehicles}
                             onDuplicateVehicle={duplicateVehicle}
+                            onCreateVariant={createVariant}
                             onUpdateVehicleSpecs={updateVehicleSpecs}
                             specCustomFieldSuggestions={specCustomFieldSuggestions}
                             pendingEditVehicle={pendingEditVehicle}
@@ -900,6 +902,10 @@ export default function App() {
                             onDuplicateVehicle={async (id) => {
                                 const newVehicle = await duplicateVehicle(id);
                                 if (newVehicle) { setPendingEditVehicle(newVehicle); navigateTo('vehicles'); }
+                            }}
+                            onCreateVariant={async (id) => {
+                                const variant = await createVariant(id);
+                                if (variant) { setPendingEditVehicle(variant); navigateTo('vehicles'); }
                             }}
                             onDeleteVehicle={async (id) => { await deleteVehicle(id); navigateTo('vehicles'); }}
                             tags={tags}

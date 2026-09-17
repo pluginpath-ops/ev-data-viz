@@ -1,3 +1,5 @@
+import NewVariantButton from './NewVariantButton';
+import { ownValues } from '../utils/vehicleInheritance';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import SeriesColorPicker from './SeriesColorPicker';
 import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
@@ -80,7 +82,7 @@ export default function VehiclesView({
     vehicles, selectedVehicles, onToggleSelection, onSelectAllVisible, onClearAllVisible, onAdd, onUpdate, onDelete, onViewRuns,
     canCreate, canEdit, canDelete, canPublish, onToggleVisibility,
     tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
-    onReorderVehicles, onDuplicateVehicle,
+    onReorderVehicles, onDuplicateVehicle, onCreateVariant,
     onUpdateVehicleSpecs, specCustomFieldSuggestions,
     pendingEditVehicle, onClearPendingEdit,
     savedState, onSaveState,
@@ -157,7 +159,9 @@ export default function VehiclesView({
     const handleEdit = (vehicle, e) => {
         e.stopPropagation();
         setFormData(vehicleFormFrom(vehicle));
-        setFormTags(vehicle.tags || []);
+        // Own tags only: the inherited ones come from the source and are shown
+        // beside the editor, never saved onto this vehicle.
+        setFormTags(ownValues(vehicle).tags);
         setEditingId(vehicle.id);
         setShowForm(true);
     };
@@ -392,13 +396,22 @@ export default function VehiclesView({
                     <button
                         onClick={(e) => handleDuplicateVehicle(vehicle, e)}
                         disabled={duplicatingId !== null}
-                        title="Duplicate vehicle and all tests"
+                        title="Copy this vehicle, with its own copies of its specs and tests"
                         className="btn btn-secondary disabled:opacity-50"
                     >
                         {duplicatingId === vehicle.id
-                            ? <><span className="inline-block w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"/>Copying…</>
+                            ? <><span className="spinner-inline"/>Copying…</>
                             : '⧉ Copy'}
                     </button>
+                )}
+                {canEdit(vehicle) && onCreateVariant && (
+                    <NewVariantButton
+                        disabled={duplicatingId !== null}
+                        onCreate={async () => {
+                            const variant = await onCreateVariant(vehicle.id);
+                            if (variant) handleEdit(variant, { stopPropagation: () => {} });
+                        }}
+                    />
                 )}
                 {canDelete(vehicle) && (
                     <button
@@ -416,15 +429,20 @@ export default function VehiclesView({
         if (!vehicle.tags?.length) return null;
         return (
             <div className="vehicle-tags">
-                {vehicle.tags.map(tag => (
-                    <span
-                        key={tag.id}
-                        className="px-2 py-0.5 rounded-full text-xs font-medium"
-                        style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
-                    >
-                        {tag.name}
-                    </span>
-                ))}
+                {vehicle.tags.map(tag => {
+                    // A tag that came down the inheritance chain is drawn as
+                    // one, so a curator can tell it from a tag set here.
+                    const from = vehicle.inheritedFrom?.tags?.[tag.id];
+                    return (
+                        <span
+                            key={tag.id}
+                            className={`vehicle-tag${from ? ' is-inherited' : ''}`}
+                            title={from ? `Inherited from ${from.name}` : undefined}
+                        >
+                            {tag.name}
+                        </span>
+                    );
+                })}
             </div>
         );
     };
@@ -847,13 +865,15 @@ export default function VehiclesView({
                                             >
                                                 <SeriesColorPicker
                                                     value={vehicle.color || DEFAULT_RUN_COLOR}
-                                                    stored={vehicle.color ?? null}
+                                                    stored={ownValues(vehicle).color}
                                                     label={vehicle.name}
                                                     onChange={hex => onUpdate(vehicle.id, { color: hex })}
                                                     onReset={() => onUpdate(vehicle.id, { color: null })}
                                                 />
                                                 <span className="text-caption">
-                                                    {vehicle.color ? 'Series color' : 'No color set'}
+                                                    {vehicle.inheritedFrom?.color
+                                                        ? `Inherited from ${vehicle.inheritedFrom.color.name}`
+                                                        : vehicle.color ? 'Series color' : 'No color set'}
                                                 </span>
                                             </div>
                                         )}
@@ -1000,7 +1020,7 @@ export default function VehiclesView({
                                             {canEdit(vehicle) && (
                                                 <SeriesColorPicker
                                                     value={vehicle.color || DEFAULT_RUN_COLOR}
-                                                    stored={vehicle.color ?? null}
+                                                    stored={ownValues(vehicle).color}
                                                     label={vehicle.name}
                                                     onChange={hex => onUpdate(vehicle.id, { color: hex })}
                                                     onReset={() => onUpdate(vehicle.id, { color: null })}

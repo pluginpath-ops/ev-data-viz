@@ -32,6 +32,9 @@ export function vehicleFormFrom(vehicle) {
         battery: vehicle.battery || '',
         range:   vehicle.range   || '',
         manufacturer_id: vehicle.manufacturer?.id ?? null,
-        color:  vehicle.color ?? null,
+        // The vehicle's OWN color. A variant's resolved color is its source's,
+        // and seeding the form with it would save it as the variant's own the
+        // first time the form was submitted, cutting the pointer.
+        color:  vehicle.own ? vehicle.own.color : (vehicle.color ?? null),
     };
 }

@@ -1,3 +1,4 @@
+import { ownValues } from '../../utils/vehicleInheritance';
 import { useState, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 
@@ -22,7 +23,9 @@ export default function TagRegistry() {
     const usage = useMemo(() => {
         const by = {};
         for (const v of vehicles ?? []) {
-            for (const t of v.tags ?? []) by[t.id] = (by[t.id] ?? 0) + 1;
+            // Own tags: a merge or delete acts on the vehicles that hold the tag,
+            // and a variant showing its source's tag does not hold it.
+            for (const t of ownValues(v).tags) by[t.id] = (by[t.id] ?? 0) + 1;
         }
         return by;
     }, [vehicles]);
