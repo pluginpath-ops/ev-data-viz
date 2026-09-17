@@ -1932,14 +1932,18 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     padding: 12px 14px 13px;
 }
 
-/* The primary action reads first and the per-vehicle controls follow it. */
+/* A card's actions, at its foot: a row for anyone (View Tests & Data, Specs),
+   then a row a curator sees (Copy, Variant, Edit, Delete). */
 .vehicle-card-actions {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 6px;
     margin-top: auto;
     padding-top: 2px;
 }
+/* The curator row: equal shares, so four short labels read as one set rather
+   than as buttons sized by their words. The rows' flex layout is inline. */
+.vehicle-card-curator-actions > * { flex: 1 1 0; min-width: 0; }
 
 /* ── Chart layout: rail on the left, plot on the right ─────────────────────
  *
@@ -2636,6 +2640,26 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
         rgba(17, 22, 31, 0.08) 100%);
 }
 
+/* On a card, the band runs 36px further down, UNDER the top of the card body,
+   so the photograph is cropped less without the card growing. The fade
+   reaches the card's own color at the top of the first panel (24px up from
+   the band's foot: the body's 12px padding under a 36px overlap), so the
+   panel sits on solid ground; the name stays where it was.
+   The dark part is kept behind the name (30-58%, where it sits) and gone by
+   80%: spread over the taller band the old stops dimmed most of the car, and
+   a dark photograph under that turned to mud. The name's own text-shadow
+   carries the rest of its legibility. */
+.vehicle-media.is-card-band { margin-bottom: -36px; }
+.vehicle-media.is-card-band .vehicle-media-scrim {
+    background: linear-gradient(to top,
+        var(--color-card) 17%,
+        rgba(17, 22, 31, 0.72) 30%,
+        rgba(17, 22, 31, 0.3) 58%,
+        rgba(17, 22, 31, 0) 80%);
+}
+.vehicle-media.is-card-band .vehicle-media-title { bottom: 45px; }
+.vehicle-media.is-card-band + .vehicle-card-body { position: relative; }
+
 /* No photograph is a DESIGNED state. A flat panel with the make set large reads
    as deliberate; an empty box reads as broken. */
 .vehicle-media.is-empty {
@@ -2682,6 +2706,27 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     color: rgba(255, 255, 255, 0.72);
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A curator's series color control, top-left of the band under the selection
+   mark's corner (8px + its 19px + a gap). No plate: the swatch is a solid,
+   bordered chip and reads over any photo, and the caption borrows the name's
+   white and shadow rather than inventing a third on-photo treatment. */
+.vehicle-media-color {
+    position: absolute;
+    top: 33px;
+    left: 8px;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.vehicle-media-color-caption {
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: rgba(255, 255, 255, 0.72);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
     white-space: nowrap;
 }
 
