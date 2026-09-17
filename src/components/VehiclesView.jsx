@@ -1,3 +1,5 @@
+import NewVariantButton from './NewVariantButton';
+import { ownValues } from '../utils/vehicleInheritance';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import SeriesColorPicker from './SeriesColorPicker';
 import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
@@ -80,7 +82,7 @@ export default function VehiclesView({
     vehicles, selectedVehicles, onToggleSelection, onSelectAllVisible, onClearAllVisible, onAdd, onUpdate, onDelete, onViewRuns,
     canCreate, canEdit, canDelete, canPublish, onToggleVisibility,
     tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
-    onReorderVehicles, onDuplicateVehicle,
+    onReorderVehicles, onDuplicateVehicle, onCreateVariant,
     onUpdateVehicleSpecs, specCustomFieldSuggestions,
     pendingEditVehicle, onClearPendingEdit,
     savedState, onSaveState,
@@ -157,7 +159,9 @@ export default function VehiclesView({
     const handleEdit = (vehicle, e) => {
         e.stopPropagation();
         setFormData(vehicleFormFrom(vehicle));
-        setFormTags(vehicle.tags || []);
+        // Own tags only: the inherited ones come from the source and are shown
+        // beside the editor, never saved onto this vehicle.
+        setFormTags(ownValues(vehicle).tags);
         setEditingId(vehicle.id);
         setShowForm(true);
     };
@@ -361,43 +365,68 @@ export default function VehiclesView({
         return <span className={cls}>{label}</span>;
     };
 
-    const ActionButtons = ({ vehicle }) => {
+    /**
+     * Specs: the editor for someone who can edit the vehicle, the read-only view
+     * for everyone else, and nothing when there is nothing to view. It sits
+     * beside View Tests & Data for every reader, so the first row of a card
+     * reads the same whoever is signed in.
+     */
+    const SpecsButton = ({ vehicle }) => {
+        if (canEdit(vehicle)) {
+            return (
+                <button
+                    onClick={(e) => { e.stopPropagation(); setSpecsEditingVehicle(vehicle); }}
+                    className="btn btn-secondary"
+                >
+                    Specs
+                </button>
+            );
+        }
+        if (!vehicle.specs || Object.keys(vehicle.specs).length === 0) return null;
+        return (
+            <button
+                onClick={(e) => { e.stopPropagation(); setSpecsViewingVehicle(vehicle); }}
+                className="btn btn-secondary"
+            >
+                Specs
+            </button>
+        );
+    };
+
+    /**
+     * What a curator can do TO a vehicle: Copy, Variant, Edit, Delete, in that
+     * order. Rendered bare so the card can give them a row of their own and the
+     * list can run them on after its other controls. Delete is last, so the
+     * destructive one is never between two harmless ones.
+     */
+    const CuratorActions = ({ vehicle }) => {
         const isPending = pendingDeletes.has(vehicle.id);
         return (
-            <div className="flex flex-col gap-1 items-stretch">
-                {canEdit(vehicle) && (
-                    <button
-                        onClick={(e) => handleEdit(vehicle, e)}
-                        className="px-3 py-1 rounded-md text-xs font-medium bg-[var(--color-surface-sunken)] text-secondary hover:bg-[var(--color-surface-muted)] transition"
-                    >
-                        Edit
-                    </button>
-                )}
-                {canEdit(vehicle) ? (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setSpecsEditingVehicle(vehicle); }}
-                        className="btn btn-secondary"
-                    >
-                        Specs
-                    </button>
-                ) : vehicle.specs && Object.keys(vehicle.specs).length > 0 && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setSpecsViewingVehicle(vehicle); }}
-                        className="btn btn-secondary"
-                    >
-                        Specs
-                    </button>
-                )}
+            <>
                 {canEdit(vehicle) && (
                     <button
                         onClick={(e) => handleDuplicateVehicle(vehicle, e)}
                         disabled={duplicatingId !== null}
-                        title="Duplicate vehicle and all tests"
+                        title="Copy this vehicle, with its own copies of its specs and tests"
                         className="btn btn-secondary disabled:opacity-50"
                     >
                         {duplicatingId === vehicle.id
-                            ? <><span className="inline-block w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"/>Copying…</>
+                            ? <><span className="spinner-inline"/>Copying…</>
                             : '⧉ Copy'}
+                    </button>
+                )}
+                {canEdit(vehicle) && onCreateVariant && (
+                    <NewVariantButton
+                        disabled={duplicatingId !== null}
+                        onCreate={async () => {
+                            const variant = await onCreateVariant(vehicle.id);
+                            if (variant) handleEdit(variant, { stopPropagation: () => {} });
+                        }}
+                    />
+                )}
+                {canEdit(vehicle) && (
+                    <button onClick={(e) => handleEdit(vehicle, e)} className="btn btn-secondary">
+                        Edit
                     </button>
                 )}
                 {canDelete(vehicle) && (
@@ -408,7 +437,7 @@ export default function VehiclesView({
                         {isPending ? '↩ Restore' : 'Delete'}
                     </button>
                 )}
-            </div>
+            </>
         );
     };
 
@@ -416,15 +445,20 @@ export default function VehiclesView({
         if (!vehicle.tags?.length) return null;
         return (
             <div className="vehicle-tags">
-                {vehicle.tags.map(tag => (
-                    <span
-                        key={tag.id}
-                        className="px-2 py-0.5 rounded-full text-xs font-medium"
-                        style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
-                    >
-                        {tag.name}
-                    </span>
-                ))}
+                {vehicle.tags.map(tag => {
+                    // A tag that came down the inheritance chain is drawn as
+                    // one, so a curator can tell it from a tag set here.
+                    const from = vehicle.inheritedFrom?.tags?.[tag.id];
+                    return (
+                        <span
+                            key={tag.id}
+                            className={`vehicle-tag${from ? ' is-inherited' : ''}`}
+                            title={from ? `Inherited from ${from.name}` : undefined}
+                        >
+                            {tag.name}
+                        </span>
+                    );
+                })}
             </div>
         );
     };
@@ -822,42 +856,43 @@ export default function VehiclesView({
                                         scrim carrying the identity, rather than a
                                         full-card background under an 80% wash that
                                         made it unreadable AND unlookable-at. */}
-                                    <VehicleMedia vehicle={vehicle}>
+                                    <VehicleMedia vehicle={vehicle} height={140} className="is-card-band">
                                         <div className="vehicle-media-title">
                                             <h3>{vehicle.name}</h3>
                                             <p>{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
                                         </div>
                                         <VisibilityPill vehicle={vehicle} onMedia />
-                                    </VehicleMedia>
-
-                                    <div className="vehicle-card-body">
-                                        {/* The curator's swatch, in the card BODY rather
-                                            than beside the name — the name sits over the
-                                            photograph behind a scrim, and a control there
-                                            has to fight an arbitrary image the way
-                                            .vehicle-media-badge does. Editing in place is
-                                            the point: coloring a catalogue this size is a
-                                            scroll-and-click pass, and routing each one
-                                            through the full edit form is what would make
-                                            it not worth doing. */}
+                                        {/* The curator's swatch, on the band under the
+                                            selection mark's corner. It was the first row
+                                            of the card body, which made a curator's card
+                                            taller than everyone else's and pushed the
+                                            figures down. On the band it costs no height.
+                                            It used to be kept off the photograph because
+                                            a control there fights an arbitrary image; the
+                                            swatch is a bordered solid chip that reads over
+                                            anything, and its caption takes the name's
+                                            shadow. Editing in place is still the point:
+                                            coloring a catalogue this size is a
+                                            scroll-and-click pass. */}
                                         {canEdit(vehicle) && (
-                                            <div
-                                                className="flex items-center gap-2 mb-2"
-                                                onClick={e => e.stopPropagation()}
-                                            >
+                                            <div className="vehicle-media-color" onClick={e => e.stopPropagation()}>
                                                 <SeriesColorPicker
                                                     value={vehicle.color || DEFAULT_RUN_COLOR}
-                                                    stored={vehicle.color ?? null}
+                                                    stored={ownValues(vehicle).color}
                                                     label={vehicle.name}
                                                     onChange={hex => onUpdate(vehicle.id, { color: hex })}
                                                     onReset={() => onUpdate(vehicle.id, { color: null })}
                                                 />
-                                                <span className="text-caption">
-                                                    {vehicle.color ? 'Series color' : 'No color set'}
+                                                <span className="vehicle-media-color-caption">
+                                                    {vehicle.inheritedFrom?.color
+                                                        ? `Inherited from ${vehicle.inheritedFrom.color.name}`
+                                                        : vehicle.color ? 'Series color' : 'No color set'}
                                                 </span>
                                             </div>
                                         )}
+                                    </VehicleMedia>
 
+                                    <div className="vehicle-card-body">
                                         {/* Reorder controls — shown in edit order mode */}
                                         {showReorderButtons && (
                                             <div className="reorder-controls mb-2 flex-wrap" onClick={e => e.stopPropagation()}>
@@ -911,19 +946,28 @@ export default function VehiclesView({
 
                                         {vehicle.tags?.length > 0 && <TagPills vehicle={vehicle} />}
 
-                                        {/* Actions sit at the foot of the card, on one
-                                            row: the primary action reads first and the
-                                            per-vehicle controls follow it, rather than
-                                            occupying a column that squeezed the content
-                                            beside them. */}
+                                        {/* Actions at the foot of the card, in two rows.
+                                            The first is what anyone can do with the
+                                            vehicle, the same for every reader. The
+                                            second is what a curator can do TO it, and
+                                            appears only for them. It was one column of
+                                            five stacked buttons beside the primary action,
+                                            which made a curator's card half controls. */}
                                         <div className="vehicle-card-actions" onClick={e => e.stopPropagation()}>
-                                            <button
-                                                onClick={() => onViewRuns(vehicle)}
-                                                className="btn btn-primary flex-1"
-                                            >
-                                                View Tests &amp; Data →
-                                            </button>
-                                            <ActionButtons vehicle={vehicle} />
+                                            <div className="flex items-center gap-1.5">
+                                                <button
+                                                    onClick={() => onViewRuns(vehicle)}
+                                                    className="btn btn-primary flex-1"
+                                                >
+                                                    View Tests &amp; Data →
+                                                </button>
+                                                <SpecsButton vehicle={vehicle} />
+                                            </div>
+                                            {(canEdit(vehicle) || canDelete(vehicle)) && (
+                                                <div className="vehicle-card-curator-actions flex items-center gap-1.5">
+                                                    <CuratorActions vehicle={vehicle} />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -1000,7 +1044,7 @@ export default function VehiclesView({
                                             {canEdit(vehicle) && (
                                                 <SeriesColorPicker
                                                     value={vehicle.color || DEFAULT_RUN_COLOR}
-                                                    stored={vehicle.color ?? null}
+                                                    stored={ownValues(vehicle).color}
                                                     label={vehicle.name}
                                                     onChange={hex => onUpdate(vehicle.id, { color: hex })}
                                                     onReset={() => onUpdate(vehicle.id, { color: null })}
@@ -1046,7 +1090,10 @@ export default function VehiclesView({
                                         >
                                             Tests &amp; Data →
                                         </button>
-                                        <ActionButtons vehicle={vehicle} />
+                                        {/* The same order as the card's two rows, run
+                                            on as one: a list row has the width. */}
+                                        <SpecsButton vehicle={vehicle} />
+                                        <CuratorActions vehicle={vehicle} />
                                     </div>
                                 </div>
 

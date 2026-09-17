@@ -1,6 +1,7 @@
 // Shared vehicle edit form — used in VehiclesView (inline) and RunsView (modal).
 // Lifted to module level so React never unmounts it mid-keystroke due to a new
 // function reference being created inside a parent render.
+import { ownValues } from '../utils/vehicleInheritance';
 import { useState, useRef, useCallback } from 'react';
 import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -54,6 +55,20 @@ export default function EditVehicleForm({
     manufacturers = [],
     onAddManufacturer,
 }) {
+    // What the vehicle being edited inherits (vehicleInheritance.js). The form
+    // edits own values only; these are shown beside them, never saved.
+    const inheritedColor = editingVehicle?.inheritedFrom?.color ?? null;
+    // Inherited tags show only while the vehicle has none of its own: tags are
+    // one set, overridden whole. The first change a curator makes here adopts
+    // the inherited set as the vehicle's own and applies the change to that,
+    // so removing one inherited tag keeps the rest rather than losing them all.
+    const inheritedTags = (formTags?.length ?? 0) > 0 ? [] : Object.entries(editingVehicle?.inheritedFrom?.tags ?? {})
+        .map(([id, from]) => ({ tag: (editingVehicle.tags ?? []).find(t => String(t.id) === id), from }))
+        .filter(({ tag }) => tag);
+    const adoptInheritedTags = (exceptId = null) => {
+        for (const { tag } of inheritedTags) if (tag.id !== exceptId) onAddTag(tag);
+    };
+
     const [imgSrc, setImgSrc] = useState('');
     const [crop, setCrop] = useState();
     const [completedCrop, setCompletedCrop] = useState(null);
@@ -90,7 +105,7 @@ export default function EditVehicleForm({
         };
         setCrop(initial);
         setCompletedCrop(initial);
-    }, []);
+    }, [setCrop, setCompletedCrop]);
 
     const handleCropConfirm = async () => {
         if (!completedCrop || !imgRef.current) return;
@@ -228,7 +243,7 @@ export default function EditVehicleForm({
                     <label className="block font-medium mb-2">Series color</label>
                     <div className="flex items-center gap-3">
                         <SeriesColorPicker
-                            value={formData.color || DEFAULT_RUN_COLOR}
+                            value={formData.color || (inheritedColor ? editingVehicle.color : null) || DEFAULT_RUN_COLOR}
                             stored={formData.color ?? null}
                             label={formData.name?.trim() || 'this vehicle'}
                             onChange={hex => onFormChange({ ...formData, color: hex })}
@@ -237,7 +252,9 @@ export default function EditVehicleForm({
                         <span className="text-note">
                             {formData.color
                                 ? 'Every chart draws this vehicle from here, shading its tests off it.'
-                                : 'Unset — the palette chooses. The press-car color is usually the one that stands out.'}
+                                : inheritedColor
+                                    ? `Inherited from ${inheritedColor.name}. Set one to override it.`
+                                    : 'Unset — the palette chooses. The press-car color is usually the one that stands out.'}
                         </span>
                     </div>
                 </div>
@@ -246,20 +263,33 @@ export default function EditVehicleForm({
                 {editingId && (
                     <div className="form-section mt-5">
                         <label className="block font-medium mb-2">Tags</label>
-                        {formTags.length > 0 && (
+                        {(formTags.length > 0 || inheritedTags.length > 0) && (
                             <div className="flex flex-wrap gap-2 mb-3">
                                 {formTags.map(tag => (
-                                    <div
-                                        key={tag.id}
-                                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium"
-                                        style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-text)' }}
-                                    >
+                                    <div key={tag.id} className="vehicle-tag is-editable">
                                         <span>{tag.name}</span>
                                         <button
                                             type="button"
                                             onClick={() => onRemoveTag(tag.id)}
-                                            className="ml-1 rounded-full w-4 h-4 flex items-center justify-center hover:opacity-70"
-                                            style={{ fontSize: '12px' }}
+                                            className="vehicle-tag-remove"
+                                            aria-label={`Remove ${tag.name}`}
+                                        >
+                                            &times;
+                                        </button>
+                                    </div>
+                                ))}
+                                {/* Inherited tags, while this vehicle has none of its
+                                    own. Any change adopts them first (see
+                                    adoptInheritedTags), so the set is edited as a
+                                    whole rather than silently dropped. */}
+                                {inheritedTags.map(({ tag, from }) => (
+                                    <div key={tag.id} className="vehicle-tag is-editable is-inherited" title={`Inherited from ${from.name}`}>
+                                        <span>{tag.name}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => adoptInheritedTags(tag.id)}
+                                            className="vehicle-tag-remove"
+                                            aria-label={`Remove ${tag.name}`}
                                         >
                                             &times;
                                         </button>
@@ -267,12 +297,17 @@ export default function EditVehicleForm({
                                 ))}
                             </div>
                         )}
+                        {inheritedTags.length > 0 && (
+                            <p className="text-note mb-2">
+                                Inherited from {inheritedTags[0].from.name}. Changing a tag here gives this vehicle its own set.
+                            </p>
+                        )}
                         {availableTagsForForm.length > 0 && (
                             <div className="mb-2">
                                 <select
                                     onChange={(e) => {
                                         const tag = tags.find(t => t.id === parseInt(e.target.value));
-                                        if (tag) onAddTag(tag);
+                                        if (tag) { adoptInheritedTags(); onAddTag(tag); }
                                         e.target.value = '';
                                     }}
                                     className="form-input form-input w-full"
@@ -291,10 +326,10 @@ export default function EditVehicleForm({
                                 placeholder="New tag name"
                                 value={newTagName}
                                 onChange={(e) => onNewTagNameChange(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onCreateTag(); } }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); adoptInheritedTags(); onCreateTag(); } }}
                                 className="form-input form-input flex-1"
                             />
-                            <button type="button" onClick={onCreateTag} className="btn btn-primary text-sm">
+                            <button type="button" onClick={() => { adoptInheritedTags(); onCreateTag(); }} className="btn btn-primary text-sm">
                                 Create tag
                             </button>
                         </div>
@@ -315,7 +350,7 @@ export default function EditVehicleForm({
                         )}
                         <label className="image-upload-label">
                             <span className="btn btn-primary text-sm">
-                                {imageUploading ? 'Uploading…' : editingVehicle?.image_url ? 'Replace image' : 'Upload image'}
+                                {imageUploading ? 'Uploading…' : ownValues(editingVehicle ?? {}).image_url ? 'Replace image' : 'Upload image'}
                             </span>
                             <input
                                 ref={fileInputRef}
@@ -326,6 +361,11 @@ export default function EditVehicleForm({
                                 disabled={imageUploading}
                             />
                         </label>
+                        {editingVehicle?.inheritedFrom?.photo && (
+                            <p className="text-note mt-1">
+                                Inherited from {editingVehicle.inheritedFrom.photo.name}, and follows it when that photo changes. Upload one to override it.
+                            </p>
+                        )}
                         <p className="text-xs text-meta mt-1">16:9 crop · max 1600×900 · saved as JPEG</p>
                     </div>
                 )}

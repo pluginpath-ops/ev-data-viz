@@ -62,7 +62,7 @@ export default function GuideDetailModal({ row, vehicles, onClose }) {
                     {row.is_collapsed && (
                         <div className="guide-warning">
                             EPA collapsed several configurations into this row. Its motor count and
-                            motor power are the union of those variants, so no arithmetic over them
+                            motor power are the union of those configurations, so no arithmetic over them
                             describes one vehicle.
                         </div>
                     )}

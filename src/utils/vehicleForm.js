@@ -31,7 +31,14 @@ export function vehicleFormFrom(vehicle) {
         year:   vehicle.year  || '',
         battery: vehicle.battery || '',
         range:   vehicle.range   || '',
-        manufacturer_id: vehicle.manufacturer?.id ?? null,
-        color:  vehicle.color ?? null,
+        // The joined object when the vehicle came from getVehicles, the bare id
+        // when it is a row just inserted (Copy, ＋ Variant hand the form the
+        // insert's return, which has no join). Reading only the object showed
+        // "— Manufacturer —" for those, and saving wrote null over the id.
+        manufacturer_id: vehicle.manufacturer?.id ?? vehicle.manufacturer_id ?? null,
+        // The vehicle's OWN color. A variant's resolved color is its source's,
+        // and seeding the form with it would save it as the variant's own the
+        // first time the form was submitted, cutting the pointer.
+        color:  vehicle.own ? vehicle.own.color : (vehicle.color ?? null),
     };
 }

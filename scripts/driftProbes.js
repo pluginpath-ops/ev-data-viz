@@ -193,7 +193,7 @@ export const LEDGER = [
     },
     {
         key: 'palette-border',
-        count: 30,
+        count: 29,
         scope: 'src/**/*.jsx',
         what: 'Border colors written as palette utilities.',
         fix: '--color-border, --color-border-strong, --color-border-subtle.',
