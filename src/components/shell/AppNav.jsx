@@ -1,6 +1,7 @@
 import { useIsCompact } from '../../hooks/useIsCompact';
 import NavMenu from './NavMenu';
 import AccountMenu from './AccountMenu';
+import { modeNeedsSelection } from '../../constants/chartNav';
 
 /**
  * The 50px chrome bar: wordmark, top-level tabs, account block.
@@ -60,15 +61,20 @@ export default function AppNav({
             disabled: !activeVehicle,
             hint: activeVehicle ? activeVehicle.name : 'Select a vehicle first',
         },
-        // One top-level tab per chart category. All are driven by the current
-        // vehicle selection, so they share the same gate.
-        ...chartCategories.map(({ key, label }) => ({
-            key,
-            label,
-            chart: true,
-            disabled: !hasSelection,
-            hint: hasSelection ? undefined : 'Select a vehicle first',
-        })),
+        // One top-level tab per chart category. They plot the vehicle
+        // selection, so they wait for one, unless a mode inside can show
+        // something without it: Specifications holds the vehicle table, where
+        // a selection is made (#315).
+        ...chartCategories.map(({ key, label, modes }) => {
+            const gated = !hasSelection && modes.every(modeNeedsSelection);
+            return {
+                key,
+                label,
+                chart: true,
+                disabled: gated,
+                hint: gated ? 'Select a vehicle first' : undefined,
+            };
+        }),
         // Reference data, not a chart: the guide covers every EV EPA has rated,
         // so it is deliberately NOT gated on a vehicle selection the way the
         // chart categories above are.
