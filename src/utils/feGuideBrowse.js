@@ -25,6 +25,8 @@
  * RPCs — you cannot page your way to a correct median.
  */
 
+import { sortByColumn, barMaximaOf, barPercentOf, BAR_MIN_PCT } from './tableColumns';
+
 /** Rows past which the load-everything approach should be revisited (#236). */
 export const ROW_BUDGET = 5000;
 
@@ -255,8 +257,8 @@ export const GUIDE_COLUMNS = [
       hint: 'Corporate parent: Chevrolet, Cadillac and GMC all read General Motors. Blank until a curator sets it.' },
     { key: 'division',         label: 'EPA division', group: 'Identity',
       hint: 'The division exactly as EPA filed it, before brand resolution.' },
-    { key: 'model_year',       label: 'Year',        group: 'Identity',   numeric: true,  digits: 0, default: true },
-    { key: 'model_type_index', label: 'Model type',  group: 'Identity',
+    { key: 'model_year',       label: 'Year',        group: 'Identity',   numeric: true,  digits: 0, default: true, holds: 'short-values' },
+    { key: 'model_type_index', label: 'Model type',  group: 'Identity',   holds: 'short-values',
       hint: 'EPA’s own index for a model type. Part of the natural key — carline alone is not unique.' },
     { key: 'smog_test_group',  label: 'Test group',  group: 'Identity',
       hint: 'EPA’s smog test group. Configurations certified together share one; it is not unique per configuration.' },
@@ -289,15 +291,15 @@ export const GUIDE_COLUMNS = [
     // several configurations into one row, which puts nine motors on a Taycan.
     // Still offered, because it is right for the ~94% of rows that are not
     // collapsed, and those rows are flagged.
-    { key: 'motor_count',    label: 'Motors',      group: 'Powertrain', numeric: true, digits: 0,
+    { key: 'motor_count',    label: 'Motors',      group: 'Powertrain', numeric: true, digits: 0, holds: 'short-values',
       hint: 'EPA’s motor-generator count. A union on collapsed rows — see the "multi" flag — so read it alongside that.' },
-    { key: 'wheel_size_in',  label: 'Wheels', unit: 'in', group: 'Powertrain', numeric: true, digits: 0, derived: true,
+    { key: 'wheel_size_in',  label: 'Wheels', unit: 'in', group: 'Powertrain', numeric: true, digits: 0, derived: true, holds: 'short-values',
       hint: 'Read from the configuration name. EPA has no wheel column, and only some makers state it — about 43% of rows resolve, mostly Rivian and BMW. Blank means the maker did not say.' },
 
     // Classification
     { key: 'body_class',    label: 'Class',      group: 'Classification', derived: true, default: true,
       hint: 'EPA’s carline class with the drivetrain suffix removed, so "Standard SUV 4WD" and "Standard SUV 2WD" group as one body. Drivetrain has its own column.' },
-    { key: 'carline_class', label: 'EPA class',  group: 'Classification',
+    { key: 'carline_class', label: 'EPA class',  group: 'Classification', holds: 'long-text',
       hint: 'EPA’s class string verbatim, drivetrain suffix and all.' },
 
     // Charging
@@ -314,13 +316,23 @@ export const GUIDE_COLUMNS = [
       hint: 'The adjustment EPA applied to THIS configuration. Not a flat 0.7 — the 2027 R2 is 0.7051 at 20" and 0.7294 at 21".' },
     { key: 'adjustment_signature', label: 'Signature', group: 'Unadjusted & adjusted',
       hint: 'Read from the numbers, not from EPA’s declaration: 57% of rows declaring a 5-cycle label carry exactly 0.700000, the fixed factor. This is the value to trust.' },
-    { key: 'calc_approach', label: 'Calc approach', group: 'Unadjusted & adjusted',
+    { key: 'calc_approach', label: 'Calc approach', group: 'Unadjusted & adjusted', holds: 'long-text',
       hint: 'EPA’s own statement of method. Kept because it is the source’s claim, but it disagrees with the signature often enough that the signature leads.' },
 ];
+
+// `holds` sets a column's width by what its values are like, the same property
+// the vehicle table reads off the spec schema: `short-values` for years and
+// small counts, `long-text` for EPA's verbatim strings. The two tables share a
+// header and a cell, so they share the vocabulary for sizing one (#315).
 
 export const COLUMN_GROUPS = [...new Set(GUIDE_COLUMNS.map(c => c.group))];
 export const DEFAULT_COLUMNS = GUIDE_COLUMNS.filter(c => c.default).map(c => c.key);
 export const columnByKey = (key) => GUIDE_COLUMNS.find(c => c.key === key) ?? null;
+
+// A guide row carries its figures at the top level; columns share a bar scale
+// by unit, so city, highway and combined range read against one maximum.
+const guideValue = (row, col) => row?.[col.key];
+const guideScale = (col) => col.unit ?? col.key;
 
 /** Format one cell. Null renders as an em dash — a fact, not a zero. */
 export function formatCell(row, col) {
@@ -403,16 +415,7 @@ export function filterRows(rows, filters) {
 export function sortRows(rows, key, dir = 'asc') {
     const col = columnByKey(key);
     if (!col) return rows;
-    const sign = dir === 'desc' ? -1 : 1;
-    return [...rows].sort((a, b) => {
-        const av = a[key], bv = b[key];
-        const aNull = av == null || av === '', bNull = bv == null || bv === '';
-        if (aNull && bNull) return 0;
-        if (aNull) return 1;
-        if (bNull) return -1;
-        if (col.numeric) return sign * (Number(av) - Number(bv));
-        return sign * String(av).localeCompare(String(bv));
-    });
+    return sortByColumn(rows, col, dir, guideValue);
 }
 
 // ── URL round-trip ───────────────────────────────────────────────────────────
@@ -548,20 +551,7 @@ export function decodeGuideParams(search) {
  * have.
  */
 export function computeBarMaxima(rows) {
-    const maxima = {};
-    for (const col of GUIDE_COLUMNS) {
-        if (!col.bar) continue;
-        const scale = col.unit ?? col.key;
-        let max = maxima[scale] ?? 0;
-        for (const r of rows) {
-            const v = r?.[col.key];
-            if (v == null || v === '') continue;
-            const n = Number(v);
-            if (Number.isFinite(n) && n > max) max = n;
-        }
-        maxima[scale] = max;
-    }
-    return maxima;
+    return barMaximaOf(rows, GUIDE_COLUMNS, guideValue, guideScale);
 }
 
 /**
@@ -602,24 +592,11 @@ export function clusterByTestGroup(rows) {
     });
 }
 
-/**
- * The smallest bar a real value may draw.
- *
- * Below this a measurement renders as an empty track, which is what an ABSENT
- * value looks like — and the distinction between "short" and "not measured" is
- * the one this column has to keep.
- */
-export const BAR_MIN_PCT = 4;
+/** The smallest bar a real value may draw; shared with the vehicle table. */
+export { BAR_MIN_PCT };
 
 /** A value's share of its unit's maximum, 0–100, or null when there is no bar. */
 export function barPercent(row, col, maxima) {
     if (!col.bar) return null;
-    const max = maxima?.[col.unit ?? col.key];
-    const v = row?.[col.key];
-    // Number(null) is 0 and 0 is finite, so an absent value would draw an
-    // empty bar — which reads as a measured zero rather than as no data.
-    if (v == null || v === '') return null;
-    const n = Number(v);
-    if (!Number.isFinite(n) || !(max > 0)) return null;
-    return Math.max(BAR_MIN_PCT, Math.min(100, (n / max) * 100));
+    return barPercentOf(guideValue(row, col), maxima?.[guideScale(col)]);
 }

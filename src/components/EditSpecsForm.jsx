@@ -348,7 +348,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                     <h3 className="section-title mb-0">Edit Specs — {vehicle.name}</h3>
                     <button
                         onClick={onClose}
-                        className="text-meta hover:text-secondary text-xl leading-none"
+                        type="button" className="modal-close"
                         aria-label="Close"
                     >
                         ×

@@ -1094,7 +1094,11 @@ export function AppProvider({ children }) {
         }
     };
 
-    /** Unflag a spec field. Admin only — enforced here. */
+    /**
+     * Clear a spec flag. Admin only. The check here only saves a doomed round
+     * trip: the RPC refuses anyone else itself (migration 069), and a refusal
+     * lands in the catch below, which puts the flag back.
+     */
     const unflagSpecField = async (vehicleId, fieldKey) => {
         if (!isAdmin) return;
         setVehicles(prev => prev.map(v =>

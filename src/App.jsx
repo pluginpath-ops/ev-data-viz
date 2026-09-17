@@ -12,7 +12,8 @@ import ChargingView from './components/ChargingView';
 import ChargeCompareView from './components/ChargeCompareView';
 import RoadTripView from './components/RoadTripView';
 import PopoutView from './components/PopoutView';
-import SpecsView from './components/SpecsView';
+import VehicleTable from './components/VehicleTable';
+import { VEHICLE_TABLE_PARAM_PREFIX } from './utils/vehicleTable';
 import SpecsChartView from './components/SpecsChartView';
 import SpecsScatterView from './components/SpecsScatterView';
 import EpaCurvesView from './components/EpaCurvesView';
@@ -21,7 +22,7 @@ import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/AdminView';
 import Playground from './components/playground/Playground';
 import EpaSection, { EPA_SUBTABS, DEFAULT_EPA_SUBTAB, epaSubtabFromParam } from './components/epa/EpaSection';
-import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory } from './constants/chartNav';
+import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor } from './constants/chartNav';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
 
@@ -235,9 +236,8 @@ export default function App() {
     const navigateToChartCategory = (categoryKey) => {
         const category = categoryByKey(categoryKey);
         if (!category) return;
-        const remembered = lastModeByCategory.current[categoryKey];
-        const valid = remembered && category.modes.some(m => m.key === remembered);
-        handleChartModeChange(valid ? remembered : category.modes[0].key);
+        const mode = entryModeFor(category, lastModeByCategory.current[categoryKey], selectedVehicles.length > 0);
+        if (mode) handleChartModeChange(mode);
     };
 
     const { isPopout, sendState } = useChartSync({
@@ -568,6 +568,14 @@ export default function App() {
             if (epaConfig.selectedMappings?.length) p.set('epa_m', epaConfig.selectedMappings.join(','));
         }
 
+        // The vehicle table writes its own columns, sort and filters (vt_*);
+        // carry them over rather than wiping them on every selection change.
+        if (chartMode === 'specstable') {
+            for (const [key, value] of new URLSearchParams(window.location.search)) {
+                if (key.startsWith(VEHICLE_TABLE_PARAM_PREFIX)) p.append(key, value);
+            }
+        }
+
         history.replaceState({ view, chartMode }, '', '?' + p.toString());
     }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings]);
 
@@ -721,7 +729,11 @@ export default function App() {
                         />
                     ) : (
                         <SubTabStrip
-                            items={activeChartCategory?.modes ?? []}
+                            items={(activeChartCategory?.modes ?? []).map(m => ({
+                                ...m,
+                                // A chart with nothing to plot is not somewhere to go.
+                                disabled: selectedVehicles.length === 0 && modeNeedsSelection(m),
+                            }))}
                             activeKey={chartMode}
                             onSelect={handleChartModeChange}
                             end={activeChartCategory && (
@@ -992,11 +1004,9 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                         />
                     )}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specstable' && (
-                        <SpecsView
-                            selectedVehicleIds={selectedVehicles}
-                        />
-                    )}
+                    {/* No selection gate: the vehicle table is where a selection is
+                        made, over the whole fleet (#315). */}
+                    {activeChartCategory && chartMode === 'specstable' && <VehicleTable />}
                     {view === 'epa' && <EpaSection subtab={epaSubtab} />}
 
                     {/* The playground, ungated and unlinked.

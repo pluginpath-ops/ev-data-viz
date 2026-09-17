@@ -232,7 +232,7 @@ export default function ImportVehiclesModal({ onClose }) {
             >
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="section-title mb-0">Bulk Import Vehicles</h3>
-                    <button onClick={onClose} className="text-meta hover:text-secondary text-xl leading-none" aria-label="Close">×</button>
+                    <button onClick={onClose} type="button" className="modal-close" aria-label="Close">×</button>
                 </div>
 
                 {error && (

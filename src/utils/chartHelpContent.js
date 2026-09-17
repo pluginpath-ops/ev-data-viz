@@ -262,25 +262,25 @@ export const CHART_HELP_DEFAULTS = {
     },
 
     specstable: {
-        title: 'About Compare Specs',
+        title: 'About the Vehicle Table',
         data_source:
-            'A side-by-side table of every structured spec for the selected vehicles, ' +
-            'read from each vehicle’s spec sheet (the `specs` data on the vehicle record, ' +
-            'including custom fields). These are published figures — manufacturer claims ' +
-            'and road-test results cited from elsewhere — not values measured by EVBench.',
+            'Every vehicle, one row each. Spec columns read each vehicle’s spec sheet ' +
+            'through inheritance — published figures, not values measured by EVBench. ' +
+            'Battery and EPA range are the resolved figures, each with its basis. Tested ' +
+            'columns show the best published or EVBench result, with the source that set it.',
         how_to_read:
-            'One column per selected vehicle, one row per spec, grouped by category. ' +
-            'Blank cells mean the value hasn’t been entered for that vehicle. Community ' +
-            'members can vouch for a value’s accuracy or flag it as suspect; flagged ' +
-            'fields are highlighted until an admin clears them.',
+            'Tick a vehicle to select it: it joins the band at the top and appears on every ' +
+            'chart. Sort by any column, filter by make, year, drive or tag, and choose and ' +
+            'order columns from the Columns menu. Bars appear only where more or less is ' +
+            'plainly better. Click a row to see its full specs and to vouch for or flag a value.',
         key_terms:
-            'Spec — a structured attribute on the vehicle (battery kWh, horsepower, seats, …).\n' +
-            'Custom field — a free-form spec added outside the standard schema.\n' +
-            'Vouch / flag — community accuracy signals on an individual value.\n' +
+            'Basis — where a resolved figure came from: EPA tested, Usable, Gross, an EPA label, an Expected EPA Range.\n' +
+            'Tested — the best published or EVBench result; the source is named beneath it.\n' +
+            'Bar cell — a figure drawn against the longest or largest among the rows shown.\n' +
             'Units follow your imperial/metric toggle.',
         math_approach:
-            'No calculation — values are shown as stored, converted only for unit display ' +
-            '(e.g. kW↔hp, mi↔km).',
+            'No calculation beyond picking the best tested result per metric and unit conversion ' +
+            '(e.g. in↔mm, mi↔km). Bars scale against the filtered rows.',
     },
 
     specs: {

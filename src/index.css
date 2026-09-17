@@ -1234,6 +1234,26 @@ body {
 .modal-header {
     @apply flex items-center justify-between;
 }
+/* A modal's corner x. It was an inline cluster whose text-xl lost to the meta
+   role's size, so it drew at note size in a box no bigger than the glyph —
+   the hardest control on the modal to see and to hit. The box is a full touch
+   target, and the glyph is sized to read as a control rather than a mark. */
+.modal-close {
+    @apply flex-none inline-flex items-center justify-center leading-none;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin-right: -0.5rem;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    font-size: calc(var(--fs-body) * 2);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+.modal-close:hover {
+    background-color: var(--color-surface-muted);
+    color: var(--color-text-primary);
+}
 .modal-body {
     @apply overflow-y-auto flex-1 px-6 py-5;
 }
@@ -4173,6 +4193,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-primary);
 }
 
+/* A peek sized to what it says: a table cell's restated value is a few words,
+   and a 276px box around "Premium Luxury AWD" reads as a panel, not a gloss.
+   It still wraps at the peek's width, so a long name does not run off. */
+.popover.popover--peek.popover--fit {
+    --popover-w: max-content;
+    max-width: min(276px, calc(100vw - 2rem));
+}
+
 /* The affordance, not an instruction: it appears only where a pin exists. */
 .popover-more {
     @apply block mt-1.5;
@@ -6018,10 +6046,12 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     table-layout: fixed;
 }
 
-/* Header: name on one line, unit beneath. The unit line is always present so
-   every header is the same height. */
+/* Header: the name, then its unit beneath, or the name's own second line when
+   there is no unit. Top-aligned, so every name starts on the same line and the
+   eye reads across the header row. Bottom alignment dropped a unitless name a
+   line below its neighbours, so a row of labels looked like two rows. */
 .guide-th {
-    @apply px-3 py-2 text-left align-bottom whitespace-nowrap cursor-pointer select-none;
+    @apply px-3 py-2 text-left align-top whitespace-nowrap cursor-pointer select-none;
     background-color: var(--color-surface-muted);
     border-bottom: 1px solid var(--color-border);
     position: sticky;
@@ -6063,11 +6093,30 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    unit line beneath carries the rest of the meaning. */
 .guide-th          { width: 9rem; }
 .guide-th.numeric  { width: 6rem; }
+/* Two more, where a table knows its columns better than "text or figure"
+   (the vehicle table reads them off the spec schema). Yes/no and small counts
+   need half a figure's room; free text is a sentence and needs more than a
+   name's. Later than the two above, so they win at equal specificity. */
+.guide-th.short-values { width: 4.75rem; }
+.guide-th.long-text    { width: 13rem; }
 .guide-th-name     { @apply truncate; }
+/* A header with no unit line spends that line on its own name: it wraps to
+   two lines before it ellipses, and the row stays two lines tall either way. */
+.guide-th-name.wraps {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    text-overflow: clip;
+}
 .guide-sort-caret {
     @apply ml-1 inline-block;
     font-size: 0.5625rem;
 }
+/* Unsorted, it is empty, and its margin alone pushed "Cameras" onto a second
+   line in a short-values column. */
+.guide-sort-caret:empty { display: none; }
 
 /* ── Pinned columns ──────────────────────────────────────────────────────────
    The checkbox and the configuration name stay put through a sideways scroll:
@@ -6151,15 +6200,46 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border-bottom: 1px solid var(--color-border);
 }
 .guide-td.numeric { @apply text-center tabular-nums; }
+/* Words, as against figures. A figure is compared down its column, so it keeps
+   body size on one line. Words are read to identify a row, so they step down
+   one size and take a second line before they ellipsis. A figure's value, bar
+   and note already hold the row above two lines of the smaller size, so the
+   wrap is free height; past two lines the cell peek restates the rest. */
+.guide-td.wraps { white-space: normal; }
+.guide-cell-text,
+.guide-cell-name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+}
+.guide-cell-text { font-size: calc(var(--fs-body) * var(--fs-step)); }
+
+/* A community flag on a value: a corner mark in the warning color, so a
+   suspect figure reads as suspect without moving it. Warning, not danger —
+   a flag says "someone doubts this", not "this is wrong". The peek says it in
+   words. `position: relative` is what anchors the mark; a sticky cell is
+   already positioned and keeps its own. */
+.guide-td.is-flagged:not(.sticky-name) { position: relative; }
+.guide-td.is-flagged { background-image: linear-gradient(var(--color-warning-surface), var(--color-warning-surface)); }
+.guide-td-flag {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    line-height: 1;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-warning);
+}
 
 /* The name column is the widest and the likeliest to clip; the full value is in
    the tooltip and the detail view. */
 .guide-carline {
     @apply flex items-center gap-1.5 min-w-0;
 }
-.guide-carline-name {
-    @apply truncate;
-}
+.guide-carline-name { @apply min-w-0; }
 
 /* A value's bar, under the value.
  *
@@ -6179,6 +6259,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     gap: 3px;
 }
 .guide-td:not(.numeric) .guide-cell-stack { align-items: flex-start; }
+/* Text in the stack clips to an ellipsis like a bare cell's does, rather than
+   running under the next column — TableCell's tooltip answers the ellipsis. */
+.guide-cell-stack > :not(.guide-spark) { @apply max-w-full truncate; }
 .guide-spark {
     display: block;
     width: 100%;
@@ -6326,6 +6409,36 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     height: 7px;
     padding: 0;
     border: none;
+}
+
+/* ── The vehicle table's selected band (#315) ────────────────────────────────
+   The pinned band's look with a selection's meaning: these rows are the
+   vehicles on every chart, not rows kept in one table. Their own classes, so
+   "pin" appears nowhere in the vehicle table — see docs/vocabulary.md, Tables.
+   The rows themselves are .guide-row.selected. */
+.vehicle-table-band td {
+    padding: 6px 12px;
+    background-color: var(--color-pinned-head);
+    border-bottom: 1px solid var(--color-border);
+}
+.vehicle-table-band-spacer td {
+    height: 7px;
+    padding: 0;
+    border: none;
+}
+/* The fixed name cell: the vehicle's series swatch, then its name. */
+.vehicle-table-name {
+    @apply flex items-center gap-2 min-w-0;
+}
+/* Where a resolved or tested figure came from, under it — "EPA tested",
+   "Car and Driver". In the unit's voice: it qualifies the figure. */
+.vehicle-table-note {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
 }
 
 /* Badges ride on the configuration name rather than holding their own columns. */
@@ -6649,7 +6762,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* ── Summary table ───────────────────────────────────────────────────────── */
 
-.stats-table .guide-th { @apply cursor-default; }
+/* The stats table keeps the bottom alignment it was designed with: its
+   Distribution header is two lines (the word, then the unit) and every other
+   header is one, which sits level with that unit line. It has no two-line
+   names to line up, which is what moved the browse tables to the top. */
+.stats-table .guide-th { @apply cursor-default align-bottom; }
 .stats-th-dist { @apply w-1/2; }
 
 /* ── Sortable headings ───────────────────────────────────────────────────────

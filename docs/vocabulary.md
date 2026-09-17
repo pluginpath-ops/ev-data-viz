@@ -151,6 +151,12 @@ status and is never chrome.
 | Something missing that would let a figure be checked | **a gap** | `.data-check-finding.is-gap` |
 | A change a curator makes from a finding — a move out of a retiring column, a spec field, the primary | **a fix**; a column fix is **a move** | [dataCheckFixes.js](../src/utils/dataCheckFixes.js), `.data-check-fixes` |
 | A curator's recorded decision that something needs no action, still visible under a filter | **a skip** — skipped, un-skip | `epa_test_groups.fe_guide_skipped_at` (link sweep), `data_check_skips` (Data Checks), `.skip-ask` |
+| Anyone's signal that data looks right or wrong, taken together | **accuracy signals** | `votes`, `vehicles.flagged_specs`, [VoteButtons.jsx](../src/components/VoteButtons.jsx) |
+| Saying a vehicle's specs, or a run, look accurate | **a vouch** — vouch, vouched, "Vouch for accuracy" | `votes.vote_type = 'vouch'`; `SpecVouchButton` (whole vehicle), `RunVoteButtons` (run) |
+| Saying one spec value, or a run, may be inaccurate | **a flag** — flag, flagged | spec field: `vehicles.flagged_specs`, `SpecFieldFlagButton`; run: `votes.vote_type = 'flag'` |
+| A spec flag made in View Specs but not yet saved (saved when the modal closes) | **a pending flag** | `pendingFlags` in [ViewSpecsModal.jsx](../src/components/ViewSpecsModal.jsx) |
+| An admin removing a spec flag | **clearing a flag** — "click to clear" | `unflagSpecField` / `unflag_spec_field` (the code's verb; the UI says clear) |
+| A table cell whose value carries a flag | **a flagged cell** — the corner mark, and a peek that always shows | `.guide-td.is-flagged`, `.guide-td-flag`, `TableCell` `flagged` |
 
 **A skip is a decision, not a deletion.** The same word in both places because
 it is the same act: someone looked, and nothing needs doing. A Data Checks skip
@@ -161,6 +167,14 @@ comes back, marked as skipped before. Moving a limit does not bring it back.
 *Tested* range is an EVBench range test set against EPA
 ([TestedFigure.jsx](../src/components/vehicles/TestedFigure.jsx)). A bare
 "Tested capacity" beside it would use one word for two sources.
+
+**Vouch and flag mean the same act on a spec and on a run, but they are not
+the same record.** A run's vouch and flag are *counted*, one per browser
+(`browser_token`), and a browser holds one or the other, never both. On specs
+the vouch is for the whole vehicle and counted the same way, but a flag is
+*per field* and is only on or off: `flagged_specs` holds the field's
+`category.field` key, with no count and no record of who. Say "flagged", not
+"flagged by N people", for a spec value.
 
 **A Data Checks finding is not a flag.** Community members *flag* suspect spec
 values (`flagged_specs`), which is a different act by different people. A
@@ -201,7 +215,9 @@ it; read it as a *reference band* where it appears.
 | The band those rows sit in | **the pinned band** | — | `.guide-pinned-head`, `.guide-pinned-spacer` |
 | A vehicle chosen for the whole app, driving every chart | **selected** | ARIA `aria-selected` | `selectedVehicles` in [App.jsx](../src/App.jsx), `toggleVehicleSelection`, the chips |
 | A proportional fill behind a value, scaled per column | **a bar cell** | — | `computeBarMaxima()` in [feGuideBrowse.js](../src/utils/feGuideBrowse.js) |
-| Choosing which columns show, and in what order | **the column picker** | — | [GuideColumnPicker.jsx](../src/components/epa/guide/GuideColumnPicker.jsx) |
+| Choosing which columns show, and in what order | **the column picker** | — | [ColumnPicker.jsx](../src/components/tables/ColumnPicker.jsx), shared by both tables |
+| Every vehicle a row, any field a column, over the whole fleet | **the vehicle table** — "Vehicle Table" in the sub-nav; it replaced Compare Specs (#315) | — | [VehicleTable.jsx](../src/components/VehicleTable.jsx), [vehicleTable.js](../src/utils/vehicleTable.js); mode key stays `specstable` |
+| The band of selected vehicles at the top of the vehicle table | **the selected band** | — | `.vehicle-table-band` — the pinned band's look, a selection's meaning |
 
 **Pin is local, select is global**, and the difference is what a second click
 costs. Unpinning an FE Guide row rearranges one table. Deselecting a vehicle
@@ -242,7 +258,6 @@ says to stop and ask when the right name is not obvious.
 | The thing | Where it lands | Candidates | Leaning |
 |---|---|---|---|
 | The aggregate curve standing for a vehicle's charging behaviour | [#313](https://github.com/pluginpath-ops/ev-data-viz/issues/313) | typical curve · representative curve · composite curve · nominal curve | **typical curve** |
-| Compare Specs once it is a fleet-wide browse-and-select table | [#315](https://github.com/pluginpath-ops/ev-data-viz/issues/315) | the specs table · the vehicle table · keep "Compare Specs" | undecided |
 | The shrinkage weight that trades a vehicle's own spread against the fleet's | [#314](https://github.com/pluginpath-ops/ev-data-viz/issues/314) | — | undecided |
 
 **Why not "nominal curve."** In this codebase *nominal* already means **rated**,
@@ -252,13 +267,13 @@ and typical rather than specified. Reusing the word would make "nominal" mean
 both *what the manufacturer claims* and *what we observed on average*, which is
 the exact failure this document was written about.
 
-**"Compare Specs" may stop being true.** The tab compares what you already
-selected. Once the table lists the whole fleet and selecting happens *in it*,
-comparing is one of the things it does rather than the thing it is. Whether the
-tab keeps the name is a UI-text decision, not a class-name one — but the two
-should be settled together.
 
 ## Deferred renames
+
+The FE Guide's table classes — `.guide-table`, `.guide-th`, `.guide-td`,
+`.guide-row`, `.guide-spark`, `.guide-filter-strip` and the rest — now also dress
+the vehicle table, which shares the mechanisms (#315). They describe a
+browse table, not the guide, and want a neutral prefix on their own branch.
 
 `.chart-rail` → `.chart-sidebar` and `.app-nav` → `.app-header` are correct but
 touch ~40 CSS references plus JSX across five views. Worth doing on its own
