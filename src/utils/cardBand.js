@@ -16,11 +16,11 @@
  *
  * ── The band shows a WINDOW of the photo, and it is not a fixed fraction ─────
  *
- * Photos are stored as a 16:9 crop. The band is much wider than it is tall, and
- * fills with `background-size: cover`, so the image is scaled to the band's
- * WIDTH and the top and bottom run off the edges. How much survives depends on
- * how wide the card is — and the grid is fluid (1 / 2 / 3 columns), so it
- * genuinely varies:
+ * Photos are cropped to 16:9 (mostly — see PHOTO_ASPECT). The band is much
+ * wider than it is tall, and fills with `background-size: cover`, so the image
+ * is scaled to the band's WIDTH and the top and bottom run off the edges. How
+ * much survives depends on how wide the card is — and the grid is fluid
+ * (1 / 2 / 3 columns), so it genuinely varies. For a 16:9 photo:
  *
  *      viewport   columns   band width   photo shown
  *      375px         1         347            72%
@@ -70,21 +70,28 @@ export const CARD_BAND_MAX_WIDTH = 399;
  */
 export const CARD_BAND_BODY_FRACTION = CARD_BAND_OVERLAP / CARD_BAND_HEIGHT;
 
-/** Every stored photo is a 16:9 crop; the crop step enforces it. */
+/**
+ * What the crop step produces. NOT a promise about every stored photo: some
+ * predate the crop step or came in through import — the Gravity Grand
+ * Touring's is 400×267, 3:2 — and a preview that assumed 16:9 for those drew
+ * the window over the wrong part of the picture. Anything measuring a STORED
+ * photo takes its real aspect; this is the default for a fresh crop.
+ */
 export const PHOTO_ASPECT = 16 / 9;
 
 /** Centered: what a photo with no focal point set is drawn at. */
 export const DEFAULT_FOCAL_Y = 50;
 
 /**
- * The fraction of the photo's height the band shows, at a given band width.
+ * The fraction of the photo's height the band shows, at a given band width and
+ * photo aspect (width / height).
  *
  * Capped at 1: a band TALLER than the photo scaled to its width would show the
  * whole photo and letterbox it sideways instead, which no card width reaches
  * today but which a future tuning of the height could.
  */
-export function bandWindowFraction(bandWidth = CARD_BAND_MAX_WIDTH) {
-    return Math.min(1, CARD_BAND_HEIGHT / (bandWidth / PHOTO_ASPECT));
+export function bandWindowFraction(bandWidth = CARD_BAND_MAX_WIDTH, aspect = PHOTO_ASPECT) {
+    return Math.min(1, CARD_BAND_HEIGHT / (bandWidth / aspect));
 }
 
 /**
@@ -122,8 +129,8 @@ export function photoPosition(value) {
  * center Y%` does, restated so a preview can draw it: at 0 the window sits at
  * the top of the photo, at 100 at its foot, at 50 in the middle.
  */
-export function bandWindow(value, bandWidth = CARD_BAND_MAX_WIDTH) {
-    const height = bandWindowFraction(bandWidth);
+export function bandWindow(value, bandWidth = CARD_BAND_MAX_WIDTH, aspect = PHOTO_ASPECT) {
+    const height = bandWindowFraction(bandWidth, aspect);
     return { top: (1 - height) * (focalY(value) / 100), height };
 }
 
@@ -134,8 +141,8 @@ export function bandWindow(value, bandWidth = CARD_BAND_MAX_WIDTH) {
  * A window that fills the photo has nowhere to slide, so there is no focal
  * point that means anything — it returns centered rather than dividing by zero.
  */
-export function focalYFromTop(top, bandWidth = CARD_BAND_MAX_WIDTH) {
-    const slack = 1 - bandWindowFraction(bandWidth);
+export function focalYFromTop(top, bandWidth = CARD_BAND_MAX_WIDTH, aspect = PHOTO_ASPECT) {
+    const slack = 1 - bandWindowFraction(bandWidth, aspect);
     if (slack <= 0) return DEFAULT_FOCAL_Y;
     return Math.round(Math.min(100, Math.max(0, (top / slack) * 100)));
 }

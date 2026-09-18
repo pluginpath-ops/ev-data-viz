@@ -22,6 +22,15 @@ describe('the band shows a window of the photo', () => {
         expect(bandWindowFraction(313)).toBeGreaterThan(bandWindowFraction(CARD_BAND_MAX_WIDTH));
     });
 
+    it('works from the photo’s real shape, which is not always 16:9', () => {
+        // The Gravity Grand Touring's stored photo is 400×267. At 3:2 a desktop
+        // card shows about 53% of it, not the 62% a 16:9 photo would give —
+        // and assuming 16:9 is what put the preview's window over sky the
+        // card never shows.
+        expect(bandWindowFraction(CARD_BAND_MAX_WIDTH, 400 / 267)).toBeCloseTo(0.526, 3);
+        expect(focalYFromTop(bandWindow(100, CARD_BAND_MAX_WIDTH, 1.5).top, CARD_BAND_MAX_WIDTH, 1.5)).toBe(100);
+    });
+
     it('never claims to show more than the whole photo', () => {
         // Nothing reaches this today; a future taller band would.
         expect(bandWindowFraction(CARD_BAND_HEIGHT * PHOTO_ASPECT / 2)).toBe(1);

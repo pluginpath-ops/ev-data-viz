@@ -11,6 +11,7 @@ import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 import CardBandPreview from './vehicles/CardBandPreview';
 import { CARD_BAND_MAX_WIDTH, PHOTO_ASPECT, focalY } from '../utils/cardBand';
 import { makeModelLine } from '../utils/specHelpers';
+import { usePhotoAspect } from '../hooks/usePhotoAspect';
 
 // Extract the completed crop region into an offscreen canvas at full rendition
 // resolution. Encoding is left to buildRenditions, which needs one shared source
@@ -75,6 +76,8 @@ export default function EditVehicleForm({
     // preview for why an inherited one is read-only.
     const photoUrl = displayImageUrl(editingVehicle);
     const canReposition = Boolean(photoUrl) && !editingVehicle?.inheritedFrom?.photo;
+    // The stored photo's own shape, which is not always 16:9 (see the hook).
+    const photoAspect = usePhotoAspect(photoUrl);
     const setFocal = (value) => onFormChange({ ...formData, image_focal_y: value });
 
     const [imgSrc, setImgSrc] = useState('');
@@ -369,12 +372,14 @@ export default function EditVehicleForm({
                                 <div
                                     className="card-band-frame"
                                     style={{
-                                        // The desktop card at 1:1, at the photo's
-                                        // own aspect — both from utils/cardBand,
-                                        // so the preview is the card and not a
-                                        // second opinion about its shape.
+                                        // The desktop card's width at 1:1, and
+                                        // the photo's OWN shape, so the frame
+                                        // shows all of it and `cover` crops
+                                        // nothing. A 16:9 frame over a 3:2 photo
+                                        // lined the window up with an edge that
+                                        // was not the photo's.
                                         maxWidth: CARD_BAND_MAX_WIDTH,
-                                        aspectRatio: PHOTO_ASPECT,
+                                        aspectRatio: photoAspect,
                                         backgroundImage: `url(${photoUrl})`,
                                     }}
                                 >
@@ -382,6 +387,7 @@ export default function EditVehicleForm({
                                         name={formData.name}
                                         subtitle={makeModelLine(formData)}
                                         focal={formData.image_focal_y}
+                                        aspect={photoAspect}
                                         onFocalChange={canReposition ? setFocal : undefined}
                                     />
                                 </div>

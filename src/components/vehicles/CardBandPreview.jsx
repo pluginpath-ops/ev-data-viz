@@ -1,5 +1,5 @@
 /**
- * What the card's media band will keep of a 16:9 photo — drawn over the photo
+ * What the card's media band will keep of a photo — drawn over the photo
  * itself, so a curator frames for the card rather than for the file (#340).
  *
  * ── Why it is an overlay and not a second picture ────────────────────────────
@@ -12,8 +12,11 @@
  * fade, the name, and the card body's edge. Whatever is behind it shows through.
  *
  * It must therefore be placed inside a positioned box that is showing exactly
- * the 16:9 photo — the crop rectangle, or a frame at the photo's aspect. It
- * fills that box.
+ * the WHOLE photo, at the photo's own aspect — the crop rectangle, or a frame
+ * shaped like the stored image — and be told that aspect. It fills that box.
+ * A 16:9 frame over a 3:2 photo was the first bug here: `cover` cut the
+ * photo's top and bottom off the frame, so the window lined up with an edge
+ * that was not the photo's, and showed sky where the card showed wheels.
  *
  * ── Read-only, or a handle ──────────────────────────────────────────────────
  *
@@ -30,6 +33,7 @@ import { useRef } from 'react';
 import {
     CARD_BAND_BODY_FRACTION,
     CARD_BAND_MAX_WIDTH,
+    PHOTO_ASPECT,
     bandWindow,
     focalY,
     focalYFromTop,
@@ -44,6 +48,10 @@ export default function CardBandPreview({
     focal = null,
     onFocalChange,
     bandWidth = CARD_BAND_MAX_WIDTH,
+    // The photo's real width / height. A fresh crop is 16:9 by construction;
+    // a stored photo may not be, and the window's size and travel both depend
+    // on it — see usePhotoAspect.
+    aspect = PHOTO_ASPECT,
     className = '',
 }) {
     const frameRef = useRef(null);
@@ -52,13 +60,13 @@ export default function CardBandPreview({
     const dragRef = useRef(null);
 
     const interactive = typeof onFocalChange === 'function';
-    const { top, height } = bandWindow(focal, bandWidth);
+    const { top, height } = bandWindow(focal, bandWidth, aspect);
     const value = focalY(focal);
 
     const moveTo = (clientY) => {
         const drag = dragRef.current;
         if (!drag) return;
-        onFocalChange(focalYFromTop(drag.top + (clientY - drag.y) / drag.height, bandWidth));
+        onFocalChange(focalYFromTop(drag.top + (clientY - drag.y) / drag.height, bandWidth, aspect));
     };
 
     const handlePointerDown = (e) => {
