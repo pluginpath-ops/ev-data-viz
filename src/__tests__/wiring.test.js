@@ -735,6 +735,11 @@ describe('the seams that broke before', () => {
         }
         expect(read('src/components/epa/guide/GuideColumnPicker.jsx')).toMatch(/<ColumnPicker/);
         expect(table).toMatch(/<ColumnPicker/);
+        // Presets (#335) go through the shared picker, and every column change
+        // goes through the path that remembers which preset it left.
+        expect(table).toMatch(/<PresetPicker/);
+        expect(table).toMatch(/onChange=\{changeColumns\}/);
+        expect(table).not.toMatch(/onChange: setColumns|onChange=\{setColumns\}/);
     });
 
     it('reaches the reconciliation sweep from the Admin view', () => {

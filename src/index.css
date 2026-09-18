@@ -6340,15 +6340,24 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .guide-th.short-values { width: 4.75rem; }
 .guide-th.long-text    { width: 13rem; }
 .guide-th-name     { @apply truncate; }
-/* A header with no unit line spends that line on its own name: it wraps to
-   two lines before it ellipses, and the row stays two lines tall either way. */
-.guide-th-name.wraps {
+/* A name wraps to two lines before it ellipses; a header with no unit line
+   spends that line on its name too, and gets three. Every header is three
+   lines tall either way — a ragged header row is harder to scan than a
+   slightly taller one. One line truncated half the headers in a 6rem figure
+   column ("Max DC Charge Rate", "Charge Time 10→80%"), which is most of what
+   a preset shows (#335). `overflow-wrap` lets a single long word
+   ("Vehicle-to-Load") break rather than spill into the next column. */
+.guide-th-name {
     white-space: normal;
+    overflow-wrap: anywhere;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;
-    text-overflow: clip;
+}
+.guide-th-name.wraps {
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
 }
 .guide-sort-caret {
     @apply ml-1 inline-block;
@@ -6969,6 +6978,45 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-primary);
     color: var(--color-primary-text, #fff);
     font-weight: 600;
+}
+
+/* ── Preset picker ("Compare for", #335) ─────────────────────────────────────
+   A table's presets as one always-visible row, above its filter strip. The
+   buttons ARE the segmented control; this adds the label, a sideways scroll
+   for seven options on a phone, and the "modified" state — the preset the
+   columns started from, since changed. Modified is an outline, not a fill:
+   it is where you came from, not where you are. */
+.preset-picker {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.preset-picker .stats-segmented { flex: none; }
+.preset-picker-label {
+    flex: none;
+    cursor: help;
+}
+.stats-segmented button.modified {
+    box-shadow: inset 0 0 0 1px var(--color-primary);
+    color: var(--color-text-primary);
+}
+.preset-picker-modified { color: var(--color-text-meta); }
+
+/* ── Assumptions (#335) ──────────────────────────────────────────────────────
+   Inputs the reader sets for calculated columns, in a menu beside Columns. */
+.vehicle-table-assumptions { --popover-w: 260px; }
+.assumption-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px;
+}
+.assumption-field-name { color: var(--color-text-primary); }
+.assumption-slider {
+    width: 100%;
+    accent-color: var(--color-primary);
 }
 
 /* ── The headline ────────────────────────────────────────────────────────────

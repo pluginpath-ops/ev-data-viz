@@ -4,8 +4,10 @@ import {
     buildVehicleRows, formatVehicleCell, filterVehicleRows, sortVehicleRows, vehicleFacets,
     vehicleBarMaxima, vehicleBarPercent, firstSortDir,
     encodeVehicleTableParams, decodeVehicleTableParams, EMPTY_VEHICLE_FILTERS,
-    vehicleTableStartSearch, vehicleTableMemory,
+    vehicleTableStartSearch, vehicleTableMemory, PRESETS, vehiclePresetByKey, presetMatching,
+    DEFAULT_ASSUMPTIONS, labelledColumn, needsAssumptions,
 } from '../vehicleTable';
+import { VEHICLE_TABLE_PRESETS } from '../vehicleTablePresets';
 
 const vehicle = (over = {}) => ({
     id: over.id ?? 1, name: 'R1S', make: 'Rivian', model: 'R1S', trim: 'Quad', year: 2025,
@@ -113,7 +115,7 @@ describe('filtering, sorting, bars', () => {
 describe('URL', () => {
     it('writes nothing for the defaults and round-trips the rest', () => {
         expect(encodeVehicleTableParams({ columns: DEFAULT_VEHICLE_COLUMNS, sortKey: 'name', sortDir: 'asc', filters: EMPTY_VEHICLE_FILTERS }).toString()).toBe('');
-        const state = { columns: ['name', 'powertrain.horsepower_hp'], sortKey: 'powertrain.horsepower_hp', sortDir: 'desc', filters: { ...EMPTY_VEHICLE_FILTERS, makes: ['Tesla', 'Rivian'], search: 'model' } };
+        const state = { columns: ['name', 'powertrain.horsepower_hp'], sortKey: 'powertrain.horsepower_hp', sortDir: 'desc', filters: { ...EMPTY_VEHICLE_FILTERS, makes: ['Tesla', 'Rivian'], search: 'model' }, modifiedFrom: null, assumptions: DEFAULT_ASSUMPTIONS };
         expect(decodeVehicleTableParams(encodeVehicleTableParams(state).toString())).toEqual(state);
     });
 
@@ -131,6 +133,8 @@ describe('vehicle table memory', () => {
         sortKey: 'powertrain.horsepower_hp',
         sortDir: 'desc',
         filters: { ...EMPTY_VEHICLE_FILTERS, makes: ['Ford'], search: 'mach' },
+        modifiedFrom: null,
+        assumptions: { addDistance: 200 },
     };
 
     it('keeps columns and sort apart from filters', () => {
@@ -184,5 +188,143 @@ describe('flags', () => {
 
     it('has no flags for a vehicle that was never flagged', () => {
         expect(buildVehicleRows([vehicle()])[0].flagged.size).toBe(0);
+    });
+});
+
+describe('calculated columns (#335)', () => {
+    const full = vehicle({
+        socWindowKwh: 100, epaRangeMi: 300,
+        specs: {
+            pricing: { base_price_usd: 60000 },
+            powertrain: { horsepower_hp: 500, battery_gross_kwh: 105 },
+            performance: { weight_lbs: 5000 },
+            charging: { charge_time_10_to_80_pct_min: 20, max_dc_kw: 250, battery_usable_kwh: 100, battery_nominal_voltage_v: 800 },
+            interior: { cargo_cuft: 30, frunk_cuft: 5 },
+        },
+    });
+    const value = (row, key) => row.values[key];
+
+    it('works each ratio out from the row, with the resolved battery', () => {
+        const [row] = buildVehicleRows([full]);
+        expect(value(row, 'calc.efficiency')).toBe(3);
+        expect(value(row, 'calc.rangePerChargeMin')).toBeCloseTo(10.5);   // 300 × 0.7 ÷ 20
+        expect(value(row, 'calc.avgKw10to80')).toBeCloseTo(210);          // 70 kWh in a third of an hour
+        expect(value(row, 'calc.peakCRate')).toBe(2.5);
+        expect(value(row, 'calc.pricePerMile')).toBe(200);
+        expect(value(row, 'calc.pricePerKwh')).toBe(600);
+        expect(value(row, 'calc.weightPerHp')).toBe(10);
+        expect(value(row, 'calc.totalCargo')).toBe(35);
+        expect(value(row, 'calc.batteryBuffer')).toBeCloseTo(4.76, 2);
+        expect(value(row, 'calc.is800v')).toBe(true);
+    });
+
+    it('blanks a ratio when an input is missing or zero, rather than guessing', () => {
+        const [row] = buildVehicleRows([vehicle({ socWindowKwh: 0, epaRangeMi: 300, specs: {} })]);
+        expect(value(row, 'calc.efficiency')).toBeNull();
+        expect(value(row, 'calc.pricePerMile')).toBeNull();
+        expect(value(row, 'calc.is800v')).toBeNull();
+        expect(formatVehicleCell(row, vehicleColumnByKey('calc.efficiency'))).toBe('—');
+    });
+
+    it('counts cargo without a frunk figure, and says so', () => {
+        const [row] = buildVehicleRows([vehicle({ specs: { interior: { cargo_cuft: 30 } } })]);
+        expect(value(row, 'calc.totalCargo')).toBe(30);
+        expect(row.notes['calc.totalCargo']).toBe('no frunk figure');
+    });
+
+    it('converts a rate by one factor in metric, and draws bars only with a direction', () => {
+        const [row] = buildVehicleRows([full]);
+        const eff = vehicleColumnByKey('calc.efficiency');
+        expect(unitFor(eff, 'metric')).toBe('km/kWh');
+        expect(formatVehicleCell(row, eff, 'metric')).toBe('4.83');
+        expect(unitFor(vehicleColumnByKey('calc.pricePerMile'), 'metric')).toBe('$/km');
+        expect(formatVehicleCell(row, vehicleColumnByKey('calc.pricePerMile'), 'metric')).toBe('124');
+        expect(eff.bar).toBe(true);
+        expect(vehicleColumnByKey('calc.batteryBuffer').bar).toBe(false);
+        expect(formatVehicleCell(row, vehicleColumnByKey('calc.is800v'))).toBe('Yes');
+    });
+});
+
+describe('presets (#335)', () => {
+    it('refers only to columns that exist, leads with the name, and sorts by one of its own', () => {
+        for (const p of VEHICLE_TABLE_PRESETS) {
+            for (const key of p.columns) expect(vehicleColumnByKey(key), `${p.key}: ${key}`).toBeTruthy();
+            expect(p.columns[0]).toBe('name');
+            expect(p.columns, `${p.key} sorts by a column it shows`).toContain(p.sortKey);
+        }
+        expect(new Set(PRESETS.map(p => p.key)).size).toBe(PRESETS.length);
+    });
+
+    it('opens on Overview, and a URL with no table parameters is Overview', () => {
+        expect(DEFAULT_VEHICLE_COLUMNS).toEqual(vehiclePresetByKey('overview').columns);
+        expect(presetMatching(decodeVehicleTableParams('').columns)?.key).toBe('overview');
+    });
+
+    it('writes a preset as its name, and implies its sort', () => {
+        const rt = vehiclePresetByKey('road-trips');
+        const state = { columns: rt.columns, sortKey: rt.sortKey, sortDir: rt.sortDir, filters: EMPTY_VEHICLE_FILTERS };
+        const search = encodeVehicleTableParams(state).toString();
+        expect(search).toBe('vt_preset=road-trips');
+        expect(decodeVehicleTableParams(search)).toEqual({ ...state, modifiedFrom: null, assumptions: DEFAULT_ASSUMPTIONS });
+    });
+
+    it('re-sorting a preset keeps it the preset', () => {
+        const rt = vehiclePresetByKey('road-trips');
+        const search = encodeVehicleTableParams({ columns: rt.columns, sortKey: 'figures.epaRangeMi', sortDir: 'desc' }).toString();
+        const out = decodeVehicleTableParams(search);
+        expect(presetMatching(out.columns)?.key).toBe('road-trips');
+        expect(out).toMatchObject({ sortKey: 'figures.epaRangeMi', sortDir: 'desc', modifiedFrom: null });
+    });
+
+    it('carries "modified from" with a changed column set', () => {
+        const columns = [...vehiclePresetByKey('value').columns, 'dimensions.length_in'];
+        const search = encodeVehicleTableParams({ columns, sortKey: 'name', sortDir: 'asc', modifiedFrom: 'value' }).toString();
+        expect(search).toContain('vt_cols=');
+        expect(search).toContain('vt_preset=value');
+        expect(decodeVehicleTableParams(search)).toMatchObject({ columns, modifiedFrom: 'value' });
+        // Hand-built columns with no origin say nothing about one.
+        expect(decodeVehicleTableParams('vt_cols=name,powertrain.motors').modifiedFrom).toBeNull();
+    });
+
+    it('ignores an unknown preset rather than breaking', () => {
+        expect(decodeVehicleTableParams('vt_preset=bogus').columns).toEqual(DEFAULT_VEHICLE_COLUMNS);
+    });
+});
+
+describe('assumptions (#335)', () => {
+    const car = (range, min) => vehicle({ epaRangeMi: range, specs: { charging: { charge_time_10_to_80_pct_min: min } } });
+    const time = (row) => row.values['calc.timeToAdd'];
+
+    it('times a stop to add the reader\'s distance at the 10→80% average rate', () => {
+        const [row] = buildVehicleRows([car(300, 21)]);                        // 210 mi in 21 min
+        expect(time(row)).toBeCloseTo(15);                                     // 150 mi at 10 mi/min
+        const [far] = buildVehicleRows([car(300, 21)], { assumptions: { addDistance: 200 } });
+        expect(time(far)).toBeCloseTo(20);
+    });
+
+    it('leaves a stop blank, and says why, when 10→80% adds less than asked', () => {
+        const [row] = buildVehicleRows([car(250, 20)], { assumptions: { addDistance: 200 } });  // 175 mi window
+        expect(time(row)).toBeNull();
+        expect(row.notes['calc.timeToAdd']).toBe('more than a 10→80% stop adds');
+        expect(buildVehicleRows([car(null, 20)])[0].notes['calc.timeToAdd']).toBeNull();
+    });
+
+    it('reads the distance in the reader\'s units, and names the column from it', () => {
+        const [row] = buildVehicleRows([car(300, 21)], { assumptions: { addDistance: 150 }, units: 'metric' });
+        expect(time(row)).toBeCloseTo(150 / 1.60934 / 10);
+        const col = vehicleColumnByKey('calc.timeToAdd');
+        expect(labelledColumn(col, { addDistance: 200 }, 'imperial').label).toBe('Time to add 200 mi');
+        expect(labelledColumn(col, { addDistance: 250 }, 'metric').label).toBe('Time to add 250 km');
+        expect(needsAssumptions(['name', 'calc.timeToAdd'])).toBe(true);
+        expect(needsAssumptions(['name', 'calc.efficiency'])).toBe(false);
+    });
+
+    it('round-trips through the URL only when changed, snapped to the slider\'s steps', () => {
+        const base = { columns: DEFAULT_VEHICLE_COLUMNS, sortKey: 'name', sortDir: 'asc' };
+        expect(encodeVehicleTableParams({ ...base, assumptions: DEFAULT_ASSUMPTIONS }).toString()).toBe('');
+        expect(encodeVehicleTableParams({ ...base, assumptions: { addDistance: 200 } }).toString()).toBe('vt_add=200');
+        expect(decodeVehicleTableParams('vt_add=210').assumptions.addDistance).toBe(200);
+        expect(decodeVehicleTableParams('vt_add=9999').assumptions.addDistance).toBe(300);
+        expect(decodeVehicleTableParams('vt_add=nope').assumptions.addDistance).toBe(150);
     });
 });
