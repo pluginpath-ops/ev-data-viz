@@ -77,3 +77,26 @@ export function barPercentOf(value, max) {
     if (!Number.isFinite(n) || !(max > 0)) return null;
     return Math.max(BAR_MIN_PCT, Math.min(100, (n / max) * 100));
 }
+
+/**
+ * Move column `from` to sit before or after column `to`, keeping every other
+ * column in order. Shared by the column picker's list and the table's own
+ * headers, which are two handles on the same ordered list.
+ *
+ * The side is explicit because "put it where the target is" cannot move a
+ * column one place to the right: taking `a` out of [a, b, c] and splicing it
+ * back in at `b` puts it straight back in front of `b`.
+ *
+ * The fixed column (the row label) neither moves nor has anything placed in
+ * front of it. Returns the same array when nothing changes, so a caller can
+ * skip a state update on a drop that went nowhere.
+ */
+export function moveColumn(visible, from, to, side, fixedKey) {
+    if (from === to || from === fixedKey || !visible.includes(from)) return visible;
+    if (to === fixedKey && side === 'before') return visible;
+    const next = visible.filter(k => k !== from);
+    const at = next.indexOf(to);
+    if (at < 0) return visible;
+    next.splice(side === 'after' ? at + 1 : at, 0, from);
+    return next.every((k, i) => k === visible[i]) ? visible : next;
+}

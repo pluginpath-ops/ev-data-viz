@@ -23,6 +23,7 @@ import { useAppContext } from '../context/AppContext';
 import { useAsyncResource } from '../hooks/useAsyncResource';
 import SortHeader from './tables/SortHeader';
 import ColumnPicker from './tables/ColumnPicker';
+import useColumnDrag from '../hooks/useColumnDrag';
 import TableCell from './tables/TableCell';
 import { useCellPeek } from '../hooks/useCellPeek';
 import GuideFacetMenu from './epa/guide/GuideFacetMenu';
@@ -165,6 +166,8 @@ export default function VehicleTable() {
     const facets   = useMemo(() => vehicleFacets(rows), [rows]);
     const filtered = useMemo(() => filterVehicleRows(rows, filters), [rows, filters]);
     const sorted   = useMemo(() => sortVehicleRows(filtered, sortKey, sortDir), [filtered, sortKey, sortDir]);
+    // Headers drag the same list the column picker does.
+    const { dragProps, dragClass } = useColumnDrag({ visible: columns, fixedKey: 'name', onChange: setColumns });
     const cols     = useMemo(() => columns.map(vehicleColumnByKey).filter(Boolean), [columns]);
     const maxima   = useMemo(() => vehicleBarMaxima(filtered, cols), [filtered, cols]);
 
@@ -253,7 +256,8 @@ export default function VehicleTable() {
                         <tr>
                             <th className="guide-th guide-th-select sticky-select" />
                             {cols.map(col => (
-                                <SortHeader key={col.key} col={col} sortKey={sortKey} sortDir={sortDir} onSort={sortBy} unit={unitFor(col, units)} />
+                                <SortHeader key={col.key} col={col} sortKey={sortKey} sortDir={sortDir} onSort={sortBy} unit={unitFor(col, units)}
+                                    dragProps={dragProps(col.key)} dragClass={dragClass(col.key)} />
                             ))}
                         </tr>
                     </thead>

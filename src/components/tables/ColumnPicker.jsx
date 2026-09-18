@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
 import MenuButton from '../shell/MenuButton';
+import useColumnDrag from '../../hooks/useColumnDrag';
 
 /**
  * Which columns a table shows, and in what ORDER — shared by the FE Guide table
@@ -10,7 +10,8 @@ import MenuButton from '../shell/MenuButton';
  * It used to be a set of checkboxes grouped by topic, and the table rendered
  * whatever was ticked in declaration order — so two people could tick the same
  * ten columns and neither could put the one they cared about next to the one
- * they were comparing it against. The list is the order now, and it drags.
+ * they were comparing it against. The list is the order now, and it drags —
+ * as do the table's own column headers, through the same hook (useColumnDrag).
  *
  * The fixed column is the row label the horizontal scroll pins, and a table
  * whose row labels can be hidden or moved to the middle is a table of numbers
@@ -23,13 +24,8 @@ import MenuButton from '../shell/MenuButton';
  * @param {Function} [unitOf]  a column's unit as shown — defaults to `col.unit`
  */
 export default function ColumnPicker({ columns, visible, defaults, fixedKey, onChange, unitOf = (col) => col.unit }) {
-    // A REF for what is being dragged, and state only for the styling.
-    // Reading it from state in the drop handler meant reading the closure the
-    // row was last rendered with — which, between a dragstart and a drop that
-    // React has not re-rendered between, is still null and the drop does
-    // nothing. A ref is current the moment it is written.
-    const dragKeyRef = useRef(null);
-    const [dragKey, setDragKey] = useState(null);
+    // The same drag the table's column headers use (hooks/useColumnDrag).
+    const { dragProps, dragClass } = useColumnDrag({ visible, fixedKey, onChange, axis: 'y' });
 
     const byKey = new Map(columns.map(c => [c.key, c]));
     const shown = visible.map(k => byKey.get(k)).filter(Boolean);
@@ -43,16 +39,6 @@ export default function ColumnPicker({ columns, visible, defaults, fixedKey, onC
             // its declared position would silently reorder a list the reader
             // had arranged.
             : [...visible, key]);
-    };
-
-    /** Move `from` to sit where `to` currently is, keeping everything else in order. */
-    const reorder = (from, to) => {
-        if (from === to || from === fixedKey || to === fixedKey) return;
-        const next = visible.filter(k => k !== from);
-        const at = next.indexOf(to);
-        if (at < 0) return;
-        next.splice(at, 0, from);
-        onChange(next);
     };
 
     const isDefault = visible.length === defaults.length && visible.every((k, i) => k === defaults[i]);
@@ -80,24 +66,8 @@ export default function ColumnPicker({ columns, visible, defaults, fixedKey, onC
                             return (
                                 <div
                                     key={col.key}
-                                    className={`guide-column-row${dragKey === col.key ? ' dragging' : ''}`}
-                                    draggable={!fixed}
-                                    onDragStart={e => {
-                                        dragKeyRef.current = col.key;
-                                        setDragKey(col.key);
-                                        // Firefox starts no drag without payload.
-                                        e.dataTransfer?.setData('text/plain', col.key);
-                                    }}
-                                    onDragEnd={() => { dragKeyRef.current = null; setDragKey(null); }}
-                                    onDragOver={e => e.preventDefault()}
-                                    onDrop={e => {
-                                        e.preventDefault();
-                                        const from = dragKeyRef.current
-                                            ?? e.dataTransfer?.getData('text/plain');
-                                        if (from) reorder(from, col.key);
-                                        dragKeyRef.current = null;
-                                        setDragKey(null);
-                                    }}
+                                    className={`guide-column-row ${dragClass(col.key)}`}
+                                    {...dragProps(col.key)}
                                 >
                                     <span className="guide-column-grip" aria-hidden="true">
                                         {fixed ? '' : '⠿'}
