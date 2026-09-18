@@ -671,7 +671,8 @@ describe('the seams that broke before', () => {
         // data every figure that produced was wrong. The source now only
         // suggests, and a suggestion is a link like any other.
         const section = read('src/components/EpaVehicleSection.jsx');
-        expect(section).toMatch(/const variantSource = canEdit \? suggestionSource\(vehicle, vehicles\)/);
+        expect(section).toMatch(/const showSuggestions = canEdit && /);
+        expect(section).toMatch(/const variantSource = showSuggestions \? suggestionSource\(vehicle, vehicles\)/);
         expect(section).toMatch(/<VariantEpaSuggestions[\s\S]*?onLink=\{onLink\}/);
         expect(read('src/context/AppContext.jsx')).toMatch(/dataService\.getEpaSuggestionCandidates\(/);
 

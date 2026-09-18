@@ -88,4 +88,27 @@ describe('rankSuggestions', () => {
         expect(ranked.map(s => s.group)).toEqual([awd, lt]);
         expect(ranked[0].matched).toEqual(['awd']);
     });
+
+    it("ranks by the vehicle's own make and model when there is no source to go on", () => {
+        // The Leaf S+: not a variant, nothing linked anywhere in its family.
+        const leaf = vehicle({ name: 'Leaf', make: 'Nissan', model: 'Leaf', trim: 'S+', year: '2026' });
+        const big = group({ make: 'NISSAN', model_year: 2026, epa_carline_name: 'LEAF 75kWh (19 inch wheels)', drive: null });
+        const small = group({ make: 'NISSAN', model_year: 2026, epa_carline_name: 'NISSAN LEAF 53kWh (18 inch steel', drive: null });
+        const ariya = group({ make: 'NISSAN', model_year: 2026, epa_carline_name: 'ARIYA', drive: null });
+        const other = group({ make: 'KIA', model_year: 2026, epa_carline_name: 'LEAF', drive: null });
+        expect(candidateQuery(leaf)).toEqual({ makes: ['Nissan'], years: [2026] });
+        const ranked = rankSuggestions(leaf, null, [big, small, ariya, other]);
+        expect(ranked.map(s => s.group)).toEqual([big, small]);
+        expect(ranked.every(s => !s.fromSource)).toBe(true);
+    });
+
+    it("searches the years of the vehicle's own links, and marks them linked", () => {
+        const g2024 = group({ make: 'HYUNDAI', model_year: 2024, epa_carline_name: 'Ioniq 5', drive: null });
+        const sib = group({ make: 'HYUNDAI', model_year: 2024, epa_carline_name: 'Ioniq 5 N', drive: null });
+        const ioniq = vehicle({ name: 'IONIQ5', make: 'Hyundai', model: 'Ioniq 5', year: '2025', epa_mappings: linkTo(g2024) });
+        expect(candidateQuery(ioniq).years).toEqual([2024, 2025]);
+        const ranked = rankSuggestions(ioniq, null, [g2024, sib]);
+        expect(ranked.find(s => s.group === g2024).linked).toBe(true);
+        expect(ranked.find(s => s.group === sib).linked).toBe(false);
+    });
 });

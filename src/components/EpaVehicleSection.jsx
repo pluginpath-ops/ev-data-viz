@@ -377,9 +377,11 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
     const debounceRef = useRef(null);
 
     const mappings = vehicle?.epa_mappings ?? [];
-    // A variant: its source says where to look (#341). Kept after a link, for
-    // the next one. Curators only — a viewer sees links, never suggestions.
-    const variantSource = canEdit ? suggestionSource(vehicle, vehicles) : null;
+    // Where to look (#341): a variant's source, or the vehicle's own make and
+    // model when there is no source to go on. Kept after a link, for the next
+    // one. Curators only — a viewer sees links, never suggestions.
+    const showSuggestions = canEdit && Boolean(vehicle?.make || vehicle?.spec_source_vehicle_id != null);
+    const variantSource = showSuggestions ? suggestionSource(vehicle, vehicles) : null;
 
     const handleCreate = async () => {
         const id = createDraft.test_group_id.trim();
@@ -615,7 +617,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                 a vehicle already linked, where what is linked is what a reader
                 came for; keyed by vehicle so that is judged per vehicle, and a
                 link made here leaves it open for the next. */}
-            {variantSource && (
+            {showSuggestions && (
                 <VariantEpaSuggestions
                     key={vehicle.id}
                     vehicle={vehicle}
@@ -630,7 +632,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
             {mappings.length === 0 ? (
                 <p className="text-sm text-secondary mb-3">
                     No EPA test group linked yet.
-                    {canEdit && !variantSource && ' Use the search above to assign one.'}
+                    {canEdit && !showSuggestions && ' Use the search above to assign one.'}
                 </p>
             ) : (
                 <>

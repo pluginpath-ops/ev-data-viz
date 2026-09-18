@@ -24,6 +24,14 @@
  * The source's own configurations come after, for the variant that really does
  * share one.
  *
+ * ── A vehicle with no source to go on ───────────────────────────────────────
+ *
+ * Not a variant, or one whose whole chain has nothing linked — the Leaf S+, the
+ * EX60 P10. The vehicles that most need a suggestion are the ones nobody in the
+ * family has linked yet, so the vehicle stands in for its own source: its make,
+ * model year and model pick the candidates, and every word of its name and trim
+ * beyond the make and model ranks them.
+ *
  * Nothing here is stored. The chain is walked on each render, and linking a
  * suggestion writes the same mapping a search does.
  *
@@ -65,35 +73,46 @@ export function suggestionSource(vehicle, vehicles = []) {
 
 /**
  * What to fetch candidates by: the source configurations' makes and model
- * years. The variant's own year is added, since a variant is sometimes the next
- * model year of the car it was made from.
+ * years, or the vehicle's own make and its links' years when there is no
+ * source. The vehicle's own year is added, since a variant is sometimes the
+ * next model year of the car it was made from.
  */
-export function candidateQuery(variant, source) {
-    const groups = linkedGroups(source);
+export function candidateQuery(variant, source = null) {
+    // With no source, the vehicle's own links set the years too: the IONIQ5 is
+    // recorded as 2025 and certified as 2024, and its siblings are 2024s.
+    const groups = linkedGroups(source ?? variant);
+    const ownMake = variant?.manufacturer?.name || variant?.make;
     return {
-        makes: [...new Set(groups.map(g => g.make).filter(Boolean))],
+        makes: [...new Set(source ? groups.map(g => g.make) : [ownMake])].filter(Boolean),
         years: [...new Set([...groups.map(g => Number(g.model_year)), ...years(variant?.year)].filter(Boolean))],
     };
 }
 
-/** The words that name what the variant is, minus the ones it shares with its source. */
+/**
+ * The words that name what the vehicle is, minus the ones it shares with its
+ * source — or, with no source, minus its make and model, which every candidate
+ * already shares.
+ */
 function distinguishingTokens(variant, source) {
     const own = tokens([variant.name, variant.trim, variant.model].join(' '));
-    const theirs = new Set(tokens([source.name, source.trim, source.model].join(' ')));
+    const shared = source
+        ? [source.name, source.trim, source.model]
+        : [variant.model, variant.make, variant.manufacturer?.name];
+    const theirs = new Set(tokens(shared.join(' ')));
     return [...new Set(own.filter(t => !theirs.has(t)))];
 }
 
 /**
- * Does a configuration belong to the same model as the source? Every word of
- * the source's model must be in the carline — `Blazer` in `BLAZER EV AWD`,
+ * Does a configuration belong to the same model as the source (or, with none,
+ * the vehicle itself)? Every word of its model must be in the carline — `Blazer` in `BLAZER EV AWD`,
  * `Ioniq 5` in `Ioniq 5` and not in `Ioniq 6`. With no model recorded, any
  * word shared with a source configuration's carline will do.
  */
-function sameModel(group, source) {
+function sameModel(group, basis) {
     const carline = new Set(tokens(group.epa_carline_name));
-    const model = tokens(source.model);
+    const model = tokens(basis.model);
     if (model.length) return model.every(t => carline.has(t));
-    const sourceWords = new Set(linkedGroups(source).flatMap(g => tokens(g.epa_carline_name)));
+    const sourceWords = new Set(linkedGroups(basis).flatMap(g => tokens(g.epa_carline_name)));
     return [...carline].some(t => sourceWords.has(t));
 }
 
@@ -101,7 +120,7 @@ function sameModel(group, source) {
  * The suggestions for a variant, in the order they are shown.
  *
  * @param {Object} variant     the vehicle the suggestions are for
- * @param {Object} source      from suggestionSource
+ * @param {Object|null} source  from suggestionSource; null ranks by the vehicle's own make and model
  * @param {Array}  candidates  epa_test_groups rows fetched by candidateQuery
  * @returns {Array<{ group, figures, fromSource: boolean, linked: boolean, matched: string[] }>}
  *          `figures` as epaConfigurationFigures gives them; `fromSource` marks
@@ -110,11 +129,11 @@ function sameModel(group, source) {
  *          under a click; `matched` is the variant's distinguishing words found
  *          in the carline or drive
  */
-export function rankSuggestions(variant, source, candidates = []) {
-    if (!variant || !source) return [];
+export function rankSuggestions(variant, source = null, candidates = []) {
+    if (!variant) return [];
     const sourceGroups = linkedGroups(source);
     const sourceIds = new Set(sourceGroups.map(g => g.test_group_id));
-    const makes = sourceGroups.map(g => g.make);
+    const makes = source ? sourceGroups.map(g => g.make) : candidateQuery(variant).makes;
     const distinct = distinguishingTokens(variant, source);
     const variantYears = new Set(years(variant.year));
     const variantIds = new Set(linkedGroups(variant).map(g => g.test_group_id));
@@ -122,7 +141,7 @@ export function rankSuggestions(variant, source, candidates = []) {
     const siblings = candidates
         .filter(g => !sourceIds.has(g.test_group_id))
         .filter(g => makes.some(m => sameMake(m, g.make)))
-        .filter(g => sameModel(g, source))
+        .filter(g => sameModel(g, source ?? variant))
         .map(group => {
             const words = new Set(tokens(`${group.epa_carline_name} ${group.drive ?? ''} ${group.display_name ?? ''}`));
             return {

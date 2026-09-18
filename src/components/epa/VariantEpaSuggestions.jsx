@@ -1,5 +1,6 @@
 /**
- * EPA configurations to link, suggested from a variant's source (#341).
+ * EPA configurations to link, suggested from a variant's source (#341) — or,
+ * with no source to go on, from the vehicle's own make, model and year.
  *
  * Shown to a curator on a variant, and kept after a link — a variant spanning
  * wheel sizes links several, and the next is found here. Starts folded when the
@@ -96,7 +97,7 @@ export default function VariantEpaSuggestions({ vehicle, source, startCollapsed 
                     onClick={() => setOpen(v => !v)}
                 >
                     <span className="disclosure-caret" aria-hidden="true">{open ? '▾' : '▸'}</span>
-                    Suggested from {vehicleLabel(source)}
+                    {source ? `Suggested from ${vehicleLabel(source)}` : `Suggested for ${vehicleLabel(vehicle)}`}
                     {!open && !loading && ` (${siblings.length + own.length})`}
                 </button>
                 {open ? (
@@ -122,7 +123,9 @@ export default function VariantEpaSuggestions({ vehicle, source, startCollapsed 
             )}
             {!loading && !siblings.length && !fetched.error && (
                 <p className="primary-config-note text-caption">
-                    No other {source.model || 'configuration'} certified in the same model year.
+                    {source
+                        ? `No other ${source.model || 'configuration'} certified in the same model year.`
+                        : `No ${[vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'configuration'} certified for ${vehicle.year || 'this model year'} in the EPA data yet.`}
                 </p>
             )}
 
