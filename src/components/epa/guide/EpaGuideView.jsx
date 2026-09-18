@@ -228,6 +228,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                             ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }}
                     visibleColumns={columns}
+                    onColumnsChange={setColumns}
                     sortKey={sortKey}
                     sortDir={sortDir}
                     onSort={handleSort}

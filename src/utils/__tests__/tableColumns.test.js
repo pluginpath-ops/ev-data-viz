@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isBlank, sortByColumn, barMaximaOf, barPercentOf, BAR_MIN_PCT } from '../tableColumns';
+import { isBlank, sortByColumn, barMaximaOf, barPercentOf, BAR_MIN_PCT, moveColumn } from '../tableColumns';
 
 const valueOf = (row, col) => row[col.key];
 const scaleOf = (col) => col.scale ?? col.key;
@@ -40,5 +40,30 @@ describe('bars', () => {
         expect(barPercentOf(0, 100)).toBe(BAR_MIN_PCT);
         expect(barPercentOf(50, 100)).toBe(50);
         expect(barPercentOf(150, 100)).toBe(100);
+    });
+});
+
+describe('moveColumn', () => {
+    const cols = ['name', 'a', 'b', 'c'];
+
+    it('moves a column one place right — the move "splice at the target" could not make', () => {
+        expect(moveColumn(cols, 'a', 'b', 'after', 'name')).toEqual(['name', 'b', 'a', 'c']);
+    });
+
+    it('moves left and right across several columns', () => {
+        expect(moveColumn(cols, 'c', 'a', 'before', 'name')).toEqual(['name', 'c', 'a', 'b']);
+        expect(moveColumn(cols, 'a', 'c', 'after', 'name')).toEqual(['name', 'b', 'c', 'a']);
+    });
+
+    it('never moves the fixed column, nor puts anything in front of it', () => {
+        expect(moveColumn(cols, 'name', 'b', 'after', 'name')).toBe(cols);
+        expect(moveColumn(cols, 'b', 'name', 'before', 'name')).toBe(cols);
+        expect(moveColumn(cols, 'b', 'name', 'after', 'name')).toEqual(['name', 'b', 'a', 'c']);
+    });
+
+    it('returns the same array for a drop that changes nothing', () => {
+        expect(moveColumn(cols, 'a', 'b', 'before', 'name')).toBe(cols);
+        expect(moveColumn(cols, 'a', 'a', 'after', 'name')).toBe(cols);
+        expect(moveColumn(cols, 'zz', 'a', 'after', 'name')).toBe(cols);
     });
 });

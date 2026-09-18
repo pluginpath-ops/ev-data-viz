@@ -260,6 +260,7 @@ it; read it as a *reference band* where it appears.
 | A vehicle chosen for the whole app, driving every chart | **selected** | ARIA `aria-selected` | `selectedVehicles` in [App.jsx](../src/App.jsx), `toggleVehicleSelection`, the chips |
 | A proportional fill behind a value, scaled per column | **a bar cell** | — | `computeBarMaxima()` in [feGuideBrowse.js](../src/utils/feGuideBrowse.js) |
 | Choosing which columns show, and in what order | **the column picker** | — | [ColumnPicker.jsx](../src/components/tables/ColumnPicker.jsx), shared by both tables |
+| The cell at the top of a table column — click sorts by it, drag moves it. Always qualified: "header" alone is the top of the page | **a column header** | HTML `<th>`; common web | [SortHeader.jsx](../src/components/tables/SortHeader.jsx); dragging goes through [useColumnDrag.js](../src/hooks/useColumnDrag.js), the same order the column picker drags |
 | Every vehicle a row, any field a column, over the whole fleet | **the vehicle table** — "Vehicle Table" in the sub-nav; it replaced Compare Specs (#315) | — | [VehicleTable.jsx](../src/components/VehicleTable.jsx), [vehicleTable.js](../src/utils/vehicleTable.js); mode key stays `specstable` |
 | The band of selected vehicles at the top of the vehicle table | **the selected band** | — | `.vehicle-table-band` — the pinned band's look, a selection's meaning |
 

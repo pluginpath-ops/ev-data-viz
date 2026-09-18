@@ -12,14 +12,23 @@
  *
  * `unit` defaults to the column's own; the vehicle table passes one converted
  * to the reader's unit system.
+ *
+ * `dragProps`/`dragClass` come from hooks/useColumnDrag and make the header a
+ * handle on the column order — the same list the column picker drags. A drag
+ * fires no click, so moving a column never re-sorts by it.
  */
-export default function SortHeader({ col, sortKey, sortDir, onSort, unit = col.unit }) {
+export default function SortHeader({ col, sortKey, sortDir, onSort, unit = col.unit, dragProps, dragClass = '' }) {
     const active = sortKey === col.key;
     return (
         <th
-            className={`guide-th ${col.numeric ? 'numeric' : ''} ${active ? 'active' : ''} ${col.sticky ? 'sticky-name' : ''} ${col.holds ?? ''}`}
+            className={`guide-th ${col.numeric ? 'numeric' : ''} ${active ? 'active' : ''} ${col.sticky ? 'sticky-name' : ''} ${col.holds ?? ''} ${dragClass}`}
+            {...dragProps}
             onClick={() => onSort(col.key)}
-            title={col.hint || `Sort by ${col.label}`}
+            // The drag hint goes LAST, on its own line, and only where the
+            // header really drags — the fixed column would promise a move it
+            // refuses.
+            title={[col.hint || `Sort by ${col.label}`, dragProps?.draggable && 'Drag to reorder']
+                .filter(Boolean).join('\n')}
             aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
         >
             <span className={`guide-th-name ${unit ? '' : 'wraps'}`}>

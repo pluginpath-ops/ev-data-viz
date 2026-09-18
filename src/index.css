@@ -6109,6 +6109,12 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     cursor: grab;
 }
 .guide-column-row.dragging { opacity: 0.5; }
+/* Where a dragged column will land: a line on the edge it goes to, drawn
+   before the drop so the reader can see "left of Range" versus "right of it".
+   One rule for both handles on the order (hooks/useColumnDrag) — the picker's
+   rows stack, so their edges are top and bottom; headers sit side by side. */
+.guide-column-row.drop-before { box-shadow: inset 0 2px 0 var(--color-primary); }
+.guide-column-row.drop-after  { box-shadow: inset 0 -2px 0 var(--color-primary); }
 .guide-column-row.is-hidden {
     color: var(--color-text-meta);
     cursor: pointer;
@@ -6309,6 +6315,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .guide-th.numeric .guide-th-name,
 .guide-th.numeric .guide-th-unit { @apply text-center; }
 .guide-th.active .guide-th-name  { color: var(--color-primary); }
+.guide-th.dragging    { opacity: 0.5; }
+.guide-th.drop-before { box-shadow: inset 2px 0 0 var(--color-primary); }
+.guide-th.drop-after  { box-shadow: inset -2px 0 0 var(--color-primary); }
 /* The checkbox column is the one cell whose content is not text. It must not
    ellipsis, and at 2.25rem the default px-3 leaves 12px of room for a 16px box
    — under fixed layout that overflowed and drew a "…" beside every checkbox. */

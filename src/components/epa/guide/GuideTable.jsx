@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { columnByKey, formatCell, barPercent, clusterByTestGroup } from '../../../utils/feGuideBrowse';
 import SortHeader from '../../tables/SortHeader';
+import useColumnDrag from '../../../hooks/useColumnDrag';
 import TableCell from '../../tables/TableCell';
 import { useCellPeek } from '../../../hooks/useCellPeek';
 
@@ -189,7 +190,7 @@ function Cluster({ group, span, rowProps }) {
 }
 
 export default function GuideTable({
-    rows, visibleColumns, sortKey, sortDir, onSort,
+    rows, visibleColumns, onColumnsChange, sortKey, sortDir, onSort,
     selectedIds, onToggleSelect, onOpenRow, vehicleLinks, barMaxima,
     pinnedRows = [], onUnpinAll, onOpenCompare, clustered = false,
 }) {
@@ -197,6 +198,8 @@ export default function GuideTable({
     // the order the reader arranged is the order they get, and filtering would
     // silently restore the constant's.
     const cols = visibleColumns.map(columnByKey).filter(Boolean);
+    // Headers drag the same list the column picker does.
+    const { dragProps, dragClass } = useColumnDrag({ visible: visibleColumns, fixedKey: 'carline', onChange: onColumnsChange });
     // One peek for every clipped cell in the table, rather than one per cell.
     const { tableProps: peekProps, panel: cellPeek } = useCellPeek();
     const span = cols.length + 1;
@@ -209,7 +212,8 @@ export default function GuideTable({
                     <tr>
                         <th className="guide-th guide-th-select sticky-select" />
                         {cols.map(col => (
-                            <SortHeader key={col.key} col={col} sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                            <SortHeader key={col.key} col={col} sortKey={sortKey} sortDir={sortDir} onSort={onSort}
+                                dragProps={dragProps(col.key)} dragClass={dragClass(col.key)} />
                         ))}
                     </tr>
                 </thead>
