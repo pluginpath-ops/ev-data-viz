@@ -8,8 +8,9 @@ import 'react-image-crop/dist/ReactCrop.css';
 import { FULL_MAX, buildRenditions, displayImageUrl } from '../utils/imageRenditions';
 import SeriesColorPicker from './SeriesColorPicker';
 import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
-
-const ASPECT = 16 / 9;
+import CardBandPreview from './vehicles/CardBandPreview';
+import { CARD_BAND_MAX_WIDTH, PHOTO_ASPECT, focalY } from '../utils/cardBand';
+import { makeModelLine } from '../utils/specHelpers';
 
 // Extract the completed crop region into an offscreen canvas at full rendition
 // resolution. Encoding is left to buildRenditions, which needs one shared source
@@ -69,6 +70,13 @@ export default function EditVehicleForm({
         for (const { tag } of inheritedTags) if (tag.id !== exceptId) onAddTag(tag);
     };
 
+    // The photo on screen is the resolved one — a variant shows its source's —
+    // but only a vehicle's OWN photo can be reframed here. See the note by the
+    // preview for why an inherited one is read-only.
+    const photoUrl = displayImageUrl(editingVehicle);
+    const canReposition = Boolean(photoUrl) && !editingVehicle?.inheritedFrom?.photo;
+    const setFocal = (value) => onFormChange({ ...formData, image_focal_y: value });
+
     const [imgSrc, setImgSrc] = useState('');
     const [crop, setCrop] = useState();
     const [completedCrop, setCompletedCrop] = useState(null);
@@ -94,8 +102,8 @@ export default function EditVehicleForm({
     // Set an initial centered 16:9 crop once the image loads
     const onImageLoad = useCallback((e) => {
         const { width, height } = e.currentTarget;
-        const cropW = Math.min(width, height * ASPECT);
-        const cropH = cropW / ASPECT;
+        const cropW = Math.min(width, height * PHOTO_ASPECT);
+        const cropH = cropW / PHOTO_ASPECT;
         const initial = {
             unit: 'px',
             x: (width - cropW) / 2,
@@ -113,6 +121,11 @@ export default function EditVehicleForm({
         setImgSrc('');
         setCrop(undefined);
         setCompletedCrop(null);
+        // A focal point frames ONE picture. `uploadVehicleImage` clears the
+        // stored one in the same patch as the new URLs; this clears the copy
+        // the form is holding, which would otherwise be written straight back
+        // over it by the next Save.
+        setFocal(null);
         onImageReady(renditions);
     };
 
@@ -339,14 +352,58 @@ export default function EditVehicleForm({
                 {/* Image upload — edit mode only */}
                 {editingId && (
                     <div className="form-section mt-4">
-                        <label className="block font-medium mb-2">Card Background Image</label>
-                        {displayImageUrl(editingVehicle) && (
-                            <img
-                                src={displayImageUrl(editingVehicle)}
-                                alt="Current"
-                                decoding="async"
-                                className="h-24 w-full object-cover rounded mb-2 border"
-                            />
+                        <label className="block font-medium mb-2">Photo</label>
+                        {/* The stored photo under the card's view of it, and —
+                            when the photo is this vehicle's own — a handle.
+                            Dragging sets the focal point, which is the whole of
+                            repositioning: nothing is re-encoded or re-uploaded,
+                            the number is what Save writes.
+
+                            Read-only on an inherited photo. The focal point is
+                            a property of the picture, so writing one here would
+                            leave this vehicle holding a number that frames a
+                            photo belonging to another car — and it would go on
+                            framing whatever the source uploaded next. */}
+                        {photoUrl && (
+                            <div className="mb-2">
+                                <div
+                                    className="card-band-frame"
+                                    style={{
+                                        // The desktop card at 1:1, at the photo's
+                                        // own aspect — both from utils/cardBand,
+                                        // so the preview is the card and not a
+                                        // second opinion about its shape.
+                                        maxWidth: CARD_BAND_MAX_WIDTH,
+                                        aspectRatio: PHOTO_ASPECT,
+                                        backgroundImage: `url(${photoUrl})`,
+                                    }}
+                                >
+                                    <CardBandPreview
+                                        name={formData.name}
+                                        subtitle={makeModelLine(formData)}
+                                        focal={formData.image_focal_y}
+                                        onFocalChange={canReposition ? setFocal : undefined}
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2 mt-1.5">
+                                    <span className="text-note flex-1">
+                                        {!canReposition
+                                            ? 'The media band is what a card shows of it.'
+                                            : formData.image_focal_y == null
+                                                ? 'Drag the media band up or down to reframe the card. Centered until you do.'
+                                                : `Focal point ${focalY(formData.image_focal_y)}% down the photo.`}
+                                    </span>
+                                    {canReposition && formData.image_focal_y != null && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setFocal(null)}
+                                            className="btn btn-secondary text-sm"
+                                        >
+                                            Center
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                         )}
                         <label className="image-upload-label">
                             <span className="btn btn-primary text-sm">
@@ -389,14 +446,18 @@ export default function EditVehicleForm({
                     <div className="crop-modal-panel">
                         <div className="crop-modal-header">
                             <h3 className="font-semibold text-base">Crop Image (16:9)</h3>
-                            <p className="text-xs text-secondary mt-0.5">Drag to reposition · resize handles to adjust · max output 1600×900</p>
+                            <p className="text-xs text-secondary mt-0.5">
+                                Drag to reposition · resize handles to adjust · max output 1600×900.
+                                The bright area is the card's media band — crop a little wide and you
+                                can move the photo up or down inside it afterwards.
+                            </p>
                         </div>
                         <div className="crop-modal-body">
                             <ReactCrop
                                 crop={crop}
                                 onChange={c => setCrop(c)}
                                 onComplete={c => setCompletedCrop(c)}
-                                aspect={ASPECT}
+                                aspect={PHOTO_ASPECT}
                                 minWidth={80}
                             >
                                 <img
@@ -406,6 +467,28 @@ export default function EditVehicleForm({
                                     className="crop-modal-img"
                                     onLoad={onImageLoad}
                                 />
+                                {/* The card's view, over the crop rectangle.
+                                    Without it the curator frames for the 16:9
+                                    file and the card then cuts a third of it
+                                    off, roof and wheels first.
+
+                                    A sibling of the image inside ReactCrop, so
+                                    the crop's own pixel coordinates place it:
+                                    .ReactCrop is the positioned ancestor and
+                                    the image sits at its origin. `crop` rather
+                                    than `completedCrop` so it tracks the drag
+                                    rather than jumping at the end of it. */}
+                                {crop?.width > 0 && (
+                                    <div
+                                        className="crop-modal-card-view"
+                                        style={{ top: crop.y, left: crop.x, width: crop.width, height: crop.height }}
+                                    >
+                                        <CardBandPreview
+                                            name={formData.name}
+                                            subtitle={makeModelLine(formData)}
+                                        />
+                                    </div>
+                                )}
                             </ReactCrop>
                         </div>
                         <div className="crop-modal-footer">

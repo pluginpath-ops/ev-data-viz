@@ -52,7 +52,7 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
                      'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
-                     'vehicleInheritance.js'];
+                     'vehicleInheritance.js', 'cardBand.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -72,6 +72,10 @@ describe('utilities built for the UI are reached by the UI', () => {
             'Reached through withVehicleFigures in AppContext; exported so its tiers are tested one at a time.',
         'vehicleFigures.resolveEpaRange':
             'Reached through withVehicleFigures in AppContext; exported so its tiers are tested one at a time.',
+        'cardBand.DEFAULT_FOCAL_Y':
+            'Centered — the value itself. Consumed inside the module by focalY, and asserted by name so "null means centered" is a stated fact rather than a 50 in three files.',
+        'cardBand.bandWindowFraction':
+            'Reached through bandWindow and focalYFromTop; exported so the one number the whole feature turns on — how much of the photo a card shows — is tested against a card width on its own.',
         'testSessions.suggestedPairing':
             'Built and tested; surfacing it is a curation action awaiting its own review (#184).',
         'conditionCorrection.DEFAULT_CORRECTION_MODE':
@@ -187,6 +191,47 @@ describe('the seams that broke before', () => {
         expect(writers.length).toBeGreaterThan(0);
         const view = read('src/components/RangeChartView.jsx');
         expect(view).toMatch(/_correction\?\.note/);
+    });
+
+    it('draws the card band and its preview from the same measurements', () => {
+        // The seam #340 opened: the crop step now shows the curator what the
+        // card's band will keep of a photo. A preview is only worth having
+        // while it agrees with the card, and the way it stops agreeing is the
+        // quiet way — somebody tunes the band and the preview goes on drawing
+        // last month's one, with nothing failing. So the numbers live in
+        // utils/cardBand and nothing else may state them.
+        const css = read('src/index.css');
+        expect(css, 'the band overlap is restated in index.css — read --card-band-overlap')
+            .not.toMatch(/margin-bottom:\s*-36px/);
+        expect(css, 'the name\'s offset is restated in index.css — derive it from the overlap')
+            .not.toMatch(/\.is-card-band\s+\.vehicle-media-title\s*\{\s*bottom:\s*45px/);
+
+        const view = read('src/components/VehiclesView.jsx');
+        expect(view, 'the card band\'s height is a literal in VehiclesView')
+            .not.toMatch(/className="is-card-band"[^>]*height=\{140\}|height=\{140\}[^>]*is-card-band/);
+        expect(view).toMatch(/CARD_BAND_HEIGHT/);
+
+        // And the two surfaces that draw a band both read the module.
+        for (const file of ['src/components/vehicles/VehicleMedia.jsx',
+                            'src/components/vehicles/CardBandPreview.jsx']) {
+            expect(read(file), `${file} draws a band without utils/cardBand`)
+                .toMatch(/from '\.\.\/\.\.\/utils\/cardBand'/);
+        }
+    });
+
+    it('frames every photo it draws by the focal point it stores', () => {
+        // Built, migrated and never applied is the shape this suite exists for,
+        // and a focal point is invisible when it is dropped: the photo simply
+        // stays centered, exactly as it did before, and nothing errors.
+        expect(read('src/components/vehicles/VehicleMedia.jsx'))
+            .toMatch(/backgroundPosition:\s*photoPosition\(vehicle\.image_focal_y\)/);
+        // It reaches the database as its own key, and comes back with the photo
+        // rather than on its own (vehicleInheritance PHOTO_KEYS).
+        expect(read('src/services/DataService.js')).toMatch(/set\('image_focal_y'/);
+        expect(read('src/utils/vehicleInheritance.js'))
+            .toMatch(/PHOTO_KEYS = \[[^\]]*image_focal_y/);
+        // And the editor writes it — the form field, not a second write path.
+        expect(read('src/components/EditVehicleForm.jsx')).toMatch(/image_focal_y/);
     });
 
     it('marks a mixed cycle wherever a test speed is shown', () => {

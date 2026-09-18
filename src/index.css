@@ -1282,6 +1282,14 @@ body {
     @apply block max-w-full max-h-full;
     max-height: calc(90vh - 11rem);
 }
+/* The card's view, laid over the crop rectangle. A sibling of the image inside
+   ReactCrop, whose own element is the positioned ancestor — the crop's pixel
+   coordinates are relative to the image, and the image sits at that element's
+   origin, so they place this box directly. */
+.crop-modal-card-view {
+    position: absolute;
+    pointer-events: none;
+}
 .crop-modal-footer {
     @apply px-5 py-4 flex-shrink-0 flex justify-end gap-2;
     border-top: 1px solid var(--color-border);
@@ -2640,24 +2648,42 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
         rgba(17, 22, 31, 0.08) 100%);
 }
 
-/* On a card, the band runs 36px further down, UNDER the top of the card body,
-   so the photograph is cropped less without the card growing. The fade
+/* On a card, the band runs further down, UNDER the top of the card body, so
+   the photograph is cropped less without the card growing. The fade
    reaches the card's own color at the top of the first panel (24px up from
    the band's foot: the body's 12px padding under a 36px overlap), so the
    panel sits on solid ground; the name stays where it was.
    The dark part is kept behind the name (30-58%, where it sits) and gone by
    80%: spread over the taller band the old stops dimmed most of the car, and
    a dark photograph under that turned to mud. The name's own text-shadow
-   carries the rest of its legibility. */
-.vehicle-media.is-card-band { margin-bottom: -36px; }
-.vehicle-media.is-card-band .vehicle-media-scrim {
+   carries the rest of its legibility.
+
+   The overlap is NOT a literal here. VehicleMedia publishes it as
+   --card-band-overlap from utils/cardBand, which is also where the band's
+   height comes from and what the crop step's preview reads — one home for the
+   geometry, so tuning the band moves the preview with it (#340). The fallback
+   keeps this rule standing on its own if it is ever applied by hand. */
+.vehicle-media.is-card-band { margin-bottom: calc(-1 * var(--card-band-overlap, 36px)); }
+/* One declaration, two selectors, because the crop step has to show the SAME
+   fade it is previewing — see .card-band-preview. Two copies of these stops is
+   a preview that keeps painting the old one after the band is re-tuned. */
+.vehicle-media.is-card-band .vehicle-media-scrim,
+.card-band-scrim {
     background: linear-gradient(to top,
         var(--color-card) 17%,
         rgba(17, 22, 31, 0.72) 30%,
         rgba(17, 22, 31, 0.3) 58%,
         rgba(17, 22, 31, 0) 80%);
 }
-.vehicle-media.is-card-band .vehicle-media-title { bottom: 45px; }
+/* Clear of the card body, which paints over the overlap: the 9px the title
+   sits above its box's foot, measured from the top of the body instead.
+   Shared with the preview, where --card-band-overlap is a PERCENTAGE of the
+   window rather than 36px — the frame is drawn at whatever size it happens to
+   be, and calc() resolves either against the same containing block. */
+.vehicle-media.is-card-band .vehicle-media-title,
+.card-band-window .vehicle-media-title {
+    bottom: calc(var(--card-band-overlap, 36px) + 9px);
+}
 .vehicle-media.is-card-band + .vehicle-card-body { position: relative; }
 
 /* No photograph is a DESIGNED state. A flat panel with the make set large reads
@@ -2771,6 +2797,101 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* Clickable when the reader can actually change it. */
 button.vehicle-media-badge { cursor: pointer; }
 button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
+
+/* ── The card's view of a photo, drawn over the photo ───────────────────────
+ *
+ * The band is much wider than it is tall and fills with `cover`, so it shows a
+ * horizontal WINDOW of the 16:9 file and cuts the rest — on a desktop card,
+ * about 38% of the photo's height. A curator cropping had no way to see that,
+ * so a car framed well in 16:9 could lose its roof and its wheels on the card.
+ *
+ * These classes draw that window over the photo itself, in the crop step and in
+ * the edit form: what survives, what is cut, the same fade, and the name where
+ * the card puts it. Nothing here paints a picture — whatever is behind shows
+ * through — so the preview cannot disagree with what it is drawn on.
+ *
+ * Every measurement is passed in from utils/cardBand, including the body's
+ * edge, because the frame is drawn at whatever size it happens to be (a crop
+ * rectangle is usually twice a card's width) and because a second copy of 140
+ * and 36 would keep describing the old band the first time it is tuned.
+ */
+.card-band-preview {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    /* In the crop step every drag belongs to the cropper underneath. The
+       window takes events back for itself when it is a handle. */
+    pointer-events: none;
+}
+
+/* What the card cuts. Dimmed and not hidden: the choice being made is between
+   this and the window, so both have to be on screen. */
+.card-band-cut {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background-color: rgba(8, 12, 18, 0.62);
+}
+
+/* The band itself. A white hairline rather than an accent color: it sits on an
+   arbitrary photograph, where white is the one edge that always reads — the
+   same reason the cropper's own selection is drawn in it. Orange would also
+   spend the one "active now" signal on a guide. */
+.card-band-window {
+    position: absolute;
+    left: 0;
+    right: 0;
+    outline: 1px solid rgba(255, 255, 255, 0.85);
+    outline-offset: -1px;
+}
+.card-band-scrim {
+    position: absolute;
+    inset: 0;
+}
+/* The card body's top edge: the band runs under it, so the photograph below
+   this line is never seen on a card. Height and the name's clearance both come
+   off the one --card-band-overlap the window carries. */
+.card-band-body {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--card-band-overlap);
+    background-color: var(--color-card);
+}
+
+/* Repositioning: the window IS the handle. */
+.card-band-preview.is-interactive .card-band-window {
+    pointer-events: auto;
+    cursor: grab;
+    touch-action: none;
+}
+.card-band-preview.is-interactive .card-band-window:active { cursor: grabbing; }
+.card-band-preview.is-interactive .card-band-window:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 0;
+}
+
+/* The frame the preview is drawn on, in the edit form: the stored photo at its
+   own aspect. Its max-width and aspect ratio are set inline from
+   CARD_BAND_MAX_WIDTH and PHOTO_ASPECT, so at full size the preview IS the
+   desktop card at 1:1 and the name in it is the size the name will be.
+
+   An outline rather than a border, and this is the whole reason: a border is
+   part of the box, so it takes 2px out of the content the percentages resolve
+   against and the band comes out 138.8px instead of 140. An outline draws in
+   the same place and costs the layout nothing. */
+.card-band-frame {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    outline: 1px solid var(--color-border);
+    outline-offset: -1px;
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-sunken);
+    background-size: cover;
+    background-position: center;
+}
 
 /* ── Stat cell ──────────────────────────────────────────────────────────────
  *

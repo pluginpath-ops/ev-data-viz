@@ -8,9 +8,10 @@
  * come down the same chain:
  *
  *   color   the nearest vehicle in the chain with one set, else the palette
- *   photo   the nearest vehicle with a photo; image_url and image_thumb_url
- *           travel together, so a thumbnail never pairs with another car's
- *           full image
+ *   photo   the nearest vehicle with a photo; image_url, image_thumb_url and
+ *           image_focal_y travel together, so a thumbnail never pairs with
+ *           another car's full image and a photo is never framed by a number
+ *           that was set against a different picture (#340)
  *   tags    the vehicle's own tags if it has any, else the nearest source's.
  *           One set, overridden whole, not added up down the chain: the 2025
  *           R1T inherits from the R1S, and a sum made it an SUV as well as a
@@ -28,15 +29,20 @@
  * ── Own values stay reachable ───────────────────────────────────────────────
  *
  * The resolved values go on the usual keys (`color`, `image_url`,
- * `image_thumb_url`, `tags`), so every card, chip and chart reads the right
- * thing without knowing inheritance exists. EDITING must not: a form seeded
- * from the resolved values would save an inherited color as the variant's own
- * the first time it was opened, and cut the pointer. Editors read `own`, and
- * `inheritedFrom` says where each resolved value came from.
+ * `image_thumb_url`, `image_focal_y`, `tags`), so every card, chip and chart
+ * reads the right thing without knowing inheritance exists. EDITING must not:
+ * a form seeded from the resolved values would save an inherited color as the
+ * variant's own the first time it was opened, cutting the pointer. Editors
+ * read `own`, and `inheritedFrom` says where each resolved value came from.
  */
 import { vehicleLabel } from './specHelpers';
 
-const PHOTO_KEYS = ['image_url', 'image_thumb_url'];
+/* One unit. The focal point is a property OF the photo -- it says which slice
+   of that particular image the card's band shows -- so it can only ever be
+   resolved from the same vehicle the URLs came from. Resolving it separately
+   would frame one car's photo with another car's number the moment a variant
+   set its own picture. */
+const PHOTO_KEYS = ['image_url', 'image_thumb_url', 'image_focal_y'];
 
 const hasColor = (v) => v?.color != null && v.color !== '';
 const hasPhoto = (v) => Boolean(v?.image_url || v?.image_thumb_url);
@@ -68,6 +74,7 @@ export function ownValues(vehicle) {
         color: vehicle?.color ?? null,
         image_url: vehicle?.image_url ?? null,
         image_thumb_url: vehicle?.image_thumb_url ?? null,
+        image_focal_y: vehicle?.image_focal_y ?? null,
         tags: vehicle?.tags ?? [],
     };
 }
@@ -76,7 +83,7 @@ export function ownValues(vehicle) {
  * The fleet with color, photo and tags resolved through inheritance.
  *
  * Adds to each vehicle:
- *   own            { color, image_url, image_thumb_url, tags } as stored
+ *   own            { color, image_url, image_thumb_url, image_focal_y, tags } as stored
  *   inheritedFrom  { color, photo, tags } — a { id, name } source for color and
  *                  photo, or null when the vehicle's own value (or none) is
  *                  shown; tags is { [tagId]: { id, name } } for inherited tags
@@ -88,6 +95,7 @@ export function withInheritance(vehicles = []) {
             color: vehicle.color ?? null,
             image_url: vehicle.image_url ?? null,
             image_thumb_url: vehicle.image_thumb_url ?? null,
+            image_focal_y: vehicle.image_focal_y ?? null,
             tags: vehicle.tags ?? [],
         };
         const chain = inheritanceChain(vehicle, byId);

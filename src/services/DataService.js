@@ -677,7 +677,13 @@ class DataService {
    *
    * @param {number} vehicleId
    * @param {{ full: Blob, thumb: Blob }} renditions from utils/imageRenditions
-   * @returns {Promise<{ image_url: string, image_thumb_url: string }>}
+   * The focal point goes back to null in the same patch. It frames ONE picture
+   * -- "show the slice 30% down" is an answer about this photo and no other --
+   * so carrying it onto a replacement would frame the new image by where the
+   * old car's roof happened to be. Centered is the right starting point for a
+   * photo nobody has looked at yet (#340).
+   *
+   * @returns {Promise<{ image_url: string, image_thumb_url: string, image_focal_y: null }>}
    */
   async uploadVehicleImage(vehicleId, renditions) {
     // Always store as JPEG — both blobs are produced by the crop/resize canvas step
@@ -689,7 +695,7 @@ class DataService {
       this.#putVehicleImageObject(thumbPath, renditions.thumb),
     ]);
 
-    const patch = { image_url: fullResult, image_thumb_url: thumbResult };
+    const patch = { image_url: fullResult, image_thumb_url: thumbResult, image_focal_y: null };
     const { error: updateError } = await getSupabase()
       .from('vehicles').update(patch).eq('id', vehicleId);
     if (updateError) throw updateError;
@@ -829,6 +835,14 @@ class DataService {
     // `|| null` is what lets the picker's Auto hand the vehicle back to the
     // palette rather than storing an empty string.
     set('color', updates.color !== undefined ? (updates.color || null) : undefined);
+    // Null, not 0: the column is nullable and null means centered, so the form's
+    // "not repositioned" and the database's are the same value rather than two
+    // things that have to be mapped between. `?? null` rather than `|| null`
+    // because 0 is a real answer here -- the top of the photo (#340).
+    set('image_focal_y', updates.image_focal_y !== undefined
+        ? (updates.image_focal_y === null || updates.image_focal_y === ''
+            ? null : Math.round(Number(updates.image_focal_y)))
+        : undefined);
 
     const { error } = await getSupabase().from('vehicles').update(patch).eq('id', vehicleId);
     if (error) throw error;

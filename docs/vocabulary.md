@@ -104,11 +104,31 @@ rail.
 | The colored left edge encoding state | **accent border** | CSS `border-left`; common in design systems | `.vehicle-card`, `.vehicle-row`, `.vehicle-run-group`, `.routing-row` |
 | The ✓ on a selected card | **selected indicator** | ARIA `aria-selected` | `.vehicle-card.is-selected::before` |
 | The photo band with the title over a scrim | **media band** | Material *media* | [VehicleMedia.jsx](../src/components/vehicles/VehicleMedia.jsx), `.vehicle-media` |
+| The slice of a 16:9 photo that band actually shows | **the band window** | — | [cardBand.js](../src/utils/cardBand.js) `bandWindow()`, `.card-band-window` |
+| A photo's stored vertical framing, 0 (top) to 100 (foot); null is centered | **focal point** | Cloudinary, Contentful, Drupal *Focal Point* | `vehicles.image_focal_y`, [cardBand.js](../src/utils/cardBand.js) `focalY()` |
+| Moving a photo up or down inside the band after it is uploaded | **repositioning** | — | [CardBandPreview.jsx](../src/components/vehicles/CardBandPreview.jsx), drag or arrow keys |
 | A full-width labelled divider inside the sidebar | **section band** | — | `.run-selector-header`, `.subgroup-header` |
 | Small mono state labels inside a bar or row | **badges** | Material *badge* | `.badge-micro`, `.badge-default`, `.badge-status` |
 
 Accent-border colors carry meaning and are not decorative: orange = selected or
 overridden, red = queued for deletion, per-run color = series identity.
+
+**A focal point is vertical, and it is not a crop.** Cropping chooses the 16:9
+file and throws the rest away; the focal point chooses which part of that file
+the band window lands on, and throws nothing away. So a photo can be
+repositioned as often as you like and re-cropped never — the uncropped original
+is not kept ([#340](https://github.com/pluginpath-ops/ev-data-viz/issues/340)).
+Say **crop a little wide** for the habit that leaves room to reposition into.
+
+**The band window is not a fixed fraction.** The grid is fluid, so a card's
+band runs from 313px to 399px wide and shows between 79% and 62% of the photo's
+height; a one-column layout is wider still. Previews draw the tightest ordinary
+case — the desktop card — because every narrower card then shows more, never
+less. `cardBand.js` carries the table.
+
+**The focal point belongs to the photo, not to the vehicle.** Replacing a photo
+clears it, and a variant showing its source's photo is framed by the source's
+focal point and follows it. Never resolve one without the other.
 
 ## Type and color
 

@@ -8,6 +8,20 @@ export function vehicleLabel(v) {
     return v?.trim ? `${base} · ${v.trim}` : base;
 }
 
+/**
+ * The line under the name on a card's media band: what the car IS, where
+ * `vehicleLabel` is what we CALL it.
+ *
+ * Here rather than inline in the card because the crop step previews the band
+ * before there is a card to look at (#340), and two spellings of the same line
+ * is how the preview starts lying about what the card will say. Fields are
+ * dropped rather than left blank — a half-filled vehicle reads as "Rivian · R1S"
+ * rather than as a row of separators.
+ */
+export function makeModelLine(v) {
+    return [v?.make, v?.model, v?.trim, v?.year].filter(Boolean).join(' · ');
+}
+
 // ── Spec inheritance merge ────────────────────────────────────────────────────
 
 /**
