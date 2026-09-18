@@ -13,7 +13,7 @@ import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import DerivedValues from './epa/DerivedValues';
 import PrimaryConfigurationPicker from './epa/PrimaryConfigurationPicker';
 import VariantEpaSuggestions from './epa/VariantEpaSuggestions';
-import { suggestionSource } from '../utils/variantEpaSuggestions';
+import { suggestionSource, packLabels } from '../utils/variantEpaSuggestions';
 import EpaDerivationChecks from './epa/EpaDerivationChecks';
 import EpaCuratorEditor from './epa/EpaCuratorEditor';
 import FeGuidePicker from './epa/FeGuidePicker';
@@ -382,6 +382,10 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
     // one. Curators only — a viewer sees links, never suggestions.
     const showSuggestions = canEdit && Boolean(vehicle?.make || vehicle?.spec_source_vehicle_id != null);
     const variantSource = showSuggestions ? suggestionSource(vehicle, vehicles) : null;
+    const suggestionLabels = useMemo(
+        () => (showSuggestions ? packLabels(vehicle, vehicles) : []),
+        [showSuggestions, vehicle, vehicles],
+    );
 
     const handleCreate = async () => {
         const id = createDraft.test_group_id.trim();
@@ -622,6 +626,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                     key={vehicle.id}
                     vehicle={vehicle}
                     source={variantSource}
+                    labels={suggestionLabels}
                     startCollapsed={mappings.length > 0}
                     getCandidates={getEpaSuggestionCandidates}
                     onLink={onLink}

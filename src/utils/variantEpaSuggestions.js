@@ -24,6 +24,14 @@
  * The source's own configurations come after, for the variant that really does
  * share one.
  *
+ * ── Battery size, where the names run out ───────────────────────────────────
+ *
+ * EPA often names every configuration of a model the same — five `Ioniq 5`s,
+ * told apart only by test group ID — and the pack is what differs. So after
+ * the words, a configuration whose EPA tested capacity sits within tolerance of
+ * the nearer of the vehicle's own Usable and Gross ranks first: the same rule,
+ * and the same knob, `resolveSocWindow` uses to accept EPA tested at all.
+ *
  * ── A vehicle with no source to go on ───────────────────────────────────────
  *
  * Not a variant, or one whose whole chain has nothing linked — the Leaf S+, the
@@ -40,6 +48,9 @@
 
 import { epaConfigurationFigures } from './epaConfiguration';
 import { sameMake } from './feGuideMatch';
+import { testedAgreement } from './vehicleFigures';
+import { resolveEffectiveSpecs } from './specHelpers';
+import { TESTED_CAPACITY_TOLERANCE_PCT } from '../constants/epa';
 
 const tokens = (value) => String(value ?? '').toLowerCase().match(/[a-z0-9]+/g) ?? [];
 const years = (value) => (String(value ?? '').match(/\d{4}/g) ?? []).map(Number);
@@ -125,20 +136,54 @@ function sameModel(group, basis) {
     return [...carline].some(t => sourceWords.has(t));
 }
 
+const positive = (v) => {
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+/**
+ * The vehicle's own pack figures, through spec inheritance, to hold a
+ * configuration's EPA tested against: Usable and Gross, whichever exist.
+ *
+ * Not EPA tested, which may be read from the very configuration being judged.
+ * Not the unsorted `vehicles.battery` either: it is Usable on some vehicles and
+ * Gross on others, and a ranking that trusted it would push the right
+ * configuration down on a figure nobody has confirmed. With neither label, the
+ * pack simply does not rank.
+ */
+export function packLabels(vehicle, vehicles = []) {
+    const specs = vehicle ? resolveEffectiveSpecs(vehicle, vehicles) : {};
+    const usable = positive(specs?.charging?.battery_usable_kwh);
+    const gross = positive(specs?.powertrain?.battery_gross_kwh);
+    return [usable && { name: 'Usable', kwh: usable }, gross && { name: 'Gross', kwh: gross }].filter(Boolean);
+}
+
+/** How a configuration's EPA tested sits against the vehicle's pack, or null with nothing to compare. */
+function packFit(testedKwh, labels, tolerancePct) {
+    if (testedKwh == null || !labels.length) return null;
+    const { ok, nearest } = testedAgreement(testedKwh, labels, tolerancePct);
+    return { ok, label: nearest.name, kwh: nearest.kwh, pct: nearest.pct };
+}
+
 /**
  * The suggestions for a variant, in the order they are shown.
  *
  * @param {Object} variant     the vehicle the suggestions are for
  * @param {Object|null} source  from suggestionSource; null ranks by the vehicle's own make and model
  * @param {Array}  candidates  epa_test_groups rows fetched by candidateQuery
- * @returns {Array<{ group, figures, fromSource: boolean, linked: boolean, matched: string[] }>}
+ * @param {Object} [options]
+ * @param {Array<{name, kwh}>} [options.labels]  the vehicle's pack figures (packLabels)
+ * @param {number} [options.tolerancePct]
+ * @returns {Array<{ group, figures, fromSource: boolean, linked: boolean, matched: string[], pack: {ok, label, kwh, pct}|null }>}
  *          `figures` as epaConfigurationFigures gives them; `fromSource` marks
  *          a configuration the source itself links; `linked` one the variant
  *          already links, kept in its place so the list does not reshuffle
  *          under a click; `matched` is the variant's distinguishing words found
- *          in the carline or drive
+ *          in the carline or drive; `pack` is how EPA tested sits against the
+ *          vehicle's nearer pack figure, null with nothing to compare
  */
-export function rankSuggestions(variant, source = null, candidates = []) {
+export function rankSuggestions(variant, source = null, candidates = [], { labels = [], tolerancePct = TESTED_CAPACITY_TOLERANCE_PCT } = {}) {
     if (!variant) return [];
     const sourceGroups = linkedGroups(source);
     const sourceIds = new Set(sourceGroups.map(g => g.test_group_id));
@@ -153,26 +198,35 @@ export function rankSuggestions(variant, source = null, candidates = []) {
         .filter(g => sameModel(g, source ?? variant))
         .map(group => {
             const words = new Set(tokens(`${group.epa_carline_name} ${group.drive ?? ''} ${group.display_name ?? ''}`));
+            const figures = epaConfigurationFigures(group);
             return {
                 group,
-                figures: epaConfigurationFigures(group),
+                figures,
+                pack: packFit(figures.testedKwh, labels, tolerancePct),
                 fromSource: false,
                 linked: variantIds.has(group.test_group_id),
                 matched: distinct.filter(t => words.has(t)),
                 sameYear: variantYears.has(Number(group.model_year)),
             };
         })
-        // Most distinguishing words first, then the variant's own model year,
-        // then the shorter carline — the plainer name is the base configuration,
-        // and a longer one adds a trim this variant has not said it has.
+        // Most distinguishing words first; then a pack that fits; then the
+        // variant's own model year; then the nearer pack; then the shorter
+        // carline — the plainer name is the base configuration, and a longer
+        // one adds a trim this variant has not said it has.
         .sort((a, b) => (b.matched.length - a.matched.length)
+            || (Boolean(b.pack?.ok) - Boolean(a.pack?.ok))
             || (b.sameYear - a.sameYear)
+            || ((a.pack?.pct ?? Infinity) - (b.pack?.pct ?? Infinity))
             || String(a.group.epa_carline_name ?? '').length - String(b.group.epa_carline_name ?? '').length);
 
-    const own = sourceGroups.map(group => ({
-        group, figures: epaConfigurationFigures(group), fromSource: true,
-        linked: variantIds.has(group.test_group_id), matched: [],
-    }));
+    const own = sourceGroups.map(group => {
+        const figures = epaConfigurationFigures(group);
+        return {
+            group, figures, fromSource: true,
+            linked: variantIds.has(group.test_group_id), matched: [],
+            pack: packFit(figures.testedKwh, labels, tolerancePct),
+        };
+    });
 
     return [
         ...siblings.map(({ sameYear: _sameYear, ...s }) => s),

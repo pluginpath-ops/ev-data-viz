@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { suggestionSource, candidateQuery, rankSuggestions } from '../variantEpaSuggestions';
+import { suggestionSource, candidateQuery, rankSuggestions, packLabels } from '../variantEpaSuggestions';
 
 let nextId = 1;
 const group = (over = {}) => ({
@@ -120,5 +120,36 @@ describe('rankSuggestions', () => {
         const ranked = rankSuggestions(ioniq, null, [g2024, sib]);
         expect(ranked.find(s => s.group === g2024).linked).toBe(true);
         expect(ranked.find(s => s.group === sib).linked).toBe(false);
+    });
+
+    it("ranks a configuration whose pack fits the vehicle's above one that does not, when the names cannot tell", () => {
+        // Five configurations all called "Ioniq 5"; the pack is what differs.
+        const mct = (kwh) => ({ procedure_code: 77, total_dc_energy_kwh: kwh, test_number: `T${nextId++}`, test_date: '2026-01-01' });
+        const lr = group({ make: 'Hyundai', model_year: 2026, epa_carline_name: 'Ioniq 5', drive: null, epa_tests: [mct(84)] });
+        const sr = group({ make: 'Hyundai', model_year: 2026, epa_carline_name: 'Ioniq 5', drive: null, epa_tests: [mct(64)] });
+        const bare = group({ make: 'Hyundai', model_year: 2026, epa_carline_name: 'Ioniq 5', drive: null });
+        const base = vehicle({ name: 'IONIQ5 Base', make: 'Hyundai', model: 'Ioniq 5', trim: 'SR', year: '2026' });
+        const ranked = rankSuggestions(base, null, [lr, bare, sr], { labels: [{ name: 'Usable', kwh: 63 }] });
+        expect(ranked.map(s => s.group)).toEqual([sr, lr, bare]);
+        expect(ranked[0].pack).toMatchObject({ ok: true, label: 'Usable' });
+        expect(ranked[1].pack.ok).toBe(false);
+        expect(ranked[2].pack).toBeNull();
+    });
+
+    it('lets the words outrank the pack', () => {
+        const mct = (kwh) => ({ procedure_code: 77, total_dc_energy_kwh: kwh, test_number: `T${nextId++}`, test_date: '2026-01-01' });
+        const typeSGroup = group({ test_group_id: 'TS', epa_carline_name: 'ZDX AWD TYPE S', epa_tests: [mct(90)] });
+        const rwd = group({ test_group_id: 'RWD', epa_carline_name: 'ZDX RWD', epa_tests: [mct(102)] });
+        const ranked = rankSuggestions(typeS, aSpec, [typeSGroup, rwd], { labels: [{ name: 'Usable', kwh: 102 }] });
+        expect(ranked[0].group).toBe(typeSGroup);
+    });
+});
+
+describe('packLabels', () => {
+    it("reads Usable and Gross through inheritance, and never the unsorted column", () => {
+        const parent = vehicle({ specs: { charging: { battery_usable_kwh: 77.4 }, powertrain: { battery_gross_kwh: 84 } } });
+        const child = vehicle({ spec_source_vehicle_id: parent.id, specs: {} });
+        expect(packLabels(child, [parent, child])).toEqual([{ name: 'Usable', kwh: 77.4 }, { name: 'Gross', kwh: 84 }]);
+        expect(packLabels(vehicle({ battery: 70 }))).toEqual([]);
     });
 });

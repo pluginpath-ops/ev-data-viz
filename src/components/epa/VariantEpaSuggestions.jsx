@@ -22,7 +22,7 @@ const miles = (v) => (v != null ? `${Math.round(v)} mi` : '—');
 const kwh   = (v) => (v != null ? `${Math.round(v * 10) / 10} kWh` : '—');
 const yearSpan = (ys) => (ys.length > 1 ? `${ys[0]}–${ys[ys.length - 1]}` : String(ys[0] ?? ''));
 
-export default function VariantEpaSuggestions({ vehicle, source, startCollapsed = false, getCandidates, onLink }) {
+export default function VariantEpaSuggestions({ vehicle, source, labels = [], startCollapsed = false, getCandidates, onLink }) {
     const [open, setOpen] = useState(!startCollapsed);
     const query = useMemo(() => candidateQuery(vehicle, source), [vehicle, source]);
     const queryKey = JSON.stringify(query);
@@ -42,8 +42,8 @@ export default function VariantEpaSuggestions({ vehicle, source, startCollapsed 
 
     const loading = fetched.key !== queryKey;
     const suggestions = useMemo(
-        () => rankSuggestions(vehicle, source, loading ? [] : fetched.rows),
-        [vehicle, source, fetched, loading],
+        () => rankSuggestions(vehicle, source, loading ? [] : fetched.rows, { labels }),
+        [vehicle, source, fetched, loading, labels],
     );
     const siblings = suggestions.filter(s => !s.fromSource);
     const own = suggestions.filter(s => s.fromSource);
@@ -72,7 +72,13 @@ export default function VariantEpaSuggestions({ vehicle, source, startCollapsed 
                 </span>
             </span>
             <span className="primary-config-figure">{miles(s.figures.labelRangeMi)}</span>
-            <span className="primary-config-figure">{kwh(s.figures.testedKwh)}</span>
+            <span
+                className="primary-config-figure"
+                title={s.pack ? `${Math.round(s.pack.pct)}% from its ${s.pack.kwh} kWh ${s.pack.label}` : undefined}
+            >
+                {kwh(s.figures.testedKwh)}
+                {s.pack?.ok && <span className="block text-caption">fits {s.pack.label}</span>}
+            </span>
             {s.linked ? (
                 <span className="text-caption text-right">Linked</span>
             ) : (
