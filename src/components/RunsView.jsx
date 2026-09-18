@@ -1330,7 +1330,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         );
                     })()}
                     {canEdit(vehicle) && (
-                        <button onClick={openEditVehicle} className="btn btn-secondary">
+                        <button onClick={openEditVehicle} className="btn btn-edit">
                             Edit
                         </button>
                     )}
@@ -1347,7 +1347,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         <button
                             onClick={async () => { setDuplicatingVehicle(true); await onDuplicateVehicle(vehicle.id); setDuplicatingVehicle(false); }}
                             disabled={duplicatingVehicle}
-                            className="btn btn-secondary disabled:opacity-50"
+                            className="btn btn-primary disabled:opacity-50"
                         >
                             {duplicatingVehicle ? <><span className="spinner-inline"/>Copying…</> : '⧉ Copy'}
                         </button>

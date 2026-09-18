@@ -52,7 +52,7 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
                      'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
-                     'vehicleInheritance.js', 'cardBand.js'];
+                     'vehicleInheritance.js', 'cardBand.js', 'variantEpaSuggestions.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -664,6 +664,22 @@ describe('the seams that broke before', () => {
             expect(read(f), `${f} must offer New variant beside Copy`).toMatch(/<NewVariantButton/);
         }
         expect(read('src/App.jsx').match(/onCreateVariant=/g)?.length).toBe(2);
+    });
+
+    it("suggests a variant's EPA configuration to curators, and never lends its figures", () => {
+        // #341 first had a variant READ its source's configuration; on the live
+        // data every figure that produced was wrong. The source now only
+        // suggests, and a suggestion is a link like any other.
+        const section = read('src/components/EpaVehicleSection.jsx');
+        expect(section).toMatch(/const showSuggestions = canEdit && /);
+        expect(section).toMatch(/const variantSource = showSuggestions \? suggestionSource\(vehicle, vehicles\)/);
+        expect(section).toMatch(/<VariantEpaSuggestions[\s\S]*?onLink=\{onLink\}/);
+        expect(read('src/context/AppContext.jsx')).toMatch(/dataService\.getEpaSuggestionCandidates\(/);
+
+        // The figures read the vehicle's own links only.
+        const figures = read('src/utils/vehicleFigures.js');
+        expect(figures).toMatch(/primaryEpaMapping\(vehicle\?\.epa_mappings\)/);
+        expect(figures).not.toMatch(/suggestionSource|spec_source_vehicle_id/);
     });
 
     it('makes the vehicle table a selection surface over the whole fleet', () => {

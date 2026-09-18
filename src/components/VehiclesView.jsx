@@ -409,7 +409,7 @@ export default function VehiclesView({
                         onClick={(e) => handleDuplicateVehicle(vehicle, e)}
                         disabled={duplicatingId !== null}
                         title="Copy this vehicle, with its own copies of its specs and tests"
-                        className="btn btn-secondary disabled:opacity-50"
+                        className="btn btn-primary disabled:opacity-50"
                     >
                         {duplicatingId === vehicle.id
                             ? <><span className="spinner-inline"/>Copying…</>
@@ -426,7 +426,7 @@ export default function VehiclesView({
                     />
                 )}
                 {canEdit(vehicle) && (
-                    <button onClick={(e) => handleEdit(vehicle, e)} className="btn btn-secondary">
+                    <button onClick={(e) => handleEdit(vehicle, e)} className="btn btn-edit">
                         Edit
                     </button>
                 )}

@@ -31,7 +31,7 @@ export default function NewVariantButton({ onCreate, disabled = false }) {
             onClick={handleClick}
             disabled={disabled || creating}
             title="A new vehicle that inherits this one's specs, tests, color, photo and tags. Set only what differs."
-            className="btn btn-secondary disabled:opacity-50"
+            className="btn btn-primary disabled:opacity-50"
         >
             {creating ? <><span className="spinner-inline" />Creating…</> : '＋ Variant'}
         </button>
