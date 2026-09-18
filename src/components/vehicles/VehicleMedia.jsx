@@ -19,11 +19,12 @@
  * ── The focal point (#340) ──────────────────────────────────────────────────
  *
  * The band is wider than it is tall and fills with `cover`, so it shows a
- * horizontal WINDOW of the 16:9 photo and cuts the rest. `image_focal_y` says
- * which window: null (the whole fleet until someone moves one) is centered and
- * draws exactly the pixels it always did. `utils/cardBand` owns the arithmetic
- * and the band's own measurements, because the crop step's preview has to draw
- * the same window and a second copy of 140 and 36 would drift.
+ * horizontal WINDOW of the photo and cuts the rest. `image_focal_y` is a point
+ * on the photo the band keeps at its middle as the card resizes (see
+ * utils/cardBand for why that is not `background-position: center Y%`). Null
+ * — the whole fleet until someone moves one — keeps plain `center` and draws
+ * exactly the pixels it always did. `utils/cardBand` owns the arithmetic and
+ * the band's measurements, because the editor's preview draws the same window.
  *
  * The list row gets the same treatment deliberately, even though at 92×54 the
  * photo overflows SIDEWAYS rather than vertically and the focal point cannot
@@ -32,10 +33,14 @@
  * the next time a box is resized.
  */
 import { displayImageUrl } from '../../utils/imageRenditions';
-import { CARD_BAND_OVERLAP, photoPosition } from '../../utils/cardBand';
+import { CARD_BAND_OVERLAP, focalStyle } from '../../utils/cardBand';
+import { usePhotoAspect } from '../../hooks/usePhotoAspect';
 
 export default function VehicleMedia({ vehicle, height = 104, className = '', children }) {
     const url = displayImageUrl(vehicle);
+    // Only needed to hold a focal point; the browser has the image already, so
+    // this is answered from cache. Skipped when there is no point to hold.
+    const aspect = usePhotoAspect(vehicle.image_focal_y == null ? null : url);
     // The make, not the name: a fallback panel identifies the thing at a glance,
     // and "Rivian" does that where "R1S Dual Large" is only the label already
     // printed underneath it.
@@ -47,15 +52,13 @@ export default function VehicleMedia({ vehicle, height = 104, className = '', ch
             // The overlap is published rather than written into index.css so
             // the band's geometry has ONE home — see utils/cardBand. Harmless
             // on the boxes that are not card bands: nothing else reads it.
-            style={{ height, '--card-band-overlap': `${CARD_BAND_OVERLAP}px` }}
+            // The height is published too: the focal-point rule needs it.
+            style={{ height, '--band-h': `${height}px`, '--card-band-overlap': `${CARD_BAND_OVERLAP}px` }}
         >
             {url
                 ? <div
-                    className="vehicle-media-image"
-                    style={{
-                        backgroundImage: `url(${url})`,
-                        backgroundPosition: photoPosition(vehicle.image_focal_y),
-                    }}
+                    className={`vehicle-media-image${vehicle.image_focal_y == null ? '' : ' has-focal'}`}
+                    style={{ backgroundImage: `url(${url})`, ...focalStyle(vehicle.image_focal_y, aspect) }}
                 />
                 : <span className="vehicle-media-fallback">{fallback}</span>}
             <div className="vehicle-media-scrim" />

@@ -2617,6 +2617,9 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     overflow: hidden;
     flex: none;
     background-color: var(--color-surface-sunken);
+    /* A size container, so the photo inside can ask how wide the band is —
+       the focal-point rule below needs it. */
+    container-type: inline-size;
 }
 
 .vehicle-media-image {
@@ -2624,6 +2627,30 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     inset: 0;
     background-size: cover;
     background-position: center;
+}
+
+/* A photo with a focal point: that point is held at --band-hold of the band
+   (the middle of the part the card body does not cover), clamped so the photo
+   never leaves a gap at either edge.
+
+   Not `background-position: center Y%`. That holds the Y% LINE of the photo on
+   the Y% line of the band, so as a card widens and the photo scales up, a
+   photo anchored at 89% grows almost entirely upward — the roof goes and the
+   band fills with road. Holding a point grows every photo around the thing
+   the curator chose.
+
+   --photo-h is what `cover` draws: the photo scaled to the band's width, or to
+   its height if that is larger. The offset is then plain arithmetic, and
+   utils/cardBand bandWindow() is the same arithmetic for the editor's preview.
+   All three inputs come from VehicleMedia; a photo without a focal point never
+   gets this class and keeps plain `center`, pixel for pixel. */
+.vehicle-media-image.has-focal {
+    --photo-h: max(calc(100cqw / var(--photo-aspect)), var(--band-h));
+    background-position-x: center;
+    background-position-y: clamp(
+        calc(var(--band-h) - var(--photo-h)),
+        calc(var(--band-h) * var(--band-hold) - var(--focal) * var(--photo-h)),
+        0px);
 }
 
 /* The list row's crop of the same asset. No scrim: nothing is written on it

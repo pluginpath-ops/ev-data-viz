@@ -13,13 +13,16 @@
 -- crop already threw away.
 --
 -- So: the focal point, the industry word for this (Cloudinary, Contentful,
--- Drupal's Focal Point module all use it). 0 aligns the top of the photo with
--- the top of the band, 100 aligns the feet, 50 is centered.
+-- Drupal's Focal Point module all use it). A POINT on the photo, 0 its top
+-- edge and 100 its foot, that the card holds at the middle of the band's
+-- visible part as the card resizes (see src/utils/cardBand.js). It was first
+-- written as `background-position: center <n>%`, which holds a LINE rather
+-- than a point and let wide cards lose the roof; the column did not change.
 --
 -- NULLABLE, and null is not a missing value: it means centered, which is what
 -- every photo does today. So every existing row renders at exactly the same
--- pixels until someone moves one -- `background-position: center 50%` is the
--- same declaration as the `center` the stylesheet has always had.
+-- pixels until someone moves one -- a null never gets the focal-point rule
+-- and keeps the plain `center` the stylesheet has always had.
 --
 -- Vertical only. The photo is already cropped to the band's width, so there is
 -- no horizontal slack to spend and a second column would store a number that

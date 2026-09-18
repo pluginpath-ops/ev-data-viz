@@ -32,11 +32,11 @@
 import { useRef } from 'react';
 import {
     CARD_BAND_BODY_FRACTION,
+    CARD_BAND_HOLD,
     CARD_BAND_MAX_WIDTH,
     PHOTO_ASPECT,
     bandWindow,
     focalY,
-    focalYFromTop,
 } from '../../utils/cardBand';
 
 /** One arrow key's worth of movement, in focal-point units. */
@@ -61,12 +61,22 @@ export default function CardBandPreview({
 
     const interactive = typeof onFocalChange === 'function';
     const { top, height } = bandWindow(focal, bandWidth, aspect);
-    const value = focalY(focal);
+    // The point the window is visibly holding. For a photo with no focal point
+    // that is wherever centering put it, so the first key or drag moves on from
+    // there instead of jumping to 50-held-high.
+    const value = focal == null ? Math.round((top + height * CARD_BAND_HOLD) * 100) : focalY(focal);
 
+    // The drag moves the POINT, one-for-one with the pointer. It may run past
+    // where the window stops at the photo's edge — dragging hard to the top
+    // should mean "the top", which on a wider card (a smaller window) is still
+    // the top, rather than whatever centre the window happened to clamp at
+    // here. It starts from where the window visibly is, so a point stored past
+    // the edge never leaves a dead zone before the window moves.
     const moveTo = (clientY) => {
         const drag = dragRef.current;
         if (!drag) return;
-        onFocalChange(focalYFromTop(drag.top + (clientY - drag.y) / drag.height, bandWidth, aspect));
+        const next = drag.focal + ((clientY - drag.y) / drag.height) * 100;
+        onFocalChange(Math.round(Math.min(100, Math.max(0, next))));
     };
 
     const handlePointerDown = (e) => {
@@ -76,7 +86,7 @@ export default function CardBandPreview({
         // Capture, so a drag that leaves the frame — which it will, the window
         // being most of it — keeps moving instead of stopping at the edge.
         e.currentTarget.setPointerCapture(e.pointerId);
-        dragRef.current = { y: e.clientY, top, height: frame.height };
+        dragRef.current = { y: e.clientY, focal: (top + height * CARD_BAND_HOLD) * 100, height: frame.height };
     };
 
     const handlePointerUp = (e) => {
@@ -125,7 +135,7 @@ export default function CardBandPreview({
                     'aria-valuemin': 0,
                     'aria-valuemax': 100,
                     'aria-valuenow': value,
-                    'aria-valuetext': value === 50 ? 'Centered' : `${value}% down the photo`,
+                    'aria-valuetext': focal == null ? 'Centered' : `${value}% down the photo`,
                 } : { 'aria-hidden': true })}
             >
                 <div className="card-band-scrim" />

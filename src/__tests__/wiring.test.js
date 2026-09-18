@@ -224,7 +224,10 @@ describe('the seams that broke before', () => {
         // and a focal point is invisible when it is dropped: the photo simply
         // stays centered, exactly as it did before, and nothing errors.
         expect(read('src/components/vehicles/VehicleMedia.jsx'))
-            .toMatch(/backgroundPosition:\s*photoPosition\(vehicle\.image_focal_y\)/);
+            .toMatch(/focalStyle\(vehicle\.image_focal_y/);
+        // ...and the stylesheet turns those properties into a position. Without
+        // this rule the variables are set and nothing reads them.
+        expect(read('src/index.css')).toMatch(/\.vehicle-media-image\.has-focal\s*\{[^}]*var\(--focal\)/);
         // It reaches the database as its own key, and comes back with the photo
         // rather than on its own (vehicleInheritance PHOTO_KEYS).
         expect(read('src/services/DataService.js')).toMatch(/set\('image_focal_y'/);

@@ -45,9 +45,22 @@
  *
  * ── The focal point ─────────────────────────────────────────────────────────
  *
- * Which part of that window the photo is aligned to. 0 is the top of the photo,
- * 100 the bottom, and null means centered — which is what every photo did
- * before this existed and what every photo nobody has repositioned still does.
+ * A POINT on the photo — 0 its top edge, 100 its foot — that the band keeps at
+ * the middle of its VISIBLE part (CARD_BAND_HOLD), clamped so the photo never
+ * leaves a gap. Null means centered,
+ * which is what every photo did before this existed.
+ *
+ * It is deliberately NOT `background-position: center Y%`. That rule holds the
+ * Y% line of the photo on the Y% line of the band, so as a card widens and the
+ * photo scales up, a photo anchored at 89% grows almost entirely upward: the
+ * roof goes and the band fills with road. A point held at the middle grows the
+ * same way on every photo — around the thing the curator chose — which is what
+ * "focal point" means everywhere else (Cloudinary, Contentful).
+ *
+ * The card cannot do that with a fixed percentage, because how far to shift
+ * depends on the card's width. index.css computes it with container units from
+ * --focal and --photo-aspect; `bandWindow` below is the same rule for a preview.
+ *
  * It is stored per photo and travels with it through inheritance, so a variant
  * showing its source's photo is framed the way the source is framed.
  */
@@ -69,6 +82,17 @@ export const CARD_BAND_MAX_WIDTH = 399;
  * the name proportionally rather than at 36 and 45 literal pixels.
  */
 export const CARD_BAND_BODY_FRACTION = CARD_BAND_OVERLAP / CARD_BAND_HEIGHT;
+
+/**
+ * Where on the band a focal point is held, as a fraction of its height: the
+ * middle of the part the card body does NOT cover. 52px down a 140px band.
+ *
+ * Not the band's own middle. The bottom 36px is under the body, and the name
+ * and the densest part of the fade sit just above that, so the geometric
+ * middle is low in what a reader actually sees — a car held there looked
+ * dropped. Derived rather than chosen, so re-tuning the band moves it too.
+ */
+export const CARD_BAND_HOLD = (1 - CARD_BAND_BODY_FRACTION) / 2;
 
 /**
  * What the crop step produces. NOT a promise about every stored photo: some
@@ -111,38 +135,35 @@ export function focalY(value) {
 }
 
 /**
- * A photo's `background-position`.
+ * The custom properties the stylesheet frames a photo with — or nothing.
  *
- * `center 50%` is identical to the `center` the stylesheet has always used, so
- * a photo with no focal point is drawn at exactly the same pixels as before.
+ * Nothing for a photo with no focal point, so it keeps the plain `center` it
+ * has always had rather than a computed equivalent: the computed one needs the
+ * photo's shape, and until the image has been measured that is a 16:9 guess.
+ * Centered is the one case where the guess would not matter, and the one case
+ * that must not move.
  */
-export function photoPosition(value) {
-    return `center ${focalY(value)}%`;
+export function focalStyle(value, aspect = PHOTO_ASPECT) {
+    if (value === null || value === undefined || value === '') return {};
+    return { '--focal': focalY(value) / 100, '--photo-aspect': aspect, '--band-hold': CARD_BAND_HOLD };
 }
 
 /**
  * Where the band's window sits inside the whole photo, as fractions of the
  * photo's height — what a preview draws to show which slice the card keeps.
  *
- * The window is `fraction` tall and slides over the `1 - fraction` that does
- * not fit, in proportion to the focal point. That IS what `background-position:
- * center Y%` does, restated so a preview can draw it: at 0 the window sits at
- * the top of the photo, at 100 at its foot, at 50 in the middle.
+ * The focal point held at CARD_BAND_HOLD of the window and clamped to the
+ * photo, which is exactly the rule index.css applies to the card: the same
+ * point sits at the same height in the window here and in the band there.
+ *
+ * A photo with no focal point is drawn with plain `center` on the card, so it
+ * is centered here too rather than held — the one case that must not move.
  */
 export function bandWindow(value, bandWidth = CARD_BAND_MAX_WIDTH, aspect = PHOTO_ASPECT) {
     const height = bandWindowFraction(bandWidth, aspect);
-    return { top: (1 - height) * (focalY(value) / 100), height };
-}
-
-/**
- * The focal point that puts the band's window at `top` (a fraction of the
- * photo's height). The inverse of `bandWindow`, for a drag.
- *
- * A window that fills the photo has nowhere to slide, so there is no focal
- * point that means anything — it returns centered rather than dividing by zero.
- */
-export function focalYFromTop(top, bandWidth = CARD_BAND_MAX_WIDTH, aspect = PHOTO_ASPECT) {
-    const slack = 1 - bandWindowFraction(bandWidth, aspect);
-    if (slack <= 0) return DEFAULT_FOCAL_Y;
-    return Math.round(Math.min(100, Math.max(0, (top / slack) * 100)));
+    if (value === null || value === undefined || value === '') {
+        return { top: (1 - height) / 2, height };
+    }
+    const point = focalY(value) / 100;
+    return { top: Math.min(1 - height, Math.max(0, point - height * CARD_BAND_HOLD)), height };
 }

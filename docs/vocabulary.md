@@ -105,7 +105,7 @@ rail.
 | The ✓ on a selected card | **selected indicator** | ARIA `aria-selected` | `.vehicle-card.is-selected::before` |
 | The photo band with the title over a scrim | **media band** | Material *media* | [VehicleMedia.jsx](../src/components/vehicles/VehicleMedia.jsx), `.vehicle-media` |
 | The slice of a 16:9 photo that band actually shows | **the band window** | — | [cardBand.js](../src/utils/cardBand.js) `bandWindow()`, `.card-band-window` |
-| A photo's stored vertical framing, 0 (top) to 100 (foot); null is centered | **focal point** | Cloudinary, Contentful, Drupal *Focal Point* | `vehicles.image_focal_y`, [cardBand.js](../src/utils/cardBand.js) `focalY()` |
+| A point on the photo, 0 (top) to 100 (foot), the band holds at the middle of its visible part; null is centered | **focal point** | Cloudinary, Contentful, Drupal *Focal Point* | `vehicles.image_focal_y`, [cardBand.js](../src/utils/cardBand.js) `focalY()` |
 | Moving a photo up or down inside the band after it is uploaded | **repositioning** | — | [CardBandPreview.jsx](../src/components/vehicles/CardBandPreview.jsx), drag or arrow keys |
 | A full-width labelled divider inside the sidebar | **section band** | — | `.run-selector-header`, `.subgroup-header` |
 | Small mono state labels inside a bar or row | **badges** | Material *badge* | `.badge-micro`, `.badge-default`, `.badge-status` |

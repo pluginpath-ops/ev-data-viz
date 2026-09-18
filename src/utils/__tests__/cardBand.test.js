@@ -4,13 +4,13 @@ import {
     CARD_BAND_MAX_WIDTH,
     CARD_BAND_OVERLAP,
     CARD_BAND_BODY_FRACTION,
+    CARD_BAND_HOLD,
     DEFAULT_FOCAL_Y,
     PHOTO_ASPECT,
     bandWindow,
     bandWindowFraction,
+    focalStyle,
     focalY,
-    focalYFromTop,
-    photoPosition,
 } from '../cardBand';
 
 describe('the band shows a window of the photo', () => {
@@ -28,7 +28,8 @@ describe('the band shows a window of the photo', () => {
         // and assuming 16:9 is what put the preview's window over sky the
         // card never shows.
         expect(bandWindowFraction(CARD_BAND_MAX_WIDTH, 400 / 267)).toBeCloseTo(0.526, 3);
-        expect(focalYFromTop(bandWindow(100, CARD_BAND_MAX_WIDTH, 1.5).top, CARD_BAND_MAX_WIDTH, 1.5)).toBe(100);
+        expect(bandWindow(100, CARD_BAND_MAX_WIDTH, 1.5).top + bandWindowFraction(CARD_BAND_MAX_WIDTH, 1.5))
+            .toBeCloseTo(1, 10);
     });
 
     it('never claims to show more than the whole photo', () => {
@@ -52,38 +53,45 @@ describe('the focal point', () => {
         expect(focalY(140)).toBe(100);
     });
 
-    it('draws an un-repositioned photo at exactly the pixels it always did', () => {
-        // `center 50%` is the same declaration as the stylesheet's `center`.
-        expect(photoPosition(null)).toBe('center 50%');
-        expect(photoPosition(30)).toBe('center 30%');
+    it('leaves an un-repositioned photo to the stylesheet’s plain center', () => {
+        // No properties at all, so the has-focal rule has nothing to compute
+        // from and the photo is drawn at exactly the pixels it always was.
+        expect(focalStyle(null)).toEqual({});
+        expect(focalStyle(30, 1.5)).toEqual({ '--focal': 0.3, '--photo-aspect': 1.5, '--band-hold': CARD_BAND_HOLD });
     });
 });
 
-describe('the window slides over what does not fit', () => {
-    it('sits at the top at 0, at the foot at 100, and in the middle by default', () => {
-        const height = bandWindowFraction();
-        expect(bandWindow(0)).toEqual({ top: 0, height });
-        expect(bandWindow(100).top).toBeCloseTo(1 - height, 10);
-        expect(bandWindow(null).top).toBeCloseTo((1 - height) / 2, 10);
-        // Always inside the photo, whatever the focal point.
-        expect(bandWindow(100).top + height).toBeCloseTo(1, 10);
+describe('the window holds the focal point', () => {
+    const h = bandWindowFraction();
+
+    it('keeps the point at the middle of the band’s visible part', () => {
+        // 52px down a 140px band: the middle of what the card body leaves.
+        expect(CARD_BAND_HOLD * CARD_BAND_HEIGHT).toBeCloseTo(52, 10);
+        const w = bandWindow(45);
+        expect(w.top + w.height * CARD_BAND_HOLD).toBeCloseTo(0.45, 10);
     });
 
-    it('reads back the focal point a drag lands on', () => {
-        for (const value of [0, 17, 50, 83, 100]) {
-            expect(focalYFromTop(bandWindow(value).top)).toBe(value);
+    it('clamps at the photo’s edges rather than leaving a gap', () => {
+        expect(bandWindow(0).top).toBe(0);
+        expect(bandWindow(100).top).toBeCloseTo(1 - h, 10);
+    });
+
+    it('centers a photo with no focal point, as the card does', () => {
+        expect(bandWindow(null).top).toBeCloseTo((1 - h) / 2, 10);
+    });
+
+    it('holds the SAME point as the band widens — the bug the old rule had', () => {
+        // background-position: center 89% kept the 89% LINE fixed, so a wider
+        // card lost the roof and gained road. A held point stays put.
+        for (const width of [313, CARD_BAND_MAX_WIDTH, 588]) {
+            const w = bandWindow(45, width);   // fits unclamped at all three
+            expect(w.top + w.height * CARD_BAND_HOLD).toBeCloseTo(0.45, 10);
         }
     });
 
-    it('stays centered when the window fills the photo and has nowhere to slide', () => {
+    it('has nowhere to go when the window fills the photo', () => {
         const width = CARD_BAND_HEIGHT * PHOTO_ASPECT / 2;   // window fraction 1
-        expect(focalYFromTop(0, width)).toBe(DEFAULT_FOCAL_Y);
         expect(bandWindow(80, width)).toEqual({ top: 0, height: 1 });
-    });
-
-    it('clamps a drag that runs past either edge', () => {
-        expect(focalYFromTop(-0.5)).toBe(0);
-        expect(focalYFromTop(1.5)).toBe(100);
     });
 });
 
