@@ -1145,6 +1145,9 @@ export function AppProvider({ children }) {
     /** Pass-through: server-side search used by the linking combobox. */
     const searchEpaTestGroups = (query, year) => dataService.searchEpaTestGroups(query, year);
 
+    /** Pass-through: the groups a variant's EPA suggestions are ranked from (#341). */
+    const getEpaSuggestionCandidates = (query) => dataService.getEpaSuggestionCandidates(query);
+
     const linkEpaTestGroup = async (vehicleId, groupId, confidence, notes) => {
         try {
             await dataService.linkEpaTestGroup(vehicleId, groupId, confidence, notes);
@@ -1825,6 +1828,7 @@ export function AppProvider({ children }) {
         deleteTestSession,
         setRunsSession,
         searchEpaTestGroups,
+        getEpaSuggestionCandidates,
         linkEpaTestGroup,
         createAndLinkEpaTestGroup,
         importEpaCsiGroups,

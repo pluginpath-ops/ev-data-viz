@@ -12,6 +12,8 @@ import SectionHeader, { SectionAction } from './SectionHeader';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import DerivedValues from './epa/DerivedValues';
 import PrimaryConfigurationPicker from './epa/PrimaryConfigurationPicker';
+import VariantEpaSuggestions from './epa/VariantEpaSuggestions';
+import { suggestionSource } from '../utils/variantEpaSuggestions';
 import EpaDerivationChecks from './epa/EpaDerivationChecks';
 import EpaCuratorEditor from './epa/EpaCuratorEditor';
 import FeGuidePicker from './epa/FeGuidePicker';
@@ -367,7 +369,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
     const [showDropdown, setShowDropdown] = useState(false);
     const [linking, setLinking]           = useState(false);
     const [showPdfModal, setShowPdfModal] = useState(false);
-    const { importEpaCsiGroups, getExistingEpaTestGroupIds, deleteEpaTestGroup } = useAppContext();
+    const { importEpaCsiGroups, getExistingEpaTestGroupIds, deleteEpaTestGroup, vehicles, getEpaSuggestionCandidates } = useAppContext();
     const [showCreate, setShowCreate]     = useState(false);
     const [createDraft, setCreateDraft]   = useState({ test_group_id: '', model_year: '', make: '', epa_carline_name: '' });
     const [creating, setCreating]         = useState(false);
@@ -375,6 +377,9 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
     const debounceRef = useRef(null);
 
     const mappings = vehicle?.epa_mappings ?? [];
+    // A variant: its source says where to look (#341). Kept after a link, for
+    // the next one. Curators only — a viewer sees links, never suggestions.
+    const variantSource = canEdit ? suggestionSource(vehicle, vehicles) : null;
 
     const handleCreate = async () => {
         const id = createDraft.test_group_id.trim();
@@ -605,11 +610,27 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                 </div>
             )}
 
+            {/* Above the linked configurations, so a link — which adds a card —
+                never moves the rows being clicked. Folded when the tab opens on
+                a vehicle already linked, where what is linked is what a reader
+                came for; keyed by vehicle so that is judged per vehicle, and a
+                link made here leaves it open for the next. */}
+            {variantSource && (
+                <VariantEpaSuggestions
+                    key={vehicle.id}
+                    vehicle={vehicle}
+                    source={variantSource}
+                    startCollapsed={mappings.length > 0}
+                    getCandidates={getEpaSuggestionCandidates}
+                    onLink={onLink}
+                />
+            )}
+
             {/* Existing mappings */}
             {mappings.length === 0 ? (
                 <p className="text-sm text-secondary mb-3">
                     No EPA test group linked yet.
-                    {canEdit && ' Use the search below to assign one.'}
+                    {canEdit && !variantSource && ' Use the search above to assign one.'}
                 </p>
             ) : (
                 <>

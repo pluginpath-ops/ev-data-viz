@@ -1745,6 +1745,29 @@ class DataService {
   }
 
   /**
+   * EPA test groups a variant's configuration might be, for the suggestions on
+   * its EPA section (#341): its source's makes and model years. Carries what
+   * the suggestion shows — label range, and the tests EPA tested is read from —
+   * and what it is ranked on. Narrowed to the model and ranked in
+   * variantEpaSuggestions.js; a make is matched loosely there too, so here it
+   * is a case-insensitive prefix rather than an exact value.
+   */
+  async getEpaSuggestionCandidates({ makes = [], years = [] } = {}) {
+    if (!this.useSupabase || !makes.length || !years.length) return [];
+    const makeFilter = makes
+      .map(m => `make.ilike.${String(m).replace(/[%_,()]/g, '')}%`)
+      .join(',');
+    const { data, error } = await getSupabase()
+      .from('epa_test_groups')
+      .select('test_group_id, model_year, make, epa_carline_name, drive, display_name, label_range_published, preferred_test_number, epa_tests(test_number, test_date, procedure_code, total_dc_energy_kwh)')
+      .in('model_year', years)
+      .or(makeFilter)
+      .limit(200);
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
    * Link a vehicle to an EPA test group.
    * Contributor-level permission enforced by RLS on epa_vehicle_mappings.
    */

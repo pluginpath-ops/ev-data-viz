@@ -5461,6 +5461,22 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply px-3 py-2 border-t;
     border-color: var(--color-border);
 }
+/* The same rows as suggestions for a variant with nothing linked (#341): no
+   radio, a Link button last, and no test weight — the label range and EPA tested
+   are what the link would give the vehicle, so they are what a fit is judged by. */
+.primary-config-option.config-suggestion {
+    grid-template-columns: minmax(10rem, 1fr) repeat(2, 6rem) 4rem;
+    cursor: default;
+}
+/* The header doubles as the fold: folded when the tab opens on a vehicle
+   already linked, since what is linked is what a reader came for. */
+.config-suggestions-toggle {
+    @apply inline-flex items-center gap-1.5 text-left;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    color: inherit;
+}
 
 /* A result's source, chosen from the one list or named as new (#327). */
 .source-picker {

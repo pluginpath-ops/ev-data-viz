@@ -173,6 +173,7 @@ status and is never chrome.
 | A curator's recorded decision that something needs no action, still visible under a filter | **a skip** — skipped, un-skip | `epa_test_groups.fe_guide_skipped_at` (link sweep), `data_check_skips` (Data Checks), `.skip-ask` |
 | A vehicle whose specs, tests, color, photo and tags come from another vehicle until set on it — the same car with a stated difference (battery, weight, wheels) | **a variant**; it **inherits from** its source. Created with **＋ Variant** | `spec_source_vehicle_id`, [vehicleInheritance.js](../src/utils/vehicleInheritance.js), [NewVariantButton.jsx](../src/components/NewVariantButton.jsx) |
 | What a variant shows that is not set on it | **inherited** — "Inherited from *source*" | `vehicle.inheritedFrom`, `.vehicle-tag.is-inherited` |
+| EPA configurations offered to a curator on a variant's EPA section, drawn from its source — each a one-click link | **suggested configurations** — "Suggested from *source*" | [variantEpaSuggestions.js](../src/utils/variantEpaSuggestions.js), [VariantEpaSuggestions.jsx](../src/components/epa/VariantEpaSuggestions.jsx), `.config-suggestion` |
 | A vehicle's values as stored, before inheritance: what an editor reads and writes | **its own** color, photo, tags | `vehicle.own`, `ownValues()` |
 | A new vehicle holding its own duplicates of another's values and tests | **a copy** — "⧉ Copy" | `duplicateVehicle` |
 | Anyone's signal that data looks right or wrong, taken together | **accuracy signals** | `votes`, `vehicles.flagged_specs`, [VoteButtons.jsx](../src/components/VoteButtons.jsx) |
@@ -202,6 +203,13 @@ configuration.
 tags or a spec, and every variant that has not set its own shows the change.
 A copy never does. The difference is why both buttons exist. Tags are one set:
 a variant with any tags of its own shows only those.
+
+**A variant never inherits its EPA configuration.** It inherits specs, tests,
+color, photo and tags, but a variant exists because something differs, and
+that almost always means a different certification: on the live data, every
+EPA range a variant would have borrowed was wrong for the car (#341). Its
+source only *suggests* where to look. EPA figures come from configurations
+linked to the vehicle itself, or are empty.
 
 **Vouch and flag mean the same act on a spec and on a run, but they are not
 the same record.** A run's vouch and flag are *counted*, one per browser
