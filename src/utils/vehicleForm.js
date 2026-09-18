@@ -10,11 +10,13 @@
  *
  * `null` for color rather than `''`: the column is nullable and null means "the
  * palette chooses", so the form's empty state and the database's are the same
- * value rather than two things that have to be mapped between.
+ * value rather than two things that have to be mapped between. `image_focal_y`
+ * is null for the same reason and reads the same way -- null means centered.
  */
 export const EMPTY_VEHICLE_FORM = {
     name: '', make: '', model: '', trim: '', year: '',
     battery: '', range: '', manufacturer_id: null, color: null,
+    image_focal_y: null,
 };
 
 /**
@@ -40,5 +42,10 @@ export function vehicleFormFrom(vehicle) {
         // and seeding the form with it would save it as the variant's own the
         // first time the form was submitted, cutting the pointer.
         color:  vehicle.own ? vehicle.own.color : (vehicle.color ?? null),
+        // Its own, for the same reason as the color: a variant showing its
+        // source's photo shows the source's focal point too, and seeding the
+        // form with that would save it onto the variant -- which would then
+        // hold a number framing a picture it does not own (#340).
+        image_focal_y: vehicle.own ? vehicle.own.image_focal_y : (vehicle.image_focal_y ?? null),
     };
 }

@@ -3,7 +3,8 @@ import { withInheritance, ownValues, variantLinkPlan } from '../vehicleInheritan
 
 const tag = (id, name) => ({ id, name });
 const v = (id, over = {}) => ({
-    id, name: `V${id}`, year: '2026', color: null, image_url: null, image_thumb_url: null, tags: [],
+    id, name: `V${id}`, year: '2026', color: null,
+    image_url: null, image_thumb_url: null, image_focal_y: null, tags: [],
     spec_source_vehicle_id: null, ...over,
 });
 const byId = (fleet) => Object.fromEntries(withInheritance(fleet).map(x => [x.id, x]));
@@ -37,12 +38,17 @@ describe('withInheritance', () => {
         expect(out[3].image_thumb_url).toBe('thumb-1.jpg');
         expect(out[3].inheritedFrom.color).toEqual({ id: 1, name: '2026 V1' });
         expect(out[3].inheritedFrom.photo.id).toBe(1);
-        expect(out[3].own).toEqual({ color: null, image_url: null, image_thumb_url: null, tags: [] });
+        expect(out[3].own).toEqual({
+            color: null, image_url: null, image_thumb_url: null, image_focal_y: null, tags: [],
+        });
     });
 
     it('keeps a vehicle’s own color and photo, and moves the photo as a pair', () => {
         const out = byId([
-            v(1, { color: '#111111', image_url: 'full-1.jpg', image_thumb_url: 'thumb-1.jpg' }),
+            v(1, {
+                color: '#111111', image_url: 'full-1.jpg', image_thumb_url: 'thumb-1.jpg',
+                image_focal_y: 20,
+            }),
             v(2, { spec_source_vehicle_id: 1, color: '#222222', image_url: 'full-2.jpg' }),
         ]);
         expect(out[2].color).toBe('#222222');
@@ -51,6 +57,23 @@ describe('withInheritance', () => {
         expect(out[2].image_url).toBe('full-2.jpg');
         expect(out[2].image_thumb_url).toBeNull();
         expect(out[2].inheritedFrom.photo).toBeNull();
+        // Nor with the source's focal point, which frames a photo this vehicle
+        // is no longer showing: its own picture starts centered.
+        expect(out[2].image_focal_y).toBeNull();
+    });
+
+    it('carries the focal point with the photo, and follows the source when it is moved', () => {
+        const fleet = [
+            v(1, { image_url: 'full-1.jpg', image_thumb_url: 'thumb-1.jpg', image_focal_y: 30 }),
+            v(2, { spec_source_vehicle_id: 1 }),
+        ];
+        expect(byId(fleet)[2].image_focal_y).toBe(30);
+        expect(byId(fleet)[2].inheritedFrom.photo.id).toBe(1);
+        expect(byId(fleet)[2].own.image_focal_y).toBeNull();
+
+        // Repositioned on the source; nothing is written to the variant.
+        fleet[0] = { ...fleet[0], image_focal_y: 72 };
+        expect(byId(fleet)[2].image_focal_y).toBe(72);
     });
 
     it('follows the source: a replaced photo reaches every variant with nothing written', () => {

@@ -9,6 +9,7 @@ import { DATA_CATEGORIES, vehicleDataCategories, hasDataCategory, filterByDataCa
 import { distanceValue, distanceUnit } from '../utils/unitConversions';
 import StatCell from './StatCell';
 import VehicleMedia from './vehicles/VehicleMedia';
+import { CARD_BAND_HEIGHT } from '../utils/cardBand';
 import TestedFigure from './vehicles/TestedFigure';
 import { testedRangeSummary } from '../utils/testedRange';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
@@ -856,7 +857,7 @@ export default function VehiclesView({
                                         scrim carrying the identity, rather than a
                                         full-card background under an 80% wash that
                                         made it unreadable AND unlookable-at. */}
-                                    <VehicleMedia vehicle={vehicle} height={140} className="is-card-band">
+                                    <VehicleMedia vehicle={vehicle} height={CARD_BAND_HEIGHT} className="is-card-band">
                                         <div className="vehicle-media-title">
                                             <h3>{vehicle.name}</h3>
                                             <p>{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
