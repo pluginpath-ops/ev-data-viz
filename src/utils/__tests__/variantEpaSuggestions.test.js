@@ -43,9 +43,9 @@ describe('suggestionSource', () => {
 });
 
 describe('candidateQuery', () => {
-    it("asks for the source configurations' makes and years, plus the variant's year", () => {
+    it("asks for the source configurations' makes and years, plus the variant's year and one either side", () => {
         const next = vehicle({ year: '2025-2026' });
-        expect(candidateQuery(next, aSpec)).toEqual({ makes: ['ACURA'], years: [2024, 2025, 2026] });
+        expect(candidateQuery(next, aSpec)).toEqual({ makes: ['ACURA'], years: [2024, 2025, 2026, 2027] });
     });
 });
 
@@ -96,17 +96,27 @@ describe('rankSuggestions', () => {
         const small = group({ make: 'NISSAN', model_year: 2026, epa_carline_name: 'NISSAN LEAF 53kWh (18 inch steel', drive: null });
         const ariya = group({ make: 'NISSAN', model_year: 2026, epa_carline_name: 'ARIYA', drive: null });
         const other = group({ make: 'KIA', model_year: 2026, epa_carline_name: 'LEAF', drive: null });
-        expect(candidateQuery(leaf)).toEqual({ makes: ['Nissan'], years: [2026] });
+        expect(candidateQuery(leaf)).toEqual({ makes: ['Nissan'], years: [2025, 2026, 2027] });
         const ranked = rankSuggestions(leaf, null, [big, small, ariya, other]);
         expect(ranked.map(s => s.group)).toEqual([big, small]);
         expect(ranked.every(s => !s.fromSource)).toBe(true);
+    });
+
+    it('finds a model year either side, and ranks the exact year first', () => {
+        // The IONIQ5 Base: recorded 2025, EPA has 2024 and 2026 Ioniq 5s only.
+        const base = vehicle({ name: 'IONIQ5 Base', make: 'Hyundai', model: 'Ioniq 5', trim: 'SR', year: '2025' });
+        const y24 = group({ make: 'Hyundai', model_year: 2024, epa_carline_name: 'Ioniq 5', drive: null });
+        const y26 = group({ make: 'Hyundai', model_year: 2026, epa_carline_name: 'Ioniq 5', drive: null });
+        const y25 = group({ make: 'Hyundai', model_year: 2025, epa_carline_name: 'Ioniq 5 XRT', drive: null });
+        expect(candidateQuery(base).years).toEqual([2024, 2025, 2026]);
+        expect(rankSuggestions(base, null, [y24, y26, y25])[0].group).toBe(y25);
     });
 
     it("searches the years of the vehicle's own links, and marks them linked", () => {
         const g2024 = group({ make: 'HYUNDAI', model_year: 2024, epa_carline_name: 'Ioniq 5', drive: null });
         const sib = group({ make: 'HYUNDAI', model_year: 2024, epa_carline_name: 'Ioniq 5 N', drive: null });
         const ioniq = vehicle({ name: 'IONIQ5', make: 'Hyundai', model: 'Ioniq 5', year: '2025', epa_mappings: linkTo(g2024) });
-        expect(candidateQuery(ioniq).years).toEqual([2024, 2025]);
+        expect(candidateQuery(ioniq).years).toEqual([2024, 2025, 2026]);
         const ranked = rankSuggestions(ioniq, null, [g2024, sib]);
         expect(ranked.find(s => s.group === g2024).linked).toBe(true);
         expect(ranked.find(s => s.group === sib).linked).toBe(false);

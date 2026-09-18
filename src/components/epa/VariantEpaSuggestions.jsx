@@ -20,6 +20,7 @@ import { candidateQuery, rankSuggestions, SUGGESTION_LIMIT } from '../../utils/v
 
 const miles = (v) => (v != null ? `${Math.round(v)} mi` : '—');
 const kwh   = (v) => (v != null ? `${Math.round(v * 10) / 10} kWh` : '—');
+const yearSpan = (ys) => (ys.length > 1 ? `${ys[0]}–${ys[ys.length - 1]}` : String(ys[0] ?? ''));
 
 export default function VariantEpaSuggestions({ vehicle, source, startCollapsed = false, getCandidates, onLink }) {
     const [open, setOpen] = useState(!startCollapsed);
@@ -125,7 +126,7 @@ export default function VariantEpaSuggestions({ vehicle, source, startCollapsed 
                 <p className="primary-config-note text-caption">
                     {source
                         ? `No other ${source.model || 'configuration'} certified in the same model year.`
-                        : `No ${[vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'configuration'} certified for ${vehicle.year || 'this model year'} in the EPA data yet.`}
+                        : `No ${[vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'configuration'} certified for ${yearSpan(query.years) || 'this model year'} in the EPA data yet.`}
                 </p>
             )}
 

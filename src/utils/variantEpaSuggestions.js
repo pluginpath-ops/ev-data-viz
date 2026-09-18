@@ -74,8 +74,9 @@ export function suggestionSource(vehicle, vehicles = []) {
 /**
  * What to fetch candidates by: the source configurations' makes and model
  * years, or the vehicle's own make and its links' years when there is no
- * source. The vehicle's own year is added, since a variant is sometimes the
- * next model year of the car it was made from.
+ * source. The vehicle's own year and one either side are added: a variant is
+ * sometimes the next model year of the car it was made from, and our model
+ * years and EPA's often disagree by one.
  */
 export function candidateQuery(variant, source = null) {
     // With no source, the vehicle's own links set the years too: the IONIQ5 is
@@ -84,7 +85,15 @@ export function candidateQuery(variant, source = null) {
     const ownMake = variant?.manufacturer?.name || variant?.make;
     return {
         makes: [...new Set(source ? groups.map(g => g.make) : [ownMake])].filter(Boolean),
-        years: [...new Set([...groups.map(g => Number(g.model_year)), ...years(variant?.year)].filter(Boolean))],
+        // A year either side of the vehicle's own: model years in our records and
+        // in EPA's drift by one, and the IONIQ5 Base (2025) sits between EPA's
+        // 2024 and 2026 Ioniq 5s with no 2025 of its own. The ranking still puts
+        // the exact year first — year orders here, it does not exclude, as in
+        // feGuideMatch.
+        years: [...new Set([
+            ...groups.map(g => Number(g.model_year)),
+            ...years(variant?.year).flatMap(y => [y - 1, y, y + 1]),
+        ].filter(Boolean))].sort((a, b) => a - b),
     };
 }
 
