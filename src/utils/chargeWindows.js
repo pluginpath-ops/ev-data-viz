@@ -44,6 +44,18 @@ export const CHARGE_WINDOWS = [5, 10, 15];
 /** Scan resolution for a window's start, in minutes. */
 const SCAN_STEP_MIN = 0.1;
 
+/**
+ * How far short of a window a whole session may fall and still fill it.
+ *
+ * A "10% + 15 min" test often logs 14.7 or 14.9 minutes — the last sample
+ * lands just before the clock does — and calling that "too short for 15
+ * minutes" throws away exactly the test the 15-minute figure is for. Within
+ * 5%, the whole session stands in for the window, averaged over the time it
+ * actually covers, and `spanMin` records that time so the figure says so.
+ * Beyond 5% the session is short: a 10-minute log is not a 15-minute answer.
+ */
+const WINDOW_TOLERANCE = 0.05;
+
 const finite = (v) => v != null && v !== '' && Number.isFinite(Number(v));
 const round1 = (n) => Math.round(n * 10) / 10;
 
@@ -83,9 +95,10 @@ function valueAt(samples, t, field) {
  *
  * @param {Array} points  [{ time (min), chargeRate (kW), soc (%) }] in any order
  * @returns {{ version, windows: Object|null, reason?, durationMin?, startSoc?, peakKw? }}
- *   `windows[5|10|15]` is `{ kw, startMin, startSoc, endSoc }`, or null with the
- *   reason in `gaps[W]` — 'short' (the session is shorter than the window) or
- *   'gap' (every placement rests on too long a gap).
+ *   `windows[5|10|15]` is `{ kw, startMin, startSoc, endSoc }` — plus `spanMin`
+ *   when a session within WINDOW_TOLERANCE of the window stood in for it — or
+ *   null with the reason in `gaps[W]`: 'short' (the session is shorter than the
+ *   window) or 'gap' (every placement rests on too long a gap).
  */
 export function summarizeChargeSession(points = []) {
     const samples = usableSamples(points);
@@ -116,8 +129,22 @@ export function summarizeChargeSession(points = []) {
     const windows = {};
     const gaps = {};
     for (const w of CHARGE_WINDOWS) {
-        if (tEnd - t0 < w - 1e-9) { windows[w] = null; gaps[w] = 'short'; continue; }
+        const duration = tEnd - t0;
         const tooLong = segments.filter(s => s.to - s.from > w / 2);
+        if (duration < w - 1e-9) {
+            // Nearly long enough: the whole session is the window (see
+            // WINDOW_TOLERANCE), with the same gap rule as any other.
+            if (duration < w * (1 - WINDOW_TOLERANCE) - 1e-9) { windows[w] = null; gaps[w] = 'short'; continue; }
+            if (tooLong.length) { windows[w] = null; gaps[w] = 'gap'; continue; }
+            windows[w] = {
+                kw: round1(cum[cum.length - 1] / (duration / 60)),
+                startMin: 0,
+                startSoc: samples[0].soc == null ? null : Math.round(samples[0].soc),
+                endSoc: samples[samples.length - 1].soc == null ? null : Math.round(samples[samples.length - 1].soc),
+                spanMin: round1(duration),
+            };
+            continue;
+        }
         // Every sample time and every sample time minus the window, plus a fine
         // grid: the energy of a sliding window over a piecewise-linear curve
         // peaks at a breakpoint or between them, and the grid catches between.

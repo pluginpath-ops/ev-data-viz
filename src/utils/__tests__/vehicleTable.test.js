@@ -341,6 +341,11 @@ describe('tested charging columns (#346)', () => {
         expect(formatVehicleCell(row, vehicleColumnByKey('tested.charge_best_15min_kw'))).toBe('187');
     });
 
+    it('says when a session a little short of the window stood in for it', () => {
+        const [row] = buildVehicleRows([vehicle({ chargeBest: { 15: { kw: 150, startSoc: 10, endSoc: 52, spanMin: 14.7 } } })]);
+        expect(row.notes['tested.charge_best_15min_kw']).toBe('10→52% · over 14.7 min');
+    });
+
     it('arrives with the vehicle, so it never triggers the performance fetch', () => {
         expect(needsPerformance(['name', 'tested.charge_best_15min_kw'])).toBe(false);
         expect(needsPerformance(['name', 'tested.quarter_mile_sec'])).toBe(true);

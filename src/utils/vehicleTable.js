@@ -436,6 +436,8 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
 function chargeNote(best, units) {
     const parts = [];
     if (best.startSoc != null && best.endSoc != null) parts.push(`${best.startSoc}→${best.endSoc}%`);
+    // A session a few seconds short of the window stood in for it.
+    if (best.spanMin != null) parts.push(`over ${best.spanMin} min`);
     if (best.temperatureF != null) {
         parts.push(units === 'metric' ? `${Math.round((best.temperatureF - 32) * 5 / 9)}°C` : `${Math.round(best.temperatureF)}°F`);
     }

@@ -52,6 +52,18 @@ describe('summarizeChargeSession', () => {
         expect(s.windows[15].kw).toBe(100);
     });
 
+    it('lets a session a few seconds short of a window stand in for it, and says so', () => {
+        // A "10% + 15 min" test that logged 14.7 minutes.
+        const s = summarizeChargeSession(session({ minutes: 14.7, step: 0.1, kwAt: () => 180 }));
+        expect(s.windows[15]).toMatchObject({ kw: 180, spanMin: 14.7, startSoc: 10, endSoc: 25 });
+        expect(s.windows[10].spanMin).toBeUndefined();
+        // 5% is the limit: 14.2 minutes is short for 15.
+        expect(summarizeChargeSession(session({ minutes: 14.2, step: 0.1 })).gaps[15]).toBe('short');
+        // And the gap rule still applies to a stand-in.
+        const sparse = summarizeChargeSession([{ time: 0, chargeRate: 100 }, { time: 9, chargeRate: 100 }, { time: 14.6, chargeRate: 100 }]);
+        expect(sparse.gaps[15]).toBe('gap');
+    });
+
     it('marks a window longer than the session as short', () => {
         const s = summarizeChargeSession(session({ minutes: 12 }));
         expect(s.windows[10].kw).toBe(100);
