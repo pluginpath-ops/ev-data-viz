@@ -31,6 +31,23 @@ describe('summarizeChargeSession', () => {
         expect(s.windows[15].kw).toBeLessThan(s.windows[5].kw);
     });
 
+    it('places a window between samples, interpolating power across the partial stretches', () => {
+        // Power climbs 20 kW a minute to 200 at minute 10, sampled every 2
+        // minutes, then drops to 0 by minute 11. The best 5 minutes starts
+        // near 5.45 — between the samples at 4 and 6 — and averages ~154.5 kW.
+        // Snapped to samples, the best would read 150 (from 5) or 148 (from 6).
+        const pts = [0, 2, 4, 6, 8, 10].map(t => ({ time: t, chargeRate: 20 * t, soc: 10 + t }));
+        pts.push({ time: 11, chargeRate: 0, soc: 21 });
+        const win = summarizeChargeSession(pts).windows[5];
+        expect(win.startMin).toBeGreaterThan(4);
+        expect(win.startMin).toBeLessThan(6);
+        expect(win.kw).toBeCloseTo(154.5, 0);
+        // Divided by the full 5 minutes, not by the span between the samples
+        // inside it: a window from 5.5 holds power at 110 kW (interpolated
+        // between 4 and 6) for its first half-minute.
+        expect(win.kw).toBeGreaterThan(150);
+    });
+
     it('weights by time, not by how densely a stretch was logged', () => {
         // Dense logging of a slow stretch must not drag down the average: 200 kW
         // for 10 minutes read every 2 minutes, then 100 kW logged every 6 seconds.
