@@ -52,12 +52,14 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
                      'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
-                     'vehicleInheritance.js', 'cardBand.js', 'variantEpaSuggestions.js'];
+                     'vehicleInheritance.js', 'cardBand.js', 'variantEpaSuggestions.js', 'chargeWindows.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
         'sources.domainOf':
             'Reached through findSource and pickedSource; exported so link reading is tested on its own.',
+        'chargeWindows.countsTowardBest':
+            'Reached through bestChargeWindows; exported so which sessions count is tested on its own.',
         'publishedResultsBatch.splitBatchText':
             'Reached through readBatch; exported so header splitting is tested on its own.',
         'publishedResultsBatch.matchVehicle':
@@ -735,6 +737,23 @@ describe('the seams that broke before', () => {
         }
         expect(read('src/components/epa/guide/GuideColumnPicker.jsx')).toMatch(/<ColumnPicker/);
         expect(table).toMatch(/<ColumnPicker/);
+        // Charging summaries (#346): every call that writes a session's points
+        // re-summarizes it, or the table's charge rate silently goes stale after
+        // the first edit. Import, duplicate and copy all go through addRun.
+        const ds = read('src/services/DataService.js');
+        const body = (name) => ds.slice(ds.indexOf(`async ${name}(`), ds.indexOf('\n  async ', ds.indexOf(`async ${name}(`) + 1));
+        expect(body('addRun'), 'addRun must summarize').toMatch(/writeChargeSummary\(/);
+        expect(body('mergeRunData'), 'mergeRunData must summarize').toMatch(/refreshChargeSummary\(/);
+        expect(body('replaceRunData'), 'replaceRunData must summarize').toMatch(/writeChargeSummary\(/);
+        for (const name of ['duplicateRun', 'copyRunToVehicle', 'importTableauSessions']) {
+            expect(body(name), `${name} must write through addRun`).toMatch(/this\.addRun\(/);
+        }
+        // ...the best is chosen where every vehicle figure is, never stored...
+        expect(read('src/utils/vehicleFigures.js')).toMatch(/chargeBest: bestChargeWindows\(/);
+        expect(ds, 'the per-vehicle best is read-time only').not.toMatch(/chargeBest|charge_best/);
+        // ...and a curator can reach the backfill.
+        expect(read('src/components/admin/DataChecksPanel.jsx')).toMatch(/<ChargeSummaryMaintenance/);
+
         // Presets (#335) go through the shared picker, and every column change
         // goes through the path that remembers which preset it left.
         expect(table).toMatch(/<PresetPicker/);

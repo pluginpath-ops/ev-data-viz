@@ -16,8 +16,10 @@
  *                        with the source that set it (performanceDerivations)
  *   every spec field     through inheritance, in schema order
  *   Calculated           ratios of the above, worked out per row (#335)
+ *   Tested charging      the best 5/10/15-minute average charge rate across
+ *                        the vehicle's charging sessions (#346)
  *
- * Tested range and charging data are deliberately not here yet. The plan for
+ * Tested range data is deliberately not here yet. The plan for
  * choosing which tested figure a row shows is on #335: best result for what a
  * car is capable of, the vehicle's default test WITH its conditions for what
  * depends on conditions.
@@ -39,6 +41,7 @@ import { deriveTested } from './performanceDerivations';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from './vehicleFigures';
 import { sortByColumn, barMaximaOf, barPercentOf } from './tableColumns';
 import { VEHICLE_TABLE_PRESETS } from './vehicleTablePresets';
+import { CHARGE_WINDOWS } from './chargeWindows';
 
 // ── Units ───────────────────────────────────────────────────────────────────
 
@@ -105,6 +108,21 @@ const TESTED_COLUMNS = [
     { key: 'tested.top_speed_mph',         label: 'Top speed (tested)', unitGroup: 'speed', better: 'higher' },
     { key: 'tested.skidpad_g',             label: 'Skidpad',     unit: 'g', better: 'higher' },
 ].map(c => ({ ...c, group: 'Tested performance', numeric: true, bar: true }));
+
+/**
+ * EVBench's own charge rate (#346): the best 5, 10 and 15-minute average
+ * across the vehicle's charging sessions, chosen in vehicleFigures.js from
+ * summaries stored on each session. Beneath each figure, where the window sat
+ * and the session's temperature, so a best set on a warm day says so.
+ */
+const CHARGING_COLUMNS = CHARGE_WINDOWS.map(w => ({
+    key: `tested.charge_best_${w}min_kw`, window: w,
+    label: `Best ${w}-min charge`, unit: 'kW', better: 'higher', digits: 0,
+    group: 'Tested charging', numeric: true, bar: true, scale: 'chargeBest',
+    hint: w === 15
+        ? 'The highest average charge rate over any 15 minutes of the vehicle’s own charging sessions: what a real stop delivers. Beneath it, where the window sat and the session’s temperature.'
+        : `The highest average charge rate over any ${w} minutes of the vehicle’s charging sessions — shows a boost window a spec’s peak kW overstates and a curve undersells. Beneath it, where the window sat.`,
+}));
 
 /**
  * Calculated columns (#335): ratios of figures the table already holds.
@@ -287,7 +305,7 @@ const SPEC_COLUMNS = SPEC_CATEGORIES.flatMap(cat => cat.fields.map(f => {
 }));
 
 /** Every column the table can show, in picker order. */
-export const VEHICLE_COLUMNS = [...IDENTITY_COLUMNS, ...FIGURE_COLUMNS, ...CALCULATED_COLUMNS, ...TESTED_COLUMNS, ...SPEC_COLUMNS];
+export const VEHICLE_COLUMNS = [...IDENTITY_COLUMNS, ...FIGURE_COLUMNS, ...CALCULATED_COLUMNS, ...TESTED_COLUMNS, ...CHARGING_COLUMNS, ...SPEC_COLUMNS];
 
 const BY_KEY = new Map(VEHICLE_COLUMNS.map(c => [c.key, c]));
 export const vehicleColumnByKey = (key) => BY_KEY.get(key) ?? null;
@@ -326,8 +344,9 @@ export function presetMatching(columns = []) {
     return PRESETS.find(p => sameColumns(p.columns, columns)) ?? null;
 }
 
-/** Whether any of these column keys needs performance results fetched. */
-export const needsPerformance = (keys = []) => keys.some(k => String(k).startsWith('tested.'));
+const PERFORMANCE_KEYS = new Set(TESTED_COLUMNS.map(c => c.key));
+/** Whether any of these column keys needs performance results fetched. Charging figures arrive with the vehicle. */
+export const needsPerformance = (keys = []) => keys.some(k => PERFORMANCE_KEYS.has(k));
 
 // ── Rows ────────────────────────────────────────────────────────────────────
 
@@ -373,6 +392,12 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         values['figures.epaCityMi'] = vehicle.epaRange?.cityMi ?? null;
         values['figures.epaHwyMi'] = vehicle.epaRange?.hwyMi ?? null;
 
+        for (const col of CHARGING_COLUMNS) {
+            const best = vehicle.chargeBest?.[col.window] ?? null;
+            values[col.key] = best?.kw ?? null;
+            notes[col.key] = best ? chargeNote(best, units) : null;
+        }
+
         if (performance) {
             const perf = performance[vehicle.id] ?? { sessions: [], summaries: [] };
             for (const col of TESTED_COLUMNS) {
@@ -401,6 +426,23 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
 
         return { id: vehicle.id, index, vehicle, values, notes, flagged };
     });
+}
+
+/**
+ * What sits beneath a charge rate: where the window was, how warm the session
+ * was, and — the one caveat that could flatter it — time worked out from a
+ * capacity rather than logged.
+ */
+function chargeNote(best, units) {
+    const parts = [];
+    if (best.startSoc != null && best.endSoc != null) parts.push(`${best.startSoc}→${best.endSoc}%`);
+    // A session a few seconds short of the window stood in for it.
+    if (best.spanMin != null) parts.push(`over ${best.spanMin} min`);
+    if (best.temperatureF != null) {
+        parts.push(units === 'metric' ? `${Math.round((best.temperatureF - 32) * 5 / 9)}°C` : `${Math.round(best.temperatureF)}°F`);
+    }
+    if (best.timeDerived) parts.push('time derived');
+    return parts.join(' · ') || null;
 }
 
 /** One cell's text. Absent is an em dash — a fact, not a zero. */

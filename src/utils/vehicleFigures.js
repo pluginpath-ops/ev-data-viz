@@ -50,6 +50,7 @@ import { resolveEffectiveSpecs } from './specHelpers';
 import { epaConfigurationFigures, primaryEpaMapping } from './epaConfiguration';
 import { TESTED_CAPACITY_TOLERANCE_PCT } from '../constants/epa';
 import { distanceValue, distanceUnit } from './unitConversions';
+import { bestChargeWindows } from './chargeWindows';
 
 // Absent stays absent: Number(null) is 0, and a 0 kWh pack is a figure the data
 // never gave.
@@ -235,6 +236,10 @@ export function withVehicleFigures(vehicles = []) {
             epaRangeMi: range.mi,
             epaRangeBasis: range.basis,
             epaRange: range,
+            // The best 5/10/15-minute charge rate across the vehicle's own
+            // charging sessions (#346). Chosen here, on every change to its
+            // runs, and never stored — see chargeWindows.js.
+            chargeBest: bestChargeWindows(vehicle.runs ?? []),
         };
     });
 }

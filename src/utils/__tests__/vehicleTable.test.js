@@ -328,3 +328,26 @@ describe('assumptions (#335)', () => {
         expect(decodeVehicleTableParams('vt_add=nope').assumptions.addDistance).toBe(150);
     });
 });
+
+describe('tested charging columns (#346)', () => {
+    const best = { kw: 187.4, startSoc: 9, endSoc: 48, temperatureF: 41, timeDerived: true };
+    it('reads the vehicle\'s best window, with where it sat and how warm it was beneath', () => {
+        const [row] = buildVehicleRows([vehicle({ chargeBest: { 5: null, 10: null, 15: best } })]);
+        expect(row.values['tested.charge_best_15min_kw']).toBe(187.4);
+        expect(row.notes['tested.charge_best_15min_kw']).toBe('9→48% · 41°F · time derived');
+        expect(row.values['tested.charge_best_5min_kw']).toBeNull();
+        const [metric] = buildVehicleRows([vehicle({ chargeBest: { 15: best } })], { units: 'metric' });
+        expect(metric.notes['tested.charge_best_15min_kw']).toBe('9→48% · 5°C · time derived');
+        expect(formatVehicleCell(row, vehicleColumnByKey('tested.charge_best_15min_kw'))).toBe('187');
+    });
+
+    it('says when a session a little short of the window stood in for it', () => {
+        const [row] = buildVehicleRows([vehicle({ chargeBest: { 15: { kw: 150, startSoc: 10, endSoc: 52, spanMin: 14.7 } } })]);
+        expect(row.notes['tested.charge_best_15min_kw']).toBe('10→52% · over 14.7 min');
+    });
+
+    it('arrives with the vehicle, so it never triggers the performance fetch', () => {
+        expect(needsPerformance(['name', 'tested.charge_best_15min_kw'])).toBe(false);
+        expect(needsPerformance(['name', 'tested.quarter_mile_sec'])).toBe(true);
+    });
+});

@@ -1,3 +1,4 @@
+import ChargeSummaryMaintenance from './ChargeSummaryMaintenance';
 import { useState, useMemo, useCallback } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
@@ -549,7 +550,13 @@ export default function DataChecksPanel() {
                 comes back if its values change.
             </p>
 
-            <h4 className="subsection-title">Limits</h4>
+            {/* First, not last: it is the one section with a button a curator
+                must press after a deploy, and at the foot of a long findings
+                list it went unseen. */}
+            <h4 className="subsection-title">Charging summaries</h4>
+            <ChargeSummaryMaintenance />
+
+            <h4 className="subsection-title mt-6">Limits</h4>
             <p className="text-note mb-2">
                 Change a limit and every count below updates at once. Nothing is saved until you
                 keep it — kept values show as local in Model Constants, which is where they are
