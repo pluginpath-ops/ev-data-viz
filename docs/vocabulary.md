@@ -32,7 +32,7 @@ a house one, so that a new reader already knows it.
 | Anything that floats above the page | **popover** | common web | `.popover` + one `.popover--<placement>` |
 | Where it opens relative to its anchor | **placement** | Floating UI *placement* | `--above`, `--below`, `--center`, `--right`, `--end`, `--stretch` |
 | A row of them above a table or chart | **controls strip** | — | `.controls-strip` — one class, shared |
-| One choice, always visible, of two or three | **segmented control** | Apple HIG *segmented control* | `.stats-segmented`, `.account-segmented` |
+| One choice, always visible, of two or three — or more when every option is a short word and the row may scroll sideways (the preset picker's seven) | **segmented control** | Apple HIG *segmented control* | `.stats-segmented`, `.account-segmented`; `.preset-picker` wraps one |
 | Row 3 — the removable selected-vehicle pills | **chips** | Material *input chips* | `.selected-strip`, `.selected-vehicle-chip` |
 | The capped box the chips scroll inside | **chip scroller** | — | `.selected-chip-scroll` — two rows, then it scrolls |
 | The centred max-width content column | **page container** | — | `.page-container` |
@@ -260,6 +260,10 @@ it; read it as a *reference band* where it appears.
 | A vehicle chosen for the whole app, driving every chart | **selected** | ARIA `aria-selected` | `selectedVehicles` in [App.jsx](../src/App.jsx), `toggleVehicleSelection`, the chips |
 | A proportional fill behind a value, scaled per column | **a bar cell** | — | `computeBarMaxima()` in [feGuideBrowse.js](../src/utils/feGuideBrowse.js) |
 | Choosing which columns show, and in what order | **the column picker** | — | [ColumnPicker.jsx](../src/components/tables/ColumnPicker.jsx), shared by both tables |
+| A named set of columns, in order, with a sort, answering one question (Road trips, Value, Efficiency) | **a preset** — on screen the row is labelled **"Compare for"** and the word appears only in its tooltip. Not "view": #338 makes the vehicle table the Table *view* of the Vehicles tab | common web | [vehicleTablePresets.js](../src/utils/vehicleTablePresets.js), [PresetPicker.jsx](../src/components/tables/PresetPicker.jsx) (**the preset picker**), `.preset-picker` |
+| A preset whose columns have since been changed | **modified** — "modified from Value" | — | `modifiedFrom`, `vt_preset` beside `vt_cols` |
+| A column worked out per row from other columns (efficiency, price ÷ range) | **a calculated column** | — | `CALCULATED_COLUMNS` in [vehicleTable.js](../src/utils/vehicleTable.js) |
+| An input the reader sets for calculated columns (how far a charging stop should take them) | **an assumption**; the menu is **Assumptions** | common in calculators | [VehicleTableAssumptions.jsx](../src/components/VehicleTableAssumptions.jsx), `DEFAULT_ASSUMPTIONS`, `vt_add` |
 | The cell at the top of a table column — click sorts by it, drag moves it. Always qualified: "header" alone is the top of the page | **a column header** | HTML `<th>`; common web | [SortHeader.jsx](../src/components/tables/SortHeader.jsx); dragging goes through [useColumnDrag.js](../src/hooks/useColumnDrag.js), the same order the column picker drags |
 | Every vehicle a row, any field a column, over the whole fleet | **the vehicle table** — "Vehicle Table" in the sub-nav; it replaced Compare Specs (#315) | — | [VehicleTable.jsx](../src/components/VehicleTable.jsx), [vehicleTable.js](../src/utils/vehicleTable.js); mode key stays `specstable` |
 | The band of selected vehicles at the top of the vehicle table | **the selected band** | — | `.vehicle-table-band` — the pinned band's look, a selection's meaning |

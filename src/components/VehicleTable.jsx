@@ -23,6 +23,8 @@ import { useAppContext } from '../context/AppContext';
 import { useAsyncResource } from '../hooks/useAsyncResource';
 import SortHeader from './tables/SortHeader';
 import ColumnPicker from './tables/ColumnPicker';
+import PresetPicker from './tables/PresetPicker';
+import VehicleTableAssumptions from './VehicleTableAssumptions';
 import useColumnDrag from '../hooks/useColumnDrag';
 import TableCell from './tables/TableCell';
 import { useCellPeek } from '../hooks/useCellPeek';
@@ -35,7 +37,8 @@ import {
     vehicleColumnByKey, unitFor, needsPerformance, buildVehicleRows, formatVehicleCell,
     filterVehicleRows, sortVehicleRows, firstSortDir, vehicleFacets, facetValues,
     vehicleBarMaxima, vehicleBarPercent, encodeVehicleTableParams, decodeVehicleTableParams,
-    vehicleTableStartSearch, vehicleTableMemory,
+    vehicleTableStartSearch, vehicleTableMemory, PRESETS, vehiclePresetByKey, presetMatching,
+    labelledColumn, needsAssumptions,
 } from '../utils/vehicleTable';
 
 /*
@@ -129,6 +132,13 @@ export default function VehicleTable() {
     const [sortKey, setSortKey] = useState(initial.sortKey);
     const [sortDir, setSortDir] = useState(initial.sortDir);
     const [filters, setFilters] = useState(initial.filters);
+    const [assumptions, setAssumptions] = useState(initial.assumptions);
+    // The preset the columns last WERE, kept so a changed set can say what it
+    // was changed from. Which preset is showing is never stored: it is read
+    // off the columns (presetMatching).
+    const [origin, setOrigin] = useState(initial.modifiedFrom ?? presetMatching(initial.columns)?.key ?? null);
+    const shownPreset = presetMatching(columns);
+    const modifiedFrom = shownPreset ? null : origin;
     const [viewing, setViewing] = useState(null);
 
     // The table's own parameters, merged into whatever else the query holds.
@@ -138,12 +148,12 @@ export default function VehicleTable() {
         for (const key of [...params.keys()]) {
             if (key.startsWith(VEHICLE_TABLE_PARAM_PREFIX)) params.delete(key);
         }
-        for (const [key, value] of encodeVehicleTableParams({ columns, sortKey, sortDir, filters })) {
+        for (const [key, value] of encodeVehicleTableParams({ columns, sortKey, sortDir, filters, modifiedFrom, assumptions })) {
             params.append(key, value);
         }
         window.history.replaceState(window.history.state, '', `?${params.toString()}`);
-        writeMemory(vehicleTableMemory({ columns, sortKey, sortDir, filters }));
-    }, [columns, sortKey, sortDir, filters]);
+        writeMemory(vehicleTableMemory({ columns, sortKey, sortDir, filters, modifiedFrom, assumptions }));
+    }, [columns, sortKey, sortDir, filters, modifiedFrom, assumptions]);
 
     // Tested results are fetched only while a tested column is shown or sorted
     // by: sessions carry every run and split, which is the heaviest read here.
@@ -162,13 +172,33 @@ export default function VehicleTable() {
     // One peek for every clipped cell in the table, rather than one per cell.
     const { tableProps: peekProps, panel: cellPeek } = useCellPeek();
 
-    const rows     = useMemo(() => buildVehicleRows(vehicles, { performance }), [vehicles, performance]);
+    const rows     = useMemo(
+        () => buildVehicleRows(vehicles, { performance, assumptions, units }),
+        [vehicles, performance, assumptions, units],
+    );
     const facets   = useMemo(() => vehicleFacets(rows), [rows]);
     const filtered = useMemo(() => filterVehicleRows(rows, filters), [rows, filters]);
     const sorted   = useMemo(() => sortVehicleRows(filtered, sortKey, sortDir), [filtered, sortKey, sortDir]);
+    /** Every column change goes through here, so the preset it leaves is remembered. */
+    const changeColumns = (next) => {
+        if (shownPreset) setOrigin(shownPreset.key);
+        setColumns(next);
+    };
+    /** A preset brings its columns and its sort; filters are the reader's and stay. */
+    const pickPreset = (key) => {
+        const preset = vehiclePresetByKey(key);
+        if (!preset) return;
+        setOrigin(preset.key);
+        setColumns(preset.columns);
+        setSortKey(preset.sortKey);
+        setSortDir(preset.sortDir);
+    };
     // Headers drag the same list the column picker does.
-    const { dragProps, dragClass } = useColumnDrag({ visible: columns, fixedKey: 'name', onChange: setColumns });
-    const cols     = useMemo(() => columns.map(vehicleColumnByKey).filter(Boolean), [columns]);
+    const { dragProps, dragClass } = useColumnDrag({ visible: columns, fixedKey: 'name', onChange: changeColumns });
+    // Named from the assumptions where a name carries one ("Time to add 150 mi").
+    const label    = useCallback((col) => labelledColumn(col, assumptions, units), [assumptions, units]);
+    const cols     = useMemo(() => columns.map(vehicleColumnByKey).filter(Boolean).map(label), [columns, label]);
+    const pickable = useMemo(() => VEHICLE_COLUMNS.map(label), [label]);
     const maxima   = useMemo(() => vehicleBarMaxima(filtered, cols), [filtered, cols]);
 
     /**
@@ -209,6 +239,12 @@ export default function VehicleTable() {
     return (
         <div className="vehicle-table">
             <div className="guide-filter-strip">
+                <PresetPicker
+                    presets={PRESETS}
+                    activeKey={shownPreset?.key}
+                    modifiedKey={modifiedFrom}
+                    onPick={pickPreset}
+                />
                 <div className="guide-filter-row">
                     <input
                         type="search"
@@ -229,13 +265,16 @@ export default function VehicleTable() {
                             onClear={() => setFilters(prev => ({ ...prev, [f.key]: [] }))}
                         />
                     ))}
+                    {needsAssumptions(columns) && (
+                        <VehicleTableAssumptions assumptions={assumptions} units={units} onChange={setAssumptions} />
+                    )}
                     <ColumnPicker
-                        columns={VEHICLE_COLUMNS}
+                        columns={pickable}
                         visible={columns}
                         defaults={DEFAULT_VEHICLE_COLUMNS}
                         fixedKey="name"
                         unitOf={col => unitFor(col, units)}
-                        onChange={setColumns}
+                        onChange={changeColumns}
                     />
                     <div className="guide-filter-tally">
                         {wantsPerformance && performanceLoading && <span className="text-meta">loading tested results…</span>}
