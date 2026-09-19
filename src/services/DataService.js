@@ -8,6 +8,7 @@ import { rankFeCandidates } from '../utils/feGuideMatch';
 import { promotionUpdates, demotionUpdates, acceptGuideUpdates, isCuratorOwned } from '../utils/feGuidePromotion';
 import { selectTestForGuide } from '../utils/epaTestSelection';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
+import { summarizeChargeSession, isCurrentSummary } from '../utils/chargeWindows';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
 const roundField = roundTo;
@@ -1042,8 +1043,65 @@ class DataService {
         await getSupabase().from('runs').update(fieldsUpdate).eq('id', newRun.id);
         Object.assign(newRun, fieldsUpdate);
       }
+      // Summarized from the points in hand — they were just written, so
+      // reading them back would only cost a round trip. Import, duplicate and
+      // copy all arrive here.
+      if (newRun.kind === 'charging') {
+        newRun.charge_summary = await this.writeChargeSummary(newRun.id, run.data);
+      }
     }
     return { ...newRun, data: run.data };
+  }
+
+  // ── Charging summaries (#346) ─────────────────────────────────────────────
+  //
+  // A charging session's best 5/10/15-minute average charge rate, stored on
+  // runs.charge_summary (migration 071) and recomputed by every call that
+  // writes the session's points: addRun, mergeRunData, replaceRunData. The
+  // wiring suite holds all three to it. Each vehicle's best is chosen at read
+  // time (vehicleFigures.js), never stored.
+
+  /**
+   * Summarize points and store the result. A failure here never fails the
+   * write that called it: the points are saved, and a stale or missing summary
+   * is exactly what the Admin backfill recomputes.
+   */
+  async writeChargeSummary(runId, points) {
+    try {
+      const summary = { ...summarizeChargeSession(points), computedAt: new Date().toISOString() };
+      const { error } = await getSupabase().from('runs').update({ charge_summary: summary }).eq('id', runId);
+      if (error) throw error;
+      return summary;
+    } catch (err) {
+      console.warn('[DataService] charge summary not written for run', runId, err?.message ?? err);
+      return null;
+    }
+  }
+
+  /** Re-read a session's points and re-summarize it; null for a range test. */
+  async refreshChargeSummary(runId) {
+    const { data: run } = await getSupabase().from('runs').select('kind').eq('id', runId).single();
+    if (run?.kind !== 'charging') return null;
+    return this.writeChargeSummary(runId, await this.getRunData(runId));
+  }
+
+  /**
+   * Summarize every charging session whose summary is missing or from an older
+   * version of the calculation (Admin → Data checks). One session at a time:
+   * each read is a whole time series, and a backfill has no deadline.
+   */
+  async backfillChargeSummaries({ all = false, onProgress } = {}) {
+    const { data: runs, error } = await getSupabase()
+      .from('runs').select('id, charge_summary').eq('kind', 'charging');
+    if (error) throw error;
+    const todo = (runs ?? []).filter(r => all || !isCurrentSummary(r.charge_summary));
+    let written = 0, failed = 0;
+    for (const [i, r] of todo.entries()) {
+      const summary = await this.writeChargeSummary(r.id, await this.getRunData(r.id));
+      if (summary) written++; else failed++;
+      onProgress?.({ done: i + 1, total: todo.length });
+    }
+    return { checked: runs?.length ?? 0, written, failed };
   }
 
   async updateRun(vehicleId, runId, updates) {
@@ -1481,8 +1539,11 @@ class DataService {
       await getSupabase().from('runs').update({ populated_fields: merged }).eq('id', runId);
       result.populatedFields = merged;
     }
+    // A merge can add the time or power a summary needs, so the whole
+    // session is re-read: the merged rows alone are only part of it.
+    result.chargeSummary = await this.refreshChargeSummary(runId);
 
-    return result; // { updated: N, inserted: M, populatedFields?: [...] }
+    return result; // { updated: N, inserted: M, populatedFields?: [...], chargeSummary }
   }
 
   /**
@@ -1513,7 +1574,11 @@ class DataService {
     const populatedFields = detectPopulatedFields(points);
     await getSupabase().from('runs').update({ populated_fields: populatedFields }).eq('id', runId);
 
-    return { rowCount: points.length, populatedFields };
+    // The points in hand ARE the session now, so no re-read.
+    const { data: kindRow } = await getSupabase().from('runs').select('kind').eq('id', runId).single();
+    const chargeSummary = kindRow?.kind === 'charging' ? await this.writeChargeSummary(runId, points) : null;
+
+    return { rowCount: points.length, populatedFields, chargeSummary };
   }
 
   async signOut() {

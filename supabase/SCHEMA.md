@@ -99,6 +99,7 @@ One charging or range test session per vehicle.
 | `trim_id` | `bigint` | `NULL` | FK → `trims.id` ON DELETE SET NULL. Which trim/wheel/tire config was used for this test. |
 | `populated_fields` | `text[]` | — | Which data columns have values: `['soc','chargeRate','time','range','temperature']` |
 | `calculated_fields` | `text[]` | — | Fields computed rather than measured |
+| `charge_summary` | `jsonb` | `NULL` | Charging sessions only: best 5/10/15-minute average charge rate and where each window sat, with a calculation `version`. Computed client-side (`utils/chargeWindows.js`) whenever the session's points are written; null until then (migration 071, #346) |
 | `created_at` | `timestamptz` | `now()` | |
 
 > Runs have no `user_id`. Ownership and edit permission are inherited from the parent vehicle via RLS subquery joins.

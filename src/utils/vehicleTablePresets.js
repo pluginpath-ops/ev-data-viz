@@ -58,7 +58,8 @@ export const VEHICLE_TABLE_PRESETS = [
         columns: [
             'name', 'charging.battery_usable_kwh', 'powertrain.battery_gross_kwh', 'calc.batteryBuffer',
             'charging.battery_nominal_voltage_v', 'calc.is800v', 'charging.max_dc_kw',
-            'calc.avgKw10to80', 'calc.peakCRate', 'powertrain.motor_type',
+            'calc.avgKw10to80', 'tested.charge_best_5min_kw', 'tested.charge_best_15min_kw',
+            'calc.peakCRate', 'powertrain.motor_type',
             'suspension.adaptive_damping', 'suspension.adjustable_height',
             'compute.processing_chip', 'compute.lidar',
         ],
@@ -70,7 +71,8 @@ export const VEHICLE_TABLE_PRESETS = [
         description: 'Range, and how much of it a charging stop puts back per minute.',
         columns: [
             'name', 'figures.epaRangeMi', 'figures.epaHwyMi', 'charging.max_dc_kw',
-            'charging.charge_time_10_to_80_pct_min', 'calc.rangePerChargeMin', 'calc.timeToAdd', 'charging.charge_port',
+            'charging.charge_time_10_to_80_pct_min', 'tested.charge_best_15min_kw',
+            'calc.rangePerChargeMin', 'calc.timeToAdd', 'charging.charge_port',
             'interior.seating', 'calc.totalCargo', 'interior.max_cargo_cuft',
             'interior.front_heated_seats', 'interior.heated_steering_wheel', 'interior.hud',
         ],

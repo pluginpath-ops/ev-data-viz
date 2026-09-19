@@ -465,7 +465,7 @@ export function AppProvider({ children }) {
             setVehicles(prev => prev.map(v =>
                 v.id === vehicleId
                     ? { ...v, runs: v.runs.map(r => r.id === runId
-                        ? { ...r, populated_fields: result.populatedFields, dataPointCount: result.rowCount }
+                        ? { ...r, populated_fields: result.populatedFields, dataPointCount: result.rowCount, charge_summary: result.chargeSummary ?? r.charge_summary }
                         : r) }
                     : v
             ));
@@ -483,10 +483,14 @@ export function AppProvider({ children }) {
             // No need to call initializeApp() — run cards don't display data-point
             // values loaded from DB, and ChartView fetches fresh via getRunData().
             // If the service returned updated populated_fields, sync them into state.
-            if (result?.populatedFields) {
+            if (result?.populatedFields || result?.chargeSummary) {
                 setVehicles(prev => prev.map(v =>
                     v.id === vehicleId
-                        ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, populated_fields: result.populatedFields } : r) }
+                        ? { ...v, runs: v.runs.map(r => r.id === runId ? {
+                            ...r,
+                            populated_fields: result.populatedFields ?? r.populated_fields,
+                            charge_summary: result.chargeSummary ?? r.charge_summary,
+                        } : r) }
                         : v
                 ));
             }
@@ -776,6 +780,14 @@ export function AppProvider({ children }) {
         // context did not touch, and a partial run must not leave the grid
         // claiming thumbnails that were not written.
         if (result.updated > 0) await softRefreshVehicles();
+        return result;
+    };
+
+    const backfillChargeSummaries = async (opts) => {
+        const result = await dataService.backfillChargeSummaries(opts);
+        // Re-read, as the thumbnail backfill does: it wrote rows this context
+        // never touched, and every vehicle's best is chosen from them.
+        if (result.written > 0) await softRefreshVehicles();
         return result;
     };
 
@@ -1790,6 +1802,7 @@ export function AppProvider({ children }) {
         syncVehicleTags,
         uploadVehicleImage,
         backfillVehicleThumbnails,
+        backfillChargeSummaries,
         toggleVehicleVisibility,
         replaceRunData,
         mergeRunData,
