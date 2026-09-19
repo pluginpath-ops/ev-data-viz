@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import MenuButton from '../shell/MenuButton';
 import useColumnDrag from '../../hooks/useColumnDrag';
 
@@ -96,23 +97,26 @@ export default function ColumnPicker({ columns, visible, defaults, fixedKey, onC
                                     of this list is the table you are looking at,
                                     and the bottom is what you could add to it. */}
                                 <div className="guide-column-divider text-nano">Not shown</div>
-                                {hidden.map(col => {
+                                {hidden.map((col, i) => {
                                     const unit = unitOf(col);
+                                    // The group once, as a heading, rather than
+                                    // "Tested performance · " on every row — at
+                                    // menu width the prefix left the name "0–60 …".
+                                    const heading = col.group && col.group !== hidden[i - 1]?.group;
                                     return (
-                                        <button
-                                            key={col.key}
-                                            type="button"
-                                            className="guide-column-row is-hidden"
-                                            onClick={() => toggle(col.key)}
-                                            title={col.hint || `Show ${col.label}`}
-                                        >
-                                            <span className="guide-column-grip" aria-hidden="true">+</span>
-                                            <span className="guide-column-name">
-                                                {col.group ? <span className="text-meta">{col.group} · </span> : null}
-                                                {col.label}
-                                            </span>
-                                            {unit && <span className="guide-column-unit">{unit}</span>}
-                                        </button>
+                                        <Fragment key={col.key}>
+                                            {heading && <div className="guide-column-group text-nano">{col.group}</div>}
+                                            <button
+                                                type="button"
+                                                className="guide-column-row is-hidden"
+                                                onClick={() => toggle(col.key)}
+                                                title={col.hint || `Show ${col.label}`}
+                                            >
+                                                <span className="guide-column-grip" aria-hidden="true">+</span>
+                                                <span className="guide-column-name">{col.label}</span>
+                                                {unit && <span className="guide-column-unit">{unit}</span>}
+                                            </button>
+                                        </Fragment>
                                     );
                                 })}
                             </>

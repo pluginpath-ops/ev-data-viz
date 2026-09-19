@@ -6102,7 +6102,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* The column list. Wider than a facet menu because a column carries a label
    AND a unit AND a control, where a facet value carries a name and a count. */
-.guide-column-panel { --popover-w: 220px; }
+/* 320px: at 220 most names ended in "…" — "Weight per…", "0–60 …" — which
+   made the list of what you could add unreadable. The popover's own
+   max-width still fits it to a phone. */
+.guide-column-panel { --popover-w: 320px; }
 .guide-column-row {
     width: 100%;
     /* The one real difference: these rows are draggable and say so. */
@@ -6148,6 +6151,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     padding: 6px 4px 3px;
     border-top: 1px solid var(--color-border);
     margin-top: 4px;
+}
+/* A group's name, once, above its columns in the "Not shown" list. */
+.guide-column-group {
+    padding: 6px 4px 2px;
+    color: var(--color-text-meta);
 }
 
 /* A range's bounds, in the same button-and-panel shape as a facet so the row

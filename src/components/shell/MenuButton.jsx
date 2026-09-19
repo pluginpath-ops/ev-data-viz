@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useLightDismiss } from '../../hooks/useLightDismiss';
 
 /**
@@ -34,8 +34,31 @@ export default function MenuButton({
     label, value, active = false, title, panelClass = '', children,
 }) {
     const [open, setOpen] = useState(false);
+    // How far the panel is nudged sideways to stay on screen, in px.
+    const [shift, setShift] = useState(0);
     const ref = useLightDismiss(open, () => setOpen(false));
     const close = () => setOpen(false);
+
+    /**
+     * Keep the panel inside the viewport, 8px from either edge.
+     *
+     * It opens from its button's left edge, which on a phone runs a 320px
+     * column list off the right of the screen from any button past the first
+     * few — and right-aligning instead only moves the problem to the left edge
+     * for a button in the middle. So it measures itself once attached and
+     * slides just far enough. A callback ref rather than an effect: it runs
+     * before paint, so the unshifted panel is never drawn (see
+     * useAnchoredPosition for the same reasoning).
+     */
+    const place = useCallback((panel) => {
+        if (!panel || !ref.current) return;
+        const edge = 8;
+        const anchorLeft = ref.current.getBoundingClientRect().left;
+        const viewport = document.documentElement.clientWidth;
+        const left = Math.max(edge, Math.min(anchorLeft, viewport - edge - panel.offsetWidth));
+        const next = Math.round(left - anchorLeft);
+        setShift(prev => (prev === next ? prev : next));
+    }, [ref]);
 
     return (
         <div className="menu-button" ref={ref}>
@@ -55,7 +78,11 @@ export default function MenuButton({
             </button>
 
             {open && (
-                <div className={`popover popover--below guide-facet-panel ${panelClass}`.trim()}>
+                <div
+                    ref={place}
+                    className={`popover popover--below guide-facet-panel ${panelClass}`.trim()}
+                    style={shift ? { left: shift } : undefined}
+                >
                     {typeof children === 'function' ? children({ close }) : children}
                 </div>
             )}
