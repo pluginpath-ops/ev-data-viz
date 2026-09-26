@@ -170,7 +170,7 @@ function scanCss(key, test) {
 export const LEDGER = [
     {
         key: 'palette-text',
-        count: 194,
+        count: 187,
         scope: 'src/**/*.jsx',
         what: 'Text colors written as Tailwind palette utilities. These sit outside '
             + 'the theme: when the re-skin re-valued the tokens, every one of these '
@@ -213,7 +213,7 @@ export const LEDGER = [
     },
     {
         key: 'arbitrary-text-size',
-        count: 98,
+        count: 97,
         scope: 'src/**/*.jsx',
         what: 'Font sizes written as arbitrary values — `text-[10px]`, `text-[11px]`. '
             + 'Every one is a size the global UI-scale knob cannot move and the type '

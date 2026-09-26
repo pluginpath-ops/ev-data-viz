@@ -4279,6 +4279,43 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-primary);
 }
 
+/* A value that is not the vehicle's own: inherited from its source vehicle, or
+   provided by its platform (#352). A step quieter than a value set here. */
+.specs-field-inherited {
+    color: var(--color-text-secondary);
+}
+/* The ↑ after an inherited value; its title names the source vehicle. */
+.specs-inherited-mark {
+    @apply ml-0.5 leading-none select-none;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+/* "Some fields are inherited from …" above the categories. */
+.specs-inherited-note {
+    @apply mb-3 flex items-center gap-1;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    color: var(--color-text-secondary);
+}
+/* Beneath a spec editor field: what a blank shows ("↑ 84", "Native — from
+   E-GMP 800 V"), and suggestions offered for it. */
+.spec-field-hint {
+    @apply mt-0.5 pl-0.5;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    color: var(--color-text-secondary);
+}
+/* One suggested value: a link-colored word that fills the field. */
+.spec-field-suggestion {
+    @apply ml-1 underline;
+    color: var(--color-text-link);
+}
+.spec-field-suggestion:hover { color: var(--color-text-primary); }
+/* "Fields you leave blank will show ↑ inherited hints." */
+.spec-inherit-note {
+    @apply mt-1.5;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    color: var(--color-text-secondary);
+}
+
 /* Custom field rows in the edit form */
 .specs-custom-row {
     @apply flex gap-2 items-center;

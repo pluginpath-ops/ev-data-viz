@@ -336,7 +336,7 @@ export function countsTowardBest(run) {
  * session that set it — the best 5 and best 15 minutes may be different stops.
  *
  * @returns {Object} `{ 5: best|null, 10: …, 15: … }`, each best being the
- *   window plus `{ runId, runName, source, date, temperatureF, timeDerived }`
+ *   window plus `{ runId, runName, source, date, temperatureF, preconditioned, timeDerived }`
  */
 export function bestChargeWindows(runs = []) {
     const out = Object.fromEntries(CHARGE_WINDOWS.map(w => [w, null]));
@@ -353,6 +353,8 @@ export function bestChargeWindows(runs = []) {
                 source: run.source ?? null,
                 date: run.date ?? null,
                 temperatureF: finite(run.temperature_f) ? Number(run.temperature_f) : null,
+                // true, false, or null for not recorded (migration 073, #352).
+                preconditioned: run.preconditioned ?? null,
                 // Time worked out from SoC, power and a capacity rather than
                 // logged: the one input that could flatter the average.
                 timeDerived: (run.calculated_fields ?? []).includes('time'),

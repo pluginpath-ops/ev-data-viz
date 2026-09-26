@@ -1,5 +1,6 @@
 import { SPEC_CATEGORIES, formatCustomKey } from './vehicleSpecSchema';
 import { distanceLabel } from './unitConversions';
+import { platformProvides } from './platforms';
 
 // ── Vehicle display label ─────────────────────────────────────────────────────
 
@@ -25,16 +26,28 @@ export function makeModelLine(v) {
 // ── Spec inheritance merge ────────────────────────────────────────────────────
 
 /**
- * Walk the full ancestor chain for a vehicle and return its fully-resolved
- * effective specs — own fields merged over all ancestors — so that grandchild
- * vehicles see values that were only set on a grandparent.
+ * A vehicle's fully-resolved effective specs: its own value for each field,
+ * else the nearest source vehicle's up the whole chain, else what its platform
+ * provides (#352, platforms.js `PLATFORM_PROVIDES`).
  *
- * _visited: Set of vehicle IDs already seen this walk; stops infinite loops
- * caused by circular spec_source_vehicle_id references.
+ * The platform comes LAST and only once, from the vehicle being resolved: a
+ * variant that changed its electrical platform (the 2025 R1) must not show what
+ * its source's platform provided. `vehicle.platforms` is attached in AppContext
+ * (`withPlatforms`); a vehicle without it resolves through the chain alone.
  *
  * Returns a plain specs object (same shape as vehicle.specs).
  */
-export function resolveEffectiveSpecs(vehicle, vehicles, _visited = new Set()) {
+export function resolveEffectiveSpecs(vehicle, vehicles) {
+    return specProvenance(vehicle, vehicles).specs;
+}
+
+/**
+ * Own specs merged over every ancestor's — the chain without any platform.
+ *
+ * _visited: Set of vehicle IDs already seen this walk; stops infinite loops
+ * caused by circular spec_source_vehicle_id references.
+ */
+function chainSpecs(vehicle, vehicles, _visited = new Set()) {
     if (!vehicle) return {};
 
     const parent = vehicle.spec_source_vehicle_id
@@ -47,9 +60,59 @@ export function resolveEffectiveSpecs(vehicle, vehicles, _visited = new Set()) {
     }
 
     const visited = new Set([..._visited, vehicle.id]);
-    const parentEffective = resolveEffectiveSpecs(parent, vehicles, visited);
-    const { merged } = mergeInheritedSpecs(vehicle.specs, parentEffective);
+    const { merged } = mergeInheritedSpecs(vehicle.specs, chainSpecs(parent, vehicles, visited));
     return merged;
+}
+
+/**
+ * What a vehicle shows where its own field is blank: its source chain's value,
+ * else its platform's. The spec editor's hints, and the lower two tiers of
+ * `specProvenance`.
+ *
+ * @param {Object} vehicle
+ * @param {Array}  vehicles
+ * @param {Object|null} [source]  the source vehicle, when it differs from the
+ *        stored one — the spec editor offers a new source before it is saved
+ * @returns {{ specs: Object, fromPlatform: Map<string, Object> }}
+ *          `fromPlatform` maps each "category.field" the platform supplied —
+ *          blank all the way up the chain — to that platform
+ */
+export function fallbackSpecs(vehicle, vehicles, source = sourceVehicleOf(vehicle, vehicles)) {
+    const ancestors = source ? chainSpecs(source, vehicles, new Set([vehicle?.id])) : null;
+    const provided = platformProvides(vehicle?.platforms);
+    const { merged, inheritedKeys } = mergeInheritedSpecs(ancestors, provided.specs);
+    const fromPlatform = new Map([...inheritedKeys].filter(k => provided.from.has(k)).map(k => [k, provided.from.get(k)]));
+    return { specs: merged, fromPlatform };
+}
+
+/**
+ * A vehicle's effective specs, with where each value that is not its own came
+ * from — what every place that marks an inherited spec reads (View Specs, the
+ * vehicle table's notes, Data Checks).
+ *
+ * @returns {{ specs: Object, source: Object|null, inheritedKeys: Set<string>, fromPlatform: Map<string, Object> }}
+ *   `inheritedKeys` — "category.field" keys that came from the source vehicle;
+ *   `fromPlatform`  — keys a platform provided, to the platform
+ */
+export function specProvenance(vehicle, vehicles = []) {
+    if (!vehicle) return { specs: {}, source: null, inheritedKeys: new Set(), fromPlatform: new Map() };
+    const source = sourceVehicleOf(vehicle, vehicles);
+    const fallback = fallbackSpecs(vehicle, vehicles, source);
+    const { merged, inheritedKeys } = mergeInheritedSpecs(vehicle.specs, fallback.specs);
+    const fromPlatform = new Map();
+    for (const key of [...inheritedKeys]) {
+        if (!fallback.fromPlatform.has(key)) continue;
+        fromPlatform.set(key, fallback.fromPlatform.get(key));
+        inheritedKeys.delete(key);
+    }
+    return { specs: merged, source, inheritedKeys, fromPlatform };
+}
+
+/** The vehicle a vehicle's specs inherit from, or null (missing, or itself). */
+function sourceVehicleOf(vehicle, vehicles = []) {
+    const id = vehicle?.spec_source_vehicle_id;
+    if (id == null || id === vehicle.id) return null;
+    return vehicles.find(v => v.id === id) ?? null;
 }
 
 /**

@@ -10,13 +10,15 @@
  * ── Columns ─────────────────────────────────────────────────────────────────
  *
  *   Vehicle              name (fixed), make, model, trim, year, tags
- *   Platform             mechanical and electrical platform, the voltage class,
- *                        and how it charges on a 400 V charger (#318)
+ *   Platform             mechanical and electrical platform, and the voltage
+ *                        class (#318)
  *   Battery & range      the resolved capacity and EPA range, with their basis
  *                        (vehicleFigures.js), and EPA city and highway range
  *   Tested performance   the best published or EVBench result per metric,
  *                        with the source that set it (performanceDerivations)
- *   every spec field     through inheritance, in schema order
+ *   every spec field     through inheritance, in schema order: own, else the
+ *                        source vehicle's, else what the platform provides —
+ *                        "from <platform>" beneath (#352)
  *   Calculated           ratios of the above, worked out per row (#335)
  *   Tested range         range and efficiency from the vehicle's reported
  *                        range test (testedRange.js), with its conditions
@@ -40,7 +42,7 @@
  */
 
 import { SPEC_CATEGORIES } from './vehicleSpecSchema';
-import { resolveEffectiveSpecs, vehicleLabel } from './specHelpers';
+import { specProvenance, vehicleLabel } from './specHelpers';
 import { convValue, fmtSpeed, MI_TO_KM, LBS_TO_KG, HP_TO_KW } from './unitConversions';
 import { deriveTested } from './performanceDerivations';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from './vehicleFigures';
@@ -52,7 +54,8 @@ import {
     rangeTestReference, chargeTimeTestReference, chargeBestTestReference, performanceTestReference,
 } from './testDetails';
 import { ASSUMED_CHARGER_EFF, MPG_E_CONVERSION } from '../constants/epa';
-import { vehiclePlatforms, resolveVoltageClass, resolveDc400Charging } from './platforms';
+import { vehiclePlatforms, resolveVoltageClass } from './platforms';
+import { preconditionedNote } from './runPreconditioning';
 
 // ── Units ───────────────────────────────────────────────────────────────────
 
@@ -77,7 +80,7 @@ export function unitFor(col, units = 'imperial') {
 
 // A parenthetical is taken as a unit only when it is one — "Elk Test Speed
 // (Moose Test)" keeps its parenthesis.
-const UNIT_WORD = /^(kWh|kW|V|in|sec|s|min|lb-ft|lbs?|hp|cu ft|g|USD|ft|mph)$/i;
+const UNIT_WORD = /^(kWh|kW|V|in|sec|s|min|lb-ft|lbs?|hp|cu ft|g|USD|ft|mph|years)$/i;
 
 /** "Battery Usable (kWh)" → label "Battery Usable", unit "kWh". */
 function splitUnit(label) {
@@ -101,9 +104,10 @@ const IDENTITY_COLUMNS = [
  * What the vehicle is built on (#318), read through its resolved links, so a
  * variant shows its source's platforms.
  *
- * Voltage class and 400 V charging are the VEHICLE's, resolved with their
- * basis beneath, like battery and EPA range: a platform provides them, it
- * does not stand in for them. Voltage class replaced the "800-volt" yes/no,
+ * Voltage class is the VEHICLE's, resolved with its basis beneath, like
+ * battery and EPA range: a platform provides it, it does not stand in for it.
+ * How it charges on a 400 V charger is a spec field since #352, provided by
+ * the platform where the vehicle sets none. Voltage class replaced the "800-volt" yes/no,
  * which said less and disagreed with nothing it could be checked against. It
  * sorts as a number and draws no bar: 800 V is not "better" than 400 V.
  */
@@ -114,8 +118,6 @@ const PLATFORM_COLUMNS = [
       hint: 'Pack, drive units and power electronics: what shapes the charging curve.' },
     { key: 'figures.voltageClass', label: 'Voltage class', unit: 'V', numeric: true, digits: 0, holds: 'short-values',
       hint: 'The pack architecture: 400 or 800 V class. The electrical platform’s, else worked out from the vehicle’s nominal voltage (under 475 V is 400 V class). Its basis is shown beneath.' },
-    { key: 'figures.dc400Charging', label: 'On a 400 V charger',
-      hint: 'How it takes DC from a 400 V charger: native, a DC booster, motor boost, or a split pack. From the electrical platform, named beneath.' },
 ].map(c => ({ ...c, group: 'Platform' }));
 
 const FIGURE_COLUMNS = [
@@ -463,6 +465,14 @@ export const VEHICLE_COLUMNS = [
 const BY_KEY = new Map(VEHICLE_COLUMNS.map(c => [c.key, c]));
 export const vehicleColumnByKey = (key) => BY_KEY.get(key) ?? null;
 
+/**
+ * Column keys that were renamed, to the key that replaced them, so a saved
+ * link keeps the column rather than dropping it. #352 moved 400 V charging
+ * from a platform-only figure to the vehicle's own spec field.
+ */
+const RENAMED_COLUMNS = { 'figures.dc400Charging': 'charging.dc_400v_charging' };
+const currentColumnKey = (k) => RENAMED_COLUMNS[k] ?? k;
+
 // A vehicle row keeps its figures under `values`, beside the vehicle itself.
 const vehicleValue = (row, col) => row?.values?.[col.key];
 const vehicleScale = (col) => col.scale ?? col.key;
@@ -521,7 +531,10 @@ const present = (v) => (v === '' || v === undefined ? null : v);
 export function buildVehicleRows(vehicles = [], { performance = null, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', platformsById = null } = {}) {
     const calcContext = assumptionContext(assumptions, units);
     return vehicles.map((vehicle, index) => {
-        const specs = resolveEffectiveSpecs(vehicle, vehicles);
+        // AppContext attaches the platform rows (withPlatforms); a caller that
+        // passes only the list gets the same resolution.
+        const withRows = vehicle.platforms || !platformsById ? vehicle : { ...vehicle, platforms: vehiclePlatforms(vehicle, platformsById) };
+        const { specs, fromPlatform } = specProvenance(withRows, vehicles);
         const values = {
             name:  vehicleLabel(vehicle),
             make:  present(vehicle.make) ?? vehicle.manufacturer?.name ?? null,
@@ -538,6 +551,10 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         for (const col of SPEC_COLUMNS) {
             const [category, field] = col.spec;
             values[col.key] = present(specs?.[category]?.[field]) ?? null;
+            // A platform provides the value; it does not stand in for the
+            // vehicle's own, so the cell says whose it is (#352).
+            const platform = fromPlatform.get(col.key);
+            if (values[col.key] != null && platform) notes[col.key] = `from ${platform.name}`;
         }
 
         const { mechanical, electrical } = vehiclePlatforms(vehicle, platformsById);
@@ -548,9 +565,6 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         notes['figures.voltageClass'] = voltageClass
             ? (voltageClass.basis === 'platform' ? `from ${voltageClass.platform.name}` : `from ${Math.round(voltageClass.nominalV)} V nominal`)
             : null;
-        const dc400 = resolveDc400Charging(electrical);
-        values['figures.dc400Charging'] = dc400?.label ?? null;
-        notes['figures.dc400Charging'] = dc400 ? `from ${dc400.platform.name}` : null;
         for (const [key, kind] of [['platform.mechanical', 'mechanical_platform_id'], ['platform.electrical', 'electrical_platform_id']]) {
             const from = vehicle.inheritedFrom?.[kind];
             if (values[key] != null && from) notes[key] = `from ${from.name}`;
@@ -652,7 +666,8 @@ function chargeWindowTime(vehicle, specs, { windowFrom, windowTo, isSpecWindow }
     const maxDcKw = num(specs?.charging?.max_dc_kw);
     const tested = chargeTimeSession(vehicle.runs ?? [], { from: windowFrom, to: windowTo, maxDcKw });
     if (tested.run) {
-        const parts = [tested.run.source, tested.temperatureF != null ? temperatureText(tested.temperatureF, units) : null];
+        const parts = [tested.run.source, tested.temperatureF != null ? temperatureText(tested.temperatureF, units) : null,
+            preconditionedNote(tested.run.preconditioned)];
         return { minutes: tested.minutes, note: parts.filter(Boolean).join(' · ') || 'tested', summary: tested.run.charge_summary, tested };
     }
     const spec = num(specs?.charging?.charge_time_10_to_80_pct_min);
@@ -692,6 +707,8 @@ function chargeNote(best, units) {
     // A session a few seconds short of the window stood in for it.
     if (best.spanMin != null) parts.push(`over ${best.spanMin} min`);
     if (best.temperatureF != null) parts.push(temperatureText(best.temperatureF, units));
+    const pre = preconditionedNote(best.preconditioned);
+    if (pre) parts.push(pre);
     if (best.timeDerived) parts.push('time derived');
     return parts.join(' · ') || null;
 }
@@ -836,7 +853,7 @@ export function encodeVehicleTableParams({ columns, sortKey, sortDir, filters, m
 export function decodeVehicleTableParams(search) {
     const p = new URLSearchParams(search ?? '');
     const preset = vehiclePresetByKey(p.get('vt_preset'));
-    const cols = (p.get('vt_cols') ?? '').split(',').filter(k => BY_KEY.has(k));
+    const cols = [...new Set((p.get('vt_cols') ?? '').split(',').map(currentColumnKey))].filter(k => BY_KEY.has(k));
     // The vehicle name is the row's label; a table without it is numbers
     // belonging to nothing.
     const columns = cols.length ? (cols.includes('name') ? cols : ['name', ...cols])
@@ -845,7 +862,8 @@ export function decodeVehicleTableParams(search) {
     const implied = shown ?? vehiclePresetByKey('overview');
     const filters = { ...EMPTY_VEHICLE_FILTERS, search: p.get('vt_q') ?? '' };
     for (const [key, param] of Object.entries(LIST_PARAMS)) filters[key] = p.getAll(param);
-    const sortKey = BY_KEY.has(p.get('vt_sort')) ? p.get('vt_sort') : null;
+    const rawSort = currentColumnKey(p.get('vt_sort'));
+    const sortKey = BY_KEY.has(rawSort) ? rawSort : null;
     return {
         columns,
         sortKey: sortKey ?? implied.sortKey,

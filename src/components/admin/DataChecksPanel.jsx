@@ -4,7 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
 import { KNOB_GROUPS } from '../../constants/knobs';
 import { setOverride } from '../../constants/overrides';
-import { vehicleLabel, resolveEffectiveSpecs } from '../../utils/specHelpers';
+import { vehicleLabel, fallbackSpecs } from '../../utils/specHelpers';
 import { columnMoves, checkFields, withSpecValues, epaSectionHref, EPA_SECTION_CHECKS } from '../../utils/dataCheckFixes';
 import { SpecField } from '../EditSpecsForm';
 import PrimaryConfigurationPicker from '../epa/PrimaryConfigurationPicker';
@@ -95,7 +95,7 @@ function Tally({ row }) {
  * moves a control a curator is about to click. The caller keys this by the
  * stored value, so a save from elsewhere resets the draft.
  */
-function FixField({ vehicle, category, field, def, inheritedValue, onSave }) {
+function FixField({ vehicle, category, field, def, inheritedValue, providedBy, onSave }) {
     const own = vehicle.specs?.[category]?.[field] ?? null;
     const [draft, setDraft] = useState(own);
     const [saving, setSaving] = useState(false);
@@ -108,7 +108,7 @@ function FixField({ vehicle, category, field, def, inheritedValue, onSave }) {
     return (
         <span className="data-check-fix-field">
             <span className="text-note">{def.label}</span>
-            <SpecField field={def} value={draft} onChange={setDraft} inheritedValue={inheritedValue} />
+            <SpecField field={def} value={draft} onChange={setDraft} inheritedValue={inheritedValue} providedBy={providedBy} />
             <button type="button" className="btn btn-secondary text-sm" disabled={!dirty || saving} onClick={save}>
                 {saving ? 'Saving…' : 'Save'}
             </button>
@@ -129,9 +129,10 @@ function FindingFixes({ finding: f, vehicle, fleet, onMove, onSaveSpec, onChoose
     const choosePrimary = f.check === 'no-primary';
     if (!moves.length && !fields.length && !toEpa && !choosePrimary) return null;
 
-    // The parent's values, shown as the hint an empty own field inherits.
-    const parent = vehicle.spec_source_vehicle_id ? fleet.find(v => v.id === vehicle.spec_source_vehicle_id) : null;
-    const inherited = fields.length && parent ? resolveEffectiveSpecs(parent, fleet) : null;
+    // What an empty own field shows — the source vehicle's value, else the
+    // platform's (#352) — as its hint.
+    const fallback = fields.length ? fallbackSpecs(vehicle, fleet) : null;
+    const inherited = fallback?.specs ?? null;
 
     const move = async (m) => {
         setBusy(true);
@@ -154,6 +155,7 @@ function FindingFixes({ finding: f, vehicle, fleet, onMove, onSaveSpec, onChoose
                     field={field}
                     def={def}
                     inheritedValue={inherited?.[category]?.[field] ?? null}
+                    providedBy={fallback?.fromPlatform.get(`${category}.${field}`) ?? null}
                     onSave={(cat, values) => onSaveSpec(vehicle, cat, values)}
                 />
             ))}

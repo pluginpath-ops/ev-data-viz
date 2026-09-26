@@ -48,7 +48,7 @@
  * Pure module: no data access, no React.
  */
 
-import { resolveEffectiveSpecs, mergeInheritedSpecs, vehicleLabel } from './specHelpers';
+import { specProvenance, vehicleLabel } from './specHelpers';
 import { epaConfigurationFigures, primaryEpaMapping } from './epaConfiguration';
 // The same agreement test the capacity resolver uses, so a vehicle Data Checks
 // passes is one whose EPA tested the calculations actually use.
@@ -214,17 +214,16 @@ function primaryFindings(links) {
  * a mistyped value on the vehicle itself.
  */
 function specContext(vehicle, vehicles) {
-    const parent = vehicle.spec_source_vehicle_id
-        ? vehicles.find(v => v.id === vehicle.spec_source_vehicle_id)
-        : null;
-    if (!parent) return { specs: vehicle.specs ?? {}, inherited: new Set(), parentName: null };
-    const { merged, inheritedKeys } = mergeInheritedSpecs(vehicle.specs, resolveEffectiveSpecs(parent, vehicles));
-    return { specs: merged, inherited: inheritedKeys, parentName: vehicleLabel(parent) };
+    const { specs, source, inheritedKeys, fromPlatform } = specProvenance(vehicle, vehicles);
+    return { specs, inherited: inheritedKeys, fromPlatform, parentName: source ? vehicleLabel(source) : null };
 }
 
 const specValue = (ctx, category, field) => ctx.specs?.[category]?.[field] ?? null;
-const inheritedNote = (ctx, category, field) =>
-    ctx.inherited.has(`${category}.${field}`) ? ` (inherited from ${ctx.parentName})` : '';
+const inheritedNote = (ctx, category, field) => {
+    const key = `${category}.${field}`;
+    if (ctx.inherited.has(key)) return ` (inherited from ${ctx.parentName})`;
+    return ctx.fromPlatform?.has(key) ? ` (from ${ctx.fromPlatform.get(key).name})` : '';
+};
 
 // ── The checks ──────────────────────────────────────────────────────────────
 

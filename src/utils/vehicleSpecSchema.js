@@ -14,6 +14,8 @@
  *   'text'    — free-text input
  */
 
+import { CHEMISTRIES, DC_400V_CHARGING } from './platforms';
+
 /**
  * `better: 'lower' | 'higher'` — which way is an improvement, on the rows where
  * that is a fact rather than an opinion.
@@ -151,6 +153,53 @@ export const SPEC_CATEGORIES = [
             { key: 'charge_port',                 label: 'Charge Port',                   type: 'enum',
               options: ['NACS', 'CCS1', 'CHAdeMO', 'Type 2'] },
             { key: 'v2l',                         label: 'Vehicle-to-Load (V2L)',          type: 'boolean' },
+            // V2H and V2G are separate answers: a car can power a house through
+            // a bidirectional wallbox without being allowed to export to the grid.
+            { key: 'v2h',                         label: 'Vehicle-to-Home (V2H)',          type: 'boolean' },
+            { key: 'v2g',                         label: 'Vehicle-to-Grid (V2G)',          type: 'boolean' },
+            { key: 'plug_and_charge',             label: 'Plug & Charge',                  type: 'boolean' },
+            // Whether the car can use Superchargers without an adapter or an
+            // account workaround. The charge port alone does not say: a NACS
+            // port arrived before access on some cars, and access before the
+            // port on others.
+            { key: 'native_supercharger_access',  label: 'Native Supercharger Access',     type: 'boolean', tableLabel: 'Supercharger access' },
+            // The VEHICLE's answer (#352). Its electrical platform provides one
+            // (platforms.js PLATFORM_PROVIDES) when this is blank, and a value set
+            // here wins: a Taycan's booster was optional, so the platform's
+            // answer is not every Taycan's. Stored as the label, like every enum.
+            { key: 'dc_400v_charging',            label: 'On a 400 V Charger',             type: 'enum',
+              options: DC_400V_CHARGING.map(m => m.label), tableLabel: 'On a 400 V charger' },
+            // Per vehicle, never the platform's list: a Mach-E is NMC or LFP, not
+            // both. The platform's chemistries are offered as suggestions in the
+            // spec editor and never fill this in.
+            { key: 'battery_chemistry',           label: 'Battery Chemistry',              type: 'enum',
+              options: CHEMISTRIES, tableLabel: 'Chemistry' },
+            // "None" is an answer — the car cannot warm its battery for a
+            // charging stop — and blank is "not recorded". The two must never
+            // be collapsed, so None is an option and not the empty value.
+            { key: 'preconditioning',             label: 'Battery Preconditioning',        type: 'enum',
+              options: ['None', 'Manual', 'Automatic (nav-triggered)', 'Both'], tableLabel: 'Preconditioning' },
+            { key: 'heat_pump',                   label: 'Heat Pump',                      type: 'boolean' },
+        ],
+    },
+    {
+        key: 'towing',
+        label: 'Towing & Payload',
+        fields: [
+            { key: 'towing_capacity_lbs', label: 'Towing Capacity', type: 'number', better: 'higher', unitGroup: 'weight' },
+            { key: 'payload_lbs',         label: 'Payload',         type: 'number', better: 'higher', unitGroup: 'weight' },
+        ],
+    },
+    {
+        // Years and miles each, because a warranty ends at whichever comes
+        // first and the two do not rank the same way across makers.
+        key: 'warranty',
+        label: 'Warranty',
+        fields: [
+            { key: 'battery_years', label: 'Battery Warranty (years)', type: 'integer', better: 'higher', tableLabel: 'Battery warranty' },
+            { key: 'battery_miles', label: 'Battery Warranty Distance', type: 'integer', better: 'higher', unitGroup: 'distance', tableLabel: 'Battery warranty distance' },
+            { key: 'basic_years',   label: 'Basic Warranty (years)',   type: 'integer', better: 'higher', tableLabel: 'Basic warranty' },
+            { key: 'basic_miles',   label: 'Basic Warranty Distance',  type: 'integer', better: 'higher', unitGroup: 'distance', tableLabel: 'Basic warranty distance' },
         ],
     },
     {

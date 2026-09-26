@@ -13,6 +13,7 @@ import { SpecFieldFlagButton } from './VoteButtons';
  *   defaultAllOpen   — start with all categories expanded
  *   showFlagButtons  — show 🚩 flag buttons on each field (default false)
  *   inheritedKeys    — optional Set<string> of field keys whose values came from a source vehicle
+ *   fromPlatform     — optional Map<string, platform> of field keys a platform provided (#352)
  *   sourceVehicleName — optional display name of the source vehicle (for tooltip text)
  *   pendingFlags     — optional Set<string> buffered locally (not yet in DB)
  *   onFlagField      — optional override flag handler (used for deferred commit)
@@ -26,6 +27,7 @@ export default function VehicleSpecsDisplay({
     defaultAllOpen = false,
     showFlagButtons = false,
     inheritedKeys,
+    fromPlatform,
     sourceVehicleName,
     pendingFlags,
     onFlagField,
@@ -73,15 +75,22 @@ export default function VehicleSpecsDisplay({
 
     const InheritedTag = () => (
         <span
-            className="text-[10px] text-indigo-400 ml-0.5 leading-none select-none"
+            className="specs-inherited-mark"
             title={sourceVehicleName ? `Inherited from ${sourceVehicleName}` : 'Inherited'}
         >↑</span>
+    );
+
+    // A platform provides the value; it does not stand in for the vehicle's
+    // own, so the value says where it came from, as its basis — the vehicle
+    // table's note, in the same class.
+    const PlatformBasis = ({ platform }) => (
+        <span className="stat-cell-basis">from {platform.name}</span>
     );
 
     return (
         <div className="mt-3">
             {sourceVehicleName && (
-                <p className="text-xs text-indigo-500 mb-3 flex items-center gap-1">
+                <p className="specs-inherited-note">
                     <span>↑</span>
                     <span>Some fields are inherited from <span className="font-medium">{sourceVehicleName}</span></span>
                 </p>
@@ -96,6 +105,7 @@ export default function VehicleSpecsDisplay({
                         key:        `${cat.key}.${f.key}`,
                         value:      formatValue(catData[f.key], f.type),
                         inherited:  inheritedKeys?.has(`${cat.key}.${f.key}`) ?? false,
+                        platform:   fromPlatform?.get(`${cat.key}.${f.key}`) ?? null,
                     }))
                     .filter(row => row.value !== null);
 
@@ -131,10 +141,11 @@ export default function VehicleSpecsDisplay({
                                         <div key={row.key} className="specs-field-row items-center">
                                             <span className="specs-field-label">{row.label}</span>
                                             <span className="specs-field-value flex items-center gap-1">
-                                                <span className={row.inherited ? 'text-indigo-400' : ''}>
+                                                <span className={row.inherited || row.platform ? 'specs-field-inherited' : ''}>
                                                     {row.value}
                                                 </span>
                                                 {row.inherited && <InheritedTag />}
+                                                {row.platform && <PlatformBasis platform={row.platform} />}
                                                 {showFlagButtons && (
                                                     <SpecFieldFlagButton
                                                         isFlagged={committedIsFlagged || isPending}
@@ -157,7 +168,7 @@ export default function VehicleSpecsDisplay({
                                         <div key={row.key} className="specs-field-row items-center">
                                             <span className="specs-field-label">{row.label}</span>
                                             <span className="specs-field-value flex items-center gap-1">
-                                                <span className={row.inherited ? 'text-indigo-400' : ''}>
+                                                <span className={row.inherited ? 'specs-field-inherited' : ''}>
                                                     {row.value}
                                                 </span>
                                                 {row.inherited && <InheritedTag />}

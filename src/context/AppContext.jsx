@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { withVehicleFigures } from '../utils/vehicleFigures';
 import { withInheritance, variantLinkPlan } from '../utils/vehicleInheritance';
+import { withPlatforms } from '../utils/platforms';
+import { toPreconditioned } from '../utils/runPreconditioning';
 import { dataService } from '../services/DataService';
 import { applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
 import { toSessionRow } from '../utils/testSessions';
@@ -356,6 +358,7 @@ export function AppProvider({ children }) {
                     case 'chargeEnergyKwh': normalized.charge_energy_kwh  = toNum(v);  break;
                     case 'temperatureF':    normalized.temperature_f      = toNum(v);  break;
                     case 'speedBasis':     normalized.speed_basis       = v || null; break;
+                    case 'preconditioned':  normalized.preconditioned     = toPreconditioned(v); break;
                     case 'altitudeFt':      normalized.altitude_ft       = toNum(v);  break;
                     case 'elevationGainFt': normalized.elevation_gain_ft  = toNum(v);  break;
                     case 'sourceUrl':       normalized.source_url         = v;         break;
@@ -1823,12 +1826,16 @@ export function AppProvider({ children }) {
     // reason (vehicleInheritance.js): a variant points at its source rather than
     // holding copies, so a replaced photo reaches it on the next render. The
     // resolved values take the usual keys; editors read `own`.
+    //
+    // Each vehicle's platform rows go on as `platforms` before the figures are
+    // worked out, because a platform is the last fallback for a vehicle's specs
+    // (#352) and the figures read specs.
     const visibleVehicles = useMemo(() => {
         const shown = isContributor
             ? vehicles
             : vehicles.map(v => ({ ...v, runs: (v.runs || []).filter(r => !r.isHidden) }));
-        return withVehicleFigures(withInheritance(shown));
-    }, [vehicles, isContributor]);
+        return withVehicleFigures(withPlatforms(withInheritance(shown), platformsById));
+    }, [vehicles, isContributor, platformsById]);
 
     const value = {
         vehicles: visibleVehicles,

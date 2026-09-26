@@ -58,7 +58,7 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 | `electrical_platform_id` | `bigint` | `NULL` | FK → `platforms.id` ON DELETE SET NULL; must be an `electrical` platform. Inherited the same way, separately. Migration 072, #318 |
 | `created_at` | `timestamptz` | `now()` | |
 
-> **`specs` JSONB structure:** Each category key maps to an object of predefined field keys plus `_custom` (user-defined key-value pairs). Categories: `pricing`, `powertrain`, `compute`, `infotainment`, `dimensions`, `wheels`, `suspension`, `lighting`, `charging`, `interior`. See `src/utils/vehicleSpecSchema.js` for the full field list. `specs = NULL` means no specs entered yet — handled gracefully by all UI components.
+> **`specs` JSONB structure:** Each category key maps to an object of predefined field keys plus `_custom` (user-defined key-value pairs). Categories: `pricing`, `powertrain`, `performance`, `compute`, `infotainment`, `dimensions`, `wheels`, `suspension`, `lighting`, `charging`, `towing`, `warranty`, `range`, `interior`. Where a field is blank on the vehicle and its source chain, what its platform provides is shown in its place, marked as the platform's (`PLATFORM_PROVIDES` in `src/utils/platforms.js`, #352); nothing is written to `specs`. See `src/utils/vehicleSpecSchema.js` for the full field list. `specs = NULL` means no specs entered yet — handled gracefully by all UI components.
 >
 > ```json
 > { "powertrain": { "motors": 2, "motor_type": "Permanent Magnet", "_custom": { "gear_ratio": "9.73:1" } } }
@@ -124,6 +124,7 @@ One charging or range test session per vehicle.
 | `populated_fields` | `text[]` | — | Which data columns have values: `['soc','chargeRate','time','range','temperature']` |
 | `calculated_fields` | `text[]` | — | Fields computed rather than measured |
 | `charge_summary` | `jsonb` | `NULL` | Charging sessions only: best 5/10/15-minute average charge rate and where each window sat, with a calculation `version`. Since version 2 also `socMin`, the minute each whole percent of SoC was first reached (101 entries, null where the session did not reach it), which the vehicle table reads for the charge window (#335). Computed client-side (`utils/chargeWindows.js`) whenever the session's points are written; null until then (migration 071, #346) |
+| `preconditioned` | `boolean` | `NULL` | Charging tests: whether the battery was preconditioned. `false` is "not preconditioned", `NULL` is "not recorded" — kept apart on purpose. Shown beneath a tested charge time and in the test peek (migration 073, #352) |
 | `created_at` | `timestamptz` | `now()` | |
 
 > Runs have no `user_id`. Ownership and edit permission are inherited from the parent vehicle via RLS subquery joins.

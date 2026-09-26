@@ -75,6 +75,16 @@ describe('charging references', () => {
         expect(ref.facts.find(f => f.label === 'Time').value).toMatch(/not logged/);
         expect(chargeBestTestReference({ id: 3 }, { kw: 1 }, 15)).toBeNull();   // nothing to link to
     });
+
+    it('says whether the battery was preconditioned, and nothing when not recorded (#352)', () => {
+        const fact = (ref) => ref.facts.find(f => f.label === 'Preconditioned')?.value;
+        const time = (pre) => chargeTimeTestReference({ id: 3 }, { run: { ...run, preconditioned: pre }, minutes: 20 }, { from: 10, to: 80 });
+        expect(fact(time(true))).toBe('Yes');
+        expect(fact(time(false))).toBe('No');          // a real answer, shown
+        expect(fact(time(null))).toBeUndefined();      // not recorded is not "No"
+        expect(fact(time(undefined))).toBeUndefined();
+        expect(fact(chargeBestTestReference({ id: 3 }, { kw: 180, runId: 9, preconditioned: false }, 15))).toBe('No');
+    });
 });
 
 describe('performanceTestReference', () => {

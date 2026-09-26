@@ -9,6 +9,7 @@ import { promotionUpdates, demotionUpdates, acceptGuideUpdates, isCuratorOwned }
 import { selectTestForGuide } from '../utils/epaTestSelection';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
 import { summarizeChargeSession, isCurrentSummary } from '../utils/chargeWindows';
+import { toPreconditioned } from '../utils/runPreconditioning';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
 const roundField = roundTo;
@@ -1036,6 +1037,9 @@ class DataService {
       avg_wind_speed_mph: numField(run.windSpeedMph,     run.avg_wind_speed_mph),
       wind_direction_deg: numField(run.windDirectionDeg, run.wind_direction_deg),
       source_url: coalesce(run.sourceUrl, run.source_url) || null,
+      // Only when recorded: a test added without it never names a column an
+      // unmigrated database lacks (migration 073).
+      ...(toPreconditioned(run.preconditioned) != null ? { preconditioned: toPreconditioned(run.preconditioned) } : {}),
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
@@ -1148,6 +1152,7 @@ class DataService {
       ...(updates.windDirectionDeg !== undefined ? { wind_direction_deg: updates.windDirectionDeg !== '' ? Number(updates.windDirectionDeg) : null } : {}),
       ...(updates.sourceUrl !== undefined ? { source_url: updates.sourceUrl || null } : {}),
       ...(updates.isHidden !== undefined ? { is_hidden: updates.isHidden } : {}),
+      ...(updates.preconditioned !== undefined ? { preconditioned: toPreconditioned(updates.preconditioned) } : {}),
     }).eq('id', runId);
     if (error) throw error;
   }
