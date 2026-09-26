@@ -82,7 +82,7 @@ What a vehicle is built on (migration 072, #318). Two kinds, because structure a
 | `name` | `text` | — | Unique per kind, ignoring case |
 | `maker_group` | `text` | — | e.g. "Hyundai Motor Group" |
 | `aliases` | `text[]` | `'{}'` | Other spellings an import file may use |
-| `voltage_class_v` | `smallint` | — | 400 \| 800 \| 900. Electrical only |
+| `voltage_class_v` | `smallint` | — | Any positive class, e.g. 400 or 800; the list lives in code (`VOLTAGE_CLASSES`), so a new class needs no migration. Electrical only |
 | `dc_400v_charging` | `text` | — | `native` \| `dc-booster` \| `motor-boost` \| `split-pack` \| `none`. Electrical only |
 | `chemistries` | `text[]` | `'{}'` | e.g. `{NMC, LFP}`. Electrical only |
 | `cell_format` | `text` | — | `cylindrical` \| `prismatic` \| `pouch` \| `blade`. Electrical only |

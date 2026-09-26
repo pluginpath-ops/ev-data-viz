@@ -54,6 +54,11 @@ export function PlatformFacts({ vehicle }) {
                 value: `${p.name}${p.maker_group && !p.name.toLowerCase().startsWith(p.maker_group.toLowerCase()) ? ` · ${p.maker_group}` : ''}${from ? ` (inherited from ${from.name})` : ''}`,
             };
         }),
+        // What follows is the PLATFORM's, and says so: a platform provides a
+        // vehicle's values, it does not stand in for them (the table resolves
+        // the vehicle's own voltage class and 400 V charging, with a basis).
+        e && (e.voltage_class_v || method || e.chemistries?.length > 0 || e.cell_format)
+            && { heading: `${e.name} hardware` },
         e?.voltage_class_v && { label: 'Voltage class', value: `${e.voltage_class_v} V` },
         method && { label: 'On a 400 V charger', value: method.label, title: method.note },
         e?.chemistries?.length > 0 && { label: 'Chemistries', value: e.chemistries.join(', ') },
@@ -61,12 +66,14 @@ export function PlatformFacts({ vehicle }) {
     ].filter(Boolean);
     return (
         <dl className="platform-facts">
-            {rows.map(r => (
-                <div key={r.label} className="platform-fact" title={r.title}>
-                    <dt>{r.label}</dt>
-                    <dd>{r.value}</dd>
-                </div>
-            ))}
+            {rows.map(r => (r.heading
+                ? <div key={r.heading} className="platform-facts-heading text-nano">{r.heading}</div>
+                : (
+                    <div key={r.label} className="platform-fact" title={r.title}>
+                        <dt>{r.label}</dt>
+                        <dd>{r.value}</dd>
+                    </div>
+                )))}
         </dl>
     );
 }

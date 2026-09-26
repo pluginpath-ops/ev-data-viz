@@ -6,7 +6,7 @@
  *
  * They usually coincide and diverge exactly where a curator must not lump cars
  * together: the 2022–24 and 2025+ Rivian R1 share a skateboard and nothing
- * electrical; the Lucid Air and Gravity share a 900 V system and not a body.
+ * electrical; the Lucid Air and Gravity share an electrical system and not a body.
  * So a vehicle links one of each (`mechanical_platform_id`,
  * `electrical_platform_id`, migration 072), and a platform is its own row, so
  * what is true of it is said once.
@@ -31,8 +31,12 @@ export const PLATFORM_COLUMN = {
     electrical: 'electrical_platform_id',
 };
 
-/** Nominal pack architecture. */
-export const VOLTAGE_CLASSES = [400, 800, 900];
+/**
+ * The voltage classes a platform can be. The column takes any positive number
+ * (migration 072), so a class is added here, not by a migration. Lucid's
+ * "900 V" is marketing for an 800 V-class architecture, and is filed as one.
+ */
+export const VOLTAGE_CLASSES = [400, 800];
 
 /** How an electrical platform takes DC from a 400 V charger. */
 export const DC_400V_CHARGING = [
@@ -116,4 +120,39 @@ export function platformLineText({ mechanical, electrical }) {
             : `${mechanical.name} · ${electrical.name}`;
     }
     return mechanical?.name ?? electrical?.name ?? null;
+}
+
+/**
+ * Where a nominal pack voltage splits the classes, when a vehicle has no
+ * electrical platform to say: below it a 400 V pack (they sit around
+ * 350–450 V nominal), from it up an 800 V one (600 V and above). A class
+ * beyond these two is only ever a platform's word.
+ */
+export const VOLTAGE_CLASS_SPLIT_V = 475;
+
+/**
+ * A vehicle's voltage class, and where it came from.
+ *
+ *   platform   its electrical platform's class (inherited like the link)
+ *   nominal    derived from its own nominal pack voltage, with no platform
+ *
+ * @returns {{ v: number, basis: 'platform'|'nominal', platform?: Object, nominalV?: number } | null}
+ */
+export function resolveVoltageClass(electrical, nominalV) {
+    if (electrical?.voltage_class_v) return { v: electrical.voltage_class_v, basis: 'platform', platform: electrical };
+    const n = Number(nominalV);
+    if (nominalV == null || nominalV === '' || !Number.isFinite(n) || n <= 0) return null;
+    return { v: n < VOLTAGE_CLASS_SPLIT_V ? 400 : 800, basis: 'nominal', nominalV: n };
+}
+
+/**
+ * How a vehicle takes DC from a 400 V charger: its electrical platform's
+ * answer, inherited. A per-vehicle override (a Taycan's booster was optional)
+ * arrives with the spec fields, section 2 of #318.
+ *
+ * @returns {{ key: string, label: string, note: string, platform: Object } | null}
+ */
+export function resolveDc400Charging(electrical) {
+    const method = DC_400V_CHARGING.find(m => m.key === electrical?.dc_400v_charging);
+    return method ? { ...method, platform: electrical } : null;
 }

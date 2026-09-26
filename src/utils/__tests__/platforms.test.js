@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     matchPlatform, electricalSummary, platformGroups, vehiclePlatforms, platformLineText,
+    resolveVoltageClass, resolveDc400Charging,
 } from '../platforms';
 import { parseVehicleImportText } from '../parseVehicleImport';
 import { buildImportPlan, selectPlanRows } from '../vehicleImportPlan';
@@ -75,12 +76,31 @@ describe('a vehicle and its platforms', () => {
         const [own, variant] = buildVehicleRows(fleet, { platformsById: byId });
         expect(own.values).toMatchObject({
             'platform.mechanical': 'E-GMP', 'platform.electrical': 'E-GMP 800 V',
-            'platform.voltage': 800, 'platform.dc400': 'Motor boost',
+            'figures.voltageClass': 800, 'figures.dc400Charging': 'Motor boost',
         });
+        expect(own.notes['figures.voltageClass']).toBe('from E-GMP 800 V');
+        expect(own.notes['figures.dc400Charging']).toBe('from E-GMP 800 V');
         expect(own.notes['platform.electrical']).toBeUndefined();
         expect(variant.notes['platform.electrical']).toBe('from Ioniq 5');
-        expect(vehicleColumnByKey('platform.voltage').bar).toBeFalsy();   // 800 V is not "better"
+        expect(vehicleColumnByKey('figures.voltageClass').bar).toBeFalsy();   // 800 V is not "better"
         expect(buildVehicleRows(fleet)[0].values['platform.mechanical']).toBeNull();
+    });
+});
+
+describe('voltage class and 400 V charging, per vehicle', () => {
+    it('takes the platform\'s class, else works one out from nominal voltage at 475 V', () => {
+        expect(resolveVoltageClass(P[1], 380)).toMatchObject({ v: 800, basis: 'platform' });   // the platform wins
+        expect(resolveVoltageClass(null, 474)).toEqual({ v: 400, basis: 'nominal', nominalV: 474 });
+        expect(resolveVoltageClass(null, 475)).toMatchObject({ v: 800, basis: 'nominal' });
+        expect(resolveVoltageClass(null, 924)).toMatchObject({ v: 800 });   // Lucid's "900 V" is 800 V class
+        expect(resolveVoltageClass(null, null)).toBeNull();
+        expect(resolveVoltageClass(null, '')).toBeNull();
+    });
+
+    it('inherits the 400 V charging method from the electrical platform, naming it', () => {
+        expect(resolveDc400Charging(P[1])).toMatchObject({ key: 'motor-boost', label: 'Motor boost', platform: P[1] });
+        expect(resolveDc400Charging(P[0])).toBeNull();   // mechanical: nothing to say
+        expect(resolveDc400Charging(null)).toBeNull();
     });
 });
 

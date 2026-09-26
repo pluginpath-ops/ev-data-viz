@@ -16,7 +16,7 @@
 -- Structure and electrical architecture usually coincide and diverge exactly
 -- where a curator must not lump cars together: the 2022-24 and 2025+ Rivian R1
 -- share a skateboard and nothing electrical; the Lucid Air and Gravity share
--- the 900 V electrical system and not a body. So a vehicle has one of each:
+-- the electrical system (marketed as 900 V) and not a body. So a vehicle has one of each:
 --
 --   mechanical   body, structure, suspension - dimensions, twins, inheritance
 --   electrical   pack, drive units, power electronics - the charging curve
@@ -48,7 +48,10 @@ CREATE TABLE IF NOT EXISTS platforms (
     maker_group      text,
     aliases          text[] NOT NULL DEFAULT '{}',
     -- Electrical only.
-    voltage_class_v  smallint CHECK (voltage_class_v IN (400, 800, 900)),
+    -- Any positive class, not a fixed list: the classes are named in code
+    -- (VOLTAGE_CLASSES in src/utils/platforms.js), so adding one is a code
+    -- change, not a migration.
+    voltage_class_v  smallint CHECK (voltage_class_v > 0),
     dc_400v_charging text CHECK (dc_400v_charging IN ('native', 'dc-booster', 'motor-boost', 'split-pack', 'none')),
     chemistries      text[] NOT NULL DEFAULT '{}',
     cell_format      text CHECK (cell_format IN ('cylindrical', 'prismatic', 'pouch', 'blade')),
@@ -66,7 +69,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_platforms_kind_name ON platforms (kind, lo
 COMMENT ON TABLE platforms IS
     'What a vehicle is built on: a mechanical platform (structure) and an electrical one (pack, drives, charging). #318.';
 COMMENT ON COLUMN platforms.voltage_class_v IS
-    'Nominal pack architecture: 400, 800 or 900 V. Electrical platforms only.';
+    'Pack architecture class, e.g. 400 or 800 V; the list lives in code (VOLTAGE_CLASSES). Electrical platforms only.';
 COMMENT ON COLUMN platforms.dc_400v_charging IS
     'How it takes DC from a 400 V charger: native (it is 400 V), dc-booster, motor-boost (drive inverter steps up), split-pack (halves charged in parallel), none.';
 
@@ -163,7 +166,8 @@ INSERT INTO platforms (kind, name, maker_group, aliases, voltage_class_v, dc_400
     ('electrical', 'F-150 Lightning 400 V','Ford',              ARRAY[]::text[],          400, 'native',      ARRAY['NMC']),
     ('electrical', 'Rivian Gen 1',       'Rivian',              ARRAY[]::text[],          400, 'native',      ARRAY[]::text[]),
     ('electrical', 'Rivian Gen 2',       'Rivian',              ARRAY[]::text[],          400, 'native',      ARRAY[]::text[]),
-    ('electrical', 'Lucid 900 V',        'Lucid',               ARRAY['LEAP'],            900, NULL,          ARRAY[]::text[]),
+    -- Marketed as 900 V; an 800 V-class architecture.
+    ('electrical', 'Lucid LEAP',         'Lucid',               ARRAY['Lucid 900 V'],     800, NULL,          ARRAY[]::text[]),
     ('electrical', 'e-TNGA 400 V',       'Toyota',              ARRAY['e-TNGA'],          400, 'native',      ARRAY[]::text[]),
     ('electrical', 'SEA 400 V',          'Geely',               ARRAY[]::text[],          400, 'native',      ARRAY[]::text[]),
     ('electrical', 'SPA2 400 V',         'Volvo Cars',          ARRAY[]::text[],          400, 'native',      ARRAY[]::text[]),

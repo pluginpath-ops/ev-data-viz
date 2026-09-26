@@ -1854,6 +1854,11 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 .platform-fact dt {
     color: var(--color-text-meta);
 }
+/* "E-GMP 800 V hardware": the rows below it are the platform's, not the car's. */
+.platform-facts-heading {
+    grid-column: 1 / -1;
+    margin-top: 0.5rem;
+}
 
 /* A window too narrow to scale from is a caveat, not a qualifier. */
 .tested-figure-window {

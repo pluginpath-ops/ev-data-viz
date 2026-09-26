@@ -10,8 +10,8 @@
  * ── Columns ─────────────────────────────────────────────────────────────────
  *
  *   Vehicle              name (fixed), make, model, trim, year, tags
- *   Platform             mechanical and electrical platform, and the electrical
- *                        one's voltage class and 400 V charging (#318)
+ *   Platform             mechanical and electrical platform, the voltage class,
+ *                        and how it charges on a 400 V charger (#318)
  *   Battery & range      the resolved capacity and EPA range, with their basis
  *                        (vehicleFigures.js), and EPA city and highway range
  *   Tested performance   the best published or EVBench result per metric,
@@ -52,7 +52,7 @@ import {
     rangeTestReference, chargeTimeTestReference, chargeBestTestReference, performanceTestReference,
 } from './testDetails';
 import { ASSUMED_CHARGER_EFF, MPG_E_CONVERSION } from '../constants/epa';
-import { vehiclePlatforms, DC_400V_CHARGING } from './platforms';
+import { vehiclePlatforms, resolveVoltageClass, resolveDc400Charging } from './platforms';
 
 // ── Units ───────────────────────────────────────────────────────────────────
 
@@ -99,18 +99,23 @@ const IDENTITY_COLUMNS = [
 
 /**
  * What the vehicle is built on (#318), read through its resolved links, so a
- * variant shows its source's platforms. Voltage class sorts as a number and
- * draws no bar: 800 V is not "better" than 400 V, it is a different design.
+ * variant shows its source's platforms.
+ *
+ * Voltage class and 400 V charging are the VEHICLE's, resolved with their
+ * basis beneath, like battery and EPA range: a platform provides them, it
+ * does not stand in for them. Voltage class replaced the "800-volt" yes/no,
+ * which said less and disagreed with nothing it could be checked against. It
+ * sorts as a number and draws no bar: 800 V is not "better" than 400 V.
  */
 const PLATFORM_COLUMNS = [
     { key: 'platform.mechanical', label: 'Mechanical platform',
       hint: 'Body, structure and suspension: what twins share.' },
     { key: 'platform.electrical', label: 'Electrical platform',
       hint: 'Pack, drive units and power electronics: what shapes the charging curve.' },
-    { key: 'platform.voltage', label: 'Voltage class', unit: 'V', numeric: true, digits: 0, holds: 'short-values',
-      hint: 'The electrical platform’s nominal pack architecture: 400, 800 or 900 V.' },
-    { key: 'platform.dc400', label: 'On a 400 V charger',
-      hint: 'How the electrical platform takes DC from a 400 V charger: native, a DC booster, motor boost, or a split pack.' },
+    { key: 'figures.voltageClass', label: 'Voltage class', unit: 'V', numeric: true, digits: 0, holds: 'short-values',
+      hint: 'The pack architecture: 400 or 800 V class. The electrical platform’s, else worked out from the vehicle’s nominal voltage (under 475 V is 400 V class). Its basis is shown beneath.' },
+    { key: 'figures.dc400Charging', label: 'On a 400 V charger',
+      hint: 'How it takes DC from a 400 V charger: native, a DC booster, motor boost, or a split pack. From the electrical platform, named beneath.' },
 ].map(c => ({ ...c, group: 'Platform' }));
 
 const FIGURE_COLUMNS = [
@@ -401,10 +406,6 @@ const CALCULATED_COLUMNS = [
       inputs: ['charging.battery_usable_kwh', 'powertrain.battery_gross_kwh'],
       calc: ([usable, gross]) => (usable != null && gross > 0 && usable <= gross ? (1 - usable / gross) * 100 : null),
       hint: 'The share of the gross pack held back from use: (gross − usable) ÷ gross. No better direction — a bigger buffer costs range and protects the cells.' },
-    { key: 'calc.is800v', label: '800-volt', type: 'boolean', holds: 'short-values',
-      inputs: ['charging.battery_nominal_voltage_v'],
-      calc: ([v]) => (v == null ? null : v > 600),
-      hint: 'Nominal pack voltage above 600 V. Charges at full power on 800-volt chargers without a converter.' },
 ].map(c => ({ ...c, group: 'Calculated', numeric: c.type !== 'boolean', bar: !!c.better }));
 
 /**
@@ -542,8 +543,14 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         const { mechanical, electrical } = vehiclePlatforms(vehicle, platformsById);
         values['platform.mechanical'] = mechanical?.name ?? null;
         values['platform.electrical'] = electrical?.name ?? null;
-        values['platform.voltage'] = electrical?.voltage_class_v ?? null;
-        values['platform.dc400'] = DC_400V_CHARGING.find(m => m.key === electrical?.dc_400v_charging)?.label ?? null;
+        const voltageClass = resolveVoltageClass(electrical, specs?.charging?.battery_nominal_voltage_v);
+        values['figures.voltageClass'] = voltageClass?.v ?? null;
+        notes['figures.voltageClass'] = voltageClass
+            ? (voltageClass.basis === 'platform' ? `from ${voltageClass.platform.name}` : `from ${Math.round(voltageClass.nominalV)} V nominal`)
+            : null;
+        const dc400 = resolveDc400Charging(electrical);
+        values['figures.dc400Charging'] = dc400?.label ?? null;
+        notes['figures.dc400Charging'] = dc400 ? `from ${dc400.platform.name}` : null;
         for (const [key, kind] of [['platform.mechanical', 'mechanical_platform_id'], ['platform.electrical', 'electrical_platform_id']]) {
             const from = vehicle.inheritedFrom?.[kind];
             if (values[key] != null && from) notes[key] = `from ${from.name}`;
