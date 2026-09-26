@@ -58,8 +58,8 @@ export default function ChargeSummaryMaintenance() {
     return (
         <div className="flex flex-col gap-2">
             <p className="text-note">
-                Charging summaries — each session’s best 5, 10 and 15-minute average charge rate,
-                which the vehicle table’s charging columns read.{' '}
+                Charging summaries — each session’s best 5, 10 and 15-minute average charge rate, and
+                its curve by state of charge, which the vehicle table’s charging columns read.{' '}
                 {stale
                     ? `${stale} of ${total} charging sessions have none, or one from before calculation version ${CHARGE_SUMMARY_VERSION}.`
                     : `All ${total} charging sessions are summarized (calculation version ${CHARGE_SUMMARY_VERSION}).`}

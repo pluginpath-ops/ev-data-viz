@@ -43,7 +43,7 @@
  * guess with a decimal point. Those are reported as measured, with the window
  * named, and the reader is told the test cannot answer the question.
  */
-import { defaultRangeRun } from './rangeSource';
+import { defaultRangeRun, miPerKwhFrom } from './rangeSource';
 import { speedBasisNote } from './unitConversions';
 
 /**
@@ -130,25 +130,31 @@ export function coversPracticalPack(run) {
 }
 
 /**
- * Which run the CARD should report, which is not always the vehicle's default.
+ * The range test a vehicle's tested figures come from — on its card, and in
+ * the vehicle table's Tested range and Tested efficiency columns (#335). One
+ * rule for both, so the card and the table never show two different tests.
  *
- * `defaultRangeRun` resolves to the most recent usable test, because `is_default`
- * is still scoped to charging runs. Newest is the right rule for a chart series,
- * where the reader picked the run. It is the wrong one for a summary: a vehicle
- * whose latest test covered 56→10% would show 99 mi beside a 327 mi EPA figure,
- * and a reader glancing at a grid of cards reads that as a catastrophic result
- * rather than as a partial window — even with the window printed beside it.
+ *   1. the curator's default range test. `is_default` is scoped per kind
+ *      (migrations 046, 049/050), so this is a deliberate choice for range,
+ *      independent of the charging default. Choosing it is the curator saying
+ *      "these are the conditions to report", and it wins even over a newer
+ *      full-pack test.
+ *   2. the newest full-pack test
+ *   3. the newest adequately characterised one (coversPracticalPack)
+ *   4. whatever defaultRangeRun resolves to — the newest usable test, partial
+ *      window and all: some evidence, correctly qualified, beats none.
  *
- * So a full-pack test wins over a newer partial one, and among full-pack tests
- * the newest wins. The fallback is the default run, partial window and all: some
- * evidence, correctly qualified, beats none.
+ * Without a curated default, a full-pack test beats a newer partial one. Newest
+ * is the right rule for a chart series, where the reader picked the run; it is
+ * the wrong one for a summary. A vehicle whose latest test covered 56→10% would
+ * show 99 mi beside a 327 mi EPA figure, and a reader glancing down a column
+ * reads that as a catastrophic result rather than as a partial window.
  */
-function cardRangeRun(vehicle) {
+export function reportedRangeRun(vehicle) {
     const usable = (vehicle?.runs || []).filter(r => r.distance_miles > 0);
+    const curated = usable.find(r => r.isDefault || r.is_default);
+    if (curated) return curated;
     const byNewest = (a, b) => new Date(b.date) - new Date(a.date);
-    // A full-pack test first, then any adequately characterised one, then
-    // whatever the default resolves to: some evidence, correctly qualified,
-    // beats none.
     const fullPack = usable
         .filter(r => { const w = socWindow(r); return w != null && w >= FULL_WINDOW_MIN_PCT; })
         .sort(byNewest);
@@ -168,7 +174,7 @@ function cardRangeRun(vehicle) {
  * }|null}
  */
 export function testedRangeSummary(vehicle) {
-    const run = cardRangeRun(vehicle);
+    const run = reportedRangeRun(vehicle);
     if (!run) return null;
 
     const distanceMi = run.distance_miles;
@@ -214,6 +220,38 @@ export function testedRangeSummary(vehicle) {
         temperatureF: run.temperature_f ?? null,
         // A held 70 mph and a mixed cycle averaging 70 mph are different tests.
         // Wherever this site prints a test speed it prints this beside it.
+        speedNote: speedBasisNote(run),
+    };
+}
+
+/**
+ * The vehicle's tested efficiency, from the same test its tested range comes
+ * from (reportedRangeRun), or null.
+ *
+ * Measured energy first; without it, the SoC window priced at the vehicle's
+ * capacity, which is an estimate and says so (`estimated`). Unlike a range, an
+ * efficiency needs no full pack — miles per kWh over 56→10% is still miles per
+ * kWh — so a narrow window is reported, with the window named.
+ *
+ * @returns {{ run, miPerKwh: number, estimated: boolean, windowPct: number|null,
+ *             isRepresentative: boolean, startSoc, endSoc, speedMph, temperatureF,
+ *             speedNote: string|null }|null}
+ */
+export function testedEfficiency(vehicle) {
+    const run = reportedRangeRun(vehicle);
+    if (!run) return null;
+    const { miPerKwh, method } = miPerKwhFrom(run, vehicle?.socWindowKwh);
+    if (!(miPerKwh > 0) || !Number.isFinite(miPerKwh)) return null;
+    return {
+        run,
+        miPerKwh,
+        estimated: method === 'soc-delta-estimate',
+        windowPct: socWindow(run),
+        isRepresentative: coversPracticalPack(run),
+        startSoc: run.start_soc ?? null,
+        endSoc: run.end_soc ?? null,
+        speedMph: run.speed_mph ?? null,
+        temperatureF: run.temperature_f ?? null,
         speedNote: speedBasisNote(run),
     };
 }

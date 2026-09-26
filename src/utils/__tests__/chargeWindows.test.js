@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     summarizeChargeSession, bestChargeWindows, countsTowardBest, isCurrentSummary, CHARGE_SUMMARY_VERSION,
+    minutesBetween, chargeTimeSession,
 } from '../chargeWindows';
 
 /** A session sampled every `step` minutes, power from `kwAt(t)`, SoC rising 1%/min from `soc0`. */
@@ -124,15 +125,115 @@ describe('bestChargeWindows', () => {
             run(2, s, { synthetic: true }),
             run('inherited_4_9', s),
             run(3, s, { kind: 'range' }),
-            run(5, { ...s, version: CHARGE_SUMMARY_VERSION - 1 }),
+            run(5, { ...s, version: 0 }),
             run(6, null),
         ])[5]).toBeNull();
         expect(isCurrentSummary({ version: CHARGE_SUMMARY_VERSION })).toBe(true);
         expect(countsTowardBest(run(7, s))).toBe(true);
     });
 
+    it('still reads the windows of a version-1 summary, which only lacks the curve', () => {
+        // Version 2 added `socMin` and left the windows alone, so a session
+        // Admin has not yet recomputed keeps setting its vehicle's best.
+        const v1 = { ...summary(300, 300), version: 1 };
+        expect(isCurrentSummary(v1)).toBe(false);
+        expect(countsTowardBest(run(1, v1))).toBe(true);
+    });
+
     it('marks a figure whose time was derived rather than logged', () => {
         const best = bestChargeWindows([run(1, summary(200, 150), { calculated_fields: ['time', 'range'] })]);
         expect(best[15].timeDerived).toBe(true);
+    });
+});
+
+describe('the curve by state of charge (#335)', () => {
+    it('records the minute each whole percent was first reached', () => {
+        // SoC rises 1%/min from 10%, so p% is reached at minute p − 10.
+        const s = summarizeChargeSession(session({ minutes: 70 }));
+        expect(s.socMin).toHaveLength(101);
+        expect(s.socMin[9]).toBeNull();              // below where it started
+        expect(s.socMin[10]).toBe(0);
+        expect(s.socMin[80]).toBe(70);
+        expect(s.socMin[81]).toBeNull();             // above where it stopped
+        expect(minutesBetween(s, 10, 80)).toBe(70);
+        expect(minutesBetween(s, 20, 50)).toBe(30);
+    });
+
+    it('interpolates between sparse samples, as a checkpoint log needs', () => {
+        const pts = [{ time: 0, soc: 8, chargeRate: 200 }, { time: 4, soc: 28, chargeRate: 180 }, { time: 20, soc: 80, chargeRate: 60 }];
+        const s = summarizeChargeSession(pts);
+        expect(s.socMin[10]).toBeCloseTo(0.4);       // 2 of 20 points in 4 minutes
+        expect(s.socMin[80]).toBe(20);
+    });
+
+    it('stops where SoC stalls — a pause is not charging time', () => {
+        // Charged to 30% by minute 5, sat there until minute 25, then resumed.
+        const pts = [{ time: 0, soc: 10, chargeRate: 150 }, { time: 5, soc: 30, chargeRate: 150 },
+            { time: 25, soc: 30, chargeRate: 0 }, { time: 40, soc: 80, chargeRate: 50 }];
+        const s = summarizeChargeSession(pts);
+        expect(s.socMin[30]).toBe(5);
+        expect(s.socMin[31]).toBeNull();
+        expect(minutesBetween(s, 10, 80)).toBeNull();
+    });
+
+    it('keeps the first time a percent was reached when SoC dips and recovers', () => {
+        const pts = [{ time: 0, soc: 10, chargeRate: 100 }, { time: 2, soc: 12, chargeRate: 100 },
+            { time: 3, soc: 11, chargeRate: 100 }, { time: 5, soc: 14, chargeRate: 100 }];
+        const s = summarizeChargeSession(pts);
+        expect(s.socMin[12]).toBe(2);
+        expect(s.socMin[13]).toBeCloseTo(4.3, 1);
+    });
+
+    it('has no curve without SoC, and none from an old summary', () => {
+        const pts = session().map(({ soc: _soc, ...p }) => p);
+        expect(summarizeChargeSession(pts).socMin).toBeUndefined();
+        expect(minutesBetween({ version: 1, windows: {} }, 10, 80)).toBeNull();
+        expect(minutesBetween(null, 10, 80)).toBeNull();
+    });
+});
+
+describe('chargeTimeSession — which session a charge time comes from (#335)', () => {
+    const curve = (minutes10to80) => {
+        const socMin = new Array(101).fill(null);
+        for (let p = 5; p <= 90; p++) socMin[p] = ((p - 10) * minutes10to80) / 70 + 5;
+        return { version: CHARGE_SUMMARY_VERSION, peakKw: 250, windows: {}, socMin };
+    };
+    const run = (id, summary, over = {}) => ({ id, kind: 'charging', date: '2025-01-01', charge_summary: summary, ...over });
+
+    it('takes the curator\'s default over a newer session', () => {
+        const got = chargeTimeSession([
+            run(1, curve(30), { is_default: true, date: '2024-01-01', temperature_f: 41 }),
+            run(2, curve(20), { date: '2025-06-01' }),
+        ], { from: 10, to: 80 });
+        expect(got.run.id).toBe(1);
+        expect(got.minutes).toBeCloseTo(30);
+        expect(got.temperatureF).toBe(41);
+    });
+
+    it('falls back to the newest session that covers the window', () => {
+        const got = chargeTimeSession([
+            run(1, curve(30), { date: '2024-01-01' }),
+            run(2, curve(20), { date: '2025-06-01' }),
+            run(3, { ...curve(10), socMin: new Array(101).fill(null) }, { date: '2026-01-01', is_default: true }),
+        ], { from: 10, to: 80 });
+        expect(got.run.id).toBe(2);
+    });
+
+    it('leaves out a charger-limited session, and counts it', () => {
+        const limited = { ...curve(40), peakKw: 120 };
+        const got = chargeTimeSession([run(1, limited)], { from: 10, to: 80, maxDcKw: 250 });
+        expect(got.run).toBeNull();
+        expect(got.limitedOut).toBe(1);
+        // Without the car's maximum there is nothing to call it limited against.
+        expect(chargeTimeSession([run(1, limited)], { from: 10, to: 80 }).run.id).toBe(1);
+    });
+
+    it('leaves out hidden, synthetic, inherited and range sessions', () => {
+        expect(chargeTimeSession([
+            run(1, curve(20), { isHidden: true }),
+            run(2, curve(20), { synthetic: true }),
+            run('inherited_4_9', curve(20)),
+            run(3, curve(20), { kind: 'range' }),
+        ], { from: 10, to: 80 }).run).toBeNull();
     });
 });

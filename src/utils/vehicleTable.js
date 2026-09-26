@@ -16,13 +16,16 @@
  *                        with the source that set it (performanceDerivations)
  *   every spec field     through inheritance, in schema order
  *   Calculated           ratios of the above, worked out per row (#335)
+ *   Tested range         range and efficiency from the vehicle's reported
+ *                        range test (testedRange.js), with its conditions
  *   Tested charging      the best 5/10/15-minute average charge rate across
- *                        the vehicle's charging sessions (#346)
+ *                        the vehicle's charging sessions (#346), and the
+ *                        charge time over the reader's window (#335)
  *
- * Tested range data is deliberately not here yet. The plan for
- * choosing which tested figure a row shows is on #335: best result for what a
- * car is capable of, the vehicle's default test WITH its conditions for what
- * depends on conditions.
+ * Which tested figure a row shows follows the rule on #335: the best result
+ * for what a car is capable of (acceleration, the best charge windows), the
+ * vehicle's default test WITH its conditions for what depends on conditions
+ * (range, efficiency, charge time).
  *
  * ── Bars ────────────────────────────────────────────────────────────────────
  *
@@ -36,12 +39,14 @@
 
 import { SPEC_CATEGORIES } from './vehicleSpecSchema';
 import { resolveEffectiveSpecs, vehicleLabel } from './specHelpers';
-import { convValue, MI_TO_KM, LBS_TO_KG, HP_TO_KW } from './unitConversions';
+import { convValue, fmtSpeed, MI_TO_KM, LBS_TO_KG, HP_TO_KW } from './unitConversions';
 import { deriveTested } from './performanceDerivations';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from './vehicleFigures';
 import { sortByColumn, barMaximaOf, barPercentOf } from './tableColumns';
 import { VEHICLE_TABLE_PRESETS } from './vehicleTablePresets';
-import { CHARGE_WINDOWS } from './chargeWindows';
+import { CHARGE_WINDOWS, chargeTimeSession, minutesBetween } from './chargeWindows';
+import { testedRangeSummary, testedEfficiency } from './testedRange';
+import { ASSUMED_CHARGER_EFF, MPG_E_CONVERSION } from '../constants/epa';
 
 // ── Units ───────────────────────────────────────────────────────────────────
 
@@ -95,6 +100,14 @@ const FIGURE_COLUMNS = [
       hint: 'The primary EPA configuration’s label, else an Expected EPA Range, else unsorted. Its basis is shown beneath.' },
     { key: 'figures.epaCityMi', label: 'EPA city range', unitGroup: 'distance', group: 'Battery & range', numeric: true, better: 'higher', bar: true, scale: 'range' },
     { key: 'figures.epaHwyMi',  label: 'EPA hwy range',  unitGroup: 'distance', group: 'Battery & range', numeric: true, better: 'higher', bar: true, scale: 'range' },
+    // Its own column rather than a value that replaces Efficiency where it
+    // exists: MPGe counts energy from the wall, charging losses included, so
+    // it reads ~10–15% below a battery-side figure for the same car. One
+    // column holding both would sort a car with a label below its twin
+    // without one, for no reason a reader could see.
+    { key: 'figures.epaEfficiency', label: 'EPA efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
+      group: 'Battery & range', numeric: true, better: 'higher', bar: true, digits: 2, scale: 'efficiency',
+      hint: 'The EPA label’s combined MPGe ÷ 33.705: miles per kWh from the wall, charging losses included, so it reads below Efficiency, which divides by the battery. The MPGe is shown beneath.' },
 ];
 
 const TESTED_COLUMNS = [
@@ -110,6 +123,21 @@ const TESTED_COLUMNS = [
 ].map(c => ({ ...c, group: 'Tested performance', numeric: true, bar: true }));
 
 /**
+ * EVBench's own range test (#335): the test the vehicle's card reports
+ * (testedRange.reportedRangeRun — the curator's default range test first), so
+ * the card and the table never show two different tests. Range and efficiency
+ * depend on speed and temperature, so beneath each figure are the conditions
+ * that produced it: a measurement, not a verdict.
+ */
+const RANGE_TESTED_COLUMNS = [
+    { key: 'tested.range_mi', label: 'Tested range', unitGroup: 'distance', better: 'higher', digits: 0, scale: 'range',
+      hint: 'The vehicle’s reported range test — the curator’s default, else the newest full-pack test — scaled to a full pack when it saw enough of one. Beneath it, its speed, temperature and window. Blank where the window was too narrow to scale from.' },
+    { key: 'tested.efficiency_mi_kwh', label: 'Tested efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
+      better: 'higher', digits: 2, scale: 'efficiency',
+      hint: 'Distance ÷ energy used on the same test as Tested range: battery-side, so comparable to Efficiency, not to EPA efficiency. Estimated from the SoC window and battery where the test logged no energy, and marked so.' },
+].map(c => ({ ...c, group: 'Tested range', numeric: true, bar: true }));
+
+/**
  * EVBench's own charge rate (#346): the best 5, 10 and 15-minute average
  * across the vehicle's charging sessions, chosen in vehicleFigures.js from
  * summaries stored on each session. Beneath each figure, where the window sat
@@ -123,6 +151,19 @@ const CHARGING_COLUMNS = CHARGE_WINDOWS.map(w => ({
         ? 'The highest average charge rate over any 15 minutes of the vehicle’s own charging sessions: what a real stop delivers. Beneath it, where the window sat and the session’s temperature.'
         : `The highest average charge rate over any ${w} minutes of the vehicle’s charging sessions — shows a boost window a spec’s peak kW overstates and a curve undersells. Beneath it, where the window sat.`,
 }));
+
+/**
+ * How long a charging stop over the reader's window takes (#335): read off the
+ * vehicle's own charging curve where a session covers the window, else the
+ * spec's 10→80% time when that is the window. Every charging calculation reads
+ * this rather than the spec field, so a tested curve reaches all of them.
+ */
+const WINDOW_TIME_COLUMN = {
+    key: 'tested.charge_window_min', label: 'Charge time', unit: 'min', better: 'lower', digits: 0,
+    group: 'Tested charging', numeric: true, bar: true, assumption: ['window'],
+    labelFor: ({ windowFrom, windowTo }) => `Charge ${windowFrom}→${windowTo}%`,
+    hint: 'Minutes over the charge window set under Assumptions, from the vehicle’s default charging session (else its newest) that covers it, with the session’s temperature beneath. Where none does, the spec’s 10→80% time, marked “spec” — which answers only 10→80%. Sessions held back by the charger are left out.',
+};
 
 /**
  * Calculated columns (#335): ratios of figures the table already holds.
@@ -145,42 +186,88 @@ const CHARGING_COLUMNS = CHARGE_WINDOWS.map(w => ({
  * the per-quantity unit groups cannot express.
  */
 /**
- * Assumptions: inputs the READER sets for calculated columns (#335), such as
- * how far a charging stop should take them. They live in the URL (`vt_add`)
- * beside the columns, so a shared link computes the same numbers.
+ * Assumptions: inputs the READER sets for calculated columns (#335). They live
+ * in the URL beside the columns, so a shared link computes the same numbers.
  *
- * A distance is in the reader's own units: "add 250" means km to a metric
- * reader, and the label says which.
+ *   addDistance          how far a charging stop should take you (`vt_add`),
+ *                        in the reader's own units: "add 250" means km to a
+ *                        metric reader, and the label says which
+ *   windowFrom/windowTo  the charge window, 10→80% by default (`vt_win`)
+ *   homePrice/fastPrice  electricity, $/kWh, at home and at a DC fast charger
+ *                        (`vt_home`, `vt_fast`)
+ *
+ * Every one has a default a reader never needs to touch, and the Assumptions
+ * menu only offers the ones a shown column reads — a table without a cost
+ * column has no price to set.
  */
-export const DEFAULT_ASSUMPTIONS = { addDistance: 150 };
-export const ADD_DISTANCE_RANGE = { min: 50, max: 300, step: 25 };
+export const DEFAULT_ASSUMPTIONS = { addDistance: 150, windowFrom: 10, windowTo: 80, homePrice: 0.17, fastPrice: 0.48 };
 
-const clampAddDistance = (n) => {
-    const { min, max, step } = ADD_DISTANCE_RANGE;
-    if (!Number.isFinite(n)) return DEFAULT_ASSUMPTIONS.addDistance;
-    return Math.min(max, Math.max(min, Math.round(n / step) * step));
+/**
+ * Each assumption's slider. The window's two ends cannot cross: From stops at
+ * 40% and To starts at 50%.
+ *
+ * The price defaults are round figures near US averages in 2026 — about 17¢
+ * residential and 48¢ at a DC fast charger — and the Assumptions menu says
+ * they are assumptions, not quotes.
+ */
+export const ASSUMPTION_RANGES = {
+    addDistance: { min: 50,   max: 300,  step: 25 },
+    windowFrom:  { min: 0,    max: 40,   step: 5 },
+    windowTo:    { min: 50,   max: 100,  step: 5 },
+    homePrice:   { min: 0.05, max: 0.60, step: 0.01 },
+    fastPrice:   { min: 0.15, max: 1.00, step: 0.01 },
 };
 
-/** What a calculation sees: the assumptions, plus the distance in miles. */
+/** A value held to its slider: in range, on a step, and the default when it is not a number. */
+function clampAssumption(key, n) {
+    const { min, max, step } = ASSUMPTION_RANGES[key];
+    const x = Number(n);
+    if (n == null || n === '' || !Number.isFinite(x)) return DEFAULT_ASSUMPTIONS[key];
+    // Rounded to the step's decimals, so 0.17 stays 0.17 rather than 0.17000000000000001.
+    const decimals = String(step).split('.')[1]?.length ?? 0;
+    return Number(Math.min(max, Math.max(min, Math.round(x / step) * step)).toFixed(decimals));
+}
+
+/** Every assumption held to its slider, missing ones defaulted. */
+function normalizeAssumptions(assumptions = DEFAULT_ASSUMPTIONS) {
+    return Object.fromEntries(Object.keys(DEFAULT_ASSUMPTIONS)
+        .map(k => [k, clampAssumption(k, assumptions?.[k] ?? DEFAULT_ASSUMPTIONS[k])]));
+}
+
+/** What a calculation sees: the assumptions, plus the distance in miles and the window as a share of the pack. */
 function assumptionContext(assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial') {
-    const addDistance = clampAddDistance(Number(assumptions?.addDistance ?? DEFAULT_ASSUMPTIONS.addDistance));
-    return { addDistance, units, addMi: units === 'metric' ? addDistance / MI_TO_KM : addDistance };
+    const a = normalizeAssumptions(assumptions);
+    return {
+        ...a,
+        units,
+        addMi: units === 'metric' ? a.addDistance / MI_TO_KM : a.addDistance,
+        windowShare: (a.windowTo - a.windowFrom) / 100,
+        isSpecWindow: a.windowFrom === SPEC_WINDOW.from && a.windowTo === SPEC_WINDOW.to,
+    };
 }
 
 /**
- * A column as a header shows it: a calculated column whose name carries an
- * assumption ("Time to add 150 mi") is named from it.
+ * A column as a header shows it: a column whose name carries an assumption
+ * ("Time to add 150 mi", "Charge 10→80%") is named from it.
  */
 export function labelledColumn(col, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial') {
     if (!col?.labelFor) return col;
     return { ...col, label: col.labelFor(assumptionContext(assumptions, units)) };
 }
 
-/** Whether any of these column keys is worked out from an assumption. */
-export const needsAssumptions = (keys = []) => keys.some(k => BY_KEY.get(k)?.assumption);
+/**
+ * The assumptions these column keys read, as the Assumptions menu groups them:
+ * 'window', 'addDistance', 'homePrice', 'fastPrice'.
+ */
+export function assumptionsFor(keys = []) {
+    return new Set(keys.flatMap(k => BY_KEY.get(k)?.assumption ?? []));
+}
 
-/** 10→80% is 70% of the pack — a definition, not a tunable. */
-const WINDOW_10_80 = 0.7;
+/** Whether any of these column keys is worked out from an assumption. */
+export const needsAssumptions = (keys = []) => assumptionsFor(keys).size > 0;
+
+/** The only window a spec answers: its 10→80% charge time. */
+const SPEC_WINDOW = { from: 10, to: 80 };
 
 const num = (v) => {
     if (v == null || v === '') return null;
@@ -190,37 +277,63 @@ const num = (v) => {
 /** a ÷ b, or null when either is absent or b is not a positive number. */
 const ratio = (a, b) => (a != null && b != null && b > 0 ? a / b : null);
 
+/**
+ * Minutes to add `addMi` from the window's start, or null with why.
+ *
+ * With a tested curve, read off it — as far as the session reached. Without
+ * one, at the average rate over the spec's 10→80%; beyond what that window
+ * holds the rate is unknown (it falls off past 80%), so the cell is blank and
+ * says why rather than extrapolating.
+ */
+function timeToAdd([range, windowMin], { addMi, windowFrom, windowShare }, { chargeSummary }) {
+    if (range == null || !(range > 0)) return { value: null };
+    const miPerPct = range / 100;
+    if (chargeSummary) {
+        const target = windowFrom + addMi / miPerPct;
+        const lo = Math.floor(target), hi = Math.ceil(target);
+        const a = minutesBetween(chargeSummary, windowFrom, lo) ?? (lo === windowFrom ? 0 : null);
+        const b = hi === lo ? a : minutesBetween(chargeSummary, windowFrom, hi);
+        if (hi > 100 || a == null || b == null) return { value: null, note: 'more than the test charged' };
+        return { value: a + (b - a) * (target - lo) };
+    }
+    if (!(windowMin > 0)) return { value: null };
+    const windowMi = range * windowShare;
+    if (addMi > windowMi) return { value: null, note: `more than a ${SPEC_WINDOW.from}→${SPEC_WINDOW.to}% stop adds` };
+    return { value: addMi / (windowMi / windowMin) };
+}
+
+/** Wall-side miles per kWh: EPA's where the label gives it, else the battery-side estimate less charging losses. */
+const wallEfficiency = (epa, battery) => epa ?? (battery != null ? battery * ASSUMED_CHARGER_EFF : null);
+const costPer100 = (price) => ([epa, battery]) => {
+    const wall = wallEfficiency(epa, battery);
+    return wall > 0 ? (price * 100) / wall : null;
+};
+const costNote = ([epa, battery]) => (epa == null && battery != null ? 'est. from battery efficiency' : null);
+
 const CALCULATED_COLUMNS = [
     { key: 'calc.efficiency', label: 'Efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
-      better: 'higher', digits: 2,
+      better: 'higher', digits: 2, scale: 'efficiency',
       inputs: ['figures.epaRangeMi', 'figures.socWindowKwh'],
       calc: ([range, kwh]) => ratio(range, kwh),
-      hint: 'EPA range ÷ battery. An estimate from the label range and the resolved battery capacity, not a measured figure.' },
+      hint: 'EPA range ÷ battery. An estimate from the label range and the resolved battery capacity, not a measured figure. Battery-side: EPA efficiency, from the wall, reads lower.' },
     { key: 'calc.rangePerChargeMin', label: 'Range per minute', unit: 'mi/min', metric: ['km/min', MI_TO_KM],
-      better: 'higher', digits: 1,
-      inputs: ['figures.epaRangeMi', 'charging.charge_time_10_to_80_pct_min'],
-      calc: ([range, min]) => ratio(range == null ? null : range * WINDOW_10_80, min),
-      hint: 'EPA range × 70% ÷ the 10→80% charge time: the miles a stop adds per minute plugged in. Peak kW is the number quoted; this is the one a road trip feels.' },
+      better: 'higher', digits: 1, assumption: ['window'], charging: true,
+      inputs: ['figures.epaRangeMi', 'tested.charge_window_min'],
+      calc: ([range, min], { windowShare }) => ratio(range == null ? null : range * windowShare, min),
+      hint: 'EPA range × the charge window ÷ the time to charge across it: the miles a stop adds per minute plugged in. Peak kW is the number quoted; this is the one a road trip feels. From a test where one covers the window, else the spec’s 10→80% time.' },
     { key: 'calc.timeToAdd', label: 'Time to add distance', unit: 'min',
-      better: 'lower', digits: 0, assumption: 'addDistance',
+      better: 'lower', digits: 0, assumption: ['addDistance', 'window'], charging: true,
       labelFor: ({ addDistance, units }) => `Time to add ${addDistance} ${units === 'metric' ? 'km' : 'mi'}`,
-      inputs: ['figures.epaRangeMi', 'charging.charge_time_10_to_80_pct_min'],
-      // Minutes to add the reader's distance from 10%, at the 10→80% average
-      // rate. Beyond what 10→80% holds the rate is unknown (it falls off past
-      // 80%), so the cell is blank and says why rather than extrapolating.
-      calc: ([range, min], { addMi }) => {
-          const window = range == null ? null : range * WINDOW_10_80;
-          if (window == null || !(min > 0) || addMi > window) return null;
-          return addMi / (window / min);
-      },
-      note: ([range, min], { addMi }) => (range != null && min > 0 && addMi > range * WINDOW_10_80
-          ? 'more than a 10→80% stop adds' : null),
-      hint: 'Minutes from 10% to add the distance set under Assumptions, at the average rate of the 10→80% charge time. Blank where a 10→80% stop adds less than that.' },
-    { key: 'calc.avgKw10to80', label: 'Avg charge 10→80%', unit: 'kW',
-      better: 'higher', digits: 0,
-      inputs: ['figures.socWindowKwh', 'charging.charge_time_10_to_80_pct_min'],
-      calc: ([kwh, min]) => ratio(kwh == null ? null : kwh * WINDOW_10_80, min == null ? null : min / 60),
-      hint: 'Battery × 70% ÷ the 10→80% charge time: the average power over the session, which says more than the peak.' },
+      inputs: ['figures.epaRangeMi', 'tested.charge_window_min'],
+      calc: (inputs, ctx, extra) => timeToAdd(inputs, ctx, extra).value,
+      note: (inputs, ctx, extra) => timeToAdd(inputs, ctx, extra).note ?? null,
+      hint: 'Minutes from the start of the charge window to add the distance set under Assumptions, pricing each percent at the EPA range. Read off the vehicle’s own charging curve where it has one; else at the average rate of the spec’s 10→80% time, and blank where that stop adds less.' },
+    { key: 'calc.avgChargeKw', label: 'Avg charge', unit: 'kW',
+      better: 'higher', digits: 0, assumption: ['window'], charging: true,
+      labelFor: ({ windowFrom, windowTo }) => `Avg charge ${windowFrom}→${windowTo}%`,
+      inputs: ['figures.socWindowKwh', 'tested.charge_window_min'],
+      calc: ([kwh, min], { windowShare }) => ratio(kwh == null ? null : kwh * windowShare, min == null ? null : min / 60),
+      hint: 'Battery × the charge window ÷ the time to charge across it: the average power over the stop, which says more than the peak.' },
     { key: 'calc.peakCRate', label: 'Peak C-rate', unit: 'C',
       better: 'higher', digits: 2,
       inputs: ['charging.max_dc_kw', 'figures.socWindowKwh'],
@@ -236,6 +349,20 @@ const CALCULATED_COLUMNS = [
       inputs: ['pricing.base_price_usd', 'figures.socWindowKwh'],
       calc: ([price, kwh]) => ratio(price, kwh),
       hint: 'Advertised base price ÷ battery.' },
+    { key: 'calc.costPer100Home', label: 'Cost per 100 mi, home', unit: '$', metric: ['$', 1 / MI_TO_KM],
+      better: 'lower', digits: 2, assumption: ['homePrice'],
+      labelFor: ({ units }) => `Cost per 100 ${units === 'metric' ? 'km' : 'mi'}, home`,
+      inputs: ['figures.epaEfficiency', 'calc.efficiency'],
+      calc: (inputs, { homePrice }) => costPer100(homePrice)(inputs),
+      note: costNote,
+      hint: 'The home electricity price set under Assumptions × 100 ÷ EPA efficiency, which counts charging losses. Where the vehicle has no EPA label, Efficiency less the assumed charging loss, marked as an estimate.' },
+    { key: 'calc.costPer100Fast', label: 'Cost per 100 mi, DC fast', unit: '$', metric: ['$', 1 / MI_TO_KM],
+      better: 'lower', digits: 2, assumption: ['fastPrice'],
+      labelFor: ({ units }) => `Cost per 100 ${units === 'metric' ? 'km' : 'mi'}, DC fast`,
+      inputs: ['figures.epaEfficiency', 'calc.efficiency'],
+      calc: (inputs, { fastPrice }) => costPer100(fastPrice)(inputs),
+      note: costNote,
+      hint: 'The same at the DC fast-charging price set under Assumptions: what a road trip’s miles cost. Priced on EPA efficiency, so a highway trip, which uses more per mile, costs somewhat more.' },
     { key: 'calc.weightPerHp', label: 'Weight per horsepower', unit: 'lb/hp', metric: ['kg/kW', LBS_TO_KG / HP_TO_KW],
       better: 'lower', digits: 1,
       inputs: ['performance.weight_lbs', 'powertrain.horsepower_hp'],
@@ -305,7 +432,10 @@ const SPEC_COLUMNS = SPEC_CATEGORIES.flatMap(cat => cat.fields.map(f => {
 }));
 
 /** Every column the table can show, in picker order. */
-export const VEHICLE_COLUMNS = [...IDENTITY_COLUMNS, ...FIGURE_COLUMNS, ...CALCULATED_COLUMNS, ...TESTED_COLUMNS, ...CHARGING_COLUMNS, ...SPEC_COLUMNS];
+export const VEHICLE_COLUMNS = [
+    ...IDENTITY_COLUMNS, ...FIGURE_COLUMNS, ...CALCULATED_COLUMNS, ...TESTED_COLUMNS,
+    ...RANGE_TESTED_COLUMNS, WINDOW_TIME_COLUMN, ...CHARGING_COLUMNS, ...SPEC_COLUMNS,
+];
 
 const BY_KEY = new Map(VEHICLE_COLUMNS.map(c => [c.key, c]));
 export const vehicleColumnByKey = (key) => BY_KEY.get(key) ?? null;
@@ -391,6 +521,25 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
             : null;
         values['figures.epaCityMi'] = vehicle.epaRange?.cityMi ?? null;
         values['figures.epaHwyMi'] = vehicle.epaRange?.hwyMi ?? null;
+        const mpge = vehicle.epaRange?.combinedMpge ?? null;
+        values['figures.epaEfficiency'] = mpge ? mpge / MPG_E_CONVERSION : null;
+        notes['figures.epaEfficiency'] = mpge ? `${Math.round(mpge)} MPGe` : null;
+
+        const range = testedRangeSummary(vehicle);
+        values['tested.range_mi'] = range?.fullPackMi ?? (range?.isFullPack ? range.distanceMi : null);
+        notes['tested.range_mi'] = range ? rangeTestNote(range, units, {
+            window: range.isScaled ? 'scaled from' : range.fullPackMi == null && !range.isFullPack ? 'only' : null,
+        }) : null;
+        const efficiency = testedEfficiency(vehicle);
+        values['tested.efficiency_mi_kwh'] = efficiency?.miPerKwh ?? null;
+        notes['tested.efficiency_mi_kwh'] = efficiency
+            ? [rangeTestNote(efficiency, units, { window: efficiency.isRepresentative ? null : 'over' }),
+                efficiency.estimated ? 'est. from SoC' : null].filter(Boolean).join(' · ')
+            : null;
+
+        const charge = chargeWindowTime(vehicle, specs, calcContext, units);
+        values[WINDOW_TIME_COLUMN.key] = charge.minutes;
+        notes[WINDOW_TIME_COLUMN.key] = charge.note;
 
         for (const col of CHARGING_COLUMNS) {
             const best = vehicle.chargeBest?.[col.window] ?? null;
@@ -410,12 +559,17 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         }
 
         // Last, so every input — spec, figure or tested — is already in place.
+        // In order, too: a calculation may read one listed before it.
+        const extra = { chargeSummary: charge.summary };
         for (const col of CALCULATED_COLUMNS) {
             const inputs = col.inputs.map(k => num(values[k]));
-            const value = col.calc(inputs, calcContext);
+            const value = col.calc(inputs, calcContext, extra);
             values[col.key] = value == null || (typeof value === 'number' && !Number.isFinite(value)) ? null : value;
             // A note can explain a blank, too ("more than a 10→80% stop adds").
-            notes[col.key] = col.note?.(inputs, calcContext) ?? null;
+            // A charging figure worked from a test says so; from the spec it
+            // is like every other calculation and says nothing.
+            notes[col.key] = col.note?.(inputs, calcContext, extra)
+                ?? (col.charging && charge.summary && values[col.key] != null ? 'from a test' : null);
         }
 
         // Community flags are stored as the spec's own `category.field` key,
@@ -429,6 +583,49 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
 }
 
 /**
+ * The charge time over the reader's window, with its basis (#335).
+ *
+ * A session that covers the window wins over the spec, whatever the window:
+ * it is the vehicle's own measurement. Without one, the spec's 10→80% time
+ * answers only a 10→80% window; any other and the cell is blank, saying why.
+ *
+ * @returns {{ minutes: number|null, note: string|null, summary: Object|null }}
+ *   `summary` — the session's stored summary, for calculations that read its curve
+ */
+function chargeWindowTime(vehicle, specs, { windowFrom, windowTo, isSpecWindow }, units) {
+    const maxDcKw = num(specs?.charging?.max_dc_kw);
+    const tested = chargeTimeSession(vehicle.runs ?? [], { from: windowFrom, to: windowTo, maxDcKw });
+    if (tested.run) {
+        const parts = [tested.run.source, tested.temperatureF != null ? temperatureText(tested.temperatureF, units) : null];
+        return { minutes: tested.minutes, note: parts.filter(Boolean).join(' · ') || 'tested', summary: tested.run.charge_summary };
+    }
+    const spec = num(specs?.charging?.charge_time_10_to_80_pct_min);
+    if (spec > 0 && isSpecWindow) return { minutes: spec, note: 'spec', summary: null };
+    const why = tested.limitedOut ? 'tests charger-limited'
+        : spec > 0 ? `spec gives ${SPEC_WINDOW.from}→${SPEC_WINDOW.to}% only` : null;
+    return { minutes: null, note: why, summary: null };
+}
+
+const temperatureText = (f, units) => (units === 'metric' ? `${Math.round((f - 32) * 5 / 9)}°C` : `${Math.round(f)}°F`);
+
+/**
+ * What sits beneath a range test's figure: speed (and a mixed cycle, which a
+ * held speed is not), temperature, and the SoC window where it matters —
+ * "scaled from 90→10%", "56→10% only".
+ */
+function rangeTestNote(t, units, { window = null } = {}) {
+    const parts = [];
+    if (t.speedMph != null) parts.push(fmtSpeed(t.speedMph, units));
+    if (t.speedNote) parts.push(t.speedNote);
+    if (t.temperatureF != null) parts.push(temperatureText(t.temperatureF, units));
+    if (window && t.startSoc != null && t.endSoc != null) {
+        const span = `${t.startSoc}→${t.endSoc}%`;
+        parts.push(window === 'only' ? `${span} only` : `${window} ${span}`);
+    }
+    return parts.join(' · ') || null;
+}
+
+/**
  * What sits beneath a charge rate: where the window was, how warm the session
  * was, and — the one caveat that could flatter it — time worked out from a
  * capacity rather than logged.
@@ -438,9 +635,7 @@ function chargeNote(best, units) {
     if (best.startSoc != null && best.endSoc != null) parts.push(`${best.startSoc}→${best.endSoc}%`);
     // A session a few seconds short of the window stood in for it.
     if (best.spanMin != null) parts.push(`over ${best.spanMin} min`);
-    if (best.temperatureF != null) {
-        parts.push(units === 'metric' ? `${Math.round((best.temperatureF - 32) * 5 / 9)}°C` : `${Math.round(best.temperatureF)}°F`);
-    }
+    if (best.temperatureF != null) parts.push(temperatureText(best.temperatureF, units));
     if (best.timeDerived) parts.push('time derived');
     return parts.join(' · ') || null;
 }
@@ -561,8 +756,13 @@ export function encodeVehicleTableParams({ columns, sortKey, sortDir, filters, m
         p.set('vt_sort', sortKey);
         if (sortDir === 'desc') p.set('vt_dir', 'desc');
     }
-    const add = clampAddDistance(Number(assumptions?.addDistance));
-    if (add !== DEFAULT_ASSUMPTIONS.addDistance) p.set('vt_add', String(add));
+    const a = normalizeAssumptions(assumptions);
+    if (a.addDistance !== DEFAULT_ASSUMPTIONS.addDistance) p.set('vt_add', String(a.addDistance));
+    if (a.windowFrom !== DEFAULT_ASSUMPTIONS.windowFrom || a.windowTo !== DEFAULT_ASSUMPTIONS.windowTo) {
+        p.set('vt_win', `${a.windowFrom}-${a.windowTo}`);
+    }
+    if (a.homePrice !== DEFAULT_ASSUMPTIONS.homePrice) p.set('vt_home', String(a.homePrice));
+    if (a.fastPrice !== DEFAULT_ASSUMPTIONS.fastPrice) p.set('vt_fast', String(a.fastPrice));
     if (filters?.search?.trim()) p.set('vt_q', filters.search.trim());
     for (const [key, param] of Object.entries(LIST_PARAMS)) {
         for (const v of filters?.[key] ?? []) p.append(param, v);
@@ -596,8 +796,20 @@ export function decodeVehicleTableParams(search) {
         sortDir: sortKey ? (p.get('vt_dir') === 'desc' ? 'desc' : 'asc') : implied.sortDir,
         filters,
         modifiedFrom: !shown && preset ? preset.key : null,
-        assumptions: { addDistance: p.has('vt_add') ? clampAddDistance(Number(p.get('vt_add'))) : DEFAULT_ASSUMPTIONS.addDistance },
+        assumptions: decodeAssumptions(p),
     };
+}
+
+/** The assumptions a query carries; each absent or unreadable one is its default. */
+function decodeAssumptions(p) {
+    const [from, to] = (p.get('vt_win') ?? '').split('-');
+    return normalizeAssumptions({
+        addDistance: p.get('vt_add'),
+        windowFrom: from,
+        windowTo: to,
+        homePrice: p.get('vt_home'),
+        fastPrice: p.get('vt_fast'),
+    });
 }
 
 // ── Memory ──────────────────────────────────────────────────────────────────
