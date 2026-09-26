@@ -16,7 +16,7 @@
 export const EMPTY_VEHICLE_FORM = {
     name: '', make: '', model: '', trim: '', year: '',
     battery: '', range: '', manufacturer_id: null, color: null,
-    image_focal_y: null,
+    image_focal_y: null, mechanical_platform_id: null, electrical_platform_id: null,
 };
 
 /**
@@ -47,5 +47,9 @@ export function vehicleFormFrom(vehicle) {
         // form with that would save it onto the variant -- which would then
         // hold a number framing a picture it does not own (#340).
         image_focal_y: vehicle.own ? vehicle.own.image_focal_y : (vehicle.image_focal_y ?? null),
+        // Its own platforms (#318), for the same reason again: a variant's
+        // resolved platform is its source's, and saving it would cut the pointer.
+        mechanical_platform_id: vehicle.own ? vehicle.own.mechanical_platform_id : (vehicle.mechanical_platform_id ?? null),
+        electrical_platform_id: vehicle.own ? vehicle.own.electrical_platform_id : (vehicle.electrical_platform_id ?? null),
     };
 }

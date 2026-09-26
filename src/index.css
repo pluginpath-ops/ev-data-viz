@@ -1826,6 +1826,40 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     color: var(--color-text-link);
 }
 
+/* What the vehicle is built on (#318): the tested line's shape, a label then
+   a quiet value — it identifies the car, it is not a figure to compare. */
+.platform-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+.platform-line-value {
+    font-family: var(--font-mono);
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    color: var(--color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Both platforms in full at the top of View Specs. */
+.platform-facts {
+    @apply grid gap-x-4 gap-y-1 px-6 pt-3 pb-1;
+    grid-template-columns: auto 1fr;
+}
+.platform-fact {
+    display: contents;
+}
+.platform-fact dt {
+    color: var(--color-text-meta);
+}
+/* "E-GMP 800 V hardware": the rows below it are the platform's, not the car's. */
+.platform-facts-heading {
+    grid-column: 1 / -1;
+    margin-top: 0.5rem;
+}
+
 /* A window too narrow to scale from is a caveat, not a qualifier. */
 .tested-figure-window {
     font-family: var(--font-mono);

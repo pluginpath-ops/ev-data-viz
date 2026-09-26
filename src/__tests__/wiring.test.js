@@ -684,6 +684,34 @@ describe('the seams that broke before', () => {
         expect(figures).not.toMatch(/suggestionSource|spec_source_vehicle_id/);
     });
 
+    it('carries a vehicle\'s platforms from the database to every place it is shown (#318)', () => {
+        // Section 1 holds and shows the data. Each hop is a place it could
+        // stop: stored, loaded, inherited, edited, imported, displayed.
+        const migration = read('supabase/migrations/072_platforms.sql');
+        expect(migration).toMatch(/CREATE TABLE IF NOT EXISTS platforms/);
+        expect(migration).toMatch(/mechanical_platform_id bigint REFERENCES platforms/);
+        expect(migration, 'a link must point at a platform of its own kind').toMatch(/check_vehicle_platform_kinds/);
+
+        const ctx = read('src/context/AppContext.jsx');
+        expect(ctx).toMatch(/dataService\.getPlatforms\(\)/);
+        expect(ctx).toMatch(/platformsById,/);
+        expect(ctx, 'an import must create the platforms it names').toMatch(/plan\.summary\.newPlatforms/);
+        expect(read('src/services/DataService.js'), 'a write must not name columns an unmigrated database lacks')
+            .toMatch(/if \(this\.platformsAvailable\)/);
+        expect(read('src/utils/vehicleInheritance.js')).toMatch(/PLATFORM_KEYS = \['mechanical_platform_id', 'electrical_platform_id'\]/);
+        expect(read('src/utils/vehicleForm.js'), 'the form must seed OWN links, or saving cuts the pointer')
+            .toMatch(/mechanical_platform_id: vehicle\.own \? vehicle\.own\.mechanical_platform_id/);
+
+        expect(read('src/components/EditVehicleForm.jsx')).toMatch(/<PlatformPicker/);
+        expect(read('src/components/AdminView.jsx')).toMatch(/<PlatformRegistry \/>/);
+        expect(read('src/components/ImportVehiclesModal.jsx')).toMatch(/buildImportPlan\([^)]*platforms/);
+        expect(read('src/utils/parseVehicleImport.js')).toMatch(/mechanical_platform: \[/);
+
+        expect(read('src/components/VehiclesView.jsx')).toMatch(/<PlatformLine vehicle=\{vehicle\} \/>/);
+        expect(read('src/components/ViewSpecsModal.jsx')).toMatch(/<PlatformFacts vehicle=\{liveVehicle\} \/>/);
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/buildVehicleRows\(vehicles, \{[^}]*platformsById/);
+    });
+
     it('links a tested figure to its test, and lands on it', () => {
         // Built once and unconnected, a link that navigates nowhere looks
         // exactly like one that works until someone clicks it.

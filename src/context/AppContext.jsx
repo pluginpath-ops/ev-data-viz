@@ -21,6 +21,10 @@ export function AppProvider({ children }) {
     const [runVotes, setRunVotes] = useState({});          // { [runId]: { vouch, flag, myVote } }
     const [units, setUnits] = useState(() => localStorage.getItem('evbench_units') || 'imperial');
     const [manufacturers, setManufacturers] = useState([]);
+    // Platforms (#318). `platformsAvailable` is false until migration 072 is
+    // applied; the pickers and columns then stay out of the way.
+    const [platforms, setPlatforms] = useState([]);
+    const [platformsAvailable, setPlatformsAvailable] = useState(false);
     const [testSessions, setTestSessions] = useState([]);
     const [chartHelp, setChartHelp] = useState({});        // { [chart_key]: row } — "About this chart" copy
     const [performanceCounts, setPerformanceCounts] = useState({}); // { [vehicleId]: {accel, braking} } — card badges
@@ -84,6 +88,7 @@ export function AppProvider({ children }) {
             chartHelpData,
             sessionsData,
             perfCounts,
+            platformsData,
         ] = await Promise.all([
             dataService.getVehicles(),
             dataService.getSelectedVehicles(),
@@ -95,6 +100,9 @@ export function AppProvider({ children }) {
             // One extra query, kept out of getVehicles so a missing performance table
             // can never take the vehicles list down with it.
             dataService.useSupabase ? dataService.getPerformanceRunCounts() : {},
+            // Kept from taking the app down, like the performance counts: a
+            // platform list that fails to load is a missing column, not an outage.
+            dataService.getPlatforms().catch(() => ({ platforms: [], available: false })),
         ]);
 
         // Derive custom field name suggestions from all vehicles' specs._custom objects
@@ -118,6 +126,8 @@ export function AppProvider({ children }) {
         setTestSessions(sessionsData);
         setChartHelp(chartHelpData);
         setPerformanceCounts(perfCounts);
+        setPlatforms(platformsData.platforms);
+        setPlatformsAvailable(platformsData.available);
         setHeaderImageUrl(siteSettings.header_image_url || '');
         setLoading(false);
     }
@@ -186,6 +196,40 @@ export function AppProvider({ children }) {
             return false;
         }
     };
+
+    // ── Platforms (#318) ──────────────────────────────────────────────────────
+
+    const savePlatform = async (row) => {
+        try {
+            const saved = await dataService.savePlatform(row);
+            setPlatforms(prev => [...prev.filter(p => p.id !== saved.id), saved]
+                .sort((a, b) => a.name.localeCompare(b.name)));
+            return saved;
+        } catch (error) {
+            // 23505: the unique index on (kind, lower(name)).
+            showError('Platform not saved: ' + (error.code === '23505' ? 'a platform of that kind with that name already exists.' : error.message));
+            throw error;
+        }
+    };
+
+    const deletePlatform = async (id) => {
+        try {
+            await dataService.deletePlatform(id);
+            setPlatforms(prev => prev.filter(p => p.id !== id));
+            // The foreign key has unlinked its vehicles; say the same here.
+            setVehicles(prev => prev.map(v => ({
+                ...v,
+                mechanical_platform_id: Number(v.mechanical_platform_id) === id ? null : v.mechanical_platform_id,
+                electrical_platform_id: Number(v.electrical_platform_id) === id ? null : v.electrical_platform_id,
+            })));
+            showSuccess('Platform deleted. Its vehicles are unlinked from it.');
+        } catch (error) {
+            showError('Platform not deleted: ' + error.message);
+            throw error;
+        }
+    };
+
+    const platformsById = useMemo(() => new Map(platforms.map(p => [Number(p.id), p])), [platforms]);
 
     const reorderVehicles = async (sortUpdates) => {
         try {
@@ -672,6 +716,27 @@ export function AppProvider({ children }) {
             }
         }
 
+        // Platforms a file names that do not exist yet (#318), by kind and name.
+        const platformKey = (kind, name) => `${kind}:${String(name).trim().toLowerCase()}`;
+        const newPlatformIds = new Map();
+        for (const { kind, name } of plan.summary.newPlatforms ?? []) {
+            try {
+                const created = await dataService.savePlatform({ kind, name });
+                newPlatformIds.set(platformKey(kind, name), created.id);
+            } catch (error) {
+                failures.push({ label: name, message: `Platform: ${error.message}` });
+            }
+        }
+        /** The platform ids a planned row links, as vehicle columns. */
+        const platformColumns = (row) => {
+            const out = {};
+            for (const [kind, p] of Object.entries(row.platforms ?? {})) {
+                const id = p.isNew ? newPlatformIds.get(platformKey(kind, p.name)) : p.id;
+                if (id != null) out[`${kind}_platform_id`] = id;
+            }
+            return out;
+        };
+
         const tagByName = new Map(tags.map(t => [t.name.toLowerCase(), t]));
         for (const name of plan.summary.newTags) {
             try {
@@ -699,11 +764,12 @@ export function AppProvider({ children }) {
                     const newVehicle = await dataService.addVehicle({
                         ...row.coreWrites,
                         ...(mfgId ? { manufacturer_id: mfgId } : {}),
+                        ...platformColumns(row),
                     });
                     rowVehicleIds.set(planIndex, newVehicle.id);
                     created++;
                 } else {
-                    const updates = { ...row.coreWrites };
+                    const updates = { ...row.coreWrites, ...platformColumns(row) };
                     if (mfgId) updates.manufacturer_id = mfgId;
                     if (Object.keys(updates).length > 0) {
                         // updateVehicle writes every core column, so send the
@@ -752,14 +818,17 @@ export function AppProvider({ children }) {
 
         // Refresh without initializeApp()'s loading flag — that would unmount the
         // import modal before it can show the result.
-        const [vehiclesData, tagsData, mfgData] = await Promise.all([
+        const [vehiclesData, tagsData, mfgData, platformsData] = await Promise.all([
             dataService.getVehicles(),
             dataService.useSupabase ? dataService.getTags() : Promise.resolve(tags),
             dataService.useSupabase ? dataService.getManufacturers() : Promise.resolve(manufacturers),
+            // An import can create platforms, as it creates brands.
+            dataService.getPlatforms().catch(() => ({ platforms, available: platformsAvailable })),
         ]);
         setVehicles(vehiclesData);
         setTags(tagsData);
         setManufacturers(mfgData);
+        setPlatforms(platformsData.platforms);
 
         return { created, updated, failures };
     };
@@ -1826,6 +1895,11 @@ export function AppProvider({ children }) {
         units,
         toggleUnits,
         manufacturers,
+        platforms,
+        platformsAvailable,
+        platformsById,
+        savePlatform,
+        deletePlatform,
         chartHelp,
         updateChartHelp,
         addManufacturer,

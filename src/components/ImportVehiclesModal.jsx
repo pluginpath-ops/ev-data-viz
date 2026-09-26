@@ -68,6 +68,10 @@ function RowDetail({ row }) {
     const coreWrites = Object.entries(row.coreWrites);
     return (
         <div className="import-row-detail">
+            {Object.entries(row.platforms ?? {}).map(([kind, p]) => (
+                <p key={kind}>{kind === 'mechanical' ? 'Mechanical' : 'Electrical'} platform: <span className="font-medium">{p.name}</span>
+                    {p.isNew && <span className="text-meta"> (new)</span>}</p>
+            ))}
             {row.manufacturerName && (
                 <p>Brand: <span className="font-medium">{row.manufacturerName}</span>
                     {row.manufacturerIsNew && <span className="text-amber-600 dark:text-amber-400"> (new)</span>}</p>
@@ -136,7 +140,7 @@ function RowDetail({ row }) {
 }
 
 export default function ImportVehiclesModal({ onClose }) {
-    const { vehicles, manufacturers, tags, importVehicles } = useAppContext();
+    const { vehicles, manufacturers, tags, importVehicles, platforms, platformsAvailable } = useAppContext();
 
     const [step, setStep]         = useState('upload'); // upload | review | done
     const [fileName, setFileName] = useState('');
@@ -161,7 +165,7 @@ export default function ImportVehiclesModal({ onClose }) {
             if (parsedFile.fileError) { setError(parsedFile.fileError); return; }
             if (parsedFile.rows.length === 0) { setError('No vehicle rows found in this file.'); return; }
 
-            const built = buildImportPlan(parsedFile.rows, { vehicles, manufacturers, tags });
+            const built = buildImportPlan(parsedFile.rows, { vehicles, manufacturers, tags, platforms, platformsAvailable });
             setParsed(parsedFile);
             setPlan(built);
             setSelected(new Set(
@@ -328,12 +332,16 @@ export default function ImportVehiclesModal({ onClose }) {
                             </p>
                         )}
 
-                        {(summary.newManufacturers.length > 0 || summary.newTags.length > 0) && (
+                        {(summary.newManufacturers.length > 0 || summary.newTags.length > 0 || summary.newPlatforms?.length > 0) && (
                             <p className="text-note mt-2">
                                 Will also create
-                                {summary.newManufacturers.length > 0 && <> brand(s): <span className="font-medium">{summary.newManufacturers.join(', ')}</span></>}
-                                {summary.newManufacturers.length > 0 && summary.newTags.length > 0 && ' and'}
-                                {summary.newTags.length > 0 && <> tag(s): <span className="font-medium">{summary.newTags.join(', ')}</span></>}
+                                {[
+                                    summary.newManufacturers.length > 0 && <> brand(s): <span className="font-medium">{summary.newManufacturers.join(', ')}</span></>,
+                                    summary.newTags.length > 0 && <> tag(s): <span className="font-medium">{summary.newTags.join(', ')}</span></>,
+                                    summary.newPlatforms?.length > 0 && <> platform(s): <span className="font-medium">{summary.newPlatforms.map(p => `${p.name} (${p.kind})`).join(', ')}</span></>,
+                                ].filter(Boolean).map((part, i, all) => (
+                                    <span key={i}>{part}{i < all.length - 1 ? (i === all.length - 2 ? ' and' : ';') : ''}</span>
+                                ))}
                             </p>
                         )}
 

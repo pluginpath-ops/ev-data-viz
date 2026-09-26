@@ -3,6 +3,8 @@ import { useAppContext } from '../context/AppContext';
 import VehicleSpecsDisplay from './VehicleSpecsDisplay';
 import { SpecVouchButton } from './VoteButtons';
 import { mergeInheritedSpecs, resolveEffectiveSpecs, vehicleLabel } from '../utils/specHelpers';
+import { PlatformFacts } from './vehicles/PlatformLine';
+
 
 /**
  * Read-only modal showing a vehicle's specs.
@@ -72,6 +74,7 @@ export default function ViewSpecsModal({ vehicle, onClose }) {
                 </div>
 
                 <div className="modal-body flex-1 overflow-y-auto">
+                    <PlatformFacts vehicle={liveVehicle} />
                     <VehicleSpecsDisplay
                         specs={effectiveSpecs}
                         flaggedSpecs={liveVehicle.flagged_specs || []}

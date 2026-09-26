@@ -216,14 +216,16 @@ describe('calculated columns (#335)', () => {
         expect(value(row, 'calc.weightPerHp')).toBe(10);
         expect(value(row, 'calc.totalCargo')).toBe(35);
         expect(value(row, 'calc.batteryBuffer')).toBeCloseTo(4.76, 2);
-        expect(value(row, 'calc.is800v')).toBe(true);
+        // The 800-volt yes/no gave way to the voltage class (#318).
+        expect(value(row, 'figures.voltageClass')).toBe(800);
+        expect(row.notes['figures.voltageClass']).toBe('from 800 V nominal');
     });
 
     it('blanks a ratio when an input is missing or zero, rather than guessing', () => {
         const [row] = buildVehicleRows([vehicle({ socWindowKwh: 0, epaRangeMi: 300, specs: {} })]);
         expect(value(row, 'calc.efficiency')).toBeNull();
         expect(value(row, 'calc.pricePerMile')).toBeNull();
-        expect(value(row, 'calc.is800v')).toBeNull();
+        expect(value(row, 'figures.voltageClass')).toBeNull();
         expect(formatVehicleCell(row, vehicleColumnByKey('calc.efficiency'))).toBe('—');
     });
 
@@ -242,7 +244,8 @@ describe('calculated columns (#335)', () => {
         expect(formatVehicleCell(row, vehicleColumnByKey('calc.pricePerMile'), 'metric')).toBe('124');
         expect(eff.bar).toBe(true);
         expect(vehicleColumnByKey('calc.batteryBuffer').bar).toBe(false);
-        expect(formatVehicleCell(row, vehicleColumnByKey('calc.is800v'))).toBe('Yes');
+        expect(formatVehicleCell(row, vehicleColumnByKey('figures.voltageClass'))).toBe('800');
+        expect(vehicleColumnByKey('calc.is800v')).toBeNull();
     });
 });
 

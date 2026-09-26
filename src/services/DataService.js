@@ -159,6 +159,8 @@ class DataService {
     this.user = null;
     this.role = null; // 'admin' | 'contributor' | 'user' | null (unauthenticated)
     this.useSupabase = false;
+    // Whether migration 072's platform columns exist; set by getPlatforms().
+    this.platformsAvailable = false;
   }
 
   get isAdmin()       { return this.role === 'admin'; }
@@ -795,6 +797,10 @@ class DataService {
       // Null rather than a default: null means "the palette chooses", and a
       // vehicle created without a color has not made a claim about one.
       color: vehicle.color || null,
+      // Only when set: a database without migration 072 has no such columns,
+      // and naming one there would refuse the whole insert.
+      ...(this.platformsAvailable && vehicle.mechanical_platform_id ? { mechanical_platform_id: Number(vehicle.mechanical_platform_id) } : {}),
+      ...(this.platformsAvailable && vehicle.electrical_platform_id ? { electrical_platform_id: Number(vehicle.electrical_platform_id) } : {}),
       visibility: 'private'
     }).select().single();
     if (error) throw error;
@@ -836,6 +842,14 @@ class DataService {
     // `|| null` is what lets the picker's Auto hand the vehicle back to the
     // palette rather than storing an empty string.
     set('color', updates.color !== undefined ? (updates.color || null) : undefined);
+    // The two platform links (#318): an id, or empty for "none". Only where
+    // migration 072 is applied: the form always sends them, and naming a
+    // column that does not exist would refuse the whole save.
+    if (this.platformsAvailable) {
+      for (const key of ['mechanical_platform_id', 'electrical_platform_id']) {
+        set(key, updates[key] !== undefined ? (updates[key] ? Number(updates[key]) : null) : undefined);
+      }
+    }
     // Null, not 0: the column is nullable and null means centered, so the form's
     // "not repositioned" and the database's are the same value rather than two
     // things that have to be mapped between. `?? null` rather than `|| null`
@@ -3222,6 +3236,54 @@ class DataService {
       if (error) throw error;
     }
     return this.savePerformanceSummary({ ...fields, id: summaryId });
+  }
+
+  // ── Platforms (#318, migration 072) ───────────────────────────────────────
+
+  /** The platform list, both kinds. `available` is false until migration 072 is applied. */
+  async getPlatforms() {
+    if (!this.useSupabase) return { platforms: [], available: false };
+    const { data, error } = await getSupabase().from('platforms').select('*').order('name');
+    if (error) {
+      if (isMissingRelation(error)) { this.platformsAvailable = false; return { platforms: [], available: false }; }
+      throw error;
+    }
+    // Remembered, so a vehicle write names the link columns only where they exist.
+    this.platformsAvailable = true;
+    return { platforms: data || [], available: true };
+  }
+
+  /**
+   * Insert (no id) or update (with id) a platform. Aliases and chemistries are
+   * stored trimmed and de-duplicated. A mechanical platform's electrical
+   * properties are cleared rather than refused, so switching a row's kind in
+   * the editor saves instead of tripping the table's CHECK.
+   */
+  async savePlatform(row) {
+    if (!this.useSupabase) return null;
+    const unique = (list) => [...new Set((list ?? []).map(s => String(s).trim()).filter(Boolean))];
+    const { id, ...fields } = row;
+    if ('name' in fields) fields.name = String(fields.name ?? '').trim();
+    if ('maker_group' in fields) fields.maker_group = String(fields.maker_group ?? '').trim() || null;
+    if ('aliases' in fields) fields.aliases = unique(fields.aliases);
+    if ('chemistries' in fields) fields.chemistries = unique(fields.chemistries);
+    if (fields.kind === 'mechanical') {
+      Object.assign(fields, { voltage_class_v: null, dc_400v_charging: null, chemistries: [], cell_format: null });
+    }
+    const db = getSupabase();
+    const q = id
+      ? db.from('platforms').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', id)
+      : db.from('platforms').insert(fields);
+    const { data, error } = await q.select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  /** Delete a platform. Its vehicles are unlinked by the foreign key, never deleted. */
+  async deletePlatform(id) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase().from('platforms').delete().eq('id', id);
+    if (error) throw error;
   }
 
   // ── Sources (#327, migration 068) ─────────────────────────────────────────

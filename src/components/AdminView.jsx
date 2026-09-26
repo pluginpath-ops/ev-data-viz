@@ -12,6 +12,7 @@ import FeGuideLinkSweep from './admin/FeGuideLinkSweep';
 import EpaAuditSweep from './admin/EpaAuditSweep';
 import BrandRegistry from './admin/BrandRegistry';
 import TagRegistry from './admin/TagRegistry';
+import PlatformRegistry from './admin/PlatformRegistry';
 import DataChecksPanel from './admin/DataChecksPanel';
 import PublishedResultsPanel from './admin/PublishedResultsPanel';
 
@@ -21,7 +22,7 @@ const SUBTABS = [
     { id: 'feguide',   label: 'Fuel Economy Guide' },
     { id: 'checks',    label: 'Data Checks' },
     { id: 'results',   label: 'Published Results' },
-    { id: 'brands',    label: 'Brands & Tags' },
+    { id: 'brands',    label: 'Brands, Platforms & Tags' },
     { id: 'constants', label: 'Model Constants' },
     { id: 'interface', label: 'Interface Settings' },
     { id: 'playground', label: 'Playground' },
@@ -224,6 +225,7 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
             {subtab === 'brands' && (
                 <div className="flex flex-col gap-6">
                     <BrandRegistry />
+                    <PlatformRegistry />
                     <TagRegistry />
                 </div>
             )}

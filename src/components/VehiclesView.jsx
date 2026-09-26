@@ -11,6 +11,7 @@ import StatCell from './StatCell';
 import VehicleMedia from './vehicles/VehicleMedia';
 import { CARD_BAND_HEIGHT } from '../utils/cardBand';
 import TestedFigure from './vehicles/TestedFigure';
+import { PlatformLine } from './vehicles/PlatformLine';
 import { testedRangeSummary } from '../utils/testedRange';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
@@ -943,6 +944,8 @@ export default function VehiclesView({
                                             produced it and no verdict attached. */}
                                         <TestedFigure vehicle={vehicle} tested={testedRangeSummary(vehicle)} units={units} onOpenTest={onOpenTest} />
 
+                                        <PlatformLine vehicle={vehicle} />
+
                                         <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
 
                                         {vehicle.tags?.length > 0 && <TagPills vehicle={vehicle} />}
@@ -1077,6 +1080,7 @@ export default function VehiclesView({
                                             />
                                         </div>
                                         <TestedFigure vehicle={vehicle} tested={testedRangeSummary(vehicle)} units={units} onOpenTest={onOpenTest} />
+                                        <PlatformLine vehicle={vehicle} />
                                         <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
                                     </div>
 
