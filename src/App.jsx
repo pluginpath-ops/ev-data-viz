@@ -13,6 +13,7 @@ import ChargeCompareView from './components/ChargeCompareView';
 import RoadTripView from './components/RoadTripView';
 import PopoutView from './components/PopoutView';
 import VehicleTable from './components/VehicleTable';
+import { testHref } from './utils/testDetails';
 import { VEHICLE_TABLE_PARAM_PREFIX } from './utils/vehicleTable';
 import SpecsChartView from './components/SpecsChartView';
 import SpecsScatterView from './components/SpecsScatterView';
@@ -113,6 +114,12 @@ export default function App() {
     // Performance / EPA). Lifted out of RunsView so it can be persisted in the
     // URL the same way activeVehicle is.
     const [runsSubtab, setRunsSubtab] = useState(DEFAULT_RUNS_SUBTAB);
+    // The test a link pointed at (?tab=runs&run=…), which Tests & Data scrolls
+    // to and marks once, then hands back. Only a link sets it.
+    const [focusRunId, setFocusRunId] = useState(null);
+    // Stable, because Tests & Data's landing effect depends on it: a new
+    // function each render would re-scroll and restart its timer every time.
+    const clearFocusRun = useCallback(() => setFocusRunId(null), []);
     // Same lift for the Admin tab's sub-tabs (Roles / EPA Data / Fuel Economy
     // Guide / Model Constants / Interface Settings).
     const [adminSubtab, setAdminSubtab] = useState(DEFAULT_ADMIN_SUBTAB);
@@ -246,6 +253,23 @@ export default function App() {
         setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings,
     });
 
+    /**
+     * Open a test in Tests & Data from a figure that rests on it — the vehicle
+     * table's tested cells (testDetails.js TestReference). A history entry, so
+     * Back returns to the table where the reader was.
+     */
+    const openTest = useCallback((ref) => {
+        const v = vehicles.find(x => String(x.id) === String(ref.vehicleId));
+        if (!v) return;
+        const sub = RUNS_SUBTAB_IDS.includes(ref.sub) ? ref.sub : DEFAULT_RUNS_SUBTAB;
+        history.pushState({ view: 'runs', vehicleId: v.id, subtab: sub }, '', testHref(ref));
+        setActiveVehicle(v);
+        setRunsSubtab(sub);
+        setFocusRunId(ref.runId ?? null);
+        setView('runs');
+        window.scrollTo(0, 0);
+    }, [vehicles]);
+
     // Navigate to a new top-level view and push a browser history entry so the
     // back button works within the app instead of exiting to the auth page.
     const navigateTo = useCallback((newView) => {
@@ -266,6 +290,7 @@ export default function App() {
     // once vehicles load.
     const pendingRunsVehicleId = useRef(null);
     const pendingRunsSubtab = useRef(null);
+    const pendingRunsRunId = useRef(null);
     // Whether to land on the Admin tab (?tab=admin&sub=…) once the user's role
     // has loaded, and which sub-tab to restore.
     const pendingAdminView = useRef(false);
@@ -300,6 +325,7 @@ export default function App() {
             if (vid) pendingRunsVehicleId.current = isNaN(Number(vid)) ? vid : Number(vid);
             const sub = p.get('sub');
             if (RUNS_SUBTAB_IDS.includes(sub)) pendingRunsSubtab.current = sub;
+            if (p.get('run')) pendingRunsRunId.current = p.get('run');
             return;
         }
         // Unlinked, but a real route: nothing here needs a role or a selection
@@ -406,6 +432,8 @@ export default function App() {
             // browser handle it naturally.
             if (!e.state?.view) return;
             setView(e.state.view);
+            // Back and Forward return to a page, not to a link's moment of arrival.
+            setFocusRunId(null);
             // Restore chart mode without clearing runs — auto-select re-initialises
             // them for the restored mode automatically.
             if (e.state.chartMode) setChartMode(e.state.chartMode);
@@ -468,11 +496,14 @@ export default function App() {
         pendingRunsVehicleId.current = null;
         const sub = pendingRunsSubtab.current;
         pendingRunsSubtab.current = null;
+        const runId = pendingRunsRunId.current;
+        pendingRunsRunId.current = null;
         const v = vehicles.find(v => v.id === id);
         if (v) {
             setActiveVehicle(v);
             setView('runs');
             if (RUNS_SUBTAB_IDS.includes(sub)) setRunsSubtab(sub);
+            if (runId) setFocusRunId(runId);
         }
     }, [loading, vehicles]);
 
@@ -591,12 +622,15 @@ export default function App() {
         p.set('tab', 'runs');
         p.set('vid', currentActiveVehicle.id);
         if (runsSubtab !== DEFAULT_RUNS_SUBTAB) p.set('sub', runsSubtab);
+        // Kept while the link's test is still being shown, so a refresh
+        // before it lands lands on it too.
+        if (focusRunId != null) p.set('run', focusRunId);
         history.replaceState(
             { view: 'runs', vehicleId: currentActiveVehicle.id, subtab: runsSubtab },
             '',
             '?' + p.toString(),
         );
-    }, [isPopout, view, currentActiveVehicle, runsSubtab]);
+    }, [isPopout, view, currentActiveVehicle, runsSubtab, focusRunId]);
 
     // ── Keep URL in sync while on the EPA tab ───────────────────────────────
     // This one PRESERVES the existing query string rather than rebuilding it,
@@ -861,7 +895,8 @@ export default function App() {
                             onAdd={addVehicle}
                             onUpdate={updateVehicle}
                             onDelete={deleteVehicle}
-                            onViewRuns={(v) => { setActiveVehicle(v); setRunsSubtab(DEFAULT_RUNS_SUBTAB); navigateTo('runs'); }}
+                            onViewRuns={(v) => { setActiveVehicle(v); setRunsSubtab(DEFAULT_RUNS_SUBTAB); setFocusRunId(null); navigateTo('runs'); }}
+                            onOpenTest={openTest}
                             canCreate={canCreate}
                             canEdit={canEdit}
                             canDelete={canDelete}
@@ -919,6 +954,8 @@ export default function App() {
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                             subtab={runsSubtab}
                             onSubtabChange={setRunsSubtab}
+                            focusRunId={focusRunId}
+                            onFocused={clearFocusRun}
                         />
                     )}
                     {/* ChargingView is the fall-through: it renders for any mode NOT
@@ -1012,7 +1049,7 @@ export default function App() {
                     )}
                     {/* No selection gate: the vehicle table is where a selection is
                         made, over the whole fleet (#315). */}
-                    {activeChartCategory && chartMode === 'specstable' && <VehicleTable />}
+                    {activeChartCategory && chartMode === 'specstable' && <VehicleTable onOpenTest={openTest} />}
                     {view === 'epa' && <EpaSection subtab={epaSubtab} />}
 
                     {/* The playground, ungated and unlinked.

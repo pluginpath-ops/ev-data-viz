@@ -28,6 +28,8 @@ import VehicleTableAssumptions from './VehicleTableAssumptions';
 import useColumnDrag from '../hooks/useColumnDrag';
 import TableCell from './tables/TableCell';
 import { useCellPeek } from '../hooks/useCellPeek';
+import TestPeek from './TestPeek';
+import { testHref } from '../utils/testDetails';
 import GuideFacetMenu from './epa/guide/GuideFacetMenu';
 import ViewSpecsModal from './ViewSpecsModal';
 import { vehicleColor } from '../utils/specHelpers';
@@ -71,9 +73,9 @@ const FACETS = [
 ];
 
 /** One vehicle. Rendered by the selected band and the body from the same component. */
-function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen }) {
+function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen, onOpenTest }) {
     return (
-        <tr className={`guide-row${selected ? ' selected' : ''}`} onClick={() => onOpen(row.vehicle)}>
+        <tr className={`guide-row${selected ? ' selected' : ''}`} data-row-id={row.id} onClick={() => onOpen(row.vehicle)}>
             <td className="guide-td guide-td-select sticky-select" onClick={e => e.stopPropagation()}>
                 <input
                     type="checkbox"
@@ -112,6 +114,8 @@ function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen 
                         pct={vehicleBarPercent(row, col, maxima)}
                         note={row.notes[col.key]}
                         flagged={row.flagged.has(col.key)}
+                        test={testLink(row.tests[col.key], onOpenTest)}
+                        testKey={col.key}
                     />
                 );
             })}
@@ -119,7 +123,22 @@ function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen 
     );
 }
 
-export default function VehicleTable() {
+/**
+ * A cell's test as TableCell links it: the href always, and an in-app open
+ * where the table has one. The pop-out window has none — it holds only the
+ * table — so there a click opens the test in a new tab instead.
+ */
+function testLink(ref, onOpenTest) {
+    if (!ref) return null;
+    return { href: testHref(ref), onOpen: onOpenTest ? () => onOpenTest(ref) : null };
+}
+
+/**
+ * Props:
+ *   onOpenTest  {(TestReference) => void}  open a test in Tests & Data
+ *               without a reload; absent in the pop-out window
+ */
+export default function VehicleTable({ onOpenTest = null }) {
     const {
         vehicles, selectedVehicles, toggleVehicleSelection, units,
         getPerformanceSummaries, getPerformanceSessions,
@@ -169,13 +188,26 @@ export default function VehicleTable() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [wantsPerformance, idsKey]);
     const { data: performance, loading: performanceLoading } = useAsyncResource(loadPerformance, [loadPerformance]);
-    // One peek for every clipped cell in the table, rather than one per cell.
-    const { tableProps: peekProps, panel: cellPeek } = useCellPeek();
 
     const rows     = useMemo(
         () => buildVehicleRows(vehicles, { performance, assumptions, units }),
         [vehicles, performance, assumptions, units],
     );
+    // A tested cell peeks with its test — which one, why, and its conditions —
+    // rather than restating its own text. One peek for every clipped cell in
+    // the table, rather than one per cell.
+    const rowsById = useMemo(() => new Map(rows.map(r => [String(r.id), r])), [rows]);
+    const renderPeek = useCallback((cell) => {
+        const key = cell.dataset.test;
+        const row = key ? rowsById.get(cell.closest('tr')?.dataset.rowId) : null;
+        const test = row?.tests?.[key];
+        const col = vehicleColumnByKey(key);
+        if (!test || !col) return null;
+        const unit = unitFor(col, units);
+        const figure = `${labelledColumn(col, assumptions, units).label}: ${formatVehicleCell(row, col, units)}${unit && row.values[key] != null ? ` ${unit}` : ''}`;
+        return <TestPeek test={test} figure={figure} />;
+    }, [rowsById, assumptions, units]);
+    const { tableProps: peekProps, panel: cellPeek } = useCellPeek({ renderPeek });
     const facets   = useMemo(() => vehicleFacets(rows), [rows]);
     const filtered = useMemo(() => filterVehicleRows(rows, filters), [rows, filters]);
     const sorted   = useMemo(() => sortVehicleRows(filtered, sortKey, sortDir), [filtered, sortKey, sortDir]);
@@ -234,7 +266,7 @@ export default function VehicleTable() {
         [key]: prev[key].includes(value) ? prev[key].filter(v => v !== value) : [...prev[key], value],
     }));
     const filtering = filters.search.trim() || FACETS.some(f => filters[f.key].length);
-    const rowProps = { cols, units, maxima, onToggle: toggleVehicleSelection, onOpen: setViewing };
+    const rowProps = { cols, units, maxima, onToggle: toggleVehicleSelection, onOpen: setViewing, onOpenTest };
 
     return (
         <div className="vehicle-table">

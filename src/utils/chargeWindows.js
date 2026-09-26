@@ -287,7 +287,7 @@ const CHARGER_LIMITED_SHARE = 0.7;
  *
  * @param {Array} runs
  * @param {{ from: number, to: number, maxDcKw?: number|null }} window
- * @returns {{ run, minutes: number, temperatureF: number|null, limitedOut: number } | { run: null, limitedOut: number }}
+ * @returns {{ run, minutes: number, temperatureF: number|null, isDefault: boolean, limitedOut: number } | { run: null, limitedOut: number }}
  *   `limitedOut` — covering sessions set aside as charger-limited
  */
 export function chargeTimeSession(runs = [], { from, to, maxDcKw = null }) {
@@ -309,6 +309,7 @@ export function chargeTimeSession(runs = [], { from, to, maxDcKw = null }) {
         run: pick.run,
         minutes: pick.minutes,
         temperatureF: finite(pick.run.temperature_f) ? Number(pick.run.temperature_f) : null,
+        isDefault: !!(pick.run.isDefault || pick.run.is_default),
         limitedOut,
     };
 }

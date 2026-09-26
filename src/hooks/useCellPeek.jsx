@@ -21,10 +21,14 @@ import { isClipped } from '../components/tables/TableCell';
  * column widths change with the picker, the window and the font. A cell with
  * `data-peek="always"` skips the measurement: it has something to say either way.
  *
+ * `renderPeek(cell)`, when given, may return richer content for a cell — the
+ * vehicle table restates the test behind a tested figure — or null for the
+ * plain restatement.
+ *
  * Returns the handlers to spread on the table and the panel to render.
  */
-export function useCellPeek() {
-    const [peek, setPeek] = useState(null);   // { serial, text } | null
+export function useCellPeek({ renderPeek } = {}) {
+    const [peek, setPeek] = useState(null);   // { serial, text, content } | null
     const hide = useCallback(() => setPeek(null), []);
 
     const { anchorRef, measureRef, style } = useAnchoredPosition(
@@ -44,8 +48,8 @@ export function useCellPeek() {
         anchorRef.current = cell;
         // A serial, not the text: two cells can restate the same words, and
         // moving between them must still re-place the panel.
-        setPeek(prev => ({ serial: (prev?.serial ?? 0) + 1, text: cell.dataset.restate }));
-    }, [anchorRef, peek]);
+        setPeek(prev => ({ serial: (prev?.serial ?? 0) + 1, text: cell.dataset.restate, content: renderPeek?.(cell) ?? null }));
+    }, [anchorRef, peek, renderPeek]);
 
     const panel = peek && createPortal(
         <div
@@ -57,7 +61,7 @@ export function useCellPeek() {
             className="popover popover--anchored popover--peek popover--fit"
             style={style}
         >
-            {peek.text}
+            {peek.content ?? peek.text}
         </div>,
         document.body,
     );

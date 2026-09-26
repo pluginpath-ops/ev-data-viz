@@ -23,6 +23,14 @@
  * `onClick` is for a cell that does something other than its row: both tables
  * make the name cell pick the row, and every other cell opens the details.
  *
+ * A cell whose figure stands on a TEST (`test`, a { href, onOpen } pair) makes
+ * its note a link to that test, and always peeks, because what the reader
+ * wants on hover is which test and under what conditions — the table's
+ * `useCellPeek` renders that from `data-test`. The note, not the whole cell:
+ * every other cell of the row opens the details, and a cell that did something
+ * different with nothing to show it would be a trap. The link stops the row's
+ * click, and is a real href, so a new tab works.
+ *
  * Children, when given, replace the default content (the name cells carry a
  * swatch or badges, and wrap their name with `.guide-cell-name`). Otherwise the
  * cell draws its text, and beneath it the bar and the note when there are any.
@@ -43,6 +51,7 @@ export const FLAGGED_NOTE = 'Flagged as possibly inaccurate';
 
 export default function TableCell({
     text, note = null, pct = null, numeric = false, flagged = false, restate, className = '', onClick, children,
+    test = null, testKey,
 }) {
     const said = restate ?? (note ? `${text} · ${note}` : text);
     // A flag can sit on a blank (someone thinks a value is missing), and
@@ -54,7 +63,8 @@ export default function TableCell({
         <td
             className={`guide-td ${numeric ? 'numeric' : 'wraps'} ${flagged ? 'is-flagged' : ''} ${className}`}
             data-restate={full || undefined}
-            data-peek={flagged ? 'always' : undefined}
+            data-peek={flagged || test ? 'always' : undefined}
+            data-test={test ? testKey : undefined}
             onClick={onClick}
         >
             {flagged && <span className="guide-td-flag" aria-label={FLAGGED_NOTE}>{'\u2691'}</span>}
@@ -64,7 +74,22 @@ export default function TableCell({
                     {/* The value, then its bar beneath it. */}
                     {pct != null && <span className="guide-spark" style={{ '--bar-fill': `${pct}%` }} aria-hidden="true" />}
                     {/* Where a resolved or tested figure came from. */}
-                    {note && <span className="vehicle-table-note">{note}</span>}
+                    {note && (test?.href ? (
+                        <a
+                            className="vehicle-table-note is-test-link"
+                            href={test.href}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                // A plain click navigates in place; a modified
+                                // one (new tab, new window) is the browser's.
+                                if (!test.onOpen || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                                e.preventDefault();
+                                test.onOpen();
+                            }}
+                        >
+                            {note}
+                        </a>
+                    ) : <span className="vehicle-table-note">{note}</span>)}
                 </span>
             ) : words ? <span className="guide-cell-text">{text}</span> : text)}
         </td>
