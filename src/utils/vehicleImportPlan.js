@@ -10,6 +10,7 @@
  */
 import { SPEC_CATEGORIES, formatCustomKey } from './vehicleSpecSchema';
 import { vehicleLabel } from './specHelpers';
+import { matchPlatform, PLATFORM_COLUMN } from './platforms';
 
 const isBlank = v => v === null || v === undefined || v === '';
 
@@ -158,8 +159,13 @@ function mergeSpecs(existingSpecs, row) {
  *   manufacturerName brand to attach (existing or newly created)
  *   tagNames         tags to attach (union with the vehicle's current tags)
  *   inherit          { vehicleId } | { rowIndex } | null
+ *   platforms        { mechanical?, electrical? } each { id, name } for an
+ *                    existing platform or { name, isNew: true } for one to create
+ *
+ * `platforms` in ctx is the platform list (#318); `platformsAvailable` false
+ * (migration 072 not applied) ignores platform columns with a warning.
  */
-export function buildImportPlan(rows, { vehicles = [], manufacturers = [], tags = [] } = {}) {
+export function buildImportPlan(rows, { vehicles = [], manufacturers = [], tags = [], platforms = [], platformsAvailable = true } = {}) {
     // Name → row index, so inherits_from can point at a vehicle created by this same file.
     const rowsByName = new Map();
     rows.forEach((row, i) => {
@@ -169,6 +175,7 @@ export function buildImportPlan(rows, { vehicles = [], manufacturers = [], tags 
     const seenNames = new Set();
     const newManufacturers = new Map(); // lowercased name → display name
     const newTags = new Map();
+    const newPlatforms = new Map();     // `${kind}:${lowercased name}` → { kind, name }
 
     const planned = rows.map((row, i) => {
         const errors = [...row.errors];
@@ -227,6 +234,40 @@ export function buildImportPlan(rows, { vehicles = [], manufacturers = [], tags 
             if (!tags.some(t => lower(t.name) === lower(name))) newTags.set(lower(name), name);
         }
 
+        // ── Platforms (#318) ──
+        // Fill-blanks like every other field: a vehicle that already links a
+        // platform of its own keeps it. A name in a kind's own column that
+        // matches nothing becomes a new platform, as an unknown brand does; a
+        // bare "platform" only links what it matches, since it cannot say
+        // which kind a new one would be.
+        const platformWrites = {};
+        const named = row.platformNames ?? {};
+        if (Object.keys(named).length && !platformsAvailable) {
+            warnings.push('Platform columns ignored: the platform list is unavailable until migration 072 is applied.');
+        } else if (Object.keys(named).length) {
+            // Whether a bare "platform" found anything to do: a match, or a
+            // kind the vehicle already has, which is not a failure to match.
+            let eitherLanded = false;
+            for (const kind of ['mechanical', 'electrical']) {
+                const explicit = named[kind];
+                const name = explicit ?? named.either;
+                if (!name) continue;
+                const own = existing ? (existing.own ?? existing)[PLATFORM_COLUMN[kind]] : null;
+                if (own != null) { if (!explicit) eitherLanded = true; continue; }
+                const found = matchPlatform(name, platforms, kind);
+                if (found) {
+                    platformWrites[kind] = { id: found.id, name: found.name };
+                    if (!explicit) eitherLanded = true;
+                } else if (explicit) {
+                    platformWrites[kind] = { name, isNew: true };
+                    newPlatforms.set(`${kind}:${lower(name)}`, { kind, name });
+                }
+            }
+            if (named.either && !eitherLanded && !(named.mechanical && named.electrical)) {
+                warnings.push(`platform: "${named.either}" matches no platform — use mechanical_platform or electrical_platform to create one.`);
+            }
+        }
+
         // ── Inheritance link ──
         let inherit = null;
         if (row.inheritsFrom) {
@@ -246,7 +287,8 @@ export function buildImportPlan(rows, { vehicles = [], manufacturers = [], tags 
             || written.length > 0
             || tagNames.length > 0
             || !!manufacturerName
-            || !!inherit;
+            || !!inherit
+            || Object.keys(platformWrites).length > 0;
 
         let action;
         if (errors.length) action = 'error';
@@ -270,6 +312,7 @@ export function buildImportPlan(rows, { vehicles = [], manufacturers = [], tags 
             manufacturerName,
             manufacturerIsNew,
             tagNames,
+            platforms: platformWrites,
             inherit,
             inheritRef: inherit ? row.inheritsFrom : null,
             fieldSkips: row.skipped,   // values that could not be read — reported, not written
@@ -287,11 +330,12 @@ export function buildImportPlan(rows, { vehicles = [], manufacturers = [], tags 
         errors:   planned.filter(r => r.action === 'error').length,
         fieldWrites: planned
             .filter(r => r.action !== 'error')
-            .reduce((n, r) => n + r.specWrites.length + Object.keys(r.coreWrites).length, 0),
+            .reduce((n, r) => n + r.specWrites.length + Object.keys(r.coreWrites).length + Object.keys(r.platforms).length, 0),
         fieldSkips:  planned.reduce((n, r) => n + r.fieldSkips.length, 0),
         coercions:   planned.reduce((n, r) => n + r.coercions.length, 0),
         newManufacturers: [...newManufacturers.values()],
         newTags: [...newTags.values()],
+        newPlatforms: [...newPlatforms.values()],
     };
 
     return { rows: planned, summary };
@@ -309,6 +353,8 @@ export function selectPlanRows(plan, selectedIndexes) {
     );
     const kept = rows.filter(r => r.action === 'create' || r.action === 'update');
     const keptTagNames = new Set(kept.flatMap(r => r.tagNames.map(lower)));
+    const keptNewPlatforms = new Set(kept.flatMap(r => Object.entries(r.platforms ?? {})
+        .filter(([, p]) => p.isNew).map(([kind, p]) => `${kind}:${lower(p.name)}`)));
 
     return {
         rows,
@@ -316,11 +362,12 @@ export function selectPlanRows(plan, selectedIndexes) {
             ...plan.summary,
             creates: kept.filter(r => r.action === 'create').length,
             updates: kept.filter(r => r.action === 'update').length,
-            fieldWrites: kept.reduce((n, r) => n + r.specWrites.length + Object.keys(r.coreWrites).length, 0),
+            fieldWrites: kept.reduce((n, r) => n + r.specWrites.length + Object.keys(r.coreWrites).length + Object.keys(r.platforms ?? {}).length, 0),
             newManufacturers: [...new Set(
                 kept.filter(r => r.manufacturerIsNew && r.manufacturerName).map(r => r.manufacturerName)
             )],
             newTags: plan.summary.newTags.filter(name => keptTagNames.has(lower(name))),
+            newPlatforms: (plan.summary.newPlatforms ?? []).filter(p => keptNewPlatforms.has(`${p.kind}:${lower(p.name)}`)),
         },
     };
 }
@@ -328,7 +375,7 @@ export function selectPlanRows(plan, selectedIndexes) {
 // ── Templates ────────────────────────────────────────────────────────────────
 
 // Columns every template leads with, in the order a person would fill them in.
-const TEMPLATE_CORE = ['name', 'manufacturer', 'model', 'trim', 'year', 'battery', 'range', 'tags', 'inherits_from'];
+const TEMPLATE_CORE = ['name', 'manufacturer', 'model', 'trim', 'year', 'battery', 'range', 'tags', 'inherits_from', 'mechanical_platform', 'electrical_platform'];
 
 /** Header row + one example row covering every core column and spec field. */
 export function buildCsvTemplate() {
@@ -345,6 +392,8 @@ export function buildCsvTemplate() {
             case 'range':         return '363';
             case 'tags':          return 'sedan;awd';
             case 'inherits_from': return '';
+            case 'mechanical_platform': return 'Tesla Model 3/Y';
+            case 'electrical_platform': return 'Tesla 400 V';
             default:              return '';
         }
     });
@@ -367,6 +416,8 @@ export function buildJsonTemplate() {
         range: 363,
         tags: ['sedan', 'awd'],
         inherits_from: null,
+        mechanical_platform: 'Tesla Model 3/Y',
+        electrical_platform: 'Tesla 400 V',
         specs,
     }], null, 2);
 }

@@ -56,8 +56,8 @@ export const VEHICLE_TABLE_PRESETS = [
         label: 'Under the skin',
         description: 'Pack, voltage and charging hardware, for the engineering-minded.',
         columns: [
-            'name', 'charging.battery_usable_kwh', 'powertrain.battery_gross_kwh', 'calc.batteryBuffer',
-            'charging.battery_nominal_voltage_v', 'calc.is800v', 'charging.max_dc_kw',
+            'name', 'platform.electrical', 'charging.battery_usable_kwh', 'powertrain.battery_gross_kwh', 'calc.batteryBuffer',
+            'charging.battery_nominal_voltage_v', 'calc.is800v', 'platform.dc400', 'charging.max_dc_kw',
             'calc.avgChargeKw', 'tested.charge_best_5min_kw', 'tested.charge_best_15min_kw',
             'calc.peakCRate', 'powertrain.motor_type',
             'suspension.adaptive_damping', 'suspension.adjustable_height',

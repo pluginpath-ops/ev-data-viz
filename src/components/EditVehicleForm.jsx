@@ -12,6 +12,36 @@ import CardBandPreview from './vehicles/CardBandPreview';
 import { CARD_BAND_MAX_WIDTH, PHOTO_ASPECT, focalY } from '../utils/cardBand';
 import { makeModelLine } from '../utils/specHelpers';
 import { usePhotoAspect } from '../hooks/usePhotoAspect';
+import { useAppContext } from '../context/AppContext';
+import { PLATFORM_KINDS, PLATFORM_COLUMN, platformGroups, electricalSummary } from '../utils/platforms';
+
+/**
+ * One platform picker (#318): the platforms of one kind, grouped by maker.
+ * Empty means none of its own — and when a source vehicle has one, the empty
+ * option says it is inherited rather than claiming there is none.
+ */
+function PlatformPicker({ kind, value, onChange, platforms, inherited, inheritedPlatform }) {
+    const groups = platformGroups(platforms, kind.key);
+    return (
+        <label className="flex flex-col gap-1">
+            <span className="text-meta" title={kind.note}>{kind.label}</span>
+            <select className="form-input" value={value ?? ''} onChange={e => onChange(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">
+                    {inherited && inheritedPlatform ? `Inherited: ${inheritedPlatform.name} (from ${inherited.name})` : '— None —'}
+                </option>
+                {groups.map(g => (
+                    <optgroup key={g.maker} label={g.maker}>
+                        {g.platforms.map(p => (
+                            <option key={p.id} value={p.id}>
+                                {p.name}{electricalSummary(p) ? ` · ${electricalSummary(p)}` : ''}
+                            </option>
+                        ))}
+                    </optgroup>
+                ))}
+            </select>
+        </label>
+    );
+}
 
 // Extract the completed crop region into an offscreen canvas at full rendition
 // resolution. Encoding is left to buildRenditions, which needs one shared source
@@ -60,6 +90,7 @@ export default function EditVehicleForm({
     // What the vehicle being edited inherits (vehicleInheritance.js). The form
     // edits own values only; these are shown beside them, never saved.
     const inheritedColor = editingVehicle?.inheritedFrom?.color ?? null;
+    const { platforms, platformsAvailable, platformsById } = useAppContext();
     // Inherited tags show only while the vehicle has none of its own: tags are
     // one set, overridden whole. The first change a curator makes here adopts
     // the inherited set as the vehicle's own and applies the change to that,
@@ -244,6 +275,32 @@ export default function EditVehicleForm({
                     <input placeholder="Battery (kWh)"  value={formData.battery} onChange={(e) => onFormChange({ ...formData, battery: e.target.value })} className="form-input form-input" />
                     <input placeholder="EPA Range (mi)" value={formData.range}   onChange={(e) => onFormChange({ ...formData, range: e.target.value })}   className="form-input form-input" />
                 </div>
+
+                {/* ── Platforms (#318) ─────────────────────────────────────
+                  * What the car is built on: structure and electrics, one each.
+                  * Offered only once migration 072 is applied. */}
+                {platformsAvailable && (
+                    <div className="form-section mt-5">
+                        <label className="block font-medium mb-2">Platforms</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {PLATFORM_KINDS.map(kind => {
+                                const col = PLATFORM_COLUMN[kind.key];
+                                const inherited = editingVehicle?.inheritedFrom?.[col] ?? null;
+                                return (
+                                    <PlatformPicker
+                                        key={kind.key}
+                                        kind={kind}
+                                        value={formData[col]}
+                                        onChange={id => onFormChange({ ...formData, [col]: id })}
+                                        platforms={platforms}
+                                        inherited={inherited}
+                                        inheritedPlatform={inherited ? platformsById.get(Number(editingVehicle[col])) : null}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* ── Series color (#308) ──────────────────────────────────
                   * The vehicle's own, not a run's. Color used to be curated per

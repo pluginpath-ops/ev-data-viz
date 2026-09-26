@@ -140,7 +140,7 @@ function testLink(ref, onOpenTest) {
  */
 export default function VehicleTable({ onOpenTest = null }) {
     const {
-        vehicles, selectedVehicles, toggleVehicleSelection, units,
+        vehicles, selectedVehicles, toggleVehicleSelection, units, platformsById,
         getPerformanceSummaries, getPerformanceSessions,
     } = useAppContext();
 
@@ -190,8 +190,8 @@ export default function VehicleTable({ onOpenTest = null }) {
     const { data: performance, loading: performanceLoading } = useAsyncResource(loadPerformance, [loadPerformance]);
 
     const rows     = useMemo(
-        () => buildVehicleRows(vehicles, { performance, assumptions, units }),
-        [vehicles, performance, assumptions, units],
+        () => buildVehicleRows(vehicles, { performance, assumptions, units, platformsById }),
+        [vehicles, performance, assumptions, units, platformsById],
     );
     // A tested cell peeks with its test — which one, why, and its conditions —
     // rather than restating its own text. One peek for every clipped cell in

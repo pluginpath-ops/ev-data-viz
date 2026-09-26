@@ -54,6 +54,8 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 | `sort_order` | `integer` | — | Manual drag-to-reorder position |
 | `specs` | `jsonb` | `NULL` | Structured vehicle specifications (see below) |
 | `flagged_specs` | `text[]` | `'{}'` | Field keys flagged as potentially inaccurate by public users (e.g. `['powertrain.horsepower_hp']`). Append-only via `flag_spec_field` RPC; cleared by `unflag_spec_field` (admin only). |
+| `mechanical_platform_id` | `bigint` | `NULL` | FK → `platforms.id` ON DELETE SET NULL; must be a `mechanical` platform (trigger `vehicles_platform_kinds`). Inherited down `spec_source_vehicle_id` when unset (`vehicleInheritance.js`). Migration 072, #318 |
+| `electrical_platform_id` | `bigint` | `NULL` | FK → `platforms.id` ON DELETE SET NULL; must be an `electrical` platform. Inherited the same way, separately. Migration 072, #318 |
 | `created_at` | `timestamptz` | `now()` | |
 
 > **`specs` JSONB structure:** Each category key maps to an object of predefined field keys plus `_custom` (user-defined key-value pairs). Categories: `pricing`, `powertrain`, `compute`, `infotainment`, `dimensions`, `wheels`, `suspension`, `lighting`, `charging`, `interior`. See `src/utils/vehicleSpecSchema.js` for the full field list. `specs = NULL` means no specs entered yet — handled gracefully by all UI components.
@@ -66,6 +68,28 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 > ```sql
 > UPDATE public.vehicles SET user_id = '<admin-uuid>' WHERE user_id IS NULL;
 > ```
+
+---
+
+### `platforms`
+
+What a vehicle is built on (migration 072, #318). Two kinds, because structure and electrical architecture diverge exactly where cars must not be lumped together. Public read; admin and contributor write, like `sources`.
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `id` | `bigint` | auto | PK |
+| `kind` | `text` | — | `'mechanical'` (body, structure, suspension) \| `'electrical'` (pack, drive units, power electronics) |
+| `name` | `text` | — | Unique per kind, ignoring case |
+| `maker_group` | `text` | — | e.g. "Hyundai Motor Group" |
+| `aliases` | `text[]` | `'{}'` | Other spellings an import file may use |
+| `voltage_class_v` | `smallint` | — | 400 \| 800 \| 900. Electrical only |
+| `dc_400v_charging` | `text` | — | `native` \| `dc-booster` \| `motor-boost` \| `split-pack` \| `none`. Electrical only |
+| `chemistries` | `text[]` | `'{}'` | e.g. `{NMC, LFP}`. Electrical only |
+| `cell_format` | `text` | — | `cylindrical` \| `prismatic` \| `pouch` \| `blade`. Electrical only |
+| `notes` | `text` | — | |
+| `created_at`, `updated_at` | `timestamptz` | `now()` | |
+
+> CHECK `platforms_electrical_properties` keeps the electrical-only columns empty on a mechanical row. NACS-native is deliberately not here: it changed within one platform by model year, so it stays the vehicle's `charging.charge_port` spec. The seed in 072 is a draft for curator review.
 
 ---
 

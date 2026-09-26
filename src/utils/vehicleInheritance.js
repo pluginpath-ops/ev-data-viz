@@ -12,6 +12,9 @@
  *           image_focal_y travel together, so a thumbnail never pairs with
  *           another car's full image and a photo is never framed by a number
  *           that was set against a different picture (#340)
+ *   platforms  each of the two platform links (#318) from the nearest vehicle
+ *           with that link set, separately: a variant can keep its source's
+ *           structure and change its electrics (the 2025 R1 did)
  *   tags    the vehicle's own tags if it has any, else the nearest source's.
  *           One set, overridden whole, not added up down the chain: the 2025
  *           R1T inherits from the R1S, and a sum made it an SUV as well as a
@@ -44,6 +47,9 @@ import { vehicleLabel } from './specHelpers';
    set its own picture. */
 const PHOTO_KEYS = ['image_url', 'image_thumb_url', 'image_focal_y'];
 
+/* The two platform links (#318), resolved one by one. */
+const PLATFORM_KEYS = ['mechanical_platform_id', 'electrical_platform_id'];
+
 const hasColor = (v) => v?.color != null && v.color !== '';
 const hasPhoto = (v) => Boolean(v?.image_url || v?.image_thumb_url);
 
@@ -75,6 +81,8 @@ export function ownValues(vehicle) {
         image_url: vehicle?.image_url ?? null,
         image_thumb_url: vehicle?.image_thumb_url ?? null,
         image_focal_y: vehicle?.image_focal_y ?? null,
+        mechanical_platform_id: vehicle?.mechanical_platform_id ?? null,
+        electrical_platform_id: vehicle?.electrical_platform_id ?? null,
         tags: vehicle?.tags ?? [],
     };
 }
@@ -83,10 +91,12 @@ export function ownValues(vehicle) {
  * The fleet with color, photo and tags resolved through inheritance.
  *
  * Adds to each vehicle:
- *   own            { color, image_url, image_thumb_url, image_focal_y, tags } as stored
- *   inheritedFrom  { color, photo, tags } — a { id, name } source for color and
- *                  photo, or null when the vehicle's own value (or none) is
- *                  shown; tags is { [tagId]: { id, name } } for inherited tags
+ *   own            { color, image_url, image_thumb_url, image_focal_y,
+ *                    mechanical_platform_id, electrical_platform_id, tags } as stored
+ *   inheritedFrom  { color, photo, mechanical_platform_id, electrical_platform_id,
+ *                  tags } — a { id, name } source for each, or null when the
+ *                  vehicle's own value (or none) is shown; tags is
+ *                  { [tagId]: { id, name } } for inherited tags
  */
 export function withInheritance(vehicles = []) {
     const byId = new Map(vehicles.map(v => [v.id, v]));
@@ -96,15 +106,18 @@ export function withInheritance(vehicles = []) {
             image_url: vehicle.image_url ?? null,
             image_thumb_url: vehicle.image_thumb_url ?? null,
             image_focal_y: vehicle.image_focal_y ?? null,
+            mechanical_platform_id: vehicle.mechanical_platform_id ?? null,
+            electrical_platform_id: vehicle.electrical_platform_id ?? null,
             tags: vehicle.tags ?? [],
         };
+        const none = { color: null, photo: null, mechanical_platform_id: null, electrical_platform_id: null, tags: {} };
         const chain = inheritanceChain(vehicle, byId);
         if (chain.length === 0) {
-            return { ...vehicle, own, inheritedFrom: { color: null, photo: null, tags: {} } };
+            return { ...vehicle, own, inheritedFrom: none };
         }
 
         const resolved = {};
-        const inheritedFrom = { color: null, photo: null, tags: {} };
+        const inheritedFrom = { ...none, tags: {} };
 
         if (!hasColor(vehicle)) {
             const source = chain.find(hasColor);
@@ -119,6 +132,15 @@ export function withInheritance(vehicles = []) {
             if (source) {
                 for (const key of PHOTO_KEYS) resolved[key] = source[key] ?? null;
                 inheritedFrom.photo = sourceRef(source);
+            }
+        }
+
+        for (const key of PLATFORM_KEYS) {
+            if (vehicle[key] != null) continue;
+            const source = chain.find(v => v[key] != null);
+            if (source) {
+                resolved[key] = source[key];
+                inheritedFrom[key] = sourceRef(source);
             }
         }
 

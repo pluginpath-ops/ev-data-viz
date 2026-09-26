@@ -161,6 +161,11 @@ status and is never chrome.
 | The Admin sub-tab importing results in bulk beside the source list | **Published Results** | [PublishedResultsPanel.jsx](../src/components/admin/PublishedResultsPanel.jsx), [publishedResultsBatch.js](../src/utils/publishedResultsBatch.js) |
 | The manufacturer's usable and gross pack capacity | **Usable** / **Gross** | `specs.charging.battery_usable_kwh`, `specs.powertrain.battery_gross_kwh` |
 | The DC energy EPA measured on the multi-cycle depletion test | **EPA tested** | `epa_tests.total_dc_energy_kwh`, procedure 77 |
+| What a vehicle is built on: body, structure and suspension — what twins share | **the mechanical platform** (`mechanical_platform_id`) | common in the industry | [platforms.js](../src/utils/platforms.js), `platforms.kind = 'mechanical'` (migration 072, #318) |
+| What a vehicle is built on: pack, drive units and power electronics — what shapes the charging curve | **the electrical platform** (`electrical_platform_id`). Not "architecture" alone, which also means the 400/800 V class | common in the industry | `platforms.kind = 'electrical'` |
+| Both at once, or either when the kind is plain from context | **platform** — on a card, "Platform"; in an import file, a bare `platform` column names both kinds | — | [PlatformLine.jsx](../src/components/vehicles/PlatformLine.jsx) |
+| An electrical platform's nominal pack architecture | **voltage class** — 400, 800 or 900 V. Not "voltage", which is a spec field's measured nominal voltage | — | `voltage_class_v` |
+| How an electrical platform takes DC from a 400 V charger | **on a 400 V charger**: native, DC booster, motor boost, split pack, not possible | — | `dc_400v_charging`, `DC_400V_CHARGING` |
 | The energy between the car's own 0% and 100% — what calculations turn %SoC into kWh with | **the SoC window**, `socWindowKwh` | [vehicleFigures.js](../src/utils/vehicleFigures.js): EPA tested, else Usable, else Gross, else unsorted |
 | Where a resolved figure came from | **its basis** — `socWindowBasis`, `epaRangeBasis` | `.stat-cell-basis` |
 | A vehicle's EPA range as the app reads it | **EPA range**, `epaRangeMi` | the primary configuration's label, else Expected EPA Range, else unsorted |

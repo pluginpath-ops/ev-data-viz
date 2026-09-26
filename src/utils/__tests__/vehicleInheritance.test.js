@@ -39,8 +39,25 @@ describe('withInheritance', () => {
         expect(out[3].inheritedFrom.color).toEqual({ id: 1, name: '2026 V1' });
         expect(out[3].inheritedFrom.photo.id).toBe(1);
         expect(out[3].own).toEqual({
-            color: null, image_url: null, image_thumb_url: null, image_focal_y: null, tags: [],
+            color: null, image_url: null, image_thumb_url: null, image_focal_y: null,
+            mechanical_platform_id: null, electrical_platform_id: null, tags: [],
         });
+    });
+
+    it('takes each platform from the nearest source with that one set, separately (#318)', () => {
+        // The 2025 R1 kept its skateboard and changed its electrics: a variant
+        // setting one platform must still inherit the other.
+        const out = byId([
+            v(1, { mechanical_platform_id: 10, electrical_platform_id: 20 }),
+            v(2, { spec_source_vehicle_id: 1, electrical_platform_id: 21 }),
+            v(3, { spec_source_vehicle_id: 2 }),
+        ]);
+        expect(out[2]).toMatchObject({ mechanical_platform_id: 10, electrical_platform_id: 21 });
+        expect(out[2].inheritedFrom.mechanical_platform_id).toEqual({ id: 1, name: '2026 V1' });
+        expect(out[2].inheritedFrom.electrical_platform_id).toBeNull();
+        expect(out[3]).toMatchObject({ mechanical_platform_id: 10, electrical_platform_id: 21 });
+        expect(out[3].inheritedFrom.electrical_platform_id.id).toBe(2);
+        expect(out[3].own.electrical_platform_id).toBeNull();
     });
 
     it('keeps a vehicle’s own color and photo, and moves the photo as a pair', () => {
@@ -104,7 +121,9 @@ describe('withInheritance', () => {
         const [out] = withInheritance([plain]);
         expect(out.color).toBe('#333333');
         expect(out.tags).toEqual(plain.tags);
-        expect(out.inheritedFrom).toEqual({ color: null, photo: null, tags: {} });
+        expect(out.inheritedFrom).toEqual({
+            color: null, photo: null, mechanical_platform_id: null, electrical_platform_id: null, tags: {},
+        });
     });
 });
 

@@ -52,6 +52,12 @@ const CORE_ALIASES = {
     range:         ['range', 'epa_range', 'epa_range_mi', 'range_mi'],
     power:         ['power', 'power_kw'],
     tags:          ['tags', 'tag'],
+    // The two platforms (#318), by name or alias. A bare "platform" names both
+    // at once — E-GMP is both a structure and an electrical system — and the
+    // planner links whichever kinds it matches.
+    mechanical_platform: ['mechanical_platform', 'body_platform', 'structural_platform'],
+    electrical_platform: ['electrical_platform', 'electrical_architecture', 'ev_architecture'],
+    platform:      ['platform'],
     inherits_from: ['inherits_from', 'inherit_from', 'inherits', 'spec_source', 'spec_parent', 'parent'],
 };
 
@@ -218,6 +224,7 @@ function emptyRow(index) {
         custom: {},            // { [catKey]: { [customKey]: value } }
         tagNames: [],
         inheritsFrom: null,    // raw reference (id or vehicle name) — resolved later
+        platformNames: {},     // { mechanical?, electrical?, either? } names — resolved by the planner
         skipped: [],           // [{ path, reason }] values that could not be read
         coercions: [],         // [{ path, from, to }] loose enum matches, for the preview
         errors: [],            // row-fatal problems only (identity, duplicates)
@@ -238,6 +245,9 @@ function applyCell(row, target, raw) {
         const { key } = target;
         if (key === 'tags') { row.tagNames = parseTagList(raw); return; }
         if (key === 'inherits_from') { row.inheritsFrom = String(raw).trim(); return; }
+        if (key === 'mechanical_platform') { row.platformNames.mechanical = String(raw).trim(); return; }
+        if (key === 'electrical_platform') { row.platformNames.electrical = String(raw).trim(); return; }
+        if (key === 'platform') { row.platformNames.either = String(raw).trim(); return; }
         if (key === 'manufacturer') { row.manufacturerName = String(raw).trim(); return; }
         if (NUMERIC_CORE.has(key)) {
             const { value, error } = coerceNumber(raw);
@@ -284,6 +294,7 @@ function rowIsEmpty(row) {
         && Object.keys(row.custom).length === 0
         && row.tagNames.length === 0
         && !row.inheritsFrom
+        && Object.keys(row.platformNames).length === 0
         && row.skipped.length === 0
         && row.errors.length === 0;
 }
