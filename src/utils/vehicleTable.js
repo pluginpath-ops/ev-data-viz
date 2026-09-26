@@ -581,12 +581,12 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
             const value = col.calc(inputs, calcContext, extra);
             values[col.key] = value == null || (typeof value === 'number' && !Number.isFinite(value)) ? null : value;
             // A note can explain a blank, too ("more than a 10→80% stop adds").
-            // A charging figure worked from a test says so; from the spec it
+            // A charging figure worked from a test says "tested"; from the spec it
             // is like every other calculation and says nothing.
             const fromTest = col.charging && charge.summary && values[col.key] != null;
-            notes[col.key] = col.note?.(inputs, calcContext, extra) ?? (fromTest ? 'from a test' : null);
-            // "From a test" names the charging test the time came from, so it
-            // links to it — as does a blank explained by that test's reach.
+            notes[col.key] = col.note?.(inputs, calcContext, extra) ?? (fromTest ? 'tested' : null);
+            // "Tested" links to the charging test the time came from — as does
+            // a blank explained by that test's reach.
             tests[col.key] = col.charging && charge.summary && (fromTest || notes[col.key]) ? chargeTest : null;
         }
 

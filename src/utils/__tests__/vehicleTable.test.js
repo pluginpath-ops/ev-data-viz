@@ -451,7 +451,7 @@ describe('the charge window (#335)', () => {
         expect(r.values[W]).toBeCloseTo(21);
         expect(r.notes[W]).toBe('Out of Spec · 50°F');
         expect(r.values['calc.rangePerChargeMin']).toBeCloseTo(10);    // 210 mi in 21 min
-        expect(r.notes['calc.rangePerChargeMin']).toBe('from a test');
+        expect(r.notes['calc.rangePerChargeMin']).toBe('tested');
         expect(r.values['calc.avgChargeKw']).toBeCloseTo(200);         // 70 kWh in 21 min
     });
 

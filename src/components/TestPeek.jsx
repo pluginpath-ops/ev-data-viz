@@ -4,8 +4,10 @@
  *
  * Shown wherever a figure rests on a test — hovering a tested cell of the
  * vehicle table, and the tested line on a vehicle card. The peek is
- * pointer-transparent, so it cannot hold the link itself; the line it glosses
- * is the link, and the last line says so.
+ * pointer-transparent, so it cannot hold the link itself. It does not say
+ * where the link is either: it shows on hovering the whole cell, and "click to
+ * open" would be untrue anywhere but the link — which is plain enough in link
+ * colour without being pointed at.
  */
 export default function TestPeek({ test, figure = null }) {
     if (!test) return null;
@@ -25,9 +27,6 @@ export default function TestPeek({ test, figure = null }) {
                 </dl>
             )}
             {test.caveat && <div className="test-peek-caveat">{test.caveat}</div>}
-            <div className="popover-more">
-                {test.runId != null ? 'Click to open this test' : 'Click for the vehicle’s performance results'}
-            </div>
         </div>
     );
 }
