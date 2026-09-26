@@ -12,9 +12,20 @@
  * where it stops being flat.
  */
 import { distanceValue, distanceUnit, fmtSpeed, fmtTemp } from '../../utils/unitConversions';
+import { rangeTestReference, testHref } from '../../utils/testDetails';
+import Popover from '../Popover';
+import TestPeek from '../TestPeek';
 
-export default function TestedFigure({ tested, units }) {
+/**
+ * Hovering the figure restates its test (TestPeek) — which one, why, and its
+ * conditions — and its conditions line links to it in Tests & Data, as a
+ * tested cell of the vehicle table does. `onOpenTest` opens it in place; a
+ * modified click is the browser's, so a new tab works.
+ */
+export default function TestedFigure({ vehicle, tested, units, onOpenTest }) {
     if (!tested) return null;
+    const test = vehicle ? rangeTestReference(vehicle, tested, units) : null;
+    const href = testHref(test);
 
     // The scaled figure when there is one, because that is what the EPA number
     // beside it can be compared to. The measured distance stays reachable in
@@ -29,15 +40,18 @@ export default function TestedFigure({ tested, units }) {
         tested.temperatureF != null ? fmtTemp(tested.temperatureF, units) : null,
     ].filter(Boolean);
 
-    return (
-        <div className="tested-figure">
+    const open = (e) => {
+        // The card behind this selects its vehicle on click; opening a test must not.
+        e.stopPropagation();
+        if (!onOpenTest || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        onOpenTest(test);
+    };
+
+    const figure = (props = {}) => (
+        <div className="tested-figure" {...props}>
             <span className="text-micro">Tested</span>
-            <span
-                className="tested-figure-value"
-                title={tested.isScaled
-                    ? `${distanceValue(tested.distanceMi, units)} ${distanceUnit(units)} measured over ${tested.startSoc}→${tested.endSoc}%, scaled to a full pack`
-                    : undefined}
-            >
+            <span className="tested-figure-value">
                 {distanceValue(shown, units)}
                 <span className="tested-figure-unit">{distanceUnit(units)}</span>
             </span>
@@ -46,30 +60,40 @@ export default function TestedFigure({ tested, units }) {
                 looking at a number no odometer showed. An INADEQUATE window is
                 a caveat: the test could not answer the question, and its raw
                 distance is reported unscaled. */}
+            {/* What each caveat means in full is in the peek (TestPeek). */}
             {tested.isScaled && (
-                <span
-                    className="tested-figure-scaled"
-                    title="Scaled to a full pack from the window measured, assuming consumption is flat across the pack"
-                >
+                <span className="tested-figure-scaled">
                     scaled from {tested.startSoc}→{tested.endSoc}%
                 </span>
             )}
             {!tested.isRepresentative && tested.startSoc != null && (
-                <span
-                    className="tested-figure-window"
-                    title="Window too narrow to characterise the pack — reported as measured, not scaled"
-                >
+                <span className="tested-figure-window">
                     {tested.startSoc}→{tested.endSoc}% only
                 </span>
             )}
             {tested.startSoc == null && (
-                <span className="tested-figure-window" title="The run does not record its state-of-charge window">
+                <span className="tested-figure-window">
                     window not stated
                 </span>
             )}
-            {conditions.length > 0 && (
-                <span className="tested-figure-conditions">{conditions.join(' · ')}</span>
+            {conditions.length > 0 && (href
+                ? <a className="tested-figure-conditions is-test-link" href={href} onClick={open}>{conditions.join(' · ')}</a>
+                : <span className="tested-figure-conditions">{conditions.join(' · ')}</span>
             )}
         </div>
+    );
+
+    if (!test) return figure();
+    return (
+        <Popover
+            peek={<TestPeek test={test} />}
+            // Only the hover gloss: the link opens the test, so there is no
+            // panel for a click to open. On touch, with no hover, the link is
+            // the way in.
+            trigger={({ ref, onPointerEnter, onPointerLeave, onFocus, onBlur, ...aria }) => figure({
+                ref, onPointerEnter, onPointerLeave, onFocus, onBlur,
+                'aria-describedby': aria['aria-describedby'],
+            })}
+        />
     );
 }

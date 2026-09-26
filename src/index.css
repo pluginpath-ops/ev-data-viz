@@ -5291,6 +5291,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     opacity: 0.6;
     border-color: var(--color-danger-border);
 }
+/* The test a link pointed at (a tested figure in the vehicle table), marked
+   for a moment after the page scrolls to it so the eye lands on the right
+   card. The outline fades out rather than vanishing. */
+.card.is-link-target {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    transition: outline-color 0.6s ease-out;
+}
 /* The one spinner that was drawn with a palette border rather than the
    theme's. */
 .spinner-inline {
@@ -6696,6 +6704,48 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     text-overflow: ellipsis;
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     color: var(--color-text-meta);
+}
+/* Text that names a test links to it — a tested cell's note in the vehicle
+   table, the conditions on a card's tested line. Link-coloured and underlined
+   only on hover: every tested figure carries one, and a column of underlines
+   would read as noise rather than as "you can open this". Doubled with its
+   element so it outranks the note's own colour wherever it lands. */
+a.is-test-link {
+    color: var(--color-text-link);
+    text-decoration: none;
+}
+a.is-test-link:hover,
+a.is-test-link:focus-visible {
+    text-decoration: underline;
+}
+
+/* The test behind a figure, restated in the cell's peek (TestPeek.jsx):
+   the figure, the test, why that test, then its conditions. */
+.test-peek {
+    @apply flex flex-col gap-1;
+}
+.test-peek-figure {
+    color: var(--color-text-meta);
+}
+.test-peek-title {
+    font-weight: 600;
+}
+.test-peek-reason {
+    color: var(--color-text-secondary);
+}
+.test-peek-facts {
+    @apply grid gap-x-3 mt-1;
+    grid-template-columns: auto 1fr;
+}
+.test-peek-fact {
+    display: contents;
+}
+.test-peek-fact dt {
+    color: var(--color-text-meta);
+}
+.test-peek-caveat {
+    color: var(--color-text-secondary);
+    font-style: italic;
 }
 
 /* Badges ride on the configuration name rather than holding their own columns. */

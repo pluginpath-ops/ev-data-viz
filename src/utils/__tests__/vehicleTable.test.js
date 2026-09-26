@@ -383,6 +383,14 @@ describe('tested range columns (#335)', () => {
         expect(r.notes['tested.efficiency_mi_kwh']).toBe('70 mph · mixed cycle · 72°F · est. from SoC');
     });
 
+    it('names the test behind each figure, so its note can link to it', () => {
+        const r = row([test()]);
+        expect(r.tests['tested.range_mi']).toMatchObject({ runId: 7, sub: 'tests' });
+        expect(r.tests['tested.efficiency_mi_kwh']).toMatchObject({ runId: 7 });
+        expect(r.tests['figures.epaRangeMi']).toBeUndefined();
+        expect(row([]).tests['tested.range_mi']).toBeNull();
+    });
+
     it('shares its bar scale with EPA range, and efficiency with Efficiency', () => {
         expect(vehicleColumnByKey('tested.range_mi').scale).toBe(vehicleColumnByKey('figures.epaRangeMi').scale);
         expect(vehicleColumnByKey('tested.efficiency_mi_kwh').scale).toBe(vehicleColumnByKey('calc.efficiency').scale);
@@ -445,6 +453,17 @@ describe('the charge window (#335)', () => {
         expect(r.values['calc.rangePerChargeMin']).toBeCloseTo(10);    // 210 mi in 21 min
         expect(r.notes['calc.rangePerChargeMin']).toBe('from a test');
         expect(r.values['calc.avgChargeKw']).toBeCloseTo(200);         // 70 kWh in 21 min
+    });
+
+    it('links a charge time, and every calculation from it, to the test', () => {
+        const r = row(car([session(21)]));
+        expect(r.tests[W]).toMatchObject({ runId: 11, reason: 'The newest charging test that covers 10→80%' });
+        expect(r.tests['calc.rangePerChargeMin']).toBe(r.tests[W]);
+        expect(r.tests['calc.timeToAdd']).toBe(r.tests[W]);
+        // From the spec there is no test to open.
+        const spec = row(car([]));
+        expect(spec.tests[W]).toBeNull();
+        expect(spec.tests['calc.rangePerChargeMin']).toBeNull();
     });
 
     it('falls back to the spec at 10→80%, and says so', () => {

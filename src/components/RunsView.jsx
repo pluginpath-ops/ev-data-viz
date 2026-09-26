@@ -105,6 +105,9 @@ export const RUNS_SUBTAB_IDS = SUBTABS.map(t => t.id);
 /** Sub-tab shown when none is specified, and the fallback for an unknown `?sub=`. */
 export const DEFAULT_RUNS_SUBTAB = 'tests';
 
+/** How long a test a link pointed at stays marked, in ms: long enough to find, short enough not to linger. */
+const LINK_TARGET_MS = 2500;
+
 /**
  * One of the two scaling knobs on an inherited test, as an editable number.
  *
@@ -404,7 +407,7 @@ const DeriveAxisPanel = ({
     );
 };
 
-export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange }) {
+export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, onFocused }) {
     const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
@@ -1265,6 +1268,30 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         next.has(k) ? next.delete(k) : next.add(k);
         return next;
     });
+    // A link to one test (?run=…, from a tested figure in the vehicle table).
+    // Derived from the prop while App holds it: the test's session group shows
+    // even if it was collapsed, and the card is marked. The effect scrolls to
+    // it, and after a moment hands the focus back — keeping its group open, so
+    // the page does not fold up under the reader when the mark fades.
+    const linkTarget = focusRunId == null || subtab !== 'tests' ? null : String(focusRunId);
+    const linkGroupKey = linkTarget == null ? null
+        : runGroups.find(g => g.runs.some(r => String(r.id) === linkTarget))?.key ?? null;
+    useEffect(() => {
+        if (linkTarget == null || linkGroupKey == null) return;   // not loaded yet: stays pending
+        document.querySelector(`[data-run-id="${CSS.escape(linkTarget)}"]`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const done = setTimeout(() => {
+            setCollapsedSessions(prev => {
+                if (!prev.has(String(linkGroupKey))) return prev;
+                const next = new Set(prev);
+                next.delete(String(linkGroupKey));
+                return next;
+            });
+            onFocused?.();
+        }, LINK_TARGET_MS);
+        return () => clearTimeout(done);
+    }, [linkTarget, linkGroupKey, onFocused]);
+
     const inheritedRuns    = allDisplayRuns.filter(r => r._inherited);
     const barVisible       = pendingDeletes.size > 0 || !!undoState;
 
@@ -1867,7 +1894,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
             <div className="space-y-4">
                 {runGroups.map(group => {
-                  const collapsed = collapsedSessions.has(String(group.key));
+                  const collapsed = collapsedSessions.has(String(group.key)) && group.key !== linkGroupKey;
                   const session   = group.sessionId != null
                       ? (testSessions || []).find(x => String(x.id) === String(group.sessionId)) ?? null
                       : null;
@@ -1896,7 +1923,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                   return (
                     <div
                         key={run.id}
-                        className={`card${isPending ? ' is-pending-delete' : ''}`}
+                        data-run-id={run.id}
+                        className={`card${isPending ? ' is-pending-delete' : ''}${linkTarget === String(run.id) ? ' is-link-target' : ''}`}
                     >
                         {editingRunId === run.id ? (
                             <div>

@@ -151,15 +151,31 @@ export function coversPracticalPack(run) {
  * reads that as a catastrophic result rather than as a partial window.
  */
 export function reportedRangeRun(vehicle) {
+    return reportedRangeChoice(vehicle).run;
+}
+
+/** Why the reported range test was the one chosen, as a reader is told it. */
+export const REPORTED_RANGE_REASON = {
+    default:        'The curator’s default range test',
+    'full-pack':    'The newest full-pack test',
+    representative: 'The newest test that saw most of the pack',
+    newest:         'The newest test — none saw enough of the pack to report a range',
+};
+
+/** reportedRangeRun, with which rule chose it (a key of REPORTED_RANGE_REASON). */
+export function reportedRangeChoice(vehicle) {
     const usable = (vehicle?.runs || []).filter(r => r.distance_miles > 0);
     const curated = usable.find(r => r.isDefault || r.is_default);
-    if (curated) return curated;
+    if (curated) return { run: curated, reason: 'default' };
     const byNewest = (a, b) => new Date(b.date) - new Date(a.date);
     const fullPack = usable
         .filter(r => { const w = socWindow(r); return w != null && w >= FULL_WINDOW_MIN_PCT; })
         .sort(byNewest);
+    if (fullPack[0]) return { run: fullPack[0], reason: 'full-pack' };
     const representative = usable.filter(coversPracticalPack).sort(byNewest);
-    return fullPack[0] ?? representative[0] ?? defaultRangeRun(vehicle);
+    if (representative[0]) return { run: representative[0], reason: 'representative' };
+    const fallback = defaultRangeRun(vehicle);
+    return { run: fallback, reason: fallback ? 'newest' : null };
 }
 
 /**
@@ -174,7 +190,7 @@ export function reportedRangeRun(vehicle) {
  * }|null}
  */
 export function testedRangeSummary(vehicle) {
-    const run = reportedRangeRun(vehicle);
+    const { run, reason } = reportedRangeChoice(vehicle);
     if (!run) return null;
 
     const distanceMi = run.distance_miles;
@@ -194,6 +210,7 @@ export function testedRangeSummary(vehicle) {
 
     return {
         run,
+        reason,
         distanceMi,
         // Two separate questions, and conflating them is what the old single
         // threshold did:
@@ -238,12 +255,13 @@ export function testedRangeSummary(vehicle) {
  *             speedNote: string|null }|null}
  */
 export function testedEfficiency(vehicle) {
-    const run = reportedRangeRun(vehicle);
+    const { run, reason } = reportedRangeChoice(vehicle);
     if (!run) return null;
     const { miPerKwh, method } = miPerKwhFrom(run, vehicle?.socWindowKwh);
     if (!(miPerKwh > 0) || !Number.isFinite(miPerKwh)) return null;
     return {
         run,
+        reason,
         miPerKwh,
         estimated: method === 'soc-delta-estimate',
         windowPct: socWindow(run),

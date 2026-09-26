@@ -46,6 +46,9 @@ import { sortByColumn, barMaximaOf, barPercentOf } from './tableColumns';
 import { VEHICLE_TABLE_PRESETS } from './vehicleTablePresets';
 import { CHARGE_WINDOWS, chargeTimeSession, minutesBetween } from './chargeWindows';
 import { testedRangeSummary, testedEfficiency } from './testedRange';
+import {
+    rangeTestReference, chargeTimeTestReference, chargeBestTestReference, performanceTestReference,
+} from './testDetails';
 import { ASSUMED_CHARGER_EFF, MPG_E_CONVERSION } from '../constants/epa';
 
 // ── Units ───────────────────────────────────────────────────────────────────
@@ -490,8 +493,9 @@ const present = (v) => (v === '' || v === undefined ? null : v);
  *        while it loads — tested columns are then empty, not zero
  * @param {Object} [opts.assumptions]  the reader's inputs to calculated columns
  * @param {string} [opts.units]  the reader's unit system, which the assumptions are in
- * @returns {Array<{ id, index, vehicle, values: Object, notes: Object }>}
- *          `notes` holds the basis or source shown beneath a figure
+ * @returns {Array<{ id, index, vehicle, values: Object, notes: Object, tests: Object, flagged: Set }>}
+ *          `notes` holds the basis or source shown beneath a figure; `tests`
+ *          the test behind it, where one is (testDetails.js TestReference)
  */
 export function buildVehicleRows(vehicles = [], { performance = null, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial' } = {}) {
     const calcContext = assumptionContext(assumptions, units);
@@ -506,6 +510,9 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
             tags:  (vehicle.tags ?? []).map(t => t.name).filter(Boolean).join(', ') || null,
         };
         const notes = {};
+        // The test behind a figure, where one stands behind it (testDetails.js):
+        // its note links to it, and hovering the cell restates it.
+        const tests = {};
 
         for (const col of SPEC_COLUMNS) {
             const [category, field] = col.spec;
@@ -530,21 +537,28 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         notes['tested.range_mi'] = range ? rangeTestNote(range, units, {
             window: range.isScaled ? 'scaled from' : range.fullPackMi == null && !range.isFullPack ? 'only' : null,
         }) : null;
+        tests['tested.range_mi'] = rangeTestReference(vehicle, range, units);
         const efficiency = testedEfficiency(vehicle);
         values['tested.efficiency_mi_kwh'] = efficiency?.miPerKwh ?? null;
         notes['tested.efficiency_mi_kwh'] = efficiency
             ? [rangeTestNote(efficiency, units, { window: efficiency.isRepresentative ? null : 'over' }),
                 efficiency.estimated ? 'est. from SoC' : null].filter(Boolean).join(' · ')
             : null;
+        tests['tested.efficiency_mi_kwh'] = rangeTestReference(vehicle, efficiency, units, 'efficiency');
 
         const charge = chargeWindowTime(vehicle, specs, calcContext, units);
         values[WINDOW_TIME_COLUMN.key] = charge.minutes;
         notes[WINDOW_TIME_COLUMN.key] = charge.note;
+        const chargeTest = charge.tested
+            ? chargeTimeTestReference(vehicle, charge.tested, { from: calcContext.windowFrom, to: calcContext.windowTo }, units)
+            : null;
+        tests[WINDOW_TIME_COLUMN.key] = chargeTest;
 
         for (const col of CHARGING_COLUMNS) {
             const best = vehicle.chargeBest?.[col.window] ?? null;
             values[col.key] = best?.kw ?? null;
             notes[col.key] = best ? chargeNote(best, units) : null;
+            tests[col.key] = best?.kw ? chargeBestTestReference(vehicle, best, col.window, units) : null;
         }
 
         if (performance) {
@@ -553,6 +567,7 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
                 const result = deriveTested(perf.sessions, perf.summaries, col.key.slice('tested.'.length));
                 values[col.key] = result.value ?? null;
                 notes[col.key] = result.value != null ? (result.basis?.sourceName ?? null) : null;
+                tests[col.key] = performanceTestReference(vehicle, result);
             }
         } else {
             for (const col of TESTED_COLUMNS) values[col.key] = null;
@@ -568,8 +583,11 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
             // A note can explain a blank, too ("more than a 10→80% stop adds").
             // A charging figure worked from a test says so; from the spec it
             // is like every other calculation and says nothing.
-            notes[col.key] = col.note?.(inputs, calcContext, extra)
-                ?? (col.charging && charge.summary && values[col.key] != null ? 'from a test' : null);
+            const fromTest = col.charging && charge.summary && values[col.key] != null;
+            notes[col.key] = col.note?.(inputs, calcContext, extra) ?? (fromTest ? 'from a test' : null);
+            // "From a test" names the charging test the time came from, so it
+            // links to it — as does a blank explained by that test's reach.
+            tests[col.key] = col.charging && charge.summary && (fromTest || notes[col.key]) ? chargeTest : null;
         }
 
         // Community flags are stored as the spec's own `category.field` key,
@@ -578,7 +596,7 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         // results are worked out, not entered, and nobody flags them.
         const flagged = new Set((vehicle.flagged_specs ?? []).filter(k => BY_KEY.get(k)?.spec));
 
-        return { id: vehicle.id, index, vehicle, values, notes, flagged };
+        return { id: vehicle.id, index, vehicle, values, notes, tests, flagged };
     });
 }
 
@@ -589,15 +607,16 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
  * it is the vehicle's own measurement. Without one, the spec's 10→80% time
  * answers only a 10→80% window; any other and the cell is blank, saying why.
  *
- * @returns {{ minutes: number|null, note: string|null, summary: Object|null }}
- *   `summary` — the session's stored summary, for calculations that read its curve
+ * @returns {{ minutes: number|null, note: string|null, summary: Object|null, tested: Object|null }}
+ *   `summary` — the session's stored summary, for calculations that read its curve;
+ *   `tested` — chargeTimeSession's answer, when a test supplied the time
  */
 function chargeWindowTime(vehicle, specs, { windowFrom, windowTo, isSpecWindow }, units) {
     const maxDcKw = num(specs?.charging?.max_dc_kw);
     const tested = chargeTimeSession(vehicle.runs ?? [], { from: windowFrom, to: windowTo, maxDcKw });
     if (tested.run) {
         const parts = [tested.run.source, tested.temperatureF != null ? temperatureText(tested.temperatureF, units) : null];
-        return { minutes: tested.minutes, note: parts.filter(Boolean).join(' · ') || 'tested', summary: tested.run.charge_summary };
+        return { minutes: tested.minutes, note: parts.filter(Boolean).join(' · ') || 'tested', summary: tested.run.charge_summary, tested };
     }
     const spec = num(specs?.charging?.charge_time_10_to_80_pct_min);
     if (spec > 0 && isSpecWindow) return { minutes: spec, note: 'spec', summary: null };

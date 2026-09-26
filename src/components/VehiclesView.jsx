@@ -80,7 +80,7 @@ const ListViewIcon = () => (
 
 
 export default function VehiclesView({
-    vehicles, selectedVehicles, onToggleSelection, onSelectAllVisible, onClearAllVisible, onAdd, onUpdate, onDelete, onViewRuns,
+    vehicles, selectedVehicles, onToggleSelection, onSelectAllVisible, onClearAllVisible, onAdd, onUpdate, onDelete, onViewRuns, onOpenTest,
     canCreate, canEdit, canDelete, canPublish, onToggleVisibility,
     tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage,
     onReorderVehicles, onDuplicateVehicle, onCreateVariant,
@@ -941,7 +941,7 @@ export default function VehiclesView({
 
                                         {/* The measurement, with the conditions that
                                             produced it and no verdict attached. */}
-                                        <TestedFigure tested={testedRangeSummary(vehicle)} units={units} />
+                                        <TestedFigure vehicle={vehicle} tested={testedRangeSummary(vehicle)} units={units} onOpenTest={onOpenTest} />
 
                                         <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
 
@@ -1076,7 +1076,7 @@ export default function VehiclesView({
                                                 title={EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note ?? 'EPA range'}
                                             />
                                         </div>
-                                        <TestedFigure tested={testedRangeSummary(vehicle)} units={units} />
+                                        <TestedFigure vehicle={vehicle} tested={testedRangeSummary(vehicle)} units={units} onOpenTest={onOpenTest} />
                                         <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
                                     </div>
 
