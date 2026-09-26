@@ -5,8 +5,9 @@ import {
     vehicleBarMaxima, vehicleBarPercent, firstSortDir,
     encodeVehicleTableParams, decodeVehicleTableParams, EMPTY_VEHICLE_FILTERS,
     vehicleTableStartSearch, vehicleTableMemory, PRESETS, vehiclePresetByKey, presetMatching,
-    DEFAULT_ASSUMPTIONS, labelledColumn, needsAssumptions,
+    DEFAULT_ASSUMPTIONS, labelledColumn, needsAssumptions, assumptionsFor,
 } from '../vehicleTable';
+import { CHARGE_SUMMARY_VERSION } from '../chargeWindows';
 import { VEHICLE_TABLE_PRESETS } from '../vehicleTablePresets';
 
 const vehicle = (over = {}) => ({
@@ -134,7 +135,7 @@ describe('vehicle table memory', () => {
         sortDir: 'desc',
         filters: { ...EMPTY_VEHICLE_FILTERS, makes: ['Ford'], search: 'mach' },
         modifiedFrom: null,
-        assumptions: { addDistance: 200 },
+        assumptions: { ...DEFAULT_ASSUMPTIONS, addDistance: 200 },
     };
 
     it('keeps columns and sort apart from filters', () => {
@@ -208,7 +209,7 @@ describe('calculated columns (#335)', () => {
         const [row] = buildVehicleRows([full]);
         expect(value(row, 'calc.efficiency')).toBe(3);
         expect(value(row, 'calc.rangePerChargeMin')).toBeCloseTo(10.5);   // 300 × 0.7 ÷ 20
-        expect(value(row, 'calc.avgKw10to80')).toBeCloseTo(210);          // 70 kWh in a third of an hour
+        expect(value(row, 'calc.avgChargeKw')).toBeCloseTo(210);          // 70 kWh in a third of an hour
         expect(value(row, 'calc.peakCRate')).toBe(2.5);
         expect(value(row, 'calc.pricePerMile')).toBe(200);
         expect(value(row, 'calc.pricePerKwh')).toBe(600);
@@ -349,5 +350,155 @@ describe('tested charging columns (#346)', () => {
     it('arrives with the vehicle, so it never triggers the performance fetch', () => {
         expect(needsPerformance(['name', 'tested.charge_best_15min_kw'])).toBe(false);
         expect(needsPerformance(['name', 'tested.quarter_mile_sec'])).toBe(true);
+    });
+});
+
+describe('tested range columns (#335)', () => {
+    const test = (over = {}) => ({
+        id: 7, kind: 'range', distance_miles: 280, energy_kwh: 90, start_soc: 100, end_soc: 5,
+        speed_mph: 70, temperature_f: 72, date: '2025-05-01', ...over,
+    });
+    const row = (runs, opts) => buildVehicleRows([vehicle({ socWindowKwh: 95, runs })], opts)[0];
+
+    it('shows the range scaled to a full pack, with its conditions and window beneath', () => {
+        const r = row([test()]);
+        expect(r.values['tested.range_mi']).toBeCloseTo(294.7, 1);   // 280 over 95 points
+        expect(r.notes['tested.range_mi']).toBe('70 mph · 72°F · scaled from 100→5%');
+        const metric = row([test()], { units: 'metric' });
+        expect(metric.notes['tested.range_mi']).toBe('112.7 kph · 22°C · scaled from 100→5%');
+    });
+
+    it('leaves the range blank, and says why, when the window was too narrow to scale', () => {
+        const r = row([test({ start_soc: 56, end_soc: 10, distance_miles: 120, energy_kwh: 40 })]);
+        expect(r.values['tested.range_mi']).toBeNull();
+        expect(r.notes['tested.range_mi']).toBe('70 mph · 72°F · 56→10% only');
+        // Efficiency needs no full pack.
+        expect(r.values['tested.efficiency_mi_kwh']).toBe(3);
+        expect(r.notes['tested.efficiency_mi_kwh']).toBe('70 mph · 72°F · over 56→10%');
+    });
+
+    it('marks a mixed cycle, and an efficiency estimated from the window', () => {
+        const r = row([test({ speed_basis: 'mixed', energy_kwh: null, start_soc: 100, end_soc: 0, distance_miles: 285 })]);
+        expect(r.values['tested.efficiency_mi_kwh']).toBeCloseTo(3);
+        expect(r.notes['tested.efficiency_mi_kwh']).toBe('70 mph · mixed cycle · 72°F · est. from SoC');
+    });
+
+    it('shares its bar scale with EPA range, and efficiency with Efficiency', () => {
+        expect(vehicleColumnByKey('tested.range_mi').scale).toBe(vehicleColumnByKey('figures.epaRangeMi').scale);
+        expect(vehicleColumnByKey('tested.efficiency_mi_kwh').scale).toBe(vehicleColumnByKey('calc.efficiency').scale);
+        expect(needsPerformance(['tested.range_mi', 'tested.efficiency_mi_kwh'])).toBe(false);
+    });
+});
+
+describe('EPA efficiency and electricity cost (#335)', () => {
+    const labelled = vehicle({ socWindowKwh: 100, epaRangeMi: 300, epaRange: { combinedMpge: 101.115 } });
+    const unlabelled = vehicle({ id: 2, socWindowKwh: 100, epaRangeMi: 300, epaRange: {} });
+
+    it('turns the label\'s MPGe into miles per kWh from the wall', () => {
+        const [r] = buildVehicleRows([labelled]);
+        expect(r.values['figures.epaEfficiency']).toBeCloseTo(3);   // 101.115 ÷ 33.705
+        expect(r.notes['figures.epaEfficiency']).toBe('101 MPGe');
+    });
+
+    it('prices 100 miles at each assumed price, on EPA efficiency where there is one', () => {
+        const [r] = buildVehicleRows([labelled]);
+        expect(r.values['calc.costPer100Home']).toBeCloseTo(0.17 * 100 / 3);
+        expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / 3);
+        expect(r.notes['calc.costPer100Home']).toBeNull();
+        const [cheap] = buildVehicleRows([labelled], { assumptions: { homePrice: 0.1 } });
+        expect(cheap.values['calc.costPer100Home']).toBeCloseTo(10 / 3);
+    });
+
+    it('estimates from the battery-side efficiency, less charging losses, without a label — and says so', () => {
+        const [r] = buildVehicleRows([unlabelled]);
+        expect(r.values['calc.costPer100Home']).toBeGreaterThan(0.17 * 100 / 3);   // losses cost more
+        expect(r.notes['calc.costPer100Home']).toBe('est. from battery efficiency');
+    });
+
+    it('names the cost per 100 km for a metric reader, and converts it', () => {
+        const col = vehicleColumnByKey('calc.costPer100Home');
+        expect(labelledColumn(col, DEFAULT_ASSUMPTIONS, 'metric').label).toBe('Cost per 100 km, home');
+        const [r] = buildVehicleRows([labelled]);
+        expect(Number(formatVehicleCell(r, col, 'metric'))).toBeCloseTo(0.17 * 100 / 3 / 1.60934, 2);
+    });
+});
+
+describe('the charge window (#335)', () => {
+    // A session covering 5→90%, taking `m` minutes over 10→80% at a flat rate.
+    const session = (m, over = {}) => {
+        const socMin = new Array(101).fill(null);
+        for (let p = 5; p <= 90; p++) socMin[p] = Math.round((((p - 10) * m) / 70 + 5) * 10) / 10;
+        return { id: 11, kind: 'charging', date: '2025-01-01', source: 'Out of Spec', temperature_f: 50,
+            charge_summary: { version: CHARGE_SUMMARY_VERSION, peakKw: 240, windows: {}, socMin }, ...over };
+    };
+    const car = (runs, specMin = 30) => vehicle({
+        socWindowKwh: 100, epaRangeMi: 300, runs,
+        specs: { charging: { charge_time_10_to_80_pct_min: specMin, max_dc_kw: 250 } },
+    });
+    const row = (v, assumptions) => buildVehicleRows([v], { assumptions })[0];
+    const W = 'tested.charge_window_min';
+
+    it('reads the vehicle\'s own test over the spec, and says whose', () => {
+        const r = row(car([session(21)]));
+        expect(r.values[W]).toBeCloseTo(21);
+        expect(r.notes[W]).toBe('Out of Spec · 50°F');
+        expect(r.values['calc.rangePerChargeMin']).toBeCloseTo(10);    // 210 mi in 21 min
+        expect(r.notes['calc.rangePerChargeMin']).toBe('from a test');
+        expect(r.values['calc.avgChargeKw']).toBeCloseTo(200);         // 70 kWh in 21 min
+    });
+
+    it('falls back to the spec at 10→80%, and says so', () => {
+        const r = row(car([]));
+        expect(r.values[W]).toBe(30);
+        expect(r.notes[W]).toBe('spec');
+        expect(r.notes['calc.rangePerChargeMin']).toBeNull();
+    });
+
+    it('answers any window from a test, and none from a spec', () => {
+        const wide = { windowFrom: 5, windowTo: 90 };
+        const tested = row(car([session(21)]), wide);
+        expect(tested.values[W]).toBeCloseTo(25.5);                     // 85 points at 0.3 min each
+        expect(tested.values['calc.rangePerChargeMin']).toBeCloseTo(300 * 0.85 / 25.5);
+        const spec = row(car([]), wide);
+        expect(spec.values[W]).toBeNull();
+        expect(spec.notes[W]).toBe('spec gives 10→80% only');
+        expect(spec.values['calc.rangePerChargeMin']).toBeNull();
+    });
+
+    it('sets aside a charger-limited test, and says so when that leaves nothing', () => {
+        const limited = session(40, { charge_summary: { ...session(40).charge_summary, peakKw: 100 } });
+        expect(row(car([limited]), { windowFrom: 20, windowTo: 80 }).notes[W]).toBe('tests charger-limited');
+        expect(row(car([limited])).notes[W]).toBe('spec');
+    });
+
+    it('times a stop along the tested curve, past 80% where the test went', () => {
+        // 3 mi per percent; 240 mi from 10% is 80 points, to 90% — beyond the
+        // spec's window, inside the test's.
+        const r = row(car([session(21)]), { addDistance: 225 });   // 75 points, to 85%
+        expect(r.values['calc.timeToAdd']).toBeCloseTo(22.5);
+        const far = row(car([session(21)]), { addDistance: 300 }); // 100 points: past 90%
+        expect(far.values['calc.timeToAdd']).toBeNull();
+        expect(far.notes['calc.timeToAdd']).toBe('more than the test charged');
+    });
+
+    it('names its columns from the window, and asks only for what is shown', () => {
+        const w = { ...DEFAULT_ASSUMPTIONS, windowFrom: 20, windowTo: 90 };
+        expect(labelledColumn(vehicleColumnByKey(W), w).label).toBe('Charge 20→90%');
+        expect(labelledColumn(vehicleColumnByKey('calc.avgChargeKw'), w).label).toBe('Avg charge 20→90%');
+        expect([...assumptionsFor(['name', 'calc.timeToAdd'])].sort()).toEqual(['addDistance', 'window']);
+        expect([...assumptionsFor(['name', 'calc.costPer100Fast'])]).toEqual(['fastPrice']);
+        expect(assumptionsFor(['name', 'calc.efficiency']).size).toBe(0);
+    });
+
+    it('round-trips the window and prices through the URL only when changed', () => {
+        const base = { columns: DEFAULT_VEHICLE_COLUMNS, sortKey: 'name', sortDir: 'asc' };
+        const changed = { ...DEFAULT_ASSUMPTIONS, windowFrom: 20, windowTo: 90, homePrice: 0.12, fastPrice: 0.6 };
+        const search = encodeVehicleTableParams({ ...base, assumptions: changed }).toString();
+        expect(search).toBe('vt_win=20-90&vt_home=0.12&vt_fast=0.6');
+        expect(decodeVehicleTableParams(search).assumptions).toEqual(changed);
+        // Held to the sliders: the ends cannot cross, a price stays a price.
+        expect(decodeVehicleTableParams('vt_win=70-30').assumptions).toMatchObject({ windowFrom: 40, windowTo: 50 });
+        expect(decodeVehicleTableParams('vt_win=junk&vt_home=-3').assumptions)
+            .toMatchObject({ windowFrom: 10, windowTo: 80, homePrice: 0.05 });
     });
 });

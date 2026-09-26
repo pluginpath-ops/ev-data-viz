@@ -38,7 +38,7 @@ import {
     filterVehicleRows, sortVehicleRows, firstSortDir, vehicleFacets, facetValues,
     vehicleBarMaxima, vehicleBarPercent, encodeVehicleTableParams, decodeVehicleTableParams,
     vehicleTableStartSearch, vehicleTableMemory, PRESETS, vehiclePresetByKey, presetMatching,
-    labelledColumn, needsAssumptions,
+    labelledColumn, needsAssumptions, assumptionsFor,
 } from '../utils/vehicleTable';
 
 /*
@@ -266,7 +266,7 @@ export default function VehicleTable() {
                         />
                     ))}
                     {needsAssumptions(columns) && (
-                        <VehicleTableAssumptions assumptions={assumptions} units={units} onChange={setAssumptions} />
+                        <VehicleTableAssumptions assumptions={assumptions} needed={assumptionsFor(columns)} units={units} onChange={setAssumptions} />
                     )}
                     <ColumnPicker
                         columns={pickable}

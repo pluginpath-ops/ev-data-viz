@@ -31,12 +31,30 @@
  * summaries that load with its runs — a copy stored on the vehicle would go
  * stale on every add, edit, delete or move of a session.
  *
+ * ── The curve, for the charge window (#335) ─────────────────────────────────
+ *
+ * Since version 2 the summary also holds `socMin`, the minute each whole
+ * percent was reached, so the vehicle table can time any charge window the
+ * reader sets without loading a point. `chargeTimeSession` picks the session a
+ * vehicle's charge time comes from — its default, not its best, because how
+ * long a stop takes depends on conditions.
+ *
  * Pure module: no data access, no React.
  */
 import { isInheritedRunId } from './runUtils';
 
-/** Bump when the calculation changes; stale summaries are then recomputed. */
-export const CHARGE_SUMMARY_VERSION = 1;
+/**
+ * Bump when the calculation changes; stale summaries are then recomputed.
+ *
+ *   1  the best 5/10/15-minute windows (#346)
+ *   2  adds `socMin`, the curve by state of charge (#335). The windows are
+ *      unchanged, so a version-1 summary still sets a vehicle's best (see
+ *      WINDOWS_SINCE_VERSION) while Admin → Data checks catches up.
+ */
+export const CHARGE_SUMMARY_VERSION = 2;
+
+/** The oldest version whose `windows` are still what this module computes. */
+const WINDOWS_SINCE_VERSION = 1;
 
 /** The windows summarized, in minutes. */
 export const CHARGE_WINDOWS = [5, 10, 15];
@@ -173,18 +191,127 @@ export function summarizeChargeSession(points = []) {
     }
 
     const firstSoc = samples.find(s => s.soc != null)?.soc ?? null;
+    const socMin = socCurve(samples, t0);
     return {
         version: CHARGE_SUMMARY_VERSION,
         durationMin: round1(tEnd - t0),
         startSoc: firstSoc == null ? null : Math.round(firstSoc),
         peakKw: round1(Math.max(...samples.map(s => s.kw))),
         windows,
+        ...(socMin ? { socMin } : {}),
         ...(Object.keys(gaps).length ? { gaps } : {}),
     };
 }
 
+/**
+ * The session's curve by state of charge (#335): `socMin[p]` is the minute,
+ * from the session's start, at which it first reached p%, or null for a p it
+ * never reached (below where it started, above where it stopped).
+ *
+ * 101 numbers rather than the time series, so the vehicle table can answer
+ * "how long from 10% to X%" for every vehicle without loading any points —
+ * the same reason the windows are stored. Interpolated linearly between
+ * samples, as Charge Compare does.
+ *
+ * A sampling gap is bridged, however long: SoC still rose across it, and the
+ * times at either end are measured, so a checkpoint log read off a video
+ * every few minutes answers 10→80% as exactly as a dense one. What ends the
+ * curve is a STALL — SoC held still for longer than MAX_STALL_MIN, the session
+ * paused or the charger dropped out. Counting a pause as charging time would
+ * make the car look slower than it is.
+ *
+ * Null when the session carries no SoC.
+ */
+const MAX_STALL_MIN = 10;
+
+function socCurve(samples, t0) {
+    const known = samples.filter(s => s.soc != null);
+    if (known.length < 2) return null;
+    const out = new Array(101).fill(null);
+    const mark = (p, t) => { if (p >= 0 && p <= 100 && out[p] == null) out[p] = round1(t - t0); };
+    let high = known[0].soc;
+    let highAt = known[0].t;
+    if (Number.isInteger(high)) mark(high, known[0].t);
+    for (let i = 1; i < known.length; i++) {
+        const a = known[i - 1], b = known[i];
+        if (b.soc <= high) continue;
+        // SoC sat at its high since `highAt`: a stall, unless it rose between.
+        if (a.t - highAt > MAX_STALL_MIN) break;
+        // First time each whole percent above the running high is reached.
+        for (let p = Math.floor(high) + 1; p <= Math.floor(b.soc); p++) {
+            if (p <= a.soc) continue;
+            const f = (p - a.soc) / (b.soc - a.soc);
+            mark(p, a.t + f * (b.t - a.t));
+        }
+        high = b.soc;
+        highAt = b.t;
+    }
+    return out.some(v => v != null) ? out : null;
+}
+
 /** Whether a stored summary was made by this version of the calculation. */
 export const isCurrentSummary = (summary) => summary?.version === CHARGE_SUMMARY_VERSION;
+
+/** Whether a stored summary's `windows` can be read — true for every version since they were introduced. */
+const hasReadableWindows = (summary) => summary?.version >= WINDOWS_SINCE_VERSION && !!summary.windows;
+
+/**
+ * Minutes a session took from `from`% to `to`%, read off its stored curve, or
+ * null when it did not cover both.
+ */
+export function minutesBetween(summary, from, to) {
+    const curve = summary?.socMin;
+    if (!Array.isArray(curve) || !(to > from)) return null;
+    const a = curve[from], b = curve[to];
+    return a != null && b != null && b >= a ? b - a : null;
+}
+
+/**
+ * A session whose peak stayed below this share of the car's own maximum DC
+ * rate was held back by the charger — a 150 kW stall, a shared cabinet — and
+ * says nothing about how long the CAR takes. It is left out of the curve pick,
+ * and the note says so when that is why a vehicle has no tested figure (#335).
+ */
+const CHARGER_LIMITED_SHARE = 0.7;
+
+/**
+ * The charging session a vehicle's tested charge time comes from, for a window
+ * from `from`% to `to`% (#335).
+ *
+ * Charge time depends on conditions — a cold pack, a warm one — so this is not
+ * the best session. It is the curator's default charging run when that covers
+ * the window, else the newest session that does: a measurement with its
+ * conditions beside it, not a verdict. Sessions that could not stand for the
+ * car are left out: hidden, synthetic or inherited ones (as for the best
+ * windows), and charger-limited ones.
+ *
+ * @param {Array} runs
+ * @param {{ from: number, to: number, maxDcKw?: number|null }} window
+ * @returns {{ run, minutes: number, temperatureF: number|null, limitedOut: number } | { run: null, limitedOut: number }}
+ *   `limitedOut` — covering sessions set aside as charger-limited
+ */
+export function chargeTimeSession(runs = [], { from, to, maxDcKw = null }) {
+    let limitedOut = 0;
+    const covering = [];
+    for (const run of runs) {
+        if (!run || run.kind !== 'charging') continue;
+        if (run.isHidden || run.is_hidden || run.synthetic || isInheritedRunId(run.id)) continue;
+        const minutes = minutesBetween(run.charge_summary, from, to);
+        if (!(minutes > 0)) continue;
+        const peak = run.charge_summary.peakKw;
+        if (maxDcKw > 0 && peak > 0 && peak < maxDcKw * CHARGER_LIMITED_SHARE) { limitedOut++; continue; }
+        covering.push({ run, minutes });
+    }
+    const pick = covering.find(c => c.run.isDefault || c.run.is_default)
+        ?? covering.sort((a, b) => new Date(b.run.date) - new Date(a.run.date))[0];
+    if (!pick) return { run: null, limitedOut };
+    return {
+        run: pick.run,
+        minutes: pick.minutes,
+        temperatureF: finite(pick.run.temperature_f) ? Number(pick.run.temperature_f) : null,
+        limitedOut,
+    };
+}
 
 /**
  * Whether a session may set a vehicle's best.
@@ -200,7 +327,7 @@ export function countsTowardBest(run) {
     if (!run || run.kind !== 'charging') return false;
     if (run.isHidden || run.is_hidden || run.synthetic) return false;
     if (isInheritedRunId(run.id)) return false;
-    return isCurrentSummary(run.charge_summary) && !!run.charge_summary.windows;
+    return hasReadableWindows(run.charge_summary);
 }
 
 /**

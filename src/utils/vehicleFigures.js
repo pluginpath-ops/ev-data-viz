@@ -30,7 +30,8 @@
  * ── epaRangeMi ──────────────────────────────────────────────────────────────
  *
  *   epa-label    the primary configuration's label, which the Fuel Economy
- *                Guide fills. City and highway come with it.
+ *                Guide fills. City and highway come with it, and the
+ *                combined MPGe.
  *   expected     no label: a curator's Expected EPA Range, with its basis
  *                (Manufacturer, Independent test)
  *   unsorted     `vehicles.range`, which no EPA label confirms (#324 step 2)
@@ -133,6 +134,7 @@ export function resolveSocWindow(vehicle, vehicles = [], { tolerancePct = TESTED
  * @returns {{
  *   mi: number|null, basis: string|null,
  *   cityMi: number|null, hwyMi: number|null,   only with an EPA label
+ *   combinedMpge: number|null,                 likewise
  *   spanMi: [number, number]|null,             several labels, none primary
  *   expectedSource: string|null,               the Expected EPA Range's basis
  * }}
@@ -140,7 +142,7 @@ export function resolveSocWindow(vehicle, vehicles = [], { tolerancePct = TESTED
 export function resolveEpaRange(vehicle, vehicles = []) {
     const links = (vehicle?.epa_mappings ?? []).filter(m => m.epaGroup);
     const pick = primaryEpaMapping(links);
-    const none = { mi: null, basis: null, cityMi: null, hwyMi: null, spanMi: null, expectedSource: null };
+    const none = { mi: null, basis: null, cityMi: null, hwyMi: null, combinedMpge: null, spanMi: null, expectedSource: null };
 
     const fromLabel = (group) => ({
         ...none,
@@ -148,6 +150,8 @@ export function resolveEpaRange(vehicle, vehicles = []) {
         basis: 'epa-label',
         cityMi: positive(group.label_city_range_mi),
         hwyMi:  positive(group.label_hwy_range_mi),
+        // The label's efficiency, for the vehicle table's EPA efficiency (#335).
+        combinedMpge: positive(group.label_combined_mpge),
     });
 
     let spanMi = null;

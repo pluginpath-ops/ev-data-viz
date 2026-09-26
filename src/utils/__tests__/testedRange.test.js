@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-    testedRangeSummary, socWindow, coversPracticalPack,
+    testedRangeSummary, testedEfficiency, reportedRangeRun, socWindow, coversPracticalPack,
     FULL_WINDOW_MIN_PCT, WINDOW_START_MIN_PCT, WINDOW_END_MAX_PCT, WIDE_SPAN_MIN_PCT,
 } from '../testedRange';
 
@@ -150,6 +150,18 @@ describe('testedRangeSummary', () => {
         expect(s.isFullPack).toBe(true);
     });
 
+    it('takes the curator\'s default range test over any other (#335)', () => {
+        // The default says "these are the conditions to report". It wins even
+        // over a newer full-pack test, so the card and the vehicle table show
+        // the same test, and the one a curator chose.
+        const chosen = rangeRun({ id: 1, distance_miles: 220, start_soc: 80, end_soc: 10, date: '2023-01-01', is_default: true });
+        const newer = rangeRun({ id: 2, distance_miles: 300, start_soc: 100, end_soc: 1, date: '2025-06-01' });
+        expect(reportedRangeRun(vehicle([newer, chosen])).id).toBe(1);
+        expect(testedRangeSummary(vehicle([newer, chosen])).distanceMi).toBe(220);
+        // A default that is not a range test with a distance is no default here.
+        expect(reportedRangeRun(vehicle([newer, { id: 3, kind: 'charging', is_default: true }])).id).toBe(2);
+    });
+
     it('takes the newest among full-pack tests', () => {
         const s = testedRangeSummary(vehicle([
             rangeRun({ id: 1, distance_miles: 300, start_soc: 100, end_soc: 2, date: '2023-01-01' }),
@@ -241,5 +253,31 @@ describe('testedRangeSummary extras', () => {
         expect(testedRangeSummary(vehicle([rangeRun({ distance_miles: null })]))).toBeNull();
         expect(testedRangeSummary(vehicle([rangeRun({ distance_miles: 0 })]))).toBeNull();
         expect(testedRangeSummary(undefined)).toBeNull();
+    });
+});
+
+describe('testedEfficiency (#335)', () => {
+    it('reads the same test as the range, from measured energy', () => {
+        const e = testedEfficiency(vehicle([rangeRun()]));
+        expect(e.miPerKwh).toBeCloseTo(291 / 84);
+        expect(e.estimated).toBe(false);
+        expect(e).toMatchObject({ speedMph: 70, temperatureF: 72, isRepresentative: true });
+    });
+
+    it('estimates from the window and the battery when no energy was logged, and says so', () => {
+        const e = testedEfficiency(vehicle([rangeRun({ energy_kwh: null, start_soc: 100, end_soc: 0, distance_miles: 252 })]));
+        expect(e.miPerKwh).toBeCloseTo(3);          // 252 mi on 84 kWh
+        expect(e.estimated).toBe(true);
+    });
+
+    it('reports a narrow window, which a range cannot', () => {
+        const e = testedEfficiency(vehicle([rangeRun({ start_soc: 56, end_soc: 10, distance_miles: 120, energy_kwh: 40 })]));
+        expect(e.miPerKwh).toBe(3);
+        expect(e.isRepresentative).toBe(false);
+    });
+
+    it('is null with nothing to divide', () => {
+        expect(testedEfficiency(vehicle([]))).toBeNull();
+        expect(testedEfficiency(vehicle([rangeRun({ energy_kwh: null, start_soc: null })]))).toBeNull();
     });
 });
