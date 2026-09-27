@@ -5,7 +5,7 @@ import { useAsyncResource } from '../../hooks/useAsyncResource';
 import { KNOB_GROUPS } from '../../constants/knobs';
 import { setOverride } from '../../constants/overrides';
 import { vehicleLabel, fallbackSpecs } from '../../utils/specHelpers';
-import { columnMoves, checkFields, withSpecValues, epaSectionHref, EPA_SECTION_CHECKS } from '../../utils/dataCheckFixes';
+import { columnMoves, checkFields, withSpecValues, epaSectionHref, EPA_SECTION_CHECKS, nativeFillPlan } from '../../utils/dataCheckFixes';
 import { SpecField } from '../EditSpecsForm';
 import PrimaryConfigurationPicker from '../epa/PrimaryConfigurationPicker';
 import {
@@ -481,7 +481,8 @@ export default function DataChecksPanel() {
 
     /**
      * A move out of vehicles.battery or vehicles.range: the spec first, the
-     * column only once the spec is saved. The context reports a failed write
+     * column only once the spec is saved. A fill (Native 400 V support) writes
+     * the spec and clears nothing. The context reports a failed write
      * itself and returns false, so a refused spec leaves the column — until then
      * the only copy of the value — untouched.
      */
@@ -490,7 +491,22 @@ export default function DataChecksPanel() {
             const ok = await updateVehicleSpecs(vehicle.id, withSpecValues(vehicle.specs, move.spec.category, move.spec.values));
             if (!ok) return;
         }
-        await updateVehicle(vehicle.id, { [move.clear]: null });
+        if (move.clear) await updateVehicle(vehicle.id, { [move.clear]: null });
+    };
+
+    // "Fill all" for 400 V support (#352): Native on every 400 V class vehicle
+    // with nothing recorded, one write each, sources before the variants that
+    // would inherit it (nativeFillPlan). Stops at the first refused write.
+    const fillPlan = useMemo(() => nativeFillPlan(rows), [rows]);
+    const [filling, setFilling] = useState(false);
+    const fillAllNative = async () => {
+        setFilling(true);
+        setWriteError(null);
+        for (const v of fillPlan) {
+            const ok = await updateVehicleSpecs(v.id, withSpecValues(v.specs, 'charging', { dc_400v_charging: 'Native' }));
+            if (!ok) { setWriteError(`Stopped at ${vehicleLabel(v)}: its write was refused.`); break; }
+        }
+        setFilling(false);
     };
     const saveSpec = (vehicle, category, values) =>
         updateVehicleSpecs(vehicle.id, withSpecValues(vehicle.specs, category, values));
@@ -544,7 +560,8 @@ export default function DataChecksPanel() {
             <p className="text-note mb-4">
                 Every vehicle against its own sources: range against its EPA labels, the
                 manufacturer’s Usable and Gross against EPA tested, curb weight against EPA test
-                weight, drive type and voltage against EPA, and claimed against tested 0–60. A
+                weight, drive type and voltage against EPA, 400 V support against the voltage class,
+                and claimed against tested 0–60. A
                 vehicle is judged against its primary EPA configuration; with several and none
                 chosen, it disagrees only when none of them agrees. Fix a finding from under it —
                 sort a typed battery or range into the field that says what it is, edit the spec it
@@ -666,6 +683,17 @@ export default function DataChecksPanel() {
                 <p className="text-note mb-2">Skips cannot be recorded until migration 066 is applied.</p>
             )}
             {writeError && <div className="note-panel is-danger mb-2">{writeError}</div>}
+            {only === 'no-400v-support' && fillPlan.length > 0 && (
+                <div className="note-panel is-info mb-2 flex flex-wrap items-center justify-between gap-3">
+                    <span>
+                        Record Native on {plural(fillPlan.length, 'vehicle')}. A variant whose source is in the list
+                        inherits it rather than getting its own copy.
+                    </span>
+                    <button type="button" className="btn btn-primary text-sm" disabled={filling} onClick={fillAllNative}>
+                        {filling ? 'Filling…' : `Fill all ${fillPlan.length}`}
+                    </button>
+                </div>
+            )}
 
             <div className="flex flex-col gap-1">
                 {shown.map(({ row, findings }) => (

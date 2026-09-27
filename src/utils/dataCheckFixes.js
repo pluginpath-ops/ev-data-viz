@@ -27,6 +27,8 @@ const CHECK_FIELDS = {
     'voltage-vs-epa':      [['charging', 'battery_nominal_voltage_v']],
     'claimed-060-quicker': [['performance', 'zero_to_60_mph_sec']],
     'expected-vs-label':   [['range', 'expected_epa_mi'], ['range', 'expected_epa_basis']],
+    'no-400v-support':     [['charging', 'dc_400v_charging']],
+    'native-on-800v':      [['charging', 'dc_400v_charging']],
 };
 
 /** Checks whose other half is on the vehicle's EPA section: a link, a label, a test. */
@@ -64,7 +66,7 @@ export function withSpecValues(specs, category, values) {
  * @returns {Array<{
  *   key, label, title,
  *   spec: { category, values } | null,   what to write first, if anything
- *   clear: 'battery'|'range',            the column to clear after
+ *   clear: 'battery'|'range'|null,       the column to clear after, if any
  * }>}
  */
 export function columnMoves(finding) {
@@ -112,5 +114,47 @@ export function columnMoves(finding) {
         }];
     }
 
+    // A 400 V class pack charges natively (#352): one answer, one click.
+    if (finding?.check === 'no-400v-support') {
+        return [{
+            key: 'dc400-native',
+            label: 'Native',
+            title: 'Record Native as its 400 V support: a 400 V pack needs nothing to charge from a 400 V charger.',
+            spec: { category: 'charging', values: { dc_400v_charging: 'Native' } },
+            clear: null,
+        }];
+    }
+
     return [];
+}
+
+/**
+ * The vehicles "Fill all" writes Native to, from Data Checks rows (#352).
+ *
+ * Every vehicle with an open `no-400v-support` finding, except a variant whose
+ * source chain holds another vehicle being filled: the source's value comes
+ * down to it, and writing its own copy would cut that pointer. A variant that
+ * is not 400 V class is never in the set, and if it inherits the source's
+ * Native anyway, `native-on-800v` reports it.
+ *
+ * @param {Array} rows  runDataChecks output, across the whole fleet
+ * @returns {Array} vehicles, in row order
+ */
+export function nativeFillPlan(rows = []) {
+    const byId = new Map(rows.map(r => [r.vehicle.id, r.vehicle]));
+    const due = rows
+        .filter(r => r.findings.some(f => f.check === 'no-400v-support' && !f.skipped))
+        .map(r => r.vehicle);
+    const ids = new Set(due.map(v => v.id));
+    const coveredByAncestor = (v) => {
+        const seen = new Set([v.id]);
+        let id = v.spec_source_vehicle_id;
+        while (id != null && !seen.has(id)) {
+            if (ids.has(id)) return true;
+            seen.add(id);
+            id = byId.get(id)?.spec_source_vehicle_id;
+        }
+        return false;
+    };
+    return due.filter(v => !coveredByAncestor(v));
 }
