@@ -61,9 +61,11 @@ export const CHART_CATEGORIES = [
         key: 'efficiency',
         label: 'Charging & Range',
         modes: [
-            { key: 'charging',  label: 'Charging' },
+            // Labels renamed (#338) for what each shows; keys unchanged.
+            { key: 'charging',  label: 'Charging Curves' },
             { key: 'range',     label: 'Range & Efficiency' },
-            { key: 'compare',   label: 'Charge Compare' },
+            // A charging stop's worth: range added in X minutes, time to add M miles.
+            { key: 'compare',   label: 'Charge Stop' },
             { key: 'roadtrip',  label: 'Road Trip' },
         ],
     },
