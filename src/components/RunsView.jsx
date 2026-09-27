@@ -3,6 +3,7 @@ import { ownValues } from '../utils/vehicleInheritance';
 import { useState, useMemo, useEffect, Fragment } from 'react';
 import { EMPTY_VEHICLE_FORM, vehicleFormFrom } from '../utils/vehicleForm';
 import { useAppContext } from '../context/AppContext';
+import { autoMapHeaders } from '../utils/csvColumnMapping';
 import PreconditionedSelect from './PreconditionedSelect';
 import { toPreconditioned, preconditionedFormValue } from '../utils/runPreconditioning';
 import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
@@ -575,22 +576,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     };
 
     // ── File upload ───────────────────────────────────────────────────────────
-
-    const autoMapHeaders = (headers) => {
-        const autoMapping = {};
-        headers.forEach(header => {
-            const lower = String(header).toLowerCase();
-            if (lower.includes('soc') || lower.includes('state of charge')) autoMapping.soc = header;
-            if (lower.includes('charge') && lower.includes('rate')) autoMapping.chargeRate = header;
-            // 'timestamp' is more specific — check it before the generic 'time' test
-            if (lower.includes('timestamp')) autoMapping.timestamp = header;
-            else if (lower.includes('time')) autoMapping.time = header;
-            if (lower.includes('range')) autoMapping.range = header;
-            if (lower.includes('temp')) autoMapping.temperature = header;
-            if (lower.includes('frame')) autoMapping.frame = header;
-        });
-        return autoMapping;
-    };
 
     /**
      * After field mapping, detect timestamp columns and convert them to elapsed
