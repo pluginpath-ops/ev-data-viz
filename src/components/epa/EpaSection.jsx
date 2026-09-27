@@ -34,7 +34,7 @@ export const EPA_SUBTABS = [
     { id: 'labelstats', label: 'Label Statistics' },
     { id: 'certstats',  label: 'Certification Statistics' },
     // Id kept: it is the ?sub= token. Renamed (#338): "curves" means nothing
-    // to most readers. Its sibling Modeled vs Tested is a chart mode drawn in
+    // to most readers. Its sibling for the selected vehicles, of the same name, is a chart mode drawn in
     // the same sub-nav (chartNav.js `navParent`).
     { id: 'curves',     label: 'Modeled Efficiency',
       description: 'Efficiency against speed, modeled from EPA certification data, for any configuration. No vehicle, selection or tests.' },

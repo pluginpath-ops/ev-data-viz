@@ -137,7 +137,7 @@ export const CHART_HELP_DEFAULTS = {
     },
 
     epacurves: {
-        title: 'About Modeled vs Tested',
+        title: 'About Modeled Efficiency for selected vehicles',
         data_source:
             'A theoretical efficiency-vs-speed curve built from a vehicle’s official EPA ' +
             'lab data — the road-load coefficients and test phases stored in the linked ' +

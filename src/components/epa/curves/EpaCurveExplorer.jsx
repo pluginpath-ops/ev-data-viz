@@ -377,7 +377,7 @@ export default function EpaCurveExplorer() {
         <div className="stats-view">
             <div className="chart-layout">
                 <aside className="chart-rail">
-                    {/* What this view is, beside its sibling Modeled vs Tested
+                    {/* What this view is, beside its sibling for the selected vehicles
                         (#338): the two share a model and differ in scope. */}
                     <p className="text-note">Efficiency against speed, modeled from EPA certification data, for any configuration. No vehicle, selection or tests.</p>
                     {/* Every class here is Phase 4's. The controls were a stack

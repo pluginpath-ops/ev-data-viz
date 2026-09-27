@@ -34,7 +34,8 @@
  * tab — its modes join the parent's sub-nav, and the parent's tab is the one
  * lit — while keeping everything a chart mode has: the selection chips, the
  * pop-out, the URL state and its help bubble. The navigation plan on #338 put
- * EPA Curves, renamed Modeled vs Tested, under the EPA tab beside Modeled
+ * EPA Curves under the EPA tab, as Modeled Efficiency in its "Selected
+ * vehicles" section, beside the all-EVs Modeled
  * Efficiency, which is not a chart mode; this is how it gets there without
  * losing any of that.
  *
@@ -76,11 +77,15 @@ export const CHART_CATEGORIES = [
         // state. Its key is frozen like every mode's (see the top); the tab
         // key is new, and old ?tab=efficiency&m=epacurves links land here
         // because the URL restore lands on whichever category owns the mode.
+        // Its label is the sub-nav SECTION it heads (#338). The view shares
+        // its name with EPA's own Modeled Efficiency on purpose: one model,
+        // two scopes — every EV EPA rated, or the selected vehicles with their
+        // tests — and the section says which.
         key: 'epatested',
-        label: 'Modeled vs Tested',
+        label: 'Selected vehicles',
         navParent: 'epa',
         modes: [
-            { key: 'epacurves', label: 'Modeled vs Tested',
+            { key: 'epacurves', label: 'Modeled Efficiency',
               description: 'The selected vehicles’ efficiency against speed, modeled from their EPA data, with EVBench’s range tests laid over it.' },
         ],
     },

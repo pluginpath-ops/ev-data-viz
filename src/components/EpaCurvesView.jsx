@@ -795,7 +795,7 @@ export default function EpaCurvesView({
     if (selectedVehicleIds.length === 0) {
         return (
             <div>
-                <h2 className="page-title mb-6">Modeled vs Tested</h2>
+                <h2 className="page-title mb-6">Modeled Efficiency · selected vehicles</h2>
                 <div className="empty-state">
                     <p className="text-lg">No vehicles selected. Select vehicles from the Vehicles tab to see their modeled efficiency beside their tests.</p>
                 </div>
@@ -812,7 +812,7 @@ export default function EpaCurvesView({
               * right. */}
             {!presentationMode && (
                 <aside className="chart-rail">
-                    {/* What this view is, beside its sibling Modeled Efficiency
+                    {/* What this view is, beside its sibling for all EVs
                         (#338): the two share a model and differ in scope. */}
                     <p className="text-note">The selected vehicles’ efficiency against speed, modeled from their EPA data, with EVBench’s range tests laid over it.</p>
                     {/* ── AXES ── X is fixed: this chart is consumption against

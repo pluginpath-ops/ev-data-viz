@@ -770,6 +770,7 @@ describe('the seams that broke before', () => {
         const app = read('src/App.jsx');
         expect(app, 'the header must light the parent tab').toMatch(/view=\{navTabFor\(view\)\}/);
         expect(app, 'only top-level categories are tabs').toMatch(/chartCategories=\{TOP_CHART_CATEGORIES\}/);
+        expect(app, 'EPA\'s own sub-tabs are its All EVs section').toMatch(/group: 'All EVs'/);
         expect(app, 'a tab\'s sub-nav must carry the chart modes under it').toMatch(/\.\.\.chartModesUnder\(parentStrip\.tab\)\.map/);
         expect(app).toMatch(/epa:\s+\{ tab: 'epa'/);
         expect(app, 'a chart mode keeps its pop-out wherever it is drawn').toMatch(/end=\{activeChartCategory && popoutButton\}[\s\S]*end=\{activeChartCategory && popoutButton\}/);

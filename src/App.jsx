@@ -30,7 +30,9 @@ import { isEpaPartnerId } from './utils/rangeSource';
 
 /* SubTabStrip speaks `key`; the EPA registry has always spoken `id`, and it is
    read by name in several places, so it is mapped here rather than renamed. */
-const EPA_STRIP_ITEMS = EPA_SUBTABS.map(t => ({ key: t.id, label: t.label, description: t.description }));
+// EPA's own sub-tabs are its "All EVs" section (#338); the chart modes drawn
+// under it form a "Selected vehicles" section after them.
+const EPA_STRIP_ITEMS = EPA_SUBTABS.map(t => ({ key: t.id, label: t.label, description: t.description, group: 'All EVs' }));
 // Vehicles & Specs' own sub-nav section (#338); its "Specifications & Data"
 // section is the chart modes drawn under it (chartNav.js `navParent`).
 const VEHICLES_STRIP_ITEMS = [
@@ -221,7 +223,7 @@ export default function App() {
     // ref, not state — it's read during a click handler, never rendered.
     const lastModeByCategory = useRef({});
     // The chart mode last shown under a parent tab (Vehicles & Specs' Table,
-    // EPA's Modeled vs Tested), or null when the tab's own view was. Clicking
+    // EPA's selected-vehicles Modeled Efficiency), or null when the tab's own view was. Clicking
     // the tab returns there rather than to its first item (#338).
     const lastModeUnderTab = useRef({});
     // Cards or List (#338): a sub-nav item now, so App owns it.
@@ -437,7 +439,7 @@ export default function App() {
         };
         if (Object.keys(rtOverride).length > 0) setRoadTripConfig(prev => ({ ...prev, ...rtOverride }));
 
-        // Modeled vs Tested (EPA Curves) config
+        // Modeled Efficiency · selected vehicles (EPA Curves) config
         const epaYa = p.get('epa_ya');
         const epaSel = p.get('epa_m');
         const epaOverride = {};
@@ -619,7 +621,7 @@ export default function App() {
             if (chartConfig.scatterYField) p.set('scy', chartConfig.scatterYField);
         }
 
-        // Modeled vs Tested (EPA Curves) options
+        // Modeled Efficiency · selected vehicles (EPA Curves) options
         if (chartMode === 'epacurves') {
             if (epaConfig.yAxis && epaConfig.yAxis !== 'kwh100mi') p.set('epa_ya', epaConfig.yAxis);
             // Written whenever anything is selected. Without it the curves a
@@ -808,7 +810,7 @@ export default function App() {
                       * views, not a peer of their tabs. */}
                     {parentStrip ? (
                         // A tab's own sub-tabs, then the chart modes drawn under
-                        // it (#338): EPA's Modeled vs Tested, Vehicles & Specs'
+                        // it (#338): EPA's Selected vehicles section, Vehicles & Specs'
                         // Table and Chart. A sub-tab stays on the tab's view; a
                         // chart mode goes to its category and keeps its chips
                         // and pop-out.

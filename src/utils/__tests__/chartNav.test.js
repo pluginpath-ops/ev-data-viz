@@ -31,7 +31,7 @@ describe('chart tabs and the selection', () => {
 describe('a chart category drawn under another tab (#338)', () => {
     it('puts Modeled vs Tested under EPA, not in the header', () => {
         expect(TOP_CHART_CATEGORIES.map(c => c.key)).not.toContain('epatested');
-        expect(chartModesUnder('epa').map(m => m.key)).toEqual(['epacurves']);
+        expect(chartModesUnder('epa').map(m => [m.key, m.label, m.group])).toEqual([['epacurves', 'Modeled Efficiency', 'Selected vehicles']]);
         expect(navTabFor('epatested')).toBe('epa');
         expect(navTabFor('efficiency')).toBe('efficiency');   // a top tab is its own
         expect(navTabFor('vehicles')).toBe('vehicles');       // so is a non-chart view
