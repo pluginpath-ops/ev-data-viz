@@ -766,6 +766,16 @@ describe('the seams that broke before', () => {
         expect(read('src/utils/testDetails.js')).toMatch(/fact\('Preconditioned'/);
     });
 
+    it('draws Modeled vs Tested under the EPA tab, keeping it a chart mode (#338)', () => {
+        const app = read('src/App.jsx');
+        expect(app, 'the header must light the parent tab').toMatch(/view=\{navTabFor\(view\)\}/);
+        expect(app, 'only top-level categories are tabs').toMatch(/chartCategories=\{TOP_CHART_CATEGORIES\}/);
+        expect(app, 'EPA\'s sub-nav must carry the chart modes under it').toMatch(/const EPA_CHART_MODES = chartModesUnder\('epa'\)/);
+        expect(app).toMatch(/\.\.\.EPA_CHART_MODES\.map/);
+        expect(app, 'a chart mode keeps its pop-out wherever it is drawn').toMatch(/end=\{activeChartCategory && popoutButton\}[\s\S]*end=\{activeChartCategory && popoutButton\}/);
+        expect(read('src/components/shell/SubTabStrip.jsx'), 'a sub-tab\'s description is its tooltip').toMatch(/title=\{description\}/);
+    });
+
     it('links a tested figure to its test, and lands on it', () => {
         // Built once and unconnected, a link that navigates nowhere looks
         // exactly like one that works until someone clicks it.

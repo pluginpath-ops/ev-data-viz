@@ -23,13 +23,15 @@ import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/AdminView';
 import Playground from './components/playground/Playground';
 import EpaSection, { EPA_SUBTABS, DEFAULT_EPA_SUBTAB, epaSubtabFromParam } from './components/epa/EpaSection';
-import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor } from './constants/chartNav';
+import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor, navTabFor, chartModesUnder } from './constants/chartNav';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
 
 /* SubTabStrip speaks `key`; the EPA registry has always spoken `id`, and it is
    read by name in several places, so it is mapped here rather than renamed. */
-const EPA_STRIP_ITEMS = EPA_SUBTABS.map(t => ({ key: t.id, label: t.label }));
+const EPA_STRIP_ITEMS = EPA_SUBTABS.map(t => ({ key: t.id, label: t.label, description: t.description }));
+// The chart modes drawn in the EPA tab's sub-nav after its own sub-tabs (#338).
+const EPA_CHART_MODES = chartModesUnder('epa');
 
 /**
  * Views that never read the vehicle selection.
@@ -124,7 +126,7 @@ export default function App() {
     // Guide / Model Constants / Interface Settings).
     const [adminSubtab, setAdminSubtab] = useState(DEFAULT_ADMIN_SUBTAB);
     // And for EPA (Browse / Label Statistics / Certification Statistics /
-    // Speed-Consumption Curves), which used to own its own state and draw its
+    // Modeled Efficiency), which used to own its own state and draw its
     // own sub-nav below the header — the one section whose sub-tabs did not sit
     // in the header with everything else.
     const [epaSubtab, setEpaSubtab] = useState(DEFAULT_EPA_SUBTAB);
@@ -409,7 +411,7 @@ export default function App() {
         };
         if (Object.keys(rtOverride).length > 0) setRoadTripConfig(prev => ({ ...prev, ...rtOverride }));
 
-        // EPA Curves config
+        // Modeled vs Tested (EPA Curves) config
         const epaYa = p.get('epa_ya');
         const epaSel = p.get('epa_m');
         const epaOverride = {};
@@ -591,7 +593,7 @@ export default function App() {
             if (chartConfig.scatterYField) p.set('scy', chartConfig.scatterYField);
         }
 
-        // EPA Curves options
+        // Modeled vs Tested (EPA Curves) options
         if (chartMode === 'epacurves') {
             if (epaConfig.yAxis && epaConfig.yAxis !== 'kwh100mi') p.set('epa_ya', epaConfig.yAxis);
             // Written whenever anything is selected. Without it the curves a
@@ -689,6 +691,22 @@ export default function App() {
         sendState();
     }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, sendState]);
 
+    // The pop-out, at the right end of whichever sub-nav a chart mode is drawn in.
+    const popoutButton = (
+        <button
+            type="button"
+            onClick={() => window.open(
+                window.location.origin + window.location.pathname + window.location.search + '&popout=1',
+                'evbench-popout',
+                `width=${window.screen.availWidth},height=${window.screen.availHeight},left=0,top=0`
+            )}
+            className="btn btn-primary"
+            title="Open chart in a separate window for presentation"
+        >
+            ⧉ Open in new window
+        </button>
+    );
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-background)' }}>
@@ -733,8 +751,8 @@ export default function App() {
                   * replaced are gone; see components/shell/AppNav for why. */}
                 <nav className="app-nav" ref={headerRef}>
                     <AppNav
-                        view={view}
-                        chartCategories={CHART_CATEGORIES}
+                        view={navTabFor(view)}
+                        chartCategories={TOP_CHART_CATEGORIES}
                         activeVehicle={currentActiveVehicle}
                         hasSelection={selectedVehicles.length > 0}
                         isAdmin={isAdmin}
@@ -756,11 +774,27 @@ export default function App() {
                       * The strip's right end is where a section's own controls
                       * belong — the popout button is a control OF the chart
                       * views, not a peer of their tabs. */}
-                    {view === 'epa' ? (
+                    {navTabFor(view) === 'epa' ? (
+                        // EPA's own sub-tabs, then the chart modes that live
+                        // under it (Modeled vs Tested). One strip, two kinds of
+                        // item: a sub-tab stays on the EPA view, a chart mode
+                        // goes to its category and keeps its chips and pop-out.
                         <SubTabStrip
-                            items={EPA_STRIP_ITEMS}
-                            activeKey={epaSubtab}
-                            onSelect={setEpaSubtab}
+                            items={[
+                                ...EPA_STRIP_ITEMS,
+                                ...EPA_CHART_MODES.map(m => ({
+                                    ...m,
+                                    disabled: selectedVehicles.length === 0 && modeNeedsSelection(m),
+                                    hint: 'Select a vehicle first',
+                                })),
+                            ]}
+                            activeKey={view === 'epa' ? epaSubtab : chartMode}
+                            onSelect={(key) => {
+                                if (EPA_CHART_MODES.some(m => m.key === key)) { handleChartModeChange(key); return; }
+                                if (view !== 'epa') navigateTo('epa');
+                                setEpaSubtab(key);
+                            }}
+                            end={activeChartCategory && popoutButton}
                         />
                     ) : (
                         <SubTabStrip
@@ -771,20 +805,7 @@ export default function App() {
                             }))}
                             activeKey={chartMode}
                             onSelect={handleChartModeChange}
-                            end={activeChartCategory && (
-                                <button
-                                    type="button"
-                                    onClick={() => window.open(
-                                        window.location.origin + window.location.pathname + window.location.search + '&popout=1',
-                                        'evbench-popout',
-                                        `width=${window.screen.availWidth},height=${window.screen.availHeight},left=0,top=0`
-                                    )}
-                                    className="btn btn-primary"
-                                    title="Open chart in a separate window for presentation"
-                                >
-                                    ⧉ Open in new window
-                                </button>
-                            )}
+                            end={activeChartCategory && popoutButton}
                         />
                     )}
                     {!SELECTION_INERT_VIEWS.has(view) && <div className="selected-strip">

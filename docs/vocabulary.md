@@ -23,9 +23,13 @@ a house one, so that a new reader already knows it.
 | The pinned block at the top of every page | **header** | HTML `<header>`; Material *top app bar* | `.app-nav`, [App.jsx](../src/App.jsx) |
 | Its measured height, published for CSS | **`--app-header-h`** | — | [useHeaderHeight.js](../src/hooks/useHeaderHeight.js) |
 | Row 1 — wordmark, section tabs, account | **nav bar** | Bootstrap *navbar* | `.app-nav-bar`, [AppNav.jsx](../src/components/shell/AppNav.jsx) |
-| The six section buttons | **tabs** | WAI-ARIA `tablist` | `.btn-tab` |
+| The section buttons in the nav bar | **tabs** | WAI-ARIA `tablist` | `.btn-tab` |
 | Row 2 — Charging / Range & Efficiency / … | **sub-nav** | common web | `.subtab-strip`, [SubTabStrip.jsx](../src/components/shell/SubTabStrip.jsx) |
 | Either row of tabs, collapsed below 1000px | **nav menu** | — | `.nav-menu`, [NavMenu.jsx](../src/components/shell/NavMenu.jsx) |
+| The three bars before the collapsed main nav's section name | **the menu icon** | common web ("hamburger") | `.nav-menu-icon` — main nav only; the sub-nav keeps its caret |
+| The tab analysing EVBench's tested charging and range results | **Charging & Range** — the tab key stays `efficiency`. Not "Charging & Efficiency", its old name: efficiency is also the EPA tab's subject | — | [chartNav.js](../src/constants/chartNav.js) (#338) |
+| EPA's efficiency against speed, for any configuration, with no vehicle, selection or tests | **Modeled Efficiency** — the EPA sub-tab, `?sub=curves`. Never "curves" in UI text: it means nothing to most readers | — | [EpaCurveExplorer.jsx](../src/components/epa/curves/EpaCurveExplorer.jsx) (#338) |
+| The same model for the selected vehicles, with EVBench's range tests laid over it | **Modeled vs Tested** — a chart mode drawn in the EPA sub-nav (`epacurves`, category `epatested`). Its old name was "EPA Curves" | — | [EpaCurvesView.jsx](../src/components/EpaCurvesView.jsx), `navParent` in chartNav.js (#338) |
 | The one width at which the chrome collapses | **compact** | — | [useIsCompact.js](../src/hooks/useIsCompact.js) — the only breakpoint |
 | The circle at the right end, and what it opens | **account menu** | Material *account* | `.account-menu`, [AccountMenu.jsx](../src/components/shell/AccountMenu.jsx) |
 | A button stating its value, opening a panel | **menu button** | WAI-ARIA *menu button* | `.menu-button`, [MenuButton.jsx](../src/components/shell/MenuButton.jsx) |

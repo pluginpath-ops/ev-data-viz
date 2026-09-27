@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { CHART_CATEGORIES, categoryByKey, entryModeFor, modeNeedsSelection } from '../../constants/chartNav';
+import {
+    CHART_CATEGORIES, TOP_CHART_CATEGORIES, categoryByKey, categoryForMode, entryModeFor, modeNeedsSelection,
+    navTabFor, chartModesUnder,
+} from '../../constants/chartNav';
 
 describe('chart tabs and the selection', () => {
     const specs = categoryByKey('specifications');
@@ -22,5 +25,28 @@ describe('chart tabs and the selection', () => {
 
     it('has nowhere to enter a chart-only tab with nothing selected', () => {
         expect(entryModeFor(categoryByKey('efficiency'), 'charging', false)).toBeNull();
+    });
+});
+
+describe('a chart category drawn under another tab (#338)', () => {
+    it('puts Modeled vs Tested under EPA, not in the header', () => {
+        expect(TOP_CHART_CATEGORIES.map(c => c.key)).not.toContain('epatested');
+        expect(chartModesUnder('epa').map(m => m.key)).toEqual(['epacurves']);
+        expect(navTabFor('epatested')).toBe('epa');
+        expect(navTabFor('efficiency')).toBe('efficiency');   // a top tab is its own
+        expect(navTabFor('vehicles')).toBe('vehicles');       // so is a non-chart view
+    });
+
+    it('lands an old Charging & Efficiency link to EPA Curves on its new home', () => {
+        // The URL restore lands on whichever category owns the linked mode.
+        expect(categoryForMode('epacurves').key).toBe('epatested');
+        expect(categoryByKey('efficiency').modes.map(m => m.key)).not.toContain('epacurves');
+    });
+
+    it('keeps every mode key, which pop-outs, help bubbles and links depend on', () => {
+        const keys = CHART_CATEGORIES.flatMap(c => c.modes.map(m => m.key));
+        for (const k of ['charging', 'range', 'compare', 'roadtrip', 'epacurves', 'perfcompare', 'perfcurve', 'specs', 'specscatter', 'specstable']) {
+            expect(keys).toContain(k);
+        }
     });
 });

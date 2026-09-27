@@ -28,6 +28,16 @@
  * through guard noted there), a PopoutView branch, and a CHART_HELP_DEFAULTS
  * entry.
  *
+ * ── A CATEGORY THAT LIVES UNDER ANOTHER TAB ─────────────────────────────────
+ *
+ * A category with `navParent` is not a tab of its own. It is drawn under that
+ * tab — its modes join the parent's sub-nav, and the parent's tab is the one
+ * lit — while keeping everything a chart mode has: the selection chips, the
+ * pop-out, the URL state and its help bubble. The navigation plan on #338 put
+ * EPA Curves, renamed Modeled vs Tested, under the EPA tab beside Modeled
+ * Efficiency, which is not a chart mode; this is how it gets there without
+ * losing any of that.
+ *
  * NOTE: 'specs' is the Spec CHART (bar). Compare Specs — the table — is
  * 'specstable'. The two are easy to confuse; 'specs' is the older key and is
  * kept as-is for the reasons above.
@@ -43,18 +53,33 @@ export const CHART_CATEGORIES = [
         ],
     },
     {
-        // "Charging & Efficiency", not "Range & Efficiency": the 'range' mode
-        // below already carries that name, and a tab sharing a label with one of
-        // its own sub-tabs made the nav ambiguous. The key stays 'efficiency' —
-        // it's the ?tab= token, and churning it would gain nothing visible.
+        // "Charging & Range" (#338): the analysis of EVBench's tested results.
+        // Not "Range & Efficiency", which is one of its own sub-tabs; not
+        // "Charging & Efficiency" any more, since efficiency is also the EPA
+        // tab's subject. The key stays 'efficiency' — it's the ?tab= token, and
+        // churning it would break links for nothing visible.
         key: 'efficiency',
-        label: 'Charging & Efficiency',
+        label: 'Charging & Range',
         modes: [
             { key: 'charging',  label: 'Charging' },
             { key: 'range',     label: 'Range & Efficiency' },
             { key: 'compare',   label: 'Charge Compare' },
             { key: 'roadtrip',  label: 'Road Trip' },
-            { key: 'epacurves', label: 'EPA Curves' },
+        ],
+    },
+    {
+        // EPA Curves, renamed (#338) and moved under the EPA tab. It stays a
+        // chart mode — the selected vehicles' modeled efficiency with EVBench's
+        // range tests laid over it — so it keeps the chips, pop-out and URL
+        // state. Its key is frozen like every mode's (see the top); the tab
+        // key is new, and old ?tab=efficiency&m=epacurves links land here
+        // because the URL restore lands on whichever category owns the mode.
+        key: 'epatested',
+        label: 'Modeled vs Tested',
+        navParent: 'epa',
+        modes: [
+            { key: 'epacurves', label: 'Modeled vs Tested',
+              description: 'The selected vehicles’ efficiency against speed, modeled from their EPA data, with EVBench’s range tests laid over it.' },
         ],
     },
     {
@@ -80,6 +105,22 @@ export const ALL_CHART_MODES = CHART_CATEGORIES.flatMap(c => c.modes.map(m => m.
 
 /** Category keys — these double as top-level `view` values in App.jsx. */
 export const CHART_CATEGORY_KEYS = CHART_CATEGORIES.map(c => c.key);
+
+/** The chart categories that are top-level tabs: every one without a `navParent`. */
+export const TOP_CHART_CATEGORIES = CHART_CATEGORIES.filter(c => !c.navParent);
+
+/**
+ * The top-level tab a view is shown under: its category's `navParent`, else
+ * the view itself. What the header lights, and which sub-nav is drawn.
+ */
+export function navTabFor(view) {
+    return categoryByKey(view)?.navParent ?? view;
+}
+
+/** The chart modes drawn in a non-chart tab's sub-nav (a category's `navParent`). */
+export function chartModesUnder(tab) {
+    return CHART_CATEGORIES.filter(c => c.navParent === tab).flatMap(c => c.modes);
+}
 
 /** True when a top-level view is one of the chart categories. */
 export const isChartCategory = (view) => CHART_CATEGORY_KEYS.includes(view);

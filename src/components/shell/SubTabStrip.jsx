@@ -33,12 +33,13 @@ export default function SubTabStrip({ items, activeKey, onSelect, end = null }) 
                 <NavMenu items={items} activeKey={activeKey} onSelect={onSelect} level="sub" />
             ) : (
                 <div className="subtab-strip-items">
-                    {items.map(({ key, label, disabled }) => (
+                    {items.map(({ key, label, disabled, description }) => (
                         <button
                             key={key}
                             type="button"
                             onClick={() => onSelect(key)}
                             disabled={disabled}
+                            title={description}
                             aria-current={key === activeKey ? 'page' : undefined}
                             className={`btn-subtab ${key === activeKey ? 'active' : ''}`}
                         >

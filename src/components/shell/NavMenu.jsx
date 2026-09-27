@@ -44,6 +44,15 @@ export default function NavMenu({ items, activeKey, onSelect, level = 'main' }) 
                 aria-expanded={open}
                 aria-haspopup="menu"
             >
+                {/* The main bar collapsed says so (#338): three bars before the
+                    section's name, the mark every phone reader knows as "the
+                    menu". The sub-nav keeps the caret alone — it is a choice
+                    within a section, not the site's navigation. */}
+                {level === 'main' && (
+                    <svg className="nav-menu-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                        <path d="M2 4h12M2 8h12M2 12h12" />
+                    </svg>
+                )}
                 <span className="nav-menu-current">{active.label}</span>
                 <span className="disclosure-caret nav-menu-caret" aria-hidden="true">▾</span>
             </button>
