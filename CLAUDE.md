@@ -81,6 +81,10 @@ gh pr create --base main
 
 After a PR merges, pull `main` and delete the local branch before starting the next feature.
 
+**Stacked PRs are allowed for one plan's dependent layers**, not for unrelated
+work. Use `gh stack` and follow `.claude/skills/stacked-prs/SKILL.md`, which
+adds this repo's rules to GitHub's gh-stack skill.
+
 ### The docs check, and the pledge
 
 **Before every commit, and again on the PR title and description**, check what
