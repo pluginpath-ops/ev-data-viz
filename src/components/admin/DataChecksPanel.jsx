@@ -651,6 +651,26 @@ export default function DataChecksPanel() {
                 ))}
             </div>
 
+            {/* Shown whenever there is something to fill, filtered or not: behind
+                the filter chip nobody found it. Above the list, which is long. */}
+            {fillPlan.length > 0 && (
+                <div className="note-panel is-info mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <span>
+                        400 V support: {plural(fillPlan.length, 'vehicle')} {fillPlan.length === 1 ? 'is' : 'are'} 400 V
+                        class with nothing recorded. Fill all records Native on each; a variant whose source is
+                        among them inherits it rather than getting its own copy.
+                    </span>
+                    <span className="flex items-center gap-2">
+                        <button type="button" className="btn btn-secondary text-sm" onClick={() => setOnly('no-400v-support')}>
+                            Show them
+                        </button>
+                        <button type="button" className="btn btn-primary text-sm" disabled={filling} onClick={fillAllNative}>
+                            {filling ? 'Filling…' : `Fill all ${fillPlan.length}`}
+                        </button>
+                    </span>
+                </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-3 mb-2">
                 <input
                     type="text"
@@ -683,17 +703,6 @@ export default function DataChecksPanel() {
                 <p className="text-note mb-2">Skips cannot be recorded until migration 066 is applied.</p>
             )}
             {writeError && <div className="note-panel is-danger mb-2">{writeError}</div>}
-            {only === 'no-400v-support' && fillPlan.length > 0 && (
-                <div className="note-panel is-info mb-2 flex flex-wrap items-center justify-between gap-3">
-                    <span>
-                        Record Native on {plural(fillPlan.length, 'vehicle')}. A variant whose source is in the list
-                        inherits it rather than getting its own copy.
-                    </span>
-                    <button type="button" className="btn btn-primary text-sm" disabled={filling} onClick={fillAllNative}>
-                        {filling ? 'Filling…' : `Fill all ${fillPlan.length}`}
-                    </button>
-                </div>
-            )}
 
             <div className="flex flex-col gap-1">
                 {shown.map(({ row, findings }) => (
