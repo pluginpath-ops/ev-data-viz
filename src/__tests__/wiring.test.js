@@ -766,6 +766,62 @@ describe('the seams that broke before', () => {
         expect(read('src/utils/testDetails.js')).toMatch(/fact\('Preconditioned'/);
     });
 
+    it('draws Modeled vs Tested under the EPA tab, keeping it a chart mode (#338)', () => {
+        const app = read('src/App.jsx');
+        expect(app, 'the header must light the parent tab').toMatch(/const headerTab = view === 'runs' \? 'vehicles' : navTabFor\(view\)/);
+        expect(app).toMatch(/view=\{headerTab\}/);
+        expect(app, 'only top-level categories are tabs').toMatch(/chartCategories=\{TOP_CHART_CATEGORIES\}/);
+        expect(app, 'EPA\'s own sub-tabs are its All EVs section').toMatch(/group: 'All EVs'/);
+        expect(app, 'a tab\'s sub-nav must carry the chart modes under it').toMatch(/\.\.\.chartModesUnder\(parentStrip\.tab\)\.map/);
+        expect(app).toMatch(/epa:\s+\{ tab: 'epa'/);
+        expect(app, 'a chart mode keeps its pop-out wherever it is drawn').toMatch(/end=\{activeChartCategory && popoutButton\}[\s\S]*end=\{activeChartCategory && popoutButton\}/);
+        expect(read('src/components/shell/SubTabStrip.jsx'), 'a sub-tab\'s description is its tooltip').toMatch(/title=\{description\}/);
+    });
+
+    it('makes Cards and List sub-nav items and one Chart for both spec charts (#338)', () => {
+        const app = read('src/App.jsx');
+        expect(app, 'App owns Cards or List now').toMatch(/viewMode=\{vehiclesMode\}/);
+        expect(app).toMatch(/vehicles: \{ tab: 'vehicles', items: VEHICLES_STRIP_ITEMS/);
+        expect(app, 'the bar/scatter switch must be drawn for both spec charts').toMatch(/<SpecChartKind mode=\{chartMode\} onChange=\{handleChartModeChange\} \/>/);
+        expect(app, 'a header tab returns to the chart mode last shown under it').toMatch(/onNavigate=\{navigateToTab\}/);
+        expect(read('src/components/VehiclesView.jsx'), 'the in-page toggle is gone').not.toMatch(/setViewMode/);
+        expect(read('src/components/shell/SubTabStrip.jsx'), 'sections are labelled').toMatch(/subtab-section-label/);
+        expect(read('src/components/shell/NavMenu.jsx'), 'and survive the collapse').toMatch(/nav-menu-section/);
+    });
+
+    it('shows the opened vehicle in the header and closes it from its page (#338)', () => {
+        const app = read('src/App.jsx');
+        expect(app).toMatch(/openedVehicle=\{currentActiveVehicle\}/);
+        expect(app).toMatch(/onCloseVehicle=\{closeVehicle\}/);
+        expect(app, 'the page gets the way back and the way out').toMatch(/onBack=\{\(\) => navigateTo\('vehicles'\)\}\s+onClose=\{closeVehicle\}/);
+        expect(app, 'Vehicles & Specs returns to the vehicle page').toMatch(/if \(mode === 'runs'\)/);
+        const nav = read('src/components/shell/AppNav.jsx');
+        expect(nav, 'Tests & Data is no longer a tab').not.toMatch(/key: 'runs'/);
+        expect(nav).toMatch(/className="opened-vehicle"/);
+        expect(nav, 'and survives the collapse as a menu item').toMatch(/label: `↳ \$\{openedVehicle\.name\}`/);
+        expect(read('src/components/RunsView.jsx')).toMatch(/className="vehicle-page-close"/);
+    });
+
+    it('gives Reference a tab, a sub-nav and a URL, with stubs for #354 and #355 (#338)', () => {
+        const app = read('src/App.jsx');
+        expect(read('src/components/shell/AppNav.jsx')).toMatch(/\{ key: 'reference', label: 'Reference' \}/);
+        expect(app).toMatch(/reference: \{ tab: 'reference', items: REFERENCE_STRIP_ITEMS/);
+        expect(app, 'a link restores it').toMatch(/if \(tab === 'reference'\)/);
+        expect(app, 'and it writes its own').toMatch(/p\.set\('tab', 'reference'\)/);
+        expect(app).toMatch(/<ReferenceSection\s+subtab=\{referenceSubtab\}\s+platformId=\{referencePlatformId\}/);
+    });
+
+    it('opens a platform\'s page from every place a platform is named (#354)', () => {
+        const app = read('src/App.jsx');
+        expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform \}\}>/);
+        expect(app, 'and restores ?pid=').toMatch(/setReferencePlatformId\(p\.get\('pid'\) \|\| null\)/);
+        expect(read('src/components/vehicles/PlatformLine.jsx'), 'the card line and View Specs').toMatch(/<PlatformLink platform=/);
+        expect(read('src/components/VehicleSpecsDisplay.jsx'), 'a provided value\'s basis').toMatch(/from <PlatformLink platform=\{platform\} \/>/);
+        expect(read('src/utils/vehicleTable.js'), 'a table note names its platform').toMatch(/links\[col\.key\] = \{ platformId: platform\.id \}/);
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\)\}/);
+        expect(read('src/components/tables/TableCell.jsx'), 'without borrowing the test peek').toMatch(/const noteLink = test \?\? link/);
+    });
+
     it('links a tested figure to its test, and lands on it', () => {
         // Built once and unconnected, a link that navigates nowhere looks
         // exactly like one that works until someone clicks it.

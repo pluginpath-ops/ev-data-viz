@@ -525,7 +525,7 @@ const present = (v) => (v === '' || v === undefined ? null : v);
  * @param {Object} [opts.assumptions]  the reader's inputs to calculated columns
  * @param {string} [opts.units]  the reader's unit system, which the assumptions are in
  * @param {Map}    [opts.platformsById]  the platform list by id (#318); platform columns are blank without it
- * @returns {Array<{ id, index, vehicle, values: Object, notes: Object, tests: Object, flagged: Set }>}
+ * @returns {Array<{ id, index, vehicle, values: Object, notes: Object, links: Object, tests: Object, flagged: Set }>}
  *          `notes` holds the basis or source shown beneath a figure; `tests`
  *          the test behind it, where one is (testDetails.js TestReference)
  */
@@ -545,6 +545,8 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
             tags:  (vehicle.tags ?? []).map(t => t.name).filter(Boolean).join(', ') || null,
         };
         const notes = {};
+        // A platform a note names, so the note links to its page (#354).
+        const links = {};
         // The test behind a figure, where one stands behind it (testDetails.js):
         // its note links to it, and hovering the cell restates it.
         const tests = {};
@@ -555,7 +557,10 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
             // A platform provides the value; it does not stand in for the
             // vehicle's own, so the cell says whose it is (#352).
             const platform = fromPlatform.get(col.key);
-            if (values[col.key] != null && platform) notes[col.key] = `from ${platform.name}`;
+            if (values[col.key] != null && platform) {
+                notes[col.key] = `from ${platform.name}`;
+                links[col.key] = { platformId: platform.id };
+            }
         }
 
         const { mechanical, electrical } = vehiclePlatforms(vehicle, platformsById);
@@ -566,6 +571,7 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         notes['figures.voltageClass'] = voltageClass
             ? (voltageClass.basis === 'platform' ? `from ${voltageClass.platform.name}` : `from ${Math.round(voltageClass.nominalV)} V nominal`)
             : null;
+        if (voltageClass?.basis === 'platform') links['figures.voltageClass'] = { platformId: voltageClass.platform.id };
         for (const [key, kind] of [['platform.mechanical', 'mechanical_platform_id'], ['platform.electrical', 'electrical_platform_id']]) {
             const from = vehicle.inheritedFrom?.[kind];
             if (values[key] != null && from) notes[key] = `from ${from.name}`;
@@ -648,7 +654,7 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         // results are worked out, not entered, and nobody flags them.
         const flagged = new Set((vehicle.flagged_specs ?? []).filter(k => BY_KEY.get(k)?.spec));
 
-        return { id: vehicle.id, index, vehicle, values, notes, tests, flagged };
+        return { id: vehicle.id, index, vehicle, values, notes, links, tests, flagged };
     });
 }
 

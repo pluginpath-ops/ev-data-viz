@@ -271,7 +271,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                 {result.mappingsCount > 0 && <>, <strong>{result.mappingsCount}</strong> vehicle link{result.mappingsCount !== 1 ? 's' : ''} created</>}
                             </p>
                             <p className="text-sm text-meta mt-2">
-                                Vehicles with new EPA data will show a dashed curve on the EPA Curves chart tab.
+                                Vehicles with new EPA data will show a dashed curve in EPA → Selected vehicles → Modeled Efficiency.
                                 Confidence is set to "likely" — update it to "verified" via the vehicle edit form if confirmed.
                             </p>
                         </div>

@@ -38,7 +38,7 @@ export const CHART_HELP_SECTIONS = [
 
 export const CHART_HELP_DEFAULTS = {
     charging: {
-        title: 'About the Charging chart',
+        title: 'About the Charging Curves chart',
         data_source:
             'Plots the time-series readings from your saved charging tests — the ' +
             'log uploaded from a CSV or Tableau export of a real charging session. ' +
@@ -104,7 +104,7 @@ export const CHART_HELP_DEFAULTS = {
     },
 
     compare: {
-        title: 'About the Charge Compare charts',
+        title: 'About the Charge Stop charts',
         data_source:
             'Answers two road-trip questions from your charging logs: how much range ' +
             'you’d add in a set number of minutes, and how long it takes to add a set ' +
@@ -137,7 +137,7 @@ export const CHART_HELP_DEFAULTS = {
     },
 
     epacurves: {
-        title: 'About the EPA Curves chart',
+        title: 'About Modeled Efficiency for selected vehicles',
         data_source:
             'A theoretical efficiency-vs-speed curve built from a vehicle’s official EPA ' +
             'lab data — the road-load coefficients and test phases stored in the linked ' +

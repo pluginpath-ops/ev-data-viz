@@ -30,6 +30,8 @@ import TableCell from './tables/TableCell';
 import { useCellPeek } from '../hooks/useCellPeek';
 import TestPeek from './TestPeek';
 import { testHref } from '../utils/testDetails';
+import { platformHref } from '../utils/platforms';
+import { useNavigation } from '../context/NavigationContext';
 import GuideFacetMenu from './epa/guide/GuideFacetMenu';
 import ViewSpecsModal from './ViewSpecsModal';
 import { vehicleColor } from '../utils/specHelpers';
@@ -74,6 +76,7 @@ const FACETS = [
 
 /** One vehicle. Rendered by the selected band and the body from the same component. */
 function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen, onOpenTest }) {
+    const { openPlatform } = useNavigation();
     return (
         <tr className={`guide-row${selected ? ' selected' : ''}`} data-row-id={row.id} onClick={() => onOpen(row.vehicle)}>
             <td className="guide-td guide-td-select sticky-select" onClick={e => e.stopPropagation()}>
@@ -116,6 +119,7 @@ function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen,
                         flagged={row.flagged.has(col.key)}
                         test={testLink(row.tests[col.key], onOpenTest)}
                         testKey={col.key}
+                        link={platformNoteLink(row.links?.[col.key], openPlatform)}
                     />
                 );
             })}
@@ -128,6 +132,12 @@ function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen,
  * where the table has one. The pop-out window has none — it holds only the
  * table — so there a click opens the test in a new tab instead.
  */
+/** A "from <platform>" note as TableCell links it (#354). */
+function platformNoteLink(link, openPlatform) {
+    if (link?.platformId == null) return null;
+    return { href: platformHref(link.platformId), onOpen: openPlatform ? () => openPlatform(link.platformId) : null };
+}
+
 function testLink(ref, onOpenTest) {
     if (!ref) return null;
     return { href: testHref(ref), onOpen: onOpenTest ? () => onOpenTest(ref) : null };

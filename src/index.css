@@ -555,6 +555,134 @@
 
    Two levels, two signals, and the rule the rest of the re-skin obeys: blue
    says which section you are in, orange says which view inside it is live. */
+/* The top of a vehicle's page (#338): a breadcrumb back to Vehicles & Specs
+   and Close vehicle, a target big enough to find without looking. The
+   breadcrumb, .page-crumb, is shared with a platform's page. */
+.vehicle-page-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.page-crumb {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    color: var(--color-text-meta);
+}
+.page-crumb a { color: var(--color-text-link); }
+.page-crumb [aria-current] { color: var(--color-text-secondary); }
+.vehicle-page-close {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-border-strong);
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-primary);
+    font-weight: 600;
+    cursor: pointer;
+}
+.vehicle-page-close:hover { background-color: var(--color-hover-lift); }
+.vehicle-page-close-x { font-size: calc(var(--fs-body) * 1.4286); line-height: 1; }
+
+/* A platform's page (#354): three cards across — what it is and provides,
+   its notes, the vehicles on it — one column when narrow. */
+.platform-page-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+.platform-page-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+}
+.platform-page-card .platform-facts { padding: 0; }
+.platform-page-notes {
+    white-space: pre-line;
+    color: var(--color-text-secondary);
+}
+.platform-page-more {
+    align-self: flex-start;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--color-text-link);
+}
+.platform-page-more:hover { text-decoration: underline; }
+.platform-page-vehicles {
+    display: flex;
+    flex-direction: column;
+    max-height: 420px;
+    overflow-y: auto;
+}
+.platform-page-vehicle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    border-bottom: 1px solid var(--color-border);
+    cursor: pointer;
+}
+
+/* The Vehicles & Specs tab's cell, which also holds the opened vehicle (#338). */
+.nav-tab-cell {
+    position: relative;
+    display: flex;
+    flex: none;
+    height: 100%;
+}
+/* The opened vehicle: a line at the foot of the tab's cell, below the label.
+   Absolutely placed, so the label stays level with every other tab and
+   opening or closing a vehicle moves nothing. */
+.opened-vehicle {
+    position: absolute;
+    left: 15px;
+    right: 4px;
+    bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    line-height: 1.2;
+}
+.opened-vehicle-link {
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-link);
+}
+.opened-vehicle-link:hover,
+.opened-vehicle-link.active {
+    color: var(--color-text-primary);
+    text-decoration: underline;
+}
+.opened-vehicle-close {
+    flex: none;
+    padding: 0 3px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--color-text-meta);
+}
+.opened-vehicle-close:hover { color: var(--color-text-primary); }
+
 .btn-tab {
     display: flex;
     align-items: center;
@@ -1033,6 +1161,24 @@ body {
     scrollbar-width: none;
 }
 .subtab-strip-items::-webkit-scrollbar { display: none; }
+/* A section of the sub-nav (#338) — Vehicles & Specs' "Summary" and
+   "Specifications & Data". The label reads as the sub-nav's own meta text,
+   and the rule between sections is the same color, faded, so neither competes
+   with the items. */
+.subtab-section-label {
+    align-self: center;
+    padding: 0 6px 0 11px;
+    color: var(--color-text-nav-meta);
+    white-space: nowrap;
+}
+.subtab-section-rule {
+    align-self: center;
+    width: 1px;
+    height: 18px;
+    margin: 0 8px;
+    background-color: var(--color-text-nav-meta);
+    opacity: 0.35;
+}
 
 /* The right-hand end of the strip is where the view's own controls and its
    count live — not a third band. */
@@ -1082,6 +1228,20 @@ body {
     color: var(--color-text-primary);
 }
 .nav-menu-current { @apply truncate; }
+/* The mark before a collapsed nav bar's current name (#338): three bars on
+   the main nav, a bulleted list on the sub-nav. Drawn in the text's own
+   color, so it follows the theme with the label. */
+.nav-menu-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+}
+/* The bullets: round caps on a zero-length stroke, drawn wider, are dots. */
+.nav-menu-icon-dot { stroke-width: 2.75; }
 .nav-menu-main .nav-menu-btn {
     height: 100%;
     font-size: calc(var(--fs-body) * var(--fs-step));
@@ -1126,6 +1286,10 @@ body {
     color: var(--color-text-primary);
 }
 .nav-menu-item:hover:not(:disabled) { background-color: var(--color-hover-lift); }
+/* A sub-nav section's name inside the collapsed menu (#338). */
+.nav-menu-section {
+    padding: 8px 10px 2px;
+}
 /* Orange, like every other "which view is live" mark in this design — and
    square on the color side, like every other accent border in it. The item's
    own corner radius was rounding the ends of the bar, which reads as a pill
@@ -3060,13 +3224,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Search / filter row above the vehicle grid */
 .vehicle-filter-bar {
     @apply flex gap-3 items-center mb-3;
-}
-
-/* Card / list view mode toggle widget */
-.view-toggle {
-    @apply flex border rounded-lg overflow-hidden;
-    border-color: var(--color-border);
-    color: var(--color-text-muted);
 }
 
 /* Tag filter chip strip below the search bar */

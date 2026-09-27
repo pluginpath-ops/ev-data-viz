@@ -32,7 +32,11 @@ import { modeNeedsSelection } from '../../constants/chartNav';
 export default function AppNav({
     view,
     chartCategories,
-    activeVehicle,
+    openedVehicle = null,
+    openedActive = false,
+    onOpenVehicle,
+    onCloseVehicle,
+    onHome,
     hasSelection,
     isAdmin,
     user,
@@ -54,17 +58,17 @@ export default function AppNav({
      * between the buttons this replaced.
      */
     const items = [
-        { key: 'vehicles', label: 'Vehicles' },
-        {
-            key: 'runs',
-            label: 'Tests & Data',
-            disabled: !activeVehicle,
-            hint: activeVehicle ? activeVehicle.name : 'Select a vehicle first',
-        },
-        // One top-level tab per chart category. They plot the vehicle
-        // selection, so they wait for one, unless a mode inside can show
-        // something without it: Specifications holds the vehicle table, where
-        // a selection is made (#315).
+        // Vehicles & Specs (#338): the cards and list, and — drawn under it —
+        // the vehicle table and the spec chart. Specs are front and center by
+        // being in the first tab's name, not by a tab of their own.
+        { key: 'vehicles', label: 'Vehicles & Specs' },
+        // Tests & Data is no longer a tab (#338): it is one vehicle's page,
+        // opened from a card, row, chip or tested figure, and shown in the
+        // header as the opened vehicle beneath Vehicles & Specs.
+        // One top-level tab per chart category (those drawn under another tab
+        // are left out by the caller). They plot the vehicle selection, so
+        // they wait for one, unless a mode inside can show something without
+        // it.
         ...chartCategories.map(({ key, label, modes }) => {
             const gated = !hasSelection && modes.every(modeNeedsSelection);
             return {
@@ -79,10 +83,20 @@ export default function AppNav({
         // so it is deliberately NOT gated on a vehicle selection the way the
         // chart categories above are.
         { key: 'epa', label: 'EPA' },
+        // Reference (#338): what is true of every EV, selected or not —
+        // platforms and explainers. Not gated on a selection, like EPA.
+        { key: 'reference', label: 'Reference' },
         ...(isAdmin ? [{ key: 'admin', label: 'Admin' }] : []),
     ];
 
+    // Collapsed, the opened vehicle is a menu item of its own, after its tab.
+    const OPENED = 'opened-vehicle';
+    const menuItems = openedVehicle
+        ? items.flatMap(i => (i.key === 'vehicles' ? [i, { key: OPENED, label: `↳ ${openedVehicle.name}` }] : [i]))
+        : items;
+
     const select = (key) => {
+        if (key === OPENED) { onOpenVehicle?.(); return; }
         const item = items.find(i => i.key === key);
         if (!item || item.disabled) return;
         if (item.chart) onNavigateChartCategory(key);
@@ -93,7 +107,7 @@ export default function AppNav({
         <div className="app-nav-bar">
             <button
                 type="button"
-                onClick={() => onNavigate('vehicles')}
+                onClick={() => (onHome ?? onNavigate)('vehicles')}
                 className="app-wordmark"
                 title="EVBench — home"
             >
@@ -102,21 +116,54 @@ export default function AppNav({
             </button>
 
             {compact ? (
-                <NavMenu items={items} activeKey={view} onSelect={select} level="main" />
+                <NavMenu items={menuItems} activeKey={openedActive ? OPENED : view} onSelect={select} level="main" />
             ) : (
                 <div className="nav-tab-group">
-                    {items.map(({ key, label, disabled, hint }) => (
-                        <button
-                            key={key}
-                            type="button"
-                            onClick={() => select(key)}
-                            disabled={disabled}
-                            className={`btn-tab ${view === key ? 'active' : ''}`}
-                            title={hint}
-                        >
-                            {label}
-                        </button>
-                    ))}
+                    {items.map(({ key, label, disabled, hint }) => {
+                        const tab = (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => select(key)}
+                                disabled={disabled}
+                                className={`btn-tab ${view === key ? 'active' : ''}`}
+                                title={hint}
+                            >
+                                {label}
+                            </button>
+                        );
+                        if (key !== 'vehicles') return tab;
+                        // The opened vehicle (#338), in the tab's own cell below
+                        // its label: visible from every tab, never a chip, and
+                        // absolutely placed so opening one moves nothing.
+                        return (
+                            <div key={key} className="nav-tab-cell">
+                                {tab}
+                                {openedVehicle && (
+                                    <span className="opened-vehicle">
+                                        <button
+                                            type="button"
+                                            className={`opened-vehicle-link ${openedActive ? 'active' : ''}`}
+                                            onClick={onOpenVehicle}
+                                            aria-current={openedActive ? 'page' : undefined}
+                                            title={`Open ${openedVehicle.name}’s tests and data`}
+                                        >
+                                            ↳ {openedVehicle.name}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="opened-vehicle-close"
+                                            onClick={onCloseVehicle}
+                                            aria-label={`Close ${openedVehicle.name}`}
+                                            title="Close vehicle"
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 

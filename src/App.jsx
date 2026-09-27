@@ -23,13 +23,26 @@ import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/AdminView';
 import Playground from './components/playground/Playground';
 import EpaSection, { EPA_SUBTABS, DEFAULT_EPA_SUBTAB, epaSubtabFromParam } from './components/epa/EpaSection';
-import { CHART_CATEGORIES, DEFAULT_CHART_MODE, ALL_CHART_MODES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor } from './constants/chartNav';
+import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor, navTabFor, chartModesUnder, navItemForMode } from './constants/chartNav';
+import SpecChartKind from './components/SpecChartKind';
+import { NavigationContext } from './context/NavigationContext';
+import { platformHref } from './utils/platforms';
+import ReferenceSection, { REFERENCE_SUBTABS, DEFAULT_REFERENCE_SUBTAB, referenceSubtabFromParam } from './components/reference/ReferenceSection';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
 
 /* SubTabStrip speaks `key`; the EPA registry has always spoken `id`, and it is
    read by name in several places, so it is mapped here rather than renamed. */
-const EPA_STRIP_ITEMS = EPA_SUBTABS.map(t => ({ key: t.id, label: t.label }));
+// EPA's own sub-tabs are its "All EVs" section (#338); the chart modes drawn
+// under it form a "Selected vehicles" section after them.
+const EPA_STRIP_ITEMS = EPA_SUBTABS.map(t => ({ key: t.id, label: t.label, description: t.description, group: 'All EVs' }));
+// Vehicles & Specs' own sub-nav section (#338); its "Specifications & Data"
+// section is the chart modes drawn under it (chartNav.js `navParent`).
+const REFERENCE_STRIP_ITEMS = REFERENCE_SUBTABS.map(t => ({ key: t.id, label: t.label, description: t.description }));
+const VEHICLES_STRIP_ITEMS = [
+    { key: 'card', label: 'Cards', group: 'Summary' },
+    { key: 'list', label: 'List',  group: 'Summary' },
+];
 
 /**
  * Views that never read the vehicle selection.
@@ -48,7 +61,7 @@ const EPA_STRIP_ITEMS = EPA_SUBTABS.map(t => ({ key: t.id, label: t.label }));
  * Hiding is not clearing. The selection survives the trip and the chips are
  * back the moment a view uses them again.
  */
-const SELECTION_INERT_VIEWS = new Set(['runs', 'epa', 'admin', 'playground']);
+const SELECTION_INERT_VIEWS = new Set(['runs', 'epa', 'reference', 'admin', 'playground']);
 
 export default function App() {
     const {
@@ -124,7 +137,7 @@ export default function App() {
     // Guide / Model Constants / Interface Settings).
     const [adminSubtab, setAdminSubtab] = useState(DEFAULT_ADMIN_SUBTAB);
     // And for EPA (Browse / Label Statistics / Certification Statistics /
-    // Speed-Consumption Curves), which used to own its own state and draw its
+    // Modeled Efficiency), which used to own its own state and draw its
     // own sub-nav below the header — the one section whose sub-tabs did not sit
     // in the header with everything else.
     const [epaSubtab, setEpaSubtab] = useState(DEFAULT_EPA_SUBTAB);
@@ -143,7 +156,6 @@ export default function App() {
         mfgFilterStates: {},
         modelFilter: new Set(),
         sortBy: 'default',
-        viewMode: 'card',
         vehiclePage: 1,
     }));
     const [dragOverIdx, setDragOverIdx] = useState(null); // pill drop-indicator position
@@ -214,6 +226,20 @@ export default function App() {
     // returns you where you were rather than resetting to the first sub-tab. A
     // ref, not state — it's read during a click handler, never rendered.
     const lastModeByCategory = useRef({});
+    // The chart mode last shown under a parent tab (Vehicles & Specs' Table,
+    // EPA's selected-vehicles Modeled Efficiency), or null when the tab's own view was. Clicking
+    // the tab returns there rather than to its first item (#338).
+    const lastModeUnderTab = useRef({});
+    // A vehicle's page is the last place under Vehicles & Specs while it shows.
+    useEffect(() => {
+        if (view === 'runs') lastModeUnderTab.current.vehicles = 'runs';
+    }, [view]);
+    // Cards or List (#338): a sub-nav item now, so App owns it.
+    const [vehiclesMode, setVehiclesMode] = useState('card');
+    // Reference's sub-tab (#338): Platforms or Explainers.
+    const [referenceSubtab, setReferenceSubtab] = useState(DEFAULT_REFERENCE_SUBTAB);
+    // The platform whose page is showing under Reference › Platforms (#354), or null for the list.
+    const [referencePlatformId, setReferencePlatformId] = useState(null);
 
     const handleChartModeChange = (newMode) => {
         const categoryKey = categoryForMode(newMode).key;
@@ -224,6 +250,8 @@ export default function App() {
             `?tab=${categoryKey}&m=${newMode}`, // URL sync effect replaces with full params
         );
         lastModeByCategory.current[categoryKey] = newMode;
+        const parentTab = categoryForMode(newMode).navParent;
+        if (parentTab) lastModeUnderTab.current[parentTab] = newMode;
         setView(categoryKey);
         setChartMode(newMode);
         // Only on an actual mode change. Clearing unconditionally emptied the
@@ -282,6 +310,60 @@ export default function App() {
         setView(newView);
     }, [chartMode]);
 
+    /**
+     * A header tab that is not a chart category. Returns to the chart mode last
+     * shown under it, if there was one and it can still show; else its own view.
+     */
+    const navigateToTab = (tab) => {
+        const mode = lastModeUnderTab.current[tab];
+        // The vehicle's page is a place under Vehicles & Specs too (#338).
+        if (mode === 'runs') {
+            navigateTo(currentActiveVehicle ? 'runs' : tab);
+            return;
+        }
+        const modeDef = mode ? categoryForMode(mode).modes.find(m => m.key === mode) : null;
+        if (modeDef && (selectedVehicles.length > 0 || !modeNeedsSelection(modeDef))) {
+            handleChartModeChange(mode);
+            return;
+        }
+        navigateTo(tab);
+    };
+
+    /**
+     * A platform's page, from anywhere a platform is named (#354). A history
+     * entry, so Back returns to the card, table or View Specs it came from.
+     */
+    const openPlatform = (id) => {
+        history.pushState({ view: 'reference', subtab: DEFAULT_REFERENCE_SUBTAB, platformId: String(id) }, '', platformHref(id));
+        setReferenceSubtab(DEFAULT_REFERENCE_SUBTAB);
+        setReferencePlatformId(String(id));
+        setView('reference');
+        window.scrollTo(0, 0);
+    };
+
+    /** A Reference sub-tab's top level: the platform list, or Explainers. */
+    const openReference = (subtab) => {
+        const url = subtab === DEFAULT_REFERENCE_SUBTAB ? '?tab=reference' : `?tab=reference&sub=${subtab}`;
+        history.pushState({ view: 'reference', subtab, platformId: null }, '', url);
+        setReferenceSubtab(subtab);
+        setReferencePlatformId(null);
+        setView('reference');
+    };
+
+    /** Show the opened vehicle's page (#338). */
+    const openVehiclePage = () => navigateTo('runs');
+
+    /**
+     * Close the opened vehicle (#338): it leaves the header, Vehicles & Specs
+     * stops returning to it, and if its page is showing, the reader goes back
+     * to Vehicles & Specs.
+     */
+    const closeVehicle = () => {
+        if (lastModeUnderTab.current.vehicles === 'runs') lastModeUnderTab.current.vehicles = null;
+        if (view === 'runs') navigateTo('vehicles');
+        setActiveVehicle(null);
+    };
+
     const [pendingEditVehicle, setPendingEditVehicle] = useState(null);
     const [showAuthModal, setShowAuthModal] = useState(false);
     const pendingUrlState = useRef(null);
@@ -332,6 +414,12 @@ export default function App() {
         // resolved first, because the page reads no data at all.
         if (tab === 'playground') {
             setView('playground');
+            return;
+        }
+        if (tab === 'reference') {
+            setReferenceSubtab(referenceSubtabFromParam(p.get('sub')));
+            setReferencePlatformId(p.get('pid') || null);
+            setView('reference');
             return;
         }
         if (tab === 'epa') {
@@ -409,7 +497,7 @@ export default function App() {
         };
         if (Object.keys(rtOverride).length > 0) setRoadTripConfig(prev => ({ ...prev, ...rtOverride }));
 
-        // EPA Curves config
+        // Modeled Efficiency · selected vehicles (EPA Curves) config
         const epaYa = p.get('epa_ya');
         const epaSel = p.get('epa_m');
         const epaOverride = {};
@@ -441,6 +529,10 @@ export default function App() {
                 const v = vehicles.find(v => v.id === e.state.vehicleId);
                 if (v) setActiveVehicle(v);
                 if (RUNS_SUBTAB_IDS.includes(e.state.subtab)) setRunsSubtab(e.state.subtab);
+            }
+            if (e.state.view === 'reference') {
+                setReferenceSubtab(referenceSubtabFromParam(e.state.subtab));
+                setReferencePlatformId(e.state.platformId ?? null);
             }
             if (e.state.view === 'admin' && ADMIN_SUBTAB_IDS.includes(e.state.subtab)) {
                 setAdminSubtab(e.state.subtab);
@@ -591,7 +683,7 @@ export default function App() {
             if (chartConfig.scatterYField) p.set('scy', chartConfig.scatterYField);
         }
 
-        // EPA Curves options
+        // Modeled Efficiency · selected vehicles (EPA Curves) options
         if (chartMode === 'epacurves') {
             if (epaConfig.yAxis && epaConfig.yAxis !== 'kwh100mi') p.set('epa_ya', epaConfig.yAxis);
             // Written whenever anything is selected. Without it the curves a
@@ -647,6 +739,17 @@ export default function App() {
         history.replaceState({ view: 'epa', subtab: epaSubtab }, '', '?' + p.toString());
     }, [isPopout, view, epaSubtab]);
 
+    // ── Keep URL in sync while on the Reference tab (#338) ──────────────────
+    useEffect(() => {
+        if (isPopout) return;
+        if (view !== 'reference') return;
+        const p = new URLSearchParams();
+        p.set('tab', 'reference');
+        if (referenceSubtab !== DEFAULT_REFERENCE_SUBTAB) p.set('sub', referenceSubtab);
+        else if (referencePlatformId != null) p.set('pid', referencePlatformId);
+        history.replaceState({ view: 'reference', subtab: referenceSubtab, platformId: referencePlatformId }, '', '?' + p.toString());
+    }, [isPopout, view, referenceSubtab, referencePlatformId]);
+
     // ── Keep URL in sync while on the Admin tab ─────────────────────────────
     useEffect(() => {
         if (isPopout) return;
@@ -689,6 +792,36 @@ export default function App() {
         sendState();
     }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, sendState]);
 
+    // The header tab a view is shown under (#338): a vehicle's page (the
+    // `runs` view) is under Vehicles & Specs; a chart category drawn under
+    // another tab is under that tab.
+    const headerTab = view === 'runs' ? 'vehicles' : navTabFor(view);
+
+    // A non-chart tab whose sub-nav also carries chart modes (#338), or null.
+    const parentStrip = {
+        epa:      { tab: 'epa',      items: EPA_STRIP_ITEMS,      active: epaSubtab,    select: setEpaSubtab },
+        vehicles: { tab: 'vehicles', items: VEHICLES_STRIP_ITEMS, active: vehiclesMode, select: setVehiclesMode },
+        reference: { tab: 'reference', items: REFERENCE_STRIP_ITEMS, active: referenceSubtab,
+            // A sub-tab opens its own top level: Platforms is the list.
+            select: (key) => { setReferenceSubtab(key); setReferencePlatformId(null); } },
+    }[headerTab] ?? null;
+
+    // The pop-out, at the right end of whichever sub-nav a chart mode is drawn in.
+    const popoutButton = (
+        <button
+            type="button"
+            onClick={() => window.open(
+                window.location.origin + window.location.pathname + window.location.search + '&popout=1',
+                'evbench-popout',
+                `width=${window.screen.availWidth},height=${window.screen.availHeight},left=0,top=0`
+            )}
+            className="btn btn-primary"
+            title="Open chart in a separate window for presentation"
+        >
+            ⧉ Open in new window
+        </button>
+    );
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-background)' }}>
@@ -717,7 +850,7 @@ export default function App() {
     }
 
     return (
-        <>
+        <NavigationContext.Provider value={{ openPlatform }}>
             {showAuthModal && (
                 <AuthModal
                     onClose={() => setShowAuthModal(false)}
@@ -733,16 +866,20 @@ export default function App() {
                   * replaced are gone; see components/shell/AppNav for why. */}
                 <nav className="app-nav" ref={headerRef}>
                     <AppNav
-                        view={view}
-                        chartCategories={CHART_CATEGORIES}
-                        activeVehicle={currentActiveVehicle}
+                        view={headerTab}
+                        chartCategories={TOP_CHART_CATEGORIES}
+                        openedVehicle={currentActiveVehicle}
+                        openedActive={view === 'runs'}
+                        onOpenVehicle={openVehiclePage}
+                        onCloseVehicle={closeVehicle}
+                        onHome={navigateTo}
                         hasSelection={selectedVehicles.length > 0}
                         isAdmin={isAdmin}
                         user={user}
                         userRole={userRole}
                         units={units}
                         onToggleUnits={toggleUnits}
-                        onNavigate={navigateTo}
+                        onNavigate={navigateToTab}
                         onNavigateChartCategory={navigateToChartCategory}
                         onSignIn={() => setShowAuthModal(true)}
                         onSignOut={signOut}
@@ -756,11 +893,36 @@ export default function App() {
                       * The strip's right end is where a section's own controls
                       * belong — the popout button is a control OF the chart
                       * views, not a peer of their tabs. */}
-                    {view === 'epa' ? (
+                    {parentStrip ? (
+                        // A tab's own sub-tabs, then the chart modes drawn under
+                        // it (#338): EPA's Selected vehicles section, Vehicles & Specs'
+                        // Table and Chart. A sub-tab stays on the tab's view; a
+                        // chart mode goes to its category and keeps its chips
+                        // and pop-out.
                         <SubTabStrip
-                            items={EPA_STRIP_ITEMS}
-                            activeKey={epaSubtab}
-                            onSelect={setEpaSubtab}
+                            items={[
+                                ...parentStrip.items,
+                                ...chartModesUnder(parentStrip.tab).map(m => ({
+                                    ...m,
+                                    disabled: selectedVehicles.length === 0 && modeNeedsSelection(m),
+                                    hint: 'Select a vehicle first',
+                                })),
+                            ]}
+                            // On a vehicle's page no item is current: the header's
+                            // opened vehicle is.
+                            activeKey={view === parentStrip.tab ? parentStrip.active : view === 'runs' ? null : navItemForMode(chartMode)}
+                            onSelect={(key) => {
+                                if (chartModesUnder(parentStrip.tab).some(m => m.key === key)) {
+                                    // Chart stands for both spec charts: re-entering it
+                                    // keeps whichever one was showing.
+                                    handleChartModeChange(key === navItemForMode(chartMode) ? chartMode : key);
+                                    return;
+                                }
+                                lastModeUnderTab.current[parentStrip.tab] = null;
+                                if (view !== parentStrip.tab) navigateTo(parentStrip.tab);
+                                parentStrip.select(key);
+                            }}
+                            end={activeChartCategory && popoutButton}
                         />
                     ) : (
                         <SubTabStrip
@@ -771,20 +933,7 @@ export default function App() {
                             }))}
                             activeKey={chartMode}
                             onSelect={handleChartModeChange}
-                            end={activeChartCategory && (
-                                <button
-                                    type="button"
-                                    onClick={() => window.open(
-                                        window.location.origin + window.location.pathname + window.location.search + '&popout=1',
-                                        'evbench-popout',
-                                        `width=${window.screen.availWidth},height=${window.screen.availHeight},left=0,top=0`
-                                    )}
-                                    className="btn btn-primary"
-                                    title="Open chart in a separate window for presentation"
-                                >
-                                    ⧉ Open in new window
-                                </button>
-                            )}
+                            end={activeChartCategory && popoutButton}
                         />
                     )}
                     {!SELECTION_INERT_VIEWS.has(view) && <div className="selected-strip">
@@ -915,6 +1064,7 @@ export default function App() {
                             onClearPendingEdit={() => setPendingEditVehicle(null)}
                             savedState={vehiclesViewState}
                             onSaveState={setVehiclesViewState}
+                            viewMode={vehiclesMode}
                         />
                     )}
                     {view === 'runs' && currentActiveVehicle && (
@@ -951,6 +1101,8 @@ export default function App() {
                             specCustomFieldSuggestions={specCustomFieldSuggestions}
                             vehicles={vehicles}
                             onViewVehicle={(v) => setActiveVehicle(v)}
+                            onBack={() => navigateTo('vehicles')}
+                            onClose={closeVehicle}
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                             subtab={runsSubtab}
                             onSubtabChange={setRunsSubtab}
@@ -1007,6 +1159,9 @@ export default function App() {
                             setChartConfig={setChartConfig}
                         />
                     )}
+                    {activeChartCategory && selectedVehicles.length > 0 && (chartMode === 'specs' || chartMode === 'specscatter') && (
+                        <SpecChartKind mode={chartMode} onChange={handleChartModeChange} />
+                    )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specs' && (
                         <SpecsChartView
                             vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
@@ -1051,6 +1206,14 @@ export default function App() {
                         made, over the whole fleet (#315). */}
                     {activeChartCategory && chartMode === 'specstable' && <VehicleTable onOpenTest={openTest} />}
                     {view === 'epa' && <EpaSection subtab={epaSubtab} />}
+                    {view === 'reference' && (
+                        <ReferenceSection
+                            subtab={referenceSubtab}
+                            platformId={referencePlatformId}
+                            onBackToPlatforms={() => openReference('platforms')}
+                            onOpenExplainers={() => openReference('explainers')}
+                        />
+                    )}
 
                     {/* The playground, ungated and unlinked.
                       *
@@ -1128,6 +1291,6 @@ export default function App() {
                     </div>
                 </div>
             )}
-        </>
+        </NavigationContext.Provider>
     );
 }
