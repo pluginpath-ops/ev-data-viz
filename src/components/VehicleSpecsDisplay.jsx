@@ -102,6 +102,7 @@ export default function VehicleSpecsDisplay({
                 const predefinedRows = cat.fields
                     .map(f => ({
                         label:      f.label,
+                        hint:       f.hint ?? undefined,
                         key:        `${cat.key}.${f.key}`,
                         value:      formatValue(catData[f.key], f.type),
                         inherited:  inheritedKeys?.has(`${cat.key}.${f.key}`) ?? false,
@@ -139,7 +140,7 @@ export default function VehicleSpecsDisplay({
                                     const isPending = pendingFlags?.has(row.key) ?? false;
                                     return (
                                         <div key={row.key} className="specs-field-row items-center">
-                                            <span className="specs-field-label">{row.label}</span>
+                                            <span className="specs-field-label" title={row.hint ?? row.label}>{row.label}</span>
                                             <span className="specs-field-value flex items-center gap-1">
                                                 <span className={row.inherited || row.platform ? 'specs-field-inherited' : ''}>
                                                     {row.value}

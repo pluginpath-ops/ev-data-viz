@@ -12,6 +12,10 @@
  *   'boolean' — Yes / No / blank select
  *   'enum'    — select from a fixed list of options
  *   'text'    — free-text input
+ *
+ * `hint` — optional. What the field means where the label cannot say it: the
+ * vehicle table's column tooltip, and the label's tooltip in View Specs and
+ * the spec editor.
  */
 
 import { CHEMISTRIES, DC_400V_CHARGING } from './platforms';
@@ -167,8 +171,14 @@ export const SPEC_CATEGORIES = [
             // (platforms.js PLATFORM_PROVIDES) when this is blank, and a value set
             // here wins: a Taycan's booster was optional, so the platform's
             // answer is not every Taycan's. Stored as the label, like every enum.
-            { key: 'dc_400v_charging',            label: 'On a 400 V Charger',             type: 'enum',
-              options: DC_400V_CHARGING.map(m => m.label), tableLabel: 'On a 400 V charger' },
+            { key: 'dc_400v_charging',            label: '400 V Support',                  type: 'enum',
+              options: DC_400V_CHARGING.map(m => m.label), tableLabel: '400 V support',
+              hint: 'How the car charges from a 400 V DC fast charger, if it can: native (a 400 V pack), a DC booster, motor boost, a split pack, or not at all. It decides whether an 800 V car can use older DC fast chargers, and Tesla Superchargers installed before V4 (mid-2026). Its electrical platform provides it unless the vehicle sets its own.' },
+            // Per vehicle, not provided by the platform: it changed by model
+            // year within one platform (early and later E-GMP).
+            { key: 'max_dc_400v_kw',              label: 'Max DC on 400 V (kW)',           type: 'number', better: 'higher',
+              tableLabel: 'Max DC on 400 V',
+              hint: 'The fastest DC charge rate the car reaches on a 400 V charger, which on an 800 V car is usually well below its peak. It varies by model year on one platform: early E-GMP cars reach about 80 kW and later ones about 150 kW; an early Taycan about 50 kW. Few DC boosters pass 200 kW (the Lucid Gravity is one). A split pack is usually limited by current, to 400–500 A.' },
             // Per vehicle, never the platform's list: a Mach-E is NMC or LFP, not
             // both. The platform's chemistries are offered as suggestions in the
             // spec editor and never fill this in.

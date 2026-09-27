@@ -720,7 +720,7 @@ describe('the seams that broke before', () => {
         const { resolveColumn } = await import('../utils/parseVehicleImport');
         const added = [
             'charging.v2h', 'charging.v2g', 'charging.plug_and_charge', 'charging.native_supercharger_access',
-            'charging.dc_400v_charging', 'charging.battery_chemistry', 'charging.preconditioning', 'charging.heat_pump',
+            'charging.dc_400v_charging', 'charging.max_dc_400v_kw', 'charging.battery_chemistry', 'charging.preconditioning', 'charging.heat_pump',
             'towing.towing_capacity_lbs', 'towing.payload_lbs',
             'warranty.battery_years', 'warranty.battery_miles', 'warranty.basic_years', 'warranty.basic_miles',
         ];
@@ -732,6 +732,10 @@ describe('the seams that broke before', () => {
             expect(resolveColumn(key), `${key} imports by its key`).toMatchObject({ kind: 'spec', catKey: cat, fieldKey: field });
             expect(resolveColumn(def.label), `${key} imports by its label`).toMatchObject({ kind: 'spec', catKey: cat, fieldKey: field });
         }
+        expect(vehicleColumnByKey('charging.dc_400v_charging').hint, 'a schema hint is the column tooltip')
+            .toMatch(/Superchargers installed before V4/);
+        expect(read('src/components/VehicleSpecsDisplay.jsx'), 'View Specs shows the hint on the label').toMatch(/title=\{row\.hint/);
+        expect(read('src/components/EditSpecsForm.jsx'), 'so does the spec editor').toMatch(/title=\{field\.hint\}/);
         expect(read('src/components/VehicleSpecsDisplay.jsx'), 'View Specs must render every schema field')
             .toMatch(/SPEC_CATEGORIES\.filter/);
     });

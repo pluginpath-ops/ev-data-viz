@@ -58,7 +58,7 @@ export const VEHICLE_TABLE_PRESETS = [
         columns: [
             'name', 'platform.electrical', 'charging.battery_usable_kwh', 'powertrain.battery_gross_kwh', 'calc.batteryBuffer',
             'charging.battery_chemistry',
-            'charging.battery_nominal_voltage_v', 'figures.voltageClass', 'charging.dc_400v_charging', 'charging.max_dc_kw',
+            'charging.battery_nominal_voltage_v', 'figures.voltageClass', 'charging.dc_400v_charging', 'charging.max_dc_400v_kw', 'charging.max_dc_kw',
             'calc.avgChargeKw', 'tested.charge_best_5min_kw', 'tested.charge_best_15min_kw',
             'calc.peakCRate', 'powertrain.motor_type',
             'suspension.adaptive_damping', 'suspension.adjustable_height',

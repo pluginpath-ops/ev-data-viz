@@ -106,7 +106,7 @@ const IDENTITY_COLUMNS = [
  *
  * Voltage class is the VEHICLE's, resolved with its basis beneath, like
  * battery and EPA range: a platform provides it, it does not stand in for it.
- * How it charges on a 400 V charger is a spec field since #352, provided by
+ * 400 V support is a spec field since #352, provided by
  * the platform where the vehicle sets none. Voltage class replaced the "800-volt" yes/no,
  * which said less and disagreed with nothing it could be checked against. It
  * sorts as a number and draws no bar: 800 V is not "better" than 400 V.
@@ -452,6 +452,7 @@ const SPEC_COLUMNS = SPEC_CATEGORIES.flatMap(cat => cat.fields.map(f => {
         better: f.better ?? null,
         bar: !!f.better,
         holds: holdsFor(f),
+        hint: f.hint ?? null,
         spec: [cat.key, f.key],
     };
 }));

@@ -161,12 +161,15 @@ export function resolveVoltageClass(electrical, nominalV) {
  *
  * Only what is true of every vehicle on the platform belongs here:
  *
- *   on a 400 V charger   the electrical platform's method, as the spec's label.
+ *   400 V support        the electrical platform's method, as the spec's label.
  *                        A vehicle that differs (a Taycan's booster was
  *                        optional) sets its own.
  *
  * Deliberately NOT provided:
  *
+ *   max DC on 400 V      the rate changed by model year within one platform
+ *                        (early E-GMP about 80 kW, later about 150 kW), so it is
+ *                        the vehicle's alone.
  *   voltage class        not a spec field. It stays the vehicle's resolved
  *                        figure (`resolveVoltageClass`): the platform's class,
  *                        else worked out from the nominal voltage.

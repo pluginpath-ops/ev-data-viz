@@ -90,7 +90,7 @@ function PlatformRow({ platform, kind, uses, onSave, onDelete }) {
                         </select>
                     </td>
                     <td className="p-2">
-                        <select className="form-input" value={draft.dc_400v_charging} onChange={set('dc_400v_charging')} aria-label="On a 400 V charger">
+                        <select className="form-input" value={draft.dc_400v_charging} onChange={set('dc_400v_charging')} aria-label="400 V support">
                             <option value="">Not recorded</option>
                             {DC_400V_CHARGING.map(m => <option key={m.key} value={m.key} title={m.note}>{m.label}</option>)}
                         </select>
@@ -179,7 +179,7 @@ export default function PlatformRegistry() {
                                         {electrical && (
                                             <>
                                                 <th className="p-2">Voltage</th>
-                                                <th className="p-2">On a 400 V charger</th>
+                                                <th className="p-2">400 V support</th>
                                                 <th className="p-2">Chemistries</th>
                                                 <th className="p-2">Cells</th>
                                             </>

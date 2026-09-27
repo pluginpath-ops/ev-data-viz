@@ -506,7 +506,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                                 const inheritedValue = inheritedCat[field.key] ?? null;
                                                 return (
                                                     <div key={field.key}>
-                                                        <label className="block text-xs text-secondary mb-0.5 flex items-center gap-1">
+                                                        <label className="block text-xs text-secondary mb-0.5 flex items-center gap-1" title={field.hint}>
                                                             {field.label}
                                                             {isFlagged && (
                                                                 <SpecFieldFlagButton
