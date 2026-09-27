@@ -60,7 +60,7 @@ export function PlatformFacts({ vehicle }) {
         e && (e.voltage_class_v || method || e.chemistries?.length > 0 || e.cell_format)
             && { heading: `${e.name} hardware` },
         e?.voltage_class_v && { label: 'Voltage class', value: `${e.voltage_class_v} V` },
-        method && { label: 'On a 400 V charger', value: method.label, title: method.note },
+        method && { label: '400 V support', value: method.label, title: method.note },
         e?.chemistries?.length > 0 && { label: 'Chemistries', value: e.chemistries.join(', ') },
         e?.cell_format && { label: 'Cells', value: e.cell_format },
     ].filter(Boolean);

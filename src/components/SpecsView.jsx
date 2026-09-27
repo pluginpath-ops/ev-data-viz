@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { formatSpecValue } from '../utils/unitConversions';
 import { SpecFieldFlagButton } from './VoteButtons';
-import { mergeInheritedSpecs, resolveEffectiveSpecs, vehicleLabel, vehicleColor } from '../utils/specHelpers';
+import { specProvenance, vehicleLabel, vehicleColor } from '../utils/specHelpers';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
 import SpecsControls from './specs/SpecsControls';
 import { bestIndices, labelWithoutUnit, rowDiffers, rowIsEmpty } from '../utils/specCompare';
@@ -127,11 +127,7 @@ export default function SpecsView({ selectedVehicleIds }) {
 
     // Resolve effective specs (own overrides + full ancestor chain) for each vehicle.
     const resolvedVehicles = displayVehicles.map(v => {
-        const source = v.spec_source_vehicle_id
-            ? vehicles.find(sv => sv.id === v.spec_source_vehicle_id)
-            : null;
-        const ancestorSpecs = source ? resolveEffectiveSpecs(source, vehicles, new Set([v.id])) : null;
-        const { merged, inheritedKeys } = mergeInheritedSpecs(v.specs, ancestorSpecs);
+        const { specs: merged, source, inheritedKeys } = specProvenance(v, vehicles);
         return {
             ...v,
             effectiveSpecs: merged,

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, normalizeCustomKey, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { SpecVouchButton, SpecFieldFlagButton } from './VoteButtons';
-import { vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
+import { vehicleLabel, fallbackSpecs } from '../utils/specHelpers';
+import { chemistrySuggestions } from '../utils/platforms';
 
 /**
  * Modal form for editing all spec categories of a vehicle.
@@ -109,11 +110,21 @@ function fmtInheritedHint(value, field) {
     return String(value);
 }
 
-/** One spec field's input, by schema type. Also used inline by Data Checks. */
-export function SpecField({ field, value, onChange, inheritedValue }) {
+/**
+ * One spec field's input, by schema type. Also used inline by Data Checks.
+ *
+ * `inheritedValue` is what a blank field shows — its source vehicle's value, or
+ * its platform's; `providedBy` names the platform when it is the platform's
+ * (#352), so the hint says "from E-GMP 800 V" rather than passing a platform's
+ * answer off as the source vehicle's. `suggestions` are one-click values that
+ * are never shown as inherited: a platform's possible chemistries.
+ */
+export function SpecField({ field, value, onChange, inheritedValue, providedBy = null, suggestions = null }) {
     const hasInherited = inheritedValue !== null && inheritedValue !== undefined;
     const isEmpty      = value === null || value === undefined || value === '';
-    const hint         = hasInherited && isEmpty ? fmtInheritedHint(inheritedValue, field) : null;
+    const shown        = hasInherited && isEmpty ? fmtInheritedHint(inheritedValue, field) : null;
+    const hint         = shown && providedBy ? `${shown} — from ${providedBy.name}` : shown;
+    const hintLine     = hint && <p className="spec-field-hint">{providedBy ? hint : `↑ ${hint}`}</p>;
 
     if (field.type === 'boolean') {
         const selectValue = value === true ? 'yes' : value === false ? 'no' : '';
@@ -131,7 +142,7 @@ export function SpecField({ field, value, onChange, inheritedValue }) {
                     <option value="yes">Yes</option>
                     <option value="no">No</option>
                 </select>
-                {hint && <p className="text-xs text-indigo-400 mt-0.5 pl-0.5">↑ {hint}</p>}
+                {hintLine}
             </div>
         );
     }
@@ -148,7 +159,17 @@ export function SpecField({ field, value, onChange, inheritedValue }) {
                         <option key={opt} value={opt}>{opt}</option>
                     ))}
                 </select>
-                {hint && <p className="text-xs text-indigo-400 mt-0.5 pl-0.5">↑ {hint}</p>}
+                {hintLine}
+                {suggestions?.options.length > 0 && isEmpty && (
+                    <p className="spec-field-hint">
+                        {suggestions.label}:{' '}
+                        {suggestions.options.map(opt => (
+                            <button key={opt} type="button" className="spec-field-suggestion" onClick={() => onChange(opt)}>
+                                {opt}
+                            </button>
+                        ))}
+                    </p>
+                )}
             </div>
         );
     }
@@ -214,12 +235,20 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     const liveVehicle = vehicles.find(v => v.id === vehicle.id) || vehicle;
     const flaggedSpecs = liveVehicle.flagged_specs || [];
 
-    // Source vehicle specs for inheritance hints — resolve the full ancestor chain
-    // so hints show the value that would actually be inherited (not just direct parent's own fields).
+    // What a blank field would show: the source vehicle's value through its full
+    // ancestor chain (not just the direct parent's own fields), else what the
+    // vehicle's platform provides (#352). The source is the one chosen in this
+    // form, so the hints follow it before it is saved.
     const sourceVehicle  = inheritFromId ? vehicles.find(v => String(v.id) === inheritFromId) : null;
-    const inheritedSpecs = sourceVehicle
-        ? resolveEffectiveSpecs(sourceVehicle, vehicles, new Set([vehicle.id]))
-        : {};
+    const { specs: inheritedSpecs, fromPlatform } = fallbackSpecs(liveVehicle, vehicles, sourceVehicle);
+
+    // A platform's chemistries are what the vehicle's MAY be. Offered, never
+    // filled in: a Mach-E is NMC or LFP, not both.
+    const electrical = liveVehicle.platforms?.electrical ?? null;
+    const chemistries = chemistrySuggestions(electrical);
+    const suggestionsFor = (fieldKey) => (fieldKey === 'charging.battery_chemistry' && chemistries.length
+        ? { label: `${electrical.name} uses`, options: chemistries }
+        : null);
 
     // Build the set of descendant IDs so we can exclude them from the parent picker
     // (selecting a descendant as parent would create a circular inheritance chain).
@@ -423,7 +452,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                             )}
                         </div>
                         {sourceVehicle && (
-                            <p className="text-xs text-indigo-500 mt-1.5">
+                            <p className="spec-inherit-note">
                                 Fields you leave blank will show <span className="font-medium">↑ inherited</span> hints.
                             </p>
                         )}
@@ -474,12 +503,10 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                             {cat.fields.map(field => {
                                                 const fieldKey = `${cat.key}.${field.key}`;
                                                 const isFlagged = flaggedSpecs.includes(fieldKey);
-                                                const inheritedValue = sourceVehicle
-                                                    ? inheritedCat[field.key] ?? null
-                                                    : undefined;
+                                                const inheritedValue = inheritedCat[field.key] ?? null;
                                                 return (
                                                     <div key={field.key}>
-                                                        <label className="block text-xs text-secondary mb-0.5 flex items-center gap-1">
+                                                        <label className="block text-xs text-secondary mb-0.5 flex items-center gap-1" title={field.hint}>
                                                             {field.label}
                                                             {isFlagged && (
                                                                 <SpecFieldFlagButton
@@ -494,6 +521,8 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                                             value={catData[field.key]}
                                                             onChange={v => setFieldValue(cat.key, field.key, v)}
                                                             inheritedValue={inheritedValue}
+                                                            providedBy={fromPlatform.get(fieldKey) ?? null}
+                                                            suggestions={suggestionsFor(fieldKey)}
                                                         />
                                                     </div>
                                                 );

@@ -15,6 +15,7 @@
  */
 import { REPORTED_RANGE_REASON } from './testedRange';
 import { fmtSpeed, fmtDistance } from './unitConversions';
+import { preconditionedFact } from './runPreconditioning';
 
 /**
  * @typedef {Object} TestReference
@@ -97,6 +98,7 @@ export function chargeTimeTestReference(vehicle, tested, { from, to }, units = '
         facts: [
             ...commonFacts(run, units),
             fact(`${from}→${to}%`, `${Math.round(tested.minutes)} min`),
+            fact('Preconditioned', preconditionedFact(run.preconditioned)),
             fact('Started at', summary.startSoc != null ? `${summary.startSoc}%` : null),
             fact('Peak', summary.peakKw != null ? `${Math.round(summary.peakKw)} kW` : null),
             fact('Session', summary.durationMin != null ? `${Math.round(summary.durationMin)} min` : null),
@@ -125,6 +127,7 @@ export function chargeBestTestReference(vehicle, best, minutes, units = 'imperia
             fact('Date', best.date),
             fact('Source', best.source),
             fact('Temperature', best.temperatureF != null ? temperature(best.temperatureF, units) : null),
+            fact('Preconditioned', preconditionedFact(best.preconditioned)),
             fact('Window', sat),
             fact('Covered', best.spanMin != null ? `${best.spanMin} min — the whole session` : null),
             fact('Started at', best.sessionStartSoc != null ? `${best.sessionStartSoc}%` : null),

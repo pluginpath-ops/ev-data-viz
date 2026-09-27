@@ -12,7 +12,13 @@
  *   'boolean' — Yes / No / blank select
  *   'enum'    — select from a fixed list of options
  *   'text'    — free-text input
+ *
+ * `hint` — optional. What the field means where the label cannot say it: the
+ * vehicle table's column tooltip, and the label's tooltip in View Specs and
+ * the spec editor.
  */
+
+import { CHEMISTRIES, DC_400V_CHARGING } from './platforms';
 
 /**
  * `better: 'lower' | 'higher'` — which way is an improvement, on the rows where
@@ -151,6 +157,59 @@ export const SPEC_CATEGORIES = [
             { key: 'charge_port',                 label: 'Charge Port',                   type: 'enum',
               options: ['NACS', 'CCS1', 'CHAdeMO', 'Type 2'] },
             { key: 'v2l',                         label: 'Vehicle-to-Load (V2L)',          type: 'boolean' },
+            // V2H and V2G are separate answers: a car can power a house through
+            // a bidirectional wallbox without being allowed to export to the grid.
+            { key: 'v2h',                         label: 'Vehicle-to-Home (V2H)',          type: 'boolean' },
+            { key: 'v2g',                         label: 'Vehicle-to-Grid (V2G)',          type: 'boolean' },
+            { key: 'plug_and_charge',             label: 'Plug & Charge',                  type: 'boolean' },
+            // Whether the car can use Superchargers without an adapter or an
+            // account workaround. The charge port alone does not say: a NACS
+            // port arrived before access on some cars, and access before the
+            // port on others.
+            { key: 'native_supercharger_access',  label: 'Native Supercharger Access',     type: 'boolean', tableLabel: 'Supercharger access' },
+            // The VEHICLE's answer (#352). Its electrical platform provides one
+            // (platforms.js PLATFORM_PROVIDES) when this is blank, and a value set
+            // here wins: a Taycan's booster was optional, so the platform's
+            // answer is not every Taycan's. Stored as the label, like every enum.
+            { key: 'dc_400v_charging',            label: '400 V Support',                  type: 'enum',
+              options: DC_400V_CHARGING.map(m => m.label), tableLabel: '400 V support',
+              hint: 'How the car charges from a 400 V DC fast charger, if it can: native (a 400 V pack), a DC booster, motor boost, a split pack, or not at all. It decides whether an 800 V car can use older DC fast chargers, and Tesla Superchargers installed before V4 (mid-2026). Its electrical platform provides it unless the vehicle sets its own.' },
+            // Per vehicle, not provided by the platform: it changed by model
+            // year within one platform (early and later E-GMP).
+            { key: 'max_dc_400v_kw',              label: 'Max DC on 400 V (kW)',           type: 'number', better: 'higher',
+              tableLabel: 'Max DC on 400 V',
+              hint: 'The fastest DC charge rate the car reaches on a 400 V charger, which on an 800 V car is usually well below its peak. It varies by model year on one platform: early E-GMP cars reach about 80 kW and later ones about 150 kW; an early Taycan about 50 kW. Few DC boosters pass 200 kW (the Lucid Gravity is one). A split pack is usually limited by current, to 400–500 A.' },
+            // Per vehicle, never the platform's list: a Mach-E is NMC or LFP, not
+            // both. The platform's chemistries are offered as suggestions in the
+            // spec editor and never fill this in.
+            { key: 'battery_chemistry',           label: 'Battery Chemistry',              type: 'enum',
+              options: CHEMISTRIES, tableLabel: 'Chemistry' },
+            // "None" is an answer — the car cannot warm its battery for a
+            // charging stop — and blank is "not recorded". The two must never
+            // be collapsed, so None is an option and not the empty value.
+            { key: 'preconditioning',             label: 'Battery Preconditioning',        type: 'enum',
+              options: ['None', 'Manual', 'Automatic (nav-triggered)', 'Both'], tableLabel: 'Preconditioning' },
+            { key: 'heat_pump',                   label: 'Heat Pump',                      type: 'boolean' },
+        ],
+    },
+    {
+        key: 'towing',
+        label: 'Towing & Payload',
+        fields: [
+            { key: 'towing_capacity_lbs', label: 'Towing Capacity', type: 'number', better: 'higher', unitGroup: 'weight' },
+            { key: 'payload_lbs',         label: 'Payload',         type: 'number', better: 'higher', unitGroup: 'weight' },
+        ],
+    },
+    {
+        // Years and miles each, because a warranty ends at whichever comes
+        // first and the two do not rank the same way across makers.
+        key: 'warranty',
+        label: 'Warranty',
+        fields: [
+            { key: 'battery_years', label: 'Battery Warranty (years)', type: 'integer', better: 'higher', tableLabel: 'Battery warranty' },
+            { key: 'battery_miles', label: 'Battery Warranty Distance', type: 'integer', better: 'higher', unitGroup: 'distance', tableLabel: 'Battery warranty distance' },
+            { key: 'basic_years',   label: 'Basic Warranty (years)',   type: 'integer', better: 'higher', tableLabel: 'Basic warranty' },
+            { key: 'basic_miles',   label: 'Basic Warranty Distance',  type: 'integer', better: 'higher', unitGroup: 'distance', tableLabel: 'Basic warranty distance' },
         ],
     },
     {

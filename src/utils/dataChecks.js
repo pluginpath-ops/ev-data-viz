@@ -48,7 +48,7 @@
  * Pure module: no data access, no React.
  */
 
-import { resolveEffectiveSpecs, mergeInheritedSpecs, vehicleLabel } from './specHelpers';
+import { specProvenance, vehicleLabel } from './specHelpers';
 import { epaConfigurationFigures, primaryEpaMapping } from './epaConfiguration';
 // The same agreement test the capacity resolver uses, so a vehicle Data Checks
 // passes is one whose EPA tested the calculations actually use.
@@ -56,6 +56,7 @@ import { testedAgreement } from './vehicleFigures';
 import { labelRangeCheck } from './labelRangeCheck';
 import { sameSource } from './sources';
 import { deriveTested } from './performanceDerivations';
+import { resolveVoltageClass } from './platforms';
 import {
     LABEL_RANGE_TOLERANCE_PCT, LABEL_SPREAD_PCT,
     TESTED_CAPACITY_TOLERANCE_PCT, TESTED_SPREAD_PCT, PACK_BUFFER_PCT_BAND,
@@ -89,6 +90,8 @@ export const DATA_CHECKS = [
     { key: 'test-weight-offset', figure: 'weight',      kind: 'disagrees', label: 'Curb weight does not fit EPA test weight' },
     { key: 'drive-vs-epa',       figure: 'drive',       kind: 'disagrees', label: 'Drive type disagrees with EPA' },
     { key: 'voltage-vs-epa',     figure: 'voltage',     kind: 'disagrees', label: 'Voltage does not fit EPA pack voltage' },
+    { key: 'no-400v-support',    figure: 'voltage',     kind: 'gap',       label: '400 V class, no 400 V support' },
+    { key: 'native-on-800v',     figure: 'voltage',     kind: 'disagrees', label: '800 V class says Native on 400 V' },
     { key: 'claimed-060-quicker', figure: 'performance', kind: 'disagrees', label: 'Claimed 0–60 quicker than tested' },
 ];
 
@@ -214,17 +217,16 @@ function primaryFindings(links) {
  * a mistyped value on the vehicle itself.
  */
 function specContext(vehicle, vehicles) {
-    const parent = vehicle.spec_source_vehicle_id
-        ? vehicles.find(v => v.id === vehicle.spec_source_vehicle_id)
-        : null;
-    if (!parent) return { specs: vehicle.specs ?? {}, inherited: new Set(), parentName: null };
-    const { merged, inheritedKeys } = mergeInheritedSpecs(vehicle.specs, resolveEffectiveSpecs(parent, vehicles));
-    return { specs: merged, inherited: inheritedKeys, parentName: vehicleLabel(parent) };
+    const { specs, source, inheritedKeys, fromPlatform } = specProvenance(vehicle, vehicles);
+    return { specs, inherited: inheritedKeys, fromPlatform, parentName: source ? vehicleLabel(source) : null };
 }
 
 const specValue = (ctx, category, field) => ctx.specs?.[category]?.[field] ?? null;
-const inheritedNote = (ctx, category, field) =>
-    ctx.inherited.has(`${category}.${field}`) ? ` (inherited from ${ctx.parentName})` : '';
+const inheritedNote = (ctx, category, field) => {
+    const key = `${category}.${field}`;
+    if (ctx.inherited.has(key)) return ` (inherited from ${ctx.parentName})`;
+    return ctx.fromPlatform?.has(key) ? ` (from ${ctx.fromPlatform.get(key).name})` : '';
+};
 
 // ── The checks ──────────────────────────────────────────────────────────────
 
@@ -419,6 +421,34 @@ function voltageFindings(links, ctx, limits) {
 }
 
 /**
+ * 400 V support against the vehicle's voltage class (#352).
+ *
+ * A 400 V class pack charges natively from a 400 V charger, so a 400 V car
+ * with nothing recorded is a gap with one obvious answer — the fix writes
+ * Native. The reverse, an 800 V class car saying Native, is a disagreement,
+ * and the likeliest way to get one is a variant inheriting Native from a 400 V
+ * source. The class is the one the vehicle table shows: the electrical
+ * platform's, else worked out from the nominal voltage.
+ */
+function dc400Findings(vehicle, ctx) {
+    const cls = resolveVoltageClass(vehicle.platforms?.electrical, specValue(ctx, 'charging', 'battery_nominal_voltage_v'));
+    if (!cls) return [];
+    const support = specValue(ctx, 'charging', 'dc_400v_charging');
+    const basis = cls.basis === 'platform' ? `from ${cls.platform.name}` : `from ${Math.round(cls.nominalV)} V nominal`;
+    if (cls.v === 400 && support == null) {
+        return [finding('no-400v-support',
+            `400 V class (${basis}), and nothing records its 400 V support. A 400 V pack charges natively.`,
+            { voltageClass: cls.v })];
+    }
+    if (cls.v === 800 && support === 'Native') {
+        return [finding('native-on-800v',
+            `800 V class (${basis}), but its 400 V support says Native${inheritedNote(ctx, 'charging', 'dc_400v_charging')}.`,
+            { voltageClass: cls.v, support })];
+    }
+    return [];
+}
+
+/**
  * A manufacturer's claim quicker than anyone measured.
  *
  * Claims carry no rollout convention, so the claim is held against the QUICKER
@@ -525,6 +555,7 @@ export function runDataChecks(vehicles = [], {
                 ...weightFindings(links, ctx, limits),
                 ...driveFindings(links, ctx),
                 ...voltageFindings(links, ctx, limits),
+                ...dc400Findings(vehicle, ctx),
                 ...performanceFindings(ctx, perf, limits),
             ], skipsByKey);
             const open = findings.filter(f => !f.skipped);

@@ -4,8 +4,8 @@ import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
 import { KNOB_GROUPS } from '../../constants/knobs';
 import { setOverride } from '../../constants/overrides';
-import { vehicleLabel, resolveEffectiveSpecs } from '../../utils/specHelpers';
-import { columnMoves, checkFields, withSpecValues, epaSectionHref, EPA_SECTION_CHECKS } from '../../utils/dataCheckFixes';
+import { vehicleLabel, fallbackSpecs } from '../../utils/specHelpers';
+import { columnMoves, checkFields, withSpecValues, epaSectionHref, EPA_SECTION_CHECKS, nativeFillPlan } from '../../utils/dataCheckFixes';
 import { SpecField } from '../EditSpecsForm';
 import PrimaryConfigurationPicker from '../epa/PrimaryConfigurationPicker';
 import {
@@ -95,7 +95,7 @@ function Tally({ row }) {
  * moves a control a curator is about to click. The caller keys this by the
  * stored value, so a save from elsewhere resets the draft.
  */
-function FixField({ vehicle, category, field, def, inheritedValue, onSave }) {
+function FixField({ vehicle, category, field, def, inheritedValue, providedBy, onSave }) {
     const own = vehicle.specs?.[category]?.[field] ?? null;
     const [draft, setDraft] = useState(own);
     const [saving, setSaving] = useState(false);
@@ -108,7 +108,7 @@ function FixField({ vehicle, category, field, def, inheritedValue, onSave }) {
     return (
         <span className="data-check-fix-field">
             <span className="text-note">{def.label}</span>
-            <SpecField field={def} value={draft} onChange={setDraft} inheritedValue={inheritedValue} />
+            <SpecField field={def} value={draft} onChange={setDraft} inheritedValue={inheritedValue} providedBy={providedBy} />
             <button type="button" className="btn btn-secondary text-sm" disabled={!dirty || saving} onClick={save}>
                 {saving ? 'Saving…' : 'Save'}
             </button>
@@ -129,9 +129,10 @@ function FindingFixes({ finding: f, vehicle, fleet, onMove, onSaveSpec, onChoose
     const choosePrimary = f.check === 'no-primary';
     if (!moves.length && !fields.length && !toEpa && !choosePrimary) return null;
 
-    // The parent's values, shown as the hint an empty own field inherits.
-    const parent = vehicle.spec_source_vehicle_id ? fleet.find(v => v.id === vehicle.spec_source_vehicle_id) : null;
-    const inherited = fields.length && parent ? resolveEffectiveSpecs(parent, fleet) : null;
+    // What an empty own field shows — the source vehicle's value, else the
+    // platform's (#352) — as its hint.
+    const fallback = fields.length ? fallbackSpecs(vehicle, fleet) : null;
+    const inherited = fallback?.specs ?? null;
 
     const move = async (m) => {
         setBusy(true);
@@ -154,6 +155,7 @@ function FindingFixes({ finding: f, vehicle, fleet, onMove, onSaveSpec, onChoose
                     field={field}
                     def={def}
                     inheritedValue={inherited?.[category]?.[field] ?? null}
+                    providedBy={fallback?.fromPlatform.get(`${category}.${field}`) ?? null}
                     onSave={(cat, values) => onSaveSpec(vehicle, cat, values)}
                 />
             ))}
@@ -479,7 +481,8 @@ export default function DataChecksPanel() {
 
     /**
      * A move out of vehicles.battery or vehicles.range: the spec first, the
-     * column only once the spec is saved. The context reports a failed write
+     * column only once the spec is saved. A fill (Native 400 V support) writes
+     * the spec and clears nothing. The context reports a failed write
      * itself and returns false, so a refused spec leaves the column — until then
      * the only copy of the value — untouched.
      */
@@ -488,7 +491,22 @@ export default function DataChecksPanel() {
             const ok = await updateVehicleSpecs(vehicle.id, withSpecValues(vehicle.specs, move.spec.category, move.spec.values));
             if (!ok) return;
         }
-        await updateVehicle(vehicle.id, { [move.clear]: null });
+        if (move.clear) await updateVehicle(vehicle.id, { [move.clear]: null });
+    };
+
+    // "Fill all" for 400 V support (#352): Native on every 400 V class vehicle
+    // with nothing recorded, one write each, sources before the variants that
+    // would inherit it (nativeFillPlan). Stops at the first refused write.
+    const fillPlan = useMemo(() => nativeFillPlan(rows), [rows]);
+    const [filling, setFilling] = useState(false);
+    const fillAllNative = async () => {
+        setFilling(true);
+        setWriteError(null);
+        for (const v of fillPlan) {
+            const ok = await updateVehicleSpecs(v.id, withSpecValues(v.specs, 'charging', { dc_400v_charging: 'Native' }));
+            if (!ok) { setWriteError(`Stopped at ${vehicleLabel(v)}: its write was refused.`); break; }
+        }
+        setFilling(false);
     };
     const saveSpec = (vehicle, category, values) =>
         updateVehicleSpecs(vehicle.id, withSpecValues(vehicle.specs, category, values));
@@ -542,7 +560,8 @@ export default function DataChecksPanel() {
             <p className="text-note mb-4">
                 Every vehicle against its own sources: range against its EPA labels, the
                 manufacturer’s Usable and Gross against EPA tested, curb weight against EPA test
-                weight, drive type and voltage against EPA, and claimed against tested 0–60. A
+                weight, drive type and voltage against EPA, 400 V support against the voltage class,
+                and claimed against tested 0–60. A
                 vehicle is judged against its primary EPA configuration; with several and none
                 chosen, it disagrees only when none of them agrees. Fix a finding from under it —
                 sort a typed battery or range into the field that says what it is, edit the spec it
@@ -631,6 +650,26 @@ export default function DataChecksPanel() {
                     </div>
                 ))}
             </div>
+
+            {/* Shown whenever there is something to fill, filtered or not: behind
+                the filter chip nobody found it. Above the list, which is long. */}
+            {fillPlan.length > 0 && (
+                <div className="note-panel is-info mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <span>
+                        400 V support: {plural(fillPlan.length, 'vehicle')} {fillPlan.length === 1 ? 'is' : 'are'} 400 V
+                        class with nothing recorded. Fill all records Native on each; a variant whose source is
+                        among them inherits it rather than getting its own copy.
+                    </span>
+                    <span className="flex items-center gap-2">
+                        <button type="button" className="btn btn-secondary text-sm" onClick={() => setOnly('no-400v-support')}>
+                            Show them
+                        </button>
+                        <button type="button" className="btn btn-primary text-sm" disabled={filling} onClick={fillAllNative}>
+                            {filling ? 'Filling…' : `Fill all ${fillPlan.length}`}
+                        </button>
+                    </span>
+                </div>
+            )}
 
             <div className="flex flex-wrap items-center gap-3 mb-2">
                 <input

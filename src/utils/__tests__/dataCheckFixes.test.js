@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { columnMoves, checkFields, withSpecValues, epaSectionHref, EPA_SECTION_CHECKS } from '../dataCheckFixes';
+import { columnMoves, checkFields, withSpecValues, epaSectionHref, EPA_SECTION_CHECKS, nativeFillPlan } from '../dataCheckFixes';
 import { DATA_CHECKS } from '../dataChecks';
 
 const CHECK_KEYS = new Set(DATA_CHECKS.map(c => c.key));
@@ -71,5 +71,26 @@ describe('the EPA section', () => {
 
     it('addresses a vehicle the way App.jsx restores it', () => {
         expect(epaSectionHref(52)).toBe('?tab=runs&vid=52&sub=epa');
+    });
+});
+
+describe('400 V support fixes (#352)', () => {
+    it('offers Native in one click, clearing no column', () => {
+        const [m] = columnMoves({ check: 'no-400v-support', evidence: { voltageClass: 400 } });
+        expect(m).toMatchObject({ spec: { category: 'charging', values: { dc_400v_charging: 'Native' } }, clear: null });
+        expect(checkFields('native-on-800v').map(f => f.def.label)).toEqual(['400 V Support']);
+    });
+
+    it('fills a source and lets its variants inherit, skipping skipped findings', () => {
+        const gap = (skipped = false) => [{ check: 'no-400v-support', skipped }];
+        const rows = [
+            { vehicle: { id: 1 }, findings: gap() },
+            { vehicle: { id: 2, spec_source_vehicle_id: 1 }, findings: gap() },   // inherits from 1
+            { vehicle: { id: 3, spec_source_vehicle_id: 2 }, findings: gap() },   // and further down
+            { vehicle: { id: 4, spec_source_vehicle_id: 9 }, findings: gap() },   // source not being filled
+            { vehicle: { id: 5 }, findings: gap(true) },
+            { vehicle: { id: 9 }, findings: [] },
+        ];
+        expect(nativeFillPlan(rows).map(v => v.id)).toEqual([1, 4]);
     });
 });

@@ -648,7 +648,7 @@ describe('the seams that broke before', () => {
     it('lets a variant inherit color, photo and tags by pointer, and keeps editors on own values', () => {
         // Resolved where the figures are, so every reader of the fleet sees it.
         const ctx = read('src/context/AppContext.jsx');
-        expect(ctx).toMatch(/withVehicleFigures\(withInheritance\(shown\)\)/);
+        expect(ctx).toMatch(/withVehicleFigures\(withPlatforms\(withInheritance\(shown\), platformsById\)\)/);
         expect(ctx, 'createVariant must link every run the source shows').toMatch(/dataService\.createVariant\(source, variantLinkPlan\(source\)\)/);
 
         // Editors read own values. A form seeded from the resolved ones saves
@@ -710,6 +710,60 @@ describe('the seams that broke before', () => {
         expect(read('src/components/VehiclesView.jsx')).toMatch(/<PlatformLine vehicle=\{vehicle\} \/>/);
         expect(read('src/components/ViewSpecsModal.jsx')).toMatch(/<PlatformFacts vehicle=\{liveVehicle\} \/>/);
         expect(read('src/components/VehicleTable.jsx')).toMatch(/buildVehicleRows\(vehicles, \{[^}]*platformsById/);
+    });
+
+    it('carries the #352 spec fields to a column, the importer and View Specs', async () => {
+        // The schema is the single source, so a field reaches each place for
+        // free — as long as each place still derives from it. This pins both.
+        const { SPEC_CATEGORIES } = await import('../utils/vehicleSpecSchema');
+        const { vehicleColumnByKey } = await import('../utils/vehicleTable');
+        const { resolveColumn } = await import('../utils/parseVehicleImport');
+        const added = [
+            'charging.v2h', 'charging.v2g', 'charging.plug_and_charge', 'charging.native_supercharger_access',
+            'charging.dc_400v_charging', 'charging.max_dc_400v_kw', 'charging.battery_chemistry', 'charging.preconditioning', 'charging.heat_pump',
+            'towing.towing_capacity_lbs', 'towing.payload_lbs',
+            'warranty.battery_years', 'warranty.battery_miles', 'warranty.basic_years', 'warranty.basic_miles',
+        ];
+        for (const key of added) {
+            const [cat, field] = key.split('.');
+            const def = SPEC_CATEGORIES.find(c => c.key === cat)?.fields.find(f => f.key === field);
+            expect(def, `${key} is in the schema`).toBeTruthy();
+            expect(vehicleColumnByKey(key), `${key} is a vehicle-table column`).toBeTruthy();
+            expect(resolveColumn(key), `${key} imports by its key`).toMatchObject({ kind: 'spec', catKey: cat, fieldKey: field });
+            expect(resolveColumn(def.label), `${key} imports by its label`).toMatchObject({ kind: 'spec', catKey: cat, fieldKey: field });
+        }
+        expect(vehicleColumnByKey('charging.dc_400v_charging').hint, 'a schema hint is the column tooltip')
+            .toMatch(/Superchargers installed before V4/);
+        expect(read('src/components/VehicleSpecsDisplay.jsx'), 'View Specs shows the hint on the label').toMatch(/title=\{row\.hint/);
+        expect(read('src/components/EditSpecsForm.jsx'), 'so does the spec editor').toMatch(/title=\{field\.hint\}/);
+        expect(read('src/components/VehicleSpecsDisplay.jsx'), 'View Specs must render every schema field')
+            .toMatch(/SPEC_CATEGORIES\.filter/);
+    });
+
+    it('marks a value a platform provided wherever an inherited spec is marked (#352)', () => {
+        // Resolved once, own → source → platform, and every reader of the
+        // provenance marks the platform's values as its own kind of basis.
+        const helpers = read('src/utils/specHelpers.js');
+        expect(helpers).toMatch(/platformProvides\(vehicle\?\.platforms\)/);
+        expect(read('src/components/ViewSpecsModal.jsx')).toMatch(/fromPlatform=\{fromPlatform\}/);
+        expect(read('src/components/VehicleSpecsDisplay.jsx')).toMatch(/fromPlatform\?\.get\(/);
+        expect(read('src/utils/vehicleTable.js')).toMatch(/notes\[col\.key\] = `from \$\{platform\.name\}`/);
+        const editor = read('src/components/EditSpecsForm.jsx');
+        expect(editor, 'the editor\'s hints must name the platform').toMatch(/providedBy=\{fromPlatform\.get\(fieldKey\)/);
+        expect(editor, 'a platform\'s chemistries are offered, never filled in').toMatch(/chemistrySuggestions\(electrical\)/);
+        expect(read('src/components/admin/DataChecksPanel.jsx')).toMatch(/providedBy=\{fallback\?\.fromPlatform/);
+    });
+
+    it('carries a charging test\'s preconditioning from the database to the table and the peek (#352)', () => {
+        expect(read('supabase/migrations/073_run_preconditioned.sql')).toMatch(/ADD COLUMN IF NOT EXISTS preconditioned boolean/);
+        const ds = read('src/services/DataService.js');
+        expect(ds, 'written on add').toMatch(/preconditioned: toPreconditioned\(run\.preconditioned\)/);
+        expect(ds, 'written on edit').toMatch(/preconditioned: toPreconditioned\(updates\.preconditioned\)/);
+        expect(read('src/context/AppContext.jsx')).toMatch(/case 'preconditioned':/);
+        expect(read('src/components/RunsView.jsx').match(/<PreconditionedSelect/g)).toHaveLength(2);   // add and edit
+        expect(read('src/utils/chargeWindows.js')).toMatch(/preconditioned: run\.preconditioned/);
+        expect(read('src/utils/vehicleTable.js')).toMatch(/preconditionedNote\(tested\.run\.preconditioned\)/);
+        expect(read('src/utils/testDetails.js')).toMatch(/fact\('Preconditioned'/);
     });
 
     it('links a tested figure to its test, and lands on it', () => {

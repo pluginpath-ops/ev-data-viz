@@ -3,6 +3,8 @@ import { ownValues } from '../utils/vehicleInheritance';
 import { useState, useMemo, useEffect, Fragment } from 'react';
 import { EMPTY_VEHICLE_FORM, vehicleFormFrom } from '../utils/vehicleForm';
 import { useAppContext } from '../context/AppContext';
+import PreconditionedSelect from './PreconditionedSelect';
+import { toPreconditioned, preconditionedFormValue } from '../utils/runPreconditioning';
 import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
@@ -474,6 +476,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         chargeEnergyKwh: '',
         temperatureF: '',
         speedBasis: '',
+        preconditioned: '',
         altitudeFt: '',
         elevationGainFt: '',
         windSpeedMph: '',
@@ -561,7 +564,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
+        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', preconditioned: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: null });
@@ -851,6 +854,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             chargeEnergyKwh: run.charge_energy_kwh ?? '',
             temperatureF: run.temperature_f ?? '',
             speedBasis: run.speed_basis ?? '',
+            preconditioned: preconditionedFormValue(run.preconditioned),
             altitudeFt: run.altitude_ft ?? '',
             elevationGainFt: run.elevation_gain_ft ?? '',
             windSpeedMph: run.avg_wind_speed_mph ?? '',
@@ -864,9 +868,13 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setSavingData(true);
         try {
             // Convert dataFlags → boolean columns and drop the flags field
-            const { dataFlags, ...formRest } = editFormData;
+            const { dataFlags, preconditioned, ...formRest } = editFormData;
+            // Sent only when it changed, so saving any other field never names
+            // a column an unmigrated database lacks (migration 073).
+            const stored = vehicle.runs?.find(r => r.id === runId)?.preconditioned ?? null;
             await onUpdateRun(runId, {
                 ...formRest,
+                ...(toPreconditioned(preconditioned) !== stored ? { preconditioned } : {}),
                 kind: dataFlags.includes('range') ? 'range' : 'charging',
                 calculated_fields: editCalculatedFields,
             });
@@ -1534,6 +1542,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 <p className="text-xs text-meta mt-1">
                                                     Energy measured at charger or vehicle — <em>energy in</em>
                                                 </p>
+                                                <PreconditionedSelect
+                                                    value={runMetadata.preconditioned}
+                                                    onChange={v => setRunMetadata({ ...runMetadata, preconditioned: v })}
+                                                />
                                             </div>
                                         )}
 
@@ -2105,6 +2117,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             <p className="text-xs text-meta mt-1">
                                                 Energy measured at charger or vehicle — <em>energy in</em> (not equal to energy used driving due to charging losses)
                                             </p>
+                                            <PreconditionedSelect
+                                                value={editFormData.preconditioned}
+                                                onChange={v => setEditFormData({ ...editFormData, preconditioned: v })}
+                                            />
                                         </div>
                                     )}
                                 </div>

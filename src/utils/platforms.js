@@ -11,9 +11,11 @@
  * `electrical_platform_id`, migration 072), and a platform is its own row, so
  * what is true of it is said once.
  *
- * Section 1 of #318 holds and shows the data. Suggesting spec links between
- * cars on one platform, grouping by platform, and reading the electrical
- * platform when comparing charging curves come later.
+ * Section 1 of #318 holds and shows the data; section 2 (#352) makes the
+ * platform the last fallback for a vehicle's specs (`PLATFORM_PROVIDES`).
+ * Suggesting spec links between cars on one platform, grouping by platform,
+ * and reading the electrical platform when comparing charging curves come
+ * later.
  *
  * Pure module: no data access, no React.
  */
@@ -145,14 +147,87 @@ export function resolveVoltageClass(electrical, nominalV) {
     return { v: n < VOLTAGE_CLASS_SPLIT_V ? 400 : 800, basis: 'nominal', nominalV: n };
 }
 
+// ── What a platform provides (#352) ─────────────────────────────────────────
+
 /**
- * How a vehicle takes DC from a 400 V charger: its electrical platform's
- * answer, inherited. A per-vehicle override (a Taycan's booster was optional)
- * arrives with the spec fields, section 2 of #318.
+ * The vehicle spec fields a platform provides, and from which property.
  *
- * @returns {{ key: string, label: string, note: string, platform: Object } | null}
+ * Spec resolution is the vehicle's own value, then its source vehicle's
+ * (`spec_source_vehicle_id`), then its platform's (specHelpers.js
+ * `specProvenance`). A platform PROVIDES a vehicle's values and never stands
+ * in for them: what it supplies lands on the vehicle's own spec field, is
+ * overridden by setting that field, and is marked "from <platform>" wherever
+ * it is shown.
+ *
+ * Only what is true of every vehicle on the platform belongs here:
+ *
+ *   400 V support        the electrical platform's method, as the spec's label.
+ *                        A vehicle that differs (a Taycan's booster was
+ *                        optional) sets its own.
+ *
+ * Deliberately NOT provided:
+ *
+ *   max DC on 400 V      the rate changed by model year within one platform
+ *                        (early E-GMP about 80 kW, later about 150 kW), so it is
+ *                        the vehicle's alone.
+ *   voltage class        not a spec field. It stays the vehicle's resolved
+ *                        figure (`resolveVoltageClass`): the platform's class,
+ *                        else worked out from the nominal voltage.
+ *   chemistries          the platform's POSSIBLE set. A Mach-E is NMC or LFP,
+ *                        not both, so the list is offered as suggestions for
+ *                        the vehicle's chemistry (`chemistrySuggestions`) and
+ *                        never fills it in.
+ *   anything mechanical  twins on one structure still differ in every
+ *                        dimension the schema records — the Ioniq 5, EV6 and
+ *                        Ioniq 6 share E-GMP and not one length, width, height
+ *                        or wheelbase. What twins share is said by linking specs
+ *                        to a source vehicle, which already inherits field by
+ *                        field.
  */
-export function resolveDc400Charging(electrical) {
-    const method = DC_400V_CHARGING.find(m => m.key === electrical?.dc_400v_charging);
-    return method ? { ...method, platform: electrical } : null;
+export const PLATFORM_PROVIDES = [
+    {
+        spec: 'charging.dc_400v_charging',
+        kind: 'electrical',
+        value: (p) => DC_400V_CHARGING.find(m => m.key === p?.dc_400v_charging)?.label ?? null,
+    },
+];
+
+/**
+ * The spec values a vehicle's platforms provide, shaped like `vehicle.specs`,
+ * with the platform behind each.
+ *
+ * @param {{ mechanical?: Object|null, electrical?: Object|null }} [platforms]
+ * @returns {{ specs: Object, from: Map<string, Object> }}  `from` maps a
+ *          "category.field" key to the platform that provided it
+ */
+export function platformProvides(platforms) {
+    const specs = {};
+    const from = new Map();
+    for (const { spec, kind, value } of PLATFORM_PROVIDES) {
+        const platform = platforms?.[kind];
+        const v = platform ? value(platform) : null;
+        if (v == null || v === '') continue;
+        const [cat, field] = spec.split('.');
+        specs[cat] = { ...(specs[cat] ?? {}), [field]: v };
+        from.set(spec, platform);
+    }
+    return { specs, from };
+}
+
+/**
+ * The fleet with each vehicle's platform rows attached as `platforms`
+ * ({ mechanical, electrical }), from its resolved links — so spec resolution
+ * can read what the platform provides without being handed the platform list.
+ * Run after `withInheritance`, which resolves a variant's links.
+ */
+export function withPlatforms(vehicles = [], byId) {
+    return vehicles.map(v => ({ ...v, platforms: vehiclePlatforms(v, byId) }));
+}
+
+/**
+ * Chemistries to offer for a vehicle's battery chemistry: its electrical
+ * platform's possible set. Suggestions only — never a value (see above).
+ */
+export function chemistrySuggestions(electrical) {
+    return (electrical?.chemistries ?? []).filter(c => CHEMISTRIES.includes(c));
 }

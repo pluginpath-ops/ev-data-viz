@@ -1,11 +1,14 @@
 /**
- * Platforms (#318), section 1: holding and showing what a vehicle is built on.
+ * Platforms (#318), section 1: holding and showing what a vehicle is built on;
+ * section 2 (#352): the platform as the last fallback for a vehicle's specs.
  */
 import { describe, it, expect } from 'vitest';
 import {
     matchPlatform, electricalSummary, platformGroups, vehiclePlatforms, platformLineText,
-    resolveVoltageClass, resolveDc400Charging,
+    resolveVoltageClass, platformProvides, withPlatforms, chemistrySuggestions,
 } from '../platforms';
+import { specProvenance, resolveEffectiveSpecs, fallbackSpecs } from '../specHelpers';
+import { SPEC_CATEGORIES } from '../vehicleSpecSchema';
 import { parseVehicleImportText } from '../parseVehicleImport';
 import { buildImportPlan, selectPlanRows } from '../vehicleImportPlan';
 import { vehicleFormFrom } from '../vehicleForm';
@@ -76,10 +79,10 @@ describe('a vehicle and its platforms', () => {
         const [own, variant] = buildVehicleRows(fleet, { platformsById: byId });
         expect(own.values).toMatchObject({
             'platform.mechanical': 'E-GMP', 'platform.electrical': 'E-GMP 800 V',
-            'figures.voltageClass': 800, 'figures.dc400Charging': 'Motor boost',
+            'figures.voltageClass': 800, 'charging.dc_400v_charging': 'Motor boost',
         });
         expect(own.notes['figures.voltageClass']).toBe('from E-GMP 800 V');
-        expect(own.notes['figures.dc400Charging']).toBe('from E-GMP 800 V');
+        expect(own.notes['charging.dc_400v_charging']).toBe('from E-GMP 800 V');
         expect(own.notes['platform.electrical']).toBeUndefined();
         expect(variant.notes['platform.electrical']).toBe('from Ioniq 5');
         expect(vehicleColumnByKey('figures.voltageClass').bar).toBeFalsy();   // 800 V is not "better"
@@ -97,10 +100,82 @@ describe('voltage class and 400 V charging, per vehicle', () => {
         expect(resolveVoltageClass(null, '')).toBeNull();
     });
 
-    it('inherits the 400 V charging method from the electrical platform, naming it', () => {
-        expect(resolveDc400Charging(P[1])).toMatchObject({ key: 'motor-boost', label: 'Motor boost', platform: P[1] });
-        expect(resolveDc400Charging(P[0])).toBeNull();   // mechanical: nothing to say
-        expect(resolveDc400Charging(null)).toBeNull();
+    it('provides the 400 V charging method from the electrical platform, naming it', () => {
+        const { specs, from } = platformProvides({ mechanical: P[0], electrical: P[1] });
+        expect(specs).toEqual({ charging: { dc_400v_charging: 'Motor boost' } });
+        expect(from.get('charging.dc_400v_charging')).toBe(P[1]);
+        // A mechanical platform provides nothing; neither does no platform.
+        expect(platformProvides({ mechanical: P[0], electrical: null }).specs).toEqual({});
+        expect(platformProvides(undefined).specs).toEqual({});
+    });
+
+    it('stores what it provides as the spec field\'s own option', () => {
+        const field = SPEC_CATEGORIES.find(c => c.key === 'charging').fields.find(f => f.key === 'dc_400v_charging');
+        expect(field.options).toContain(platformProvides({ electrical: P[1] }).specs.charging.dc_400v_charging);
+        expect(field.options).toContain(platformProvides({ electrical: P[3] }).specs.charging.dc_400v_charging);
+    });
+});
+
+describe('the platform as the last fallback (#352)', () => {
+    const fleet = (...vs) => withPlatforms(withInheritance(vs.map(v => ({ tags: [], specs: {}, ...v }))), byId);
+
+    it('resolves own, then the source vehicle, then the platform', () => {
+        const [taycan, withOwn, variant] = fleet(
+            { id: 20, name: 'Taycan', electrical_platform_id: 2 },
+            { id: 21, name: 'Taycan (no booster)', electrical_platform_id: 2, specs: { charging: { dc_400v_charging: 'Not possible' } } },
+            { id: 22, name: 'Taycan 4S', spec_source_vehicle_id: 21 },
+        );
+        const all = [taycan, withOwn, variant];
+
+        const bare = specProvenance(taycan, all);
+        expect(bare.specs.charging.dc_400v_charging).toBe('Motor boost');
+        expect(bare.fromPlatform.get('charging.dc_400v_charging')).toBe(P[1]);
+        expect(bare.inheritedKeys.size).toBe(0);
+
+        // The vehicle's own value wins, and is not marked as the platform's.
+        const own = specProvenance(withOwn, all);
+        expect(own.specs.charging.dc_400v_charging).toBe('Not possible');
+        expect(own.fromPlatform.size).toBe(0);
+
+        // The source vehicle's value comes before the platform's, marked as inherited.
+        const inherited = specProvenance(variant, all);
+        expect(inherited.specs.charging.dc_400v_charging).toBe('Not possible');
+        expect(inherited.inheritedKeys.has('charging.dc_400v_charging')).toBe(true);
+        expect(inherited.fromPlatform.size).toBe(0);
+        expect(resolveEffectiveSpecs(variant, all).charging.dc_400v_charging).toBe('Not possible');
+    });
+
+    it('takes the platform of the vehicle resolved, never its source\'s', () => {
+        // The 2025 R1 kept the structure and changed the electrics: what the
+        // old electrical platform provided must not come down the chain.
+        const [older, newer] = fleet(
+            { id: 30, name: 'R1S 2024', mechanical_platform_id: 3, electrical_platform_id: 2 },
+            { id: 31, name: 'R1S 2025', spec_source_vehicle_id: 30, electrical_platform_id: 4 },
+        );
+        const prov = specProvenance(newer, [older, newer]);
+        expect(prov.specs.charging.dc_400v_charging).toBe('Native');
+        expect(prov.fromPlatform.get('charging.dc_400v_charging')).toBe(P[3]);
+    });
+
+    it('offers what a blank field would show, and whose, for the editor\'s hints', () => {
+        const [car] = fleet({ id: 40, name: 'Ioniq 5', electrical_platform_id: 2 });
+        const { specs, fromPlatform } = fallbackSpecs(car, [car]);
+        expect(specs.charging.dc_400v_charging).toBe('Motor boost');
+        expect(fromPlatform.get('charging.dc_400v_charging').name).toBe('E-GMP 800 V');
+    });
+
+    it('resolves through the chain alone for a vehicle with no platform rows attached', () => {
+        const v = { id: 50, specs: { charging: { max_dc_kw: 250 } } };
+        expect(specProvenance(v, [v]).specs.charging.max_dc_kw).toBe(250);
+        expect(specProvenance(v, [v]).fromPlatform.size).toBe(0);
+    });
+
+    it('offers a platform\'s chemistries as suggestions and never as a value', () => {
+        const mache = { id: 7, kind: 'electrical', name: 'GE1', chemistries: ['NMC', 'LFP', 'Unobtainium'] };
+        expect(chemistrySuggestions(mache)).toEqual(['NMC', 'LFP']);
+        expect(chemistrySuggestions(null)).toEqual([]);
+        const [car] = withPlatforms([{ id: 60, specs: {}, electrical_platform_id: 7 }], new Map([[7, mache]]));
+        expect(resolveEffectiveSpecs(car, [car]).charging.battery_chemistry).toBeNull();
     });
 });
 

@@ -333,6 +333,14 @@ describe('assumptions (#335)', () => {
     });
 });
 
+describe('a renamed column (#352)', () => {
+    it('keeps an old link\'s 400 V charging column under its new key', () => {
+        const d = decodeVehicleTableParams('vt_cols=name,figures.dc400Charging&vt_sort=figures.dc400Charging');
+        expect(d.columns).toEqual(['name', 'charging.dc_400v_charging']);
+        expect(d.sortKey).toBe('charging.dc_400v_charging');
+    });
+});
+
 describe('tested charging columns (#346)', () => {
     const best = { kw: 187.4, startSoc: 9, endSoc: 48, temperatureF: 41, timeDerived: true };
     it('reads the vehicle\'s best window, with where it sat and how warm it was beneath', () => {
@@ -467,6 +475,14 @@ describe('the charge window (#335)', () => {
         const spec = row(car([]));
         expect(spec.tests[W]).toBeNull();
         expect(spec.tests['calc.rangePerChargeMin']).toBeNull();
+    });
+
+    it('says beneath a tested charge time whether the battery was preconditioned (#352)', () => {
+        expect(row(car([session(21, { preconditioned: true })])).notes[W]).toBe('Out of Spec · 50°F · preconditioned');
+        expect(row(car([session(21, { preconditioned: false })])).notes[W]).toBe('Out of Spec · 50°F · not preconditioned');
+        expect(row(car([session(21, { preconditioned: null })])).notes[W]).toBe('Out of Spec · 50°F');
+        const [best] = buildVehicleRows([vehicle({ chargeBest: { 15: { kw: 150, startSoc: 10, endSoc: 52, preconditioned: false } } })]);
+        expect(best.notes['tested.charge_best_15min_kw']).toBe('10→52% · not preconditioned');
     });
 
     it('falls back to the spec at 10→80%, and says so', () => {

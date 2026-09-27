@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import VehicleSpecsDisplay from './VehicleSpecsDisplay';
 import { SpecVouchButton } from './VoteButtons';
-import { mergeInheritedSpecs, resolveEffectiveSpecs, vehicleLabel } from '../utils/specHelpers';
+import { specProvenance, vehicleLabel } from '../utils/specHelpers';
 import { PlatformFacts } from './vehicles/PlatformLine';
 
 
@@ -23,17 +23,9 @@ export default function ViewSpecsModal({ vehicle, onClose }) {
     const liveVehicle = vehicles.find(v => v.id === vehicle.id) || vehicle;
     const vouches = specVouches[vehicle.id] ?? { count: 0, myVouch: false };
 
-    // Resolve inherited specs
-    const sourceVehicle = liveVehicle.spec_source_vehicle_id
-        ? vehicles.find(v => v.id === liveVehicle.spec_source_vehicle_id)
-        : null;
-    const ancestorSpecs = sourceVehicle
-        ? resolveEffectiveSpecs(sourceVehicle, vehicles, new Set([liveVehicle.id]))
-        : null;
-    const { merged: effectiveSpecs, inheritedKeys } = mergeInheritedSpecs(
-        liveVehicle.specs,
-        ancestorSpecs
-    );
+    // Own, else the source vehicle's, else the platform's (#352) — each value
+    // not the vehicle's own is marked with where it came from.
+    const { specs: effectiveSpecs, source: sourceVehicle, inheritedKeys, fromPlatform } = specProvenance(liveVehicle, vehicles);
     const sourceVehicleName = sourceVehicle ? vehicleLabel(sourceVehicle) : null;
 
     // Pending flags — buffered locally, committed to DB only when the modal closes.
@@ -82,6 +74,7 @@ export default function ViewSpecsModal({ vehicle, onClose }) {
                         defaultAllOpen={true}
                         showFlagButtons={true}
                         inheritedKeys={inheritedKeys}
+                        fromPlatform={fromPlatform}
                         sourceVehicleName={sourceVehicleName}
                         pendingFlags={pendingFlags}
                         onFlagField={handleFlagField}

@@ -193,9 +193,11 @@ describe('voltage', () => {
         [group({ total_voltage: pack })]);
 
     it('checks the class, not equality — they are different quantities', () => {
-        expect(checksFor(volts(400, 335))).toEqual([]);
-        expect(checksFor(volts(800, 765))).toEqual([]);
-        expect(checksFor(volts(400, 628))).toEqual(['voltage-vs-epa']);
+        // Only this check: a 400 V car with no 400 V support is also a gap (#352).
+        const epa = (v) => checksFor(v).filter(c => c === 'voltage-vs-epa');
+        expect(epa(volts(400, 335))).toEqual([]);
+        expect(epa(volts(800, 765))).toEqual([]);
+        expect(epa(volts(400, 628))).toEqual(['voltage-vs-epa']);
     });
 
     it('skips a spec value that names no class', () => {
@@ -448,5 +450,32 @@ describe('keepOrder: rows hold their places while a curator works', () => {
 
     it('is the live order when nothing is held', () => {
         expect(keepOrder([], ['C', 'A'])).toEqual(['C', 'A']);
+    });
+});
+
+describe('400 V support against the voltage class (#352)', () => {
+    const e800 = { id: 2, kind: 'electrical', name: 'E-GMP 800 V', voltage_class_v: 800 };
+    const volts = (v) => ({ charging: { battery_nominal_voltage_v: v } });
+
+    it('reports a 400 V class car with nothing recorded as a gap', () => {
+        const v = vehicle({ specs: volts(400) });
+        const f = findingsFor(v).find(x => x.check === 'no-400v-support');
+        expect(f).toMatchObject({ kind: 'gap' });
+        expect(f.text).toMatch(/400 V class \(from 400 V nominal\)/);
+    });
+
+    it('is settled by any recorded answer, and never asked of an 800 V car', () => {
+        expect(checksFor(vehicle({ specs: { charging: { battery_nominal_voltage_v: 400, dc_400v_charging: 'Native' } } })))
+            .not.toContain('no-400v-support');
+        expect(checksFor(vehicle({ specs: volts(800) }))).not.toContain('no-400v-support');
+        expect(checksFor(vehicle({ specs: {} }))).not.toContain('no-400v-support');   // no class to judge
+    });
+
+    it('reports Native on an 800 V class car, naming where it came from', () => {
+        const source = vehicle({ specs: { charging: { battery_nominal_voltage_v: 400, dc_400v_charging: 'Native' } } });
+        const variant = vehicle({ spec_source_vehicle_id: source.id, specs: {}, platforms: { electrical: e800 } });
+        const f = findingsFor(variant, { others: [source] }).find(x => x.check === 'native-on-800v');
+        expect(f).toMatchObject({ kind: 'disagrees' });
+        expect(f.text).toMatch(/800 V class \(from E-GMP 800 V\).*inherited from/);
     });
 });
