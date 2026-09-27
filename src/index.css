@@ -555,6 +555,90 @@
 
    Two levels, two signals, and the rule the rest of the re-skin obeys: blue
    says which section you are in, orange says which view inside it is live. */
+/* The top of a vehicle's page (#338): a breadcrumb back to Vehicles & Specs
+   and Close vehicle, a target big enough to find without looking. */
+.vehicle-page-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.vehicle-page-crumb {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    color: var(--color-text-meta);
+}
+.vehicle-page-crumb a { color: var(--color-text-link); }
+.vehicle-page-crumb [aria-current] { color: var(--color-text-secondary); }
+.vehicle-page-close {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-border-strong);
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-primary);
+    font-weight: 600;
+    cursor: pointer;
+}
+.vehicle-page-close:hover { background-color: var(--color-hover-lift); }
+.vehicle-page-close-x { font-size: calc(var(--fs-body) * 1.4286); line-height: 1; }
+
+/* The Vehicles & Specs tab's cell, which also holds the opened vehicle (#338). */
+.nav-tab-cell {
+    position: relative;
+    display: flex;
+    flex: none;
+    height: 100%;
+}
+/* The opened vehicle: a line at the foot of the tab's cell, below the label.
+   Absolutely placed, so the label stays level with every other tab and
+   opening or closing a vehicle moves nothing. */
+.opened-vehicle {
+    position: absolute;
+    left: 15px;
+    right: 4px;
+    bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    line-height: 1.2;
+}
+.opened-vehicle-link {
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-link);
+}
+.opened-vehicle-link:hover,
+.opened-vehicle-link.active {
+    color: var(--color-text-primary);
+    text-decoration: underline;
+}
+.opened-vehicle-close {
+    flex: none;
+    padding: 0 3px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--color-text-meta);
+}
+.opened-vehicle-close:hover { color: var(--color-text-primary); }
+
 .btn-tab {
     display: flex;
     align-items: center;

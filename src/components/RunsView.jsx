@@ -410,7 +410,7 @@ const DeriveAxisPanel = ({
     );
 };
 
-export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, onFocused }) {
+export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, onFocused, onBack, onClose }) {
     const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
@@ -1292,6 +1292,26 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
     return (
         <div className={barVisible ? 'pb-20' : ''}>
+            {/* The vehicle's page, inside Vehicles & Specs (#338): the way back,
+                and a large way out. Closing takes the vehicle out of the
+                header too; the breadcrumb only goes back and keeps it open. */}
+            {(onBack || onClose) && (
+                <div className="vehicle-page-bar">
+                    <nav aria-label="Breadcrumb" className="vehicle-page-crumb">
+                        {onBack && (
+                            <a href="?tab=vehicles" onClick={e => { e.preventDefault(); onBack(); }}>Vehicles &amp; Specs</a>
+                        )}
+                        <span aria-hidden="true"> / </span>
+                        <span aria-current="page">{vehicle.name}</span>
+                    </nav>
+                    {onClose && (
+                        <button type="button" className="vehicle-page-close" onClick={onClose}>
+                            <span aria-hidden="true" className="vehicle-page-close-x">×</span>
+                            Close vehicle
+                        </button>
+                    )}
+                </div>
+            )}
             {/* Vehicle summary header */}
             <div className="card py-3 px-4 flex items-center gap-4 mb-6">
                 <div className="list-thumbnail">

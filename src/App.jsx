@@ -226,6 +226,10 @@ export default function App() {
     // EPA's selected-vehicles Modeled Efficiency), or null when the tab's own view was. Clicking
     // the tab returns there rather than to its first item (#338).
     const lastModeUnderTab = useRef({});
+    // A vehicle's page is the last place under Vehicles & Specs while it shows.
+    useEffect(() => {
+        if (view === 'runs') lastModeUnderTab.current.vehicles = 'runs';
+    }, [view]);
     // Cards or List (#338): a sub-nav item now, so App owns it.
     const [vehiclesMode, setVehiclesMode] = useState('card');
 
@@ -304,12 +308,31 @@ export default function App() {
      */
     const navigateToTab = (tab) => {
         const mode = lastModeUnderTab.current[tab];
+        // The vehicle's page is a place under Vehicles & Specs too (#338).
+        if (mode === 'runs') {
+            navigateTo(currentActiveVehicle ? 'runs' : tab);
+            return;
+        }
         const modeDef = mode ? categoryForMode(mode).modes.find(m => m.key === mode) : null;
         if (modeDef && (selectedVehicles.length > 0 || !modeNeedsSelection(modeDef))) {
             handleChartModeChange(mode);
             return;
         }
         navigateTo(tab);
+    };
+
+    /** Show the opened vehicle's page (#338). */
+    const openVehiclePage = () => navigateTo('runs');
+
+    /**
+     * Close the opened vehicle (#338): it leaves the header, Vehicles & Specs
+     * stops returning to it, and if its page is showing, the reader goes back
+     * to Vehicles & Specs.
+     */
+    const closeVehicle = () => {
+        if (lastModeUnderTab.current.vehicles === 'runs') lastModeUnderTab.current.vehicles = null;
+        if (view === 'runs') navigateTo('vehicles');
+        setActiveVehicle(null);
     };
 
     const [pendingEditVehicle, setPendingEditVehicle] = useState(null);
@@ -719,11 +742,16 @@ export default function App() {
         sendState();
     }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, sendState]);
 
+    // The header tab a view is shown under (#338): a vehicle's page (the
+    // `runs` view) is under Vehicles & Specs; a chart category drawn under
+    // another tab is under that tab.
+    const headerTab = view === 'runs' ? 'vehicles' : navTabFor(view);
+
     // A non-chart tab whose sub-nav also carries chart modes (#338), or null.
     const parentStrip = {
         epa:      { tab: 'epa',      items: EPA_STRIP_ITEMS,      active: epaSubtab,    select: setEpaSubtab },
         vehicles: { tab: 'vehicles', items: VEHICLES_STRIP_ITEMS, active: vehiclesMode, select: setVehiclesMode },
-    }[navTabFor(view)] ?? null;
+    }[headerTab] ?? null;
 
     // The pop-out, at the right end of whichever sub-nav a chart mode is drawn in.
     const popoutButton = (
@@ -785,9 +813,13 @@ export default function App() {
                   * replaced are gone; see components/shell/AppNav for why. */}
                 <nav className="app-nav" ref={headerRef}>
                     <AppNav
-                        view={navTabFor(view)}
+                        view={headerTab}
                         chartCategories={TOP_CHART_CATEGORIES}
-                        activeVehicle={currentActiveVehicle}
+                        openedVehicle={currentActiveVehicle}
+                        openedActive={view === 'runs'}
+                        onOpenVehicle={openVehiclePage}
+                        onCloseVehicle={closeVehicle}
+                        onHome={navigateTo}
                         hasSelection={selectedVehicles.length > 0}
                         isAdmin={isAdmin}
                         user={user}
@@ -823,7 +855,9 @@ export default function App() {
                                     hint: 'Select a vehicle first',
                                 })),
                             ]}
-                            activeKey={view === parentStrip.tab ? parentStrip.active : navItemForMode(chartMode)}
+                            // On a vehicle's page no item is current: the header's
+                            // opened vehicle is.
+                            activeKey={view === parentStrip.tab ? parentStrip.active : view === 'runs' ? null : navItemForMode(chartMode)}
                             onSelect={(key) => {
                                 if (chartModesUnder(parentStrip.tab).some(m => m.key === key)) {
                                     // Chart stands for both spec charts: re-entering it
@@ -1014,6 +1048,8 @@ export default function App() {
                             specCustomFieldSuggestions={specCustomFieldSuggestions}
                             vehicles={vehicles}
                             onViewVehicle={(v) => setActiveVehicle(v)}
+                            onBack={() => navigateTo('vehicles')}
+                            onClose={closeVehicle}
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
                             subtab={runsSubtab}
                             onSubtabChange={setRunsSubtab}
