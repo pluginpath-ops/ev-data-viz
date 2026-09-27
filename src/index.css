@@ -556,7 +556,8 @@
    Two levels, two signals, and the rule the rest of the re-skin obeys: blue
    says which section you are in, orange says which view inside it is live. */
 /* The top of a vehicle's page (#338): a breadcrumb back to Vehicles & Specs
-   and Close vehicle, a target big enough to find without looking. */
+   and Close vehicle, a target big enough to find without looking. The
+   breadcrumb, .page-crumb, is shared with a platform's page. */
 .vehicle-page-bar {
     display: flex;
     align-items: center;
@@ -564,7 +565,7 @@
     gap: 12px;
     margin-bottom: 12px;
 }
-.vehicle-page-crumb {
+.page-crumb {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -572,8 +573,8 @@
     font-size: calc(var(--fs-body) * var(--fs-step));
     color: var(--color-text-meta);
 }
-.vehicle-page-crumb a { color: var(--color-text-link); }
-.vehicle-page-crumb [aria-current] { color: var(--color-text-secondary); }
+.page-crumb a { color: var(--color-text-link); }
+.page-crumb [aria-current] { color: var(--color-text-secondary); }
 .vehicle-page-close {
     display: flex;
     align-items: center;
@@ -590,6 +591,49 @@
 }
 .vehicle-page-close:hover { background-color: var(--color-hover-lift); }
 .vehicle-page-close-x { font-size: calc(var(--fs-body) * 1.4286); line-height: 1; }
+
+/* A platform's page (#354): three cards across — what it is and provides,
+   its notes, the vehicles on it — one column when narrow. */
+.platform-page-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+.platform-page-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+}
+.platform-page-card .platform-facts { padding: 0; }
+.platform-page-notes {
+    white-space: pre-line;
+    color: var(--color-text-secondary);
+}
+.platform-page-more {
+    align-self: flex-start;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--color-text-link);
+}
+.platform-page-more:hover { text-decoration: underline; }
+.platform-page-vehicles {
+    display: flex;
+    flex-direction: column;
+    max-height: 420px;
+    overflow-y: auto;
+}
+.platform-page-vehicle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    border-bottom: 1px solid var(--color-border);
+    cursor: pointer;
+}
 
 /* The Vehicles & Specs tab's cell, which also holds the opened vehicle (#338). */
 .nav-tab-cell {

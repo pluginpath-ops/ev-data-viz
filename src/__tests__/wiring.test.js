@@ -802,6 +802,26 @@ describe('the seams that broke before', () => {
         expect(read('src/components/RunsView.jsx')).toMatch(/className="vehicle-page-close"/);
     });
 
+    it('gives Reference a tab, a sub-nav and a URL, with stubs for #354 and #355 (#338)', () => {
+        const app = read('src/App.jsx');
+        expect(read('src/components/shell/AppNav.jsx')).toMatch(/\{ key: 'reference', label: 'Reference' \}/);
+        expect(app).toMatch(/reference: \{ tab: 'reference', items: REFERENCE_STRIP_ITEMS/);
+        expect(app, 'a link restores it').toMatch(/if \(tab === 'reference'\)/);
+        expect(app, 'and it writes its own').toMatch(/p\.set\('tab', 'reference'\)/);
+        expect(app).toMatch(/<ReferenceSection\s+subtab=\{referenceSubtab\}\s+platformId=\{referencePlatformId\}/);
+    });
+
+    it('opens a platform\'s page from every place a platform is named (#354)', () => {
+        const app = read('src/App.jsx');
+        expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform \}\}>/);
+        expect(app, 'and restores ?pid=').toMatch(/setReferencePlatformId\(p\.get\('pid'\) \|\| null\)/);
+        expect(read('src/components/vehicles/PlatformLine.jsx'), 'the card line and View Specs').toMatch(/<PlatformLink platform=/);
+        expect(read('src/components/VehicleSpecsDisplay.jsx'), 'a provided value\'s basis').toMatch(/from <PlatformLink platform=\{platform\} \/>/);
+        expect(read('src/utils/vehicleTable.js'), 'a table note names its platform').toMatch(/links\[col\.key\] = \{ platformId: platform\.id \}/);
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\)\}/);
+        expect(read('src/components/tables/TableCell.jsx'), 'without borrowing the test peek').toMatch(/const noteLink = test \?\? link/);
+    });
+
     it('links a tested figure to its test, and lands on it', () => {
         // Built once and unconnected, a link that navigates nowhere looks
         // exactly like one that works until someone clicks it.

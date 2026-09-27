@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
     matchPlatform, electricalSummary, platformGroups, vehiclePlatforms, platformLineText,
     resolveVoltageClass, platformProvides, withPlatforms, chemistrySuggestions,
+    platformHref, vehiclesOnPlatform, platformListRows,
 } from '../platforms';
 import { specProvenance, resolveEffectiveSpecs, fallbackSpecs } from '../specHelpers';
 import { SPEC_CATEGORIES } from '../vehicleSpecSchema';
@@ -219,5 +220,37 @@ describe('importing platforms', () => {
         const { rows } = plan('name,mechanical_platform\nIoniq 6,E-GMP\n', { platformsAvailable: false });
         expect(rows[0].platforms).toEqual({});
         expect(rows[0].warnings.join(' ')).toMatch(/migration 072/);
+    });
+});
+
+describe('platforms readers can browse (#354)', () => {
+    const fleet = withInheritance([
+        { id: 10, name: 'Ioniq 5', tags: [], mechanical_platform_id: 1, electrical_platform_id: 2 },
+        { id: 11, name: 'EV6', tags: [], mechanical_platform_id: 1, electrical_platform_id: 2 },
+        { id: 12, name: 'Ioniq 5 N', tags: [], spec_source_vehicle_id: 10 },   // on it through its source
+        { id: 13, name: 'R1S', tags: [], mechanical_platform_id: 3, electrical_platform_id: 4 },
+    ]);
+
+    it('lists the vehicles on a platform through their resolved links, by name', () => {
+        expect(vehiclesOnPlatform(P[1], fleet).map(v => v.name)).toEqual(['EV6', 'Ioniq 5', 'Ioniq 5 N']);
+        expect(vehiclesOnPlatform(P[2], fleet).map(v => v.name)).toEqual(['R1S']);
+        expect(vehiclesOnPlatform(null, fleet)).toEqual([]);
+    });
+
+    it('lists platforms electrical first, by maker then name, with their counts', () => {
+        const rows = platformListRows(P, fleet);
+        expect(rows.map(r => r.platform.kind)).toEqual(['electrical', 'electrical', 'electrical', 'electrical', 'mechanical', 'mechanical']);
+        expect(rows.find(r => r.platform.id === 2).vehicleCount).toBe(3);
+        expect(platformListRows(P, fleet, 'mechanical').map(r => r.platform.name)).toEqual(['E-GMP', 'Rivian R1']);
+    });
+
+    it('addresses a platform page by id', () => {
+        expect(platformHref(12)).toBe('?tab=reference&pid=12');
+    });
+
+    it('links a table note that names a platform', () => {
+        const rows = buildVehicleRows(fleet.slice(0, 1), { platformsById: byId });
+        expect(rows[0].links['charging.dc_400v_charging']).toEqual({ platformId: 2 });
+        expect(rows[0].links['figures.voltageClass']).toEqual({ platformId: 2 });
     });
 });

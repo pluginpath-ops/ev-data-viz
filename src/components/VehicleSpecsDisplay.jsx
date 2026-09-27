@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { SpecFieldFlagButton } from './VoteButtons';
+import PlatformLink from './reference/PlatformLink';
 
 /**
  * Read-only collapsible display of a vehicle's structured specs.
@@ -84,7 +85,7 @@ export default function VehicleSpecsDisplay({
     // own, so the value says where it came from, as its basis — the vehicle
     // table's note, in the same class.
     const PlatformBasis = ({ platform }) => (
-        <span className="stat-cell-basis">from {platform.name}</span>
+        <span className="stat-cell-basis">from <PlatformLink platform={platform} /></span>
     );
 
     return (

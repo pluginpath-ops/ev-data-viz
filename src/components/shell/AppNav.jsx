@@ -83,6 +83,9 @@ export default function AppNav({
         // so it is deliberately NOT gated on a vehicle selection the way the
         // chart categories above are.
         { key: 'epa', label: 'EPA' },
+        // Reference (#338): what is true of every EV, selected or not —
+        // platforms and explainers. Not gated on a selection, like EPA.
+        { key: 'reference', label: 'Reference' },
         ...(isAdmin ? [{ key: 'admin', label: 'Admin' }] : []),
     ];
 

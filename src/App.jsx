@@ -25,6 +25,9 @@ import Playground from './components/playground/Playground';
 import EpaSection, { EPA_SUBTABS, DEFAULT_EPA_SUBTAB, epaSubtabFromParam } from './components/epa/EpaSection';
 import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor, navTabFor, chartModesUnder, navItemForMode } from './constants/chartNav';
 import SpecChartKind from './components/SpecChartKind';
+import { NavigationContext } from './context/NavigationContext';
+import { platformHref } from './utils/platforms';
+import ReferenceSection, { REFERENCE_SUBTABS, DEFAULT_REFERENCE_SUBTAB, referenceSubtabFromParam } from './components/reference/ReferenceSection';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
 
@@ -35,6 +38,7 @@ import { isEpaPartnerId } from './utils/rangeSource';
 const EPA_STRIP_ITEMS = EPA_SUBTABS.map(t => ({ key: t.id, label: t.label, description: t.description, group: 'All EVs' }));
 // Vehicles & Specs' own sub-nav section (#338); its "Specifications & Data"
 // section is the chart modes drawn under it (chartNav.js `navParent`).
+const REFERENCE_STRIP_ITEMS = REFERENCE_SUBTABS.map(t => ({ key: t.id, label: t.label, description: t.description }));
 const VEHICLES_STRIP_ITEMS = [
     { key: 'card', label: 'Cards', group: 'Summary' },
     { key: 'list', label: 'List',  group: 'Summary' },
@@ -57,7 +61,7 @@ const VEHICLES_STRIP_ITEMS = [
  * Hiding is not clearing. The selection survives the trip and the chips are
  * back the moment a view uses them again.
  */
-const SELECTION_INERT_VIEWS = new Set(['runs', 'epa', 'admin', 'playground']);
+const SELECTION_INERT_VIEWS = new Set(['runs', 'epa', 'reference', 'admin', 'playground']);
 
 export default function App() {
     const {
@@ -232,6 +236,10 @@ export default function App() {
     }, [view]);
     // Cards or List (#338): a sub-nav item now, so App owns it.
     const [vehiclesMode, setVehiclesMode] = useState('card');
+    // Reference's sub-tab (#338): Platforms or Explainers.
+    const [referenceSubtab, setReferenceSubtab] = useState(DEFAULT_REFERENCE_SUBTAB);
+    // The platform whose page is showing under Reference › Platforms (#354), or null for the list.
+    const [referencePlatformId, setReferencePlatformId] = useState(null);
 
     const handleChartModeChange = (newMode) => {
         const categoryKey = categoryForMode(newMode).key;
@@ -321,6 +329,27 @@ export default function App() {
         navigateTo(tab);
     };
 
+    /**
+     * A platform's page, from anywhere a platform is named (#354). A history
+     * entry, so Back returns to the card, table or View Specs it came from.
+     */
+    const openPlatform = (id) => {
+        history.pushState({ view: 'reference', subtab: DEFAULT_REFERENCE_SUBTAB, platformId: String(id) }, '', platformHref(id));
+        setReferenceSubtab(DEFAULT_REFERENCE_SUBTAB);
+        setReferencePlatformId(String(id));
+        setView('reference');
+        window.scrollTo(0, 0);
+    };
+
+    /** A Reference sub-tab's top level: the platform list, or Explainers. */
+    const openReference = (subtab) => {
+        const url = subtab === DEFAULT_REFERENCE_SUBTAB ? '?tab=reference' : `?tab=reference&sub=${subtab}`;
+        history.pushState({ view: 'reference', subtab, platformId: null }, '', url);
+        setReferenceSubtab(subtab);
+        setReferencePlatformId(null);
+        setView('reference');
+    };
+
     /** Show the opened vehicle's page (#338). */
     const openVehiclePage = () => navigateTo('runs');
 
@@ -385,6 +414,12 @@ export default function App() {
         // resolved first, because the page reads no data at all.
         if (tab === 'playground') {
             setView('playground');
+            return;
+        }
+        if (tab === 'reference') {
+            setReferenceSubtab(referenceSubtabFromParam(p.get('sub')));
+            setReferencePlatformId(p.get('pid') || null);
+            setView('reference');
             return;
         }
         if (tab === 'epa') {
@@ -494,6 +529,10 @@ export default function App() {
                 const v = vehicles.find(v => v.id === e.state.vehicleId);
                 if (v) setActiveVehicle(v);
                 if (RUNS_SUBTAB_IDS.includes(e.state.subtab)) setRunsSubtab(e.state.subtab);
+            }
+            if (e.state.view === 'reference') {
+                setReferenceSubtab(referenceSubtabFromParam(e.state.subtab));
+                setReferencePlatformId(e.state.platformId ?? null);
             }
             if (e.state.view === 'admin' && ADMIN_SUBTAB_IDS.includes(e.state.subtab)) {
                 setAdminSubtab(e.state.subtab);
@@ -700,6 +739,17 @@ export default function App() {
         history.replaceState({ view: 'epa', subtab: epaSubtab }, '', '?' + p.toString());
     }, [isPopout, view, epaSubtab]);
 
+    // ── Keep URL in sync while on the Reference tab (#338) ──────────────────
+    useEffect(() => {
+        if (isPopout) return;
+        if (view !== 'reference') return;
+        const p = new URLSearchParams();
+        p.set('tab', 'reference');
+        if (referenceSubtab !== DEFAULT_REFERENCE_SUBTAB) p.set('sub', referenceSubtab);
+        else if (referencePlatformId != null) p.set('pid', referencePlatformId);
+        history.replaceState({ view: 'reference', subtab: referenceSubtab, platformId: referencePlatformId }, '', '?' + p.toString());
+    }, [isPopout, view, referenceSubtab, referencePlatformId]);
+
     // ── Keep URL in sync while on the Admin tab ─────────────────────────────
     useEffect(() => {
         if (isPopout) return;
@@ -751,6 +801,9 @@ export default function App() {
     const parentStrip = {
         epa:      { tab: 'epa',      items: EPA_STRIP_ITEMS,      active: epaSubtab,    select: setEpaSubtab },
         vehicles: { tab: 'vehicles', items: VEHICLES_STRIP_ITEMS, active: vehiclesMode, select: setVehiclesMode },
+        reference: { tab: 'reference', items: REFERENCE_STRIP_ITEMS, active: referenceSubtab,
+            // A sub-tab opens its own top level: Platforms is the list.
+            select: (key) => { setReferenceSubtab(key); setReferencePlatformId(null); } },
     }[headerTab] ?? null;
 
     // The pop-out, at the right end of whichever sub-nav a chart mode is drawn in.
@@ -797,7 +850,7 @@ export default function App() {
     }
 
     return (
-        <>
+        <NavigationContext.Provider value={{ openPlatform }}>
             {showAuthModal && (
                 <AuthModal
                     onClose={() => setShowAuthModal(false)}
@@ -1153,6 +1206,14 @@ export default function App() {
                         made, over the whole fleet (#315). */}
                     {activeChartCategory && chartMode === 'specstable' && <VehicleTable onOpenTest={openTest} />}
                     {view === 'epa' && <EpaSection subtab={epaSubtab} />}
+                    {view === 'reference' && (
+                        <ReferenceSection
+                            subtab={referenceSubtab}
+                            platformId={referencePlatformId}
+                            onBackToPlatforms={() => openReference('platforms')}
+                            onOpenExplainers={() => openReference('explainers')}
+                        />
+                    )}
 
                     {/* The playground, ungated and unlinked.
                       *
@@ -1230,6 +1291,6 @@ export default function App() {
                     </div>
                 </div>
             )}
-        </>
+        </NavigationContext.Provider>
     );
 }

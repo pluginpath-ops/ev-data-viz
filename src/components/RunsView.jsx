@@ -1297,7 +1297,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 header too; the breadcrumb only goes back and keeps it open. */}
             {(onBack || onClose) && (
                 <div className="vehicle-page-bar">
-                    <nav aria-label="Breadcrumb" className="vehicle-page-crumb">
+                    <nav aria-label="Breadcrumb" className="page-crumb">
                         {onBack && (
                             <a href="?tab=vehicles" onClick={e => { e.preventDefault(); onBack(); }}>Vehicles &amp; Specs</a>
                         )}

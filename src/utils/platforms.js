@@ -231,3 +231,39 @@ export function withPlatforms(vehicles = [], byId) {
 export function chemistrySuggestions(electrical) {
     return (electrical?.chemistries ?? []).filter(c => CHEMISTRIES.includes(c));
 }
+
+// ── Platforms readers can browse (#354) ─────────────────────────────────────
+
+/** Where a platform's page lives, as a query string — a real href. */
+export function platformHref(id) {
+    return `?tab=reference&pid=${encodeURIComponent(id)}`;
+}
+
+/**
+ * The vehicles built on a platform, through their RESOLVED links (a variant
+ * that inherits its source's platform is on it too), sorted by name.
+ */
+export function vehiclesOnPlatform(platform, vehicles = []) {
+    if (!platform) return [];
+    const column = PLATFORM_COLUMN[platform.kind];
+    return vehicles
+        .filter(v => v[column] != null && Number(v[column]) === Number(platform.id))
+        .sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? '')));
+}
+
+/**
+ * The platform list's rows: every platform of the kinds asked for, with how
+ * many vehicles are on it — electrical before mechanical (the kind a reader
+ * comes for), then by maker group and name.
+ *
+ * @param {'all'|'electrical'|'mechanical'} [kind]
+ */
+export function platformListRows(platforms = [], vehicles = [], kind = 'all') {
+    const order = { electrical: 0, mechanical: 1 };
+    return platforms
+        .filter(p => kind === 'all' || p.kind === kind)
+        .map(p => ({ platform: p, vehicleCount: vehiclesOnPlatform(p, vehicles).length }))
+        .sort((a, b) => (order[a.platform.kind] ?? 2) - (order[b.platform.kind] ?? 2)
+            || String(a.platform.maker_group ?? '~').localeCompare(String(b.platform.maker_group ?? '~'))
+            || a.platform.name.localeCompare(b.platform.name));
+}

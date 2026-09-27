@@ -52,7 +52,11 @@ export const FLAGGED_NOTE = 'Flagged as possibly inaccurate';
 export default function TableCell({
     text, note = null, pct = null, numeric = false, flagged = false, restate, className = '', onClick, children,
     test = null, testKey,
+    // A note that names a page but is not a test (a platform, #354): linked
+    // the same way, without the test's peek.
+    link = null,
 }) {
+    const noteLink = test ?? link;
     const said = restate ?? (note ? `${text} · ${note}` : text);
     // A flag can sit on a blank (someone thinks a value is missing), and
     // "— · Flagged" reads as a typo rather than as that.
@@ -74,17 +78,17 @@ export default function TableCell({
                     {/* The value, then its bar beneath it. */}
                     {pct != null && <span className="guide-spark" style={{ '--bar-fill': `${pct}%` }} aria-hidden="true" />}
                     {/* Where a resolved or tested figure came from. */}
-                    {note && (test?.href ? (
+                    {note && (noteLink?.href ? (
                         <a
                             className="vehicle-table-note is-test-link"
-                            href={test.href}
+                            href={noteLink.href}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 // A plain click navigates in place; a modified
                                 // one (new tab, new window) is the browser's.
-                                if (!test.onOpen || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                                if (!noteLink.onOpen || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
                                 e.preventDefault();
-                                test.onOpen();
+                                noteLink.onOpen();
                             }}
                         >
                             {note}

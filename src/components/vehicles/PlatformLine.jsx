@@ -11,6 +11,7 @@
  * platforms and says so (vehicleInheritance.js).
  */
 import { useAppContext } from '../../context/AppContext';
+import PlatformLink from '../reference/PlatformLink';
 import {
     DC_400V_CHARGING, PLATFORM_KINDS, PLATFORM_COLUMN, electricalSummary, vehiclePlatforms, platformLineText,
 } from '../../utils/platforms';
@@ -31,7 +32,12 @@ export function PlatformLine({ vehicle }) {
     return (
         <div className="platform-line" title={title}>
             <span className="text-micro">Platform</span>
-            <span className="platform-line-value">{text}</span>
+            {/* Each name opens its platform's page (#354). */}
+            <span className="platform-line-value">
+                {both.mechanical && both.electrical && text !== both.electrical.name
+                    ? <><PlatformLink platform={both.mechanical} /> · <PlatformLink platform={both.electrical} /></>
+                    : <PlatformLink platform={both.electrical ?? both.mechanical} />}
+            </span>
         </div>
     );
 }
@@ -49,6 +55,7 @@ export function PlatformFacts({ vehicle }) {
             const from = vehicle.inheritedFrom?.[PLATFORM_COLUMN[kind.key]];
             return p && {
                 label: kind.label,
+                platform: p,
                 // The maker only where the name does not already say it: "E-GMP ·
                 // Hyundai Motor Group", but not "Rivian R1 · Rivian".
                 value: `${p.name}${p.maker_group && !p.name.toLowerCase().startsWith(p.maker_group.toLowerCase()) ? ` · ${p.maker_group}` : ''}${from ? ` (inherited from ${from.name})` : ''}`,
@@ -71,7 +78,7 @@ export function PlatformFacts({ vehicle }) {
                 : (
                     <div key={r.label} className="platform-fact" title={r.title}>
                         <dt>{r.label}</dt>
-                        <dd>{r.value}</dd>
+                        <dd>{r.platform ? <><PlatformLink platform={r.platform} />{r.value.slice(r.platform.name.length)}</> : r.value}</dd>
                     </div>
                 )))}
         </dl>
