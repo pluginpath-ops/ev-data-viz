@@ -54,17 +54,20 @@ export default function AppNav({
      * between the buttons this replaced.
      */
     const items = [
-        { key: 'vehicles', label: 'Vehicles' },
+        // Vehicles & Specs (#338): the cards and list, and — drawn under it —
+        // the vehicle table and the spec chart. Specs are front and center by
+        // being in the first tab's name, not by a tab of their own.
+        { key: 'vehicles', label: 'Vehicles & Specs' },
         {
             key: 'runs',
             label: 'Tests & Data',
             disabled: !activeVehicle,
             hint: activeVehicle ? activeVehicle.name : 'Select a vehicle first',
         },
-        // One top-level tab per chart category. They plot the vehicle
-        // selection, so they wait for one, unless a mode inside can show
-        // something without it: Specifications holds the vehicle table, where
-        // a selection is made (#315).
+        // One top-level tab per chart category (those drawn under another tab
+        // are left out by the caller). They plot the vehicle selection, so
+        // they wait for one, unless a mode inside can show something without
+        // it.
         ...chartCategories.map(({ key, label, modes }) => {
             const gated = !hasSelection && modes.every(modeNeedsSelection);
             return {

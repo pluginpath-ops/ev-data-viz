@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     CHART_CATEGORIES, TOP_CHART_CATEGORIES, categoryByKey, categoryForMode, entryModeFor, modeNeedsSelection,
-    navTabFor, chartModesUnder,
+    navTabFor, chartModesUnder, navItemForMode,
 } from '../../constants/chartNav';
 
 describe('chart tabs and the selection', () => {
@@ -48,5 +48,24 @@ describe('a chart category drawn under another tab (#338)', () => {
         for (const k of ['charging', 'range', 'compare', 'roadtrip', 'epacurves', 'perfcompare', 'perfcurve', 'specs', 'specscatter', 'specstable']) {
             expect(keys).toContain(k);
         }
+    });
+});
+
+describe('Vehicles & Specs (#338)', () => {
+    it('draws the Specifications section under Vehicles & Specs, not as a tab', () => {
+        expect(TOP_CHART_CATEGORIES.map(c => c.key)).not.toContain('specifications');
+        expect(navTabFor('specifications')).toBe('vehicles');
+        expect(categoryForMode('specstable').key).toBe('specifications');   // old links land under Vehicles & Specs
+    });
+
+    it('shows Table and one Chart item for the two spec charts, in a named section', () => {
+        const items = chartModesUnder('vehicles');
+        expect(items.map(m => [m.key, m.label, m.group])).toEqual([
+            ['specstable', 'Table', 'Specifications & Data'],
+            ['specs', 'Chart', 'Specifications & Data'],
+        ]);
+        expect(navItemForMode('specscatter')).toBe('specs');
+        expect(navItemForMode('specs')).toBe('specs');
+        expect(navItemForMode('charging')).toBe('charging');
     });
 });

@@ -770,10 +770,21 @@ describe('the seams that broke before', () => {
         const app = read('src/App.jsx');
         expect(app, 'the header must light the parent tab').toMatch(/view=\{navTabFor\(view\)\}/);
         expect(app, 'only top-level categories are tabs').toMatch(/chartCategories=\{TOP_CHART_CATEGORIES\}/);
-        expect(app, 'EPA\'s sub-nav must carry the chart modes under it').toMatch(/const EPA_CHART_MODES = chartModesUnder\('epa'\)/);
-        expect(app).toMatch(/\.\.\.EPA_CHART_MODES\.map/);
+        expect(app, 'a tab\'s sub-nav must carry the chart modes under it').toMatch(/\.\.\.chartModesUnder\(parentStrip\.tab\)\.map/);
+        expect(app).toMatch(/epa:\s+\{ tab: 'epa'/);
         expect(app, 'a chart mode keeps its pop-out wherever it is drawn').toMatch(/end=\{activeChartCategory && popoutButton\}[\s\S]*end=\{activeChartCategory && popoutButton\}/);
         expect(read('src/components/shell/SubTabStrip.jsx'), 'a sub-tab\'s description is its tooltip').toMatch(/title=\{description\}/);
+    });
+
+    it('makes Cards and List sub-nav items and one Chart for both spec charts (#338)', () => {
+        const app = read('src/App.jsx');
+        expect(app, 'App owns Cards or List now').toMatch(/viewMode=\{vehiclesMode\}/);
+        expect(app).toMatch(/vehicles: \{ tab: 'vehicles', items: VEHICLES_STRIP_ITEMS/);
+        expect(app, 'the bar/scatter switch must be drawn for both spec charts').toMatch(/<SpecChartKind mode=\{chartMode\} onChange=\{handleChartModeChange\} \/>/);
+        expect(app, 'a header tab returns to the chart mode last shown under it').toMatch(/onNavigate=\{navigateToTab\}/);
+        expect(read('src/components/VehiclesView.jsx'), 'the in-page toggle is gone').not.toMatch(/setViewMode/);
+        expect(read('src/components/shell/SubTabStrip.jsx'), 'sections are labelled').toMatch(/subtab-section-label/);
+        expect(read('src/components/shell/NavMenu.jsx'), 'and survive the collapse').toMatch(/nav-menu-section/);
     });
 
     it('links a tested figure to its test, and lands on it', () => {

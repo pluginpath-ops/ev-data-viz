@@ -85,16 +85,24 @@ export const CHART_CATEGORIES = [
         ],
     },
     {
+        // The Specifications tab, folded into Vehicles & Specs (#338) as its
+        // "Specifications & Data" section: views of the same fleet the cards
+        // and list show. The tab key stays, so ?tab=specifications links land
+        // here, under Vehicles & Specs.
         key: 'specifications',
-        label: 'Specifications',
+        label: 'Specifications & Data',
+        navParent: 'vehicles',
         modes: [
             // Key kept: it is the URL and chart-help identifier (see the note
             // at the top). The table it names became the vehicle table in #315.
-            // It needs no selection because it is where one is made, which
-            // keeps the whole Specifications tab reachable with nothing chosen.
-            { key: 'specstable',  label: 'Vehicle Table', needsSelection: false },
-            { key: 'specs',       label: 'Spec Chart' },
-            { key: 'specscatter', label: 'Spec Scatter' },
+            // It needs no selection because it is where one is made.
+            { key: 'specstable',  label: 'Table', needsSelection: false },
+            // One sub-nav item, "Chart", for the two spec charts: a bar or a
+            // scatter of the table's columns, switched above the plot. The
+            // scatter is drawn AS the bar's item (`navAlias`), so the sub-nav
+            // lights Chart for either.
+            { key: 'specs',       label: 'Chart' },
+            { key: 'specscatter', label: 'Chart', navAlias: 'specs' },
         ],
     },
 ];
@@ -119,9 +127,24 @@ export function navTabFor(view) {
     return categoryByKey(view)?.navParent ?? view;
 }
 
-/** The chart modes drawn in a non-chart tab's sub-nav (a category's `navParent`). */
+/**
+ * The chart modes drawn in a non-chart tab's sub-nav (a category's
+ * `navParent`), one item each, each carrying its category's label as `group`
+ * so the sub-nav can head the section. A mode drawn as another's item
+ * (`navAlias`) is left out: that item stands for both.
+ */
 export function chartModesUnder(tab) {
-    return CHART_CATEGORIES.filter(c => c.navParent === tab).flatMap(c => c.modes);
+    return CHART_CATEGORIES.filter(c => c.navParent === tab)
+        .flatMap(c => c.modes.filter(m => !m.navAlias).map(m => ({ ...m, group: c.label })));
+}
+
+/** The sub-nav item a mode is drawn as: its `navAlias`, else itself. */
+export function navItemForMode(mode) {
+    for (const c of CHART_CATEGORIES) {
+        const found = c.modes.find(m => m.key === mode);
+        if (found) return found.navAlias ?? found.key;
+    }
+    return mode;
 }
 
 /** True when a top-level view is one of the chart categories. */

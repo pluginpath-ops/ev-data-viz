@@ -1033,6 +1033,24 @@ body {
     scrollbar-width: none;
 }
 .subtab-strip-items::-webkit-scrollbar { display: none; }
+/* A section of the sub-nav (#338) — Vehicles & Specs' "Summary" and
+   "Specifications & Data". The label reads as the sub-nav's own meta text,
+   and the rule between sections is the same color, faded, so neither competes
+   with the items. */
+.subtab-section-label {
+    align-self: center;
+    padding: 0 6px 0 11px;
+    color: var(--color-text-nav-meta);
+    white-space: nowrap;
+}
+.subtab-section-rule {
+    align-self: center;
+    width: 1px;
+    height: 18px;
+    margin: 0 8px;
+    background-color: var(--color-text-nav-meta);
+    opacity: 0.35;
+}
 
 /* The right-hand end of the strip is where the view's own controls and its
    count live — not a third band. */
@@ -1082,8 +1100,9 @@ body {
     color: var(--color-text-primary);
 }
 .nav-menu-current { @apply truncate; }
-/* The three bars before the collapsed main nav's section name (#338). Drawn
-   in the text's own color, so it follows the theme with the label. */
+/* The mark before a collapsed nav bar's current name (#338): three bars on
+   the main nav, a bulleted list on the sub-nav. Drawn in the text's own
+   color, so it follows the theme with the label. */
 .nav-menu-icon {
     width: 16px;
     height: 16px;
@@ -1093,6 +1112,8 @@ body {
     stroke-width: 1.75;
     stroke-linecap: round;
 }
+/* The bullets: round caps on a zero-length stroke, drawn wider, are dots. */
+.nav-menu-icon-dot { stroke-width: 2.75; }
 .nav-menu-main .nav-menu-btn {
     height: 100%;
     font-size: calc(var(--fs-body) * var(--fs-step));
@@ -1137,6 +1158,10 @@ body {
     color: var(--color-text-primary);
 }
 .nav-menu-item:hover:not(:disabled) { background-color: var(--color-hover-lift); }
+/* A sub-nav section's name inside the collapsed menu (#338). */
+.nav-menu-section {
+    padding: 8px 10px 2px;
+}
 /* Orange, like every other "which view is live" mark in this design — and
    square on the color side, like every other accent border in it. The item's
    own corner radius was rounding the ends of the bar, which reads as a pill
@@ -3071,13 +3096,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Search / filter row above the vehicle grid */
 .vehicle-filter-bar {
     @apply flex gap-3 items-center mb-3;
-}
-
-/* Card / list view mode toggle widget */
-.view-toggle {
-    @apply flex border rounded-lg overflow-hidden;
-    border-color: var(--color-border);
-    color: var(--color-text-muted);
 }
 
 /* Tag filter chip strip below the search bar */

@@ -23,15 +23,20 @@ import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/AdminView';
 import Playground from './components/playground/Playground';
 import EpaSection, { EPA_SUBTABS, DEFAULT_EPA_SUBTAB, epaSubtabFromParam } from './components/epa/EpaSection';
-import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor, navTabFor, chartModesUnder } from './constants/chartNav';
+import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor, navTabFor, chartModesUnder, navItemForMode } from './constants/chartNav';
+import SpecChartKind from './components/SpecChartKind';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
 
 /* SubTabStrip speaks `key`; the EPA registry has always spoken `id`, and it is
    read by name in several places, so it is mapped here rather than renamed. */
 const EPA_STRIP_ITEMS = EPA_SUBTABS.map(t => ({ key: t.id, label: t.label, description: t.description }));
-// The chart modes drawn in the EPA tab's sub-nav after its own sub-tabs (#338).
-const EPA_CHART_MODES = chartModesUnder('epa');
+// Vehicles & Specs' own sub-nav section (#338); its "Specifications & Data"
+// section is the chart modes drawn under it (chartNav.js `navParent`).
+const VEHICLES_STRIP_ITEMS = [
+    { key: 'card', label: 'Cards', group: 'Summary' },
+    { key: 'list', label: 'List',  group: 'Summary' },
+];
 
 /**
  * Views that never read the vehicle selection.
@@ -145,7 +150,6 @@ export default function App() {
         mfgFilterStates: {},
         modelFilter: new Set(),
         sortBy: 'default',
-        viewMode: 'card',
         vehiclePage: 1,
     }));
     const [dragOverIdx, setDragOverIdx] = useState(null); // pill drop-indicator position
@@ -216,6 +220,12 @@ export default function App() {
     // returns you where you were rather than resetting to the first sub-tab. A
     // ref, not state — it's read during a click handler, never rendered.
     const lastModeByCategory = useRef({});
+    // The chart mode last shown under a parent tab (Vehicles & Specs' Table,
+    // EPA's Modeled vs Tested), or null when the tab's own view was. Clicking
+    // the tab returns there rather than to its first item (#338).
+    const lastModeUnderTab = useRef({});
+    // Cards or List (#338): a sub-nav item now, so App owns it.
+    const [vehiclesMode, setVehiclesMode] = useState('card');
 
     const handleChartModeChange = (newMode) => {
         const categoryKey = categoryForMode(newMode).key;
@@ -226,6 +236,8 @@ export default function App() {
             `?tab=${categoryKey}&m=${newMode}`, // URL sync effect replaces with full params
         );
         lastModeByCategory.current[categoryKey] = newMode;
+        const parentTab = categoryForMode(newMode).navParent;
+        if (parentTab) lastModeUnderTab.current[parentTab] = newMode;
         setView(categoryKey);
         setChartMode(newMode);
         // Only on an actual mode change. Clearing unconditionally emptied the
@@ -283,6 +295,20 @@ export default function App() {
         history.pushState({ view: newView, chartMode }, '', url);
         setView(newView);
     }, [chartMode]);
+
+    /**
+     * A header tab that is not a chart category. Returns to the chart mode last
+     * shown under it, if there was one and it can still show; else its own view.
+     */
+    const navigateToTab = (tab) => {
+        const mode = lastModeUnderTab.current[tab];
+        const modeDef = mode ? categoryForMode(mode).modes.find(m => m.key === mode) : null;
+        if (modeDef && (selectedVehicles.length > 0 || !modeNeedsSelection(modeDef))) {
+            handleChartModeChange(mode);
+            return;
+        }
+        navigateTo(tab);
+    };
 
     const [pendingEditVehicle, setPendingEditVehicle] = useState(null);
     const [showAuthModal, setShowAuthModal] = useState(false);
@@ -691,6 +717,12 @@ export default function App() {
         sendState();
     }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, sendState]);
 
+    // A non-chart tab whose sub-nav also carries chart modes (#338), or null.
+    const parentStrip = {
+        epa:      { tab: 'epa',      items: EPA_STRIP_ITEMS,      active: epaSubtab,    select: setEpaSubtab },
+        vehicles: { tab: 'vehicles', items: VEHICLES_STRIP_ITEMS, active: vehiclesMode, select: setVehiclesMode },
+    }[navTabFor(view)] ?? null;
+
     // The pop-out, at the right end of whichever sub-nav a chart mode is drawn in.
     const popoutButton = (
         <button
@@ -760,7 +792,7 @@ export default function App() {
                         userRole={userRole}
                         units={units}
                         onToggleUnits={toggleUnits}
-                        onNavigate={navigateTo}
+                        onNavigate={navigateToTab}
                         onNavigateChartCategory={navigateToChartCategory}
                         onSignIn={() => setShowAuthModal(true)}
                         onSignOut={signOut}
@@ -774,25 +806,32 @@ export default function App() {
                       * The strip's right end is where a section's own controls
                       * belong — the popout button is a control OF the chart
                       * views, not a peer of their tabs. */}
-                    {navTabFor(view) === 'epa' ? (
-                        // EPA's own sub-tabs, then the chart modes that live
-                        // under it (Modeled vs Tested). One strip, two kinds of
-                        // item: a sub-tab stays on the EPA view, a chart mode
-                        // goes to its category and keeps its chips and pop-out.
+                    {parentStrip ? (
+                        // A tab's own sub-tabs, then the chart modes drawn under
+                        // it (#338): EPA's Modeled vs Tested, Vehicles & Specs'
+                        // Table and Chart. A sub-tab stays on the tab's view; a
+                        // chart mode goes to its category and keeps its chips
+                        // and pop-out.
                         <SubTabStrip
                             items={[
-                                ...EPA_STRIP_ITEMS,
-                                ...EPA_CHART_MODES.map(m => ({
+                                ...parentStrip.items,
+                                ...chartModesUnder(parentStrip.tab).map(m => ({
                                     ...m,
                                     disabled: selectedVehicles.length === 0 && modeNeedsSelection(m),
                                     hint: 'Select a vehicle first',
                                 })),
                             ]}
-                            activeKey={view === 'epa' ? epaSubtab : chartMode}
+                            activeKey={view === parentStrip.tab ? parentStrip.active : navItemForMode(chartMode)}
                             onSelect={(key) => {
-                                if (EPA_CHART_MODES.some(m => m.key === key)) { handleChartModeChange(key); return; }
-                                if (view !== 'epa') navigateTo('epa');
-                                setEpaSubtab(key);
+                                if (chartModesUnder(parentStrip.tab).some(m => m.key === key)) {
+                                    // Chart stands for both spec charts: re-entering it
+                                    // keeps whichever one was showing.
+                                    handleChartModeChange(key === navItemForMode(chartMode) ? chartMode : key);
+                                    return;
+                                }
+                                lastModeUnderTab.current[parentStrip.tab] = null;
+                                if (view !== parentStrip.tab) navigateTo(parentStrip.tab);
+                                parentStrip.select(key);
                             }}
                             end={activeChartCategory && popoutButton}
                         />
@@ -936,6 +975,7 @@ export default function App() {
                             onClearPendingEdit={() => setPendingEditVehicle(null)}
                             savedState={vehiclesViewState}
                             onSaveState={setVehiclesViewState}
+                            viewMode={vehiclesMode}
                         />
                     )}
                     {view === 'runs' && currentActiveVehicle && (
@@ -1027,6 +1067,9 @@ export default function App() {
                             handSet={chartConfig.handSet ?? false}
                             setChartConfig={setChartConfig}
                         />
+                    )}
+                    {activeChartCategory && selectedVehicles.length > 0 && (chartMode === 'specs' || chartMode === 'specscatter') && (
+                        <SpecChartKind mode={chartMode} onChange={handleChartModeChange} />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specs' && (
                         <SpecsChartView

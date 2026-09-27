@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useLightDismiss } from '../../hooks/useLightDismiss';
 
 /**
@@ -44,13 +44,18 @@ export default function NavMenu({ items, activeKey, onSelect, level = 'main' }) 
                 aria-expanded={open}
                 aria-haspopup="menu"
             >
-                {/* The main bar collapsed says so (#338): three bars before the
-                    section's name, the mark every phone reader knows as "the
-                    menu". The sub-nav keeps the caret alone — it is a choice
-                    within a section, not the site's navigation. */}
-                {level === 'main' && (
+                {/* Each collapsed bar says so (#338), with a different mark so
+                    the two never read as the same menu: three bars for the
+                    site's navigation, the mark every phone reader knows; a
+                    bulleted list for the choices within this section. */}
+                {level === 'main' ? (
                     <svg className="nav-menu-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                         <path d="M2 4h12M2 8h12M2 12h12" />
+                    </svg>
+                ) : (
+                    <svg className="nav-menu-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                        <path d="M6 4h8M6 8h8M6 12h8" />
+                        <path className="nav-menu-icon-dot" d="M2.5 4h.01M2.5 8h.01M2.5 12h.01" />
                     </svg>
                 )}
                 <span className="nav-menu-current">{active.label}</span>
@@ -59,9 +64,13 @@ export default function NavMenu({ items, activeKey, onSelect, level = 'main' }) 
 
             {open && (
                 <div className="popover popover--stretch nav-menu-panel" role="menu">
-                    {items.map(({ key, label, disabled, hint }) => (
+                    {items.map(({ key, label, disabled, hint, group }, i) => (
+                        <Fragment key={key}>
+                        {/* The sub-nav's sections survive the collapse (#338). */}
+                        {group && group !== items[i - 1]?.group && (
+                            <span className="nav-menu-section text-nano" role="presentation">{group}</span>
+                        )}
                         <button
-                            key={key}
                             type="button"
                             role="menuitem"
                             disabled={disabled}
@@ -75,6 +84,7 @@ export default function NavMenu({ items, activeKey, onSelect, level = 'main' }) 
                                 a touch device has no way to show. */}
                             {disabled && hint && <span className="nav-menu-item-hint">{hint}</span>}
                         </button>
+                        </Fragment>
                     ))}
                 </div>
             )}

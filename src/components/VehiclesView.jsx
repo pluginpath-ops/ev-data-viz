@@ -61,25 +61,6 @@ function TestCountPills({ vehicle, performanceCounts = {} }) {
     );
 }
 
-// Icons for view toggle
-const CardViewIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-        <rect x="1" y="1" width="6" height="6" rx="1"/>
-        <rect x="9" y="1" width="6" height="6" rx="1"/>
-        <rect x="1" y="9" width="6" height="6" rx="1"/>
-        <rect x="9" y="9" width="6" height="6" rx="1"/>
-    </svg>
-);
-
-const ListViewIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-        <rect x="1" y="2" width="14" height="2.5" rx="1"/>
-        <rect x="1" y="6.75" width="14" height="2.5" rx="1"/>
-        <rect x="1" y="11.5" width="14" height="2.5" rx="1"/>
-    </svg>
-);
-
-
 export default function VehiclesView({
     vehicles, selectedVehicles, onToggleSelection, onSelectAllVisible, onClearAllVisible, onAdd, onUpdate, onDelete, onViewRuns, onOpenTest,
     canCreate, canEdit, canDelete, canPublish, onToggleVisibility,
@@ -88,6 +69,8 @@ export default function VehiclesView({
     onUpdateVehicleSpecs, specCustomFieldSuggestions,
     pendingEditVehicle, onClearPendingEdit,
     savedState, onSaveState,
+    // Cards or List: chosen in the sub-nav since #338, not by a toggle here.
+    viewMode = 'card',
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -99,7 +82,6 @@ export default function VehiclesView({
     const [tagFilterStates, setTagFilterStates] = useState(savedState?.tagFilterStates ?? {}); // { [tagId]: 'or' | 'and' | 'not' }
     const [dataFilterStates, setDataFilterStates] = useState(savedState?.dataFilterStates ?? {}); // { [categoryKey]: 'or' | 'and' | 'not' }
     const [imageUploading, setImageUploading] = useState(false);
-    const [viewMode, setViewMode] = useState(savedState?.viewMode ?? 'card'); // 'card' | 'list'
     const [sortBy, setSortBy] = useState(savedState?.sortBy ?? 'default');
     const [textFilter, setTextFilter] = useState(savedState?.textFilter ?? '');
     const [editingOrder, setEditingOrder] = useState(false);
@@ -118,9 +100,9 @@ export default function VehiclesView({
     useEffect(() => {
         persistableState.current = {
             textFilter, tagFilterStates, mfgFilterStates, dataFilterStates, modelFilter,
-            sortBy, viewMode, vehiclePage,
+            sortBy, vehiclePage,
         };
-    }, [textFilter, tagFilterStates, mfgFilterStates, dataFilterStates, modelFilter, sortBy, viewMode, vehiclePage]);
+    }, [textFilter, tagFilterStates, mfgFilterStates, dataFilterStates, modelFilter, sortBy, vehiclePage]);
 
     // Save state back to App when this tab is left (unmount).
     useEffect(() => {
@@ -594,23 +576,7 @@ export default function VehiclesView({
                     </span>
                 </div>
                 <div className="inline-row">
-                    {/* View mode toggle */}
-                    <div className="view-toggle">
-                        <button
-                            onClick={() => setViewMode('card')}
-                            title="Card view"
-                            className={`px-2 py-1.5 transition ${viewMode === 'card' ? 'bg-[var(--color-surface-muted)] text-[var(--color-text-primary)]' : 'hover:bg-[var(--color-surface-sunken)]'}`}
-                        >
-                            <CardViewIcon />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('list')}
-                            title="List view"
-                            className={`px-2 py-1.5 transition ${viewMode === 'list' ? 'bg-[var(--color-surface-muted)] text-[var(--color-text-primary)]' : 'hover:bg-[var(--color-surface-sunken)]'}`}
-                        >
-                            <ListViewIcon />
-                        </button>
-                    </div>
+
                     {canCreate && (
                         <>
                             <button

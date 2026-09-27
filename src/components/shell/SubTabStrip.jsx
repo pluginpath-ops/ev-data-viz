@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { useIsCompact } from '../../hooks/useIsCompact';
 import NavMenu from './NavMenu';
 
@@ -33,9 +34,18 @@ export default function SubTabStrip({ items, activeKey, onSelect, end = null }) 
                 <NavMenu items={items} activeKey={activeKey} onSelect={onSelect} level="sub" />
             ) : (
                 <div className="subtab-strip-items">
-                    {items.map(({ key, label, disabled, description }) => (
+                    {items.map(({ key, label, disabled, description, group }, i) => (
+                        <Fragment key={key}>
+                        {/* A section of the sub-nav (#338): its label before its
+                            first item, and a rule between sections. Items with
+                            no group draw neither. */}
+                        {group && group !== items[i - 1]?.group && (
+                            <>
+                                {i > 0 && <span className="subtab-section-rule" aria-hidden="true" />}
+                                <span className="subtab-section-label text-nano">{group}</span>
+                            </>
+                        )}
                         <button
-                            key={key}
                             type="button"
                             onClick={() => onSelect(key)}
                             disabled={disabled}
@@ -45,6 +55,7 @@ export default function SubTabStrip({ items, activeKey, onSelect, end = null }) 
                         >
                             {label}
                         </button>
+                        </Fragment>
                     ))}
                 </div>
             )}
