@@ -2132,6 +2132,9 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     column-gap: 14px;
     padding: 8px 14px;
 }
+/* A row's ⋯ menu opens below the row it belongs to, so the row must not clip
+   it. The card's overflow: hidden is for its media band, which a row lacks. */
+.vehicle-row { overflow: visible; }
 /* The header lines up with rows that have a 3px accent border on the left
    and a 1px border on the right, so its padding carries both. */
 .vehicle-list-head {
@@ -2145,7 +2148,15 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     background-color: var(--color-background);
     border-bottom: 1px solid var(--color-border);
 }
-.vehicle-list-head .is-numeric { text-align: right; }
+/* Every heading is centred the same way, sortable (a button) or not, so none
+   sits on a text baseline its neighbours do not share. */
+.vehicle-list-head > [role="columnheader"] {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+.vehicle-list-head > .is-numeric { justify-content: flex-end; }
+.vehicle-list-head .text-micro { line-height: 1.2; }
 .vehicle-list-sort {
     padding: 0;
     border: none;
@@ -2170,23 +2181,38 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     text-overflow: ellipsis;
     white-space: nowrap;
     font-family: var(--font-display);
-    font-weight: 700;
-    font-size: calc(var(--fs-body) * var(--fs-step) * var(--fs-step));
+    font-weight: 600;
+    /* The card's title size (.vehicle-media-title h3): the same object, and
+       the largest text in its row. */
+    font-size: calc(var(--fs-body) * 1.2143);
+    letter-spacing: -0.01em;
     color: var(--color-text-primary);
 }
-/* Make · model · trim · year, then platform and tags: one line, clipped, so
-   every row is one height. */
+/* Make · model · trim · year: one line, ending in an ellipsis where it runs
+   out, so every row is one height. */
 .vehicle-list-meta {
-    display: flex;
-    align-items: center;
-    gap: 10px;
     min-width: 0;
     overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
     color: var(--color-text-secondary);
 }
-.vehicle-list-meta .vehicle-tags { flex-wrap: nowrap; }
+/* The third line: tags, then the platform, a step smaller than the line above
+   — what the car is filed under, after what it is. Clipped like the others. */
+.vehicle-list-extra {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.vehicle-list-extra .vehicle-tags { flex-wrap: nowrap; }
+.vehicle-list-extra .vehicle-tag {
+    padding: 0 6px;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+}
 /* A figure column: right-aligned so values compare down the column, the basis
    beneath. */
 .vehicle-list-figure {
@@ -2203,12 +2229,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     align-items: flex-end;
     gap: 1px;
 }
-.vehicle-list-tests {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+.vehicle-list-tests { min-width: 0; }
 .vehicle-list-actions {
     display: flex;
     align-items: center;
@@ -2222,36 +2243,45 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     border-bottom: 1px solid var(--color-border);
 }
 
-/* How many tests of each kind, one neutral line (#338). The numbers are the
+/* How many tests of each kind (#338), two to a line: up to four kinds fit a
+   2 × 2 block the width of two, where one line truncated. The numbers are the
    data, so they take the value color; the words are its labels. */
 .test-counts {
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    column-gap: 12px;
+    row-gap: 1px;
     font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
     color: var(--color-text-secondary);
+    white-space: nowrap;
 }
 .test-count-n {
     font-family: var(--font-mono);
     color: var(--color-text-value);
 }
-.test-count-sep { margin: 0 6px; color: var(--color-text-meta); }
 
-/* A list row's ⋯ menu (#338). The trigger is a square the height of the
-   button beside it; an empty slot keeps the same width when there is nothing
-   to put in the menu. */
-.vehicle-row-menu-btn,
-.vehicle-row-menu-slot {
+/* The slot after Tests & Data on a List row (#338): the ⋯ menu, a single
+   action's button (a reader's Specs), or nothing — always this wide, so Tests
+   & Data sits in the same place on every row. */
+.vehicle-row-more {
+    display: inline-flex;
+    justify-content: flex-end;
+    width: 64px;
+}
+/* The ⋯ trigger: a square the height of the button beside it, the glyph one
+   step up (--fs-step is a step DOWN, so up divides by it). */
+.vehicle-row-menu-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 36px;
     height: 36px;
-}
-.vehicle-row-menu-btn {
     border: 1px solid var(--color-border-strong);
     border-radius: var(--radius-control);
     background-color: var(--color-surface-sunken);
     color: var(--color-text-secondary);
     cursor: pointer;
-    font-size: calc(var(--fs-body) * var(--fs-step) * var(--fs-step));
+    font-size: calc(var(--fs-body) / var(--fs-step));
     line-height: 1;
 }
 .vehicle-row-menu-btn:hover,
@@ -2267,7 +2297,10 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
    is the one for reading figures on a phone. */
 @media (max-width: 999.98px) {
     /* div. for specificity: the base .vehicle-list rule is later in the file. */
-    div.vehicle-list { --vehicle-list-cols: 20px 72px minmax(0, 1fr) 84px; }
+    div.vehicle-list { --vehicle-list-cols: 20px 72px minmax(0, 1fr) 112px; }
+    /* Tests & Data above the second action, rather than beside it. */
+    .vehicle-list-actions { flex-direction: column; align-items: flex-end; }
+    .vehicle-list-actions .vehicle-row-more { width: auto; }
     .vehicle-list .vehicle-list-figure,
     .vehicle-list .vehicle-list-tests,
     .vehicle-list-head > :nth-child(n+4):not(:last-child) { display: none; }
@@ -3363,7 +3396,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    share (#338; see .vehicle-row). */
 .vehicle-list {
     @apply flex flex-col gap-1.5;
-    --vehicle-list-cols: 20px 96px minmax(220px, 1fr) 92px 92px 150px 190px 152px;
+    /* Figure columns sized to their widest content on the live fleet
+       (2026-09-28: battery 67px, EPA range 81, tested 109, a tests pair 138). */
+    --vehicle-list-cols: 20px 96px minmax(220px, 1fr) 76px 88px 116px 144px 180px;
 }
 
 /* Search / filter row above the vehicle grid */

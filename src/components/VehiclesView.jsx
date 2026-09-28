@@ -1112,13 +1112,16 @@ export default function VehiclesView({
                                             <span className="vehicle-list-name-text">{vehicle.name}</span>
                                             <VisibilityPill vehicle={vehicle} />
                                         </span>
-                                        {/* What it is, on one line: make · model · trim ·
-                                            year, then its platform and tags, clipped
-                                            rather than wrapped so every row is one height. */}
+                                        {/* What it is: make · model · trim · year. */}
                                         <span className="vehicle-list-meta">
-                                            <span>{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</span>
-                                            <PlatformLine vehicle={vehicle} bare />
+                                            {[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}
+                                        </span>
+                                        {/* What it is filed under, a step smaller: its
+                                            tags, then its platform. Its own line, so a
+                                            long trim no longer clips the tags away. */}
+                                        <span className="vehicle-list-extra">
                                             <TagPills vehicle={vehicle} />
+                                            <PlatformLine vehicle={vehicle} bare />
                                         </span>
                                     </span>
                                     <span role="cell" className="vehicle-list-figure" title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}>
