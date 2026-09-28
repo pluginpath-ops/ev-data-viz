@@ -350,6 +350,15 @@ and typical rather than specified. Reusing the word would make "nominal" mean
 both *what the manufacturer claims* and *what we observed on average*, which is
 the exact failure this document was written about.
 
+**"As filed" is not one point on the voltage range.** A pack's voltage moves
+with its charge, and `epa_fe_guide.total_voltage_v` holds whichever point the
+maker filed. GM files full charge: its 80-cell Ultium cars show 336 V, which
+is 80 × 4.2 V, against about 288 V nominal. Lucid's 810 V for the Gravity
+looks nominal, where Lucid's own 926 V is near full. So never compare
+`total_voltage_v` across makers as if it were nominal, and never copy it into
+`battery_nominal_voltage_v` unchecked. The evidence is the explainers' facts
+ledger, `epa-voltage-points-differ` in `src/explainers/facts.json`.
+
 
 ## Deferred renames
 

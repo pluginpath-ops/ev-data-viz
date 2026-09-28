@@ -178,7 +178,7 @@ export const SPEC_CATEGORIES = [
             // year within one platform (early and later E-GMP).
             { key: 'max_dc_400v_kw',              label: 'Max DC on 400 V (kW)',           type: 'number', better: 'higher',
               tableLabel: 'Max DC on 400 V',
-              hint: 'The fastest DC charge rate the car reaches on a 400 V charger, which on an 800 V car is usually well below its peak. It varies by model year on one platform: early E-GMP cars reach about 80 kW and later ones about 150 kW; an early Taycan about 50 kW. Few DC boosters pass 200 kW (the Lucid Gravity is one). A split pack is usually limited by current, to 400–500 A.' },
+              hint: 'The fastest DC charge rate the car reaches on a 400 V charger, which on an 800 V car is usually well below its peak. It varies by model year on one platform: early E-GMP cars reach about 80 kW and later ones about 150 kW; an early Taycan about 50 kW. Few boosters pass 200 kW; the Lucid Gravity, which boosts through its rear motor, is rated up to 225 kW. A split pack is usually limited by current, to 400–500 A.' },
             // Per vehicle, never the platform's list: a Mach-E is NMC or LFP, not
             // both. The platform's chemistries are offered as suggestions in the
             // spec editor and never fill this in.

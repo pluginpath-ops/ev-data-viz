@@ -1304,6 +1304,34 @@ class DataService {
     return out;
   }
 
+  /**
+   * Charging tests by id, each with its vehicle's name and its SoC/kW points:
+   * read-only, for a preview outside the chart views (an explainer's tests
+   * card, via hooks/useChargingTests). Ids that do not resolve are dropped,
+   * and the order asked for is kept.
+   */
+  async getChargingTestsPreview(runIds) {
+    if (!this.useSupabase || !runIds?.length) return [];
+    const real = runIds.filter(id => !isInheritedRunId(id)).map(Number);
+    if (!real.length) return [];
+    const { data, error } = await getSupabase()
+      .from('runs')
+      .select('id, name, kind, vehicle_id, vehicles(name)')
+      .in('id', real);
+    if (error) throw error;
+    const byId = new Map((data || []).map(r => [r.id, r]));
+    const found = real.map(id => byId.get(id)).filter(Boolean);
+    return Promise.all(found.map(async r => ({
+      id: r.id,
+      name: r.name,
+      vehicleId: r.vehicle_id,
+      vehicleName: r.vehicles?.name ?? null,
+      points: (await this.getRunData(r.id))
+        .filter(p => p.soc != null && p.chargeRate != null)
+        .map(p => ({ soc: Number(p.soc), kw: Number(p.chargeRate) })),
+    })));
+  }
+
   async getRunData(runId, efficiencyFactor = 1, capacityFactor = 1) {
     // Inherited runs carry synthetic string ids like "inherited_<linkId>_<realRunId>".
     const actualId = isInheritedRunId(runId)

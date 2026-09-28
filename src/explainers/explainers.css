@@ -1,0 +1,380 @@
+/* Explainers (#355). Kept beside the pages rather than in src/index.css, so
+   the folder stays whole (src/explainers/CLAUDE.md). The same rules as
+   index.css apply, and explainersBoundary.test.js holds them: colors come from
+   tokens only, sizes derive from --fs-body. The theme's guards (drift,
+   contrast, playground catalogue) read index.css only, so that test is this
+   file's guard. */
+
+/* The article keeps a reading measure; the contents box takes the right
+   column beside it on a wide screen, and moves above it on a narrow one. */
+.explainer-shell { max-width: 66rem; }
+.explainer-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 46rem) 13rem;
+    gap: 32px;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .explainer-layout { grid-template-columns: minmax(0, 46rem); }
+    .explainer-layout > .explainer-toc { order: -1; position: static; }
+}
+
+.explainer { display: flex; flex-direction: column; gap: 14px; }
+.explainer .page-title { margin-bottom: 4px; }
+/* A section starts with a clear break: a larger heading on a rule, with room
+   above it, so it cannot be read as the end of the paragraph before. */
+.explainer-heading {
+    margin-top: 20px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--color-border);
+    font-size: calc(var(--fs-body) * 1.5);
+    scroll-margin-top: calc(var(--app-header-h, 0px) + 16px);
+}
+.explainer-subheading { margin-top: 8px; scroll-margin-top: calc(var(--app-header-h, 0px) + 16px); }
+.explainer-notes h3, .explainer-sources h3, .explainer-fits h3 { scroll-margin-top: calc(var(--app-header-h, 0px) + 16px); }
+
+/* ── Contents ───────────────────────────────────────────────────────────── */
+
+.explainer-toc {
+    position: sticky;
+    top: calc(var(--app-header-h, 0px) + 16px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background-color: var(--color-card);
+    max-height: calc(100vh - var(--app-header-h, 0px) - 32px);
+    overflow-y: auto;
+}
+.explainer-toc.is-closed { padding-bottom: 12px; }
+.explainer-toc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.explainer-toc-toggle {
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--color-text-link);
+    font-size: calc(var(--fs-body) * 0.86);
+}
+.explainer-toc-toggle:hover { text-decoration: underline; }
+.explainer-toc-list { display: flex; flex-direction: column; gap: 2px; }
+.explainer-toc-list a {
+    display: block;
+    padding: 3px 8px;
+    border-left: 2px solid transparent;
+    color: var(--color-text-secondary);
+    font-size: calc(var(--fs-body) * 0.93);
+    line-height: 1.4;
+}
+.explainer-toc-list a:hover { color: var(--color-text-primary); background-color: var(--color-hover-lift); }
+.explainer-toc-list .is-level-3 a { padding-left: 20px; }
+.explainer-toc-list .is-active a { color: var(--color-text-primary); border-left-color: var(--color-primary); font-weight: 600; }
+.explainer-para, .explainer-list { line-height: 1.6; color: var(--color-text-primary); }
+.explainer-list { padding-left: 1.25rem; list-style: disc; display: flex; flex-direction: column; gap: 6px; }
+.explainer-code {
+    font-family: var(--font-mono);
+    font-size: calc(var(--fs-body) * 0.93);
+    padding: 0 4px;
+    border-radius: var(--radius-mark);
+    background-color: var(--color-surface-sunken);
+}
+.explainer a, .explainer-link { color: var(--color-text-link); }
+.explainer a:hover, .explainer-link:hover { text-decoration: underline; }
+
+.explainer-draft-note {
+    padding: 8px 12px;
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-control);
+    background-color: var(--color-warning-surface);
+    color: var(--color-warning-text);
+}
+
+.explainer-cite, .explainer-fn { font-size: calc(var(--fs-body) * 0.71); margin-left: 1px; }
+.explainer-cite a::before { content: '['; }
+.explainer-cite a::after { content: ']'; }
+.explainer-cite.is-unverified a {
+    color: var(--color-warning-text);
+    background-color: var(--color-warning-surface);
+    border-radius: var(--radius-mark);
+    padding: 0 2px;
+}
+
+.explainer-table-wrap { overflow-x: auto; }
+.explainer-table { width: 100%; border-collapse: collapse; }
+.explainer-table th, .explainer-table td {
+    text-align: left;
+    vertical-align: top;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    line-height: 1.5;
+}
+.explainer-table th { color: var(--color-text-secondary); font-weight: 600; }
+
+.explainer-quote {
+    padding: 8px 14px;
+    border-left: 3px solid var(--color-border-strong);
+    color: var(--color-text-secondary);
+}
+
+.explainer-engineers {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    padding: 10px 14px;
+    background-color: var(--color-surface-muted);
+}
+.explainer-engineers > summary { cursor: pointer; font-weight: 600; color: var(--color-text-secondary); }
+.explainer-engineers[open] > summary { margin-bottom: 10px; }
+
+.explainer-held {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px dashed var(--color-warning-border);
+    border-radius: var(--radius-card);
+    color: var(--color-text-secondary);
+}
+
+.explainer-tests {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background-color: var(--color-card);
+}
+.explainer-tests-badge {
+    align-self: flex-start;
+    font-family: var(--font-mono);
+    font-size: calc(var(--fs-body) * 0.71);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-success-text);
+}
+.explainer-tests-link { font-weight: 600; }
+
+.explainer-preview svg { width: 100%; height: auto; display: block; }
+.explainer-preview.is-empty { padding: 24px 0; text-align: center; }
+.explainer-preview-grid { stroke: var(--color-chart-grid); stroke-width: 1; }
+.explainer-preview-tick { fill: var(--color-text-meta); font-size: 11px; }
+.explainer-preview-line { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.explainer-preview-line.is-series-0, .explainer-preview-swatch.is-series-0 { stroke: var(--color-accent-blue); background-color: var(--color-accent-blue); }
+.explainer-preview-line.is-series-1, .explainer-preview-swatch.is-series-1 { stroke: var(--color-accent-violet); background-color: var(--color-accent-violet); }
+.explainer-preview-line.is-series-2, .explainer-preview-swatch.is-series-2 { stroke: var(--color-accent-grey); background-color: var(--color-accent-grey); }
+.explainer-preview-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; color: var(--color-text-secondary); font-size: calc(var(--fs-body) * 0.93); }
+.explainer-preview-legend li { display: flex; align-items: center; gap: 6px; }
+.explainer-preview-swatch { width: 14px; height: 3px; border-radius: 2px; }
+
+.explainer-placeholder {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 24px 14px;
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius-card);
+    text-align: center;
+}
+
+.explainer-notes ol, .explainer-sources ol {
+    padding-left: 1.25rem;
+    list-style: decimal;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    color: var(--color-text-secondary);
+}
+.explainer-notes, .explainer-sources { border-top: 1px solid var(--color-border-subtle); padding-top: 12px; }
+.explainer-sources li { display: flex; flex-direction: column; gap: 2px; }
+.explainer-sources li.is-unverified .explainer-source-claim { color: var(--color-warning-text); }
+.explainer-source-claim { color: var(--color-text-primary); }
+.explainer-source { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.explainer-rank, .explainer-unverified-tag, .explainer-model-badge {
+    font-family: var(--font-mono);
+    font-size: calc(var(--fs-body) * 0.71);
+    padding: 1px 6px;
+    border-radius: var(--radius-chip);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+}
+.explainer-cite.is-accepted a {
+    color: var(--color-text-meta);
+    text-decoration: underline dotted;
+}
+.explainer-accepted-tag {
+    font-family: var(--font-mono);
+    font-size: calc(var(--fs-body) * 0.71);
+    padding: 1px 6px;
+    border-radius: var(--radius-chip);
+    border: 1px dashed var(--color-border-strong);
+    color: var(--color-text-meta);
+}
+.explainer-unverified-tag { align-self: flex-start; border-color: var(--color-warning-border); color: var(--color-warning-text); }
+.explainer-model-badge { border-color: var(--color-primary-border); color: var(--color-primary-text); background-color: var(--color-primary-surface); }
+
+/* ── The landing page and the topic tree ────────────────────────────────
+   Each hub has its own hue, used on its glyph and the tree's rule only.
+   Orange is the "active / now" signal (design-tokens.md) and is not a hue. */
+
+.explainer-landing { max-width: 64rem; display: flex; flex-direction: column; gap: 24px; }
+.explainer-landing-head { display: flex; flex-direction: column; gap: 6px; }
+.explainer-lede {
+    max-width: 44rem;
+    font-size: calc(var(--fs-body) * 1.14);
+    line-height: 1.55;
+    color: var(--color-text-secondary);
+}
+.explainer-hubs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; align-items: start; }
+.explainer-hub, .explainer-fits {
+    --hub: var(--color-accent-blue);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px;
+    border: 1px solid var(--color-border);
+    border-top: 3px solid var(--hub);
+    border-radius: var(--radius-card);
+    background-color: var(--color-card);
+}
+.explainer-hub.is-cells, .explainer-fits.is-cells { --hub: var(--color-accent-violet); }
+.explainer-fits { margin: 8px 0; }
+.explainer-hub-head { display: flex; align-items: flex-start; gap: 14px; }
+.explainer-hub-blurb { margin-top: 4px; color: var(--color-text-secondary); line-height: 1.5; }
+.explainer-hub-glyph { flex: none; width: 64px; height: 40px; }
+.explainer-hub-glyph-axis { fill: none; stroke: var(--color-border-strong); stroke-width: 1.5; }
+.explainer-hub-glyph-line { fill: none; stroke: var(--hub); stroke-width: 3; stroke-linecap: round; }
+.explainer-hub-glyph-cell { fill: var(--color-surface-sunken); stroke: var(--hub); stroke-width: 1.5; }
+
+.explainer-tree { display: flex; flex-direction: column; gap: 4px; }
+.explainer-tree .explainer-tree {
+    margin: 4px 0 2px 10px;
+    padding-left: 14px;
+    border-left: 2px solid var(--color-border-subtle);
+}
+.explainer-tree-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: var(--radius-control);
+}
+.explainer-tree-row:not(.is-planned):hover { background-color: var(--color-hover-lift); }
+.explainer-tree-row.is-current { background-color: var(--color-surface-muted); box-shadow: inset 3px 0 0 var(--hub); }
+.explainer-tree-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-weight: 600; }
+.explainer-tree-title a { color: var(--color-text-link); }
+.explainer-tree-row.is-planned .explainer-tree-title { color: var(--color-text-meta); font-weight: 500; }
+.explainer-tree-blurb { color: var(--color-text-secondary); font-size: calc(var(--fs-body) * 0.93); line-height: 1.45; }
+.explainer-tree-row.is-planned .explainer-tree-blurb { color: var(--color-text-meta); }
+
+.explainer-tag {
+    font-family: var(--font-mono);
+    font-size: calc(var(--fs-body) * 0.71);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: var(--radius-chip);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-meta);
+}
+.explainer-tag.is-draft { border-color: var(--color-warning-border); color: var(--color-warning-text); background-color: var(--color-warning-surface); }
+.explainer-tag.is-lab { border-color: var(--color-primary-border); color: var(--color-primary-text); background-color: var(--color-primary-surface); }
+
+/* ── The Split Pack Lab ─────────────────────────────────────────────────── */
+
+.explainer-lab {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background-color: var(--color-card);
+}
+.explainer-lab-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.explainer-lab-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.explainer-lab-field { display: flex; flex-direction: column; gap: 4px; }
+.explainer-lab-field select {
+    padding: 4px 6px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-input);
+    color: var(--color-text-primary);
+}
+.explainer-lab-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.explainer-chip {
+    padding: 1px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-chip);
+    font-size: calc(var(--fs-body) * 0.86);
+    color: var(--color-text-secondary);
+    background: none;
+    cursor: pointer;
+}
+.explainer-chip[aria-pressed="true"] { border-color: var(--color-primary-border); color: var(--color-primary-text); background-color: var(--color-primary-surface); }
+
+.explainer-lab-scale { margin-top: -4px; }
+.explainer-lab-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.explainer-lab-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-muted);
+}
+.explainer-lab-column.is-moot .explainer-lab-bars,
+.explainer-lab-column.is-moot .explainer-diagram { opacity: 0.45; }
+/* Fixed heights on every row above the bars, so the tracks start and end at
+   the same height in both columns whatever wraps. */
+.explainer-lab-column-title { align-self: stretch; min-height: 2.8em; font-weight: 600; color: var(--color-text-primary); }
+.explainer-lab-total { color: var(--color-text-secondary); }
+.explainer-lab-bars { display: flex; justify-content: center; align-items: flex-start; gap: 24px; width: 100%; }
+.explainer-lab-vbar { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 7.5rem; text-align: center; }
+.explainer-lab-vbar-track {
+    position: relative;
+    width: 44px;
+    height: 160px;
+    border-radius: var(--radius-track);
+    background-color: var(--color-surface-sunken);
+    overflow: hidden;
+}
+.explainer-lab-vbar-fill { position: absolute; left: 0; right: 0; bottom: 0; transition: height 0.25s; }
+.explainer-lab-vbar-fill.is-direct     { background-color: var(--color-accent-grey); }
+.explainer-lab-vbar-fill.is-split-pack { background-color: var(--color-accent-violet); }
+.explainer-lab-vbar-fill.is-dc-booster { background-color: var(--color-accent-blue); }
+.explainer-lab-vbar-label { font-weight: 600; color: var(--color-text-primary); white-space: nowrap; }
+/* The car's own method is marked; the other stays as the comparison, quieter. */
+.explainer-lab-vbar-own {
+    font-family: var(--font-mono);
+    font-size: calc(var(--fs-body) * 0.71);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-primary-text);
+}
+.explainer-lab-vbar.is-own .explainer-lab-vbar-track { box-shadow: 0 0 0 2px var(--color-primary); }
+.explainer-lab-vbar.is-other .explainer-lab-vbar-fill { opacity: 0.45; }
+.explainer-lab-vbar-value { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: calc(var(--fs-body) * 2.9); }
+.explainer-lab-vbar-amps { color: var(--color-text-secondary); font-size: calc(var(--fs-body) * 0.86); }
+.explainer-lab-vbar-limit { line-height: 1.35; }
+.explainer-lab-caption { display: flex; flex-direction: column; gap: 4px; }
+.explainer-lab-caveat {
+    align-self: flex-start;
+    padding: 2px 8px;
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--radius-chip);
+    color: var(--color-text-meta);
+    font-size: calc(var(--fs-body) * 0.86);
+}
+
+.explainer-diagram { width: 100%; max-width: 420px; height: auto; }
+.explainer-diagram-label { fill: var(--color-text-secondary); font-size: 12px; }
+.explainer-diagram-text { fill: var(--color-text-primary); font-size: 12px; }
+.explainer-diagram-charger { fill: var(--color-surface-sunken); stroke: var(--color-border-strong); }
+.explainer-diagram-cells { fill: var(--color-surface-sunken); stroke: var(--color-accent-violet); stroke-width: 1.5; }
+.explainer-diagram-wire path { fill: none; stroke: var(--color-text-secondary); stroke-width: 2; }

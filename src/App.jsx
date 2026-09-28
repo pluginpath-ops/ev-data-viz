@@ -245,6 +245,8 @@ export default function App() {
     const [referenceSubtab, setReferenceSubtab] = useState(DEFAULT_REFERENCE_SUBTAB);
     // The platform whose page is showing under Reference › Platforms (#354), or null for the list.
     const [referencePlatformId, setReferencePlatformId] = useState(null);
+    // The explainer showing under Reference › Explainers (#355), by slug, or null for the list.
+    const [referenceTopic, setReferenceTopic] = useState(null);
 
     const handleChartModeChange = (newMode) => {
         const categoryKey = categoryForMode(newMode).key;
@@ -346,13 +348,21 @@ export default function App() {
         window.scrollTo(0, 0);
     };
 
-    /** A Reference sub-tab's top level: the platform list, or Explainers. */
-    const openReference = (subtab) => {
-        const url = subtab === DEFAULT_REFERENCE_SUBTAB ? '?tab=reference' : `?tab=reference&sub=${subtab}`;
-        history.pushState({ view: 'reference', subtab, platformId: null }, '', url);
+    /** A Reference sub-tab's top level (the platform list, or Explainers), or one explainer. */
+    const openReference = (subtab, topic = null) => {
+        const url = subtab === DEFAULT_REFERENCE_SUBTAB ? '?tab=reference'
+            : `?tab=reference&sub=${subtab}${topic ? `&topic=${encodeURIComponent(topic)}` : ''}`;
+        history.pushState({ view: 'reference', subtab, platformId: null, topic }, '', url);
         setReferenceSubtab(subtab);
         setReferencePlatformId(null);
+        setReferenceTopic(topic);
         setView('reference');
+    };
+
+    /** An explainer, from anywhere an ExplainerLink sits (#355). A history entry, like openPlatform. */
+    const openExplainer = (slug) => {
+        openReference('explainers', slug);
+        window.scrollTo(0, 0);
     };
 
     /** Show the opened vehicle's page (#338). */
@@ -424,6 +434,7 @@ export default function App() {
         if (tab === 'reference') {
             setReferenceSubtab(referenceSubtabFromParam(p.get('sub')));
             setReferencePlatformId(p.get('pid') || null);
+            setReferenceTopic(p.get('topic') || null);
             setView('reference');
             return;
         }
@@ -538,6 +549,7 @@ export default function App() {
             if (e.state.view === 'reference') {
                 setReferenceSubtab(referenceSubtabFromParam(e.state.subtab));
                 setReferencePlatformId(e.state.platformId ?? null);
+                setReferenceTopic(e.state.topic ?? null);
             }
             if (e.state.view === 'admin' && ADMIN_SUBTAB_IDS.includes(e.state.subtab)) {
                 setAdminSubtab(e.state.subtab);
@@ -768,8 +780,9 @@ export default function App() {
         p.set('tab', 'reference');
         if (referenceSubtab !== DEFAULT_REFERENCE_SUBTAB) p.set('sub', referenceSubtab);
         else if (referencePlatformId != null) p.set('pid', referencePlatformId);
-        history.replaceState({ view: 'reference', subtab: referenceSubtab, platformId: referencePlatformId }, '', '?' + p.toString());
-    }, [isPopout, view, referenceSubtab, referencePlatformId]);
+        if (referenceSubtab === 'explainers' && referenceTopic) p.set('topic', referenceTopic);
+        history.replaceState({ view: 'reference', subtab: referenceSubtab, platformId: referencePlatformId, topic: referenceTopic }, '', '?' + p.toString());
+    }, [isPopout, view, referenceSubtab, referencePlatformId, referenceTopic]);
 
     // ── Keep URL in sync while on the Admin tab ─────────────────────────────
     useEffect(() => {
@@ -824,7 +837,7 @@ export default function App() {
         vehicles: { tab: 'vehicles', items: VEHICLES_STRIP_ITEMS, active: vehiclesMode, select: setVehiclesMode },
         reference: { tab: 'reference', items: REFERENCE_STRIP_ITEMS, active: referenceSubtab,
             // A sub-tab opens its own top level: Platforms is the list.
-            select: (key) => { setReferenceSubtab(key); setReferencePlatformId(null); } },
+            select: (key) => { setReferenceSubtab(key); setReferencePlatformId(null); setReferenceTopic(null); } },
     }[headerTab] ?? null;
 
     // The pop-out, at the right end of whichever sub-nav a chart mode is drawn in.
@@ -871,7 +884,7 @@ export default function App() {
     }
 
     return (
-        <NavigationContext.Provider value={{ openPlatform }}>
+        <NavigationContext.Provider value={{ openPlatform, openExplainer }}>
             {showAuthModal && (
                 <AuthModal
                     onClose={() => setShowAuthModal(false)}
@@ -1235,8 +1248,9 @@ export default function App() {
                         <ReferenceSection
                             subtab={referenceSubtab}
                             platformId={referencePlatformId}
+                            topic={referenceTopic}
                             onBackToPlatforms={() => openReference('platforms')}
-                            onOpenExplainers={() => openReference('explainers')}
+                            onBackToExplainers={() => openReference('explainers')}
                         />
                     )}
 
