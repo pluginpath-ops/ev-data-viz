@@ -737,45 +737,8 @@ export function formatVehicleCell(row, col, units = 'imperial') {
 
 // ── Filtering and sorting ───────────────────────────────────────────────────
 
-/** The empty filter state, and the shape the URL round-trips. */
-export const EMPTY_VEHICLE_FILTERS = { search: '', makes: [], years: [], drives: [], tags: [] };
-
-/** The values a row carries for one facet — several for tags. */
-export function facetValues(row, key) {
-    switch (key) {
-        case 'makes':  return row.values.make != null ? [row.values.make] : [];
-        case 'years':  return row.values.year != null ? [String(row.values.year)] : [];
-        case 'drives': return row.values['powertrain.drive_type'] != null ? [row.values['powertrain.drive_type']] : [];
-        case 'tags':   return (row.vehicle?.tags ?? []).map(t => t.name).filter(Boolean);
-        default:       return [];
-    }
-}
-
-/** Distinct values per facet. */
-export function vehicleFacets(rows = []) {
-    const out = {};
-    for (const key of ['makes', 'years', 'drives', 'tags']) {
-        const set = new Set(rows.flatMap(r => facetValues(r, key)));
-        out[key] = [...set].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
-    }
-    return out;
-}
-
-export function filterVehicleRows(rows = [], filters = EMPTY_VEHICLE_FILTERS) {
-    const f = { ...EMPTY_VEHICLE_FILTERS, ...filters };
-    const needle = f.search.trim().toLowerCase();
-    return rows.filter(row => {
-        for (const key of ['makes', 'years', 'drives', 'tags']) {
-            if (f[key].length && !facetValues(row, key).some(v => f[key].includes(v))) return false;
-        }
-        if (needle) {
-            const hay = [row.values.name, row.values.make, row.values.model, row.values.trim, row.values.tags]
-                .filter(Boolean).join(' ').toLowerCase();
-            if (!hay.includes(needle)) return false;
-        }
-        return true;
-    });
-}
+// Filters are Vehicles & Specs' own since #338, shared with Cards and List:
+// see vehicleFilters.js. The table sorts and draws what they leave.
 
 /** Sort by one column; blanks last, as in every sortable table (tableColumns). */
 export function sortVehicleRows(rows = [], key = 'name', dir = 'asc') {
@@ -808,18 +771,17 @@ export function vehicleBarPercent(row, col, maxima) {
 /** Every vehicle-table parameter carries this prefix, so the chart URL writer can keep them. */
 export const VEHICLE_TABLE_PARAM_PREFIX = 'vt_';
 
-const LIST_PARAMS = { makes: 'vt_mk', years: 'vt_y', drives: 'vt_dr', tags: 'vt_tg' };
-
 /**
- * Columns, sort and filters as query parameters — only what differs from the
- * defaults.
+ * Columns, sort and assumptions as query parameters — only what differs from
+ * the defaults. Filters are not the table's (vehicleFilters.js, #338); the old
+ * `vt_q` and facet parameters are still read there.
  *
  * A preset's own columns travel as `vt_preset=road-trips` rather than the list,
  * so a shared link reads as what it is. Its own sort is implied by it. Columns
  * changed from a preset travel as `vt_cols` WITH `vt_preset`, which then means
  * "modified from", so the reader of a link sees where the view started.
  */
-export function encodeVehicleTableParams({ columns, sortKey, sortDir, filters, modifiedFrom = null, assumptions = DEFAULT_ASSUMPTIONS }) {
+export function encodeVehicleTableParams({ columns, sortKey, sortDir, modifiedFrom = null, assumptions = DEFAULT_ASSUMPTIONS }) {
     const p = new URLSearchParams();
     const preset = presetMatching(columns ?? []);
     const base = preset ?? vehiclePresetByKey(modifiedFrom);
@@ -843,10 +805,6 @@ export function encodeVehicleTableParams({ columns, sortKey, sortDir, filters, m
     }
     if (a.homePrice !== DEFAULT_ASSUMPTIONS.homePrice) p.set('vt_home', String(a.homePrice));
     if (a.fastPrice !== DEFAULT_ASSUMPTIONS.fastPrice) p.set('vt_fast', String(a.fastPrice));
-    if (filters?.search?.trim()) p.set('vt_q', filters.search.trim());
-    for (const [key, param] of Object.entries(LIST_PARAMS)) {
-        for (const v of filters?.[key] ?? []) p.append(param, v);
-    }
     return p;
 }
 
@@ -867,15 +825,12 @@ export function decodeVehicleTableParams(search) {
         : (preset?.columns ?? DEFAULT_VEHICLE_COLUMNS);
     const shown = presetMatching(columns);
     const implied = shown ?? vehiclePresetByKey('overview');
-    const filters = { ...EMPTY_VEHICLE_FILTERS, search: p.get('vt_q') ?? '' };
-    for (const [key, param] of Object.entries(LIST_PARAMS)) filters[key] = p.getAll(param);
     const rawSort = currentColumnKey(p.get('vt_sort'));
     const sortKey = BY_KEY.has(rawSort) ? rawSort : null;
     return {
         columns,
         sortKey: sortKey ?? implied.sortKey,
         sortDir: sortKey ? (p.get('vt_dir') === 'desc' ? 'desc' : 'asc') : implied.sortDir,
-        filters,
         modifiedFrom: !shown && preset ? preset.key : null,
         assumptions: decodeAssumptions(p),
     };
@@ -904,26 +859,21 @@ function decodeAssumptions(p) {
  * uses, so the one decoder validates both and a retired column key drops out
  * of a memory exactly as it does out of an old link.
  *
- * Two lifetimes, because they are two kinds of setting:
- * - `view`: columns, sort, the preset they came from, and the assumptions.
- *   A preference, kept across visits.
- * - `filters`: search and facets. A question being asked now, kept for the
- *   session; coming back next week to twelve rows of 94 and no memory of why
- *   is the wrong surprise.
+ * What it remembers is `view`: columns, sort, the preset they came from, and
+ * the assumptions — a preference, kept across visits. Filters used to be
+ * remembered here for the session too; since #338 they are Vehicles & Specs'
+ * own, held by App for Cards, List and Table alike.
  *
  * A link that carries any table parameter wins outright. It is the sender's
  * view, and blending the reader's memory into it would show neither.
  */
-export function vehicleTableStartSearch(urlSearch, { view = '', filters = '' } = {}) {
+export function vehicleTableStartSearch(urlSearch, { view = '' } = {}) {
     const url = new URLSearchParams(urlSearch ?? '');
     if ([...url.keys()].some(k => k.startsWith(VEHICLE_TABLE_PARAM_PREFIX))) return url.toString();
-    return [view, filters].filter(Boolean).join('&');
+    return view;
 }
 
-/** The two remembered strings for a state; see vehicleTableStartSearch. */
-export function vehicleTableMemory({ columns, sortKey, sortDir, filters, modifiedFrom = null, assumptions = DEFAULT_ASSUMPTIONS }) {
-    return {
-        view: encodeVehicleTableParams({ columns, sortKey, sortDir, filters: EMPTY_VEHICLE_FILTERS, modifiedFrom, assumptions }).toString(),
-        filters: encodeVehicleTableParams({ columns: DEFAULT_VEHICLE_COLUMNS, filters }).toString(),
-    };
+/** The remembered string for a state; see vehicleTableStartSearch. */
+export function vehicleTableMemory({ columns, sortKey, sortDir, modifiedFrom = null, assumptions = DEFAULT_ASSUMPTIONS }) {
+    return { view: encodeVehicleTableParams({ columns, sortKey, sortDir, modifiedFrom, assumptions }).toString() };
 }

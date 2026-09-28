@@ -837,7 +837,7 @@ describe('the seams that broke before', () => {
         // exactly like one that works until someone clicks it.
         const app = read('src/App.jsx');
         expect(app, 'the main window must give the table a way to open a test')
-            .toMatch(/<VehicleTable onOpenTest=\{openTest\} \/>/);
+            .toMatch(/<VehicleTable onOpenTest=\{openTest\}/);
         expect(app, 'a ?run= link must survive a load').toMatch(/p\.get\('run'\)/);
         expect(app, 'Tests & Data must be told which test to land on').toMatch(/focusRunId=\{focusRunId\}/);
         const runs = read('src/components/RunsView.jsx');
@@ -852,7 +852,7 @@ describe('the seams that broke before', () => {
     it('makes the vehicle table a selection surface over the whole fleet', () => {
         const app = read('src/App.jsx');
         // Mounted with no selection gate: the table is where a selection is made.
-        expect(app, 'App must mount the vehicle table for specstable').toMatch(/chartMode === 'specstable' && <VehicleTable[ />]/);
+        expect(app, 'App must mount the vehicle table for specstable').toMatch(/chartMode === 'specstable' && \(?\s*<VehicleTable[ />]/);
         expect(app).not.toMatch(/selectedVehicles\.length > 0 && chartMode === 'specstable'/);
         // The chart URL writer must carry the table's own parameters, or every
         // selection change wipes the reader's columns, sort and filters.

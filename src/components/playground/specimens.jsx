@@ -126,6 +126,11 @@ export const COMPOSITES = {
             <div className="guide-facet-panel" style={{ position: 'static', marginTop: 4 }}>
                 <div className="guide-facet-panel-head">
                     <span className="text-nano">1 of 36 · by count</span>
+                    {/* Any / all, for facets whose rows carry several values (#338). */}
+                    <span className="stats-segmented guide-facet-match" role="group" aria-label="Match">
+                        <button type="button" className="active">any</button>
+                        <button type="button">all</button>
+                    </span>
                     <button type="button" className="section-action">clear</button>
                 </div>
                 <div className="guide-facet-panel-list">
@@ -134,11 +139,15 @@ export const COMPOSITES = {
                         <span className="guide-facet-option-name">Rivian</span>
                         <span className="guide-facet-option-count">171</span>
                     </label>
-                    <label className="guide-facet-option">
-                        <input type="checkbox" readOnly />
-                        <span className="guide-facet-option-name">BMW</span>
-                        <span className="guide-facet-option-count">125</span>
-                    </label>
+                    {/* Excluded (#338): struck through, its "not" lit. */}
+                    <div className="flex items-center gap-1 guide-facet-option-row is-excluded">
+                        <label className="guide-facet-option">
+                            <input type="checkbox" readOnly />
+                            <span className="guide-facet-option-name">BMW</span>
+                            <span className="guide-facet-option-count">125</span>
+                        </label>
+                        <button type="button" className="guide-facet-exclude active" aria-pressed="true">not</button>
+                    </div>
                     {/* Disabled, not hidden: a make vanishing reads as a bug,
                         where a greyed one reads as an answer. */}
                     <label className="guide-facet-option">

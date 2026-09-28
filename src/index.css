@@ -3406,10 +3406,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     --vehicle-list-cols: 20px 96px minmax(220px, 1fr) 76px 88px 116px 144px 180px;
 }
 
-/* Search / filter row above the vehicle grid */
-.vehicle-filter-bar {
-    @apply flex gap-3 items-center mb-3;
-}
 
 /* Tag filter chip strip below the search bar */
 .tag-filter-bar {
@@ -6515,6 +6511,33 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .guide-facet-option:hover,
 .guide-column-row:hover { background-color: var(--color-hover-lift); }
 .guide-facet-option.selected { background-color: var(--color-primary-surface); }
+/* A value and its "not" button (#338): the option fills the row, the button
+   sits at its end. An excluded value is struck through, in the danger color
+   the "not" is drawn in. */
+.guide-facet-option-row > .guide-facet-option { flex: 1; min-width: 0; }
+.guide-facet-option-row.is-excluded .guide-facet-option-name {
+    text-decoration: line-through;
+    color: var(--color-text-secondary);
+}
+.guide-facet-exclude {
+    flex: none;
+    padding: 1px 6px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-mark);
+    background: none;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+.guide-facet-exclude:hover { color: var(--color-text-primary); border-color: var(--color-border-strong); }
+.guide-facet-exclude.active {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+}
+/* The any / all switch in a facet's head: the segmented control, small. */
+.guide-facet-match button { padding: 1px 8px; }
+
 /* Disabled, not hidden: a make vanishing reads as a bug, a greyed one reads as
    an answer. */
 .guide-facet-option:has(input:disabled) {
@@ -6604,6 +6627,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-primary);
     cursor: pointer;
 }
+/* A chip for a value left out (#338): "not Truck", in the exclude color. */
+.guide-narrowed-chip.is-excluded { color: var(--color-danger); }
 .guide-narrowed-chip:hover {
     border-color: var(--color-danger-border);
     color: var(--color-danger-text);

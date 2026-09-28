@@ -5,7 +5,7 @@ import SeriesColorPicker from './SeriesColorPicker';
 import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 import { EMPTY_VEHICLE_FORM, vehicleFormFrom } from '../utils/vehicleForm';
 import { useAppContext } from '../context/AppContext';
-import { DATA_CATEGORIES, vehicleDataCategories, hasDataCategory, filterByDataCategories } from '../utils/vehicleDataCategories';
+import { DATA_CATEGORIES, vehicleDataCategories } from '../utils/vehicleDataCategories';
 import { distanceValue, distanceUnit } from '../utils/unitConversions';
 import StatCell from './StatCell';
 import VehicleMedia from './vehicles/VehicleMedia';
@@ -17,6 +17,9 @@ import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
+import VehicleFilterBar from './vehicles/VehicleFilterBar';
+import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
+import { EMPTY_VEHICLE_FILTERS, filtersActive } from '../utils/vehicleFilters';
 import VehicleListHeader from './vehicles/VehicleListHeader';
 import VehicleRowMenu from './vehicles/VehicleRowMenu';
 import TestCounts from './vehicles/TestCounts';
@@ -103,19 +106,16 @@ export default function VehiclesView({
     savedState, onSaveState,
     // Cards or List: chosen in the sub-nav since #338, not by a toggle here.
     viewMode = 'card',
+    // Vehicles & Specs' filters, shared with the Table (#338).
+    filters = EMPTY_VEHICLE_FILTERS, onFiltersChange = () => {},
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState(EMPTY_VEHICLE_FORM);
-    const [mfgFilterStates, setMfgFilterStates] = useState(savedState?.mfgFilterStates ?? {}); // { [mfgId]: 'or' | 'not' }
-    const [modelFilter, setModelFilter] = useState(savedState?.modelFilter ?? new Set());
     const [formTags, setFormTags] = useState([]);
     const [newTagName, setNewTagName] = useState('');
-    const [tagFilterStates, setTagFilterStates] = useState(savedState?.tagFilterStates ?? {}); // { [tagId]: 'or' | 'and' | 'not' }
-    const [dataFilterStates, setDataFilterStates] = useState(savedState?.dataFilterStates ?? {}); // { [categoryKey]: 'or' | 'and' | 'not' }
     const [imageUploading, setImageUploading] = useState(false);
     const [sortBy, setSortBy] = useState(savedState?.sortBy ?? 'default');
-    const [textFilter, setTextFilter] = useState(savedState?.textFilter ?? '');
     const [editingOrder, setEditingOrder] = useState(false);
     const [pendingOrder, setPendingOrder] = useState(null);   // [{id, sort_order}] or null
     const [savingOrder, setSavingOrder]   = useState(false);
@@ -132,10 +132,9 @@ export default function VehiclesView({
     const persistableState = useRef({});
     useEffect(() => {
         persistableState.current = {
-            textFilter, tagFilterStates, mfgFilterStates, dataFilterStates, modelFilter,
             sortBy, vehiclePage,
         };
-    }, [textFilter, tagFilterStates, mfgFilterStates, dataFilterStates, modelFilter, sortBy, vehiclePage]);
+    }, [sortBy, vehiclePage]);
 
     // Save state back to App when this tab is left (unmount).
     useEffect(() => {
@@ -237,88 +236,14 @@ export default function VehiclesView({
     };
 
     // Cycle brand filter state: N/A → OR (green) → NOT (red) → N/A  (no AND — doesn't make sense for brands)
-    const cycleMfgFilter = (mfgId) => {
-        setMfgFilterStates(prev => {
-            const cur = prev[mfgId];
-            if (!cur)         return { ...prev, [mfgId]: 'or' };
-            if (cur === 'or') return { ...prev, [mfgId]: 'not' };
-            const next = { ...prev }; delete next[mfgId]; return next; // not → N/A
-        });
-        setModelFilter(new Set()); // reset model filter when brand filter changes
-    };
 
-    // Cycle tag filter state: N/A → OR (green) → AND (blue) → NOT (red) → N/A
-    const cycleTagFilter = (tagId) => {
-        setTagFilterStates(prev => {
-            const cur = prev[tagId];
-            if (!cur)          return { ...prev, [tagId]: 'or' };
-            if (cur === 'or')  return { ...prev, [tagId]: 'and' };
-            if (cur === 'and') return { ...prev, [tagId]: 'not' };
-            const next = { ...prev }; delete next[tagId]; return next; // not → N/A
-        });
-    };
-
-    // AND → NOT → clear. No OR state: the useful questions about data coverage
-    // are "has charging AND range" and "has no EPA data" — nobody asks for
-    // "charging or braking", so that state would only sit in the way.
-    const cycleDataFilter = (key) => {
-        setDataFilterStates(prev => {
-            const cur = prev[key];
-            if (!cur)          return { ...prev, [key]: 'and' };
-            if (cur === 'and') return { ...prev, [key]: 'not' };
-            const next = { ...prev }; delete next[key]; return next;
-        });
-    };
-
-    // Stage 1: quad-state tag filter + committed-delete filter
-    const orTags  = Object.entries(tagFilterStates).filter(([, s]) => s === 'or' ).map(([id]) => Number(id));
-    const andTags = Object.entries(tagFilterStates).filter(([, s]) => s === 'and').map(([id]) => Number(id));
-    const notTags = Object.entries(tagFilterStates).filter(([, s]) => s === 'not').map(([id]) => Number(id));
-
-    const tagFiltered = vehicles.filter(v => {
-        if (notTags.some(id => v.tags?.some(t => t.id === id))) return false;
-        if (andTags.length && !andTags.every(id => v.tags?.some(t => t.id === id))) return false;
-        if (orTags.length  && !orTags.some(id  => v.tags?.some(t => t.id === id))) return false;
-        return true;
-    }).filter(v => !committedDeletes.has(v.id));
-
-    // Stage 2: manufacturer filter (OR = show only these brands, NOT = hide these brands)
-    const orMfgs  = Object.entries(mfgFilterStates).filter(([, s]) => s === 'or' ).map(([id]) => Number(id));
-    const notMfgs = Object.entries(mfgFilterStates).filter(([, s]) => s === 'not').map(([id]) => Number(id));
-    const mfgFiltered = (orMfgs.length === 0 && notMfgs.length === 0) ? tagFiltered : tagFiltered.filter(v => {
-        if (notMfgs.length && notMfgs.includes(v.manufacturer?.id ?? null)) return false;
-        if (orMfgs.length  && !orMfgs.includes(v.manufacturer?.id ?? null)) return false;
-        return true;
-    });
-
-    // Stage 2b: model filter — only active when at least one OR-brand is selected
-    const availableModels = orMfgs.length > 0
-        ? [...new Set(mfgFiltered.map(v => v.model).filter(Boolean))].sort()
-        : [];
-    const modelFiltered = modelFilter.size === 0 ? mfgFiltered : mfgFiltered.filter(v =>
-        v.model && modelFilter.has(v.model)
-    );
-
-    // Stage 2c: data-type filter — which kinds of test data the vehicle holds
-    const dataFiltered = filterByDataCategories(modelFiltered, dataFilterStates, performanceCounts);
-
-    // Stage 3: text filter
-    const textLower = textFilter.trim().toLowerCase();
-    const textFiltered = !textLower ? dataFiltered : dataFiltered.filter(v => {
-        if ([v.name, v.make, v.model].some(f => (f || '').toLowerCase().includes(textLower))) return true;
-        const year = String(v.year || '');
-        if (year.toLowerCase().includes(textLower)) return true;
-        // Range match: "2022-2024" should match a search for "2023"
-        const queryNum = parseInt(textLower, 10);
-        if (!isNaN(queryNum) && /^\d{4}\s*[-–]\s*\d{4}$/.test(year)) {
-            const parts = year.split(/[-–]/).map(s => parseInt(s.trim(), 10));
-            if (parts.length === 2) return queryNum >= parts[0] && queryNum <= parts[1];
-        }
-        return false;
-    });
+    // The filters are Vehicles & Specs' own, shared with List and Table (#338);
+    // committed deletes are the only narrowing this view adds.
+    const { ctx: filterCtx, filtered: filteredVehicles } = useFilteredVehicles(vehicles, filters, performanceCounts);
+    const shownVehicles = filteredVehicles.filter(v => !committedDeletes.has(v.id));
 
     // Stage 3: sort
-    const sortedFilteredVehicles = [...textFiltered].sort((a, b) => {
+    const sortedFilteredVehicles = [...shownVehicles].sort((a, b) => {
         switch (sortBy) {
             case 'default': {
                 // Use pending sort_order when available (instant visual feedback before DB save)
@@ -608,11 +533,10 @@ export default function VehiclesView({
     useEffect(() => {
         if (!didMount.current) { didMount.current = true; return; }
         setVehiclePage(1);
-    }, [textFilter, tagFilterStates, sortBy, mfgFilterStates, dataFilterStates]);
+    }, [filters, sortBy]);
 
     const showReorderButtons = canEdit({}) && sortBy === 'default'
-        && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0
-        && editingOrder;
+        && !filtersActive(filters) && editingOrder;
 
     // ────────────────────────────────────────────────────────────────────────
 
@@ -670,205 +594,64 @@ export default function VehiclesView({
                 </div>
             </div>
 
-            {/* Sort + search bar */}
-            <div className="vehicle-filter-bar">
-                <input
-                    type="text"
-                    placeholder="Search by name, make, model, year…"
-                    value={textFilter}
-                    onChange={e => setTextFilter(e.target.value)}
-                    className="form-input form-input flex-1"
-                />
-                <select
-                    value={sortBy}
-                    onChange={e => setSortBy(e.target.value)}
-                    className="form-input form-input"
-                >
-                    <option value="default">Default Order</option>
-                    <option value="date_newest">Date Added (Newest)</option>
-                    <option value="date_oldest">Date Added (Oldest)</option>
-                    <option value="brand_az">Brand A→Z</option>
-                    <option value="brand_za">Brand Z→A</option>
-                    <option value="model_az">Model A→Z</option>
-                    <option value="model_za">Model Z→A</option>
-                    <option value="year_newest">Year (Newest)</option>
-                    <option value="year_oldest">Year (Oldest)</option>
-                    <option value="mfg_az">Group by Manufacturer</option>
-                    {/* The List view's column sorts, so Cards can use them too (#338). */}
-                    <option value="name_az">Name A→Z</option>
-                    <option value="name_za">Name Z→A</option>
-                    <option value="battery_desc">Battery (Largest)</option>
-                    <option value="battery_asc">Battery (Smallest)</option>
-                    <option value="range_desc">EPA Range (Longest)</option>
-                    <option value="range_asc">EPA Range (Shortest)</option>
-                    <option value="tested_desc">Tested Range (Longest)</option>
-                    <option value="tested_asc">Tested Range (Shortest)</option>
-                </select>
-                {canEdit({}) && sortBy === 'default' && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0 && (
-                    <button
-                        onClick={() => { if (editingOrder) setPendingOrder(null); setEditingOrder(v => !v); }}
-                        className={`btn btn-toggle${editingOrder ? ' active' : ''} flex-shrink-0`}
-                        style={editingOrder ? { backgroundColor: 'var(--color-primary-light)', borderColor: 'var(--color-primary)', color: 'var(--color-primary-text)' } : {}}
+            {/* One filter bar for Cards, List and Table (#338): the chip walls
+                that sat here — Filter, Brand, Data — are its dropdowns now. The
+                sort and Edit Order ride in its row, since they change what
+                this view shows. */}
+            <VehicleFilterBar
+                vehicles={vehicles}
+                filters={filters}
+                onChange={onFiltersChange}
+                ctx={filterCtx}
+                shownCount={shownVehicles.length}
+            >
+                    <select
+                        value={sortBy}
+                        onChange={e => setSortBy(e.target.value)}
+                        className="form-input vehicle-sort-select"
                     >
-                        ✏️ Edit Order
-                    </button>
-                )}
-            </div>
-
-            {/* Tag filter bar — quad-state: N/A → OR (green) → AND (blue) → NOT (red) */}
-            {tags.length > 0 && (
-                <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-secondary flex-shrink-0">Filter:</span>
-                    {tags.map(tag => {
-                        const state = tagFilterStates[tag.id]; // undefined = 'na'
-                        const stateClass = state === 'or' ? 'tag-filter-or'
-                            : state === 'and' ? 'tag-filter-and'
-                            : state === 'not' ? 'tag-filter-not'
-                            : 'tag-filter-na';
-                        const tooltip = state === 'or'  ? `OR — any vehicle with "${tag.name}" is shown. Click for AND.`
-                            : state === 'and' ? `AND — vehicles must have "${tag.name}". Click for NOT.`
-                            : state === 'not' ? `NOT — vehicles with "${tag.name}" are hidden. Click to clear.`
-                            : `Click to filter: OR (show any vehicle with "${tag.name}")`;
-                        return (
-                            <button
-                                key={tag.id}
-                                onClick={() => cycleTagFilter(tag.id)}
-                                className={`tag-filter-btn ${stateClass}`}
-                                title={tooltip}
-                            >
-                                {tag.name}
-                            </button>
-                        );
-                    })}
-                    {Object.keys(tagFilterStates).length > 0 && (
+                        <option value="default">Default Order</option>
+                        <option value="date_newest">Date Added (Newest)</option>
+                        <option value="date_oldest">Date Added (Oldest)</option>
+                        <option value="brand_az">Brand A→Z</option>
+                        <option value="brand_za">Brand Z→A</option>
+                        <option value="model_az">Model A→Z</option>
+                        <option value="model_za">Model Z→A</option>
+                        <option value="year_newest">Year (Newest)</option>
+                        <option value="year_oldest">Year (Oldest)</option>
+                        <option value="mfg_az">Group by Manufacturer</option>
+                        {/* The List view's column sorts, so Cards can use them too (#338). */}
+                        <option value="name_az">Name A→Z</option>
+                        <option value="name_za">Name Z→A</option>
+                        <option value="battery_desc">Battery (Largest)</option>
+                        <option value="battery_asc">Battery (Smallest)</option>
+                        <option value="range_desc">EPA Range (Longest)</option>
+                        <option value="range_asc">EPA Range (Shortest)</option>
+                        <option value="tested_desc">Tested Range (Longest)</option>
+                        <option value="tested_asc">Tested Range (Shortest)</option>
+                    </select>
+                    {canEdit({}) && sortBy === 'default' && !filtersActive(filters) && (
                         <button
-                            onClick={() => setTagFilterStates({})}
-                            className="text-xs text-meta hover:text-secondary underline ml-1 flex-shrink-0"
+                            onClick={() => { if (editingOrder) setPendingOrder(null); setEditingOrder(v => !v); }}
+                            className={`btn btn-toggle${editingOrder ? ' active' : ''} flex-shrink-0`}
+                            style={editingOrder ? { backgroundColor: 'var(--color-primary-light)', borderColor: 'var(--color-primary)', color: 'var(--color-primary-text)' } : {}}
                         >
-                            Clear
+                            ✏️ Edit Order
                         </button>
                     )}
-                    <span className="tag-filter-legend" title="Click a tag to cycle: OR (green) shows vehicles with any matching tag · AND (blue) requires all matching tags · NOT (red) hides matching vehicles">
-                        <span className="text-green-500">●</span> OR
-                        <span className="text-blue-500 ml-1">●</span> AND
-                        <span className="text-red-500 ml-1">●</span> NOT
-                    </span>
-                </div>
-            )}
-            {/* Manufacturer filter bar — tri-state: N/A → OR (green) → NOT (red) → N/A */}
-            {manufacturers.length > 0 && (
-                <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-secondary flex-shrink-0">Brand:</span>
-                    {manufacturers.map(mfg => {
-                        const state = mfgFilterStates[mfg.id];
-                        const stateClass = state === 'or'  ? 'tag-filter-or'
-                            : state === 'not' ? 'tag-filter-not'
-                            : 'tag-filter-na';
-                        const tooltip = state === 'or'  ? `OR — showing only "${mfg.name}" vehicles. Click for NOT.`
-                            : state === 'not' ? `NOT — hiding "${mfg.name}" vehicles. Click to clear.`
-                            : `Click to filter: OR (show only "${mfg.name}" vehicles)`;
-                        return (
-                            <button
-                                key={mfg.id}
-                                onClick={() => cycleMfgFilter(mfg.id)}
-                                className={`tag-filter-btn ${stateClass}`}
-                                title={tooltip}
-                            >
-                                {mfg.name}
-                            </button>
-                        );
-                    })}
-                    {Object.keys(mfgFilterStates).length > 0 && (
-                        <button
-                            onClick={() => { setMfgFilterStates({}); setModelFilter(new Set()); }}
-                            className="text-xs text-meta hover:text-secondary underline ml-1 flex-shrink-0"
-                        >
-                            Clear
-                        </button>
-                    )}
-                </div>
-            )}
+            </VehicleFilterBar>
 
-            {/* Model filter bar — visible when a brand is selected and multiple models exist */}
-            {availableModels.length > 1 && (
-                <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-secondary flex-shrink-0">Model:</span>
-                    {availableModels.map(model => {
-                        const active = modelFilter.has(model);
-                        return (
-                            <button
-                                key={model}
-                                onClick={() => setModelFilter(prev => {
-                                    const next = new Set(prev);
-                                    next.has(model) ? next.delete(model) : next.add(model);
-                                    return next;
-                                })}
-                                className={`tag-filter-btn ${active ? 'tag-filter-or' : 'tag-filter-na'}`}
-                                title={active ? `Remove "${model}" filter` : `Show only ${model} variants`}
-                            >
-                                {model}
-                            </button>
-                        );
-                    })}
-                    {modelFilter.size > 0 && (
-                        <button
-                            onClick={() => setModelFilter(new Set())}
-                            className="text-xs text-meta hover:text-secondary underline ml-1 flex-shrink-0"
-                        >
-                            Clear
-                        </button>
-                    )}
-                </div>
-            )}
-
-            {/* Data filter bar — which kinds of test data a vehicle holds.
-                Tri-state AND (blue) → NOT (red) → clear; no OR, see cycleDataFilter.
-                Counts are of the vehicles still standing after the tag/brand/model
-                filters, so a zero here means "none left", not "none in the database". */}
-            <div className="tag-filter-bar">
-                <span className="text-sm font-medium text-secondary flex-shrink-0">Data:</span>
-                {DATA_CATEGORIES.map(cat => {
-                    const state = dataFilterStates[cat.key];
-                    const stateClass = state === 'and' ? 'tag-filter-and'
-                        : state === 'not' ? 'tag-filter-not'
-                        : 'tag-filter-na';
-                    const available = modelFiltered.filter(v => hasDataCategory(v, cat.key, performanceCounts)).length;
-                    const tooltip = state === 'and' ? `AND — vehicles must have ${cat.label} data. Click for NOT.`
-                        : state === 'not' ? `NOT — vehicles with ${cat.label} data are hidden. Click to clear.`
-                        : `Click to show only vehicles with ${cat.label} data`;
-                    return (
-                        <button
-                            key={cat.key}
-                            onClick={() => cycleDataFilter(cat.key)}
-                            className={`tag-filter-btn ${stateClass}`}
-                            title={tooltip}
-                        >
-                            {cat.label} ({available})
-                        </button>
-                    );
-                })}
-                {Object.keys(dataFilterStates).length > 0 && (
-                    <button
-                        onClick={() => setDataFilterStates({})}
-                        className="text-xs text-meta hover:text-secondary underline ml-1 flex-shrink-0"
-                    >
-                        Clear
-                    </button>
-                )}
-            </div>
-
-            {/* Select All / Clear All Visible */}
-            {textFiltered.length > 0 && (
+            {shownVehicles.length > 0 && (
                 <div className="flex justify-end gap-2 mb-4 -mt-3">
                     <button
-                        onClick={() => onSelectAllVisible(textFiltered.map(v => v.id))}
+                        onClick={() => onSelectAllVisible(shownVehicles.map(v => v.id))}
                         className="btn btn-primary"
                         title="Add all currently visible vehicles to the comparison selection"
                     >
-                        Select All Visible ({textFiltered.length})
+                        Select All Visible ({shownVehicles.length})
                     </button>
                     <button
-                        onClick={() => onClearAllVisible(textFiltered.map(v => v.id))}
+                        onClick={() => onClearAllVisible(shownVehicles.map(v => v.id))}
                         className="btn btn-secondary"
                         title="Remove all currently visible vehicles from the comparison selection"
                     >
@@ -1166,9 +949,7 @@ export default function VehiclesView({
 
             {sortedFilteredVehicles.length === 0 && !showForm && (
                 <div className="empty-state">
-                    {textFilter.trim()
-                        ? <p className="text-lg">No vehicles match "{textFilter.trim()}".</p>
-                        : Object.keys(tagFilterStates).length > 0 || Object.keys(mfgFilterStates).length > 0
+                    {filtersActive(filters)
                             ? <p className="text-lg">No vehicles match the active filters.</p>
                             : <p className="text-lg">No vehicles yet. Click "Add Vehicle" to get started!</p>
                     }

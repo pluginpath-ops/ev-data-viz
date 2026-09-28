@@ -27,6 +27,7 @@ import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForM
 import SpecChartKind from './components/SpecChartKind';
 import { NavigationContext } from './context/NavigationContext';
 import { platformHref } from './utils/platforms';
+import { decodeVehicleFilters, encodeVehicleFilters } from './utils/vehicleFilters';
 import ReferenceSection, { REFERENCE_SUBTABS, DEFAULT_REFERENCE_SUBTAB, referenceSubtabFromParam } from './components/reference/ReferenceSection';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
@@ -236,6 +237,10 @@ export default function App() {
     }, [view]);
     // Cards or List (#338): a sub-nav item now, so App owns it.
     const [vehiclesMode, setVehiclesMode] = useState('card');
+    // Vehicles & Specs' filters (#338): one set for Cards, List and Table, so
+    // switching views never changes which vehicles show. Read from the link
+    // the page opened on (vehicleFilters.js reads the table's old vt_ ones too).
+    const [vehicleFilters, setVehicleFilters] = useState(() => decodeVehicleFilters(window.location.search));
     // Reference's sub-tab (#338): Platforms or Explainers.
     const [referenceSubtab, setReferenceSubtab] = useState(DEFAULT_REFERENCE_SUBTAB);
     // The platform whose page is showing under Reference › Platforms (#354), or null for the list.
@@ -698,10 +703,12 @@ export default function App() {
             for (const [key, value] of new URLSearchParams(window.location.search)) {
                 if (key.startsWith(VEHICLE_TABLE_PARAM_PREFIX)) p.append(key, value);
             }
+            // Vehicles & Specs' filters, the same parameters Cards and List write (#338).
+            for (const [key, value] of encodeVehicleFilters(vehicleFilters)) p.set(key, value);
         }
 
         history.replaceState({ view, chartMode }, '', '?' + p.toString());
-    }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings]);
+    }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings, vehicleFilters]);
 
     // ── Keep URL in sync while on the Runs tab ──────────────────────────────
     // Mirrors the chart-tab sync above: a refresh or shared link on ?tab=runs
@@ -738,6 +745,20 @@ export default function App() {
         p.set('sub', epaSubtab);
         history.replaceState({ view: 'epa', subtab: epaSubtab }, '', '?' + p.toString());
     }, [isPopout, view, epaSubtab]);
+
+    // ── Keep URL in sync while on Vehicles & Specs' Cards or List (#338) ────
+    // Only the filters: the tab alone otherwise. The table writes its own
+    // parameters, and the chart-tab effect carries the filters for it.
+    useEffect(() => {
+        if (isPopout) return;
+        if (view !== 'vehicles') return;
+        const p = new URLSearchParams();
+        p.set('tab', 'vehicles');
+        for (const [k, v] of encodeVehicleFilters(vehicleFilters)) p.set(k, v);
+        history.replaceState({ view: 'vehicles', chartMode }, '', '?' + p.toString());
+    // chartMode rides in the history state only; it does not decide the URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isPopout, view, vehicleFilters]);
 
     // ── Keep URL in sync while on the Reference tab (#338) ──────────────────
     useEffect(() => {
@@ -1065,6 +1086,8 @@ export default function App() {
                             savedState={vehiclesViewState}
                             onSaveState={setVehiclesViewState}
                             viewMode={vehiclesMode}
+                            filters={vehicleFilters}
+                            onFiltersChange={setVehicleFilters}
                         />
                     )}
                     {view === 'runs' && currentActiveVehicle && (
@@ -1204,7 +1227,9 @@ export default function App() {
                     )}
                     {/* No selection gate: the vehicle table is where a selection is
                         made, over the whole fleet (#315). */}
-                    {activeChartCategory && chartMode === 'specstable' && <VehicleTable onOpenTest={openTest} />}
+                    {activeChartCategory && chartMode === 'specstable' && (
+                        <VehicleTable onOpenTest={openTest} filters={vehicleFilters} onFiltersChange={setVehicleFilters} />
+                    )}
                     {view === 'epa' && <EpaSection subtab={epaSubtab} />}
                     {view === 'reference' && (
                         <ReferenceSection

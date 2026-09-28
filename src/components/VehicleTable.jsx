@@ -32,47 +32,37 @@ import TestPeek from './TestPeek';
 import { testHref } from '../utils/testDetails';
 import { platformHref } from '../utils/platforms';
 import { useNavigation } from '../context/NavigationContext';
-import GuideFacetMenu from './epa/guide/GuideFacetMenu';
+import VehicleFilterBar from './vehicles/VehicleFilterBar';
+import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
+import { decodeVehicleFilters } from '../utils/vehicleFilters';
 import ViewSpecsModal from './ViewSpecsModal';
 import { vehicleColor } from '../utils/specHelpers';
 import { groupPerformanceByVehicle } from '../utils/dataChecks';
 import {
-    VEHICLE_COLUMNS, DEFAULT_VEHICLE_COLUMNS, EMPTY_VEHICLE_FILTERS, VEHICLE_TABLE_PARAM_PREFIX,
+    VEHICLE_COLUMNS, DEFAULT_VEHICLE_COLUMNS, VEHICLE_TABLE_PARAM_PREFIX,
     vehicleColumnByKey, unitFor, needsPerformance, buildVehicleRows, formatVehicleCell,
-    filterVehicleRows, sortVehicleRows, firstSortDir, vehicleFacets, facetValues,
+    sortVehicleRows, firstSortDir,
     vehicleBarMaxima, vehicleBarPercent, encodeVehicleTableParams, decodeVehicleTableParams,
     vehicleTableStartSearch, vehicleTableMemory, PRESETS, vehiclePresetByKey, presetMatching,
     labelledColumn, needsAssumptions, assumptionsFor,
 } from '../utils/vehicleTable';
 
 /*
- * Columns and sort are kept across visits, filters for the session; the
- * reasoning is at vehicleTableStartSearch. Storage can be missing or refuse a
- * write (a private window, blocked site data), and the table must still work,
- * so every touch is guarded and a failure just means no memory.
+ * Columns and sort are kept across visits; the reasoning is at
+ * vehicleTableStartSearch. Storage can be missing or refuse a write (a private
+ * window, blocked site data), and the table must still work, so every touch is
+ * guarded and a failure just means no memory. Filters are not the table's to
+ * remember since #338: they are Vehicles & Specs', held by App.
  */
 const VIEW_KEY = 'evbench.vehicleTable.view';
-const FILTERS_KEY = 'evbench.vehicleTable.filters';
 
 function readMemory() {
-    const read = (store, key) => { try { return store.getItem(key) ?? ''; } catch { return ''; } };
-    return { view: read(window.localStorage, VIEW_KEY), filters: read(window.sessionStorage, FILTERS_KEY) };
+    try { return { view: window.localStorage.getItem(VIEW_KEY) ?? '' }; } catch { return { view: '' }; }
 }
 
-function writeMemory({ view, filters }) {
-    const write = (store, key, value) => {
-        try { if (value) store.setItem(key, value); else store.removeItem(key); } catch { /* no memory, no harm */ }
-    };
-    write(window.localStorage, VIEW_KEY, view);
-    write(window.sessionStorage, FILTERS_KEY, filters);
+function writeMemory({ view }) {
+    try { if (view) window.localStorage.setItem(VIEW_KEY, view); else window.localStorage.removeItem(VIEW_KEY); } catch { /* no memory, no harm */ }
 }
-
-const FACETS = [
-    { key: 'makes',  label: 'Make' },
-    { key: 'years',  label: 'Year' },
-    { key: 'drives', label: 'Drive' },
-    { key: 'tags',   label: 'Tag' },
-];
 
 /** One vehicle. Rendered by the selected band and the body from the same component. */
 function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen, onOpenTest }) {
@@ -148,10 +138,10 @@ function testLink(ref, onOpenTest) {
  *   onOpenTest  {(TestReference) => void}  open a test in Tests & Data
  *               without a reload; absent in the pop-out window
  */
-export default function VehicleTable({ onOpenTest = null }) {
+export default function VehicleTable({ onOpenTest = null, filters: sharedFilters = null, onFiltersChange = null }) {
     const {
         vehicles, selectedVehicles, toggleVehicleSelection, units, platformsById,
-        getPerformanceSummaries, getPerformanceSessions,
+        getPerformanceSummaries, getPerformanceSessions, performanceCounts,
     } = useAppContext();
 
     const [initial] = useState(() => decodeVehicleTableParams(
@@ -160,7 +150,11 @@ export default function VehicleTable({ onOpenTest = null }) {
     const [columns, setColumns] = useState(initial.columns);
     const [sortKey, setSortKey] = useState(initial.sortKey);
     const [sortDir, setSortDir] = useState(initial.sortDir);
-    const [filters, setFilters] = useState(initial.filters);
+    // Vehicles & Specs' filters, shared with Cards and List (#338). The pop-out
+    // window has no App to share them with, so it keeps its own, from its URL.
+    const [localFilters, setLocalFilters] = useState(() => decodeVehicleFilters(window.location.search));
+    const filters = sharedFilters ?? localFilters;
+    const setFilters = onFiltersChange ?? setLocalFilters;
     const [assumptions, setAssumptions] = useState(initial.assumptions);
     // The preset the columns last WERE, kept so a changed set can say what it
     // was changed from. Which preset is showing is never stored: it is read
@@ -177,12 +171,12 @@ export default function VehicleTable({ onOpenTest = null }) {
         for (const key of [...params.keys()]) {
             if (key.startsWith(VEHICLE_TABLE_PARAM_PREFIX)) params.delete(key);
         }
-        for (const [key, value] of encodeVehicleTableParams({ columns, sortKey, sortDir, filters, modifiedFrom, assumptions })) {
+        for (const [key, value] of encodeVehicleTableParams({ columns, sortKey, sortDir, modifiedFrom, assumptions })) {
             params.append(key, value);
         }
         window.history.replaceState(window.history.state, '', `?${params.toString()}`);
-        writeMemory(vehicleTableMemory({ columns, sortKey, sortDir, filters, modifiedFrom, assumptions }));
-    }, [columns, sortKey, sortDir, filters, modifiedFrom, assumptions]);
+        writeMemory(vehicleTableMemory({ columns, sortKey, sortDir, modifiedFrom, assumptions }));
+    }, [columns, sortKey, sortDir, modifiedFrom, assumptions]);
 
     // Tested results are fetched only while a tested column is shown or sorted
     // by: sessions carry every run and split, which is the heaviest read here.
@@ -218,8 +212,9 @@ export default function VehicleTable({ onOpenTest = null }) {
         return <TestPeek test={test} figure={figure} />;
     }, [rowsById, assumptions, units]);
     const { tableProps: peekProps, panel: cellPeek } = useCellPeek({ renderPeek });
-    const facets   = useMemo(() => vehicleFacets(rows), [rows]);
-    const filtered = useMemo(() => filterVehicleRows(rows, filters), [rows, filters]);
+    const { ctx: filterCtx, filtered: filteredVehicles } = useFilteredVehicles(vehicles, filters, performanceCounts);
+    const shownIds = useMemo(() => new Set(filteredVehicles.map(v => v.id)), [filteredVehicles]);
+    const filtered = useMemo(() => rows.filter(r => shownIds.has(r.id)), [rows, shownIds]);
     const sorted   = useMemo(() => sortVehicleRows(filtered, sortKey, sortDir), [filtered, sortKey, sortDir]);
     /** Every column change goes through here, so the preset it leaves is remembered. */
     const changeColumns = (next) => {
@@ -243,22 +238,6 @@ export default function VehicleTable({ onOpenTest = null }) {
     const pickable = useMemo(() => VEHICLE_COLUMNS.map(label), [label]);
     const maxima   = useMemo(() => vehicleBarMaxima(filtered, cols), [filtered, cols]);
 
-    /**
-     * Counts per facet value, each with that facet's own selection removed, so
-     * a number says what clicking would LEAVE — the guide's rule.
-     */
-    const counts = useMemo(() => {
-        const out = {};
-        for (const f of FACETS) {
-            const tally = new Map();
-            for (const row of filterVehicleRows(rows, { ...filters, [f.key]: [] })) {
-                for (const v of facetValues(row, f.key)) tally.set(v, (tally.get(v) ?? 0) + 1);
-            }
-            out[f.key] = tally;
-        }
-        return out;
-    }, [rows, filters]);
-
     const byId = useMemo(() => new Map(rows.map(r => [r.id, r])), [rows]);
     const selectedRows = selectedVehicles.map(id => byId.get(id)).filter(Boolean);
     const bodyRows = sorted.filter(r => !selectedVehicles.includes(r.id));
@@ -271,11 +250,6 @@ export default function VehicleTable({ onOpenTest = null }) {
             setSortDir(firstSortDir(vehicleColumnByKey(key)));
         }
     };
-    const toggleFacet = (key) => (value) => setFilters(prev => ({
-        ...prev,
-        [key]: prev[key].includes(value) ? prev[key].filter(v => v !== value) : [...prev[key], value],
-    }));
-    const filtering = filters.search.trim() || FACETS.some(f => filters[f.key].length);
     const rowProps = { cols, units, maxima, onToggle: toggleVehicleSelection, onOpen: setViewing, onOpenTest };
 
     return (
@@ -287,49 +261,29 @@ export default function VehicleTable({ onOpenTest = null }) {
                     modifiedKey={modifiedFrom}
                     onPick={pickPreset}
                 />
-                <div className="guide-filter-row">
-                    <input
-                        type="search"
-                        value={filters.search}
-                        onChange={e => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                        placeholder="Search vehicles…"
-                        aria-label="Search vehicles"
-                        className="form-input guide-search-input"
-                    />
-                    {FACETS.map(f => (
-                        <GuideFacetMenu
-                            key={f.key}
-                            label={f.label}
-                            values={facets[f.key]}
-                            selected={filters[f.key]}
-                            countFor={v => counts[f.key].get(v) ?? 0}
-                            onToggle={toggleFacet(f.key)}
-                            onClear={() => setFilters(prev => ({ ...prev, [f.key]: [] }))}
-                        />
-                    ))}
-                    {needsAssumptions(columns) && (
-                        <VehicleTableAssumptions assumptions={assumptions} needed={assumptionsFor(columns)} units={units} onChange={setAssumptions} />
-                    )}
-                    <ColumnPicker
-                        columns={pickable}
-                        visible={columns}
-                        defaults={DEFAULT_VEHICLE_COLUMNS}
-                        fixedKey="name"
-                        unitOf={col => unitFor(col, units)}
-                        onChange={changeColumns}
-                    />
-                    <div className="guide-filter-tally">
-                        {wantsPerformance && performanceLoading && <span className="text-meta">loading tested results…</span>}
-                        <span className="text-data">{sorted.length.toLocaleString()}</span>
-                        <span className="guide-filter-tally-total">of {rows.length.toLocaleString()}</span>
-                        {filtering && (
-                            <button type="button" className="guide-filter-reset" onClick={() => setFilters(EMPTY_VEHICLE_FILTERS)}>
-                                Reset
-                            </button>
-                        )}
-                    </div>
-                </div>
             </div>
+            {/* Vehicles & Specs' filter bar, the same above Cards and List (#338).
+                The table's own controls ride in its row. */}
+            <VehicleFilterBar
+                vehicles={vehicles}
+                filters={filters}
+                onChange={setFilters}
+                ctx={filterCtx}
+                shownCount={sorted.length}
+            >
+                {needsAssumptions(columns) && (
+                    <VehicleTableAssumptions assumptions={assumptions} needed={assumptionsFor(columns)} units={units} onChange={setAssumptions} />
+                )}
+                <ColumnPicker
+                    columns={pickable}
+                    visible={columns}
+                    defaults={DEFAULT_VEHICLE_COLUMNS}
+                    fixedKey="name"
+                    unitOf={col => unitFor(col, units)}
+                    onChange={changeColumns}
+                />
+                {wantsPerformance && performanceLoading && <span className="text-meta">loading tested results…</span>}
+            </VehicleFilterBar>
 
             <div className="guide-table-container">
                 <table className="guide-table" {...peekProps}>
