@@ -45,6 +45,8 @@ export const DATA_CATEGORIES = [
     {
         key: 'accel',
         label: 'Acceleration',
+        // Where a line has no room for the word (the list's Tests column).
+        short: 'Accel',
         colorClass: 'text-purple-600 dark:text-purple-400',
         count: (v, perf) => perf?.[v.id]?.accel ?? 0,
     },

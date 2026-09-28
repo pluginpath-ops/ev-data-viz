@@ -17,6 +17,9 @@ import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
+import VehicleListHeader from './vehicles/VehicleListHeader';
+import VehicleRowMenu from './vehicles/VehicleRowMenu';
+import TestCounts from './vehicles/TestCounts';
 import LazyBoundary from './LazyBoundary';
 import { EditVehicleForm, ImportVehiclesModal } from './lazyComponents';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
@@ -35,6 +38,35 @@ function epaRangeValue(vehicle, units) {
 /** A word beside the range only when it is not an EPA label. */
 function epaRangeBasisMark(vehicle) {
     return ['expected', 'unsorted'].includes(vehicle.epaRangeBasis) ? vehicle.epaRangeBasis : null;
+}
+
+/** Compare two figures in a direction, blanks last whichever way the column sorts. */
+function byNumber(a, b, dir = 'asc') {
+    const an = Number(a), bn = Number(b);
+    const aOk = a != null && a !== '' && Number.isFinite(an), bOk = b != null && b !== '' && Number.isFinite(bn);
+    if (aOk && bOk) return dir === 'asc' ? an - bn : bn - an;
+    return aOk ? -1 : bOk ? 1 : 0;
+}
+
+/** A vehicle's tested range in miles, as the List shows it (scaled when it was). */
+function testedMiles(vehicle) {
+    const t = testedRangeSummary(vehicle);
+    return t ? (t.fullPackMi ?? t.distanceMi) : null;
+}
+
+/**
+ * A figure in a List column (#338): the value and unit, and beneath it the
+ * basis where there is one — the vehicle table's shape, without the label the
+ * column header already gives. Blank is an em dash, never an empty cell.
+ */
+function ListFigure({ value, unit, basis }) {
+    if (value == null || value === '') return <span className="stat-cell-empty" aria-label="not recorded">—</span>;
+    return (
+        <>
+            <span className="stat-cell-value">{value}{unit && <span className="stat-cell-unit">{unit}</span>}</span>
+            {basis && <span className="stat-cell-basis">{basis}</span>}
+        </>
+    );
 }
 
 // ── Test-count row ────────────────────────────────────────────────────────────
@@ -92,7 +124,8 @@ export default function VehiclesView({
     const [specsEditingVehicle, setSpecsEditingVehicle] = useState(null);
     const [specsViewingVehicle, setSpecsViewingVehicle] = useState(null);
     const [showImportModal, setShowImportModal] = useState(false);
-    const VEHICLES_PER_PAGE = 24;
+    // A card is tall and a list row is one line, so a page of rows holds more (#338).
+    const VEHICLES_PER_PAGE = viewMode === 'list' ? 50 : 24;
 
     // Keep a ref always pointing at latest filter/sort/page so the unmount
     // cleanup can save it without stale-closure issues.
@@ -304,6 +337,15 @@ export default function VehiclesView({
             case 'model_za':    return (b.model || '').localeCompare(a.model || '');
             case 'year_newest': return Number(b.year || 0) - Number(a.year || 0);
             case 'year_oldest': return Number(a.year || 0) - Number(b.year || 0);
+            // The List view's column headers (#338); blanks last either way.
+            case 'name_az':      return (a.name || '').localeCompare(b.name || '');
+            case 'name_za':      return (b.name || '').localeCompare(a.name || '');
+            case 'battery_desc': return byNumber(a.socWindowKwh, b.socWindowKwh, 'desc');
+            case 'battery_asc':  return byNumber(a.socWindowKwh, b.socWindowKwh);
+            case 'range_desc':   return byNumber(a.epaRangeMi, b.epaRangeMi, 'desc');
+            case 'range_asc':    return byNumber(a.epaRangeMi, b.epaRangeMi);
+            case 'tested_desc':  return byNumber(testedMiles(a), testedMiles(b), 'desc');
+            case 'tested_asc':   return byNumber(testedMiles(a), testedMiles(b));
             case 'mfg_az': {
                 const aMfg = a.manufacturer?.name || a.make || '';
                 const bMfg = b.manufacturer?.name || b.make || '';
@@ -321,6 +363,37 @@ export default function VehiclesView({
         (vehiclePage - 1) * VEHICLES_PER_PAGE,
         vehiclePage * VEHICLES_PER_PAGE
     );
+
+    /**
+     * A List row's ⋯ menu (#338): the card's Specs and curator buttons, as
+     * menu items, with the same handlers. Delete stays last.
+     */
+    const rowMenuItems = (vehicle) => {
+        const isPending = pendingDeletes.has(vehicle.id);
+        const hasSpecs = vehicle.specs && Object.keys(vehicle.specs).length > 0;
+        return [
+            canEdit(vehicle)
+                ? { key: 'specs', label: 'Specs', onClick: () => setSpecsEditingVehicle(vehicle) }
+                : hasSpecs && { key: 'specs', label: 'Specs', onClick: () => setSpecsViewingVehicle(vehicle) },
+            canEdit(vehicle) && { key: 'edit', label: 'Edit', onClick: (e) => handleEdit(vehicle, e) },
+            canEdit(vehicle) && {
+                key: 'copy', label: '⧉ Copy', disabled: duplicatingId !== null,
+                title: 'Copy this vehicle, with its own copies of its specs and tests',
+                onClick: (e) => handleDuplicateVehicle(vehicle, e),
+            },
+            canEdit(vehicle) && onCreateVariant && {
+                key: 'variant', label: '＋ Variant', disabled: duplicatingId !== null,
+                title: 'A new vehicle that inherits this one\u2019s specs, tests, color, photo and tags. Set only what differs.',
+                onClick: async () => {
+                    const variant = await onCreateVariant(vehicle.id);
+                    if (variant) handleEdit(variant, { stopPropagation: () => {} });
+                },
+            },
+            canDelete(vehicle) && (isPending
+                ? { key: 'restore', label: '↩ Restore', onClick: () => restoreItem(vehicle.id) }
+                : { key: 'delete', label: 'Delete', danger: true, onClick: () => queueDelete(vehicle.id) }),
+        ];
+    };
 
     // ── Shared sub-components ────────────────────────────────────────────────
 
@@ -621,6 +694,15 @@ export default function VehiclesView({
                     <option value="year_newest">Year (Newest)</option>
                     <option value="year_oldest">Year (Oldest)</option>
                     <option value="mfg_az">Group by Manufacturer</option>
+                    {/* The List view's column sorts, so Cards can use them too (#338). */}
+                    <option value="name_az">Name A→Z</option>
+                    <option value="name_za">Name Z→A</option>
+                    <option value="battery_desc">Battery (Largest)</option>
+                    <option value="battery_asc">Battery (Smallest)</option>
+                    <option value="range_desc">EPA Range (Longest)</option>
+                    <option value="range_asc">EPA Range (Shortest)</option>
+                    <option value="tested_desc">Tested Range (Longest)</option>
+                    <option value="tested_asc">Tested Range (Shortest)</option>
                 </select>
                 {canEdit({}) && sortBy === 'default' && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0 && (
                     <button
@@ -950,7 +1032,18 @@ export default function VehiclesView({
 
             {/* ── LIST VIEW ── */}
             {viewMode === 'list' && (
-                <div className="vehicle-list">
+                <div className="vehicle-list" role="table" aria-label="Vehicles">
+                    <VehicleListHeader
+                        sortBy={sortBy}
+                        onSort={setSortBy}
+                        allSelected={pagedVehicles.length > 0 && pagedVehicles.every(v => selectedVehicles.includes(v.id))}
+                        someSelected={pagedVehicles.some(v => selectedVehicles.includes(v.id))}
+                        onToggleAll={() => {
+                            const ids = pagedVehicles.map(v => v.id);
+                            if (ids.every(id => selectedVehicles.includes(id))) onClearAllVisible(ids);
+                            else onSelectAllVisible(ids);
+                        }}
+                    />
                     {pagedVehicles.map((vehicle, pageIdx) => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
                         const isPending  = pendingDeletes.has(vehicle.id);
@@ -961,56 +1054,52 @@ export default function VehiclesView({
                         const prevMfgName = prevVehicle ? (prevVehicle.manufacturer?.name || prevVehicle.make || 'Unknown') : null;
                         const showMfgHeader = sortBy === 'mfg_az' && mfgName !== prevMfgName;
                         return (
-                            <div key={vehicle.id}>
-                                {showMfgHeader && (
-                                    <div className="pt-2 pb-1 border-b border-[var(--color-border)] mb-1">
-                                        <h3 className="text-sm font-semibold text-secondary uppercase tracking-wider">{mfgName}</h3>
-                                    </div>
-                                )}
+                            <div key={vehicle.id} role="rowgroup">
+                                {showMfgHeader && <h3 className="vehicle-list-group text-micro">{mfgName}</h3>}
+                                {/* Every row is the same grid as the header (#338):
+                                    a column is blank ("—"), never missing, so no
+                                    row's figures sit anywhere but under their
+                                    heading. The row still selects on click; the
+                                    checkbox says so where the ✓ on the photo did. */}
                                 <div
+                                    role="row"
                                     onClick={() => handleCardClick(vehicle)}
                                     className={`vehicle-card vehicle-row${isSelected ? ' is-selected' : ''}${isPending ? ' is-pending' : ''}`}
                                 >
-
-                                    {/* Reorder controls — owner only, default sort, no filters */}
-                                    {showReorderButtons && (
-                                        <div className="reorder-controls flex-shrink-0" onClick={e => e.stopPropagation()}>
-                                            <button title="Top" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, 0); }} className="reorder-btn">⇈</button>
-                                            <button title="-10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos - 10); }} disabled={globalPos < 1} className="reorder-btn disabled:opacity-30">▲▲</button>
-                                            <button title="Up" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'up'); }} disabled={globalPos === 0} className="reorder-btn disabled:opacity-30">▲</button>
-                                            <input
-                                                type="number" min={1} max={totalCount}
-                                                defaultValue={globalPos + 1}
-                                                key={`pos-${vehicle.id}-${globalPos}`}
-                                                onClick={e => e.stopPropagation()}
-                                                onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value); if (!isNaN(v)) handleMoveVehicleToIndex(vehicle.id, v - 1); e.target.blur(); } }}
-                                                onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
-                                                className="form-input form-input reorder-position-input"
-                                            />
-                                            <button title="Down" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }} disabled={globalPos === totalCount - 1} className="reorder-btn disabled:opacity-30">▼</button>
-                                            <button title="+10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos + 10); }} disabled={globalPos >= totalCount - 1} className="reorder-btn disabled:opacity-30">▼▼</button>
-                                            <button title="Bottom" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, totalCount - 1); }} className="reorder-btn">⇊</button>
-                                        </div>
-                                    )}
-
-                                    {/* Thumbnail — the same component the card uses, so
-                                        a photoless vehicle reads identically in both
-                                        views. The 🚗 it replaced said "broken image". */}
-                                    <VehicleMedia
-                                        vehicle={vehicle}
-                                        height={54}
-                                        className="vehicle-media-thumb"
-                                    />
-
-                                    {/* Name + make + tags */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            {/* The curator's swatch. Editing in place is
-                                                the point: setting a color per vehicle
-                                                across a catalogue of this size is a
-                                                scroll-and-click pass, and sending each
-                                                one through the full edit form is what
-                                                would make it not worth doing. */}
+                                    <span className="vehicle-list-select" role="cell" onClick={e => e.stopPropagation()}>
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => handleCardClick(vehicle)}
+                                            aria-label={`Select ${vehicle.name}`}
+                                        />
+                                    </span>
+                                    <span role="cell" className="vehicle-list-photo">
+                                        {/* Reorder controls replace the photo while
+                                            Edit Order is on: the same slot, so the
+                                            columns do not move. */}
+                                        {showReorderButtons ? (
+                                            <span className="reorder-controls" onClick={e => e.stopPropagation()}>
+                                                <button title="Up" onClick={() => handleMoveVehicle(vehicle.id, 'up')} disabled={globalPos === 0} className="reorder-btn">▲</button>
+                                                <input
+                                                    type="number" min={1} max={totalCount}
+                                                    defaultValue={globalPos + 1}
+                                                    key={`pos-${vehicle.id}-${globalPos}`}
+                                                    onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value); if (!isNaN(v)) handleMoveVehicleToIndex(vehicle.id, v - 1); } }}
+                                                    onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
+                                                    className="form-input reorder-position-input"
+                                                    aria-label={`Position of ${vehicle.name}`}
+                                                />
+                                                <button title="Down" onClick={() => handleMoveVehicle(vehicle.id, 'down')} disabled={globalPos === totalCount - 1} className="reorder-btn">▼</button>
+                                            </span>
+                                        ) : (
+                                            <VehicleMedia vehicle={vehicle} height={54} className="vehicle-media-thumb" />
+                                        )}
+                                    </span>
+                                    <span role="cell" className="flex flex-col gap-0.5 min-w-0">
+                                        <span className="flex items-center gap-2 min-w-0">
+                                            {/* The curator's swatch, edited in place: setting
+                                                a color per vehicle is a scroll-and-click pass. */}
                                             {canEdit(vehicle) && (
                                                 <SeriesColorPicker
                                                     value={vehicle.color || DEFAULT_RUN_COLOR}
@@ -1020,60 +1109,47 @@ export default function VehiclesView({
                                                     onReset={() => onUpdate(vehicle.id, { color: null })}
                                                 />
                                             )}
-                                            <h3 className="font-bold text-lg leading-tight truncate">{vehicle.name}</h3>
+                                            <span className="vehicle-list-name-text">{vehicle.name}</span>
                                             <VisibilityPill vehicle={vehicle} />
-                                        </div>
-                                        <p className="text-secondary text-sm mb-1">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
-                                        <TagPills vehicle={vehicle} />
-                                    </div>
-
-                                    {/* Specs */}
-                                    <div className="w-64 flex-shrink-0 hidden md:flex flex-col gap-1.5">
-                                        <div className="stat-grid">
-                                            <StatCell
-                                                label="Battery"
-                                                value={vehicle.socWindowKwh}
-                                                unit="kWh"
-                                                basis={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label}
-                                                title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}
-                                            />
-                                            <StatCell
-                                                label="Range"
-                                                value={epaRangeValue(vehicle, units)}
-                                                unit={distanceUnit(units)}
-                                                basis={epaRangeBasisMark(vehicle)}
-                                                title={EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note ?? 'EPA range'}
-                                            />
-                                        </div>
-                                        <TestedFigure vehicle={vehicle} tested={testedRangeSummary(vehicle)} units={units} onOpenTest={onOpenTest} />
-                                        <PlatformLine vehicle={vehicle} />
-                                        <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
-                                    </div>
-
-                                    {/* Actions. Visibility moved up beside the name —
-                                        it describes the vehicle, not what you can do
-                                        to it, and stacking it above the buttons made
-                                        it read as a fourth one. */}
-                                    <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                                        <button
-                                            onClick={() => onViewRuns(vehicle)}
-                                            className="btn btn-primary"
-                                        >
+                                        </span>
+                                        {/* What it is, on one line: make · model · trim ·
+                                            year, then its platform and tags, clipped
+                                            rather than wrapped so every row is one height. */}
+                                        <span className="vehicle-list-meta">
+                                            <span>{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</span>
+                                            <PlatformLine vehicle={vehicle} bare />
+                                            <TagPills vehicle={vehicle} />
+                                        </span>
+                                    </span>
+                                    <span role="cell" className="vehicle-list-figure" title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}>
+                                        <ListFigure value={vehicle.socWindowKwh} unit="kWh" basis={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label} />
+                                    </span>
+                                    <span role="cell" className="vehicle-list-figure" title={EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note ?? 'EPA range'}>
+                                        <ListFigure value={epaRangeValue(vehicle, units)} unit={distanceUnit(units)} basis={epaRangeBasisMark(vehicle)} />
+                                    </span>
+                                    <span role="cell" className="vehicle-list-figure">
+                                        {testedRangeSummary(vehicle)
+                                            ? <TestedFigure vehicle={vehicle} tested={testedRangeSummary(vehicle)} units={units} onOpenTest={onOpenTest} bare />
+                                            : <span className="stat-cell-empty" aria-label="not tested">—</span>}
+                                    </span>
+                                    <span role="cell" className="vehicle-list-tests">
+                                        <TestCounts vehicle={vehicle} performanceCounts={performanceCounts} />
+                                    </span>
+                                    {/* The same two actions on every row: its tests,
+                                        and a menu holding everything else, so no row's
+                                        buttons push its figures sideways. */}
+                                    <span role="cell" className="vehicle-list-actions" onClick={e => e.stopPropagation()}>
+                                        <button onClick={() => onViewRuns(vehicle)} className="btn btn-primary">
                                             Tests &amp; Data →
                                         </button>
-                                        {/* The same order as the card's two rows, run
-                                            on as one: a list row has the width. */}
-                                        <SpecsButton vehicle={vehicle} />
-                                        <CuratorActions vehicle={vehicle} />
-                                    </div>
+                                        <VehicleRowMenu label={vehicle.name} items={rowMenuItems(vehicle)} />
+                                    </span>
                                 </div>
-
                             </div>
                         );
                     })}
                 </div>
             )}
-
             {/* Pagination */}
             {totalPages > 1 && (
                 <div className="vehicle-pagination">

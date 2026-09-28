@@ -2106,13 +2106,9 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     background-color: rgba(8, 12, 18, 0.72);
 }
 
-/* The row has no media band to sit on top of, so the mark centres on the
-   left edge instead of hanging in a corner that does not exist. */
-.vehicle-row.is-selected::before {
-    top: 50%;
-    transform: translateY(-50%);
-    left: 6px;
-}
+/* A list row says it is selected with its checkbox (#338), so it draws no
+   second mark; the accent border is the same as the card's. */
+.vehicle-row.is-selected::before { content: none; }
 
 /* Queued for deletion: dimmed, and the accent border says why. */
 .vehicle-card.is-pending {
@@ -2122,12 +2118,159 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 
 /* The same object in a different shape, so it takes the same accent border
    rather than a second selection language: one row, horizontal, no media band
-   of its own beyond the thumbnail. */
-.vehicle-row {
-    flex-direction: row;
+   of its own beyond the thumbnail.
+ *
+ * A grid, not a flex row (#338): every row and the header share these tracks,
+ * so a figure sits under its heading whatever the row holds. As a flex row, a
+ * row with one more button pushed its figures sideways, and a row with a
+ * platform line grew taller than its neighbours. */
+.vehicle-row,
+.vehicle-list-head {
+    display: grid;
+    grid-template-columns: var(--vehicle-list-cols);
     align-items: center;
-    gap: 14px;
-    padding: 10px 14px;
+    column-gap: 14px;
+    padding: 8px 14px;
+}
+/* The header lines up with rows that have a 3px accent border on the left
+   and a 1px border on the right, so its padding carries both. */
+.vehicle-list-head {
+    position: sticky;
+    top: var(--app-header-h, 0px);
+    z-index: 3;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    padding-left: 17px;
+    padding-right: 15px;
+    background-color: var(--color-background);
+    border-bottom: 1px solid var(--color-border);
+}
+.vehicle-list-head .is-numeric { text-align: right; }
+.vehicle-list-sort {
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+.vehicle-list-sort:hover,
+.vehicle-list-sort.active { color: var(--color-text-primary); }
+.vehicle-list-select {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.vehicle-list-photo {
+    display: flex;
+    align-items: center;
+    height: 54px;
+}
+.vehicle-list-name-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: calc(var(--fs-body) * var(--fs-step) * var(--fs-step));
+    color: var(--color-text-primary);
+}
+/* Make · model · trim · year, then platform and tags: one line, clipped, so
+   every row is one height. */
+.vehicle-list-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+}
+.vehicle-list-meta .vehicle-tags { flex-wrap: nowrap; }
+/* A figure column: right-aligned so values compare down the column, the basis
+   beneath. */
+.vehicle-list-figure {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    min-width: 0;
+    text-align: right;
+}
+.vehicle-list-figure .stat-cell-basis { margin-left: 0; }
+.vehicle-list-figure .tested-figure {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+}
+.vehicle-list-tests {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vehicle-list-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+/* A make's heading when the list is grouped by make. */
+.vehicle-list-group {
+    margin: 10px 0 4px;
+    padding: 0 0 4px 17px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* How many tests of each kind, one neutral line (#338). The numbers are the
+   data, so they take the value color; the words are its labels. */
+.test-counts {
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+}
+.test-count-n {
+    font-family: var(--font-mono);
+    color: var(--color-text-value);
+}
+.test-count-sep { margin: 0 6px; color: var(--color-text-meta); }
+
+/* A list row's ⋯ menu (#338). The trigger is a square the height of the
+   button beside it; an empty slot keeps the same width when there is nothing
+   to put in the menu. */
+.vehicle-row-menu-btn,
+.vehicle-row-menu-slot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+}
+.vehicle-row-menu-btn {
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: calc(var(--fs-body) * var(--fs-step) * var(--fs-step));
+    line-height: 1;
+}
+.vehicle-row-menu-btn:hover,
+.vehicle-row-menu-btn[aria-expanded="true"] { color: var(--color-text-primary); background-color: var(--color-hover-lift); }
+.vehicle-row-menu { --popover-w: 180px; }
+.vehicle-row-menu-list {
+    display: flex;
+    flex-direction: column;
+}
+.nav-menu-item.is-danger { color: var(--color-danger); }
+
+/* Below the compact width the figures go: name, then actions. The card view
+   is the one for reading figures on a phone. */
+@media (max-width: 999.98px) {
+    /* div. for specificity: the base .vehicle-list rule is later in the file. */
+    div.vehicle-list { --vehicle-list-cols: 20px 72px minmax(0, 1fr) 84px; }
+    .vehicle-list .vehicle-list-figure,
+    .vehicle-list .vehicle-list-tests,
+    .vehicle-list-head > :nth-child(n+4):not(:last-child) { display: none; }
 }
 
 .vehicle-card-body {
@@ -3216,9 +3359,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3;
 }
 
-/* List-mode vehicle container */
+/* List-mode vehicle container, and the column tracks its header and rows
+   share (#338; see .vehicle-row). */
 .vehicle-list {
-    @apply flex flex-col gap-2;
+    @apply flex flex-col gap-1.5;
+    --vehicle-list-cols: 20px 96px minmax(220px, 1fr) 92px 92px 150px 190px 152px;
 }
 
 /* Search / filter row above the vehicle grid */

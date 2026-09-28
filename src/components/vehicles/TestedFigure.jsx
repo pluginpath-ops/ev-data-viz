@@ -22,7 +22,7 @@ import TestPeek from '../TestPeek';
  * tested cell of the vehicle table does. `onOpenTest` opens it in place; a
  * modified click is the browser's, so a new tab works.
  */
-export default function TestedFigure({ vehicle, tested, units, onOpenTest }) {
+export default function TestedFigure({ vehicle, tested, units, onOpenTest, bare = false }) {
     if (!tested) return null;
     const test = vehicle ? rangeTestReference(vehicle, tested, units) : null;
     const href = testHref(test);
@@ -50,7 +50,8 @@ export default function TestedFigure({ vehicle, tested, units, onOpenTest }) {
 
     const figure = (props = {}) => (
         <div className="tested-figure" {...props}>
-            <span className="text-micro">Tested</span>
+            {/* A list column's header already says Tested (#338). */}
+            {!bare && <span className="text-micro">Tested</span>}
             <span className="tested-figure-value">
                 {distanceValue(shown, units)}
                 <span className="tested-figure-unit">{distanceUnit(units)}</span>
