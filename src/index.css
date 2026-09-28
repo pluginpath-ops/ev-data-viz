@@ -2106,13 +2106,9 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     background-color: rgba(8, 12, 18, 0.72);
 }
 
-/* The row has no media band to sit on top of, so the mark centres on the
-   left edge instead of hanging in a corner that does not exist. */
-.vehicle-row.is-selected::before {
-    top: 50%;
-    transform: translateY(-50%);
-    left: 6px;
-}
+/* A list row says it is selected with its checkbox (#338), so it draws no
+   second mark; the accent border is the same as the card's. */
+.vehicle-row.is-selected::before { content: none; }
 
 /* Queued for deletion: dimmed, and the accent border says why. */
 .vehicle-card.is-pending {
@@ -2122,12 +2118,197 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 
 /* The same object in a different shape, so it takes the same accent border
    rather than a second selection language: one row, horizontal, no media band
-   of its own beyond the thumbnail. */
-.vehicle-row {
-    flex-direction: row;
+   of its own beyond the thumbnail.
+ *
+ * A grid, not a flex row (#338): every row and the header share these tracks,
+ * so a figure sits under its heading whatever the row holds. As a flex row, a
+ * row with one more button pushed its figures sideways, and a row with a
+ * platform line grew taller than its neighbours. */
+.vehicle-row,
+.vehicle-list-head {
+    display: grid;
+    grid-template-columns: var(--vehicle-list-cols);
     align-items: center;
-    gap: 14px;
-    padding: 10px 14px;
+    column-gap: 14px;
+    padding: 8px 14px;
+}
+/* A row's ⋯ menu opens below the row it belongs to, so the row must not clip
+   it. The card's overflow: hidden is for its media band, which a row lacks. */
+.vehicle-row { overflow: visible; }
+/* The header lines up with rows that have a 3px accent border on the left
+   and a 1px border on the right, so its padding carries both. */
+.vehicle-list-head {
+    position: sticky;
+    top: var(--app-header-h, 0px);
+    z-index: 3;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    padding-left: 17px;
+    padding-right: 15px;
+    background-color: var(--color-background);
+    border-bottom: 1px solid var(--color-border);
+}
+/* Every heading is centred the same way, sortable (a button) or not, so none
+   sits on a text baseline its neighbours do not share. */
+.vehicle-list-head > [role="columnheader"] {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+.vehicle-list-head > .is-numeric { justify-content: flex-end; }
+.vehicle-list-head .text-micro { line-height: 1.2; }
+.vehicle-list-sort {
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+.vehicle-list-sort:hover,
+.vehicle-list-sort.active { color: var(--color-text-primary); }
+.vehicle-list-select {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.vehicle-list-photo {
+    display: flex;
+    align-items: center;
+    height: 54px;
+}
+.vehicle-list-name-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-display);
+    font-weight: 600;
+    /* The card's title size (.vehicle-media-title h3): the same object, and
+       the largest text in its row. */
+    font-size: calc(var(--fs-body) * 1.2143);
+    letter-spacing: -0.01em;
+    color: var(--color-text-primary);
+}
+/* Make · model · trim · year: one line, ending in an ellipsis where it runs
+   out, so every row is one height. */
+.vehicle-list-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+}
+/* The third line: tags, then the platform, a step smaller than the line above
+   — what the car is filed under, after what it is. Clipped like the others. */
+.vehicle-list-extra {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.vehicle-list-extra .vehicle-tags { flex-wrap: nowrap; }
+.vehicle-list-extra .vehicle-tag {
+    padding: 0 6px;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+}
+/* A figure column: right-aligned so values compare down the column, the basis
+   beneath. */
+.vehicle-list-figure {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    min-width: 0;
+    text-align: right;
+}
+.vehicle-list-figure .stat-cell-basis { margin-left: 0; }
+.vehicle-list-figure .tested-figure {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+}
+.vehicle-list-tests { min-width: 0; }
+.vehicle-list-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+/* A make's heading when the list is grouped by make. */
+.vehicle-list-group {
+    margin: 10px 0 4px;
+    padding: 0 0 4px 17px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* How many tests of each kind (#338), two to a line: up to four kinds fit a
+   2 × 2 block the width of two, where one line truncated. The numbers are the
+   data, so they take the value color; the words are its labels. */
+.test-counts {
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    column-gap: 12px;
+    row-gap: 1px;
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+.test-count-n {
+    font-family: var(--font-mono);
+    color: var(--color-text-value);
+}
+
+/* The slot after Tests & Data on a List row (#338): the ⋯ menu, a single
+   action's button (a reader's Specs), or nothing — always this wide, so Tests
+   & Data sits in the same place on every row. */
+.vehicle-row-more {
+    display: inline-flex;
+    justify-content: flex-end;
+    width: 64px;
+}
+/* The ⋯ trigger: a square the height of the button beside it, the glyph one
+   step up (--fs-step is a step DOWN, so up divides by it). */
+.vehicle-row-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: calc(var(--fs-body) / var(--fs-step));
+    line-height: 1;
+}
+.vehicle-row-menu-btn:hover,
+.vehicle-row-menu-btn[aria-expanded="true"] { color: var(--color-text-primary); background-color: var(--color-hover-lift); }
+.vehicle-row-menu { --popover-w: 180px; }
+.vehicle-row-menu-list {
+    display: flex;
+    flex-direction: column;
+}
+.nav-menu-item.is-danger { color: var(--color-danger); }
+
+/* Below the compact width a row is what the vehicle IS: its name, make ·
+   model · trim · year, and its tags, beside its actions. The photo, the
+   figure columns and the platform go — Cards are the view for those on a
+   phone (#338, the owner's review). */
+@media (max-width: 999.98px) {
+    /* div. for specificity: the base .vehicle-list rule is later in the file. */
+    div.vehicle-list { --vehicle-list-cols: 20px minmax(0, 1fr) 112px; }
+    .vehicle-list .vehicle-list-photo,
+    .vehicle-list .vehicle-list-figure,
+    .vehicle-list .vehicle-list-tests,
+    .vehicle-list-extra .platform-line-value,
+    .vehicle-list-head > :nth-child(2),
+    .vehicle-list-head > :nth-child(n+4):not(:last-child) { display: none; }
+    /* Tests & Data above the second action, rather than beside it. */
+    .vehicle-list-actions { flex-direction: column; align-items: flex-end; }
+    .vehicle-list-actions .vehicle-row-more { width: auto; }
 }
 
 .vehicle-card-body {
@@ -3216,15 +3397,15 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3;
 }
 
-/* List-mode vehicle container */
+/* List-mode vehicle container, and the column tracks its header and rows
+   share (#338; see .vehicle-row). */
 .vehicle-list {
-    @apply flex flex-col gap-2;
+    @apply flex flex-col gap-1.5;
+    /* Figure columns sized to their widest content on the live fleet
+       (2026-09-28: battery 67px, EPA range 81, tested 109, a tests pair 138). */
+    --vehicle-list-cols: 20px 96px minmax(220px, 1fr) 76px 88px 116px 144px 180px;
 }
 
-/* Search / filter row above the vehicle grid */
-.vehicle-filter-bar {
-    @apply flex gap-3 items-center mb-3;
-}
 
 /* Tag filter chip strip below the search bar */
 .tag-filter-bar {
@@ -6330,6 +6511,33 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .guide-facet-option:hover,
 .guide-column-row:hover { background-color: var(--color-hover-lift); }
 .guide-facet-option.selected { background-color: var(--color-primary-surface); }
+/* A value and its "not" button (#338): the option fills the row, the button
+   sits at its end. An excluded value is struck through, in the danger color
+   the "not" is drawn in. */
+.guide-facet-option-row > .guide-facet-option { flex: 1; min-width: 0; }
+.guide-facet-option-row.is-excluded .guide-facet-option-name {
+    text-decoration: line-through;
+    color: var(--color-text-secondary);
+}
+.guide-facet-exclude {
+    flex: none;
+    padding: 1px 6px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-mark);
+    background: none;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+.guide-facet-exclude:hover { color: var(--color-text-primary); border-color: var(--color-border-strong); }
+.guide-facet-exclude.active {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+}
+/* The any / all switch in a facet's head: the segmented control, small. */
+.guide-facet-match button { padding: 1px 8px; }
+
 /* Disabled, not hidden: a make vanishing reads as a bug, a greyed one reads as
    an answer. */
 .guide-facet-option:has(input:disabled) {
@@ -6419,6 +6627,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-primary);
     cursor: pointer;
 }
+/* A chip for a value left out (#338): "not Truck", in the exclude color. */
+.guide-narrowed-chip.is-excluded { color: var(--color-danger); }
 .guide-narrowed-chip:hover {
     border-color: var(--color-danger-border);
     color: var(--color-danger-text);

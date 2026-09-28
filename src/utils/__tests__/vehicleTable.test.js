@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
     VEHICLE_COLUMNS, DEFAULT_VEHICLE_COLUMNS, vehicleColumnByKey, unitFor, needsPerformance,
-    buildVehicleRows, formatVehicleCell, filterVehicleRows, sortVehicleRows, vehicleFacets,
+    buildVehicleRows, formatVehicleCell, sortVehicleRows,
     vehicleBarMaxima, vehicleBarPercent, firstSortDir,
-    encodeVehicleTableParams, decodeVehicleTableParams, EMPTY_VEHICLE_FILTERS,
+    encodeVehicleTableParams, decodeVehicleTableParams,
     vehicleTableStartSearch, vehicleTableMemory, PRESETS, vehiclePresetByKey, presetMatching,
     DEFAULT_ASSUMPTIONS, labelledColumn, needsAssumptions, assumptionsFor,
 } from '../vehicleTable';
@@ -89,13 +89,6 @@ describe('filtering, sorting, bars', () => {
         vehicle({ id: 3, name: 'Lyriq', make: 'Cadillac', year: 2026, specs: {} }),
     ]);
 
-    it('filters by facet and search', () => {
-        expect(filterVehicleRows(rows, { ...EMPTY_VEHICLE_FILTERS, makes: ['Tesla'] }).map(r => r.id)).toEqual([2]);
-        expect(filterVehicleRows(rows, { ...EMPTY_VEHICLE_FILTERS, tags: ['suv'] }).map(r => r.id)).toEqual([1]);
-        expect(filterVehicleRows(rows, { ...EMPTY_VEHICLE_FILTERS, search: 'lyr' }).map(r => r.id)).toEqual([3]);
-        expect(vehicleFacets(rows).years).toEqual(['2025', '2026']);
-    });
-
     it('sorts with absences last in both directions, best first on the first click', () => {
         const hp = vehicleColumnByKey('powertrain.horsepower_hp');
         expect(sortVehicleRows(rows, hp.key, 'desc').map(r => r.id)).toEqual([1, 2, 3]);
@@ -115,8 +108,8 @@ describe('filtering, sorting, bars', () => {
 
 describe('URL', () => {
     it('writes nothing for the defaults and round-trips the rest', () => {
-        expect(encodeVehicleTableParams({ columns: DEFAULT_VEHICLE_COLUMNS, sortKey: 'name', sortDir: 'asc', filters: EMPTY_VEHICLE_FILTERS }).toString()).toBe('');
-        const state = { columns: ['name', 'powertrain.horsepower_hp'], sortKey: 'powertrain.horsepower_hp', sortDir: 'desc', filters: { ...EMPTY_VEHICLE_FILTERS, makes: ['Tesla', 'Rivian'], search: 'model' }, modifiedFrom: null, assumptions: DEFAULT_ASSUMPTIONS };
+        expect(encodeVehicleTableParams({ columns: DEFAULT_VEHICLE_COLUMNS, sortKey: 'name', sortDir: 'asc' }).toString()).toBe('');
+        const state = { columns: ['name', 'powertrain.horsepower_hp'], sortKey: 'powertrain.horsepower_hp', sortDir: 'desc', modifiedFrom: null, assumptions: DEFAULT_ASSUMPTIONS };
         expect(decodeVehicleTableParams(encodeVehicleTableParams(state).toString())).toEqual(state);
     });
 
@@ -133,17 +126,14 @@ describe('vehicle table memory', () => {
         columns: ['name', 'powertrain.horsepower_hp'],
         sortKey: 'powertrain.horsepower_hp',
         sortDir: 'desc',
-        filters: { ...EMPTY_VEHICLE_FILTERS, makes: ['Ford'], search: 'mach' },
         modifiedFrom: null,
         assumptions: { ...DEFAULT_ASSUMPTIONS, addDistance: 200 },
     };
 
-    it('keeps columns and sort apart from filters', () => {
+    it('remembers columns and sort, and no filters: those are Vehicles & Specs\' own (#338)', () => {
         const memory = vehicleTableMemory(state);
         expect(memory.view).toContain('vt_cols=');
-        expect(memory.view).not.toContain('vt_mk');
-        expect(memory.filters).toContain('vt_mk=Ford');
-        expect(memory.filters).not.toContain('vt_cols');
+        expect(Object.keys(memory)).toEqual(['view']);
     });
 
     it('restores the whole state from memory when the URL carries none of it', () => {
@@ -156,7 +146,6 @@ describe('vehicle table memory', () => {
         const decoded = decodeVehicleTableParams(search);
         expect(decoded.sortKey).toBe('powertrain.drive_type');
         expect(decoded.columns).toEqual(DEFAULT_VEHICLE_COLUMNS);
-        expect(decoded.filters).toEqual(EMPTY_VEHICLE_FILTERS);
     });
 
     it('drops a remembered column that no longer exists', () => {
@@ -266,7 +255,7 @@ describe('presets (#335)', () => {
 
     it('writes a preset as its name, and implies its sort', () => {
         const rt = vehiclePresetByKey('road-trips');
-        const state = { columns: rt.columns, sortKey: rt.sortKey, sortDir: rt.sortDir, filters: EMPTY_VEHICLE_FILTERS };
+        const state = { columns: rt.columns, sortKey: rt.sortKey, sortDir: rt.sortDir };
         const search = encodeVehicleTableParams(state).toString();
         expect(search).toBe('vt_preset=road-trips');
         expect(decodeVehicleTableParams(search)).toEqual({ ...state, modifiedFrom: null, assumptions: DEFAULT_ASSUMPTIONS });

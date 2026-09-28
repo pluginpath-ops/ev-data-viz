@@ -45,6 +45,8 @@ export const DATA_CATEGORIES = [
     {
         key: 'accel',
         label: 'Acceleration',
+        // Where a line has no room for the word (the list's Tests column).
+        short: 'Accel',
         colorClass: 'text-purple-600 dark:text-purple-400',
         count: (v, perf) => perf?.[v.id]?.accel ?? 0,
     },
@@ -72,28 +74,3 @@ export const hasDataCategory = (vehicle, key, performanceCounts = {}) => {
     return cat ? cat.count(vehicle, performanceCounts) > 0 : false;
 };
 
-/**
- * Apply the data filter — AND / NOT only, unlike the tag filter's OR/AND/NOT.
- *
- * OR is dropped deliberately: the questions worth asking of data coverage are
- * conjunctive ("has both charging and range", which is what the pairing work
- * needs) or exclusionary ("has no EPA data" — what still needs looking up).
- * "Has charging or braking" isn't a question anyone asks, and offering it makes
- * the first click on a chip mean something nobody wants.
- *
- * @param {Array}  vehicles
- * @param {Object} states  { [categoryKey]: 'and'|'not' }
- * @param {Object} performanceCounts
- */
-export function filterByDataCategories(vehicles, states, performanceCounts = {}) {
-    const pick = (s) => Object.entries(states).filter(([, v]) => v === s).map(([k]) => k);
-    const and = pick('and'), not = pick('not');
-    if (!and.length && !not.length) return vehicles;
-
-    return vehicles.filter(v => {
-        const has = (k) => hasDataCategory(v, k, performanceCounts);
-        if (not.some(has)) return false;
-        if (and.length && !and.every(has)) return false;
-        return true;
-    });
-}

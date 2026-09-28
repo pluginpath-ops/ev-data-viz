@@ -22,22 +22,28 @@ const describe = (label, p) => {
     return `${label}: ${p.name}${p.maker_group ? ` (${p.maker_group})` : ''}${extra ? ` — ${extra}` : ''}`;
 };
 
-export function PlatformLine({ vehicle }) {
+export function PlatformLine({ vehicle, bare = false }) {
     const { platformsById, platformsAvailable } = useAppContext();
     if (!platformsAvailable) return null;
     const both = vehiclePlatforms(vehicle, platformsById);
     const text = platformLineText(both);
     if (!text) return null;
     const title = [describe('Mechanical', both.mechanical), describe('Electrical', both.electrical)].filter(Boolean).join('\n');
+    // Each name opens its platform's page (#354).
+    const names = (
+        <span className="platform-line-value" title={bare ? title : undefined}>
+            {both.mechanical && both.electrical && text !== both.electrical.name
+                ? <><PlatformLink platform={both.mechanical} /> · <PlatformLink platform={both.electrical} /></>
+                : <PlatformLink platform={both.electrical ?? both.mechanical} />}
+        </span>
+    );
+    // Bare: just the names, for a line that is already about the vehicle (the
+    // list's second line, #338).
+    if (bare) return names;
     return (
         <div className="platform-line" title={title}>
             <span className="text-micro">Platform</span>
-            {/* Each name opens its platform's page (#354). */}
-            <span className="platform-line-value">
-                {both.mechanical && both.electrical && text !== both.electrical.name
-                    ? <><PlatformLink platform={both.mechanical} /> · <PlatformLink platform={both.electrical} /></>
-                    : <PlatformLink platform={both.electrical ?? both.mechanical} />}
-            </span>
+            {names}
         </div>
     );
 }

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import MenuButton from '../../shell/MenuButton';
-import { EMPTY_FILTERS } from '../../../utils/feGuideBrowse';
+import { guideFiltersActive } from '../../../utils/feGuideBrowse';
 import GuideFacetMenu from './GuideFacetMenu';
 
 /**
@@ -103,7 +103,7 @@ export default function GuideFilterBar({
     const counts = useMemo(() => {
         const out = {};
         for (const f of FACETS) {
-            const base = filterFn(rows, { ...filters, [f.key]: [] });
+            const base = filterFn(rows, { ...filters, [f.key]: [], exclude: { ...(filters.exclude ?? {}), [f.key]: [] } });
             const tally = new Map();
             for (const r of base) {
                 const v = r[f.rowKey];
@@ -115,25 +115,40 @@ export default function GuideFilterBar({
         return out;
     }, [rows, filters, filterFn]);
 
+    const excludedOf = (key) => filters.exclude?.[key] ?? [];
+    // Including a value clears its exclusion, and the other way round (#338).
     const toggle = (key) => (v) => {
         const cur = filters[key] ?? [];
-        onChange({ [key]: cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v] });
+        onChange({
+            [key]: cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v],
+            exclude: { ...(filters.exclude ?? {}), [key]: excludedOf(key).filter(x => x !== v) },
+        });
     };
-    const clear = (key) => () => onChange({ [key]: [] });
+    const exclude = (key) => (v) => {
+        const cur = excludedOf(key);
+        onChange({
+            [key]: (filters[key] ?? []).filter(x => x !== v),
+            exclude: { ...(filters.exclude ?? {}), [key]: cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v] },
+        });
+    };
+    const clear = (key) => () => onChange({ [key]: [], exclude: { ...(filters.exclude ?? {}), [key]: [] } });
 
-    const active = Object.entries(filters).some(([k, v]) => {
-        const empty = EMPTY_FILTERS[k];
-        return Array.isArray(v) ? v.length > 0 : v !== empty;
-    });
+    const active = guideFiltersActive(filters);
 
     /** Every active value, flattened, so the chip line is data rather than markup. */
-    const narrowedBy = FACETS.flatMap(f =>
-        (filters[f.key] ?? []).map(v => ({
+    const narrowedBy = FACETS.flatMap(f => [
+        ...(filters[f.key] ?? []).map(v => ({
             id: `${f.key}:${v}`,
             text: (f.format ?? String)(v),
             remove: () => onChange({ [f.key]: filters[f.key].filter(x => x !== v) }),
         })),
-    );
+        ...excludedOf(f.key).map(v => ({
+            id: `${f.key}:not:${v}`,
+            text: `not ${(f.format ?? String)(v)}`,
+            excluded: true,
+            remove: () => exclude(f.key)(v),
+        })),
+    ]);
 
     return (
         <div className="guide-filter-strip">
@@ -155,8 +170,10 @@ export default function GuideFilterBar({
                         format={f.format}
                         values={facets[f.key]}
                         selected={filters[f.key]}
+                        excluded={excludedOf(f.key)}
                         countFor={v => counts[f.key].get(v) ?? 0}
                         onToggle={toggle(f.key)}
+                        onExclude={exclude(f.key)}
                         onClear={clear(f.key)}
                     />
                 ))}
@@ -193,7 +210,7 @@ export default function GuideFilterBar({
                         <button
                             key={c.id}
                             type="button"
-                            className="guide-narrowed-chip"
+                            className={`guide-narrowed-chip${c.excluded ? ' is-excluded' : ''}`}
                             onClick={c.remove}
                             title={`Remove ${c.text}`}
                         >

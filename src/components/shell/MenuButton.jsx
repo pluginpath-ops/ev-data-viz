@@ -32,6 +32,9 @@ import { useLightDismiss } from '../../hooks/useLightDismiss';
  */
 export default function MenuButton({
     label, value, active = false, title, panelClass = '', children,
+    // A trigger that is not a facet button: its own class, no caret, and a
+    // name for assistive tech when the label is a glyph (the list's ⋯, #338).
+    buttonClass = null, ariaLabel,
 }) {
     const [open, setOpen] = useState(false);
     // How far the panel is nudged sideways to stay on screen, in px.
@@ -64,17 +67,18 @@ export default function MenuButton({
         <div className="menu-button" ref={ref}>
             <button
                 type="button"
-                className={`guide-facet-btn${active ? ' active' : ''}`}
-                onClick={() => setOpen(o => !o)}
+                className={buttonClass ?? `guide-facet-btn${active ? ' active' : ''}`}
+                onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
                 aria-expanded={open}
                 aria-haspopup="menu"
+                aria-label={ariaLabel}
                 title={title}
             >
                 {label}
                 {value != null && value !== '' && (
                     <span className="guide-facet-btn-value">{value}</span>
                 )}
-                <span className="disclosure-caret guide-facet-caret" aria-hidden="true">▾</span>
+                {!buttonClass && <span className="disclosure-caret guide-facet-caret" aria-hidden="true">▾</span>}
             </button>
 
             {open && (

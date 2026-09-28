@@ -822,12 +822,22 @@ describe('the seams that broke before', () => {
         expect(read('src/components/tables/TableCell.jsx'), 'without borrowing the test peek').toMatch(/const noteLink = test \?\? link/);
     });
 
+    it('lays out every List row on the header\'s grid, with one set of actions (#338)', () => {
+        const view = read('src/components/VehiclesView.jsx');
+        expect(view, 'the header row is drawn').toMatch(/<VehicleListHeader/);
+        expect(view, 'every row gets the same ⋯ menu').toMatch(/<VehicleRowMenu label=\{vehicle\.name\} items=\{rowMenuItems\(vehicle\)\} \/>/);
+        expect(view, 'the Tests column').toMatch(/<TestCounts vehicle=\{vehicle\}/);
+        const css = read('src/index.css');
+        expect(css, 'rows and header share the tracks').toMatch(/\.vehicle-row,\s*\.vehicle-list-head \{\s*display: grid;\s*grid-template-columns: var\(--vehicle-list-cols\)/);
+        expect(css, 'no auto track, or the empty header cell collapses it').not.toMatch(/--vehicle-list-cols:[^;]*\bauto;/);
+    });
+
     it('links a tested figure to its test, and lands on it', () => {
         // Built once and unconnected, a link that navigates nowhere looks
         // exactly like one that works until someone clicks it.
         const app = read('src/App.jsx');
         expect(app, 'the main window must give the table a way to open a test')
-            .toMatch(/<VehicleTable onOpenTest=\{openTest\} \/>/);
+            .toMatch(/<VehicleTable onOpenTest=\{openTest\}/);
         expect(app, 'a ?run= link must survive a load').toMatch(/p\.get\('run'\)/);
         expect(app, 'Tests & Data must be told which test to land on').toMatch(/focusRunId=\{focusRunId\}/);
         const runs = read('src/components/RunsView.jsx');
@@ -842,7 +852,7 @@ describe('the seams that broke before', () => {
     it('makes the vehicle table a selection surface over the whole fleet', () => {
         const app = read('src/App.jsx');
         // Mounted with no selection gate: the table is where a selection is made.
-        expect(app, 'App must mount the vehicle table for specstable').toMatch(/chartMode === 'specstable' && <VehicleTable[ />]/);
+        expect(app, 'App must mount the vehicle table for specstable').toMatch(/chartMode === 'specstable' && \(?\s*<VehicleTable[ />]/);
         expect(app).not.toMatch(/selectedVehicles\.length > 0 && chartMode === 'specstable'/);
         // The chart URL writer must carry the table's own parameters, or every
         // selection change wipes the reader's columns, sort and filters.

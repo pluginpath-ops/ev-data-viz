@@ -5,7 +5,7 @@ import SeriesColorPicker from './SeriesColorPicker';
 import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 import { EMPTY_VEHICLE_FORM, vehicleFormFrom } from '../utils/vehicleForm';
 import { useAppContext } from '../context/AppContext';
-import { DATA_CATEGORIES, vehicleDataCategories, hasDataCategory, filterByDataCategories } from '../utils/vehicleDataCategories';
+import { DATA_CATEGORIES, vehicleDataCategories } from '../utils/vehicleDataCategories';
 import { distanceValue, distanceUnit } from '../utils/unitConversions';
 import StatCell from './StatCell';
 import VehicleMedia from './vehicles/VehicleMedia';
@@ -17,6 +17,12 @@ import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
 import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
+import VehicleFilterBar from './vehicles/VehicleFilterBar';
+import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
+import { EMPTY_VEHICLE_FILTERS, filtersActive } from '../utils/vehicleFilters';
+import VehicleListHeader from './vehicles/VehicleListHeader';
+import VehicleRowMenu from './vehicles/VehicleRowMenu';
+import TestCounts from './vehicles/TestCounts';
 import LazyBoundary from './LazyBoundary';
 import { EditVehicleForm, ImportVehiclesModal } from './lazyComponents';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
@@ -35,6 +41,35 @@ function epaRangeValue(vehicle, units) {
 /** A word beside the range only when it is not an EPA label. */
 function epaRangeBasisMark(vehicle) {
     return ['expected', 'unsorted'].includes(vehicle.epaRangeBasis) ? vehicle.epaRangeBasis : null;
+}
+
+/** Compare two figures in a direction, blanks last whichever way the column sorts. */
+function byNumber(a, b, dir = 'asc') {
+    const an = Number(a), bn = Number(b);
+    const aOk = a != null && a !== '' && Number.isFinite(an), bOk = b != null && b !== '' && Number.isFinite(bn);
+    if (aOk && bOk) return dir === 'asc' ? an - bn : bn - an;
+    return aOk ? -1 : bOk ? 1 : 0;
+}
+
+/** A vehicle's tested range in miles, as the List shows it (scaled when it was). */
+function testedMiles(vehicle) {
+    const t = testedRangeSummary(vehicle);
+    return t ? (t.fullPackMi ?? t.distanceMi) : null;
+}
+
+/**
+ * A figure in a List column (#338): the value and unit, and beneath it the
+ * basis where there is one — the vehicle table's shape, without the label the
+ * column header already gives. Blank is an em dash, never an empty cell.
+ */
+function ListFigure({ value, unit, basis }) {
+    if (value == null || value === '') return <span className="stat-cell-empty" aria-label="not recorded">—</span>;
+    return (
+        <>
+            <span className="stat-cell-value">{value}{unit && <span className="stat-cell-unit">{unit}</span>}</span>
+            {basis && <span className="stat-cell-basis">{basis}</span>}
+        </>
+    );
 }
 
 // ── Test-count row ────────────────────────────────────────────────────────────
@@ -71,19 +106,16 @@ export default function VehiclesView({
     savedState, onSaveState,
     // Cards or List: chosen in the sub-nav since #338, not by a toggle here.
     viewMode = 'card',
+    // Vehicles & Specs' filters, shared with the Table (#338).
+    filters = EMPTY_VEHICLE_FILTERS, onFiltersChange = () => {},
 }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState(EMPTY_VEHICLE_FORM);
-    const [mfgFilterStates, setMfgFilterStates] = useState(savedState?.mfgFilterStates ?? {}); // { [mfgId]: 'or' | 'not' }
-    const [modelFilter, setModelFilter] = useState(savedState?.modelFilter ?? new Set());
     const [formTags, setFormTags] = useState([]);
     const [newTagName, setNewTagName] = useState('');
-    const [tagFilterStates, setTagFilterStates] = useState(savedState?.tagFilterStates ?? {}); // { [tagId]: 'or' | 'and' | 'not' }
-    const [dataFilterStates, setDataFilterStates] = useState(savedState?.dataFilterStates ?? {}); // { [categoryKey]: 'or' | 'and' | 'not' }
     const [imageUploading, setImageUploading] = useState(false);
     const [sortBy, setSortBy] = useState(savedState?.sortBy ?? 'default');
-    const [textFilter, setTextFilter] = useState(savedState?.textFilter ?? '');
     const [editingOrder, setEditingOrder] = useState(false);
     const [pendingOrder, setPendingOrder] = useState(null);   // [{id, sort_order}] or null
     const [savingOrder, setSavingOrder]   = useState(false);
@@ -92,17 +124,17 @@ export default function VehiclesView({
     const [specsEditingVehicle, setSpecsEditingVehicle] = useState(null);
     const [specsViewingVehicle, setSpecsViewingVehicle] = useState(null);
     const [showImportModal, setShowImportModal] = useState(false);
-    const VEHICLES_PER_PAGE = 24;
+    // A card is tall and a list row is one line, so a page of rows holds more (#338).
+    const VEHICLES_PER_PAGE = viewMode === 'list' ? 50 : 24;
 
     // Keep a ref always pointing at latest filter/sort/page so the unmount
     // cleanup can save it without stale-closure issues.
     const persistableState = useRef({});
     useEffect(() => {
         persistableState.current = {
-            textFilter, tagFilterStates, mfgFilterStates, dataFilterStates, modelFilter,
             sortBy, vehiclePage,
         };
-    }, [textFilter, tagFilterStates, mfgFilterStates, dataFilterStates, modelFilter, sortBy, vehiclePage]);
+    }, [sortBy, vehiclePage]);
 
     // Save state back to App when this tab is left (unmount).
     useEffect(() => {
@@ -204,88 +236,14 @@ export default function VehiclesView({
     };
 
     // Cycle brand filter state: N/A → OR (green) → NOT (red) → N/A  (no AND — doesn't make sense for brands)
-    const cycleMfgFilter = (mfgId) => {
-        setMfgFilterStates(prev => {
-            const cur = prev[mfgId];
-            if (!cur)         return { ...prev, [mfgId]: 'or' };
-            if (cur === 'or') return { ...prev, [mfgId]: 'not' };
-            const next = { ...prev }; delete next[mfgId]; return next; // not → N/A
-        });
-        setModelFilter(new Set()); // reset model filter when brand filter changes
-    };
 
-    // Cycle tag filter state: N/A → OR (green) → AND (blue) → NOT (red) → N/A
-    const cycleTagFilter = (tagId) => {
-        setTagFilterStates(prev => {
-            const cur = prev[tagId];
-            if (!cur)          return { ...prev, [tagId]: 'or' };
-            if (cur === 'or')  return { ...prev, [tagId]: 'and' };
-            if (cur === 'and') return { ...prev, [tagId]: 'not' };
-            const next = { ...prev }; delete next[tagId]; return next; // not → N/A
-        });
-    };
-
-    // AND → NOT → clear. No OR state: the useful questions about data coverage
-    // are "has charging AND range" and "has no EPA data" — nobody asks for
-    // "charging or braking", so that state would only sit in the way.
-    const cycleDataFilter = (key) => {
-        setDataFilterStates(prev => {
-            const cur = prev[key];
-            if (!cur)          return { ...prev, [key]: 'and' };
-            if (cur === 'and') return { ...prev, [key]: 'not' };
-            const next = { ...prev }; delete next[key]; return next;
-        });
-    };
-
-    // Stage 1: quad-state tag filter + committed-delete filter
-    const orTags  = Object.entries(tagFilterStates).filter(([, s]) => s === 'or' ).map(([id]) => Number(id));
-    const andTags = Object.entries(tagFilterStates).filter(([, s]) => s === 'and').map(([id]) => Number(id));
-    const notTags = Object.entries(tagFilterStates).filter(([, s]) => s === 'not').map(([id]) => Number(id));
-
-    const tagFiltered = vehicles.filter(v => {
-        if (notTags.some(id => v.tags?.some(t => t.id === id))) return false;
-        if (andTags.length && !andTags.every(id => v.tags?.some(t => t.id === id))) return false;
-        if (orTags.length  && !orTags.some(id  => v.tags?.some(t => t.id === id))) return false;
-        return true;
-    }).filter(v => !committedDeletes.has(v.id));
-
-    // Stage 2: manufacturer filter (OR = show only these brands, NOT = hide these brands)
-    const orMfgs  = Object.entries(mfgFilterStates).filter(([, s]) => s === 'or' ).map(([id]) => Number(id));
-    const notMfgs = Object.entries(mfgFilterStates).filter(([, s]) => s === 'not').map(([id]) => Number(id));
-    const mfgFiltered = (orMfgs.length === 0 && notMfgs.length === 0) ? tagFiltered : tagFiltered.filter(v => {
-        if (notMfgs.length && notMfgs.includes(v.manufacturer?.id ?? null)) return false;
-        if (orMfgs.length  && !orMfgs.includes(v.manufacturer?.id ?? null)) return false;
-        return true;
-    });
-
-    // Stage 2b: model filter — only active when at least one OR-brand is selected
-    const availableModels = orMfgs.length > 0
-        ? [...new Set(mfgFiltered.map(v => v.model).filter(Boolean))].sort()
-        : [];
-    const modelFiltered = modelFilter.size === 0 ? mfgFiltered : mfgFiltered.filter(v =>
-        v.model && modelFilter.has(v.model)
-    );
-
-    // Stage 2c: data-type filter — which kinds of test data the vehicle holds
-    const dataFiltered = filterByDataCategories(modelFiltered, dataFilterStates, performanceCounts);
-
-    // Stage 3: text filter
-    const textLower = textFilter.trim().toLowerCase();
-    const textFiltered = !textLower ? dataFiltered : dataFiltered.filter(v => {
-        if ([v.name, v.make, v.model].some(f => (f || '').toLowerCase().includes(textLower))) return true;
-        const year = String(v.year || '');
-        if (year.toLowerCase().includes(textLower)) return true;
-        // Range match: "2022-2024" should match a search for "2023"
-        const queryNum = parseInt(textLower, 10);
-        if (!isNaN(queryNum) && /^\d{4}\s*[-–]\s*\d{4}$/.test(year)) {
-            const parts = year.split(/[-–]/).map(s => parseInt(s.trim(), 10));
-            if (parts.length === 2) return queryNum >= parts[0] && queryNum <= parts[1];
-        }
-        return false;
-    });
+    // The filters are Vehicles & Specs' own, shared with List and Table (#338);
+    // committed deletes are the only narrowing this view adds.
+    const { ctx: filterCtx, filtered: filteredVehicles } = useFilteredVehicles(vehicles, filters, performanceCounts);
+    const shownVehicles = filteredVehicles.filter(v => !committedDeletes.has(v.id));
 
     // Stage 3: sort
-    const sortedFilteredVehicles = [...textFiltered].sort((a, b) => {
+    const sortedFilteredVehicles = [...shownVehicles].sort((a, b) => {
         switch (sortBy) {
             case 'default': {
                 // Use pending sort_order when available (instant visual feedback before DB save)
@@ -304,6 +262,15 @@ export default function VehiclesView({
             case 'model_za':    return (b.model || '').localeCompare(a.model || '');
             case 'year_newest': return Number(b.year || 0) - Number(a.year || 0);
             case 'year_oldest': return Number(a.year || 0) - Number(b.year || 0);
+            // The List view's column headers (#338); blanks last either way.
+            case 'name_az':      return (a.name || '').localeCompare(b.name || '');
+            case 'name_za':      return (b.name || '').localeCompare(a.name || '');
+            case 'battery_desc': return byNumber(a.socWindowKwh, b.socWindowKwh, 'desc');
+            case 'battery_asc':  return byNumber(a.socWindowKwh, b.socWindowKwh);
+            case 'range_desc':   return byNumber(a.epaRangeMi, b.epaRangeMi, 'desc');
+            case 'range_asc':    return byNumber(a.epaRangeMi, b.epaRangeMi);
+            case 'tested_desc':  return byNumber(testedMiles(a), testedMiles(b), 'desc');
+            case 'tested_asc':   return byNumber(testedMiles(a), testedMiles(b));
             case 'mfg_az': {
                 const aMfg = a.manufacturer?.name || a.make || '';
                 const bMfg = b.manufacturer?.name || b.make || '';
@@ -321,6 +288,37 @@ export default function VehiclesView({
         (vehiclePage - 1) * VEHICLES_PER_PAGE,
         vehiclePage * VEHICLES_PER_PAGE
     );
+
+    /**
+     * A List row's ⋯ menu (#338): the card's Specs and curator buttons, as
+     * menu items, with the same handlers. Delete stays last.
+     */
+    const rowMenuItems = (vehicle) => {
+        const isPending = pendingDeletes.has(vehicle.id);
+        const hasSpecs = vehicle.specs && Object.keys(vehicle.specs).length > 0;
+        return [
+            canEdit(vehicle)
+                ? { key: 'specs', label: 'Specs', onClick: () => setSpecsEditingVehicle(vehicle) }
+                : hasSpecs && { key: 'specs', label: 'Specs', onClick: () => setSpecsViewingVehicle(vehicle) },
+            canEdit(vehicle) && { key: 'edit', label: 'Edit', onClick: (e) => handleEdit(vehicle, e) },
+            canEdit(vehicle) && {
+                key: 'copy', label: '⧉ Copy', disabled: duplicatingId !== null,
+                title: 'Copy this vehicle, with its own copies of its specs and tests',
+                onClick: (e) => handleDuplicateVehicle(vehicle, e),
+            },
+            canEdit(vehicle) && onCreateVariant && {
+                key: 'variant', label: '＋ Variant', disabled: duplicatingId !== null,
+                title: 'A new vehicle that inherits this one\u2019s specs, tests, color, photo and tags. Set only what differs.',
+                onClick: async () => {
+                    const variant = await onCreateVariant(vehicle.id);
+                    if (variant) handleEdit(variant, { stopPropagation: () => {} });
+                },
+            },
+            canDelete(vehicle) && (isPending
+                ? { key: 'restore', label: '↩ Restore', onClick: () => restoreItem(vehicle.id) }
+                : { key: 'delete', label: 'Delete', danger: true, onClick: () => queueDelete(vehicle.id) }),
+        ];
+    };
 
     // ── Shared sub-components ────────────────────────────────────────────────
 
@@ -535,11 +533,10 @@ export default function VehiclesView({
     useEffect(() => {
         if (!didMount.current) { didMount.current = true; return; }
         setVehiclePage(1);
-    }, [textFilter, tagFilterStates, sortBy, mfgFilterStates, dataFilterStates]);
+    }, [filters, sortBy]);
 
     const showReorderButtons = canEdit({}) && sortBy === 'default'
-        && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0
-        && editingOrder;
+        && !filtersActive(filters) && editingOrder;
 
     // ────────────────────────────────────────────────────────────────────────
 
@@ -597,196 +594,64 @@ export default function VehiclesView({
                 </div>
             </div>
 
-            {/* Sort + search bar */}
-            <div className="vehicle-filter-bar">
-                <input
-                    type="text"
-                    placeholder="Search by name, make, model, year…"
-                    value={textFilter}
-                    onChange={e => setTextFilter(e.target.value)}
-                    className="form-input form-input flex-1"
-                />
-                <select
-                    value={sortBy}
-                    onChange={e => setSortBy(e.target.value)}
-                    className="form-input form-input"
-                >
-                    <option value="default">Default Order</option>
-                    <option value="date_newest">Date Added (Newest)</option>
-                    <option value="date_oldest">Date Added (Oldest)</option>
-                    <option value="brand_az">Brand A→Z</option>
-                    <option value="brand_za">Brand Z→A</option>
-                    <option value="model_az">Model A→Z</option>
-                    <option value="model_za">Model Z→A</option>
-                    <option value="year_newest">Year (Newest)</option>
-                    <option value="year_oldest">Year (Oldest)</option>
-                    <option value="mfg_az">Group by Manufacturer</option>
-                </select>
-                {canEdit({}) && sortBy === 'default' && textFilter.trim() === '' && Object.keys(tagFilterStates).length === 0 && (
-                    <button
-                        onClick={() => { if (editingOrder) setPendingOrder(null); setEditingOrder(v => !v); }}
-                        className={`btn btn-toggle${editingOrder ? ' active' : ''} flex-shrink-0`}
-                        style={editingOrder ? { backgroundColor: 'var(--color-primary-light)', borderColor: 'var(--color-primary)', color: 'var(--color-primary-text)' } : {}}
+            {/* One filter bar for Cards, List and Table (#338): the chip walls
+                that sat here — Filter, Brand, Data — are its dropdowns now. The
+                sort and Edit Order ride in its row, since they change what
+                this view shows. */}
+            <VehicleFilterBar
+                vehicles={vehicles}
+                filters={filters}
+                onChange={onFiltersChange}
+                ctx={filterCtx}
+                shownCount={shownVehicles.length}
+            >
+                    <select
+                        value={sortBy}
+                        onChange={e => setSortBy(e.target.value)}
+                        className="form-input vehicle-sort-select"
                     >
-                        ✏️ Edit Order
-                    </button>
-                )}
-            </div>
-
-            {/* Tag filter bar — quad-state: N/A → OR (green) → AND (blue) → NOT (red) */}
-            {tags.length > 0 && (
-                <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-secondary flex-shrink-0">Filter:</span>
-                    {tags.map(tag => {
-                        const state = tagFilterStates[tag.id]; // undefined = 'na'
-                        const stateClass = state === 'or' ? 'tag-filter-or'
-                            : state === 'and' ? 'tag-filter-and'
-                            : state === 'not' ? 'tag-filter-not'
-                            : 'tag-filter-na';
-                        const tooltip = state === 'or'  ? `OR — any vehicle with "${tag.name}" is shown. Click for AND.`
-                            : state === 'and' ? `AND — vehicles must have "${tag.name}". Click for NOT.`
-                            : state === 'not' ? `NOT — vehicles with "${tag.name}" are hidden. Click to clear.`
-                            : `Click to filter: OR (show any vehicle with "${tag.name}")`;
-                        return (
-                            <button
-                                key={tag.id}
-                                onClick={() => cycleTagFilter(tag.id)}
-                                className={`tag-filter-btn ${stateClass}`}
-                                title={tooltip}
-                            >
-                                {tag.name}
-                            </button>
-                        );
-                    })}
-                    {Object.keys(tagFilterStates).length > 0 && (
+                        <option value="default">Default Order</option>
+                        <option value="date_newest">Date Added (Newest)</option>
+                        <option value="date_oldest">Date Added (Oldest)</option>
+                        <option value="brand_az">Brand A→Z</option>
+                        <option value="brand_za">Brand Z→A</option>
+                        <option value="model_az">Model A→Z</option>
+                        <option value="model_za">Model Z→A</option>
+                        <option value="year_newest">Year (Newest)</option>
+                        <option value="year_oldest">Year (Oldest)</option>
+                        <option value="mfg_az">Group by Manufacturer</option>
+                        {/* The List view's column sorts, so Cards can use them too (#338). */}
+                        <option value="name_az">Name A→Z</option>
+                        <option value="name_za">Name Z→A</option>
+                        <option value="battery_desc">Battery (Largest)</option>
+                        <option value="battery_asc">Battery (Smallest)</option>
+                        <option value="range_desc">EPA Range (Longest)</option>
+                        <option value="range_asc">EPA Range (Shortest)</option>
+                        <option value="tested_desc">Tested Range (Longest)</option>
+                        <option value="tested_asc">Tested Range (Shortest)</option>
+                    </select>
+                    {canEdit({}) && sortBy === 'default' && !filtersActive(filters) && (
                         <button
-                            onClick={() => setTagFilterStates({})}
-                            className="text-xs text-meta hover:text-secondary underline ml-1 flex-shrink-0"
+                            onClick={() => { if (editingOrder) setPendingOrder(null); setEditingOrder(v => !v); }}
+                            className={`btn btn-toggle${editingOrder ? ' active' : ''} flex-shrink-0`}
+                            style={editingOrder ? { backgroundColor: 'var(--color-primary-light)', borderColor: 'var(--color-primary)', color: 'var(--color-primary-text)' } : {}}
                         >
-                            Clear
+                            ✏️ Edit Order
                         </button>
                     )}
-                    <span className="tag-filter-legend" title="Click a tag to cycle: OR (green) shows vehicles with any matching tag · AND (blue) requires all matching tags · NOT (red) hides matching vehicles">
-                        <span className="text-green-500">●</span> OR
-                        <span className="text-blue-500 ml-1">●</span> AND
-                        <span className="text-red-500 ml-1">●</span> NOT
-                    </span>
-                </div>
-            )}
-            {/* Manufacturer filter bar — tri-state: N/A → OR (green) → NOT (red) → N/A */}
-            {manufacturers.length > 0 && (
-                <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-secondary flex-shrink-0">Brand:</span>
-                    {manufacturers.map(mfg => {
-                        const state = mfgFilterStates[mfg.id];
-                        const stateClass = state === 'or'  ? 'tag-filter-or'
-                            : state === 'not' ? 'tag-filter-not'
-                            : 'tag-filter-na';
-                        const tooltip = state === 'or'  ? `OR — showing only "${mfg.name}" vehicles. Click for NOT.`
-                            : state === 'not' ? `NOT — hiding "${mfg.name}" vehicles. Click to clear.`
-                            : `Click to filter: OR (show only "${mfg.name}" vehicles)`;
-                        return (
-                            <button
-                                key={mfg.id}
-                                onClick={() => cycleMfgFilter(mfg.id)}
-                                className={`tag-filter-btn ${stateClass}`}
-                                title={tooltip}
-                            >
-                                {mfg.name}
-                            </button>
-                        );
-                    })}
-                    {Object.keys(mfgFilterStates).length > 0 && (
-                        <button
-                            onClick={() => { setMfgFilterStates({}); setModelFilter(new Set()); }}
-                            className="text-xs text-meta hover:text-secondary underline ml-1 flex-shrink-0"
-                        >
-                            Clear
-                        </button>
-                    )}
-                </div>
-            )}
+            </VehicleFilterBar>
 
-            {/* Model filter bar — visible when a brand is selected and multiple models exist */}
-            {availableModels.length > 1 && (
-                <div className="tag-filter-bar">
-                    <span className="text-sm font-medium text-secondary flex-shrink-0">Model:</span>
-                    {availableModels.map(model => {
-                        const active = modelFilter.has(model);
-                        return (
-                            <button
-                                key={model}
-                                onClick={() => setModelFilter(prev => {
-                                    const next = new Set(prev);
-                                    next.has(model) ? next.delete(model) : next.add(model);
-                                    return next;
-                                })}
-                                className={`tag-filter-btn ${active ? 'tag-filter-or' : 'tag-filter-na'}`}
-                                title={active ? `Remove "${model}" filter` : `Show only ${model} variants`}
-                            >
-                                {model}
-                            </button>
-                        );
-                    })}
-                    {modelFilter.size > 0 && (
-                        <button
-                            onClick={() => setModelFilter(new Set())}
-                            className="text-xs text-meta hover:text-secondary underline ml-1 flex-shrink-0"
-                        >
-                            Clear
-                        </button>
-                    )}
-                </div>
-            )}
-
-            {/* Data filter bar — which kinds of test data a vehicle holds.
-                Tri-state AND (blue) → NOT (red) → clear; no OR, see cycleDataFilter.
-                Counts are of the vehicles still standing after the tag/brand/model
-                filters, so a zero here means "none left", not "none in the database". */}
-            <div className="tag-filter-bar">
-                <span className="text-sm font-medium text-secondary flex-shrink-0">Data:</span>
-                {DATA_CATEGORIES.map(cat => {
-                    const state = dataFilterStates[cat.key];
-                    const stateClass = state === 'and' ? 'tag-filter-and'
-                        : state === 'not' ? 'tag-filter-not'
-                        : 'tag-filter-na';
-                    const available = modelFiltered.filter(v => hasDataCategory(v, cat.key, performanceCounts)).length;
-                    const tooltip = state === 'and' ? `AND — vehicles must have ${cat.label} data. Click for NOT.`
-                        : state === 'not' ? `NOT — vehicles with ${cat.label} data are hidden. Click to clear.`
-                        : `Click to show only vehicles with ${cat.label} data`;
-                    return (
-                        <button
-                            key={cat.key}
-                            onClick={() => cycleDataFilter(cat.key)}
-                            className={`tag-filter-btn ${stateClass}`}
-                            title={tooltip}
-                        >
-                            {cat.label} ({available})
-                        </button>
-                    );
-                })}
-                {Object.keys(dataFilterStates).length > 0 && (
-                    <button
-                        onClick={() => setDataFilterStates({})}
-                        className="text-xs text-meta hover:text-secondary underline ml-1 flex-shrink-0"
-                    >
-                        Clear
-                    </button>
-                )}
-            </div>
-
-            {/* Select All / Clear All Visible */}
-            {textFiltered.length > 0 && (
+            {shownVehicles.length > 0 && (
                 <div className="flex justify-end gap-2 mb-4 -mt-3">
                     <button
-                        onClick={() => onSelectAllVisible(textFiltered.map(v => v.id))}
+                        onClick={() => onSelectAllVisible(shownVehicles.map(v => v.id))}
                         className="btn btn-primary"
                         title="Add all currently visible vehicles to the comparison selection"
                     >
-                        Select All Visible ({textFiltered.length})
+                        Select All Visible ({shownVehicles.length})
                     </button>
                     <button
-                        onClick={() => onClearAllVisible(textFiltered.map(v => v.id))}
+                        onClick={() => onClearAllVisible(shownVehicles.map(v => v.id))}
                         className="btn btn-secondary"
                         title="Remove all currently visible vehicles from the comparison selection"
                     >
@@ -950,7 +815,18 @@ export default function VehiclesView({
 
             {/* ── LIST VIEW ── */}
             {viewMode === 'list' && (
-                <div className="vehicle-list">
+                <div className="vehicle-list" role="table" aria-label="Vehicles">
+                    <VehicleListHeader
+                        sortBy={sortBy}
+                        onSort={setSortBy}
+                        allSelected={pagedVehicles.length > 0 && pagedVehicles.every(v => selectedVehicles.includes(v.id))}
+                        someSelected={pagedVehicles.some(v => selectedVehicles.includes(v.id))}
+                        onToggleAll={() => {
+                            const ids = pagedVehicles.map(v => v.id);
+                            if (ids.every(id => selectedVehicles.includes(id))) onClearAllVisible(ids);
+                            else onSelectAllVisible(ids);
+                        }}
+                    />
                     {pagedVehicles.map((vehicle, pageIdx) => {
                         const isSelected = selectedVehicles.includes(vehicle.id);
                         const isPending  = pendingDeletes.has(vehicle.id);
@@ -961,56 +837,52 @@ export default function VehiclesView({
                         const prevMfgName = prevVehicle ? (prevVehicle.manufacturer?.name || prevVehicle.make || 'Unknown') : null;
                         const showMfgHeader = sortBy === 'mfg_az' && mfgName !== prevMfgName;
                         return (
-                            <div key={vehicle.id}>
-                                {showMfgHeader && (
-                                    <div className="pt-2 pb-1 border-b border-[var(--color-border)] mb-1">
-                                        <h3 className="text-sm font-semibold text-secondary uppercase tracking-wider">{mfgName}</h3>
-                                    </div>
-                                )}
+                            <div key={vehicle.id} role="rowgroup">
+                                {showMfgHeader && <h3 className="vehicle-list-group text-micro">{mfgName}</h3>}
+                                {/* Every row is the same grid as the header (#338):
+                                    a column is blank ("—"), never missing, so no
+                                    row's figures sit anywhere but under their
+                                    heading. The row still selects on click; the
+                                    checkbox says so where the ✓ on the photo did. */}
                                 <div
+                                    role="row"
                                     onClick={() => handleCardClick(vehicle)}
                                     className={`vehicle-card vehicle-row${isSelected ? ' is-selected' : ''}${isPending ? ' is-pending' : ''}`}
                                 >
-
-                                    {/* Reorder controls — owner only, default sort, no filters */}
-                                    {showReorderButtons && (
-                                        <div className="reorder-controls flex-shrink-0" onClick={e => e.stopPropagation()}>
-                                            <button title="Top" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, 0); }} className="reorder-btn">⇈</button>
-                                            <button title="-10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos - 10); }} disabled={globalPos < 1} className="reorder-btn disabled:opacity-30">▲▲</button>
-                                            <button title="Up" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'up'); }} disabled={globalPos === 0} className="reorder-btn disabled:opacity-30">▲</button>
-                                            <input
-                                                type="number" min={1} max={totalCount}
-                                                defaultValue={globalPos + 1}
-                                                key={`pos-${vehicle.id}-${globalPos}`}
-                                                onClick={e => e.stopPropagation()}
-                                                onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value); if (!isNaN(v)) handleMoveVehicleToIndex(vehicle.id, v - 1); e.target.blur(); } }}
-                                                onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
-                                                className="form-input form-input reorder-position-input"
-                                            />
-                                            <button title="Down" onClick={e => { e.stopPropagation(); handleMoveVehicle(vehicle.id, 'down'); }} disabled={globalPos === totalCount - 1} className="reorder-btn disabled:opacity-30">▼</button>
-                                            <button title="+10" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, globalPos + 10); }} disabled={globalPos >= totalCount - 1} className="reorder-btn disabled:opacity-30">▼▼</button>
-                                            <button title="Bottom" onClick={e => { e.stopPropagation(); handleMoveVehicleToIndex(vehicle.id, totalCount - 1); }} className="reorder-btn">⇊</button>
-                                        </div>
-                                    )}
-
-                                    {/* Thumbnail — the same component the card uses, so
-                                        a photoless vehicle reads identically in both
-                                        views. The 🚗 it replaced said "broken image". */}
-                                    <VehicleMedia
-                                        vehicle={vehicle}
-                                        height={54}
-                                        className="vehicle-media-thumb"
-                                    />
-
-                                    {/* Name + make + tags */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            {/* The curator's swatch. Editing in place is
-                                                the point: setting a color per vehicle
-                                                across a catalogue of this size is a
-                                                scroll-and-click pass, and sending each
-                                                one through the full edit form is what
-                                                would make it not worth doing. */}
+                                    <span className="vehicle-list-select" role="cell" onClick={e => e.stopPropagation()}>
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => handleCardClick(vehicle)}
+                                            aria-label={`Select ${vehicle.name}`}
+                                        />
+                                    </span>
+                                    <span role="cell" className="vehicle-list-photo">
+                                        {/* Reorder controls replace the photo while
+                                            Edit Order is on: the same slot, so the
+                                            columns do not move. */}
+                                        {showReorderButtons ? (
+                                            <span className="reorder-controls" onClick={e => e.stopPropagation()}>
+                                                <button title="Up" onClick={() => handleMoveVehicle(vehicle.id, 'up')} disabled={globalPos === 0} className="reorder-btn">▲</button>
+                                                <input
+                                                    type="number" min={1} max={totalCount}
+                                                    defaultValue={globalPos + 1}
+                                                    key={`pos-${vehicle.id}-${globalPos}`}
+                                                    onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value); if (!isNaN(v)) handleMoveVehicleToIndex(vehicle.id, v - 1); } }}
+                                                    onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
+                                                    className="form-input reorder-position-input"
+                                                    aria-label={`Position of ${vehicle.name}`}
+                                                />
+                                                <button title="Down" onClick={() => handleMoveVehicle(vehicle.id, 'down')} disabled={globalPos === totalCount - 1} className="reorder-btn">▼</button>
+                                            </span>
+                                        ) : (
+                                            <VehicleMedia vehicle={vehicle} height={54} className="vehicle-media-thumb" />
+                                        )}
+                                    </span>
+                                    <span role="cell" className="flex flex-col gap-0.5 min-w-0">
+                                        <span className="flex items-center gap-2 min-w-0">
+                                            {/* The curator's swatch, edited in place: setting
+                                                a color per vehicle is a scroll-and-click pass. */}
                                             {canEdit(vehicle) && (
                                                 <SeriesColorPicker
                                                     value={vehicle.color || DEFAULT_RUN_COLOR}
@@ -1020,60 +892,50 @@ export default function VehiclesView({
                                                     onReset={() => onUpdate(vehicle.id, { color: null })}
                                                 />
                                             )}
-                                            <h3 className="font-bold text-lg leading-tight truncate">{vehicle.name}</h3>
+                                            <span className="vehicle-list-name-text">{vehicle.name}</span>
                                             <VisibilityPill vehicle={vehicle} />
-                                        </div>
-                                        <p className="text-secondary text-sm mb-1">{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
-                                        <TagPills vehicle={vehicle} />
-                                    </div>
-
-                                    {/* Specs */}
-                                    <div className="w-64 flex-shrink-0 hidden md:flex flex-col gap-1.5">
-                                        <div className="stat-grid">
-                                            <StatCell
-                                                label="Battery"
-                                                value={vehicle.socWindowKwh}
-                                                unit="kWh"
-                                                basis={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label}
-                                                title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}
-                                            />
-                                            <StatCell
-                                                label="Range"
-                                                value={epaRangeValue(vehicle, units)}
-                                                unit={distanceUnit(units)}
-                                                basis={epaRangeBasisMark(vehicle)}
-                                                title={EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note ?? 'EPA range'}
-                                            />
-                                        </div>
-                                        <TestedFigure vehicle={vehicle} tested={testedRangeSummary(vehicle)} units={units} onOpenTest={onOpenTest} />
-                                        <PlatformLine vehicle={vehicle} />
-                                        <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
-                                    </div>
-
-                                    {/* Actions. Visibility moved up beside the name —
-                                        it describes the vehicle, not what you can do
-                                        to it, and stacking it above the buttons made
-                                        it read as a fourth one. */}
-                                    <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                                        <button
-                                            onClick={() => onViewRuns(vehicle)}
-                                            className="btn btn-primary"
-                                        >
+                                        </span>
+                                        {/* What it is: make · model · trim · year. */}
+                                        <span className="vehicle-list-meta">
+                                            {[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}
+                                        </span>
+                                        {/* What it is filed under, a step smaller: its
+                                            tags, then its platform. Its own line, so a
+                                            long trim no longer clips the tags away. */}
+                                        <span className="vehicle-list-extra">
+                                            <TagPills vehicle={vehicle} />
+                                            <PlatformLine vehicle={vehicle} bare />
+                                        </span>
+                                    </span>
+                                    <span role="cell" className="vehicle-list-figure" title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}>
+                                        <ListFigure value={vehicle.socWindowKwh} unit="kWh" basis={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label} />
+                                    </span>
+                                    <span role="cell" className="vehicle-list-figure" title={EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note ?? 'EPA range'}>
+                                        <ListFigure value={epaRangeValue(vehicle, units)} unit={distanceUnit(units)} basis={epaRangeBasisMark(vehicle)} />
+                                    </span>
+                                    <span role="cell" className="vehicle-list-figure">
+                                        {testedRangeSummary(vehicle)
+                                            ? <TestedFigure vehicle={vehicle} tested={testedRangeSummary(vehicle)} units={units} onOpenTest={onOpenTest} bare />
+                                            : <span className="stat-cell-empty" aria-label="not tested">—</span>}
+                                    </span>
+                                    <span role="cell" className="vehicle-list-tests">
+                                        <TestCounts vehicle={vehicle} performanceCounts={performanceCounts} />
+                                    </span>
+                                    {/* The same two actions on every row: its tests,
+                                        and a menu holding everything else, so no row's
+                                        buttons push its figures sideways. */}
+                                    <span role="cell" className="vehicle-list-actions" onClick={e => e.stopPropagation()}>
+                                        <button onClick={() => onViewRuns(vehicle)} className="btn btn-primary">
                                             Tests &amp; Data →
                                         </button>
-                                        {/* The same order as the card's two rows, run
-                                            on as one: a list row has the width. */}
-                                        <SpecsButton vehicle={vehicle} />
-                                        <CuratorActions vehicle={vehicle} />
-                                    </div>
+                                        <VehicleRowMenu label={vehicle.name} items={rowMenuItems(vehicle)} />
+                                    </span>
                                 </div>
-
                             </div>
                         );
                     })}
                 </div>
             )}
-
             {/* Pagination */}
             {totalPages > 1 && (
                 <div className="vehicle-pagination">
@@ -1087,9 +949,7 @@ export default function VehiclesView({
 
             {sortedFilteredVehicles.length === 0 && !showForm && (
                 <div className="empty-state">
-                    {textFilter.trim()
-                        ? <p className="text-lg">No vehicles match "{textFilter.trim()}".</p>
-                        : Object.keys(tagFilterStates).length > 0 || Object.keys(mfgFilterStates).length > 0
+                    {filtersActive(filters)
                             ? <p className="text-lg">No vehicles match the active filters.</p>
                             : <p className="text-lg">No vehicles yet. Click "Add Vehicle" to get started!</p>
                     }

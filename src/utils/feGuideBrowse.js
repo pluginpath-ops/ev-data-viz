@@ -353,7 +353,24 @@ export const EMPTY_FILTERS = {
     years: [], makes: [], parents: [], bodyClasses: [], drives: [], motorCounts: [], wheelSizes: [],
     search: '',
     minRange: null, maxRange: null, minMpge: null, maxMpge: null,
+    // Values left OUT, per facet key (#338): { makes: ['Tesla'] }. Kept apart
+    // from the include lists so every existing reader of those is unchanged.
+    exclude: {},
 };
+
+/** The row field each facet filters on. */
+const FACET_FIELD = {
+    years: 'model_year', makes: 'brand', parents: 'parent_name', bodyClasses: 'body_class',
+    drives: 'drive_group', motorCounts: 'motor_count', wheelSizes: 'wheel_size_in',
+};
+
+/** Whether any filter narrows the rows — the include lists, exclusions, search or ranges. */
+export function guideFiltersActive(filters) {
+    const f = { ...EMPTY_FILTERS, ...filters };
+    return Object.keys(FACET_FIELD).some(k => f[k].length || f.exclude?.[k]?.length)
+        || !!f.search.trim()
+        || [f.minRange, f.maxRange, f.minMpge, f.maxMpge].some(v => v != null);
+}
 
 /** Distinct values for each faceted filter, in the order they should render. */
 export function buildFacets(rows) {
@@ -376,6 +393,7 @@ export function buildFacets(rows) {
 }
 
 const inList = (list, v) => list.length === 0 || list.includes(v);
+const excludedBy = (f, key, v) => (f.exclude?.[key] ?? []).includes(v);
 const within = (v, min, max) => {
     if (min != null && !(Number(v) >= min)) return false;
     if (max != null && !(Number(v) <= max)) return false;
@@ -393,6 +411,9 @@ export function filterRows(rows, filters) {
         if (!inList(f.drives, r.drive_group))        return false;
         if (!inList(f.motorCounts, r.motor_count))   return false;
         if (!inList(f.wheelSizes, r.wheel_size_in))  return false;
+        for (const [key, field] of Object.entries(FACET_FIELD)) {
+            if (excludedBy(f, key, r[field])) return false;
+        }
         if (!within(r.label_comb_range_mi, f.minRange, f.maxRange)) return false;
         if (!within(r.label_comb_mpge, f.minMpge, f.maxMpge))       return false;
         if (needle) {
@@ -446,8 +467,9 @@ const NUMERIC_LISTS = new Set(['years', 'motorCounts', 'wheelSizes']);
 export function encodeGuideParams({ filters, sortKey, sortDir, page, selectedIds, columns, clustered }) {
     const p = new URLSearchParams();
     for (const [key, param] of Object.entries(LIST_PARAMS)) {
-        const v = filters[key];
-        if (v?.length) p.set(param, v.join(','));
+        // An excluded value rides in the same list with a leading "-" (#338).
+        const parts = [...(filters[key] ?? []), ...(filters.exclude?.[key] ?? []).map(v => `-${v}`)];
+        if (parts.length) p.set(param, parts.join(','));
     }
     for (const [key, param] of Object.entries(NUM_PARAMS)) {
         if (filters[key] != null) p.set(param, String(filters[key]));
@@ -483,13 +505,18 @@ export function decodeGuideParams(search) {
     const p = new URLSearchParams(search ?? '');
     const filters = { ...EMPTY_FILTERS };
 
+    filters.exclude = {};
     for (const [key, param] of Object.entries(LIST_PARAMS)) {
         const raw = p.get(param);
         if (!raw) continue;
         const parts = raw.split(',').filter(Boolean);
-        filters[key] = NUMERIC_LISTS.has(key)
-            ? parts.map(Number).filter(Number.isFinite)
-            : parts;
+        // "-" before a value excludes it; read before any number is parsed, so
+        // "-2026" is year 2026 left out, not a negative year.
+        const inc = parts.filter(x => !(x.startsWith('-') && x.length > 1));
+        const exc = parts.filter(x => x.startsWith('-') && x.length > 1).map(x => x.slice(1));
+        const asType = (list) => (NUMERIC_LISTS.has(key) ? list.map(Number).filter(Number.isFinite) : list);
+        filters[key] = asType(inc);
+        if (exc.length) filters.exclude[key] = asType(exc);
     }
     for (const [key, param] of Object.entries(NUM_PARAMS)) {
         const n = Number(p.get(param));

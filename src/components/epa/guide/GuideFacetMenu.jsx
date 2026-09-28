@@ -23,9 +23,21 @@ import MenuButton from '../../shell/MenuButton';
  * what the unfiltered corpus holds. And a value that would leave nothing is
  * DISABLED rather than hidden: a make vanishing from the list reads as a bug,
  * where a greyed one reads as an answer.
+ *
+ * ── Exclude, and any / all (#338) ───────────────────────────────────────────
+ *
+ * With `onExclude`, each value can also be excluded: its "not" button drops
+ * every row that has it, and an excluded value reads struck through. Including
+ * a value clears its exclusion and the other way round. With `onAllChange`,
+ * a facet whose rows carry several values (tags, test data) gets an any / all
+ * switch: match rows with any of the chosen values, or every one of them.
+ * Both are opt-in, so a caller that passes neither sees the menu it had.
  */
 export default function GuideFacetMenu({
     label, values, selected, countFor, onToggle, onClear, format = String, hint,
+    excluded = [], onExclude = null, all = false, onAllChange = null,
+    // What one count counts, for the option's tooltip.
+    unit = 'configuration',
 }) {
     const [query, setQuery] = useState('');
 
@@ -45,15 +57,18 @@ export default function GuideFacetMenu({
 
     // One selection shows its value, several show how many — "Year 2026" says
     // more than "Year 1", and "Make 3" says more than three truncated names.
-    const summary = selected.length === 0 ? null
-        : selected.length === 1 ? String(format(selected[0]))
-            : String(selected.length);
+    // An exclusion alone reads as one: "not Truck".
+    const chosen = selected.length + excluded.length;
+    const summary = chosen === 0 ? null
+        : chosen > 1 ? String(chosen)
+            : selected.length ? String(format(selected[0]))
+                : `not ${format(excluded[0])}`;
 
     return (
         <MenuButton
             label={label}
             value={summary}
-            active={selected.length > 0}
+            active={chosen > 0}
             title={hint ? `${label} — ${hint}` : label}
         >
             {({ close }) => (
@@ -75,31 +90,66 @@ export default function GuideFacetMenu({
                         <span className="text-nano">
                             {selected.length} of {values.length} · by count
                         </span>
-                        {selected.length > 0 && (
+                        {chosen > 0 && (
                             <button type="button" className="section-action" onClick={onClear}>
                                 clear
                             </button>
                         )}
                     </div>
 
+                    {/* Its own line: beside the count and "clear" in a menu this
+                        narrow, the switch was pushed off the panel's edge. */}
+                    {onAllChange && (
+                        <div className="guide-facet-panel-head">
+                            <span className="text-nano">Match</span>
+                            <span className="stats-segmented guide-facet-match" role="group" aria-label={`${label}: match`}>
+                                {[['any', false], ['all', true]].map(([word, v]) => (
+                                    <button
+                                        key={word}
+                                        type="button"
+                                        className={all === v ? 'active' : ''}
+                                        aria-pressed={all === v}
+                                        title={v ? `Rows with every chosen ${label.toLowerCase()}` : `Rows with any chosen ${label.toLowerCase()}`}
+                                        onClick={() => onAllChange(v)}
+                                    >
+                                        {word}
+                                    </button>
+                                ))}
+                            </span>
+                        </div>
+                    )}
                     <div className="guide-facet-panel-list">
                         {shown.map(({ v, n, text }) => {
                             const on = selected.includes(v);
+                            const off = excluded.includes(v);
                             return (
-                                <label
-                                    key={String(v)}
-                                    className={`guide-facet-option${on ? ' selected' : ''}`}
-                                    title={`${n} configuration${n === 1 ? '' : 's'}`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={on}
-                                        disabled={!on && n === 0}
-                                        onChange={() => onToggle(v)}
-                                    />
-                                    <span className="guide-facet-option-name">{text}</span>
-                                    <span className="guide-facet-option-count">{n}</span>
-                                </label>
+                                <div key={String(v)} className={`flex items-center gap-1 guide-facet-option-row${off ? ' is-excluded' : ''}`}>
+                                    <label
+                                        className={`guide-facet-option${on ? ' selected' : ''}`}
+                                        title={`${n} ${unit}${n === 1 ? '' : 's'}`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={on}
+                                            disabled={!on && !off && n === 0}
+                                            onChange={() => onToggle(v)}
+                                        />
+                                        <span className="guide-facet-option-name">{text}</span>
+                                        <span className="guide-facet-option-count">{n}</span>
+                                    </label>
+                                    {onExclude && (
+                                        <button
+                                            type="button"
+                                            className={`guide-facet-exclude${off ? ' active' : ''}`}
+                                            aria-pressed={off}
+                                            aria-label={`${off ? 'Stop excluding' : 'Exclude'} ${text}`}
+                                            title={off ? `Stop excluding ${text}` : `Leave out everything with ${text}`}
+                                            onClick={() => onExclude(v)}
+                                        >
+                                            not
+                                        </button>
+                                    )}
+                                </div>
                             );
                         })}
                         {shown.length === 0 && (
