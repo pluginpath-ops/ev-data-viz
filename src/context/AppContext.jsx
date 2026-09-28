@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { withVehicleFigures } from '../utils/vehicleFigures';
 import { withInheritance, variantLinkPlan } from '../utils/vehicleInheritance';
 import { withPlatforms } from '../utils/platforms';
@@ -6,12 +6,19 @@ import { toPreconditioned } from '../utils/runPreconditioning';
 import { dataService } from '../services/DataService';
 import { applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
 import { toSessionRow } from '../utils/testSessions';
+import { createWriteGuard } from '../utils/writeGuard';
 
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
     const [vehicles, setVehicles] = useState([]);
     const [selectedVehicles, setSelectedVehicles] = useState([]);
+    // Every explicit selection write notes itself here, so initializeApp's
+    // restore from localStorage can tell it was overtaken — a link's v=/r= is
+    // applied as loading ends, and a second init still in flight must not land
+    // on top of it with the selection it read before the link. utils/writeGuard.
+    const selectionWrites = useRef(null);
+    if (!selectionWrites.current) selectionWrites.current = createWriteGuard();
     const [tags, setTags] = useState([]);
     const [user, setUser] = useState(null);
     const [userRole, setUserRole] = useState(null); // 'admin'|'contributor'|'user'|null
@@ -72,6 +79,7 @@ export function AppProvider({ children }) {
 
     async function initializeApp() {
         setLoading(true);
+        const selectionStamp = selectionWrites.current.stamp();
         await dataService.initialize();
         setUser(dataService.user);
         setUserRole(dataService.role);
@@ -122,7 +130,7 @@ export function AppProvider({ children }) {
         setSpecCustomFieldSuggestions(suggestions);
 
         setVehicles(vehiclesData);
-        setSelectedVehicles(selectedIds);
+        if (!selectionWrites.current.wroteSince(selectionStamp)) setSelectedVehicles(selectedIds);
         setTags(tagsData);
         setManufacturers(manufacturersData);
         setTestSessions(sessionsData);
@@ -139,23 +147,27 @@ export function AppProvider({ children }) {
             ? selectedVehicles.filter(id => id !== vehicleId)
             : [...selectedVehicles, vehicleId];
 
+        selectionWrites.current.note();
         setSelectedVehicles(newSelection);
         await dataService.setSelectedVehicles(newSelection);
     };
 
     const removeVehicleSelection = async (vehicleId) => {
         const newSelection = selectedVehicles.filter(id => id !== vehicleId);
+        selectionWrites.current.note();
         setSelectedVehicles(newSelection);
         await dataService.setSelectedVehicles(newSelection);
     };
 
     const clearAllSelections = async () => {
+        selectionWrites.current.note();
         setSelectedVehicles([]);
         await dataService.setSelectedVehicles([]);
     };
 
     // Replace the entire selection at once (used by URL restore)
     const setVehicleSelection = async (vehicleIds) => {
+        selectionWrites.current.note();
         setSelectedVehicles(vehicleIds);
         await dataService.setSelectedVehicles(vehicleIds);
     };

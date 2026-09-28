@@ -1469,3 +1469,33 @@ describe('the picks map outlives the palette', () => {
         expect(hook()).toMatch(/const overrides = handSet \? picks : EMPTY;/);
     });
 });
+
+describe('a link wins over the saved vehicle selection', () => {
+    // A Charging Curves link opened with a different vehicle saved showed the
+    // saved one: a second initializeApp (StrictMode, or sign-in) read the
+    // selection from localStorage before the link wrote it, then landed after
+    // the link was applied. The chart pruned the link's runs as belonging to no
+    // selected vehicle and bootstrapped the saved vehicle's default in their
+    // place, and the URL sync wrote that back to the address bar.
+    const ctx = read('src/context/AppContext.jsx');
+
+    it('restores the saved selection only when nothing has written it since', () => {
+        const init = ctx.slice(ctx.indexOf('async function initializeApp'));
+        const body = init.slice(0, init.indexOf('\n    }'));
+        const restores = body.match(/[^\n]*setSelectedVehicles\(selectedIds\)/g) ?? [];
+        expect(restores, 'initializeApp no longer restores the selection').toHaveLength(1);
+        expect(restores[0], 'the restore is unguarded').toMatch(/wroteSince\(/);
+    });
+
+    it('every whole-selection write notes itself', () => {
+        // Writers that REPLACE the selection. deleteVehicle's functional filter
+        // is left out: it narrows whatever is current rather than overwriting it.
+        const writes = [...ctx.matchAll(/(?<!\.)setSelectedVehicles\((?!selectedIds\)|prev =>)/g)];
+        expect(writes.length).toBeGreaterThan(0);
+        for (const m of writes) {
+            const before = ctx.slice(Math.max(0, m.index - 120), m.index);
+            expect(before, `a selection write at offset ${m.index} is not noted`)
+                .toMatch(/selectionWrites\.current\.note\(\);\s*$/);
+        }
+    });
+});
