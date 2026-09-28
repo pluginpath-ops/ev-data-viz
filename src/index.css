@@ -2293,17 +2293,22 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 }
 .nav-menu-item.is-danger { color: var(--color-danger); }
 
-/* Below the compact width the figures go: name, then actions. The card view
-   is the one for reading figures on a phone. */
+/* Below the compact width a row is what the vehicle IS: its name, make ·
+   model · trim · year, and its tags, beside its actions. The photo, the
+   figure columns and the platform go — Cards are the view for those on a
+   phone (#338, the owner's review). */
 @media (max-width: 999.98px) {
     /* div. for specificity: the base .vehicle-list rule is later in the file. */
-    div.vehicle-list { --vehicle-list-cols: 20px 72px minmax(0, 1fr) 112px; }
+    div.vehicle-list { --vehicle-list-cols: 20px minmax(0, 1fr) 112px; }
+    .vehicle-list .vehicle-list-photo,
+    .vehicle-list .vehicle-list-figure,
+    .vehicle-list .vehicle-list-tests,
+    .vehicle-list-extra .platform-line-value,
+    .vehicle-list-head > :nth-child(2),
+    .vehicle-list-head > :nth-child(n+4):not(:last-child) { display: none; }
     /* Tests & Data above the second action, rather than beside it. */
     .vehicle-list-actions { flex-direction: column; align-items: flex-end; }
     .vehicle-list-actions .vehicle-row-more { width: auto; }
-    .vehicle-list .vehicle-list-figure,
-    .vehicle-list .vehicle-list-tests,
-    .vehicle-list-head > :nth-child(n+4):not(:last-child) { display: none; }
 }
 
 .vehicle-card-body {
