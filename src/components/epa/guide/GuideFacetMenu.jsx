@@ -90,7 +90,18 @@ export default function GuideFacetMenu({
                         <span className="text-nano">
                             {selected.length} of {values.length} · by count
                         </span>
-                        {onAllChange && (
+                        {chosen > 0 && (
+                            <button type="button" className="section-action" onClick={onClear}>
+                                clear
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Its own line: beside the count and "clear" in a menu this
+                        narrow, the switch was pushed off the panel's edge. */}
+                    {onAllChange && (
+                        <div className="guide-facet-panel-head">
+                            <span className="text-nano">Match</span>
                             <span className="stats-segmented guide-facet-match" role="group" aria-label={`${label}: match`}>
                                 {[['any', false], ['all', true]].map(([word, v]) => (
                                     <button
@@ -105,14 +116,8 @@ export default function GuideFacetMenu({
                                     </button>
                                 ))}
                             </span>
-                        )}
-                        {chosen > 0 && (
-                            <button type="button" className="section-action" onClick={onClear}>
-                                clear
-                            </button>
-                        )}
-                    </div>
-
+                        </div>
+                    )}
                     <div className="guide-facet-panel-list">
                         {shown.map(({ v, n, text }) => {
                             const on = selected.includes(v);
