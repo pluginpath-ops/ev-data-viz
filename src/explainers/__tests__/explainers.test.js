@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+const ROOT = join(import.meta.dirname, '..', '..', '..');
 import { parseExplainer, parseInline, isTopicHref } from '../parseExplainer';
 import { peakOnCharger } from '../peakOnCharger';
 import { TOPICS, FACTS } from '../topics';
 import { PRESET_FACTS } from '../labs/SplitPackLab';
 import { flattenOutline, hubOf } from '../outline';
 import { chargingTestsHref } from '../evbenchLinks';
+import { axisPoints, niceScale, PREVIEW_AXES } from '../previewAxes';
 
 describe('parseExplainer', () => {
     const doc = parseExplainer(`---
@@ -151,5 +156,33 @@ describe('chargingTestsHref', () => {
         expect(chargingTestsHref({ runIds: [23, 81], vehicleIds: [19, 19] }))
             .toBe('?tab=efficiency&r=23%2C81&v=19&x=soc&y=chargeRate');
         expect(chargingTestsHref({ runIds: [45], x: 'time' })).toBe('?tab=efficiency&r=45&x=time&y=chargeRate');
+    });
+});
+
+describe('previewAxes', () => {
+    const pts = [
+        { soc: 10, chargeRate: 200, time: 0, range: 30, temperature: 70 },
+        { soc: 50, chargeRate: null, time: 10, range: 150, temperature: 72 },
+        { soc: 80, chargeRate: 150, time: 20, range: 240, temperature: 75 },
+    ];
+
+    it('reads two axes, skipping points missing either', () => {
+        expect(axisPoints(pts, 'soc', 'chargeRate')).toEqual([[10, 200], [80, 150]]);
+    });
+
+    it('measures an added axis from the run’s first reading', () => {
+        expect(axisPoints(pts, 'time', 'deltaSoc')).toEqual([[0, 0], [10, 40], [20, 70]]);
+        expect(axisPoints(pts, 'time', 'deltaRange')).toEqual([[0, 0], [10, 120], [20, 210]]);
+    });
+
+    it('rounds an axis up to a readable top and step', () => {
+        expect(niceScale(418)).toEqual({ max: 500, step: 100 });
+        expect(niceScale(210)).toEqual({ max: 250, step: 50 });
+        expect(niceScale(28.6)).toEqual({ max: 30, step: 10 });
+    });
+
+    it('keys its axes as Charging Curves does', () => {
+        const chartView = readFileSync(join(ROOT, 'src', 'components', 'ChargingView.jsx'), 'utf8');
+        for (const key of Object.keys(PREVIEW_AXES)) expect(chartView, key).toMatch(new RegExp(`value: '${key}'`));
     });
 });

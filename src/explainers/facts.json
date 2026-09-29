@@ -36,6 +36,20 @@
       "status": "verified"
     },
     {
+      "id": "physics-split-pack-half-bus",
+      "claim": "While a split pack charges its halves in parallel, whatever runs from the pack during the charge sees half the pack's usual voltage, so it has to work at that voltage.",
+      "value": null,
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Series/parallel arithmetic: two halves in parallel present half the series voltage",
+          "url": null,
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified"
+    },
+    {
       "id": "booster-input-voltage",
       "claim": "A booster (DC-DC or motor boost) draws from a lower-voltage charger at around 420–450 V, and at 450 V at most, not at a 500 V charger's full output.",
       "value": {
@@ -100,14 +114,14 @@
     },
     {
       "id": "tesla-v3-boost-current",
-      "claim": "Tesla V3 Superchargers boost above their 350 A continuous rating: to about 500 A for non-Tesla vehicles, and well over 600 A for Tesla vehicles.",
+      "claim": "Tesla V3 Superchargers boost above their 350 A continuous rating for a period, depending on conditions such as temperature and the equipment's own state: to about 500 A for non-Tesla vehicles, and well over 600 A for Tesla vehicles.",
       "value": {
         "non_tesla_a": 500,
         "tesla_a_min": 600
       },
       "sources": [],
       "status": "observed",
-      "rationale": "The owner's field knowledge: charging on V3 sites, non-Tesla vehicles reach about 500 A and Tesla vehicles well over 600 A. Charging logs (a run's kW against a known pack voltage) could make it rank B."
+      "rationale": "Observed by EVBench and widely accepted (owner, 2026-09-28/29). A boost is by definition above the continuous rating for a limited time, and how long and how high depend on conditions. Charging logs (a run's kW against a known pack voltage) could make it rank B."
     },
     {
       "id": "tesla-v3-cabinet-shared",
@@ -691,6 +705,27 @@
       "note": "Derived, not measured: runs record neither pack voltage nor current. Under charge the voltage runs higher than 710 V (the owner puts it near 740 V), so the real currents are a few percent lower: the owner's ~880 A, ~680 A, ~680 A. The ~915 A at 325 kW is above a V4 post's 615 A continuous rating (tesla-v4-post-ratings), so it is a peak, not a steady current."
     },
     {
+      "id": "bms-rides-thermal-limit",
+      "claim": "A battery management system cuts charging power as the cells near their temperature limit, and in fast charging many vehicles hold close to that limit for part of the session. So a lower charging power can hold the car's peak for longer.",
+      "value": null,
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Widely accepted in EV engineering and in EVBench's experience (owner, 2026-09-29): cell heat rises with the square of current (physics-cell-heat-scales-with-current-squared), so power is held against a thermal limit. The Gravity's two charging tests show the effect (gravity-10-80-by-charger)."
+    },
+    {
+      "id": "gravity-10-80-by-charger",
+      "claim": "In EVBench's tests, a Lucid Gravity charged from 10 to 80% in 24.5 minutes at a 418 kW peak on a 1000 V charger, and in 28.6 minutes at a 210 kW peak on a Supercharger: half the peak power, about 17% longer.",
+      "value": {
+        "run_23_min": 24.5,
+        "run_23_peak_kw": 418,
+        "run_81_min": 28.6,
+        "run_81_peak_kw": 210
+      },
+      "sources": [],
+      "status": "observed",
+      "rationale": "EVBench's own data (runs 23 and 81, 2026-09-15 dump; time at the first point at or above 10% and 80% SoC). Observed rather than rank B because run 81's source reads 'asdf' with no URL; fixing that record makes it rank B."
+    },
+    {
       "id": "cybertruck-kw-by-charger",
       "claim": "Tesla enabled the Cybertruck to charge at up to 325 kW on select V4 Supercharger posts in December 2024, and on all V4 posts in North America by 28 January 2025.",
       "value": {
@@ -980,6 +1015,48 @@
       "sources": [],
       "status": "accepted",
       "rationale": "No SAE or IEC document defines the classes (owner, 2026-09-28); makers use the names loosely. BMW sells a 698.9 V pack as 800 V (bmw-ix3-voltage), and Lucid markets 926 V as 900 V+ while EVBench files it as 800 V class. The nominal ranges match the comment on VOLTAGE_CLASS_SPLIT_V in src/utils/platforms.js."
+    },
+    {
+      "id": "epa-800v-share-by-year",
+      "claim": "Most EV models in the EPA's Fuel Economy Guide are 400 V class, and the 800 V share is rising: at or above EVBench's 475 V line, 20% of 2024 model entries, 27% of 2025, 28% of 2026, and 36% of the 2027 entries filed so far.",
+      "value": {
+        "2024": 0.2,
+        "2025": 0.27,
+        "2026": 0.28,
+        "2027": 0.36
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA / DOE Fuel Economy Guide data (MY24–MY27 files), total_voltage_v, as imported into EVBench",
+          "url": "https://www.fueleconomy.gov/feg/download.shtml",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "C",
+          "title": "Count of distinct model-year/maker/carline entries with total_voltage_v ≥ 475 V (evbench-voltage-class-split)",
+          "url": null,
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "Entries are the EPA's carline rows, so trims and wheel options count separately. 2027 is partial (129 entries so far); the 2022–2023 files are too thin to use (83 and 32 entries). Makers file different points on the voltage range (epa-voltage-points-differ), which moves few entries across 475 V: GM's full-charge filings stay well below it."
+    },
+    {
+      "id": "400v-pack-cheaper-established",
+      "claim": "Lower-power and lower-cost EVs mostly use a 400 V-class pack: its power electronics are the more established and cheaper kind, and it charges directly on any DC fast charger.",
+      "value": null,
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Industry common knowledge (owner, 2026-09-29): 400 V was the architecture of the first mass-market EVs, so its components are the most widely made; direct charging follows from the voltage (older-chargers-500v). A supplier or teardown cost comparison would upgrade it."
+    },
+    {
+      "id": "800v-compat-tradeoffs",
+      "claim": "How an 800 V-class car handles lower-voltage chargers is a trade-off between the pack's voltage and layout, whether its inverter and motor can be designed to convert voltage, and how much cost the maker will accept.",
+      "value": null,
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Engineering judgement, widely shared (owner, 2026-09-29), and visible in the makers' own choices: Lucid argues voltage for motor boost (lucid-gravity-400v-method), Porsche fits a 150 kW converter (taycan-2025-booster), Tesla and Audi split the pack (cybertruck-400v-method, audi-ppe-bank-charging), and Mercedes first shipped the CLA with none (mercedes-cla-400v-method)."
     },
     {
       "id": "evbench-voltage-class-split",

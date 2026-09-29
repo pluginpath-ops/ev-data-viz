@@ -8,50 +8,66 @@ status: DRAFT
 
 ## The short version
 
-A DC fast charger can only push current into a pack whose voltage sits
-inside the charger's output range. A modern unit such as the ABB Terra 360
-reaches 920 V [[fact:abb-terra360-ratings]], but many chargers still in
-service stop far lower. Makers design around them: Lucid built the
-Gravity's boost for chargers of about 500 V [[fact:lucid-gravity-400v-method]],
-and Mercedes needs a converter before the CLA can use 400 V chargers at all
-[[fact:mercedes-cla-400v-method]].
+A DC fast charger can only push power into a pack whose voltage is within
+the charger's output range. Most EVs have batteries in the "400V" class and 
+can easily be charged directly with any DC fast charger. But increasingly, EVs are 
+entering the "800V" class [[fact:epa-800v-share-by-year]] [for a variety of reasons](400v-vs-800v). The voltage 
+of these batteries is too high to be charged directly on older, lower-voltage chargers
+including Tesla Superchargers (before V4) and many older 50 kW units [[fact:older-chargers-500v]]. 
+Some cars simply can't: the Mercedes CLA launched unable to use a 400 V charger at
+all, and only gained one with a factory-fitted converter [[fact:mercedes-cla-400v-method]].
 
-In the US, those lower-voltage chargers are mainly older 50 kW units and
-Tesla Superchargers before V4 [[fact:older-chargers-500v]].
-
-So every 800 V car has to answer one question: **what happens on a 400 V
-charger?** There are four answers, and they differ a lot in how fast the
-car charges there.
+Manufacturers' compatibility with lower-voltage chargers falls into 5 categories:
 
 | Method | How it works | What limits power on a 400 V charger | Example |
 |---|---|---|---|
-| Native | The pack is 400 V class | The charger | Most 400 V cars |
+| Native | Pack is 400 V class | The charger | Most 400 V cars |
 | DC booster | A separate converter steps the charger's voltage up to the pack's | The converter's rating | 2025+ Taycan, 150 kW [[fact:taycan-2025-booster]]; Lucid Air, 50 kW [[fact:lucid-air-400v]]; Mercedes CLA with its converter [[fact:mercedes-cla-400v-method]] |
 | Motor boost | The drive inverter and motor windings act as the step-up converter | The drive unit's current rating | E-GMP [[fact:egmp-motor-boost]]; Lucid Gravity, up to 225 kW [[fact:lucid-gravity-400v-method]] [[fact:lucid-gravity-400v-kw]] |
-| Split pack | Switches split the pack into two halves, charged side by side at half the voltage | Charger current × half-pack voltage | Audi Q6 e-tron (PPE), up to 135 kW [[fact:audi-ppe-bank-charging]]; Cybertruck, which switches its halves with one DPDT contactor [[fact:cybertruck-400v-method]] |
-| None | The car cannot charge there | — | A Mercedes CLA built without the converter [[fact:mercedes-cla-400v-method]] |
+| Split pack | Switches split the pack into two halves, charged in parallel with half the voltage | Charger current × half-pack voltage | Audi Q6 e-tron (PPE), up to 135 kW [[fact:audi-ppe-bank-charging]]; Cybertruck, which switches its halves with one DPDT contactor [[fact:cybertruck-400v-method]] |
+| None | Cannot charge there | — | A Mercedes CLA built without the converter [[fact:mercedes-cla-400v-method]] |
 
-## Why a split pack can fall behind a booster
+## Why do manufacturers use 800V?
+Higher voltage allows faster charging (and discharging) given current/amperage limitations.  
 
-A split pack needs no converter. Instead, it charges both halves side by
-side, so the charger sees only half the pack's voltage. Power is voltage
-times current, and the charger's current is capped. So the power is capped
-at about the charger's current times half the pack voltage
-[[fact:physics-split-pack-power]].
+Power is voltage times current, and the charger's current is capped, so at the same current a
+higher-voltage pack takes more power [[fact:physics-current-for-power]].
+That is why it matters how high the pack's voltage is. 
 
-That is why it matters how high the pack's voltage is. Take an ABB Terra
-360, whose current peaks at 500 A [[fact:abb-terra360-ratings]]. Halves at
-300 V give at most 150 kW. Halves at 450 V give up to 225 kW. Audi's
-figure for the Q6 e-tron is 135 kW [[fact:audi-ppe-bank-charging]].
+For a more in-depth explainer, refer to [the 400 V vs 800 V explainer](400v-vs-800v).
+
+Even within the 400V class, voltage still matters.  Take an ABB Terra
+360, whose current peaks at 500 A [[fact:abb-terra360-ratings]]. Battery systems presenting
+at 300 V will receive at most 150 kW. Batteries at 450 V can charge at up to 225 kW
+[[fact:physics-current-for-power]].
+
+
+## Tradeoffs in compatibility approaches
+
+The most common strategy for lower power and cheaper EVs is to simply 
+use a 400V class pack.  These allow the vehicle to leverage more established
+electronics and have broad DCFC compatibility [[fact:400v-pack-cheaper-established]].
+
+For 800V class vehicles, the approach depends on several factors [[fact:800v-compat-tradeoffs]]:
+- Total battery system voltage and design
+- Feasibility to design the inverter and motor to handle voltage conversion
+- Acceptable cost impacts
+
+A split pack needs no converter: a set of contactors reconfigures the battery between one
+series string and two halves in parallel. The Cybertruck does it with a single DPDT contactor
+[[fact:cybertruck-400v-method]]. In effect the charger sees only half the pack's voltage, so
+its power is capped at about the charger's current times half the pack voltage
+[[fact:physics-split-pack-power]]. The cost moves into the architecture instead:
+- The battery must be arranged in logical modules that can be evenly split
+- The system must support continued operation at half the typical voltage [[fact:physics-split-pack-half-bus]]
 
 Current ratings vary a lot from one charger to the next
 [[fact:dc-cable-current-ratings]]. For a sense of scale: a Tesla V3 post
-is labelled 350 A continuous [[fact:tesla-v3-cable-current]], which would
-hold 350 V halves to about 120 kW. V3 posts do boost above that label
-[[fact:tesla-v3-boost-current]], so treat this as the floor, not the
-answer.
+is labelled 350 A continuous [[fact:tesla-v3-cable-current]], this limits a 
+350 V effective battery (700 V native) to about 120 kW. V3 posts do boost above that label
+[[fact:tesla-v3-boost-current]] for a short period, depending on weather and equipment conditions.
 
-Try it: pick a charger and a pack, and see where each method runs out.
+Try it: pick a charger and a pack, and see where each method works best.
 
 ::: lab split-pack
 
@@ -78,21 +94,34 @@ Try it: pick a charger and a pack, and see where each method runs out.
 
 :::
 
-## The Gravity: slower peak, same cell heat budget
+## When lower power may not mean significantly longer charging
 
-Lucid rates the Gravity at up to 400 kW on 1000 V chargers
+Charging batteries is a complex process that is managed by the Battery Management System (BMS).
+This system has a complex algorithm to optimize battery charging based on a variety of factors
+including voltage, temperature, current.  When a cell is reaching its maximum safe temperature, 
+the charging speed must be reduced to prevent battery degradation or damage.
+
+In the case of fast charging, many vehicles "ride" the line of maximum thermal input for a portion
+of the charging curve.  If charging is limited, it is possible that the peak charging speed can
+be maintained longer [[fact:bms-rides-thermal-limit]].
+
+
+Take the case of the Lucid Gravity that is rated at up to 400 kW on 1000 V chargers
 [[fact:lucid-gravity-peak-kw]] and up to 225 kW sustained on 500 V ones,
 including Tesla V3 Superchargers [[fact:lucid-gravity-400v-kw]].
 
-The boost converter delivers power at the pack's own voltage, 810–926 V
-depending on the figure quoted [[fact:lucid-gravity-voltage]]. So at 225 kW, each cell carries a little
+The motor boost converter delivers power at the pack's own voltage, 810–926 V
+ [[fact:lucid-gravity-voltage]]. So at 225 kW, each cell carries a little
 over half the current it would at 400 kW. Heat in the cells goes with the
 square of current, so it drops to about a third
 [[fact:physics-cell-heat-scales-with-current-squared]]. The car can hold
-its peak longer before heat forces a taper. *Model, not measurement.* The
-overlay below compares it with the Gravity's charging tests in EVBench.
+its peak longer before heat forces a taper. *Model, not measurement.*
 
-::: tests 23,81 See it in the Gravity's own charging tests: one on a 1000 V charger, one on a Supercharger, overlaid by state of charge.
+EVBench's own tests bear it out: the Gravity took 24.5 minutes from 10 to 80 % at a 418 kW
+peak on a 1000 V charger, and 28.6 minutes at a 210 kW peak on a Supercharger, about 17 %
+longer on half the peak power [[fact:gravity-10-80-by-charger]].
+
+::: tests 23,81 x=time y=soc Lucid Gravity charging tests: On a 1000 V charger & on a V3.5 Supercharger
 
 ---
 
@@ -101,8 +130,9 @@ overlay below compares it with the Gravity's charging tests in EVBench.
   charge from 400 V stations [[fact:bmw-ix3-400v-capable]]. "Split" appears
   only in secondary press (`bmw-ix3-400v-method`). Once confirmed, the iX3
   is the strong split-pack example: 698.9 V gives ~350 V halves.
-- **Cybertruck kW.** Its split pack is now sourced; the 250/325 kW
-  figures are still secondary (`cybertruck-kw-by-charger`).
+- **Cybertruck on a V3 cabinet.** Its split pack, 325 kW on V4 posts and
+  500 kW on a V4 cabinet are all sourced now. What is still observed only is
+  why V4 posts lifted it (`v4-post-lifts-v3-cabinet`).
 - **GM Ultium trucks.** They may be the reverse case: 400 V packs that
   series-connect to take 800 V (`gm-ultium-series-switch`). They are left
   out of the table until GM says how they work.

@@ -231,7 +231,7 @@ function TestsCard({ runIds, caption, axes }) {
         <figure className="explainer-tests">
             <span className="explainer-tests-badge">EVBench data</span>
             {caption && <figcaption className="explainer-para">{caption}</figcaption>}
-            <ChargingPreview tests={tests} />
+            <ChargingPreview tests={tests} x={axes.x} y={axes.y} />
             <a className="explainer-link explainer-tests-link" href={href}>
                 Open {runIds.length === 1 ? 'the charging test' : `the ${runIds.length} charging tests`} in Charging Curves →
             </a>

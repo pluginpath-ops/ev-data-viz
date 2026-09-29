@@ -1305,7 +1305,8 @@ class DataService {
   }
 
   /**
-   * Charging tests by id, each with its vehicle's name and its SoC/kW points:
+   * Charging tests by id, each with its vehicle's name and its raw points
+   * (SoC, charge rate, time, range, temperature, as stored: imperial):
    * read-only, for a preview outside the chart views (an explainer's tests
    * card, via hooks/useChargingTests). Ids that do not resolve are dropped,
    * and the order asked for is kept.
@@ -1326,9 +1327,13 @@ class DataService {
       name: r.name,
       vehicleId: r.vehicle_id,
       vehicleName: r.vehicles?.name ?? null,
-      points: (await this.getRunData(r.id))
-        .filter(p => p.soc != null && p.chargeRate != null)
-        .map(p => ({ soc: Number(p.soc), kw: Number(p.chargeRate) })),
+      points: (await this.getRunData(r.id)).map(p => ({
+        soc:         p.soc         != null ? Number(p.soc)         : null,
+        chargeRate:  p.chargeRate  != null ? Number(p.chargeRate)  : null,
+        time:        p.time        != null ? Number(p.time)        : null,
+        range:       p.range       != null ? Number(p.range)       : null,
+        temperature: p.temperature != null ? Number(p.temperature) : null,
+      })),
     })));
   }
 

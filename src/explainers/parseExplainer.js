@@ -19,6 +19,7 @@
  *                            linked into Charging Curves (one line, no close).
  *                            Leading key=value words set options, e.g.
  *                            `::: tests 23,81 x=time y=chargeRate The caption.`
+ *                            x/y take Charging Curves' axis keys (previewAxes.js).
  *   [^1]: text               a footnote (indented lines continue it)
  *
  * Inline: **bold**, *italic*, `code`, [text](href), [[fact:<id>]] cites the

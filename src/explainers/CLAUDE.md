@@ -112,6 +112,40 @@ theme's guards read `index.css` only, so the boundary test guards this file.
   modelled V), because runs record neither pack voltage nor current. Label them
   that way.
 
+## Voice
+
+The owner's voice, taken from their rewrite of `400v-charger-compatibility`
+(2026-09-29), which replaced a terser, citation-driven first draft. Write new
+pages in it, and when editing theirs, keep it.
+
+- **Explain, don't list.** Flowing sentences that walk the reader through
+  the idea, like a knowledgeable friend. Not clipped clause-stacks ("It is a
+  class, not a reading.") and not a string of colons and dashes.
+- **Lead with the why, then the trade-off.** Say why a maker would choose
+  something ("Why do manufacturers use 800V?"), then what each choice costs:
+  frame methods as engineering decisions with consequences, not a taxonomy.
+- **Headings are plain questions or plain statements** of what the section
+  answers: "Why do manufacturers use 800V?", "Tradeoffs in compatibility
+  approaches", "When lower power may not mean significantly longer charging".
+- **Short lead-in, then bullets for factors or requirements**, e.g. "the
+  approach depends on several factors:" followed by the factors.
+- **Worked numbers carry the point.** "Battery systems presenting at 300 V
+  will receive at most 150 kW. Batteries at 450 V can charge at up to
+  225 kW." One concrete case beats a formula in the short version; formulas
+  go in "For engineers".
+- **Industry shorthand is fine** ("400V" class, DCFC, "ride the line"), with
+  informal terms in quotes and acronyms spelled out on first use (Battery
+  Management System (BMS)).
+- **Honest hedges, not hedging everything.** "it is possible that", "may
+  not" where the claim really is conditional; plain statements elsewhere.
+- **A light touch of wry is welcome** where the facts earn it (the CLA
+  launching unable to use a 400 V charger at all).
+- **Link sibling explainers inline** on a natural phrase ("for a variety of
+  reasons") rather than "see also" lists.
+- **Citations stay, but they don't shape the sentence.** Put
+  `[[fact:…]]` at the end of the clause it supports; never contort a
+  sentence to fit one, and never let the ledger's wording leak into prose.
+
 ## Page shape
 
 One page, two depths: a plain-language **short version** first, then

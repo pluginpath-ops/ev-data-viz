@@ -73,6 +73,8 @@
 .explainer-toc-list .is-active a { color: var(--color-text-primary); border-left-color: var(--color-primary); font-weight: 600; }
 .explainer-para, .explainer-list { line-height: 1.6; color: var(--color-text-primary); }
 .explainer-list { padding-left: 1.25rem; list-style: disc; display: flex; flex-direction: column; gap: 6px; }
+/* A little air between a list's last item and whatever follows it. */
+.explainer-list:not(:last-child) { margin-bottom: 6px; }
 .explainer-code {
     font-family: var(--font-mono);
     font-size: calc(var(--fs-body) * 0.93);
@@ -101,16 +103,38 @@
     padding: 0 2px;
 }
 
-.explainer-table-wrap { overflow-x: auto; }
-.explainer-table { width: 100%; border-collapse: collapse; }
+/* Dressed like the site's data tables (.guide-table-container, .guide-th,
+   .guide-td in index.css): a bordered, rounded card, a muted header band, a
+   rule under each row. The header uses surface-sunken rather than the grids'
+   surface-muted, which in the dark theme is darker than the card and so
+   gives no band at all. Not those classes themselves: they are built for grids
+   (fixed widths, no wrap, truncation, sticky, clickable rows), and these cells
+   hold sentences. */
+.explainer-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background-color: var(--color-card);
+}
+.explainer-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .explainer-table th, .explainer-table td {
     text-align: left;
     vertical-align: top;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--color-border-subtle);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-border);
     line-height: 1.5;
 }
-.explainer-table th { color: var(--color-text-secondary); font-weight: 600; }
+.explainer-table th {
+    background-color: var(--color-surface-sunken);
+    border-bottom-color: var(--color-border-strong);
+    color: var(--color-text-primary);
+    font-weight: 700;
+    font-size: calc(var(--fs-body) * 0.86);
+    white-space: nowrap;
+}
+.explainer-table td:first-child { font-weight: 600; color: var(--color-text-primary); }
+.explainer-table tbody tr:last-child td { border-bottom: none; }
+.explainer-table tbody tr:hover td { background-color: var(--color-hover-lift); }
 
 .explainer-quote {
     padding: 8px 14px;
@@ -164,6 +188,7 @@
 .explainer-preview-line.is-series-0, .explainer-preview-swatch.is-series-0 { stroke: var(--color-accent-blue); background-color: var(--color-accent-blue); }
 .explainer-preview-line.is-series-1, .explainer-preview-swatch.is-series-1 { stroke: var(--color-accent-violet); background-color: var(--color-accent-violet); }
 .explainer-preview-line.is-series-2, .explainer-preview-swatch.is-series-2 { stroke: var(--color-accent-grey); background-color: var(--color-accent-grey); }
+.explainer-preview-axes { margin-top: 2px; }
 .explainer-preview-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; color: var(--color-text-secondary); font-size: calc(var(--fs-body) * 0.93); }
 .explainer-preview-legend li { display: flex; align-items: center; gap: 6px; }
 .explainer-preview-swatch { width: 14px; height: 3px; border-radius: 2px; }
