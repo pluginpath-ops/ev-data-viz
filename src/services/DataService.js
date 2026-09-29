@@ -1304,6 +1304,39 @@ class DataService {
     return out;
   }
 
+  /**
+   * Charging tests by id, each with its vehicle's name and its raw points
+   * (SoC, charge rate, time, range, temperature, as stored: imperial):
+   * read-only, for a preview outside the chart views (an explainer's tests
+   * card, via hooks/useChargingTests). Ids that do not resolve are dropped,
+   * and the order asked for is kept.
+   */
+  async getChargingTestsPreview(runIds) {
+    if (!this.useSupabase || !runIds?.length) return [];
+    const real = runIds.filter(id => !isInheritedRunId(id)).map(Number);
+    if (!real.length) return [];
+    const { data, error } = await getSupabase()
+      .from('runs')
+      .select('id, name, kind, vehicle_id, vehicles(name)')
+      .in('id', real);
+    if (error) throw error;
+    const byId = new Map((data || []).map(r => [r.id, r]));
+    const found = real.map(id => byId.get(id)).filter(Boolean);
+    return Promise.all(found.map(async r => ({
+      id: r.id,
+      name: r.name,
+      vehicleId: r.vehicle_id,
+      vehicleName: r.vehicles?.name ?? null,
+      points: (await this.getRunData(r.id)).map(p => ({
+        soc:         p.soc         != null ? Number(p.soc)         : null,
+        chargeRate:  p.chargeRate  != null ? Number(p.chargeRate)  : null,
+        time:        p.time        != null ? Number(p.time)        : null,
+        range:       p.range       != null ? Number(p.range)       : null,
+        temperature: p.temperature != null ? Number(p.temperature) : null,
+      })),
+    })));
+  }
+
   async getRunData(runId, efficiencyFactor = 1, capacityFactor = 1) {
     // Inherited runs carry synthetic string ids like "inherited_<linkId>_<realRunId>".
     const actualId = isInheritedRunId(runId)

@@ -15,6 +15,21 @@ import reactRefresh from 'eslint-plugin-react-refresh';
  * finds dead code; formatting opinions are left alone so the diff on adoption
  * stays reviewable.
  */
+/**
+ * What explainers may import from EVBench, relative to src/. Theme tokens are
+ * CSS variables and need no import. useChargingTests is the one data hook:
+ * read-only curves for an explainer's tests card. NavigationContext is navigation only (ExplainerLink's in-place
+ * click), no data.
+ */
+const EXPLAINER_MAY_IMPORT = [
+    'utils/platforms',
+    'hooks/useChargingTests',
+    'context/NavigationContext',
+    'components/Popover',
+    'components/InfoIcon',
+    'components/reference/PlatformLink',
+];
+
 export default [
     // `.claude/worktrees` holds throwaway git worktrees — a second, stale copy of
     // the whole codebase, pinned to whatever commit a past session branched from.
@@ -77,6 +92,38 @@ export default [
             'no-useless-assignment': 'warn',
         },
     },
+    // ── The explainers boundary (src/explainers/CLAUDE.md) ─────────────────
+    //
+    // Explainers are kept apart from EVBench so neither has to be read to work
+    // on the other. Two connections are allowed and nothing else: EVBench may
+    // import ExplainerLink (the "Learn more" link) and ExplainersSection (the
+    // mount point under Reference), and explainers may import the short
+    // EVBench list above. Widen the list here, with a reason, rather than working around it.
+    //
+    // no-restricted-imports matches the import string, not the resolved file,
+    // so each depth of src/explainers gets its own block (hence the two-level
+    // limit in that folder's CLAUDE.md).
+    {
+        files: ['src/**/*.{js,jsx}'],
+        ignores: ['src/explainers/**'],
+        rules: {
+            'no-restricted-imports': ['error', { patterns: [{
+                regex: '(^|/)explainers/(?!(ExplainerLink|ExplainersSection)(\\.jsx)?$)',
+                message: 'EVBench may import only ExplainerLink and ExplainersSection from src/explainers (see src/explainers/CLAUDE.md).',
+            }] }],
+        },
+    },
+    ...[['src/explainers/*.{js,jsx}', '../'], ['src/explainers/*/*.{js,jsx}', '../../']].map(([files, up]) => ({
+        files: [files],
+        rules: {
+            'no-restricted-imports': ['error', { patterns: [{
+                // A regex, not a gitignore group: a group cannot re-include a
+                // file once `../*` has excluded the directory it sits in.
+                regex: `^${up.replaceAll('.', '\\.')}(?!(${EXPLAINER_MAY_IMPORT.join('|')})(\\.jsx?)?$)`,
+                message: 'Explainers may import only the EVBench modules in EXPLAINER_MAY_IMPORT (eslint.config.js).',
+            }] }],
+        },
+    })),
     {
         // Vitest globals.
         files: ['**/*.test.js', 'src/**/__tests__/**'],

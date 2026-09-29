@@ -1,0 +1,1079 @@
+{
+  "about": "The explainers' facts ledger. One entry per claim a page makes; a page cites an entry as [[fact:<id>]]. status: verified (a dated source), accepted (widely accepted in the field, no source cited), observed (EVBench's own first-hand experience, no published record), unverified (drafts only, marked). accepted and observed need a rationale. Rules: src/explainers/CLAUDE.md.",
+  "facts": [
+    {
+      "id": "physics-current-for-power",
+      "claim": "Current is power divided by voltage: 350 kW is about 875 A at 400 V and about 440 A at 800 V.",
+      "value": {
+        "kw": 350,
+        "amps_at_400v": 875,
+        "amps_at_800v": 437.5
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "P = V × I (arithmetic)",
+          "url": null,
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "physics-split-pack-power",
+      "claim": "A split pack charges both halves in parallel, so the charger sees half the pack voltage and its power is capped at about charger current × half-pack voltage.",
+      "value": {
+        "formula": "P ≈ I_max × V_pack / 2"
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Series/parallel arithmetic; the topology is stated by Audi (see audi-ppe-bank-charging)",
+          "url": null,
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "physics-split-pack-half-bus",
+      "claim": "While a split pack charges its halves in parallel, whatever runs from the pack during the charge sees half the pack's usual voltage, so it has to work at that voltage.",
+      "value": null,
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Series/parallel arithmetic: two halves in parallel present half the series voltage",
+          "url": null,
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "booster-input-voltage",
+      "claim": "A booster (DC-DC or motor boost) draws from a lower-voltage charger at around 420–450 V, and at 450 V at most, not at a 500 V charger's full output.",
+      "value": {
+        "v_min": 420,
+        "v_max": 450
+      },
+      "sources": [],
+      "status": "observed",
+      "rationale": "The owner's field experience (2026-09-29): 'definitely not 500V, 450V max'. It sits in tension with Lucid's release, which says the Gravity's boost charges 'with the highest voltage that a charging station is capable of outputting' (lucid-gravity-400v-method); both fit if what a booster can actually draw from a '500V' station is about 450 V. EVBench tests logging charger-side voltage on a booster car would make it rank B. The Split Pack Lab uses 450 V (BOOSTER_INPUT_V in peakOnCharger.js) and flags it on screen."
+    },
+    {
+      "id": "physics-cell-heat-scales-with-current-squared",
+      "claim": "Resistive heat in the cells is I²R, so at the same pack voltage, charging at 225 kW makes about (225/400)² ≈ 32 % of the heat of charging at 400 kW.",
+      "value": {
+        "ratio": 0.316
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Joule heating, Q = I²R (arithmetic; assumes equal pack voltage and resistance)",
+          "url": null,
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "A model statement, not a measurement: it ignores the entropic term and the change of R with temperature and SoC."
+    },
+    {
+      "id": "physics-low-voltage-cap",
+      "claim": "At a charger's current limit, power scales with pack voltage: at 500 A, a pack at 288 V takes at most 144 kW, and one at 400 V 200 kW.",
+      "value": {
+        "amps": 500,
+        "kw_at_288v": 144,
+        "kw_at_400v": 200
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "P = V × I (arithmetic)",
+          "url": null,
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "tesla-v3-cable-current",
+      "claim": "A Tesla V3 Supercharger post is rated 350 A continuous.",
+      "value": {
+        "amps_continuous": 350
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "r/teslamotors — 'V3 Supercharger live at Hawthorne, Los Angeles' (2019 photo of a V3 post)",
+          "url": "https://www.reddit.com/r/teslamotors/comments/bepmzf/v3_supercharger_live_at_hawthorne_los_angeles/",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "observed",
+      "rationale": "The owner has read the 350 A continuous rating on the post labels at many US V3 Supercharger sites. The 2019 Reddit photo is the only public record found; Reddit blocks automated reads, so Claude has not seen it. No Tesla document found."
+    },
+    {
+      "id": "tesla-v3-boost-current",
+      "claim": "Tesla V3 Superchargers boost above their 350 A continuous rating for a period, depending on conditions such as temperature and the equipment's own state: to about 500 A for non-Tesla vehicles, and well over 600 A for Tesla vehicles.",
+      "value": {
+        "non_tesla_a": 500,
+        "tesla_a_min": 600
+      },
+      "sources": [],
+      "status": "observed",
+      "rationale": "Observed by EVBench and widely accepted (owner, 2026-09-28/29). A boost is by definition above the continuous rating for a limited time, and how long and how high depend on conditions. Charging logs (a run's kW against a known pack voltage) could make it rank B."
+    },
+    {
+      "id": "tesla-v3-cabinet-shared",
+      "claim": "A Tesla V3 Supercharger cabinet delivers about 650 kW, shared across its 4 stalls.",
+      "value": {
+        "kw_shared": 650,
+        "stalls": 4
+      },
+      "sources": [],
+      "status": "observed",
+      "rationale": "The owner's field knowledge (2026-09-28). No Tesla document found; the V4 Cabinet announcement says only that it powers 8 posts, '2X the stalls per cabinet'."
+    },
+    {
+      "id": "v4-post-lifts-v3-cabinet",
+      "claim": "On a V3 cabinet, what limits one car's current is the post: a V4 post's higher-current cable and connector let the same cabinet deliver more current to one car than a V3 post can. That is how the Cybertruck reached 325 kW on V4 posts fed by V3 cabinets.",
+      "value": null,
+      "sources": [],
+      "status": "observed",
+      "rationale": "The owner's explanation (2026-09-28): the cabinet's power is shared across stalls and was not the limit; the V3 post's cable was. Consistent with the post ratings: a V3 post is labelled 350 A continuous (tesla-v3-cable-current, observed) and a V4 post 615 A continuous (tesla-v4-post-ratings, verified)."
+    },
+    {
+      "id": "tesla-v4-post-ratings",
+      "claim": "A Tesla V4 Supercharger post is rated 500 kW for passenger vehicles, 615 A continuous, 0–1000 V DC.",
+      "value": {
+        "kw": 500,
+        "amps_continuous": 615,
+        "v_max": 1000
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla — Supercharger for Business, Technical Specifications",
+          "url": "https://www.tesla.com/supercharger-for-business",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "tesla-v4-cabinet-voltage",
+      "claim": "A Tesla V4 cabinet outputs 180–1000 V DC, up to 1200 kW shared by 8 posts.",
+      "value": {
+        "v_min": 180,
+        "v_max": 1000,
+        "kw_shared": 1200,
+        "posts": 8
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla — Supercharger for Business, Technical Specifications",
+          "url": "https://www.tesla.com/supercharger-for-business",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "tesla-v4-cabinet-announcement",
+      "claim": "Tesla's V4 Cabinet (announced November 2024) supports 400–1000 V vehicles and delivers up to 500 kW for cars, with 30% faster charging for the Cybertruck; S3XY vehicles stay at the 250 kW they already get on a V3 Cabinet.",
+      "value": {
+        "kw_cars": 500,
+        "v_range": [
+          400,
+          1000
+        ],
+        "cybertruck_faster": 0.3,
+        "s3xy_kw": 250
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "@TeslaCharging on X, Nov 2024 — 'V4 Cabinet' announcement",
+          "url": "https://x.com/TeslaCharging/status/1857133221538148638",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "250 kW is the S3XY vehicles' rate, not a cap on the V3 Cabinet, which the owner puts at about 650 kW shared across 4 stalls (tesla-v3-cabinet-shared). '30% faster for Cybertruck' matches 250 kW → 325 kW."
+    },
+    {
+      "id": "older-chargers-500v",
+      "claim": "In the US, the DC fast chargers an 800 V-class pack cannot use directly are mainly older 50 kW units, which top out around 450–500 V, and Tesla Superchargers before V4, which top out at 500 V.",
+      "value": {
+        "old_50kw_v_max": [
+          450,
+          500
+        ],
+        "supercharger_pre_v4_v_max": 500
+      },
+      "sources": [
+        {
+          "rank": "D",
+          "title": "Lucid Group press release, 28 Jan 2025: calls V3 Superchargers '500V architecture fast chargers' (a third party describing Tesla hardware)",
+          "url": "https://ir.lucidmotors.com/news-releases/news-release-details/lucid-gravity-combining-450-miles-epa-range-400-kw-fast-charging",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "accepted",
+      "rationale": "Accepted by the owner's decision (2026-09-28), from long field experience: it is the practical reason 400 V support matters in the US. Tesla's own page no longer lists a V3 cabinet voltage, and no other primary source was found. This is a product figure, which the accepted status normally excludes; the owner made an explicit exception."
+    },
+    {
+      "id": "abb-terra360-ratings",
+      "claim": "The ABB Terra 360 (UL, CCS1) outputs 150–920 V DC, 350 A nominal and 500 A peak, on an air-cooled cable.",
+      "value": {
+        "v_min": 150,
+        "v_max": 920,
+        "amps_nominal": 350,
+        "amps_peak": 500,
+        "cable": "air-cooled"
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "ABB E-mobility — Terra 360 UL data sheet (9AKK108468A2521)",
+          "url": "https://library.e.abb.com/public/e7c2402c24c049198ea653c93aea21f0/ABB_Emobility_Terra-360_UL_Data-Sheet_A.pdf",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "alpitronic-hyc400-ratings",
+      "claim": "The Alpitronic HYC400 (UL) outputs 150–1000 V DC and up to 400 kW with four power stacks, at most 600 A per cable.",
+      "value": {
+        "v_min": 150,
+        "v_max": 1000,
+        "kw": 400,
+        "amps_per_cable": 600
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Alpitronic — HYC400 UL data sheet (V1-2, 2025): DC output and output voltage",
+          "url": "https://flare.shape404.agency/alpitronic/documents/6ee3db38511baf0ea2b150563be93234/USA_HYC400UL_Product_Data_Sheet_V1-2.pdf",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "The 400 kW needs all four power stacks; with fewer, it is 100 kW per stack. The owner remembered it as about 950 V and 600-some A; the data sheet says 1000 V and 600 A. Electrive (Mar 2026) reports the earlier HYC400 at 500 A continuous / 600 A boost, and a Series 2 at 600 A continuous."
+    },
+    {
+      "id": "dc-cable-current-ratings",
+      "claim": "DC fast-charging cable ratings vary widely. Liquid-cooled cables are commonly rated 350–500 A continuous. Air-cooled ones are rated 200–500 A continuous, and some boost briefly to 350–600 A.",
+      "value": {
+        "liquid_continuous_a": [
+          350,
+          500
+        ],
+        "air_continuous_a": [
+          200,
+          500
+        ],
+        "air_boost_a": [
+          350,
+          600
+        ]
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "ABB E-mobility — Terra 360 UL data sheet: 350 A nominal, 500 A peak, air-cooled (one consistent example)",
+          "url": "https://library.e.abb.com/public/e7c2402c24c049198ea653c93aea21f0/ABB_Emobility_Terra-360_UL_Data-Sheet_A.pdf",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "observed",
+      "rationale": "The owner's field experience across many charger models (2026-09-28): a range, not a figure for any one charger. The ABB data sheet is one example inside it. Replaces the earlier claim that '~500 A is common on liquid-cooled CCS1', which the data sheet did not support as written."
+    },
+    {
+      "id": "lucid-gravity-voltage",
+      "claim": "Lucid quotes the Gravity's pack at 926 V. EPA's Fuel Economy Guide data lists it at 810 V.",
+      "value": {
+        "lucid_v": 926,
+        "epa_v": 810
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Lucid Group press release, 28 Jan 2025",
+          "url": "https://ir.lucidmotors.com/news-releases/news-release-details/lucid-gravity-combining-450-miles-epa-range-400-kw-fast-charging",
+          "accessed": "2026-09-28"
+        },
+        {
+          "rank": "A",
+          "title": "EPA / DOE Fuel Economy Guide data (MY24–MY27 files), total_voltage_v, as imported into EVBench",
+          "url": "https://www.fueleconomy.gov/feg/download.shtml",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "Say 'Lucid quotes 926 V', never 'rated 926 V'. Which point each figure is: see gravity-voltage-points."
+    },
+    {
+      "id": "gravity-voltage-points",
+      "claim": "Lucid's 926 V for the Gravity is its pack near full charge; the EPA's 810 V is close to its nominal, around half charge.",
+      "value": {
+        "full_v": 926,
+        "nominal_v": 810
+      },
+      "sources": [],
+      "status": "accepted",
+      "rationale": "The owner's reading (2026-09-28), and it fits the arithmetic: both figures give about 225 cells in series, at about 4.12 V per cell near full and 3.6 V nominal. Neither Lucid nor the EPA says which point it quotes. A product figure, so an explicit owner exception to the accepted rule; context only, nothing rests on it."
+    },
+    {
+      "id": "epa-voltage-points-differ",
+      "claim": "The EPA's Fuel Economy Guide data does not file one consistent point on a pack's voltage range: GM's 80-cell Ultium cars appear at 336 V, their full-charge voltage (80 × 4.2 V), while the Gravity appears at 810 V, well below the 926 V Lucid quotes.",
+      "value": {
+        "gm_80s_v": 336,
+        "gm_nominal_v": 288,
+        "gravity_v": 810,
+        "gravity_lucid_v": 926
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA / DOE Fuel Economy Guide data (MY24–MY27 files), total_voltage_v, as imported into EVBench",
+          "url": "https://www.fueleconomy.gov/feg/download.shtml",
+          "accessed": "2026-09-28"
+        },
+        {
+          "rank": "C",
+          "title": "Arithmetic against gm-ultium-80s-pack (80 cells: 4.2 V full, 3.6 V nominal) and lucid-gravity-voltage (Lucid's 926 V)",
+          "url": null,
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "The GM half is exact: 336 V is 80 × 4.2 V. The Gravity half shows only that the EPA's figure and Lucid's differ by 116 V; which point each one is rests on gravity-voltage-points (accepted), and this fact does not depend on it. Also recorded in docs/vocabulary.md under 'Why not nominal curve', so EVBench readers of the column see it."
+    },
+    {
+      "id": "lucid-gravity-400v-method",
+      "claim": "The Gravity charges on 500 V chargers with motor boost: its rear drive unit steps the charger's 500 V up to pack voltage. Lucid contrasts this with pack splitting.",
+      "value": {
+        "method": "motor-boost",
+        "unit": "rear drive unit"
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Lucid Group press release, 28 Jan 2025",
+          "url": "https://ir.lucidmotors.com/news-releases/news-release-details/lucid-gravity-combining-450-miles-epa-range-400-kw-fast-charging",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "lucid-gravity-400v-kw",
+      "claim": "Lucid rates the Gravity at sustained speeds of up to 225 kW on 500 V chargers, including Tesla V3 Superchargers.",
+      "value": {
+        "kw": 225
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Lucid Group press release, 28 Jan 2025",
+          "url": "https://ir.lucidmotors.com/news-releases/news-release-details/lucid-gravity-combining-450-miles-epa-range-400-kw-fast-charging",
+          "accessed": "2026-09-28"
+        },
+        {
+          "rank": "A",
+          "title": "Lucid — Public Charging Guide ('up to 225 kW at Tesla Superchargers')",
+          "url": "https://lucidmotors.com/knowledge/ownership/charging/public-charging",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "EVBench run 81 (Gravity Grand Touring, 'State of Charge (Supercharger)') peaks at 210 kW in the 2026-09-15 dump. Its source field reads 'asdf' and it has no source URL — fix the record before the page links it."
+    },
+    {
+      "id": "lucid-gravity-peak-kw",
+      "claim": "The Gravity charges at up to 400 kW on 1000 V chargers.",
+      "value": {
+        "kw": 400
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Lucid Group press release, 28 Jan 2025",
+          "url": "https://ir.lucidmotors.com/news-releases/news-release-details/lucid-gravity-combining-450-miles-epa-range-400-kw-fast-charging",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "gravity-above-terra360",
+      "claim": "Lucid quotes the Gravity's pack at 926 V, above an ABB Terra 360's 920 V maximum output, and a pack's voltage rises further while it takes charge.",
+      "value": {
+        "pack_v": 926,
+        "charger_v_max": 920
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Arithmetic on two verified facts: lucid-gravity-voltage and abb-terra360-ratings",
+          "url": null,
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "lucid-high-voltage-chargers",
+      "claim": "Lucid vehicles can struggle on some chargers rated 920–950 V, because a hot pack taking charge can meet or exceed that voltage.",
+      "value": null,
+      "sources": [],
+      "status": "observed",
+      "rationale": "The owner's field observation of Lucid vehicles on chargers rated 920–950 V. An EVBench Lucid charging test on a known 920–950 V charger, showing the limit, would make it rank B."
+    },
+    {
+      "id": "lucid-air-400v",
+      "claim": "The Lucid Air boosts on ~400 V Superchargers through its Wunderbox, which limits output to 50 kW.",
+      "value": {
+        "method": "dc-booster",
+        "kw": 50
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Lucid — Public Charging Guide",
+          "url": "https://lucidmotors.com/knowledge/ownership/charging/public-charging",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "bmw-ix3-400v-capable",
+      "claim": "The Neue Klasse BMW iX3 can charge from 400 V DC stations, which BMW credits to 'battery management tech with integrated switching matrix'.",
+      "value": {
+        "capable": true
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "BMW Group PressClub Global — 'The start of a new era: the new BMW iX3', 5 Sep 2025",
+          "url": "https://www.press.bmwgroup.com/global/article/detail/T0451998EN/the-start-of-a-new-era-the-new-bmw-ix3?language=en",
+          "accessed": "2026-09-28"
+        },
+        {
+          "rank": "A",
+          "title": "BMW Group PressClub USA — 'The All-New BMW iX3'",
+          "url": "https://www.press.bmwgroup.com/usa/article/detail/T0452316EN_US/the-all-new-bmw-ix3?language=en_US",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "bmw-ix3-400v-method",
+      "claim": "The iX3 charges on 400 V by splitting its pack into two halves charged in parallel.",
+      "value": {
+        "method": "split-pack"
+      },
+      "sources": [
+        {
+          "rank": "D",
+          "title": "EVChargingStations.com, 14 Dec 2025 — 'can be split into two 400-volt modules'; cites no BMW document",
+          "url": "https://evchargingstations.com/chargingnews/2027-bmw-ix3-charging-monster/",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "unverified",
+      "note": "BMW never says 'split' in the three releases fetched; it says 'switching matrix'. Consistent with a split pack (run 121 peaks 194 kW on a V3 Supercharger, which at half of 698.9 V needs ~555 A), but consistent is not confirmed. Page must say 'BMW calls it a switching matrix' until a BMW technical source says more."
+    },
+    {
+      "id": "bmw-ix3-voltage",
+      "claim": "The iX3 50 xDrive's pack voltage is 698.9 V.",
+      "value": {
+        "v": 698.9
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "BMW Group PressClub USA — 'The All-New BMW iX3', technical data",
+          "url": "https://www.press.bmwgroup.com/usa/article/detail/T0452316EN_US/the-all-new-bmw-ix3?language=en_US",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "bmw-ix3-kwh",
+      "claim": "The iX3 50 xDrive's usable battery energy.",
+      "value": {
+        "global_kwh": 108.7,
+        "us_sheet_kwh": 112.2
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "BMW Group PressClub Global, 5 Sep 2025 — 'usable energy content of 108.7 kWh'",
+          "url": "https://www.press.bmwgroup.com/global/article/detail/T0451998EN/the-start-of-a-new-era-the-new-bmw-ix3?language=en",
+          "accessed": "2026-09-28"
+        },
+        {
+          "rank": "A",
+          "title": "BMW Group PressClub USA — technical data, 'Net usable energy content 112.2'",
+          "url": "https://www.press.bmwgroup.com/usa/article/detail/T0452316EN_US/the-all-new-bmw-ix3?language=en_US",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "unverified",
+      "note": "Two BMW sources disagree. Read the US technical-data table by hand (it was read through a summariser) before using either figure."
+    },
+    {
+      "id": "bmw-ix3-peak-kw",
+      "claim": "The iX3 charges at up to 400 kW and 10–80 % in 21 minutes on an 800 V charger.",
+      "value": {
+        "kw": 400,
+        "min_10_80": 21
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "BMW Group PressClub Global, 5 Sep 2025",
+          "url": "https://www.press.bmwgroup.com/global/article/detail/T0451998EN/the-start-of-a-new-era-the-new-bmw-ix3?language=en",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "bmw-ix3-400v-kw-measured",
+      "claim": "On a Tesla V3 Supercharger, an iX3 50 xDrive peaked at about 194 kW.",
+      "value": {
+        "kw": 194,
+        "run_id": 121
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "Bjorn Nyland — 'BMW iX3 50 xDrive charging test on 400 kW, 350 kW and 400 V Tesla' (EVBench run 121)",
+          "url": "https://www.youtube.com/watch?v=3Zp7eLXmaLM",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "unverified",
+      "note": "The figure is from EVBench's own run data; the video itself was not watched in this pass. Flip once a curator confirms the run matches the video."
+    },
+    {
+      "id": "mercedes-cla-400v-method",
+      "claim": "The Mercedes CLA (US) needs a factory-fitted converter to use 400 V DC chargers; it is installed on CLAs from spring 2026. Without it the car charges only on 800 V DC chargers.",
+      "value": {
+        "method": "dc-booster",
+        "from": "spring 2026"
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Mercedes-Benz USA — 2026 CLA Sedan",
+          "url": "https://www.mbusa.com/en/future-vehicles/2026-mercedes-benz-cla-sedan",
+          "accessed": "2026-09-28"
+        },
+        {
+          "rank": "D",
+          "title": "EV Powered, 28 Nov 2025 — UK: an option (£850) for orders from spring 2026, not retrofittable",
+          "url": "https://evpowered.co.uk/news/mercedes-fixes-clas-rapid-charging-problem-but-at-a-price/",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "Verified for the US statement only. Standard-vs-option varies by market; the UK price and 'not retrofittable' are secondary. No source gives the converter's kW."
+    },
+    {
+      "id": "mercedes-cla-peak-kw",
+      "claim": "The CLA charges at up to 320 kW on 800 V DC chargers.",
+      "value": {
+        "kw": 320
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Mercedes-Benz USA — 2026 CLA Sedan",
+          "url": "https://www.mbusa.com/en/future-vehicles/2026-mercedes-benz-cla-sedan",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "cybertruck-400v-method",
+      "claim": "The Cybertruck charges on 400 V Superchargers by splitting its pack: a DPDT (double-pole, double-throw) contactor switches its two halves from series to parallel.",
+      "value": {
+        "method": "split-pack",
+        "switch": "DPDT contactor"
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "Smart Charge America — 'E46: The MAGIC behind Tesla's Cybertruck DPDT 400V/800V' (YouTube)",
+          "url": "https://www.youtube.com/watch?v=a2h6Y2r6xUk",
+          "accessed": "2026-09-28"
+        },
+        {
+          "rank": "D",
+          "title": "InsideEVs — 'What Is A Split Pack Electric Vehicle Battery?'",
+          "url": "https://insideevs.com/features/711547/split-pack-electriv-vehicle-battery/",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "Supplied by the owner on 2026-09-28 as the definitive source. Claude read the video's title and channel (via oEmbed) but did not watch it. Still no Tesla document (rank A); the InsideEVs piece stays as a secondary source. kW figures are a separate, still-unverified fact (cybertruck-kw-by-charger)."
+    },
+    {
+      "id": "cybertruck-voltage",
+      "claim": "The EPA's Fuel Economy Guide data lists the Cybertruck's pack at 710 V, so each half of its split pack is about 355 V.",
+      "value": {
+        "v": 710,
+        "half_v": 355
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA / DOE Fuel Economy Guide data (MY25–MY26 files), total_voltage_v, as imported into EVBench",
+          "url": "https://www.fueleconomy.gov/feg/download.shtml",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "Which point on the voltage range Tesla filed is not stated (see epa-voltage-points-differ); treat 710 V as a round figure for the class. The owner puts it at about 740 V under charge."
+    },
+    {
+      "id": "cybertruck-supercharging-max",
+      "claim": "Tesla lists the Cybertruck's Supercharging maximum as 325 kW.",
+      "value": {
+        "kw": 325
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla — Cybertruck, specifications ('Supercharging Max/Payment Type: 325kW Max')",
+          "url": "https://www.tesla.com/cybertruck",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "cybertruck-500kw",
+      "claim": "Tesla announced 500 kW Supercharging for the Cybertruck in November 2024, and the first full V4 site, opened in October 2025, delivers 500 kW, with the Cybertruck the one Tesla able to use it. At a V4 cabinet's 1000 V it charges as one series pack.",
+      "value": {
+        "kw": 500
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "@cybertruck (Tesla's official Cybertruck account) on X, 15 Nov 2024: '500kW Supercharging is coming', quoting a @TeslaCharging video (14 Nov 2024) that shows a Cybertruck charging at '500 kW, 1298 mi/hr'",
+          "url": "https://x.com/cybertruck/status/1857196912652480981",
+          "accessed": "2026-09-28"
+        },
+        {
+          "rank": "D",
+          "title": "EVWire (Jaan Juurikas), 10 Oct 2025 — 'Tesla officially opens its first fully V4 Supercharger capable of 500 kW car and 1.2 MW truck charging' (Redwood City, CA): 'other Teslas, except Cybertruck, can't use this 500kW … and remain at 250kW'",
+          "url": "https://evwire.com/p/tesla-officially-opens-its-first-fully-v4-supercharger-capable-of-500kw-car-and-1-2mw-truck-charging",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "Supplied by the owner (2026-09-28), with a screenshot of the video frame. Tesla's post is an announcement; EVWire (D) reports the site delivering it. 'As one series pack' is arithmetic: at up to 1000 V the charger reaches the whole ~710 V pack (cybertruck-voltage, tesla-v4-cabinet-voltage), so it has no reason to split. Tesla's Cybertruck spec page still lists 325 kW max; it lags the announcement."
+    },
+    {
+      "id": "physics-cybertruck-currents",
+      "claim": "At the EPA's 710 V, the Cybertruck's current is about 915 A for 325 kW split (355 V halves), about 700 A for 250 kW split, and about 700 A for 500 kW as one series pack.",
+      "value": {
+        "a_325kw_split": 915,
+        "a_250kw_split": 704,
+        "a_500kw_series": 704
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "I = P ÷ V at 355 V (split) and 710 V (series)",
+          "url": null,
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "Derived, not measured: runs record neither pack voltage nor current. Under charge the voltage runs higher than 710 V (the owner puts it near 740 V), so the real currents are a few percent lower: the owner's ~880 A, ~680 A, ~680 A. The ~915 A at 325 kW is above a V4 post's 615 A continuous rating (tesla-v4-post-ratings), so it is a peak, not a steady current."
+    },
+    {
+      "id": "bms-rides-thermal-limit",
+      "claim": "A battery management system cuts charging power as the cells near their temperature limit, and in fast charging many vehicles hold close to that limit for part of the session. So a lower charging power can hold the car's peak for longer.",
+      "value": null,
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Widely accepted in EV engineering and in EVBench's experience (owner, 2026-09-29): cell heat rises with the square of current (physics-cell-heat-scales-with-current-squared), so power is held against a thermal limit. The Gravity's two charging tests show the effect (gravity-10-80-by-charger)."
+    },
+    {
+      "id": "gravity-10-80-by-charger",
+      "claim": "In EVBench's tests, a Lucid Gravity charged from 10 to 80% in 24.5 minutes at a 418 kW peak on a 1000 V charger, and in 28.6 minutes at a 210 kW peak on a Supercharger: half the peak power, about 17% longer.",
+      "value": {
+        "run_23_min": 24.5,
+        "run_23_peak_kw": 418,
+        "run_81_min": 28.6,
+        "run_81_peak_kw": 210
+      },
+      "sources": [],
+      "status": "observed",
+      "rationale": "EVBench's own data (runs 23 and 81, 2026-09-15 dump; time at the first point at or above 10% and 80% SoC). Observed rather than rank B because run 81's source reads 'asdf' with no URL; fixing that record makes it rank B."
+    },
+    {
+      "id": "cybertruck-kw-by-charger",
+      "claim": "Tesla enabled the Cybertruck to charge at up to 325 kW on select V4 Supercharger posts in December 2024, and on all V4 posts in North America by 28 January 2025.",
+      "value": {
+        "kw": 325,
+        "select_posts": "2024-12-14",
+        "all_na_v4_posts": "2025-01-28"
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "@TeslaCharging on X, 28 Jan 2025: 'All V4 posts in North America can now charge up to 325kW for Cybertruck'",
+          "url": "https://x.com/TeslaCharging/status/1884065911482769655",
+          "accessed": "2026-09-28"
+        },
+        {
+          "rank": "A",
+          "title": "@TeslaCharging on X, 14 Dec 2024: '@cybertruck can now charge up to 325kW on select V4 Supercharger posts. Rollout in progress.' (from the owner's screenshot)",
+          "url": null,
+          "accessed": "2026-09-28"
+        },
+        {
+          "rank": "D",
+          "title": "EVWire, 10 Oct 2025: the first fully V4 site (V4 cabinet) opened then, so the V4 posts of early 2025 were fed by V3 cabinets",
+          "url": "https://evwire.com/p/tesla-officially-opens-its-first-fully-v4-supercharger-capable-of-500kw-car-and-1-2mw-truck-charging",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "Verified for what Tesla said: 325 kW on V4 posts. Why a V4 post on a V3 cabinet could do it is v4-post-lifts-v3-cabinet (observed). EVBench run 18 peaks at 317 kW but records no charger."
+    },
+    {
+      "id": "egmp-motor-boost",
+      "claim": "Hyundai Motor Group's E-GMP charges on 400 V by using the motor and inverter to boost 400 V to 800 V, with no additional components.",
+      "value": {
+        "method": "motor-boost"
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Hyundai Motor Group — E-GMP unveiling, 2 Dec 2020",
+          "url": "https://www.hyundai.com/worldwide/en/newsroom/detail/0000000812",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "egmp-epa-voltage",
+      "claim": "The EPA's Fuel Economy Guide data lists the long-range E-GMP cars (Hyundai Ioniq 5 and Ioniq 6, Kia EV6, Genesis GV60) at 697 V, and the Standard Range EV6 at 523 V.",
+      "value": {
+        "long_range_v": 697,
+        "standard_range_v": 523
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA / DOE Fuel Economy Guide data (MY25–MY27 files), total_voltage_v, as imported into EVBench",
+          "url": "https://www.fueleconomy.gov/feg/download.shtml",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "Unlike GM's filings, these read as nominal: 697 V is about 192 cells × 3.63 V, and 523 V about 144 × 3.63 V (cell counts are inference). EVBench's own spec for the IONIQ 5 Base says 523 V, which matches."
+    },
+    {
+      "id": "egmp-400v-kw-by-year",
+      "claim": "Early E-GMP cars reach about 80 kW on 400 V chargers and later ones about 150 kW.",
+      "value": null,
+      "sources": [],
+      "status": "unverified",
+      "note": "From the owner's notes (#355) and already in the max_dc_400v_kw hint. No source found in this pass. See egmp-boost-kw for the owner's current range (120–150 kW, observed); the early-car ~80 kW figure is still unsourced."
+    },
+    {
+      "id": "egmp-boost-kw",
+      "claim": "Current E-GMP cars (Hyundai Ioniq 5, Kia EV6) boost to around 120–150 kW on a 400 V charger, depending on the model.",
+      "value": {
+        "kw_min": 120,
+        "kw_max": 150
+      },
+      "sources": [],
+      "status": "observed",
+      "rationale": "The owner's field experience (2026-09-29), with no hard numbers. EVBench charging tests of an Ioniq 5 or EV6 on a Supercharger (V3) or another 500 V charger, recording the model, would make it rank B and settle which model reaches which figure."
+    },
+    {
+      "id": "egmp-peak-kw",
+      "claim": "In EVBench's charging tests, a Hyundai Ioniq 5 peaks at about 247 kW and a Kia EV6 GT-Line at about 255 kW.",
+      "value": {
+        "ioniq5_kw": 247,
+        "ev6_kw": 255,
+        "runs": [
+          192,
+          238
+        ]
+      },
+      "sources": [],
+      "status": "observed",
+      "rationale": "EVBench's own data (runs 192 and 238, 2026-09-15 dump), but neither run records its source, so it cannot be cited as rank B yet. Hyundai does not publish a peak kW; secondary press gives 230–260 kW. The owner's rough figure was ~225 kW. Filling the runs' sources would make this rank B."
+    },
+    {
+      "id": "taycan-2025-booster",
+      "claim": "From the 2025 model year the Taycan has a 150 kW DC/DC converter as standard for 400 V charging; before, it was optional.",
+      "value": {
+        "kw": 150,
+        "standard_from_my": 2025
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Porsche Newsroom USA — 'The new 2025 Porsche Taycan models', 6 Feb 2024",
+          "url": "https://newsroom.porsche.com/en_US/2024/products/02062024_The_new_2025-_Porsche_Taycan_models.html",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "taycan-peak-kw",
+      "claim": "The 2025 Taycan charges at up to 320 kW on an 800 V DC charger, 50 kW more than before.",
+      "value": {
+        "kw": 320
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Porsche Newsroom USA — 'The new 2025 Porsche Taycan models', 6 Feb 2024",
+          "url": "https://newsroom.porsche.com/en_US/2024/products/02062024_The_new_2025-_Porsche_Taycan_models.html",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "EVBench run 45 (Taycan J1.2, the earlier generation) peaks at 313 kW."
+    },
+    {
+      "id": "taycan-epa-voltage",
+      "claim": "The EPA's Fuel Economy Guide data lists the 2025–2026 Porsche Taycan at 850 V.",
+      "value": {
+        "v": 850
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA / DOE Fuel Economy Guide data (MY25–MY26 files), total_voltage_v, as imported into EVBench",
+          "url": "https://www.fueleconomy.gov/feg/download.shtml",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "Probably near full charge rather than nominal: 850 V is about 4.3 V per cell if the pack is 198 in series, the plan's unsourced figure. Which point Porsche filed is not stated (epa-voltage-points-differ)."
+    },
+    {
+      "id": "taycan-early-booster-kw",
+      "claim": "An early Taycan charges at about 50 kW on 400 V chargers.",
+      "value": null,
+      "sources": [],
+      "status": "unverified",
+      "note": "From the owner's notes and the hint. Not researched in this pass (not needed by the two pages)."
+    },
+    {
+      "id": "audi-ppe-bank-charging",
+      "claim": "On a 400 V charger the Audi Q6 e-tron (PPE) divides its 800 V battery into two batteries of equal voltage and charges them in parallel at up to 135 kW; on 800 V it peaks at 270 kW.",
+      "value": {
+        "method": "split-pack",
+        "kw_400v": 135,
+        "kw_peak": 270
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Audi — 'Focus on charging performance: the new Premium Platform Electric (PPE)', 8 May 2024",
+          "url": "https://www.audi.com/en/press-releases/focus-on-charging-performance-the-new-premium-platform-electric-ppe-15927",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "gm-ultium-trucks-800v",
+      "claim": "GM's Ultium truck platform has 800 V battery packs and 350 kW fast charging; most other Ultium EVs are 400 V, up to 200 kW.",
+      "value": {
+        "truck_v": 800,
+        "truck_kw": 350,
+        "other_v": 400,
+        "other_kw": 200
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "GM investor release — 'GM Reveals New Ultium Batteries and a Flexible Global Platform', Mar 2020",
+          "url": "https://investor.gm.com/news-releases/news-release-details/gm-reveals-new-ultium-batteries-and-flexible-global-platform/",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "EVBench runs 48 and 49 (Silverado RST) peak at 346–347 kW, consistent with the truck platform's 350 kW."
+    },
+    {
+      "id": "gm-ultium-series-switch",
+      "claim": "The Hummer EV's pack is two 400 V layers in parallel for driving, switched to series (800 V) to fast-charge.",
+      "value": {
+        "drive_v": 400,
+        "charge_v": 800
+      },
+      "sources": [
+        {
+          "rank": "D",
+          "title": "Green Car Congress, 22 Oct 2020",
+          "url": "https://www.greencarcongress.com/2020/10/20201022-hummerev.html",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "unverified",
+      "note": "The plan files GM trucks under 'split pack'. If this is right the framing is inverted: a 400 V pack that series-connects to take 800 V, not an 800 V pack that splits. On a 400 V charger it is in its normal state. Needs a GM technical source. EPA's data lists the 2024 Silverado EV at 290 V and the Hummer EV at 334 V, consistent with packs that drive at ~400 V class and switch to series only to fast-charge."
+    },
+    {
+      "id": "gm-ultium-80s-pack",
+      "claim": "GM's 85 kWh-class Ultium cars (Equinox EV, Blazer EV FWD and AWD, Optiq, the 2026 Lyriq, Honda Prologue) run 80 cells in series: EPA lists them at 336 V, which is 80 × 4.2 V at full charge, and their nominal is about 288 V (80 × 3.6 V), under 270 V at low SoC.",
+      "value": {
+        "series": 80,
+        "epa_v": 336,
+        "nominal_v": 288,
+        "low_soc_v_below": 270
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA / DOE Fuel Economy Guide data (MY24–MY27 files), total_voltage_v, as imported into EVBench",
+          "url": "https://www.fueleconomy.gov/feg/download.shtml",
+          "accessed": "2026-09-28"
+        },
+        {
+          "rank": "D",
+          "title": "InsideEVs — 'The 2024 Chevy Equinox EV Tells Us A Lot About Why Voltage Matters' (80S, 288 V nominal, under 270 V at low SoC)",
+          "url": "https://insideevs.com/news/722934/chevy-equinox-ev-ultium-platform/",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "Verified by agreement: EPA's 336 V (A) and InsideEVs' 80-series / 288 V (D) are the same pack at 4.2 V and 3.6 V per cell, exactly. No GM document found. The low-SoC figure rests on InsideEVs alone."
+    },
+    {
+      "id": "gm-ultium-slow-at-500a",
+      "claim": "GM's smaller-pack Ultium cars charge slowly even on chargers that deliver 500 A.",
+      "value": null,
+      "sources": [],
+      "status": "observed",
+      "rationale": "The owner's field experience (2026-09-28). It is what the arithmetic predicts for an ~288 V pack (physics-low-voltage-cap); an EVBench Equinox EV charging test on a known 500 A charger would make it rank B."
+    },
+    {
+      "id": "silverado-ev-epa-voltage",
+      "claim": "The EPA's Fuel Economy Guide data lists the Chevrolet Silverado EV anywhere from 290 V to 470 V by year and trim; the 2026 Extended Range is 403 V.",
+      "value": {
+        "min_v": 290,
+        "max_v": 470,
+        "ext_range_2026_v": 403
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA / DOE Fuel Economy Guide data (MY24–MY26 files), total_voltage_v, as imported into EVBench",
+          "url": "https://www.fueleconomy.gov/feg/download.shtml",
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "403 V is 96 × 4.2 V, the same full-charge pattern as GM's 80-cell cars (gm-ultium-80s-pack), which fits one of two 96-cell layers at about 346 V nominal. That reading is inference: GM has not said which point, or which configuration, it filed."
+    },
+    {
+      "id": "silverado-split-halves-300v",
+      "claim": "Charging split on a lower-voltage charger, a Silverado EV's halves run around 300 V.",
+      "value": {
+        "half_v": 300
+      },
+      "sources": [],
+      "status": "observed",
+      "rationale": "The owner's field experience (2026-09-28). It fits the EPA data read as 96-cell layers (silverado-ev-epa-voltage): about 346 V nominal, lower at the low SoC a fast-charge starts from. An EVBench Silverado test on a Supercharger would make it rank B."
+    },
+    {
+      "id": "pack-voltage-class-ranges",
+      "claim": "No standard defines the 400 V and 800 V classes. They are industry shorthand: 400 V-class packs sit around 350–450 V nominal, 800 V-class packs around 600 V and above.",
+      "value": {
+        "v400_nominal": [
+          350,
+          450
+        ],
+        "v800_nominal_min": 600
+      },
+      "sources": [],
+      "status": "accepted",
+      "rationale": "No SAE or IEC document defines the classes (owner, 2026-09-28); makers use the names loosely. BMW sells a 698.9 V pack as 800 V (bmw-ix3-voltage), and Lucid markets 926 V as 900 V+ while EVBench files it as 800 V class. The nominal ranges match the comment on VOLTAGE_CLASS_SPLIT_V in src/utils/platforms.js."
+    },
+    {
+      "id": "epa-800v-share-by-year",
+      "claim": "Most EV models in the EPA's Fuel Economy Guide are 400 V class, and the 800 V share is rising: at or above EVBench's 475 V line, 20% of 2024 model entries, 27% of 2025, 28% of 2026, and 36% of the 2027 entries filed so far.",
+      "value": {
+        "2024": 0.2,
+        "2025": 0.27,
+        "2026": 0.28,
+        "2027": 0.36
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA / DOE Fuel Economy Guide data (MY24–MY27 files), total_voltage_v, as imported into EVBench",
+          "url": "https://www.fueleconomy.gov/feg/download.shtml",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "C",
+          "title": "Count of distinct model-year/maker/carline entries with total_voltage_v ≥ 475 V (evbench-voltage-class-split)",
+          "url": null,
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "Entries are the EPA's carline rows, so trims and wheel options count separately. 2027 is partial (129 entries so far); the 2022–2023 files are too thin to use (83 and 32 entries). Makers file different points on the voltage range (epa-voltage-points-differ), which moves few entries across 475 V: GM's full-charge filings stay well below it."
+    },
+    {
+      "id": "400v-pack-cheaper-established",
+      "claim": "Lower-power and lower-cost EVs mostly use a 400 V-class pack: its power electronics are the more established and cheaper kind, and it charges directly on any DC fast charger.",
+      "value": null,
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Industry common knowledge (owner, 2026-09-29): 400 V was the architecture of the first mass-market EVs, so its components are the most widely made; direct charging follows from the voltage (older-chargers-500v). A supplier or teardown cost comparison would upgrade it."
+    },
+    {
+      "id": "800v-compat-tradeoffs",
+      "claim": "How an 800 V-class car handles lower-voltage chargers is a trade-off between the pack's voltage and layout, whether its inverter and motor can be designed to convert voltage, and how much cost the maker will accept.",
+      "value": null,
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Engineering judgement, widely shared (owner, 2026-09-29), and visible in the makers' own choices: Lucid argues voltage for motor boost (lucid-gravity-400v-method), Porsche fits a 150 kW converter (taycan-2025-booster), Tesla and Audi split the pack (cybertruck-400v-method, audi-ppe-bank-charging), and Mercedes first shipped the CLA with none (mercedes-cla-400v-method)."
+    },
+    {
+      "id": "evbench-voltage-class-split",
+      "claim": "EVBench files a vehicle with no electrical platform as 400 V class when its nominal pack voltage is below 475 V, and 800 V class from 475 V up.",
+      "value": {
+        "split_v": 475
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench's own rule: VOLTAGE_CLASS_SPLIT_V in src/utils/platforms.js",
+          "url": null,
+          "accessed": "2026-09-28"
+        }
+      ],
+      "status": "verified",
+      "note": "A definition, not a claim about the world. The reason for the line (owner, 2026-09-28): it is about the highest nominal voltage that can realistically charge on a charger that tops out at 500 V. The owner confirmed the code's 475 V (2026-09-28). Nearest vehicles in EVBench's specs (2026-09-15 dump): Hyundai IONIQ 6 base at 480 V and IONIQ 5 base at 523 V, both correctly 800 V class. Keep this fact equal to VOLTAGE_CLASS_SPLIT_V."
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { useAppContext } from '../../context/AppContext';
 import { DC_400V_CHARGING, PLATFORM_KINDS, vehiclesOnPlatform } from '../../utils/platforms';
 import { vehicleLabel } from '../../utils/specHelpers';
+import ExplainerLink from '../../explainers/ExplainerLink';
 
 /**
  * One platform, for a reader (#354): what it is, what it provides its
@@ -11,7 +12,7 @@ import { vehicleLabel } from '../../utils/specHelpers';
  * PLATFORM_PROVIDES): a platform provides a vehicle's values and never stands
  * in for them, and a vehicle that sets its own keeps it.
  */
-export default function PlatformPage({ platformId, onBack, onOpenExplainers }) {
+export default function PlatformPage({ platformId, onBack }) {
     const { platformsById, vehicles, selectedVehicles, toggleVehicleSelection, setVehicleSelection } = useAppContext();
     const platform = platformsById.get(Number(platformId));
 
@@ -59,10 +60,10 @@ export default function PlatformPage({ platformId, onBack, onOpenExplainers }) {
                             ? 'Its 400 V support is provided to each vehicle on it unless the vehicle sets its own, and is shown there as “from ' + platform.name + '”.'
                             : 'A mechanical platform provides no spec values: vehicles on one structure still differ in every dimension recorded.'}
                     </p>
-                    {method && onOpenExplainers && (
-                        <button type="button" className="platform-page-more" onClick={onOpenExplainers}>
+                    {method && (
+                        <ExplainerLink topic="400v-charger-compatibility" className="platform-page-more">
                             How 400 V support works →
-                        </button>
+                        </ExplainerLink>
                     )}
                 </section>
 

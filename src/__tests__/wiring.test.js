@@ -813,13 +813,24 @@ describe('the seams that broke before', () => {
 
     it('opens a platform\'s page from every place a platform is named (#354)', () => {
         const app = read('src/App.jsx');
-        expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform \}\}>/);
+        expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform[ ,]/);
         expect(app, 'and restores ?pid=').toMatch(/setReferencePlatformId\(p\.get\('pid'\) \|\| null\)/);
         expect(read('src/components/vehicles/PlatformLine.jsx'), 'the card line and View Specs').toMatch(/<PlatformLink platform=/);
         expect(read('src/components/VehicleSpecsDisplay.jsx'), 'a provided value\'s basis').toMatch(/from <PlatformLink platform=\{platform\} \/>/);
         expect(read('src/utils/vehicleTable.js'), 'a table note names its platform').toMatch(/links\[col\.key\] = \{ platformId: platform\.id \}/);
         expect(read('src/components/VehicleTable.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\)\}/);
         expect(read('src/components/tables/TableCell.jsx'), 'without borrowing the test peek').toMatch(/const noteLink = test \?\? link/);
+    });
+
+    it('opens an explainer from a link, and restores it from the URL (#355)', () => {
+        const app = read('src/App.jsx');
+        expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform, openExplainer \}\}>/);
+        expect(app, 'and restores ?topic=').toMatch(/setReferenceTopic\(p\.get\('topic'\) \|\| null\)/);
+        expect(app, 'and writes it back').toMatch(/p\.set\('topic', referenceTopic\)/);
+        expect(read('src/components/reference/ReferenceSection.jsx'), 'Reference mounts the section')
+            .toMatch(/<ExplainersSection topic=\{topic\}/);
+        expect(read('src/components/reference/PlatformPage.jsx'), 'a platform\'s 400 V support links its explainer')
+            .toMatch(/<ExplainerLink topic="400v-charger-compatibility"/);
     });
 
     it('lays out every List row on the header\'s grid, with one set of actions (#338)', () => {
