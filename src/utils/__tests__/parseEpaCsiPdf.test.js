@@ -106,6 +106,14 @@ describe('parseEpaCsiText — warnings', () => {
         expect(warnings.filter(w => w.startsWith('Carryover certification:'))).toHaveLength(1);
     });
 
+    it('warns for each configuration that has no readable test (#371)', () => {
+        // The identity fixture carries no test section, so every config is a bare shell.
+        const { groups, warnings } = parseEpaCsiText(ITEMS);
+        const bare = warnings.filter(w => w.includes('no readable tests'));
+        expect(bare).toHaveLength(groups.length);
+        expect(bare[0]).toContain(groups[0].test_group_id);
+    });
+
     it('stays quiet when the certification did not carry anything over', () => {
         // Same document with the two years agreeing.
         const same = ITEMS.map((s, i) => (ITEMS[i - 1] === 'Original Test Vehicle Model Year' ? '2027' : s));

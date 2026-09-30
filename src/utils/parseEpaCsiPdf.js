@@ -671,6 +671,13 @@ export function parseEpaCsiText(rawItems) {
     // report it only in an external EPA spreadsheet, so η can't be measured until
     // a curator enters Total DC / phase energy by hand.
     for (const g of groups) {
+        // A configuration with no readable test imports as a bare shell: no
+        // cd_range_*, no DC energy, nothing to derive an η from. Some
+        // certificates carry only a procedure 2 (CVS 75, no canister load) test,
+        // which isTestHeader does not read (#371, #230).
+        if (!g.tests.length) {
+            warnings.push(`${g.test_group_id}: no readable tests in this PDF (some certificates carry only a procedure 2 test, which is not read) — it will import with no range, energy or η; enter them manually.`);
+        }
         if (g.tests.length && !g.tests.some(t => t.total_dc_energy_kwh != null)) {
             warnings.push(`${g.test_group_id}: no DC energy in this PDF (often in an external EPA spreadsheet) — enter Total DC / phase energy manually for a measured η.`);
         }
