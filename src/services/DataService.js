@@ -7,7 +7,7 @@ import { toSessionRow } from '../utils/testSessions';
 import { rankFeCandidates } from '../utils/feGuideMatch';
 import { promotionUpdates, demotionUpdates, acceptGuideUpdates, isCuratorOwned } from '../utils/feGuidePromotion';
 import { selectTestForGuide } from '../utils/epaTestSelection';
-import { planGroupImport } from '../utils/epaImportMerge';
+import { planGroupImport, uniqueCoveredModels } from '../utils/epaImportMerge';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
 import { summarizeChargeSession, isCurrentSummary } from '../utils/chargeWindows';
 import { toPreconditioned } from '../utils/runPreconditioning';
@@ -2143,7 +2143,7 @@ class DataService {
     try {
       await supabase.from('epa_covered_models').delete().eq('test_group_id', tgid);
       if (covered_models.length) {
-        const rows = covered_models.map(cm => ({ test_group_id: tgid, ...cm }));
+        const rows = uniqueCoveredModels(covered_models).map(cm => ({ test_group_id: tgid, ...cm }));
         const { error } = await supabase.from('epa_covered_models').insert(rows);
         if (error) throw error;
       }

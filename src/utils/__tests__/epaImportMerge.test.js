@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isHeld, mergeRow, planChildren, planGroupImport } from '../epaImportMerge';
+import { isHeld, mergeRow, planChildren, planGroupImport, uniqueCoveredModels } from '../epaImportMerge';
 
 const manual = { source: 'manual', at: '2026-09-01T00:00:00Z' };
 
@@ -117,5 +117,27 @@ describe('planGroupImport', () => {
         expect(plan.coefficients.insert).toHaveLength(1);
         expect(plan.tests.insert[0].phases).toHaveLength(1);
         expect(plan.kept).toEqual([]);
+    });
+});
+
+describe('uniqueCoveredModels', () => {
+    it('keeps the first row per (carline name, region), null region counting as a value', () => {
+        const rows = [
+            { carline_number: '502', carline_name: 'RCV-Delivery', certification_region: null },
+            { carline_number: '502', carline_name: 'RCV-Delivery', certification_region: null },
+            { carline_number: '702', carline_name: 'RCV-Delivery', certification_region: null },
+            { carline_number: '501', carline_name: 'EDV 500 MCA', certification_region: 'Federal' },
+            { carline_number: '501', carline_name: 'EDV 500 MCA', certification_region: 'California' },
+        ];
+        const out = uniqueCoveredModels(rows);
+        expect(out.map(r => r.carline_number)).toEqual(['502', '501', '501']);
+    });
+
+    it('treats an undefined region the same as null', () => {
+        expect(uniqueCoveredModels([{ carline_name: 'A' }, { carline_name: 'A', certification_region: null }])).toHaveLength(1);
+    });
+
+    it('tolerates no rows', () => {
+        expect(uniqueCoveredModels(undefined)).toEqual([]);
     });
 });

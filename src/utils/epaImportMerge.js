@@ -190,3 +190,24 @@ export function planGroupImport(stored, incoming) {
         coefficients, tests, kept,
     };
 }
+
+/**
+ * Collapse covered-model rows to the table's unique key.
+ *
+ * epa_covered_models is unique on (test_group_id, carline_name,
+ * certification_region), NULL region counting as a value (migration 059). A
+ * certificate can legitimately list the same carline name more than once:
+ * Rivian's RCV-Delivery (carlines 502 and 702, each twice) and Karsan's bus
+ * (carlines 124 and 125) both do, and inserting them raised a duplicate-key
+ * error that aborted the whole batch. The first row of each key is kept; the
+ * rows are a reading aid, and the dropped ones differ only in carline number.
+ */
+export function uniqueCoveredModels(rows) {
+    const seen = new Set();
+    return (rows || []).filter(r => {
+        const key = JSON.stringify([r.carline_name, r.certification_region ?? null]);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
