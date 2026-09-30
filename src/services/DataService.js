@@ -2063,15 +2063,25 @@ class DataService {
     return data;
   }
 
-  /** Which of the given test_group_ids already exist (for overwrite confirmation). */
+  /**
+   * Which of the given test_group_ids already exist (for overwrite confirmation).
+   *
+   * Chunked: `.in()` puts every id in the request URL, and a bulk drop of a
+   * year's certificates is ~460 ids, ~8 KB — at the edge of what the gateway
+   * accepts. 100 per request stays far inside it, and inside the row cap.
+   */
   async getExistingEpaTestGroupIds(ids) {
     if (!this.useSupabase || !ids.length) return [];
-    const { data, error } = await getSupabase()
-      .from('epa_test_groups')
-      .select('test_group_id')
-      .in('test_group_id', ids);
-    if (error) throw error;
-    return (data || []).map(r => r.test_group_id);
+    const found = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data, error } = await getSupabase()
+        .from('epa_test_groups')
+        .select('test_group_id')
+        .in('test_group_id', ids.slice(i, i + 100));
+      if (error) throw error;
+      found.push(...(data || []).map(r => r.test_group_id));
+    }
+    return found;
   }
 
   /**
