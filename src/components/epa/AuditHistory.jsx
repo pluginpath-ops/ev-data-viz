@@ -2,7 +2,8 @@
  * Audit-trail viewer for one EPA test group (Section: cross-cutting audit
  * requirement). Lists who changed what, when, prior → new, and any source
  * citation, across the group row and all its child rows (coefficient sets,
- * tests, phases). Collapsible; loads on first open.
+ * tests, phases). Read by test_group_id, so it still resolves after a re-import
+ * has replaced the child rows. Collapsible; loads on first open.
  */
 import { useState } from 'react';
 
@@ -25,15 +26,10 @@ export default function AuditHistory({ group, getEpaAuditForGroup }) {
     const [loading, setLoading] = useState(false);
     const [error, setError]     = useState(null);
 
-    const childIds = [
-        ...(group.epa_coefficient_sets || []).map(s => s.id),
-        ...(group.epa_tests || []).flatMap(t => [t.id, ...(t.epa_test_phases || []).map(p => p.id)]),
-    ].filter(id => id != null);
-
     const load = async () => {
         setLoading(true); setError(null);
         try {
-            setRows(await getEpaAuditForGroup(group.test_group_id, childIds));
+            setRows(await getEpaAuditForGroup(group.test_group_id));
         } catch (e) {
             setError(e.message);
         } finally {
@@ -79,7 +75,7 @@ export default function AuditHistory({ group, getEpaAuditForGroup }) {
                                         <tr key={r.id} className="border-t border-[var(--color-border)] align-top">
                                             <td className="pr-2 py-0.5 text-meta whitespace-nowrap">{timeAgo(r.edited_at)}</td>
                                             <td className="pr-2">
-                                                <span className="text-meta">{TABLE_LABEL[r.table_name] || r.table_name}·</span>{r.field}
+                                                <span className="text-meta">{TABLE_LABEL[r.table_name] || r.table_name}{r.row_key ? ` ${r.row_key}` : ''}·</span>{r.field}
                                             </td>
                                             <td className="pr-2">
                                                 <span className="text-meta line-through">{r.prior_value ?? '∅'}</span>

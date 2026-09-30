@@ -7,6 +7,7 @@ import { toSessionRow } from '../utils/testSessions';
 import { rankFeCandidates } from '../utils/feGuideMatch';
 import { promotionUpdates, demotionUpdates, acceptGuideUpdates, isCuratorOwned } from '../utils/feGuidePromotion';
 import { selectTestForGuide } from '../utils/epaTestSelection';
+import { planGroupImport, uniqueCoveredModels } from '../utils/epaImportMerge';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
 import { summarizeChargeSession, isCurrentSummary } from '../utils/chargeWindows';
 import { toPreconditioned } from '../utils/runPreconditioning';
@@ -2062,65 +2063,87 @@ class DataService {
     return data;
   }
 
-  /** Which of the given test_group_ids already exist (for overwrite confirmation). */
+  /**
+   * Which of the given test_group_ids already exist (for overwrite confirmation).
+   *
+   * Chunked: `.in()` puts every id in the request URL, and a bulk drop of a
+   * year's certificates is ~460 ids, ~8 KB — at the edge of what the gateway
+   * accepts. 100 per request stays far inside it, and inside the row cap.
+   */
   async getExistingEpaTestGroupIds(ids) {
     if (!this.useSupabase || !ids.length) return [];
-    const { data, error } = await getSupabase()
-      .from('epa_test_groups')
-      .select('test_group_id')
-      .in('test_group_id', ids);
-    if (error) throw error;
-    return (data || []).map(r => r.test_group_id);
+    const found = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data, error } = await getSupabase()
+        .from('epa_test_groups')
+        .select('test_group_id')
+        .in('test_group_id', ids.slice(i, i + 100));
+      if (error) throw error;
+      found.push(...(data || []).map(r => r.test_group_id));
+    }
+    return found;
   }
 
   /**
-   * Import one fully-parsed group (from a CSI PDF) into the curator model:
-   * upsert the group, then CLEAN-REPLACE its coefficient sets, tests and phases
-   * (delete existing, insert from the parse) so re-import is deterministic
-   * "upload is truth". Populated fields are tagged source:'pdf' in overrides.
+   * Import one fully-parsed group (from a CSI PDF) into the curator model.
+   *
+   * Updates IN PLACE rather than clean-replacing, matching rows on the identity
+   * the certificate gives them (coefficient category, EPA test number, phase
+   * index). That keeps row ids stable — so the audit trail, which finds child
+   * edits by id, still resolves after a re-import — and leaves any field a
+   * curator set by hand (overrides source other than 'pdf') exactly as it was.
+   * Everything nobody has touched is still "upload is truth". The rules live in
+   * utils/epaImportMerge.js; this method only executes the plan.
    *
    * @param {Object} group  Output element of parseEpaCsiText().groups
+   * @returns {Promise<{kept: Array}>} curator-held values the PDF disagreed with
    */
   async importEpaGroupFull(group) {
-    if (!this.useSupabase) return;
+    if (!this.useSupabase) return { kept: [] };
     const supabase = getSupabase();
     const { coefficient_sets = [], tests = [], covered_models = [], ...g } = group;
     const tgid = g.test_group_id;
+    const check = ({ error }) => { if (error) throw error; };
 
-    // Tag every populated scalar field as PDF-sourced.
-    const pdfOverrides = (obj) => {
-      const o = {};
-      for (const [k, v] of Object.entries(obj)) if (v != null && k !== 'overrides') o[k] = { source: 'pdf' };
-      return o;
-    };
+    // What is stored now.
+    const [gRes, cRes, tRes] = await Promise.all([
+      supabase.from('epa_test_groups').select('*').eq('test_group_id', tgid).maybeSingle(),
+      supabase.from('epa_coefficient_sets').select('*').eq('test_group_id', tgid),
+      supabase.from('epa_tests').select('*, epa_test_phases(*)').eq('test_group_id', tgid),
+    ]);
+    [gRes, cRes, tRes].forEach(check);
 
-    // 1. Group (upsert).
-    const { error: gErr } = await supabase
-      .from('epa_test_groups')
-      .upsert({ ...g, source_file: g.source_file ?? null, overrides: pdfOverrides(g) },
-              { onConflict: 'test_group_id', ignoreDuplicates: false });
-    if (gErr) throw gErr;
+    const plan = planGroupImport(
+      { group: gRes.data, coefficient_sets: cRes.data || [], tests: tRes.data || [] },
+      { group: { ...g, source_file: g.source_file ?? null }, coefficient_sets, tests },
+    );
 
-    // 2. Coefficient sets (clean-replace).
-    await supabase.from('epa_coefficient_sets').delete().eq('test_group_id', tgid);
-    if (coefficient_sets.length) {
-      const rows = coefficient_sets.map(cs => ({ test_group_id: tgid, ...cs, overrides: pdfOverrides(cs) }));
-      const { error } = await supabase.from('epa_coefficient_sets').insert(rows);
-      if (error) throw error;
+    // 1. Group (upsert). Held fields are absent from the payload, so the
+    //    upsert leaves those columns alone; `overrides` keeps their tags.
+    check(await supabase.from('epa_test_groups')
+      .upsert({ test_group_id: tgid, ...plan.group.payload, overrides: plan.group.overrides },
+              { onConflict: 'test_group_id', ignoreDuplicates: false }));
+
+    // 2. Coefficient sets — remove, then update in place, then insert (the
+    //    one-primary-per-group index is checked per statement).
+    const cp = plan.coefficients;
+    if (cp.remove.length) check(await supabase.from('epa_coefficient_sets').delete().in('id', cp.remove));
+    for (const u of cp.update) {
+      check(await supabase.from('epa_coefficient_sets')
+        .update({ ...u.payload, overrides: u.overrides }).eq('id', u.id));
+    }
+    if (cp.insert.length) {
+      check(await supabase.from('epa_coefficient_sets')
+        .insert(cp.insert.map(r => ({ test_group_id: tgid, ...r }))));
     }
 
-    // 2b. Covered models (clean-replace, like the coefficient sets).
-    //
-    // Certificate-wide rather than per configuration, so every group parsed
-    // from one PDF writes the same list — which is faithful: the table says
-    // what the CERTIFICATE covers. Re-importing replaces rather than doubles.
-    //
-    // Non-fatal: migration 059 may not be applied, and a missing covered-models
-    // table must not fail an import that otherwise worked.
+    // 2b. Covered models (clean-replace: certificate-wide, nothing edits them
+    //     and nothing refers to their ids). Non-fatal: migration 059 may not be
+    //     applied, and a missing table must not fail an import that worked.
     try {
       await supabase.from('epa_covered_models').delete().eq('test_group_id', tgid);
       if (covered_models.length) {
-        const rows = covered_models.map(cm => ({ test_group_id: tgid, ...cm }));
+        const rows = uniqueCoveredModels(covered_models).map(cm => ({ test_group_id: tgid, ...cm }));
         const { error } = await supabase.from('epa_covered_models').insert(rows);
         if (error) throw error;
       }
@@ -2128,33 +2151,47 @@ class DataService {
       if (!isMissingRelation(error)) throw error;
     }
 
-    // 3. Tests + phases (clean-replace; phases cascade on test delete).
-    await supabase.from('epa_tests').delete().eq('test_group_id', tgid);
-    for (const t of tests) {
-      const { phases = [], ...testRow } = t;
-      let { data: savedTest, error: tErr } = await supabase
-        .from('epa_tests')
-        .insert({ test_group_id: tgid, ...testRow, overrides: pdfOverrides(testRow) })
-        .select('id')
-        .single();
-      // `mfr_test_vehicle_comments` arrives in migration 059. Retry without it
-      // rather than failing a whole import over a field that is a curator's
-      // reading aid — the numbers matter more than the note.
-      if (tErr && isMissingColumn(tErr)) {
-        const { mfr_test_vehicle_comments: _dropped, ...withoutNote } = testRow;
-        ({ data: savedTest, error: tErr } = await supabase
-          .from('epa_tests')
-          .insert({ test_group_id: tgid, ...withoutNote, overrides: pdfOverrides(withoutNote) })
-          .select('id')
-          .single());
+    // 3. Tests + phases.
+    //    `mfr_test_vehicle_comments` arrives in migration 059. Retry without it
+    //    rather than failing a whole import over a field that is a curator's
+    //    reading aid — the numbers matter more than the note.
+    const withoutNote = ({ mfr_test_vehicle_comments: _dropped, ...rest }) => rest;
+    const writeTest = async (write, row) => {
+      let res = await write(row);
+      if (res.error && isMissingColumn(res.error)) res = await write(withoutNote(row));
+      check(res);
+      return res.data;
+    };
+    const applyPhases = async (testId, pp) => {
+      if (pp.remove.length) check(await supabase.from('epa_test_phases').delete().in('id', pp.remove));
+      for (const u of pp.update) {
+        check(await supabase.from('epa_test_phases')
+          .update({ ...u.payload, overrides: u.overrides }).eq('id', u.id));
       }
-      if (tErr) throw tErr;
-      if (phases.length) {
-        const pRows = phases.map(p => ({ test_id: savedTest.id, ...p, overrides: pdfOverrides(p) }));
-        const { error: pErr } = await supabase.from('epa_test_phases').insert(pRows);
-        if (pErr) throw pErr;
+      if (pp.insert.length) {
+        check(await supabase.from('epa_test_phases')
+          .insert(pp.insert.map(r => ({ test_id: testId, ...r }))));
+      }
+    };
+
+    const tp = plan.tests;
+    if (tp.remove.length) check(await supabase.from('epa_tests').delete().in('id', tp.remove));
+    for (const u of tp.update) {
+      await writeTest(
+        (row) => supabase.from('epa_tests').update({ ...row, overrides: u.overrides }).eq('id', u.id).select('id').single(),
+        u.payload);
+      await applyPhases(u.id, u.phases);
+    }
+    for (const t of tp.insert) {
+      const saved = await writeTest(
+        (row) => supabase.from('epa_tests').insert({ test_group_id: tgid, ...row }).select('id').single(),
+        t.row);
+      if (t.phases.length) {
+        check(await supabase.from('epa_test_phases')
+          .insert(t.phases.map(p => ({ test_id: saved.id, ...p }))));
       }
     }
+    return { kept: plan.kept };
   }
 
   /** Convenience alias kept for back-compat. */
@@ -2878,15 +2915,22 @@ class DataService {
    * Append a row to the field-edit audit trail. Records who/when/prior/new
    * plus an optional source citation. Insert-only (immutable history).
    *
-   * @param {{ tableName, rowId, field, priorValue, newValue, sourceCitation }} entry
+   * `testGroupId` is what the history is read back by; `rowKey` is the child's
+   * stable identity (coefficient category, EPA test number, "<test> #<phase>")
+   * so an entry still says what it was about after a re-import has replaced
+   * the row id. See migration 074.
+   *
+   * @param {{ tableName, rowId, testGroupId, rowKey, field, priorValue, newValue, sourceCitation }} entry
    */
-  async logEpaFieldEdit({ tableName, rowId, field, priorValue, newValue, sourceCitation }) {
+  async logEpaFieldEdit({ tableName, rowId, testGroupId, rowKey, field, priorValue, newValue, sourceCitation }) {
     if (!this.useSupabase) return;
     const { error } = await getSupabase()
       .from('epa_field_audit')
       .insert({
         table_name:      tableName,
         row_id:          String(rowId),
+        test_group_id:   testGroupId ?? null,
+        row_key:         rowKey ?? null,
         field,
         prior_value:     priorValue != null ? String(priorValue) : null,
         new_value:       newValue != null ? String(newValue) : null,
@@ -2915,20 +2959,19 @@ class DataService {
   }
 
   /**
-   * Fetch the audit trail for a whole test group: the group row plus all of its
-   * child rows (coefficient sets, tests, phases). Matches on the union of row
-   * ids (the group's text id + the stringified child ids). Most recent first.
+   * The audit trail for a whole test group — the group row and everything under
+   * it — most recent first. Keyed by `test_group_id`, not by the ids of the
+   * children that exist today: those change when rows are replaced, and history
+   * that only resolves through live ids goes quiet the moment they do.
    *
    * @param {string} testGroupId
-   * @param {Array<string|number>} childRowIds  ids of coeff sets / tests / phases
    */
-  async getEpaAuditForGroup(testGroupId, childRowIds = []) {
+  async getEpaAuditForGroup(testGroupId) {
     if (!this.useSupabase) return [];
-    const ids = [String(testGroupId), ...childRowIds.map(String)];
     const { data, error } = await getSupabase()
       .from('epa_field_audit')
       .select('*')
-      .in('row_id', ids)
+      .eq('test_group_id', testGroupId)
       .order('edited_at', { ascending: false })
       .limit(200);
     if (error) throw error;

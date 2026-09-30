@@ -20,12 +20,14 @@ import { useState } from 'react';
 import { extractPdfText } from '../utils/extractPdfText';
 import { parseEpaCsiText } from '../utils/parseEpaCsiPdf';
 import { integrityWarnings } from '../utils/epaIntegrity';
+import { importProgressLabel } from '../utils/importProgress';
 
 export default function EpaPdfImportModal({ targetVehicle = null, onImport, getExistingIds, onClose }) {
     const [step, setStep]       = useState('upload'); // upload | review | done
     const [files, setFiles]     = useState([]);   // [{ name, configs, error }]
     const [progress, setProgress] = useState(null); // { done, total, name }
     const [busy, setBusy]       = useState(false);
+    const [importProgress, setImportProgress] = useState(null); // { done, total, name, startedAt }
     const [error, setError]     = useState(null);
     const [dragOver, setDragOver] = useState(false);
     const [groups, setGroups]   = useState([]);
@@ -156,6 +158,18 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
 
     const overwriteCount = [...selected].filter(id => existing.has(id)).length;
 
+    // Bulk-accept only what is not in the database yet. A bulk drop that mixes
+    // fresh certifications with carryover IDs already imported (see #374) is
+    // most safely handled by taking the new ones first and deciding the
+    // overwrites separately. Deselected rows drop their link with them, as the
+    // per-row toggle does.
+    const newIds = allIds.filter(id => !existing.has(id));
+    const selectOnlyNew = () => {
+        const keep = new Set(newIds);
+        setSelected(keep);
+        setLinkIds(prev => new Set([...prev].filter(id => keep.has(id))));
+    };
+
     const handleImport = async () => {
         const toImport = groups.filter(g => selected.has(g.test_group_id));
         if (!toImport.length) return;
@@ -164,16 +178,22 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
             return;
         }
         setBusy(true); setError(null);
+        const startedAt = Date.now();
+        setImportProgress({ done: 0, total: toImport.length, name: null, startedAt });
         try {
-            const res = await onImport(toImport, targetVehicle
-                ? { linkVehicleId: targetVehicle.id, linkTestGroupIds: [...linkIds].filter(id => selected.has(id)) }
-                : {});
+            const res = await onImport(toImport, {
+                ...(targetVehicle
+                    ? { linkVehicleId: targetVehicle.id, linkTestGroupIds: [...linkIds].filter(id => selected.has(id)) }
+                    : {}),
+                onProgress: p => setImportProgress({ ...p, startedAt }),
+            });
             setResult(res);
             setStep('done');
         } catch (e) {
             setError(e.message);
         } finally {
             setBusy(false);
+            setImportProgress(null);
         }
     };
 
@@ -311,14 +331,32 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                             </ul>
                         )}
 
+                        {importProgress && (
+                            <div className="mt-4">
+                                <progress className="progress-bar" max={importProgress.total} value={importProgress.done} />
+                                <p className="text-xs text-secondary mt-1">
+                                    {importProgressLabel(importProgress)}
+                                </p>
+                            </div>
+                        )}
+
                         <div className="flex items-center gap-2 mt-4">
                             <span className="text-xs text-secondary flex-1">
                                 {selected.size} selected{overwriteCount ? ` · ${overwriteCount} overwrite` : ''}
                                 {targetVehicle && linkIds.size ? ` · linking ${linkIds.size} to ${targetVehicle.name}` : ''}
                             </span>
+                            {existing.size > 0 && (
+                                <button onClick={selectOnlyNew} className="btn btn-secondary text-sm"
+                                    disabled={busy || !newIds.length}
+                                    title="Select only the configurations that are not in the database yet">
+                                    Only new ({newIds.length})
+                                </button>
+                            )}
                             <button onClick={() => setStep('upload')} className="btn btn-secondary text-sm" disabled={busy}>Back</button>
                             <button onClick={handleImport} className="btn btn-primary text-sm" disabled={busy || !selected.size}>
-                                {busy ? 'Importing…' : `Import ${selected.size} config(s)`}
+                                {busy
+                                    ? (importProgress ? `Importing ${Math.min(importProgress.done + 1, importProgress.total)} of ${importProgress.total}…` : 'Importing…')
+                                    : `Import ${selected.size} config(s)`}
                             </button>
                         </div>
                     </>

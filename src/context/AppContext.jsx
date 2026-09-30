@@ -1401,9 +1401,14 @@ export function AppProvider({ children }) {
         }
     };
 
-    const importEpaCsiGroups = async (groups, { linkVehicleId, linkTestGroupIds = [] } = {}) => {
+    const importEpaCsiGroups = async (groups, { linkVehicleId, linkTestGroupIds = [], onProgress } = {}) => {
         try {
-            for (const g of groups) await dataService.importEpaGroupFull(g);
+            let keptCount = 0;
+            for (const [i, g] of groups.entries()) {
+                onProgress?.({ done: i, total: groups.length, name: g.test_group_id });
+                keptCount += (await dataService.importEpaGroupFull(g))?.kept?.length ?? 0;
+            }
+            onProgress?.({ done: groups.length, total: groups.length, name: null });
             if (linkVehicleId) {
                 for (const tgid of linkTestGroupIds) {
                     try { await dataService.linkEpaTestGroup(linkVehicleId, tgid, 'verified', null); }
@@ -1412,8 +1417,9 @@ export function AppProvider({ children }) {
             }
             const updated = await dataService.getVehicles();
             setVehicles(updated);
-            showSuccess(`Imported ${groups.length} EPA config(s) from PDF.`);
-            return { count: groups.length };
+            showSuccess(`Imported ${groups.length} EPA config(s) from PDF.`
+                + (keptCount ? ` Kept ${keptCount} hand-edited value(s) that differ from the PDF.` : ''));
+            return { count: groups.length, kept: keptCount };
         } catch (error) {
             showError('PDF import failed: ' + error.message);
             throw error;
@@ -1565,8 +1571,8 @@ export function AppProvider({ children }) {
     const getEpaFieldAudit = (tableName, rowId) => dataService.getEpaFieldAudit(tableName, rowId);
 
     /** Pass-through: read the audit trail for a whole group (+ its child rows). */
-    const getEpaAuditForGroup = (testGroupId, childRowIds) =>
-        dataService.getEpaAuditForGroup(testGroupId, childRowIds);
+    const getEpaAuditForGroup = (testGroupId) =>
+        dataService.getEpaAuditForGroup(testGroupId);
 
     // ── Performance testing (acceleration / braking) ────────────────────────
 
