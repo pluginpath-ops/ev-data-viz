@@ -1025,6 +1025,20 @@ body {
     background-color: var(--color-primary-surface);
 }
 
+/* A determinate progress readout — the native <progress>, restyled with tokens.
+   Used where a long sequential job (a bulk import) needs to show it is moving. */
+.progress-bar {
+    @apply w-full rounded-full;
+    height: 0.5rem;
+    appearance: none;
+    border: 0;
+    overflow: hidden;
+    background-color: var(--color-border);
+}
+.progress-bar::-webkit-progress-bar { background-color: var(--color-border); }
+.progress-bar::-webkit-progress-value { background-color: var(--color-primary); transition: width 0.2s; }
+.progress-bar::-moz-progress-bar { background-color: var(--color-primary); }
+
 /* Empty-state placeholder content */
 .empty-state {
     @apply text-center py-12;

@@ -1401,10 +1401,14 @@ export function AppProvider({ children }) {
         }
     };
 
-    const importEpaCsiGroups = async (groups, { linkVehicleId, linkTestGroupIds = [] } = {}) => {
+    const importEpaCsiGroups = async (groups, { linkVehicleId, linkTestGroupIds = [], onProgress } = {}) => {
         try {
             let keptCount = 0;
-            for (const g of groups) keptCount += (await dataService.importEpaGroupFull(g))?.kept?.length ?? 0;
+            for (const [i, g] of groups.entries()) {
+                onProgress?.({ done: i, total: groups.length, name: g.test_group_id });
+                keptCount += (await dataService.importEpaGroupFull(g))?.kept?.length ?? 0;
+            }
+            onProgress?.({ done: groups.length, total: groups.length, name: null });
             if (linkVehicleId) {
                 for (const tgid of linkTestGroupIds) {
                     try { await dataService.linkEpaTestGroup(linkVehicleId, tgid, 'verified', null); }
