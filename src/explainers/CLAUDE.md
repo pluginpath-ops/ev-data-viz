@@ -16,8 +16,10 @@ import paths by depth.
 `eslint.config.js` enforces two connections and no others:
 
 - **Explainers may import** from EVBench: `utils/platforms.js`,
-  `NavigationContext` (navigation only), `hooks/useChargingTests` (the one
-  data hook: read-only SoC/kW curves by run id), and the shared UI
+  `NavigationContext` (navigation only), `hooks/useChargingTests` and
+  `hooks/useModeledEfficiency` (the two data hooks: read-only SoC/kW curves by
+  run id, and modeled efficiency curves with corrected range tests by EPA link
+  id, computed EVBench-side), and the shared UI
   components named in the rule's allow-list. Theme tokens are CSS
   variables, so they need no import. Anything else fails lint, so widen the list in the
   rule, with a reason, rather than working around it.
@@ -36,7 +38,10 @@ the slug. `::: engineers` and `::: held` are blocks closed by `:::`;
 `::: tests <run ids> <caption>` shows EVBench's own charging tests (comma-
 separated run ids) as a small kW-against-SoC preview with a link into
 Charging Curves: real data beside the claim it supports. Use it wherever a
-claim has a test that shows it. Labs are
+claim has a test that shows it. `::: modeled <EPA link ids> [y=..] <caption>`
+does the same for Modeled Efficiency: each link's curve at standard conditions,
+its range tests corrected to them, and a link into the chart with them
+overlaid. The ids are the chart's `epa_m=`. Labs are
 registered in `ExplainerPage.jsx` (`LABS`); a figure with no component yet
 renders as a labelled placeholder.
 
@@ -162,7 +167,15 @@ Each step can ship alone:
 3. `voltage-vs-charge-time`
 4. `what-limits-charging` + its three children + Cell Lab
 5. `series-and-parallel`, `modules-vs-cell-to-pack`
-6. The two hubs, written last because they summarise the pages under them.
+6. The hubs, written last because they summarise the pages under them.
+
+The EPA hub (`epa-ratings`, owner's priority, 2026-09-29) runs alongside:
+`epa-vs-real-world`, then `reading-modeled-efficiency`, `epa-drive-cycles`,
+`epa-battery-figures`. Its other children come later. The certification-records
+page stays a plain-English summary with footnotes: the three levels
+(certification, configuration, guide row) resolve year, model and trim
+differently, EVBench makes assumptions to correlate them, and they never
+map 1:1. It does not walk through EVBench's tooling.
 
 ## Tracking
 

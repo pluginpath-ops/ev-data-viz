@@ -261,7 +261,9 @@ export default function EpaCurvesView({
     // currently displayed. 'uncorrected' plots the raw measured value as
     // recorded — not a valid comparison across different test conditions,
     // but useful to see the true recorded data.
-    const [overlayMode, setOverlayMode] = useState(null); // null | 'corrected' | 'uncorrected'
+    // Held in epaConfig (App.jsx) so it reaches the URL as epa_ov.
+    const overlayMode = epaConfig.overlay ?? null; // null | 'corrected' | 'uncorrected'
+    const setOverlayMode = (mode) => setEpaConfig?.(prev => ({ ...prev, overlay: mode }));
 
 
     const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;

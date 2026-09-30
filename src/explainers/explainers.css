@@ -188,11 +188,26 @@
 .explainer-preview-line.is-series-0, .explainer-preview-swatch.is-series-0 { stroke: var(--color-accent-blue); background-color: var(--color-accent-blue); }
 .explainer-preview-line.is-series-1, .explainer-preview-swatch.is-series-1 { stroke: var(--color-accent-violet); background-color: var(--color-accent-violet); }
 .explainer-preview-line.is-series-2, .explainer-preview-swatch.is-series-2 { stroke: var(--color-accent-grey); background-color: var(--color-accent-grey); }
+.explainer-preview-line.is-modeled { stroke-dasharray: 7 5; }
+.explainer-preview-dot { stroke: var(--color-card); stroke-width: 2; }
+.explainer-preview-dot.is-series-0 { fill: var(--color-accent-blue); }
+.explainer-preview-dot.is-series-1 { fill: var(--color-accent-violet); }
+.explainer-preview-dot.is-series-2 { fill: var(--color-accent-grey); }
+.explainer-preview-band { fill: var(--color-surface-sunken); }
 .explainer-preview-axes { margin-top: 2px; }
 .explainer-preview-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; color: var(--color-text-secondary); font-size: calc(var(--fs-body) * 0.93); }
 .explainer-preview-legend li { display: flex; align-items: center; gap: 6px; }
 .explainer-preview-swatch { width: 14px; height: 3px; border-radius: 2px; }
 
+.explainer-image { display: flex; flex-direction: column; gap: 6px; margin: 16px 0; }
+.explainer-image img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+}
+.explainer-image-credit { white-space: nowrap; }
 .explainer-placeholder {
     display: flex;
     flex-direction: column;
@@ -265,6 +280,7 @@
     background-color: var(--color-card);
 }
 .explainer-hub.is-cells, .explainer-fits.is-cells { --hub: var(--color-accent-violet); }
+.explainer-hub.is-cycle, .explainer-fits.is-cycle { --hub: var(--color-accent-green); }
 .explainer-fits { margin: 8px 0; }
 .explainer-hub-head { display: flex; align-items: flex-start; gap: 14px; }
 .explainer-hub-blurb { margin-top: 4px; color: var(--color-text-secondary); line-height: 1.5; }
@@ -400,6 +416,25 @@
 .explainer-diagram { width: 100%; max-width: 420px; height: auto; }
 .explainer-diagram-label { fill: var(--color-text-secondary); font-size: 12px; }
 .explainer-diagram-text { fill: var(--color-text-primary); font-size: 12px; }
+.explainer-diagram-tick { fill: var(--color-text-meta); font-size: 11px; }
+.explainer-cycle-svg.explainer-diagram { max-width: none; }
+.explainer-cycle-svg .explainer-diagram-label { font-weight: 600; fill: var(--color-text-primary); }
+.explainer-cycle-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.explainer-cycle-clock { margin-left: auto; color: var(--color-text-secondary); }
+.explainer-cycle-band { fill: var(--color-surface-sunken); }
+.explainer-cycle-grid { stroke: var(--color-chart-grid); stroke-width: 1; }
+.explainer-cycle-avg { stroke: var(--color-text-meta); stroke-width: 1.25; stroke-dasharray: 5 4; }
+.explainer-cycle-trace { fill: none; stroke: var(--color-accent-blue); stroke-width: 1.75; stroke-linejoin: round; }
+.explainer-cycle-trace.is-ahead { stroke: var(--color-border-strong); }
+.explainer-cycle-dot { fill: var(--color-accent-blue); stroke: var(--color-card); stroke-width: 2; }
+.explainer-cycle-playhead { stroke: var(--color-text-secondary); stroke-width: 1; }
+.explainer-route-area { fill: var(--color-primary-surface); stroke: var(--color-accent-blue); stroke-width: 1.25; stroke-linejoin: round; }
+.explainer-route-area.is-ahead { fill: var(--color-surface-sunken); stroke: var(--color-border-strong); }
+.explainer-route-seg { stroke: none; }
+.explainer-route-seg.is-udds { fill: var(--color-surface-sunken); }
+.explainer-route-seg.is-hwfet { fill: var(--color-border-strong); }
+.explainer-route-seg.is-steady { fill: var(--color-primary-surface); }
+.explainer-diagram-seg-label { fill: var(--color-text-primary); font-size: 9px; font-weight: 600; }
 .explainer-diagram-charger { fill: var(--color-surface-sunken); stroke: var(--color-border-strong); }
 .explainer-diagram-cells { fill: var(--color-surface-sunken); stroke: var(--color-accent-violet); stroke-width: 1.5; }
 .explainer-diagram-wire path { fill: none; stroke: var(--color-text-secondary); stroke-width: 2; }

@@ -4,7 +4,7 @@
  * its frontmatter. Titles here are for topics not yet written; a written
  * page's own title wins (topics.js).
  *
- * The two roots are hubs: pages that summarise the ones under them, written
+ * The roots are hubs: pages that summarise the ones under them, written
  * last (build step 6). "Hub" is a word for code and these notes only; the
  * page shows a hub by its title.
  */
@@ -47,6 +47,38 @@ export const OUTLINE = [
                   { slug: '400v-charger-compatibility', title: 'How 800 V cars use 400 V chargers',
                     blurb: 'Native, DC booster, motor boost and split pack, and where each runs out.' },
               ] },
+        ],
+    },
+    {
+        // Ordered by what a reader arrives asking, not by how the label is
+        // built: "why doesn't my range match?" first, the lab procedure under it.
+        slug: 'epa-ratings',
+        title: 'Where the EPA numbers come from',
+        blurb: 'The label, the lab tests behind it, and what they can and can’t tell you about your own drive.',
+        glyph: 'cycle',
+        children: [
+            { slug: 'epa-vs-real-world', title: 'Why your highway range isn’t the label',
+              blurb: 'Nothing on the sticker was driven at 70 mph, so compare with care.',
+              children: [
+                  { slug: 'epa-label-basics', title: 'Reading the window sticker',
+                    blurb: 'MPGe, kWh/100 mi, city and highway, and the 55/45 blend.' },
+                  { slug: 'epa-drive-cycles', title: 'The five test cycles',
+                    blurb: 'What each cycle drives, how fast, and what it stands in for.' },
+                  { slug: 'epa-test-procedures', title: 'How an EV is actually tested',
+                    blurb: 'Driving to empty, bags and phases, and DC out against AC back in.' },
+                  { slug: 'epa-label-adjustment', title: 'From lab result to label',
+                    blurb: 'The ×0.7, the regression, the measured factor, and who takes which.' },
+                  { slug: 'epa-certification-records', title: 'Certifications, configurations and guide rows',
+                    blurb: 'Three levels of detail that never map one to one.' },
+              ] },
+            { slug: 'reading-modeled-efficiency', title: 'Reading the Modeled Efficiency chart',
+              blurb: 'Efficiency against speed for any EPA-certified car, and how far to trust each curve.',
+              children: [
+                  { slug: 'road-load-and-efficiency', title: 'Road load and drivetrain efficiency',
+                    blurb: 'The A, B and C of drag, and why EVBench measures η at 65 mph.' },
+              ] },
+            { slug: 'epa-battery-figures', title: 'What EPA says about the battery',
+              blurb: 'Gross against usable, pack voltage, and charging loss.' },
         ],
     },
 ];

@@ -24,6 +24,9 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 const EXPLAINER_MAY_IMPORT = [
     'utils/platforms',
     'hooks/useChargingTests',
+    // The second data hook: modeled efficiency curves + range tests by EPA link
+    // id, computed EVBench-side so explainers never import the EPA derivations.
+    'hooks/useModeledEfficiency',
     'context/NavigationContext',
     'components/Popover',
     'components/InfoIcon',

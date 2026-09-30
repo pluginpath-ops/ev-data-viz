@@ -47,7 +47,7 @@ export default function ExplainersSection({ topic = null, onBack }) {
             <header className="explainer-landing-head">
                 <h2 className="page-title">Explainers</h2>
                 <p className="explainer-lede">
-                    How EVs charge, and how their packs are built. Each page starts with the short version and opens
+                    How EVs charge, how their packs are built, and where the EPA numbers come from. Each page starts with the short version and opens
                     into the engineering, and every figure links to its source.
                 </p>
             </header>

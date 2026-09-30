@@ -3,10 +3,15 @@ import ExplainerLink from './ExplainerLink';
 import { isTopicHref } from './parseExplainer';
 import { FACTS } from './topics';
 import SplitPackLab from './labs/SplitPackLab';
+import DriveCycleLab from './labs/DriveCycleLab';
+import TestRoutesLab from './labs/TestRoutesLab';
 import ExplainerToc from './ExplainerToc';
-import { chargingTestsHref } from './evbenchLinks';
+import { chargingTestsHref, modeledEfficiencyHref } from './evbenchLinks';
 import ChargingPreview from './ChargingPreview';
+import ModeledPreview from './ModeledPreview';
+import { imageUrl } from './images';
 import { useChargingTests } from '../hooks/useChargingTests';
+import { useModeledEfficiency } from '../hooks/useModeledEfficiency';
 
 /**
  * One explainer, rendered from its parsed flat file (parseExplainer.js).
@@ -17,7 +22,7 @@ import { useChargingTests } from '../hooks/useChargingTests';
  * A widely accepted fact (no source cited, by decision) is marked more
  * quietly, on any page: it is a disclosure, not a gap.
  */
-const LABS = { 'split-pack': SplitPackLab };
+const LABS = { 'split-pack': SplitPackLab, 'drive-cycles': DriveCycleLab, 'test-routes': TestRoutesLab };
 
 /**
  * The two ways a fact may publish without a published source, each said
@@ -196,6 +201,11 @@ function Block({ block, ctx }) {
             }
             return null;
         case 'directive': {
+            if (block.name === 'image') return <ExplainerImage file={block.id} caption={block.caption} source={block.options?.source} />;
+            if (block.name === 'modeled') {
+                return <ModeledCard mappingIds={block.id.split(',').filter(Boolean).map(Number)} caption={block.caption}
+                    y={block.options?.y} />;
+            }
             if (block.name === 'tests') {
                 return <TestsCard runIds={block.id.split(',').filter(Boolean).map(Number)} caption={block.caption}
                     axes={block.options ?? {}} />;
@@ -234,6 +244,63 @@ function TestsCard({ runIds, caption, axes }) {
             <ChargingPreview tests={tests} x={axes.x} y={axes.y} />
             <a className="explainer-link explainer-tests-link" href={href}>
                 Open {runIds.length === 1 ? 'the charging test' : `the ${runIds.length} charging tests`} in Charging Curves →
+            </a>
+        </figure>
+    );
+}
+
+/**
+ * A picture from images/ with its caption, which is also its alt text, and a
+ * credit linking to where it came from. A missing file shows as a placeholder
+ * naming it, like a figure with no component, rather than a broken image.
+ */
+const creditHost = (url) => {
+    try { return url ? new URL(url).hostname.replace(/^www\./, '') : null; } catch { return null; }
+};
+
+function ExplainerImage({ file, caption, source }) {
+    const src = imageUrl(file);
+    if (!src) {
+        return (
+            <figure className="explainer-placeholder">
+                <span className="text-micro">image · {file} (not in images/)</span>
+                {caption && <figcaption className="text-note">{caption}</figcaption>}
+            </figure>
+        );
+    }
+    const host = creditHost(source);
+    return (
+        <figure className="explainer-image">
+            <img src={src} alt={caption || file} loading="lazy" />
+            {(caption || host) && (
+                <figcaption className="text-note">
+                    {caption}
+                    {host && <> <a href={source} target="_blank" rel="noopener noreferrer" className="explainer-image-credit">Source: {host}</a></>}
+                </figcaption>
+            )}
+        </figure>
+    );
+}
+
+/**
+ * Modeled Efficiency behind a claim: EPA links' curves with their range tests,
+ * previewed, and opened in the chart with the tests overlaid. The link is
+ * built from the loaded data, like TestsCard's.
+ */
+function ModeledCard({ mappingIds, caption, y }) {
+    const curves = useModeledEfficiency(mappingIds);
+    const href = modeledEfficiencyHref({
+        mappingIds,
+        vehicleIds: (curves.data ?? []).map(c => c.vehicleId),
+        ...(y && { y }),
+    });
+    return (
+        <figure className="explainer-tests">
+            <span className="explainer-tests-badge">EVBench data</span>
+            {caption && <figcaption className="explainer-para">{caption}</figcaption>}
+            <ModeledPreview curves={curves} y={y} />
+            <a className="explainer-link explainer-tests-link" href={href}>
+                Open in Modeled Efficiency →
             </a>
         </figure>
     );

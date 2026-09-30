@@ -1074,6 +1074,660 @@
       ],
       "status": "verified",
       "note": "A definition, not a claim about the world. The reason for the line (owner, 2026-09-28): it is about the highest nominal voltage that can realistically charge on a charger that tops out at 500 V. The owner confirmed the code's 475 V (2026-09-28). Nearest vehicles in EVBench's specs (2026-09-15 dump): Hyundai IONIQ 6 base at 480 V and IONIQ 5 base at 523 V, both correctly 800 V class. Keep this fact equal to VOLTAGE_CLASS_SPLIT_V."
+    },
+    {
+      "id": "epa-ev-range-test-depletion",
+      "claim": "For its range test, an EV starts fully charged and is driven over repeated cycles on a dynamometer until the battery is depleted and it can no longer follow the cycle.",
+      "value": {
+        "method": "drive-to-depletion"
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA, \"Fuel Economy and EV Range Testing\" (last updated 1 Jul 2026)",
+          "url": "https://www.epa.gov/greenvehicles/fuel-economy-and-ev-range-testing",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "A",
+          "title": "EPA (D. Good), \"EPA Test Procedures for Electric Vehicles and Plug-in Hybrids\", draft summary, 14 Nov 2017",
+          "url": "https://www.fueleconomy.gov/feg/pdfs/EPA%20test%20procedure%20for%20EVs-PHEVs-11-14-2017.pdf",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "EPA page: \"driven continuously over the EPA city cycle until the battery is depleted and the vehicle can drive no further\". Good 2017 covers the single-cycle and multi-cycle versions."
+    },
+    {
+      "id": "epa-mct-sequence",
+      "claim": "The Multi-Cycle Test (SAE J1634, 2012 on) drives city (UDDS), highway and steady-state cycles in one run until the battery is depleted, measuring DC energy out of the battery for the whole test; the car is then recharged from AC with its own charger.",
+      "value": {
+        "procedure": "J1634 MCT"
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA (D. Good), \"EPA Test Procedures for Electric Vehicles and Plug-in Hybrids\", draft summary, 14 Nov 2017",
+          "url": "https://www.fueleconomy.gov/feg/pdfs/EPA%20test%20procedure%20for%20EVs-PHEVs-11-14-2017.pdf",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "j1634-css-65mph",
+      "claim": "The steady-state (constant-speed) sections of the J1634 Multi-Cycle Test are driven at 65 mph.",
+      "value": {
+        "mph": 65
+      },
+      "sources": [],
+      "status": "unverified",
+      "note": "SAE J1634 is paywalled. EVBench treats 65 mph as specified (SS_CYCLE_SPEED_MPH in src/constants/epa.js). To verify: a public SAE abstract, an EPA or CARB document quoting the MCT schedule, or distance ÷ time on CSI records that report both for an SS phase."
+    },
+    {
+      "id": "epa-mpge-33-7",
+      "claim": "MPGe counts 33.7 kWh of electricity as one gallon of gasoline.",
+      "value": {
+        "kwh_per_gallon": 33.7,
+        "precise": 33.705
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA, \"Fuel Economy and EV Range Testing\" (last updated 1 Jul 2026)",
+          "url": "https://www.epa.gov/greenvehicles/fuel-economy-and-ev-range-testing",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "A",
+          "title": "EPA (D. Good), \"EPA Test Procedures for Electric Vehicles and Plug-in Hybrids\", draft summary, 14 Nov 2017",
+          "url": "https://www.fueleconomy.gov/feg/pdfs/EPA%20test%20procedure%20for%20EVs-PHEVs-11-14-2017.pdf",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "epa-mpge-at-the-wall",
+      "claim": "EPA MPGe and kWh/100 mi are measured at the wall: they assume Level 2 AC charging and include the charging losses.",
+      "value": {
+        "basis": "AC, wall"
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA, \"Fuel Economy and EV Range Testing\" (last updated 1 Jul 2026)",
+          "url": "https://www.epa.gov/greenvehicles/fuel-economy-and-ev-range-testing",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "A",
+          "title": "EPA (D. Good), \"EPA Test Procedures for Electric Vehicles and Plug-in Hybrids\", draft summary, 14 Nov 2017",
+          "url": "https://www.fueleconomy.gov/feg/pdfs/EPA%20test%20procedure%20for%20EVs-PHEVs-11-14-2017.pdf",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "EPA page: \"account for losses from the charging cable… moves the measurement from the vehicle to the outlet in the wall\". Good 2017: \"The recharge energy includes any losses due to inefficiencies of the manufacturer’s charger.\""
+    },
+    {
+      "id": "epa-55-45-weighting",
+      "claim": "The combined figure weights city 55% and highway 45%.",
+      "value": {
+        "city": 0.55,
+        "hwy": 0.45
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA, \"Fuel Economy and EV Range Testing\" (last updated 1 Jul 2026)",
+          "url": "https://www.epa.gov/greenvehicles/fuel-economy-and-ev-range-testing",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "epa-adjusted-for-real-world",
+      "claim": "Label figures are the lab results adjusted downward for real-world factors the two lab cycles do not include: air conditioning, cold temperatures, and high-speed, aggressive driving.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA, \"Fuel Economy and EV Range Testing\" (last updated 1 Jul 2026)",
+          "url": "https://www.epa.gov/greenvehicles/fuel-economy-and-ev-range-testing",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "epa-0-7-factor",
+      "claim": "The most common way to adjust an EV’s lab results into a label is to multiply the 2-cycle fuel economy and range by 0.7.",
+      "value": {
+        "factor": 0.7
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "40 CFR 600.210-12(d)(3): \"Multiply 2-cycle fuel economy values and driving range by 0.7…\"",
+          "url": "https://www.law.cornell.edu/cfr/text/40/600.210-12",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "A",
+          "title": "EPA, \"Fuel Economy and EV Range Testing\" (last updated 1 Jul 2026)",
+          "url": "https://www.epa.gov/greenvehicles/fuel-economy-and-ev-range-testing",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "A",
+          "title": "EPA (D. Good), \"EPA Test Procedures for Electric Vehicles and Plug-in Hybrids\", draft summary, 14 Nov 2017",
+          "url": "https://www.fueleconomy.gov/feg/pdfs/EPA%20test%20procedure%20for%20EVs-PHEVs-11-14-2017.pdf",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "EPA page: \"The most common approach is to use a factor of 0.7\". Alternatives (derived 5-cycle, vehicle-specific 5-cycle under J1634 App B, in-use factors) are listed in Good 2017."
+    },
+    {
+      "id": "epa-cycle-udds",
+      "claim": "The city cycle (UDDS) runs 1,369 seconds and 7.45 miles, averaging 19.6 mph with a top speed of about 57 mph.",
+      "value": {
+        "s": 1369,
+        "mi": 7.45,
+        "avg_mph": 19.6,
+        "top_mph": 56.7
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA dynamometer drive schedule file uddscol.txt (UDDS), second-by-second target speed; distance and averages by arithmetic (rank C)",
+          "url": "https://www.epa.gov/sites/default/files/2015-10/uddscol.txt",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "fueleconomy.gov’s table lists the FTP-75 for \"City\" (11 mi, 21.2 mph), which is the UDDS plus a repeat of its first 505 s. The EV range test uses the UDDS itself."
+    },
+    {
+      "id": "epa-cycle-hwfet",
+      "claim": "The highway cycle (HWFET) runs 765 seconds and 10.26 miles, averaging 48.3 mph with a top speed of 60 mph.",
+      "value": {
+        "s": 765,
+        "mi": 10.26,
+        "avg_mph": 48.3,
+        "top_mph": 59.9
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA dynamometer drive schedule file hwycol.txt (HWFET), second-by-second target speed; distance and averages by arithmetic (rank C)",
+          "url": "https://www.epa.gov/sites/default/files/2015-10/hwycol.txt",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "A",
+          "title": "fueleconomy.gov, \"Detailed Test Information\" (the five test schedules table)",
+          "url": "https://www.fueleconomy.gov/feg/fe_test_schedules.shtml",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "epa-cycle-us06",
+      "claim": "The high-speed cycle (US06) runs about 10 minutes and 8 miles, averaging about 48 mph with hard acceleration and a top speed of 80 mph.",
+      "value": {
+        "s": 600,
+        "mi": 8.01,
+        "avg_mph": 48,
+        "top_mph": 80.3
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA dynamometer drive schedule file us06col.txt (US06), second-by-second target speed; distance and averages by arithmetic (rank C)",
+          "url": "https://www.epa.gov/sites/default/files/2015-10/us06col.txt",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "A",
+          "title": "fueleconomy.gov, \"Detailed Test Information\" (the five test schedules table)",
+          "url": "https://www.fueleconomy.gov/feg/fe_test_schedules.shtml",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "The schedule file gives 600 s and 48.0 mph; fueleconomy.gov’s table says 9.9 min and 48.4 mph (it likely excludes the idle at the ends)."
+    },
+    {
+      "id": "epa-cycle-sc03",
+      "claim": "The air-conditioning cycle (SC03) runs about 10 minutes and 3.6 miles at an average of about 21 mph, at 95 °F with the A/C on.",
+      "value": {
+        "s": 600,
+        "mi": 3.58,
+        "avg_mph": 21.5,
+        "top_mph": 54.8,
+        "ambient_f": 95
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA dynamometer drive schedule file sc03col.txt (SC03), second-by-second target speed; distance and averages by arithmetic (rank C)",
+          "url": "https://www.epa.gov/sites/default/files/2015-10/sc03col.txt",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "A",
+          "title": "fueleconomy.gov, \"Detailed Test Information\" (the five test schedules table)",
+          "url": "https://www.fueleconomy.gov/feg/fe_test_schedules.shtml",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "epa-cycle-cold-ftp",
+      "claim": "The cold test is the city test (the FTP: 11 miles at an average of 21.2 mph, top speed 56 mph) run at 20 °F.",
+      "value": {
+        "ambient_f": 20,
+        "mi": 11,
+        "avg_mph": 21.2,
+        "top_mph": 56
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "fueleconomy.gov, \"Detailed Test Information\" (the five test schedules table)",
+          "url": "https://www.fueleconomy.gov/feg/fe_test_schedules.shtml",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "evbench-hwfet-to-cruise-eta",
+      "claim": "Across EPA certification records carrying both, drivetrain efficiency back-solved from the steady 65 mph sections runs a median 1.128 times the figure back-solved from the highway cycle, with half the fleet within about 2.5% of that.",
+      "value": {
+        "median": 1.1281,
+        "iqr": [
+          1.1162,
+          1.1449
+        ],
+        "groups": 210
+      },
+      "sources": [],
+      "status": "unverified",
+      "note": "EVBench’s own analysis of the EPA records it has imported, documented at HWFET_TO_SS_ETA_RATIO in src/constants/epa.js. To verify: re-run on a current dump and record the query and date (rank A data, rank C arithmetic), as epa-voltage-points-differ does."
+    },
+    {
+      "id": "evbench-usable-vs-gross",
+      "claim": "Across EPA records, the energy actually discharged to depletion is a few percent below the Fuel Economy Guide’s gross pack figure (voltage × amp-hours), typically about 94–96%.",
+      "value": {
+        "ratio": [
+          0.939,
+          0.955
+        ]
+      },
+      "sources": [],
+      "status": "unverified",
+      "note": "Migration 053 cited 0.939–0.955 from four packs by hand; the Certification Statistics tab computes it across every linked group (epaCertStats.js). To verify: record the current distribution and the query."
+    },
+    {
+      "id": "epa-gross-pack-v-ah",
+      "claim": "The Fuel Economy Guide’s battery figures are the pack’s voltage and amp-hour capacity; multiplied, they give a gross (nameplate) energy, not the usable energy.",
+      "sources": [],
+      "status": "unverified",
+      "note": "EVBench computes nominal_pack_kwh from total_voltage_v × batt_capacity_ah (feGuideBrowse.js). To verify: cite the guide file’s column definitions (fueleconomy.gov download page) and confirm no usable-energy column exists."
+    },
+    {
+      "id": "physics-aero-drag-speed-squared",
+      "claim": "Aerodynamic drag grows with the square of speed, so the power to overcome it grows with the cube: going from 60 to 75 mph raises drag by about 56% and the power it takes by about 95%.",
+      "value": {
+        "v1": 60,
+        "v2": 75,
+        "drag_ratio": 1.5625,
+        "power_ratio": 1.953
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Drag equation F = ½ρC_dAv² (arithmetic)",
+          "url": null,
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "physics-air-density-drag",
+      "claim": "Aerodynamic drag is proportional to air density, which falls with altitude and rises in cold air: at 5,000 ft the air is about 14% thinner than at sea level, and 20 °F air is about 11% denser than 75 °F air.",
+      "value": {
+        "alt_ft": 5000,
+        "density_ratio_alt": 0.86,
+        "cold_f": 20,
+        "warm_f": 75,
+        "density_ratio_cold": 1.11
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Drag equation; ISA barometric formula; ideal gas law (ρ ∝ 1/T) (arithmetic)",
+          "url": null,
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "Altitude: (1 − 2.25577e-5 × 1524 m)^4.2559 = 0.862 (the formula in ViewingConditions). Temperature: 297.0 K / 266.5 K = 1.114."
+    },
+    {
+      "id": "epa-road-load-coastdown",
+      "claim": "A car's road load is expressed as F = A + B·v + C·v² and is usually measured by coasting the car down in neutral on a level track; the dynamometer is then set to reproduce it.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA Compliance Division guidance letter CD-15-04, \"Determination and Use of Vehicle Road-Load Force and Dynamometer Settings\", 23 Feb 2015",
+          "url": "https://dis.epa.gov/otaqpub/display_file.jsp?docid=34102&flag=1",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "CD-15-04 §IV.A.2–3: 'This three-term equation is expressed as F = A + Bv + Cv2'; 'EPA has adopted the coastdown method to characterize road-load force. During a coastdown test the vehicle is allowed to decelerate with the transmission in neutral'. §IV.B: target coefficients describe the road; the 'three term dynamometer set coefficients' are the dyno settings."
+    },
+    {
+      "id": "mct-steady-share",
+      "claim": "In a Multi-Cycle Test, the two steady-speed sections cover most of the run: a median 84% of the distance and 88% of the energy across EPA's records.",
+      "value": {
+        "distance_share_median": 0.842,
+        "distance_share_iqr": [
+          0.828,
+          0.857
+        ],
+        "energy_share_median": 0.877,
+        "energy_share_iqr": [
+          0.866,
+          0.888
+        ],
+        "records": 273
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA certification test records (epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
+          "url": "https://dis.epa.gov/otaqpub/publist1.jsp",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "C",
+          "title": "Share of phase distance and DC energy in phases 4 and 8 (the steady sections), per procedure-77 test with all 8 phases (arithmetic)",
+          "url": null,
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "273 procedure-77 tests with 8 phases and every distance present. Phase order UDDS-HWY-UDDS-SS-UDDS-HWY-UDDS-SS in all 273 (260 leave phase 8's type blank; it is the end steady section by position). Distance share range 0.627-0.897. Earlier estimate (~78% of energy, TestPhaseEditor hint) was low."
+    },
+    {
+      "id": "pack-buffers",
+      "claim": "Makers hold back part of a pack's gross energy as buffers at the top and bottom of charge, which protects the cells; the driver can use only what is between them.",
+      "sources": [],
+      "status": "unverified",
+      "note": "General engineering knowledge; a candidate for 'accepted' if the owner agrees, or source it (a maker's gross vs usable statement, e.g. a spec sheet listing both)."
+    },
+    {
+      "id": "epa-road-load-manufacturer",
+      "claim": "Road-load coefficients are supplied by the manufacturer, which may choose its own method (coastdown, wind tunnel, analytical modeling) and is responsible for their accuracy. EPA can audit production cars, and treats a specification as substantially unrepresentative when an audited car's road-load energy is 7% or more above it on the highway cycle (10% on the city cycle).",
+      "value": {
+        "audit_tolerance_hwy": 0.07,
+        "audit_tolerance_city": 0.1
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA Compliance Division guidance letter CD-15-04, \"Determination and Use of Vehicle Road-Load Force and Dynamometer Settings\", 23 Feb 2015",
+          "url": "https://dis.epa.gov/otaqpub/display_file.jsp?docid=34102&flag=1",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "§II.C: 'the manufacturer is responsible for the accuracy of the road-load force specification'. §IV.C.2: 'EPA will allow the manufacturer to select its own test procedures and calculation methods.' §VI.C.1: flagged when the audit is '7% greater than the highway energy loss… based on the road-load specification'. The criterion is one-sided: it names only an audit GREATER than the specification. §VI.D.1: the tolerances 'do not constitute an allowance'."
+    },
+    {
+      "id": "epa-road-load-speed-window",
+      "claim": "The road-load specification only has to be representative between 9.3 and 71.5 mph, and the coastdown car is warmed up at 50 mph (not faster), so the tires and driveline sit at temperatures typical of the city and highway cycles.",
+      "value": {
+        "mph_min": 9.3,
+        "mph_max": 71.5,
+        "warmup_mph": 50
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA Compliance Division guidance letter CD-15-04, \"Determination and Use of Vehicle Road-Load Force and Dynamometer Settings\", 23 Feb 2015",
+          "url": "https://dis.epa.gov/otaqpub/display_file.jsp?docid=34102&flag=1",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "§II.A: 'representative road-load forces for vehicles at speeds between 15 km/hr (9.3 mph) and 115 km/hr (71.5 mph)'. §IV.C.1.i.c: warm-up 'for a minimum of 30 minutes at 50 miles/hr… Operating at higher speeds during the warm-up period is not permitted'."
+    },
+    {
+      "id": "taycan-4ct-matches-model",
+      "claim": "On a 70 mph highway range test, the 2025 Porsche Taycan 4 Cross Turismo returned about 3.1 mi/kWh, which lands almost exactly on the efficiency its certified road load predicts at that speed.",
+      "value": {
+        "speed_mph": 70,
+        "miles": 302,
+        "kwh": 97,
+        "temp_f": 50,
+        "mi_per_kwh_raw": 3.11,
+        "mi_per_kwh_corrected": 3.15,
+        "mi_per_kwh_model": 3.13
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "State of Charge, 70 mph range test of the 2025 Taycan 4 Cross Turismo (EVBench test 171, vehicle 28 'Taycan J1.2'): 302 mi on 97 kWh at 50 °F",
+          "url": "https://www.youtube.com/watch?v=9d1ASk2NZDw",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "C",
+          "title": "EVBench Modeled Efficiency, 2025 Taycan J1.2 (Taycan 4 Cross Turismo) certification record, EPA link 69: at standard conditions the curve reads 3.13 mi/kWh at 70 mph and test 171 corrects to 3.15 (the ::: modeled card on reading-modeled-efficiency, live data 2026-09-29)",
+          "url": null,
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "Replaces an earlier recollection that a Taycan beat its curve, which the owner corrected. The raw figure 302/97 = 3.11 mi/kWh comes from the 2026-09-15 dump; the corrected 3.15 and the model's 3.13 at 70 mph come from modeledEfficiencyPreview on live data, within 1%. One car and one test: evidence that the filed road load can be accurate, not that it always is. Live chart: ?tab=epatested&m=epacurves&v=28&epa_m=69&epa_ya=mi_kwh (EPA › Selected vehicles › Modeled Efficiency, vehicle 28, certification record 69, mi/kWh)."
+    },
+    {
+      "id": "evbench-mct-phase-lengths",
+      "claim": "In EPA's Multi-Cycle Test records, the order is always city, highway, city, a long steady stretch, city, highway, city, then steady to empty. The first steady stretch runs a median 237.5 miles and the last a median 30 miles, for about 318 miles in all.",
+      "value": {
+        "order": [
+          "UDDS",
+          "HWY",
+          "UDDS",
+          "SS",
+          "UDDS",
+          "HWY",
+          "UDDS",
+          "SS"
+        ],
+        "mid_ss_mi_median": 237.5,
+        "mid_ss_mi_iqr": [
+          216.4,
+          267.4
+        ],
+        "end_ss_mi_median": 30.0,
+        "end_ss_mi_iqr": [
+          22.8,
+          37.0
+        ],
+        "total_mi_median": 319.1,
+        "records": 273
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA certification test records (epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
+          "url": "https://dis.epa.gov/otaqpub/publist1.jsp",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "C",
+          "title": "Medians and quartiles of phase distances over 273 procedure-77 tests with 8 phases (arithmetic)",
+          "url": null,
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "Mid steady section range 81.5-405.1 mi. EVBench's R2 fixture (epaMethodologyFixtures.js) indexes its phases as UDDS, HWY, UDDS, HWY, UDDS, -, UDDS, -, which disagrees with this order; the fixture's numbering looks wrong."
+    },
+    {
+      "id": "epa-single-cycle-routes",
+      "claim": "An EV can instead be range-tested on one cycle at a time: driven over successive city cycles until the battery is depleted, and separately over successive highway cycles until it is depleted.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA (D. Good), \"EPA Test Procedures for Electric Vehicles and Plug-in Hybrids\", draft summary, 14 Nov 2017",
+          "url": "https://www.fueleconomy.gov/feg/pdfs/EPA%20test%20procedure%20for%20EVs-PHEVs-11-14-2017.pdf",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "Good 2017: 'the vehicle is driven over successive city cycles until the battery becomes discharged'; the highway test is 'the same… except the vehicle is operated over successive highway cycles'. In EPA's records these are procedures 81 (city) and 84 (highway); the multi-cycle test is 77."
+    },
+    {
+      "id": "evbench-test-route-shares",
+      "claim": "Of the 297 EV certification groups with a range test in EVBench's database of EPA records, most of them model year 2026, 265 (89%) report the Multi-Cycle Test and 32 report single-cycle (city and highway) tests.",
+      "value": {
+        "groups": 297,
+        "mct": 265,
+        "single_cycle": 32,
+        "model_years": {
+          "2027": 21,
+          "2026": 262,
+          "2025": 10,
+          "2024": 1,
+          "2022": 2,
+          "2021": 1
+        },
+        "single_cycle_makes": {
+          "Tesla": 9,
+          "Mercedes-Benz": 5,
+          "BMW": 5,
+          "Hyundai": 4,
+          "Ford": 2,
+          "Lucid": 2,
+          "other": 5
+        }
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA certification test records (epa_test_groups, epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
+          "url": "https://dis.epa.gov/otaqpub/publist1.jsp",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "C",
+          "title": "Test groups classified by procedure: any procedure-77 test = multi-cycle; otherwise any 81/84 = single-cycle (arithmetic)",
+          "url": null,
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "What is in EVBench's database as of the 2026-09-15 dump, not the whole fleet: EPA records are imported by hand, and 262 of these 297 groups (88%) are model year 2026, with 21 from 2027 and 10 from 2025 (414 groups in the table in all, 266 of them MY2026). By route: MY2025 8 multi-cycle / 2 single; MY2026 236 / 26; MY2027 21 / 0. Classification: any procedure-77 test = multi-cycle; otherwise any 81/84 = single-cycle; one group with only procedure 86 is left out. Makers appear on both sides (Tesla: 15 multi-cycle groups, 9 single-cycle), so the route is chosen per test group, not per maker. 'Report' on purpose: the single-cycle records may not be separate runs to empty (evbench-single-cycle-records). Corrected 2026-09-29 from 291 / 260 / 31: the first count keyed tests by test number, which repeats across groups."
+    },
+    {
+      "id": "evbench-test-durations",
+      "claim": "Estimated from its phase distances, a Multi-Cycle Test takes a median of about 6 hours on the dynamometer, from 3.2 to 8.7 hours across EPA's records. The same typical car, driven on the city cycle alone until empty, would need about 22.6 hours; on the highway cycle alone, about 8.",
+      "value": {
+        "mct_h_median": 6.08,
+        "mct_h_iqr": [
+          5.68,
+          6.57
+        ],
+        "mct_h_min": 3.24,
+        "mct_h_max": 8.7,
+        "mct_mi_min": 133.7,
+        "mct_mi_max": 489.1,
+        "city_to_empty_h": 22.6,
+        "hwy_to_empty_h": 8.0,
+        "records": 273
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA certification test records (epa_test_groups, epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
+          "url": "https://dis.epa.gov/otaqpub/publist1.jsp",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "C",
+          "title": "Duration = distance ÷ speed: city and highway cycles at their schedule averages (19.6 and 48.3 mph, full cycles 1,369 and 765 s), steady sections at 65 mph; city/highway-to-empty distances from evbench-same-car-to-empty (arithmetic)",
+          "url": null,
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "ESTIMATES: the records hold distances, not times, and pauses between cycles are left out. Steady sections assume 65 mph (j1634-css-65mph, unverified). An earlier version of this fact estimated single-cycle durations from the distance field of procedure 81/84 records (up to 31 h for a Lucid Air); withdrawn 2026-09-29 because that field looks like a computed range, not miles driven (evbench-single-cycle-records)."
+    },
+    {
+      "id": "evbench-same-car-to-empty",
+      "claim": "From its own Multi-Cycle Test, a typical car would cover a median of about 442 miles driving the city cycle until empty, and about 385 driving the highway cycle until empty.",
+      "value": {
+        "city_mi_median": 442.5,
+        "city_mi_iqr": [
+          400.4,
+          487.3
+        ],
+        "hwy_mi_median": 385.0,
+        "hwy_mi_iqr": [
+          353.3,
+          419.1
+        ],
+        "records": 273
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA certification test records (epa_test_groups, epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
+          "url": "https://dis.epa.gov/otaqpub/publist1.jsp",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "C",
+          "title": "Per procedure-77 test: total DC energy ÷ the warm city phases' (3, 5, 7) Wh/mi, and ÷ the highway phases' (2, 6) Wh/mi; medians over 273 tests (arithmetic)",
+          "url": null,
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "A what-if built from measured Multi-Cycle data, not a record of anyone driving it. Ranges 215–663 mi (city) and 157–602 (highway)."
+    },
+    {
+      "id": "evbench-single-cycle-records",
+      "claim": "EPA's single-cycle (procedure 81 and 84) records for recent long-range EVs don't read like two separate runs to empty: each city/highway pair carries identical energy figures, and the 'distance' matches a calculated range.",
+      "value": {
+        "examples": {
+          "Lucid Air GT XR (202403521-0)": "both 117.019 kWh DC, 134.182 kWh AC; 608 / 597.32 mi; 4 / 2 bags",
+          "Tesla Model 3 LR AWD (3D224-758491)": "both 80.099 kWh DC; 514 / 469 mi; 4 / 2 bags",
+          "BMW i7 eDrive50 (CL34779-0)": "both 106.227 kWh DC; distance = cd_range_calc; highway 445 > city 409",
+          "Ford F-150 Lightning (NWA00042)": "both 152.974 kWh AC, no distance, 1 bag each"
+        }
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA certification test records (epa_test_groups, epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
+          "url": "https://dis.epa.gov/otaqpub/publist1.jsp",
+          "accessed": "2026-09-29"
+        }
+      ],
+      "status": "verified",
+      "note": "What the records show, not what the lab did. Readings consistent with it: the pair comes from one run reported under two codes (the 4 / 2 bag counts match a Multi-Cycle Test's 4 city and 2 highway laps), or the recharge is shared between two runs. Settling it needs a CSI PDF's test notes or the lab. The owner questioned the 21-hour city run this replaced (2026-09-29)."
     }
   ]
 }
