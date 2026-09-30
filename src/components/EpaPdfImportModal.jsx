@@ -158,6 +158,18 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
 
     const overwriteCount = [...selected].filter(id => existing.has(id)).length;
 
+    // Bulk-accept only what is not in the database yet. A bulk drop that mixes
+    // fresh certifications with carryover IDs already imported (see #374) is
+    // most safely handled by taking the new ones first and deciding the
+    // overwrites separately. Deselected rows drop their link with them, as the
+    // per-row toggle does.
+    const newIds = allIds.filter(id => !existing.has(id));
+    const selectOnlyNew = () => {
+        const keep = new Set(newIds);
+        setSelected(keep);
+        setLinkIds(prev => new Set([...prev].filter(id => keep.has(id))));
+    };
+
     const handleImport = async () => {
         const toImport = groups.filter(g => selected.has(g.test_group_id));
         if (!toImport.length) return;
@@ -333,6 +345,13 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                 {selected.size} selected{overwriteCount ? ` · ${overwriteCount} overwrite` : ''}
                                 {targetVehicle && linkIds.size ? ` · linking ${linkIds.size} to ${targetVehicle.name}` : ''}
                             </span>
+                            {existing.size > 0 && (
+                                <button onClick={selectOnlyNew} className="btn btn-secondary text-sm"
+                                    disabled={busy || !newIds.length}
+                                    title="Select only the configurations that are not in the database yet">
+                                    Only new ({newIds.length})
+                                </button>
+                            )}
                             <button onClick={() => setStep('upload')} className="btn btn-secondary text-sm" disabled={busy}>Back</button>
                             <button onClick={handleImport} className="btn btn-primary text-sm" disabled={busy || !selected.size}>
                                 {busy
