@@ -95,3 +95,29 @@ that populates `auth.uid()` for real. Those are Supabase's code, not ours. The
   import. There is no continuous replication and there should not be: that would
   need a standing production credential and would sync the personal data the
   backup script deliberately excludes.
+
+## `fetchEpaCsi.py` — pull EPA Certificate Summary Information PDFs
+
+```
+python3 scripts/fetchEpaCsi.py 2021 2022
+```
+
+Downloads the CSI PDFs the importer reads (Admin → EPA → Import lab PDF) for the
+given model years, into `LocalDev/epa-csi/<year>/<docid>_<testgroup>.pdf`, and
+appends to `LocalDev/epa-csi/manifest.txt`. Standard library only.
+
+It replays the search at <https://dis.epa.gov/otaqpub/publist1.jsp> — document
+type *Certificate Summary Information*, keyword `not listed liter engine`, which
+is how EVs are found — and pages through every result, so it is not held to the
+site's 100-per-page limit. It keeps electric vehicles **including** heavy-duty
+and commercial ones, drops gas and diesel (Bin above 0) and fuel cells, and keeps
+only the **latest filing** per (year, test group, vehicle list), since EPA
+re-files the same certificate as it revises it. Re-running skips files already
+downloaded.
+
+Known-bad documents live in the script's `EXCLUDE` table (a 2022 docid EPA serves
+as an HTML error page, and the Honda Clarity Fuel Cell, whose abstract does not
+say "fuel cell"). Every download is checked for a `%PDF` marker, and one that is
+not is deleted and reported so it can be added there.
+
+The PDFs are EPA's and are not committed; `LocalDev/` is git-ignored.
