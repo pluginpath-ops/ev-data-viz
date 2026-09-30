@@ -39,8 +39,17 @@ function TreeRow({ node, topic, current }) {
     );
 }
 
-/** A small drawing for each hub: a charging curve, or a block of cells. */
+/** A small drawing for each hub: a charging curve, a block of cells, or a drive-cycle trace. */
 export function HubGlyph({ glyph }) {
+    if (glyph === 'cycle') {
+        return (
+            <svg className="explainer-hub-glyph" viewBox="0 0 64 40" aria-hidden="true">
+                <path className="explainer-hub-glyph-axis" d="M6 4 V34 H60" />
+                <path className="explainer-hub-glyph-line"
+                    d="M8 33 L11 22 L14 22 L16 33 L19 33 L22 16 L26 14 L29 33 L32 33 L35 10 L42 8 L47 12 L50 33 L58 33" />
+            </svg>
+        );
+    }
     if (glyph === 'curve') {
         return (
             <svg className="explainer-hub-glyph" viewBox="0 0 64 40" aria-hidden="true">

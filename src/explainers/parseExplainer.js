@@ -20,6 +20,15 @@
  *                            Leading key=value words set options, e.g.
  *                            `::: tests 23,81 x=time y=chargeRate The caption.`
  *                            x/y take Charging Curves' axis keys (previewAxes.js).
+ *   ::: modeled <ids> <text> EVBench's Modeled Efficiency: comma-separated EPA link
+ *                            (mapping) ids, the chart's epa_m=. Draws each curve at
+ *                            standard conditions with its corrected range tests, and
+ *                            links into the chart with them overlaid. `y=` takes the
+ *                            chart's y-axis keys (mi_kwh default, kwh100mi, wh_mi,
+ *                            mpge, range_mi), e.g. `::: modeled 69 y=mi_kwh The caption.`
+ *   ::: image <file> <text>  a picture from images/, the text as its caption and alt
+ *                            text. `source=<url>` credits where it came from, e.g.
+ *                            `::: image epa-hwfet.gif source=https://www.epa.gov/… The highway cycle.`
  *   [^1]: text               a footnote (indented lines continue it)
  *
  * Inline: **bold**, *italic*, `code`, [text](href), [[fact:<id>]] cites the
@@ -28,7 +37,7 @@
  */
 
 const CONTAINERS = new Set(['engineers', 'held']);
-const DIRECTIVES = new Set(['lab', 'figure', 'tests']);
+const DIRECTIVES = new Set(['lab', 'figure', 'tests', 'modeled', 'image']);
 
 export function parseExplainer(source) {
     const lines = source.replace(/\r\n?/g, '\n').split('\n');
@@ -71,8 +80,9 @@ export function parseExplainer(source) {
                 const [id, ...rest] = arg.trim().split(/\s+/);
                 const options = {};
                 while (rest.length && /^[a-z]\w*=\S+$/i.test(rest[0])) {
-                    const [k, v] = rest.shift().split('=');
-                    options[k] = v;
+                    const word = rest.shift();
+                    const at = word.indexOf('=');
+                    options[word.slice(0, at)] = word.slice(at + 1);
                 }
                 top().push({ type: 'directive', name, id, caption: rest.join(' '),
                     ...(Object.keys(options).length && { options }) });

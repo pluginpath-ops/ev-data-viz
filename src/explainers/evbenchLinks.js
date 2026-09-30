@@ -18,3 +18,19 @@ export function chargingTestsHref({ runIds, vehicleIds = [], x = 'soc', y = 'cha
     p.set('y', y);
     return '?' + p.toString();
 }
+
+/**
+ * Modeled Efficiency for some vehicles' EPA links, in the URL shape App.jsx
+ * reads: epa_m= the links, v= their vehicles (the chart draws only selected
+ * vehicles), epa_ya= the y-axis, epa_ov= the real-world overlay, on by default
+ * so the tests the preview shows are there when the chart opens.
+ */
+export function modeledEfficiencyHref({ mappingIds, vehicleIds = [], y = 'mi_kwh', overlay = 'corrected' }) {
+    const p = new URLSearchParams({ tab: 'epatested', m: 'epacurves' });
+    const vehicles = [...new Set(vehicleIds.filter(v => v != null))];
+    if (vehicles.length) p.set('v', vehicles.join(','));
+    p.set('epa_m', mappingIds.join(','));
+    p.set('epa_ya', y);
+    if (overlay) p.set('epa_ov', overlay);
+    return '?' + p.toString();
+}

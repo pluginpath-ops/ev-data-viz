@@ -8,7 +8,10 @@ import { peakOnCharger } from '../peakOnCharger';
 import { TOPICS, FACTS } from '../topics';
 import { PRESET_FACTS } from '../labs/SplitPackLab';
 import { flattenOutline, hubOf } from '../outline';
-import { chargingTestsHref } from '../evbenchLinks';
+import { chargingTestsHref, modeledEfficiencyHref } from '../evbenchLinks';
+import driveCycles from '../data/driveCycles.json';
+import { IMAGES } from '../images';
+import { ROUTE_FACTS, MCT_STEADY_MI, CITY_TO_EMPTY_MI, HWY_TO_EMPTY_MI, STEADY_MPH } from '../labs/TestRoutesLab';
 import { axisPoints, niceScale, PREVIEW_AXES } from '../previewAxes';
 
 describe('parseExplainer', () => {
@@ -36,6 +39,8 @@ and its continuation [[fact:x]], again [[fact:x]] then [[fact:y]].
 ::: lab split-pack
 ::: figure overlay Waiting on data.
 ::: tests 23,81 x=time Two tests.
+::: modeled 69 y=mi_kwh On the curve.
+::: image epa.png source=https://example.gov/a?b=c A caption.
 
 [^1]: *Where it breaks:* a note
 that wraps.
@@ -66,6 +71,9 @@ that wraps.
         expect(doc.blocks[4]).toEqual({ type: 'directive', name: 'lab', id: 'split-pack', caption: '' });
         expect(doc.blocks[5]).toEqual({ type: 'directive', name: 'figure', id: 'overlay', caption: 'Waiting on data.' });
         expect(doc.blocks[6]).toEqual({ type: 'directive', name: 'tests', id: '23,81', caption: 'Two tests.', options: { x: 'time' } });
+        expect(doc.blocks[7]).toEqual({ type: 'directive', name: 'modeled', id: '69', caption: 'On the curve.', options: { y: 'mi_kwh' } });
+        // An option value keeps everything after its first '=', so a URL survives.
+        expect(doc.blocks[8]).toEqual({ type: 'directive', name: 'image', id: 'epa.png', caption: 'A caption.', options: { source: 'https://example.gov/a?b=c' } });
     });
 
     it('collects a footnote with its continuation', () => {
@@ -112,7 +120,8 @@ describe('peakOnCharger', () => {
 
 describe('topics', () => {
     it('reads every content file, and each has a title', () => {
-        expect(TOPICS.map(t => t.slug).sort()).toEqual(['400v-charger-compatibility', '400v-vs-800v']);
+        expect(TOPICS.map(t => t.slug).sort()).toEqual(['400v-charger-compatibility', '400v-vs-800v',
+            'epa-battery-figures', 'epa-drive-cycles', 'epa-test-procedures', 'epa-vs-real-world', 'reading-modeled-efficiency']);
         for (const t of TOPICS) expect(t.title).not.toBe(t.slug);
     });
 
@@ -136,6 +145,7 @@ describe('outline', () => {
     it('finds a topic\'s hub through its ancestors', () => {
         expect(hubOf('400v-charger-compatibility').slug).toBe('pack-architecture');
         expect(hubOf('charging-speed').slug).toBe('charging-speed');
+        expect(hubOf('road-load-and-efficiency').slug).toBe('epa-ratings');
     });
 });
 
@@ -156,6 +166,15 @@ describe('chargingTestsHref', () => {
         expect(chargingTestsHref({ runIds: [23, 81], vehicleIds: [19, 19] }))
             .toBe('?tab=efficiency&r=23%2C81&v=19&x=soc&y=chargeRate');
         expect(chargingTestsHref({ runIds: [45], x: 'time' })).toBe('?tab=efficiency&r=45&x=time&y=chargeRate');
+    });
+});
+
+describe('modeledEfficiencyHref', () => {
+    it('opens the chart on the links, their vehicles and the axis, with the tests overlaid', () => {
+        expect(modeledEfficiencyHref({ mappingIds: [69], vehicleIds: [28, 28] }))
+            .toBe('?tab=epatested&m=epacurves&v=28&epa_m=69&epa_ya=mi_kwh&epa_ov=corrected');
+        expect(modeledEfficiencyHref({ mappingIds: [69, 70], y: 'kwh100mi', overlay: null }))
+            .toBe('?tab=epatested&m=epacurves&epa_m=69%2C70&epa_ya=kwh100mi');
     });
 });
 
@@ -184,5 +203,43 @@ describe('previewAxes', () => {
     it('keys its axes as Charging Curves does', () => {
         const chartView = readFileSync(join(ROOT, 'src', 'components', 'ChargingView.jsx'), 'utf8');
         for (const key of Object.keys(PREVIEW_AXES)) expect(chartView, key).toMatch(new RegExp(`value: '${key}'`));
+    });
+});
+
+describe('drive cycle data', () => {
+    const cycles = Object.fromEntries(driveCycles.cycles.map(c => [c.id, c]));
+    const miles = (mph) => mph.slice(1).reduce((sum, v, s) => sum + (mph[s] + v) / 2 / 3600, 0);
+
+    it('holds one speed per second, and reproduces the ledger\'s distances and averages', () => {
+        const ledger = { udds: 'epa-cycle-udds', hwfet: 'epa-cycle-hwfet', us06: 'epa-cycle-us06', sc03: 'epa-cycle-sc03' };
+        for (const [id, factId] of Object.entries(ledger)) {
+            const fact = FACTS.get(factId);
+            const c = cycles[id];
+            expect(c.mph.length - 1, id).toBe(fact.value.s);
+            expect(miles(c.mph), id).toBeCloseTo(fact.value.mi, 1);
+            expect(Math.max(...c.mph), id).toBeCloseTo(fact.value.top_mph, 0);
+        }
+    });
+});
+
+describe('images', () => {
+    it('places a picture only from images/, and every page names one that exists', () => {
+        for (const t of TOPICS) {
+            const walk = (blocks) => blocks.flatMap(b => [b, ...(b.blocks ? walk(b.blocks) : [])]);
+            for (const b of walk(t.doc.blocks).filter(b => b.type === 'directive' && b.name === 'image')) {
+                expect(IMAGES.has(b.id), `${t.slug} places ${b.id}, which is not in images/`).toBe(true);
+            }
+        }
+    });
+});
+
+describe('Test Routes Lab', () => {
+    it('draws the distances and steady speed the ledger holds', () => {
+        for (const id of ROUTE_FACTS) expect(FACTS.has(id), id).toBe(true);
+        const phases = FACTS.get('evbench-mct-phase-lengths').value;
+        expect(MCT_STEADY_MI).toEqual({ mid: phases.mid_ss_mi_median, end: phases.end_ss_mi_median });
+        const single = FACTS.get('evbench-same-car-to-empty').value;
+        expect([CITY_TO_EMPTY_MI, HWY_TO_EMPTY_MI]).toEqual([single.city_mi_median, single.hwy_mi_median]);
+        expect(STEADY_MPH).toBe(FACTS.get('j1634-css-65mph').value.mph);
     });
 });

@@ -987,11 +987,16 @@ describe('the seams that broke before', () => {
         // And it has to be READ back. The derivation falls back to most-recent
         // when the column is absent, so a query that forgets it silently
         // reinstates the default with nothing to show anything went wrong.
-        for (const marker of ['async getEpaGroupsForAudit', 'async getVehicles']) {
-            const q = svc.slice(svc.indexOf(marker));
-            expect(q.slice(0, q.indexOf('\n  }')), `${marker} must select preferred_test_number`)
-                .toMatch(/preferred_test_number/);
-        }
+        // getVehicles (and the explainers' modeled-efficiency preview) read the
+        // record through EPA_GROUP_FIELDS, so the column is checked there.
+        const q = svc.slice(svc.indexOf('async getEpaGroupsForAudit'));
+        expect(q.slice(0, q.indexOf('\n  }')), 'getEpaGroupsForAudit must select preferred_test_number')
+            .toMatch(/preferred_test_number/);
+        const fields = svc.match(/const EPA_GROUP_FIELDS = '([^']*)'/)?.[1] ?? '';
+        expect(fields, 'EPA_GROUP_FIELDS must select preferred_test_number').toMatch(/preferred_test_number/);
+        const vehiclesQuery = svc.slice(svc.indexOf('async getVehicles'));
+        expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }')), 'getVehicles must read EPA_GROUP_FIELDS')
+            .toMatch(/epa_test_groups\(\$\{EPA_GROUP_FIELDS\}\)/);
         expect(read('src/utils/epaRecordFromGroup.js'),
             'the derivation must honour the selection')
             .toMatch(/preferred_test_number/);
@@ -1183,9 +1188,12 @@ describe('the seams that broke before', () => {
         // Nothing fails loudly when a column is absent from a Supabase select —
         // the field is simply undefined — so this is the only place the two
         // lists can be held together.
+        // The list is EPA_GROUP_FIELDS, which getVehicles reads the record through.
         const svc = read('src/services/DataService.js');
-        const select = svc.slice(svc.indexOf('epa_test_groups('));
-        const columns = select.slice(0, select.indexOf('epa_coefficient_sets'));
+        const fields = svc.match(/const EPA_GROUP_FIELDS = '([^']*)'/)?.[1] ?? '';
+        const columns = fields.slice(0, fields.indexOf('epa_coefficient_sets'));
+        const vehiclesQuery = svc.slice(svc.indexOf('async getVehicles'));
+        expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }'))).toMatch(/epa_test_groups\(\$\{EPA_GROUP_FIELDS\}\)/);
 
         const promo = read('src/utils/feGuidePromotion.js');
         const targets = [...promo.matchAll(/^\s+\w+:\s+'(\w+)',/gm)].map(m => m[1]);

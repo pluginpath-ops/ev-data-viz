@@ -172,6 +172,10 @@ export default function App() {
         // Held here rather than inside EpaCurvesView so they reach the URL and
         // the pop-out, exactly as every other chart's selection does.
         selectedMappings: [], mappingColors: {},
+        // The real-world overlay (null | 'corrected' | 'uncorrected'). Here, not
+        // in the view, so a link can open the chart with its tests showing: an
+        // explainer's modeled-efficiency card links in with epa_ov=corrected.
+        overlay: null,
     });
     const [roadTripConfig, setRoadTripConfig] = useState({
         mode: 'distance', startSoc: 90, minSoc: 10, destinationMinSoc: 10,
@@ -518,6 +522,8 @@ export default function App() {
         const epaSel = p.get('epa_m');
         const epaOverride = {};
         if (epaYa) epaOverride.yAxis = epaYa;
+        const epaOv = p.get('epa_ov');
+        if (epaOv === 'corrected' || epaOv === 'uncorrected') epaOverride.overlay = epaOv;
         if (epaSel) {
             // Mapping ids are numeric; `filter(Boolean)` runs BEFORE the map
             // because Number('') is 0 and 0 is finite, so `epa_m=` alone would
@@ -707,6 +713,7 @@ export default function App() {
             // link was sent to show are whatever BOOTSTRAP happens to pick on
             // the recipient's machine.
             if (epaConfig.selectedMappings?.length) p.set('epa_m', epaConfig.selectedMappings.join(','));
+            if (epaConfig.overlay) p.set('epa_ov', epaConfig.overlay);
         }
 
         // The vehicle table writes its own columns, sort and filters (vt_*);
