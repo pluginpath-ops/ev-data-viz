@@ -174,8 +174,10 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange, 
     const cOv = (f) => (f in edits.coeff) ? 'pending' : primaryRaw?.overrides?.[f]?.source;
 
     const now = () => new Date().toISOString();
-    const audit = (tableName, rowId, field, prior, next) =>
-        logEpaFieldEdit?.({ tableName, rowId, field, priorValue: prior, newValue: next,
+    // testGroupId + rowKey are what the history is read back by (migration 074):
+    // the row id dies when a re-import replaces the row, the group id does not.
+    const audit = (tableName, rowId, field, prior, next, rowKey = null) =>
+        logEpaFieldEdit?.({ tableName, rowId, testGroupId, rowKey, field, priorValue: prior, newValue: next,
             sourceCitation: citation.trim() || null });
 
     // ── Buffered field edits (no DB write until Save) ───────────────────────────
@@ -228,13 +230,33 @@ export default function EpaCuratorEditor({ testGroupId, canEdit, onDirtyChange, 
                     test_group_id: testGroupId, category: base.category || 'City/Highway', is_primary: true,
                     ...cf, overrides,
                 });
-                Object.keys(cf).forEach(f => audit('epa_coefficient_sets', saved?.id ?? primaryRaw?.id, f, base[f], cf[f]));
+                Object.keys(cf).forEach(f => audit('epa_coefficient_sets', saved?.id ?? primaryRaw?.id, f, base[f], cf[f], base.category || 'City/Highway'));
             }
+            // Tests and phases are tagged 'manual' and audited like the group and
+            // coefficient edits. They were not, which left a hand-entered DC
+            // energy indistinguishable from the PDF's own figure — so a
+            // re-import could not know to keep it (utils/epaImportMerge.js).
+            const dbTests = dbGroup.epa_tests || [];
             for (const [id, fields] of Object.entries(edits.tests)) {
-                if (Object.keys(fields).length) await saveEpaTest({ id: Number(id), ...fields });
+                if (!Object.keys(fields).length) continue;
+                const before = dbTests.find(t => t.id === Number(id)) || {};
+                const overrides = { ...(before.overrides || {}) };
+                Object.keys(fields).forEach(f => { overrides[f] = { source: 'manual', at: now() }; });
+                await saveEpaTest({ id: Number(id), ...fields, overrides });
+                Object.keys(fields).forEach(f => audit('epa_tests', id, f, before[f], fields[f], before.test_number ?? null));
             }
             for (const [id, fields] of Object.entries(edits.phases)) {
-                if (Object.keys(fields).length) await saveEpaPhase({ id: Number(id), ...fields });
+                if (!Object.keys(fields).length) continue;
+                const owner = dbTests.find(t => (t.epa_test_phases || []).some(p => p.id === Number(id)));
+                const before = (owner?.epa_test_phases || []).find(p => p.id === Number(id)) || {};
+                const overrides = { ...(before.overrides || {}) };
+                // Only what actually changed is a hand edit; the form re-sends
+                // all three phase fields whenever one of them is touched.
+                const changed = Object.keys(fields).filter(f => String(before[f] ?? '') !== String(fields[f] ?? ''));
+                changed.forEach(f => { overrides[f] = { source: 'manual', at: now() }; });
+                await saveEpaPhase({ id: Number(id), ...fields, overrides });
+                const key = `${owner?.test_number ?? '?'} #${before.phase_index ?? '?'}`;
+                changed.forEach(f => audit('epa_test_phases', id, f, before[f], fields[f], key));
             }
             resetEdits();
             await reload();
