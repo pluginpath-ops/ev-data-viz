@@ -2251,25 +2251,33 @@ class DataService {
     const seen = new Set((existing || []).map(e =>
       `${e.model_year}|${e.division}|${e.carline}|${e.model_type_index}`));
 
-    // Chunked: a full guide year is ~320 rows, and one oversized request that
-    // fails tells you nothing about which row was the problem.
+    // Chunked: a full guide year is ~320 rows. Postgres rejects the statement,
+    // not the row, so a chunk that fails is retried row by row (#218): the good
+    // rows land, and each bad one is reported with the identity to find it in
+    // the source file and the constraint that rejected it. The happy path pays
+    // nothing extra.
+    const onConflict = 'model_year,division,carline,model_type_index';
+    const keyOf = r => `${r.modelYear}|${r.division}|${r.carline}|${r.modelTypeIndex}`;
+    const tally = r => { if (seen.has(keyOf(r))) result.updated++; else result.imported++; };
     const CHUNK = 100;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const slice = rows.slice(i, i + CHUNK);
-      const payload = slice.map(r => feGuidePayload(r, sourceFile));
 
       const { error } = await supabase
         .from('epa_fe_guide')
-        .upsert(payload, { onConflict: 'model_year,division,carline,model_type_index', ignoreDuplicates: false });
+        .upsert(slice.map(r => feGuidePayload(r, sourceFile)), { onConflict, ignoreDuplicates: false });
+      if (!error) { slice.forEach(tally); continue; }
 
-      if (error) {
-        result.failed += slice.length;
-        result.errors.push(`Rows ${i + 1}-${i + slice.length}: ${error.message}`);
-        continue;
-      }
       for (const r of slice) {
-        if (seen.has(`${r.modelYear}|${r.division}|${r.carline}|${r.modelTypeIndex}`)) result.updated++;
-        else result.imported++;
+        const { error: rowErr } = await supabase
+          .from('epa_fe_guide')
+          .upsert([feGuidePayload(r, sourceFile)], { onConflict, ignoreDuplicates: false });
+        if (rowErr) {
+          result.failed++;
+          result.errors.push(`${r.modelYear} ${r.division || '(no division)'} / ${r.carline || '(no carline)'} #${r.modelTypeIndex}: ${rowErr.message}`);
+        } else {
+          tally(r);
+        }
       }
     }
     return result;
