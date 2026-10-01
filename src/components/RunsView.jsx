@@ -9,7 +9,7 @@ import { toPreconditioned, preconditionedFormValue } from '../utils/runPrecondit
 import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
-import { packKwh } from '../utils/specHelpers';
+import { packKwh, vehicleDetailLabel, vehicleSearchText } from '../utils/specHelpers';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
 import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
@@ -36,6 +36,7 @@ import { displayImageUrl } from '../utils/imageRenditions';
 import { isRangeRun, runKindFrom, linkableRuns, linkableCounts } from '../utils/runUtils';
 import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
 import RunCard from './runs/RunCard';
+import VehicleCombobox from './VehicleCombobox';
 import { DATA_FLAGS, RunKindPill, FIELD_META, inferRunFlags } from './runs/runDisplay';
 
 
@@ -2716,16 +2717,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         return (
                             <div className="spec-link-add-form">
                                 <div className="flex gap-2 flex-wrap">
-                                    <select
+                                    <VehicleCombobox
+                                        options={sourceVehicles.map(v => ({ id: v.id, label: vehicleDetailLabel(v), search: vehicleSearchText(v) }))}
                                         value={newLinkSourceId}
-                                        onChange={e => { setNewLinkSourceId(e.target.value); setNewLinkEfficiency(''); setNewLinkCapacity(''); setNewLinkRunIds(null); setNewLinkKind('all'); }}
-                                        className="form-input form-input flex-1 min-w-48"
-                                    >
-                                        <option value="">Source vehicle…</option>
-                                        {sourceVehicles.map(v => (
-                                            <option key={v.id} value={v.id}>{v.name}</option>
-                                        ))}
-                                    </select>
+                                        noneLabel="Source vehicle…"
+                                        onChange={id => { setNewLinkSourceId(id); setNewLinkEfficiency(''); setNewLinkCapacity(''); setNewLinkRunIds(null); setNewLinkKind('all'); }}
+                                    />
                                 </div>
                                 {sourceVehicles.length === 0 && (
                                     <p className="text-xs text-meta mt-1">

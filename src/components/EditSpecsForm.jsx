@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, normalizeCustomKey, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { SpecVouchButton, SpecFieldFlagButton } from './VoteButtons';
-import { vehicleLabel, fallbackSpecs } from '../utils/specHelpers';
+import { vehicleLabel, vehicleDetailLabel, vehicleSearchText, fallbackSpecs } from '../utils/specHelpers';
+import VehicleCombobox from './VehicleCombobox';
 import { chemistrySuggestions } from '../utils/platforms';
 
 /**
@@ -224,8 +225,6 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     const [inheritFromId, setInheritFromId] = useState(
         vehicle.spec_source_vehicle_id ? String(vehicle.spec_source_vehicle_id) : ''
     );
-    const [parentSearch, setParentSearch] = useState('');
-    const [showParentDropdown, setShowParentDropdown] = useState(false);
 
     // Load vouch count for display in footer
     useEffect(() => { loadSpecVouches(vehicle.id); }, [vehicle.id]);
@@ -269,17 +268,6 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     const otherVehicles = (vehicles || [])
         .filter(v => v.id !== vehicle.id && !descendantIds.has(v.id))
         .sort((a, b) => vehicleLabel(a).localeCompare(vehicleLabel(b)));
-
-    // Filtered list for combobox
-    const parentSearchLower = parentSearch.toLowerCase();
-    const filteredParents = parentSearch
-        ? otherVehicles.filter(v => vehicleLabel(v).toLowerCase().includes(parentSearchLower))
-        : otherVehicles;
-
-    // Label for the currently-selected parent (shown in the closed combobox)
-    const selectedParentLabel = inheritFromId
-        ? vehicleLabel(otherVehicles.find(v => String(v.id) === inheritFromId) || {})
-        : '';
 
     const toggleCategory = (key) => {
         setOpenCategories(prev => {
@@ -391,57 +379,11 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                     <div className="mb-4 pb-4 border-b">
                         <div className="flex items-center gap-3">
                             <label className="text-sm font-medium text-secondary whitespace-nowrap">Inherit from:</label>
-                            <div className="relative flex-1">
-                                {showParentDropdown ? (
-                                    <input
-                                        autoFocus
-                                        type="text"
-                                        value={parentSearch}
-                                        onChange={e => setParentSearch(e.target.value)}
-                                        onBlur={() => setTimeout(() => setShowParentDropdown(false), 150)}
-                                        placeholder="Type to filter vehicles…"
-                                        className="form-input form-input w-full"
-                                    />
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => { setParentSearch(''); setShowParentDropdown(true); }}
-                                        className="form-input w-full text-left truncate"
-                                    >
-                                        {selectedParentLabel || <span className="text-meta">— None —</span>}
-                                    </button>
-                                )}
-                                {showParentDropdown && (
-                                    <ul className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border shadow-lg bg-[var(--color-surface-input)] border-[var(--color-border)]">
-                                        <li
-                                            className="px-3 py-2 text-sm cursor-pointer text-meta hover:bg-[var(--color-surface-sunken)]"
-                                            onMouseDown={() => {
-                                                setInheritFromId('');
-                                                setShowParentDropdown(false);
-                                                setParentSearch('');
-                                            }}
-                                        >
-                                            — None —
-                                        </li>
-                                        {filteredParents.map(v => (
-                                            <li
-                                                key={v.id}
-                                                className={`option-row${String(v.id) === inheritFromId ? ' is-selected' : ''}`}
-                                                onMouseDown={() => {
-                                                    setInheritFromId(String(v.id));
-                                                    setShowParentDropdown(false);
-                                                    setParentSearch('');
-                                                }}
-                                            >
-                                                {vehicleLabel(v)}
-                                            </li>
-                                        ))}
-                                        {filteredParents.length === 0 && (
-                                            <li className="px-3 py-2 text-sm text-meta italic">No matches</li>
-                                        )}
-                                    </ul>
-                                )}
-                            </div>
+                            <VehicleCombobox
+                                options={otherVehicles.map(v => ({ id: v.id, label: vehicleDetailLabel(v), search: vehicleSearchText(v) }))}
+                                value={inheritFromId}
+                                onChange={setInheritFromId}
+                            />
                             {inheritFromId && (
                                 <button
                                     type="button"

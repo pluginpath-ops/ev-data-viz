@@ -10,6 +10,35 @@ export function vehicleLabel(v) {
 }
 
 /**
+ * Name · Year · Manufacturer · Model · Trim · Platforms, for telling similar vehicles
+ * apart in a list. A part already contained in an earlier one is dropped, so
+ * a vehicle named "R1S" with model "R1S" does not read "R1S · R1S".
+ */
+export function vehicleDetailLabel(v) {
+    const parts = [];
+    for (const raw of [v?.name, v?.year, v?.manufacturer?.name ?? v?.make, v?.model, v?.trim,
+        v?.platforms?.mechanical?.name, v?.platforms?.electrical?.name]) {
+        const part = raw == null ? '' : String(raw).trim();
+        if (!part) continue;
+        if (parts.some(p => p.toLowerCase().includes(part.toLowerCase()))) continue;
+        parts.push(part);
+    }
+    return parts.join(' · ');
+}
+
+/**
+ * Everything a person might type to find a vehicle: the label plus make,
+ * model, manufacturer, platforms and tags. Lowercased for matching only — never shown.
+ */
+export function vehicleSearchText(v) {
+    return [
+        vehicleLabel(v), v?.make, v?.model, v?.manufacturer?.name,
+        v?.platforms?.mechanical?.name, v?.platforms?.electrical?.name,
+        ...(v?.tags ?? []).map(t => t?.name),
+    ].filter(Boolean).join(' ').toLowerCase();
+}
+
+/**
  * The line under the name on a card's media band: what the car IS, where
  * `vehicleLabel` is what we CALL it.
  *
